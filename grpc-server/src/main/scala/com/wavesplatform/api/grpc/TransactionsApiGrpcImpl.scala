@@ -1,4 +1,5 @@
 package com.wavesplatform.api.grpc
+
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.transaction.Authorized
@@ -25,7 +26,7 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
         case None =>
           if (request.sender.isEmpty) {
             Observable.fromIterable(transactionIds.flatMap(commonApi.transactionById)).map {
-              case (h, e) => h -> e.fold(identity, _._1)
+              case (h, e, s) => (h, e.fold(identity, _._1), s)
             }
           } else {
             val senderAddress = request.sender.toAddress
@@ -42,8 +43,11 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
 
       responseObserver.completeWith(
         stream
-          .filter { case (_, t) => transactionIdSet.isEmpty || transactionIdSet(t.id()) }
-          .map { case (h, tx) => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB)) }
+          .filter { case (_, t, _) => transactionIdSet.isEmpty || transactionIdSet(t.id()) }
+          .map {
+            case (h, tx, false) => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB), ApplicationStatus.SCRIPT_EXECUTION_FAILED)
+            case (h, tx, _)     => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB), ApplicationStatus.SUCCEEDED)
+          }
       )
     }
 
@@ -63,13 +67,16 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
       )
     }
 
-  override def getStateChanges(request: TransactionsRequest, responseObserver: StreamObserver[InvokeScriptResult]): Unit =
+  override def getStateChanges(request: TransactionsRequest, responseObserver: StreamObserver[InvokeScriptResultResponse]): Unit =
     responseObserver.interceptErrors {
       import com.wavesplatform.state.{InvokeScriptResult => VISR}
 
       val result = Observable(request.transactionIds: _*)
         .flatMap(txId => Observable.fromIterable(commonApi.transactionById(txId.toByteStr)))
-        .collect { case (_, Right((_, Some(isr)))) => VISR.toPB(isr) }
+        .collect {
+          case (_, Right((tx, Some(isr))), _) =>
+            InvokeScriptResultResponse.of(Some(PBTransactions.protobuf(tx)), Some(VISR.toPB(isr)))
+        }
 
       responseObserver.completeWith(result)
     }
@@ -81,7 +88,10 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
           .unconfirmedTransactionById(txId)
           .map(_ => TransactionStatus(txId, TransactionStatus.Status.UNCONFIRMED))
           .orElse {
-            commonApi.transactionById(txId).map { case (h, _) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h) }
+            commonApi.transactionById(txId).map {
+              case (h, _, false) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h, ApplicationStatus.SCRIPT_EXECUTION_FAILED)
+              case (h, _, _)     => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h, ApplicationStatus.SUCCEEDED)
+            }
           }
           .getOrElse(TransactionStatus(txId, TransactionStatus.Status.NOT_EXISTS))
       }

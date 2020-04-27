@@ -358,7 +358,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
       ) {
         case (blockDiff, _) =>
           blockDiff.scriptsRun shouldBe 31
-          blockDiff.scriptsComplexity shouldBe (Script.estimate(allAllowed, ScriptEstimatorV2).explicitGet() * 31)
+          blockDiff.scriptsComplexity shouldBe (Script.estimate(allAllowed, ScriptEstimatorV2, useContractVerifierLimit = false).explicitGet() * 31)
       }
     }) { x =>
       x

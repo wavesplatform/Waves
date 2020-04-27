@@ -1,12 +1,12 @@
 package com.wavesplatform.state.diffs.ci
 
 import cats.kernel.Monoid
+import com.google.protobuf.ByteString
 import com.wavesplatform.account._
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.WithState
-import com.wavesplatform.db.DBCacheSettings
+import com.wavesplatform.db.{DBCacheSettings, WithState}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
@@ -27,13 +27,12 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.settings.{TestFunctionalitySettings, TestSettings}
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, produce}
-import com.wavesplatform.state.utils.TestLevelDB
+import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, InvokeScriptTransactionDiff, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError.{InvalidAssetId, TransactionNotAllowedByScript}
+import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
@@ -43,6 +42,7 @@ import com.wavesplatform.transaction.{Asset, _}
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -56,15 +56,25 @@ class InvokeScriptTransactionDiffTest
     with NoShrink
     with Inside
     with WithState
-    with DBCacheSettings {
+    with DBCacheSettings
+    with MockFactory {
 
   private val fs = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
       BlockchainFeatures.SmartAccounts.id  -> 0,
       BlockchainFeatures.SmartAssets.id    -> 0,
       BlockchainFeatures.Ride4DApps.id     -> 0,
+      BlockchainFeatures.FeeSponsorship.id -> 0
+    )
+  )
+
+  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
+    preActivatedFeatures = Map(
+      BlockchainFeatures.SmartAccounts.id  -> 0,
+      BlockchainFeatures.SmartAssets.id    -> 0,
+      BlockchainFeatures.Ride4DApps.id     -> 0,
       BlockchainFeatures.FeeSponsorship.id -> 0,
-      BlockchainFeatures.BlockV5.id        -> 0
+      BlockchainFeatures.BlockV5.id -> 0
     )
   )
 
@@ -197,10 +207,10 @@ class InvokeScriptTransactionDiffTest
         FUNCTION_CALL(
           User(FieldNames.ScriptTransfer),
           List(
-            (recipientAddress match {
-              case  recipientAddress : Address => FUNCTION_CALL(User("Address"), List(CONST_BYTESTR(recipientAddress.bytes).explicitGet()))
-              case  recipientAddress : Alias => FUNCTION_CALL(User("Alias"), List(CONST_STRING(recipientAddress.name).explicitGet()))
-            }),
+            recipientAddress match {
+              case recipientAddress: Address => FUNCTION_CALL(User("Address"), List(CONST_BYTESTR(recipientAddress.bytes).explicitGet()))
+              case recipientAddress: Alias   => FUNCTION_CALL(User("Alias"), List(CONST_STRING(recipientAddress.name).explicitGet()))
+            },
             CONST_LONG(recipientAmount),
             a.fold(REF("unit"): EXPR)(asset => CONST_BYTESTR(asset.id).explicitGet())
           )
@@ -335,6 +345,7 @@ class InvokeScriptTransactionDiffTest
         )
     }
 
+    compiler.ContractCompiler(ctx.compilerContext, expr, stdLibVersion).left.map(println)
     compiler.ContractCompiler(ctx.compilerContext, expr, stdLibVersion).right.get
   }
 
@@ -441,12 +452,8 @@ class InvokeScriptTransactionDiffTest
           master,
           fc,
           payment.toSeq,
-          if (sponsored) sponsoredFee else
-            fee
-          ,
-          if (sponsored) sponsorTx.asset else
-            Waves
-          ,
+          if (sponsored) sponsoredFee else fee,
+          if (sponsored) sponsorTx.asset else Waves,
           ts + 3
         )
         .explicitGet()
@@ -584,10 +591,12 @@ class InvokeScriptTransactionDiffTest
           case (blockDiff, newState) =>
             blockDiff.scriptsRun shouldBe 1
             newState.accountData(genesis(0).recipient, "sender") shouldBe Some(BinaryDataEntry("sender", ci.sender.toAddress.bytes))
-            newState.accountData(genesis(0).recipient, "argument") shouldBe Some(BinaryDataEntry("argument", ci.funcCallOpt.get.args.head.asInstanceOf[CONST_BYTESTR].bs))
+            newState.accountData(genesis(0).recipient, "argument") shouldBe Some(
+              BinaryDataEntry("argument", ci.funcCallOpt.get.args.head.asInstanceOf[CONST_BYTESTR].bs)
+            )
 
             blockDiff.transactions(ci.id())._2.contains(setScript.sender) shouldBe true
-          }
+        }
 
     }
   }
@@ -597,7 +606,7 @@ class InvokeScriptTransactionDiffTest
       r <- preconditionsAndSetContract(s => dataContractGen(s, bigData = true))
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
-        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fsWithV5) {
           _ should produce("WriteSet size can't exceed")
         }
     }
@@ -608,7 +617,7 @@ class InvokeScriptTransactionDiffTest
       r <- preconditionsAndSetContract(s => dataContractGen(s, emptyData = true), txVersion = TxVersion.V1)
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
-        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fsWithV5) {
           _ shouldBe 'right
         }
     }
@@ -617,7 +626,7 @@ class InvokeScriptTransactionDiffTest
       r <- preconditionsAndSetContract(s => dataContractGen(s, emptyData = true), txVersion = TxVersion.V2)
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
-        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fsWithV5) {
           _ should produce("Empty keys aren't allowed")
         }
     }
@@ -671,19 +680,23 @@ class InvokeScriptTransactionDiffTest
 
   property("invoking default func payment to alias contract results in accounts state") {
     forAll(for {
-      ts <- timestampGen
+      ts  <- timestampGen
       fee <- ciFee(0)
-      a  <- accountGen
+      a   <- accountGen
       genesis2: GenesisTransaction = GenesisTransaction.create(a, fee, ts).explicitGet()
-      alias = Alias.create("alias").explicitGet()
+      alias                        = Alias.create("alias").explicitGet()
       aliasTx <- createAliasGen(a, alias, fee, ts)
-      am <- smallFeeGen
+      am      <- smallFeeGen
       contractGen = defaultPaymentContractGen(alias, am) _
       r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), sponsored = false, isCIDefaultFunc = true)
     } yield (a, aliasTx, am, genesis2, r._1, r._2, r._3)) {
       case (acc, aliasTx, amount, genesis2, genesis, setScript, ci) =>
-        val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
-        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(genesis2, setScript, aliasTx))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), features) {
+        val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
+        assertDiffAndState(
+          Seq(TestBlock.create(genesis ++ Seq(genesis2, setScript, aliasTx))),
+          TestBlock.create(Seq(ci), Block.ProtoBlockVersion),
+          features
+        ) {
           case (blockDiff, newState) =>
             newState.balance(acc, Waves) shouldBe amount
         }
@@ -692,23 +705,23 @@ class InvokeScriptTransactionDiffTest
 
   property("payment to alias before feature activation") {
     forAll(for {
-      ts <- timestampGen
+      ts  <- timestampGen
       fee <- ciFee(0)
-      a  <- accountGen
+      a   <- accountGen
       genesis2: GenesisTransaction = GenesisTransaction.create(a, fee, ts).explicitGet()
-      alias = Alias.create("alias").explicitGet()
+      alias                        = Alias.create("alias").explicitGet()
       aliasTx <- createAliasGen(a, alias, fee, ts)
-      am <- smallFeeGen
+      am      <- smallFeeGen
       contractGen = defaultPaymentContractGen(alias, am) _
       r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), sponsored = false, isCIDefaultFunc = true)
     } yield (a, aliasTx, am, genesis2, r._1, r._2, r._3)) {
       case (acc, aliasTx, amount, genesis2, genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(genesis2, setScript, aliasTx))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), fs) {
-          _ shouldBe 'Left
+          err =>
+            err shouldBe 'Left
         }
     }
   }
-
 
   property("suitable verifier error message on incorrect proofs number") {
     forAll(for {
@@ -891,9 +904,9 @@ class InvokeScriptTransactionDiffTest
           blockDiffEi.resultE.right.get.scriptsRun shouldBe 3
           inside(blockDiffEi.trace) {
             case List(
-                AssetVerifierTrace(attachedAssetId, None),
                 InvokeScriptTrace(_, _, Right(ScriptResultV3(_, transfers)), _),
-                AssetVerifierTrace(transferringAssetId, None)
+                AssetVerifierTrace(transferringAssetId, None),
+                AssetVerifierTrace(attachedAssetId, None)
                 ) =>
               attachedAssetId shouldBe attachedAsset.id.value
               transferringAssetId shouldBe transferringAsset.id.value
@@ -933,7 +946,7 @@ class InvokeScriptTransactionDiffTest
         assertDiffEiTraced(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
           blockDiffEi.resultE should produce("TransactionNotAllowedByScript")
           inside(blockDiffEi.trace) {
-            case List(AssetVerifierTrace(assetId, Some(TransactionNotAllowedByScript(_, isAssetScript)))) =>
+            case List(_, AssetVerifierTrace(assetId, Some(TransactionNotAllowedByScript(_, isAssetScript)))) =>
               assetId shouldBe asset.id.value
               isAssetScript shouldBe true
           }
@@ -1057,7 +1070,7 @@ class InvokeScriptTransactionDiffTest
     }
   }
 
-  property("trace contains attached asset script invocation result when transferring asset script produce error") {
+  property("trace not contains attached asset script invocation result when transferring asset script produce error") {
     forAll(for {
       a       <- accountGen
       am      <- smallFeeGen
@@ -1094,7 +1107,7 @@ class InvokeScriptTransactionDiffTest
         paymentContractGen(a, am, List(IssuedAsset(transferringAsset.id()))),
         invokerGen = Gen.oneOf(Seq(invoker)),
         payment = Some(Payment(1, IssuedAsset(attachedAsset.id()))),
-        feeGen = ciFee(1)
+        feeGen = ciFee(2)
       )
     } yield (a, am, r._1, r._2, r._3, transferringAsset, attachedAsset, invoker)) {
       case (acc, amount, genesis, setScript, ci, transferringAsset, attachedAsset, invoker) =>
@@ -1106,10 +1119,10 @@ class InvokeScriptTransactionDiffTest
           blockDiffEi.resultE should produce("TransactionValidationError")
           inside(blockDiffEi.trace) {
             case List(
-                AssetVerifierTrace(attachedAssetId, None),
-                InvokeScriptTrace(_, _, Right(ScriptResultV3(_, transfers)), _)
+                InvokeScriptTrace(_, _, Right(ScriptResultV3(_, transfers)), _),
+                AssetVerifierTrace(transferringAssetId, Some(_))
                 ) =>
-              attachedAssetId shouldBe attachedAsset.id.value
+              transferringAssetId shouldBe transferringAsset.id.value
               transfers.head.assetId.get shouldBe transferringAsset.id.value
           }
         }
@@ -1144,7 +1157,7 @@ class InvokeScriptTransactionDiffTest
             .selfSigned(2.toByte, master, acc, IssuedAsset(asset.id()), asset.quantity / 10, Waves, enoughFee, None, ts)
             .explicitGet()
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(asset, t, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
-          blockDiffEi should produce("NegativeAmount")
+          blockDiffEi should produce("Negative amount")
         }
     }
   }
@@ -1452,7 +1465,7 @@ class InvokeScriptTransactionDiffTest
       )
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
-        val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
+        val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
         assertDiffEi(Seq(TestBlock.create(Seq(genesis.head, setScript))), TestBlock.create(Seq(ci)), features) {
           _ shouldBe 'right
         }
@@ -1474,7 +1487,7 @@ class InvokeScriptTransactionDiffTest
       )
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
-        val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
+        val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
         assertDiffEi(Seq(TestBlock.create(Seq(genesis.head, setScript))), TestBlock.create(Seq(ci)), features) {
           _ should produce("DApp self-payment is forbidden since V4")
         }
@@ -1496,7 +1509,7 @@ class InvokeScriptTransactionDiffTest
       )
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
-        val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
+        val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
         assertDiffEi(Seq(TestBlock.create(Seq(genesis.head, setScript))), TestBlock.create(Seq(ci)), features) {
           _ should produce("DApp self-transfer is forbidden since V4")
         }
@@ -1527,7 +1540,7 @@ class InvokeScriptTransactionDiffTest
     } yield (a, am, r._1, r._2, r._3, asset, master)) {
       case (acc, amount, genesis, setScript, ci, asset, master) =>
         val features = fs.copy(
-          preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0)
+          preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
         )
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(asset, ci), Block.ProtoBlockVersion), features) {
           case (blockDiff, newState) =>
@@ -1555,38 +1568,271 @@ class InvokeScriptTransactionDiffTest
     compileContractFromExpr(expr, V4)
   }
 
-  private val uniqueAssetIdScenario =
+  private def throwContract(funcName: String): DApp = {
+    val expr = {
+      val script =
+        s"""
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-#SCRIPT_TYPE ACCOUNT#-}
+           |
+           |@Callable(i)
+           |func $funcName() = throw("bad news")
+           |""".stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compileContractFromExpr(expr, V4)
+  }
+
+  property("issuing asset with existed id should produce error") {
+    val uniqueAssetIdScenario =
+      for {
+        master  <- accountGen
+        invoker <- accountGen
+        ts      <- timestampGen
+
+        assetTx     <- issueGen
+        fee         <- ciFee(nonNftIssue = 1)
+        funcBinding <- funcNameGen
+        contract = issueContract(funcBinding)
+        script   = ContractScript(V4, contract)
+
+        fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
+        invokeTx = InvokeScriptTransaction
+          .selfSigned(TxVersion.V2, invoker, master, Some(fc), Seq(), fee, Waves, ts + 3)
+          .explicitGet()
+      } yield (assetTx, invokeTx, master, script, funcBinding)
+
+    val blockchain: Blockchain = mock[Blockchain]
+    forAll(uniqueAssetIdScenario) {
+      case (asset, invoke, master, script, funcBinding) =>
+        (blockchain.settings _).expects().returning(TestSettings.Default.blockchainSettings)
+        (blockchain.assetScript _).expects(*).returning(None)
+        (blockchain.accountScript _)
+          .expects(master.toAddress)
+          .returning(Some(AccountScriptInfo(master, script.explicitGet(), 10L, Map(1 -> Map(funcBinding -> 10L)))))
+          .anyNumberOfTimes()
+        (blockchain.accountScript _).expects(invoke.sender.toAddress).returning(None).anyNumberOfTimes()
+        (blockchain.hasAccountScript _).expects(invoke.sender.toAddress).returning(false).anyNumberOfTimes()
+        (blockchain.activatedFeatures _)
+          .expects()
+          .returning(Map(BlockchainFeatures.Ride4DApps.id -> 0))
+          .anyNumberOfTimes()
+        (blockchain.height _).expects().returning(1).anyNumberOfTimes()
+        (blockchain.assetDescription _)
+          .expects(*)
+          .returning(Some(AssetDescription(asset.id(), master, ByteString.EMPTY, ByteString.EMPTY, 1, false, BigInt(1), Height(1), None, 0L, false)))
+        InvokeScriptTransactionDiff
+          .apply(blockchain, invoke.timestamp)(invoke)
+          .resultE should produce("is already issued")
+    }
+  }
+
+  def reissueContract(funcName: String, asset: ByteStr): DApp = {
+    val expr = {
+      val script =
+        s"""
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-#SCRIPT_TYPE ACCOUNT#-}
+           |
+           |@Callable(i)
+           |func $funcName() = [Reissue(base58'$asset', false, 1), Reissue(base58'$asset', true, 4)]
+           |""".stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    compileContractFromExpr(expr, V4)
+  }
+  val reissueAssetIdScenario =
     for {
       master  <- accountGen
       invoker <- accountGen
       ts      <- timestampGen
       genesis1Tx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       genesis2Tx = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
-      assetTx     <- issueGen
+      assetTx     <- issueV2TransactionGen(master, None, reissuableParam = Some(true))
       fee         <- ciFee()
       funcBinding <- funcNameGen
-      contract    = issueContract(funcBinding)
+      contract    = reissueContract(funcBinding, assetTx.id.value)
       script      = ContractScript(V4, contract)
       setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
       fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
       invokeTx = InvokeScriptTransaction
         .selfSigned(TxVersion.V2, invoker, master, Some(fc), Seq(), fee, Waves, ts + 3)
         .explicitGet()
-    } yield (assetTx, invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
+    } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, assetTx, setScriptTx))
 
-  property("issuing asset with existed id should produce error") {
-    import InvokeScriptTransactionDiffTest.LevelDBWriterPredefAsset
-    forAll(uniqueAssetIdScenario) {
-      case (asset, invoke, genesisTxs) =>
+  property("Reissuing unreissued asset should produce error") {
+    forAll(reissueAssetIdScenario) {
+      case (invoke, genesisTxs) =>
         tempDb { db =>
           val features = fs.copy(
-            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0)
+            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
           )
-          val state =
-            new LevelDBWriterPredefAsset(asset, db, ignoreSpendableBalanceChanged, TestLevelDB.createTestBlockchainSettings(features), dbSettings)
 
-          assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), state) { ei =>
-            ei shouldBe Left(TransactionValidationError(InvalidAssetId, invoke))
+          assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
+            ei should produce("Asset is not reissuable")
+          }
+        }
+    }
+  }
+
+  private def transferIssueContract(funcName: String): DApp = {
+    val expr = {
+      val script =
+        s"""
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-#SCRIPT_TYPE ACCOUNT#-}
+           |
+           |@Callable(i)
+           |func $funcName() = {
+           | let v = Issue("InvokeAsset", "InvokeDesc", 100, 0, true, unit, 0)
+           | [v, ScriptTransfer(i.caller, 1, v.calculateAssetId())]
+           |}
+           |""".stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    compileContractFromExpr(expr, V4)
+  }
+
+  private val transferAssetIdScenario =
+    for {
+      master  <- accountGen
+      invoker <- accountGen
+      ts      <- timestampGen
+      genesis1Tx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis2Tx = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
+      fee         <- ciFee(nonNftIssue = 1)
+      funcBinding <- funcNameGen
+      contract    = transferIssueContract(funcBinding)
+      script      = ContractScript(V4, contract)
+      setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
+      fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
+      invokeTx = InvokeScriptTransaction
+        .selfSigned(TxVersion.V2, invoker, master, Some(fc), Seq(), fee, Waves, ts + 3)
+        .explicitGet()
+    } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
+
+  property("issued asset can be transfered") {
+    forAll(transferAssetIdScenario) {
+      case (invoke, genesisTxs) =>
+        tempDb { db =>
+          val features = fs.copy(
+            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
+          )
+
+          assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
+            ei shouldBe 'Right
+          }
+        }
+    }
+  }
+
+  private def transferNonIssueContract(funcName: String): DApp = {
+    val expr = {
+      val script =
+        s"""
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-#SCRIPT_TYPE ACCOUNT#-}
+           |
+           |@Callable(i)
+           |func $funcName() = {
+           | let v = Issue("InvokeAsset", "InvokeDesc", 100, 0, true, unit, 0)
+           | [ScriptTransfer(i.caller, 1, v.calculateAssetId())]
+           |}
+           |""".stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    compileContractFromExpr(expr, V4)
+  }
+
+  private val transferNonAssetIdScenario =
+    for {
+      master  <- accountGen
+      invoker <- accountGen
+      ts      <- timestampGen
+      genesis1Tx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis2Tx = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
+      fee         <- ciFee()
+      funcBinding <- funcNameGen
+      contract    = transferNonIssueContract(funcBinding)
+      script      = ContractScript(V4, contract)
+      setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
+      fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
+      invokeTx = InvokeScriptTransaction
+        .selfSigned(TxVersion.V2, invoker, master, Some(fc), Seq(), fee, Waves, ts + 3)
+        .explicitGet()
+    } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
+
+  property("nonissued asset cann't be transfered") {
+    forAll(transferNonAssetIdScenario) {
+      case (invoke, genesisTxs) =>
+        tempDb { db =>
+          val features = fs.copy(
+            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
+          )
+
+          assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
+            ei should produce("negative asset balance")
+          }
+        }
+    }
+  }
+
+  private def doubleIssueContract(funcName: String): DApp = {
+    val expr = {
+      val script =
+        s"""
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-#SCRIPT_TYPE ACCOUNT#-}
+           |
+           |@Callable(i)
+           |func $funcName() = {
+           | let v = Issue("InvokeAsset", "InvokeDesc", 100, 0, true, unit, 0)
+           | [v, v]
+           |}
+           |""".stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    compileContractFromExpr(expr, V4)
+  }
+
+  private val doubleAssetIdScenario =
+    for {
+      master  <- accountGen
+      invoker <- accountGen
+      ts      <- timestampGen
+      genesis1Tx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis2Tx = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
+      fee         <- ciFee(nonNftIssue = 2)
+      funcBinding <- funcNameGen
+      contract    = doubleIssueContract(funcBinding)
+      script      = ContractScript(V4, contract)
+      setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
+      fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
+      invokeTx = InvokeScriptTransaction
+        .selfSigned(TxVersion.V2, invoker, master, Some(fc), Seq(), fee, Waves, ts + 3)
+        .explicitGet()
+    } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
+
+  property("duplicate issuing asset should produce diff error") {
+    forAll(doubleAssetIdScenario) {
+      case (invoke, genesisTxs) =>
+        tempDb { db =>
+          val features = fs.copy(
+            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
+          )
+          assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
+            inside(ei) {
+              case Right(diff) => diff.scriptResults(invoke.id()).errorMessage.get.text should include("is already issued")
+            }
           }
         }
     }
@@ -1597,7 +1843,7 @@ class InvokeScriptTransactionDiffTest
       (genesis, setScript, invoke, _, issue, sponsorFee) <- preconditionsAndSetContract(s => writeSet(s, 1), sponsored = true, selfSend = true)
     } yield (genesis, setScript, issue, sponsorFee, invoke)) {
       case (genesis, setScript, issue, sponsorFee, invoke) =>
-        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(issue, sponsorFee, setScript))), TestBlock.create(Seq(invoke)), fs) { diff =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(issue, sponsorFee, setScript))), TestBlock.create(Seq(invoke)), fsWithV5) { diff =>
           invoke.feeAssetId shouldBe sponsorFee.asset
           invoke.dAppAddressOrAlias shouldBe invoke.sender.toAddress
 
@@ -1607,23 +1853,97 @@ class InvokeScriptTransactionDiffTest
         }
     }
   }
-}
 
-object InvokeScriptTransactionDiffTest {
-  import com.wavesplatform.database.LevelDBWriter
-  import com.wavesplatform.settings.{BlockchainSettings, DBSettings}
-  import monix.reactive.Observer
-  import org.iq80.leveldb.DB
+  property(s"accepts failed transactions after ${BlockchainFeatures.BlockV5} activation") {
+    def failInvariant(funcBinding: String, sponsorTx: SponsorFeeTransaction, issueTx: IssueTransaction): Gen[(TxAmount, Asset, DApp, List[EXPR])] = {
+      val feeInWaves = FeeConstants(InvokeScriptTransaction.typeId) * FeeValidation.FeeUnit
+      val feeInAsset = Sponsorship.fromWaves(FeeConstants(InvokeScriptTransaction.typeId) * FeeValidation.FeeUnit, sponsorTx.minSponsoredAssetFee.get)
+      Gen.oneOf(
+        Gen.const((feeInWaves, Waves, issueContract(funcBinding), List.empty[EXPR])),           // insufficient fee
+        Gen.const((feeInAsset, sponsorTx.asset, issueContract(funcBinding), List.empty[EXPR])), // insufficient fee
+        Gen.const((feeInWaves, Waves, throwContract(funcBinding), List.empty[EXPR])),           // DApp script execution
+        Gen.const((feeInAsset, sponsorTx.asset, throwContract(funcBinding), List.empty[EXPR])), // DApp script execution
+        for {                                                                                   // smart asset script execution
+          fee             <- ciFee(1)
+          acc             <- accountGen
+          amt             <- Gen.choose(1, issueTx.quantity)
+          arg             <- genBoundedStringBytes(1, 32)
+          paymentContract <- paymentContractGen(acc, amt, List(IssuedAsset(issueTx.assetId)), V4)(funcBinding)
+        } yield (fee, Waves, paymentContract, List(CONST_BYTESTR(ByteStr(arg)).explicitGet()))
+      )
+    }
 
-  private class LevelDBWriterPredefAsset(
-      val asset: IssueTransaction,
-      val db: DB,
-      val spendableBalanceChanged: Observer[(Address, Asset)],
-      override val settings: BlockchainSettings,
-      override val dbSettings: DBSettings
-  ) extends LevelDBWriter(db, spendableBalanceChanged, settings, dbSettings, 10) {
-    import asset._
-    override def assetDescription(ia: IssuedAsset): Option[AssetDescription] =
-      Some(AssetDescription(id(), sender, name, description, decimals, reissuable, quantity, Height(2), script.map(_ -> 1L), 0, false))
+    val failedTxScenario =
+      for {
+        master  <- accountGen
+        other   <- accountGen
+        invoker <- accountGen
+        ts      <- timestampGen
+        g1Tx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+        g2Tx = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
+        g3Tx = GenesisTransaction.create(other, ENOUGH_AMT, ts).explicitGet()
+        (i1Tx, sTx, _, _) <- sponsorFeeCancelSponsorFeeGen(other)
+        i2Tx = IssueTransaction
+          .selfSigned(TxVersion.V2, invoker, "Asset", "", 1000000, 8, false, Some(throwingAsset), enoughFee, ts)
+          .explicitGet()
+        tTx = TransferTransaction
+          .selfSigned(TxVersion.V3, other, invoker.toAddress, sTx.asset, i1Tx.quantity, Waves, enoughFee, None, ts)
+          .explicitGet()
+        funcBinding                     <- funcNameGen
+        (fee, feeAsset, contract, args) <- failInvariant(funcBinding, sTx, i2Tx)
+        script = ContractScript(V4, contract)
+        ssTx   = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
+        fc     = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), args)
+        invokeTx = InvokeScriptTransaction
+          .selfSigned(TxVersion.V2, invoker, master, Some(fc), Seq(), fee, feeAsset, ts + 3)
+          .explicitGet()
+      } yield (invokeTx, (ENOUGH_AMT - enoughFee, i1Tx.quantity), Seq(g1Tx, g2Tx, g3Tx, i1Tx, i2Tx, sTx, tTx, ssTx))
+
+    forAll(failedTxScenario) {
+      case (invoke, (wavesBalance, sponsoredBalance), genesisTxs) =>
+        assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) {
+          case (diff, state) =>
+            diff.scriptsRun shouldBe 0
+            diff.portfolios(invoke.sender.toAddress).balanceOf(invoke.feeAssetId)
+            state.balance(invoke.sender.toAddress, invoke.feeAssetId) shouldBe invoke.feeAssetId.fold(wavesBalance)(_ => sponsoredBalance) - invoke.fee
+            state.transactionInfo(invoke.id()).map(r => r._2 -> r._3) shouldBe Some((invoke, false))
+        }
+    }
+  }
+
+  property(
+    s"rejects withdrawal of fee from the funds received as a result of the script call execution after ${BlockchainFeatures.BlockV5} activation"
+  ) {
+    val scenario =
+      for {
+        master  <- accountGen
+        other   <- accountGen
+        invoker <- accountGen
+        ts      <- timestampGen
+        g1Tx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+        g2Tx = GenesisTransaction.create(other, ENOUGH_AMT, ts).explicitGet()
+        (iTx, sTx, _, _) <- sponsorFeeCancelSponsorFeeGen(other)
+        sponsoredAsset = IssuedAsset(iTx.assetId)
+        tTx            = TransferTransaction.selfSigned(TxVersion.V3, other, master, sponsoredAsset, iTx.quantity / 2, Waves, enoughFee, None, ts).explicitGet()
+        wavesFee <- ciFee(1)
+        sponsoredFee = Sponsorship.fromWaves(wavesFee, sTx.minSponsoredAssetFee.get)
+        (feeAsset, fee) <- Gen.oneOf((Waves, wavesFee), (sponsoredAsset, sponsoredFee))
+        funcBinding     <- funcNameGen
+        arg             <- genBoundedStringBytes(1, 32)
+        contract        <- paymentContractGen(invoker.toAddress, fee, List(feeAsset), V4)(funcBinding)
+        script = ContractScript(V4, contract)
+        ssTx   = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
+        fc     = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet()))
+        invokeTx = InvokeScriptTransaction
+          .selfSigned(TxVersion.V2, invoker, master, Some(fc), Seq(), fee, feeAsset, ts + 3)
+          .explicitGet()
+      } yield (invokeTx, Seq(g1Tx, g2Tx, iTx, sTx, tTx, ssTx))
+
+    forAll(scenario) {
+      case (invoke, genesisTxs) =>
+        assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) { ei =>
+          ei should produce("AccountBalanceError")
+        }
+    }
   }
 }

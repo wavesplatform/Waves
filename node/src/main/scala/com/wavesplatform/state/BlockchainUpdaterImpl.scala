@@ -9,7 +9,7 @@ import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.LevelDBWriter
+import com.wavesplatform.database.Storage
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
@@ -31,7 +31,7 @@ import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
 
 class BlockchainUpdaterImpl(
-    private val leveldb: LevelDBWriter,
+    leveldb: Blockchain with Storage,
     spendableBalanceChanged: Observer[(Address, Asset)],
     wavesSettings: WavesSettings,
     time: Time,
@@ -106,6 +106,7 @@ class BlockchainUpdaterImpl(
         .map { case (feature, votes) => feature -> (if (block.header.featureVotes.contains(feature)) votes + 1 else votes) }
         .filter { case (_, votes) => votes >= blocksForFeatureActivation }
         .keySet
+        .filterNot(settings.functionalitySettings.preActivatedFeatures.contains)
 
       if (approvedFeatures.nonEmpty) log.info(s"${displayFeatures(approvedFeatures)} APPROVED at height $height")
 
@@ -363,20 +364,26 @@ class BlockchainUpdaterImpl(
     log.info(s"Removing blocks after ${blockId.trim} from blockchain")
 
     val prevNgState = ngState
-    val result = if (prevNgState.exists(_.contains(blockId))) {
-      log.trace("Resetting liquid block, no rollback is necessary")
-      blockchainUpdateTriggers.onMicroBlockRollback(blockId, this.height)
-      Right(Seq.empty)
-    } else {
-      val discardedNgBlock = prevNgState.map(ng => (ng.bestLiquidBlock, ng.hitSource)).toSeq
-      ngState = None
-      leveldb
-        .rollbackTo(blockId)
-        .map { bs =>
-          blockchainUpdateTriggers.onRollback(blockId, leveldb.height)
-          bs ++ discardedNgBlock
-        }
-        .leftMap(err => GenericError(err))
+
+    val result = prevNgState match {
+      case Some(ng) if ng.contains(blockId) =>
+        log.trace("Resetting liquid block, no rollback necessary")
+        blockchainUpdateTriggers.onMicroBlockRollback(blockId, this.height)
+        Right(Seq.empty)
+      case Some(ng) if ng.base.id() == blockId =>
+        log.trace("Discarding liquid block, no rollback necessary")
+        blockchainUpdateTriggers.onRollback(blockId, leveldb.height)
+        ngState = None
+        Right(Seq((ng.bestLiquidBlock, ng.hitSource)))
+      case maybeNg =>
+        leveldb
+          .rollbackTo(blockId)
+          .map { bs =>
+            ngState = None
+            blockchainUpdateTriggers.onRollback(blockId, leveldb.height)
+            bs ++ maybeNg.map(ng => (ng.bestLiquidBlock, ng.hitSource)).toSeq
+          }
+          .leftMap(err => GenericError(err))
     }
 
     notifyChangedSpendable(prevNgState, ngState)
@@ -562,7 +569,7 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.transferById(id)
   }
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readLock {
+  override def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)] = readLock {
     compositeBlockchain.transactionInfo(id)
   }
 

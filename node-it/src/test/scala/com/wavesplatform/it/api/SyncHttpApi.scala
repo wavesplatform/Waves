@@ -1,7 +1,6 @@
 package com.wavesplatform.it.api
 
 import java.net.InetSocketAddress
-import java.util.concurrent.TimeoutException
 
 import akka.http.scaladsl.model.StatusCodes.BadRequest
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
@@ -41,6 +40,7 @@ import scala.util._
 import scala.util.control.NonFatal
 
 object SyncHttpApi extends Assertions {
+  case class ApiCallException(cause: Throwable) extends Exception("Error in API call", cause)
   case class ErrorMessage(error: Int, message: String)
   implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
 
@@ -68,7 +68,7 @@ object SyncHttpApi extends Assertions {
   }
 
   def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
-    case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
+    case Failure(ApiCallException(UnexpectedStatusCodeException(_, _, statusCode, responseBody))) =>
       Assertions.assert(
         statusCode == BadRequest.intValue && responseBody.replace("\n", "").matches(s".*$errorRegex.*"),
         s"\nexpected '$errorRegex'\nactual '$responseBody'"
@@ -79,9 +79,12 @@ object SyncHttpApi extends Assertions {
 
   def assertBadRequestAndMessage[R](f: => R, errorMessage: String, expectedStatusCode: Int = BadRequest.intValue): Assertion =
     Try(f) match {
-      case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
-        Assertions.assert(statusCode == expectedStatusCode && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
-      case Failure(e) => Assertions.fail(e)
+      case Failure(ApiCallException(UnexpectedStatusCodeException(_, _, statusCode, responseBody))) =>
+        Assertions.assert(statusCode == expectedStatusCode, s"Status code not match: $statusCode")
+        val message1 = parse(responseBody).as[ErrorMessage].message
+        Assertions.assert(message1.contains(errorMessage), s"Message not match: $message1")
+      case Failure(e) =>
+        Assertions.fail("Unexpected exception", new Exception(e.toString, e))
       case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
     }
 
@@ -111,7 +114,7 @@ object SyncHttpApi extends Assertions {
 
   def assertApiError[R](f: => R, expectedError: ApiError): Assertion =
     Try(f) match {
-      case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
+      case Failure(ApiCallException(UnexpectedStatusCodeException(_, _, statusCode, responseBody))) =>
         import play.api.libs.json._
         parse(responseBody).validate[JsObject] match {
           case JsSuccess(json, _) => (json - "trace") shouldBe expectedError.json
@@ -124,7 +127,7 @@ object SyncHttpApi extends Assertions {
 
   def assertApiError[R](f: => R)(check: GenericApiError => Assertion): Assertion =
     Try(f) match {
-      case Failure(UnexpectedStatusCodeException(_, _, code, responseBody)) =>
+      case Failure(ApiCallException(UnexpectedStatusCodeException(_, _, code, responseBody))) =>
         parse(responseBody).validate[GenericApiError] match {
           case JsSuccess(error, _) => check(error.copy(statusCode = code))
           case JsError(errors)     => Assertions.fail(errors.map { case (_, es) => es.mkString("(", ",", ")") }.mkString(","))
@@ -138,9 +141,7 @@ object SyncHttpApi extends Assertions {
   def sync[A](awaitable: Awaitable[A], atMost: Duration = RequestAwaitTime): A =
     try Await.result(awaitable, atMost)
     catch {
-      case usce: UnexpectedStatusCodeException => throw usce
-      case te: TimeoutException                => throw te
-      case NonFatal(cause)                     => throw new Exception(cause)
+      case NonFatal(cause) => throw ApiCallException(cause)
     }
 
   //noinspection ScalaStyle
@@ -309,12 +310,12 @@ object SyncHttpApi extends Assertions {
     ): Transaction =
       maybeWaitForTransaction(sync(async(n).reissue(sourceAddress, assetId, quantity, reissuable, fee, version)), waitForTx)
 
-    def debugStateChanges(transactionId: String): DebugStateChanges = {
-      sync(async(n).debugStateChanges(transactionId))
+    def debugStateChanges(transactionId: String, amountsAsStrings: Boolean = false): DebugStateChanges = {
+      sync(async(n).debugStateChanges(transactionId, amountsAsStrings))
     }
 
-    def debugStateChangesByAddress(address: String, limit: Int): Seq[DebugStateChanges] = {
-      sync(async(n).debugStateChangesByAddress(address, limit))
+    def debugStateChangesByAddress(address: String, limit: Int, after: Option[String] = None): Seq[DebugStateChanges] = {
+      sync(async(n).debugStateChangesByAddress(address, limit, after))
     }
 
     def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Transaction =
@@ -337,6 +338,9 @@ object SyncHttpApi extends Assertions {
 
     def scriptDecompile(code: String): DecompiledScript =
       sync(async(n).scriptDecompile(code))
+
+    def scriptEstimate(code: String): EstimatedScript =
+      sync(async(n).scriptEstimate(code))
 
     def getAddresses: Seq[String] = sync(async(n).getAddresses)
 
@@ -420,9 +424,9 @@ object SyncHttpApi extends Assertions {
         version: Byte = 2,
         matcherFeeAssetId: Option[String] = None,
         waitForTx: Boolean = false,
-        amountsAsStrings: Boolean = false
-    ,
-        validate: Boolean = true): Transaction = {
+        amountsAsStrings: Boolean = false,
+        validate: Boolean = true
+    ): Transaction = {
       maybeWaitForTransaction(
         sync(
           async(n).broadcastExchange(
@@ -436,8 +440,7 @@ object SyncHttpApi extends Assertions {
             fee,
             version,
             matcherFeeAssetId,
-            amountsAsStrings
-          ,
+            amountsAsStrings,
             validate
           )
         ),
@@ -604,8 +607,8 @@ object SyncHttpApi extends Assertions {
     def rawTransactionInfo(txId: String): JsValue =
       sync(async(n).rawTransactionInfo(txId))
 
-    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): TransactionInfo =
-      sync(async(n).waitForTransaction(txId), 2.minutes)
+    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second, timeout: FiniteDuration = 2.minutes): TransactionInfo =
+      sync(async(n).waitForTransaction(txId), timeout)
 
     def signAndBroadcast(tx: JsValue, waitForTx: Boolean = false): Transaction = {
       maybeWaitForTransaction(sync(async(n).signAndBroadcast(tx)), waitForTx)
@@ -717,6 +720,19 @@ object SyncHttpApi extends Assertions {
       sync(async(n).invokeScript(caller, dappAddress, func, args, payment, fee, feeAssetId, version)) match {
         case (tx, js) => maybeWaitForTransaction(tx, waitForTx) -> js
       }
+    }
+
+    def validateInvokeScript(
+        caller: String,
+        dappAddress: String,
+        func: Option[String] = None,
+        args: List[Terms.EXPR] = List.empty,
+        payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
+        fee: Long = smartMinFee,
+        feeAssetId: Option[String] = None,
+        version: TxVersion = TxVersion.V1
+    ): (JsValue, JsValue) = {
+      sync(async(n).validateInvokeScript(caller, dappAddress, func, args, payment, fee, feeAssetId, version))
     }
 
     def updateAssetInfo(

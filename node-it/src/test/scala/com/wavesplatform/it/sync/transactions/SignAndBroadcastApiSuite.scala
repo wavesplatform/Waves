@@ -103,7 +103,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
     val timestamp = System.currentTimeMillis
     val jsonV1 = Json.obj(
       "type"            -> CreateAliasTransaction.typeId,
-      "senderPublicKey" -> "8LbAU5BSrGkpk5wbjLMNjrbc9VzN9KBBYv9X8wGpmAJT",
+      "senderPublicKey" -> sender.publicKey.toString,
       "alias"           -> "alias",
       "fee"             -> 100000,
       "timestamp"       -> timestamp,
@@ -115,7 +115,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
     val jsonV2 = Json.obj(
       "type"            -> CreateAliasTransaction.typeId,
       "version"         -> 2,
-      "senderPublicKey" -> "8LbAU5BSrGkpk5wbjLMNjrbc9VzN9KBBYv9X8wGpmAJT",
+      "senderPublicKey" -> sender.publicKey.toString,
       "alias"           -> "alias",
       "fee"             -> 100000,
       "timestamp"       -> timestamp,

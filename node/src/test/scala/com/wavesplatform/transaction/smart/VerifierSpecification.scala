@@ -31,7 +31,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
       Seq(tx.buyOrder.assetPair.amountAsset, tx.buyOrder.assetPair.priceAsset)
         .collect { case asset: IssuedAsset => asset }
         .foreach { asset =>
-          (bc.assetDescription _).when(asset).returns(mkAssetDescription(asset.id, tx.sender, 8))
+          (bc.assetDescription _).when(asset).returns(mkAssetDescription(asset.id, tx.sender, 8, None))
           (bc.assetScript _).when(asset).returns(None)
           (bc.activatedFeatures _).when().returns(Map())
         }
@@ -49,7 +49,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
 
       (bc.height _).when().returns(0)
 
-      Verifier(bc)(tx).resultE shouldBe 'right
+      Verifier(bc)(tx).flatMap(tx => Verifier.assets(bc)(tx)).resultE shouldBe 'right
     }
   }
 
@@ -64,8 +64,8 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
     }
   }
 
-  private def mkAssetDescription(assetId: ByteStr, matcherAccount: PublicKey, decimals: Int): Option[AssetDescription] =
-    Some(AssetDescription(assetId, matcherAccount, ByteString.EMPTY, ByteString.EMPTY, decimals, reissuable = false, BigInt(0), Height(0), None, 0, decimals == 0))
+  private def mkAssetDescription(assetId: ByteStr, matcherAccount: PublicKey, decimals: Int, scriptOption: Option[(Script, Long)]): Option[AssetDescription] =
+    Some(AssetDescription(assetId, matcherAccount, ByteString.EMPTY, ByteString.EMPTY, decimals, reissuable = false, BigInt(0), Height(0), scriptOption, 0, decimals == 0))
 
   private val exchangeTransactionV2Gen: Gen[ExchangeTransaction] = for {
     sender1: KeyPair <- accountGen
@@ -88,7 +88,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
 
     def prepareAssets(assetsAndScripts: (Asset, Option[(Script, Long)])*): Unit = assetsAndScripts foreach {
       case (asset: IssuedAsset, scriptOption) =>
-        (blockchain.assetDescription _).when(asset).returns(mkAssetDescription(asset.id, tx.sender, 8))
+        (blockchain.assetDescription _).when(asset).returns(mkAssetDescription(asset.id, tx.sender, 8, scriptOption))
         (blockchain.assetScript _).when(asset).returns(scriptOption)
       case _ =>
     }
@@ -106,6 +106,6 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
 
     (blockchain.height _).when().returns(0)
 
-    Verifier(blockchain)(tx).resultE
+    Verifier(blockchain)(tx).flatMap(tx => Verifier.assets(blockchain)(tx)).resultE
   }
 }

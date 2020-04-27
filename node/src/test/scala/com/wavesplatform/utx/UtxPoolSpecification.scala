@@ -10,8 +10,9 @@ import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.{PoSSelector, TransactionsOrdering}
-import com.wavesplatform.database.{LevelDBWriter, openDB}
+import com.wavesplatform.database.{LevelDBWriter, TestStorageFactory, openDB}
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.history.randomSig
@@ -30,7 +31,7 @@ import com.wavesplatform.state.appender.{ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxValidationError.SenderIsBlacklisted
+import com.wavesplatform.transaction.TxValidationError.{GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -49,6 +50,7 @@ import org.scalatest.concurrent.PatienceConfiguration.{Interval, Timeout}
 import org.scalatest.{FreeSpec, Matchers, PrivateMethodTester}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 
 private object UtxPoolSpecification {
@@ -57,7 +59,7 @@ private object UtxPoolSpecification {
   final case class TempDB(fs: FunctionalitySettings, dbSettings: DBSettings) {
     val path: Path            = Files.createTempDirectory("leveldb-test")
     val db: DB                = openDB(path.toAbsolutePath.toString)
-    val writer: LevelDBWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs, dbSettings)
+    val writer: LevelDBWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs)
 
     sys.addShutdownHook {
       db.close()
@@ -103,8 +105,7 @@ class UtxPoolSpecification
     )
 
     val dbContext = TempDB(settings.blockchainSettings.functionalitySettings, settings.dbSettings)
-    val levelDBWriter = new LevelDBWriter(dbContext.db, ignoreSpendableBalanceChanged, settings.blockchainSettings, settings.dbSettings, 100000000L)
-    val bcu = new BlockchainUpdaterImpl(levelDBWriter, ignoreSpendableBalanceChanged, settings, new TestTime(), ignoreBlockchainUpdateTriggers)
+    val (bcu, levelDBWriter) = TestStorageFactory(settings, dbContext.db, new TestTime, ignoreSpendableBalanceChanged, ignoreBlockchainUpdateTriggers)
     bcu.processBlock(Block.genesis(genesisSettings).explicitGet()).explicitGet()
     bcu
   }
@@ -334,23 +335,22 @@ class UtxPoolSpecification
 
   private val script: Script = ExprScript(expr).explicitGet()
 
-  private def preconditionsGen(lastBlockId: ByteStr, master: KeyPair): Gen[Seq[Block]] =
-    for {
-      ts <- timestampGen
-    } yield {
-      val setScript = SetScriptTransaction.selfSigned(1.toByte, master, Some(script), 100000, ts + 1).explicitGet()
-      Seq(TestBlock.create(ts + 1, lastBlockId, Seq(setScript)))
-    }
+  private def preconditionBlocks(lastBlockId: ByteStr, master: KeyPair, time: Time): Seq[Block] = {
+    val ts        = time.getTimestamp()
+    val setScript = SetScriptTransaction.selfSigned(1.toByte, master, Some(script), 100000, ts + 1).explicitGet()
+    Seq(TestBlock.create(ts + 1, lastBlockId, Seq(setScript)))
+  }
 
   private def withScriptedAccount(scEnabled: Boolean): Gen[(KeyPair, Long, UtxPoolImpl, Long)] =
     for {
       (sender, senderBalance, bcu) <- stateGen
-      preconditions                <- preconditionsGen(bcu.lastBlockId.get, sender)
+      time          = new TestTime()
+      preconditions = preconditionBlocks(bcu.lastBlockId.get, sender, time)
     } yield {
       // val smartAccountsFs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0))
       preconditions.foreach(b => bcu.processBlock(b).explicitGet())
       val utx = new UtxPoolImpl(
-        new TestTime(),
+        time,
         bcu,
         ignoreSpendableBalanceChanged,
         UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = scEnabled, allowSkipChecks = false),
@@ -637,7 +637,7 @@ class UtxPoolSpecification
               }
             val settings =
               UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
-            val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings, () => nanoTimeSource(), true)
+            val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings, true, nanoTimeSource = () => nanoTimeSource())
 
             utxPool.putIfNew(transfer).resultE.explicitGet()
             val (tx, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, 100.nanos)
@@ -831,14 +831,15 @@ class UtxPoolSpecification
         acc  <- accountGen
         acc1 <- accountGen
         tx1  <- transferV2WithRecipient(acc, acc1, ENOUGH_AMT / 3, ntpTime).suchThat(_.amount > 20000000L)
-        tx2  <- transferV2(acc1, 10000000L, ntpTime)
+        tx2  <- transferV2(acc1, tx1.amount / 2, ntpTime)
       } yield (tx1, tx2)
 
       "takes into account priority txs when pack" in forAll(genDependent) {
         case (tx1, tx2) =>
           val blockchain = createState(tx1.sender, setBalance = false)
           (blockchain.balance _).when(tx1.sender.toAddress, *).returning(ENOUGH_AMT)
-          (blockchain.balance _).when(tx2.sender.toAddress, *).returning(0) // Should be overriden in composite blockchain
+          (blockchain.balance _).when(tx2.sender.toAddress, *).returning(ENOUGH_AMT).noMoreThanOnce() // initial validation
+          (blockchain.balance _).when(tx2.sender.toAddress, *).returning(0)                           // Should be overriden in composite blockchain
 
           val utx =
             new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, enablePriorityPool = true)
@@ -935,6 +936,77 @@ class UtxPoolSpecification
             val expectedTxs2 = mbs1.flatMap(_.transactionData) ++ mbs2.head.transactionData ++ block3.transactionData
             utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(expectedTxs2)
           }
+      }
+    }
+
+    "event stream" - {
+      "fires events correctly" in {
+        val preconditions = for {
+          richAcc   <- accountGen
+          secondAcc <- accountGen
+          ts = System.currentTimeMillis()
+          fee <- smallFeeGen
+          genesis         = GenesisTransaction.create(richAcc, ENOUGH_AMT, ts).explicitGet()
+          validTransfer   = TransferTransaction.selfSigned(TxVersion.V1, richAcc, secondAcc, Waves, 1, Waves, fee, None, ts).explicitGet()
+          invalidTransfer = TransferTransaction.selfSigned(TxVersion.V1, secondAcc, richAcc, Waves, 2, Waves, fee, None, ts).explicitGet()
+        } yield (genesis, validTransfer, invalidTransfer)
+
+        forAll(preconditions) {
+          case (genesis, validTransfer, invalidTransfer) =>
+            withDomain() { d =>
+              d.appendBlock(TestBlock.create(Seq(genesis)))
+              val time   = new TestTime()
+              val events = new ListBuffer[UtxEvent]
+              val utxPool = new UtxPoolImpl(
+                time,
+                d.blockchainUpdater,
+                ignoreSpendableBalanceChanged,
+                WavesSettings.default().utxSettings,
+                enablePriorityPool = true,
+                events += _
+              )
+
+              def assertEvents(f: Seq[UtxEvent] => Unit): Unit = {
+                val currentEvents = events.toVector
+                f(currentEvents)
+                events.clear()
+              }
+
+              def addUnverified(tx: Transaction): Unit = {
+                val addTransaction = PrivateMethod[TracedResult[ValidationError, Boolean]]('addTransaction)
+                utxPool invokePrivate addTransaction(tx, false, false)
+              }
+
+              val differ = TransactionDiffer(d.blockchainUpdater.lastBlockTimestamp, System.currentTimeMillis(), verify = false)(
+                d.blockchainUpdater,
+                _: Transaction
+              ).resultE.explicitGet()
+              val validTransferDiff   = differ(validTransfer)
+              addUnverified(validTransfer)
+              addUnverified(invalidTransfer)
+              assertEvents {
+                case UtxEvent.TxAdded(`validTransfer`, `validTransferDiff`) +: Nil => // Pass
+              }
+
+              utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)
+              assertEvents {
+                case UtxEvent.TxRemoved(`invalidTransfer`, Some(_)) +: Nil => // Pass
+              }
+
+              utxPool.removeAll(Seq(validTransfer))
+              assertEvents {
+                case UtxEvent.TxRemoved(`validTransfer`, None) +: Nil => // Pass
+              }
+
+              addUnverified(validTransfer)
+              events.clear()
+              time.advance(maxAge + 1000.millis)
+              utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)
+              assertEvents {
+                case UtxEvent.TxRemoved(`validTransfer`, Some(GenericError("Expired"))) +: Nil => // Pass
+              }
+            }
+        }
       }
     }
   }

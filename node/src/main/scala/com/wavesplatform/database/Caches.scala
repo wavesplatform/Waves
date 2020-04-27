@@ -16,14 +16,14 @@ import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, Transaction}
-import com.wavesplatform.utils.{ObservedLoadingCache, ScorexLogging}
+import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
 
-abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) extends Blockchain with ScorexLogging {
+abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) extends Blockchain with Storage {
   import Caches._
 
   val dbSettings: DBSettings
@@ -40,7 +40,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def score: BigInt = current._2
 
   protected def loadLastBlock(): Option[Block]
-  def lastBlock: Option[Block] = current._3
+  override def lastBlock: Option[Block] = current._3
 
   def loadScoreOf(blockId: ByteStr): Option[BigInt]
 
@@ -170,17 +170,20 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       totalFee: Long,
       reward: Option[Long],
       hitSource: ByteStr,
-      scriptResults: Map[ByteStr, InvokeScriptResult]
+      scriptResults: Map[ByteStr, InvokeScriptResult],
+      failedTransactionIds: Set[ByteStr]
   ): Unit
 
-  def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], htiSource: ByteStr, block: Block): Unit = {
+  override def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], hitSource: ByteStr, block: Block): Unit = {
     val newHeight = current._1 + 1
 
     val newAddresses = Set.newBuilder[Address]
     newAddresses ++= diff.portfolios.keys.filter(addressIdCache.get(_).isEmpty)
-    for ((_, addresses) <- diff.transactions.values; address <- addresses if addressIdCache.get(address).isEmpty) {
+    for ((_, addresses, _) <- diff.transactions.values; address <- addresses if addressIdCache.get(address).isEmpty) {
       newAddresses += address
     }
+
+    val failedTransactionIds: Set[ByteStr] = diff.transactions.collect { case (id, (_, _, false)) => id }.toSet
 
     val newAddressIds = (for {
       (address, offset) <- newAddresses.result().zipWithIndex
@@ -199,14 +202,14 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     val transactionList = diff.transactions.toList
 
     transactionList.foreach {
-      case (_, (tx, _)) =>
+      case (_, (tx, _, _)) =>
         transactionIds.put(tx.id(), newHeight)
     }
 
     val addressTransactions: Map[AddressId, Seq[TransactionId]] =
       transactionList
         .flatMap {
-          case (_, (tx, addrs)) =>
+          case (_, (tx, addrs, _)) =>
             transactionIds.put(tx.id(), newHeight) // be careful here!
 
             addrs.map { addr =>
@@ -238,8 +241,9 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       diff.sponsorship,
       totalFee,
       reward,
-      htiSource,
-      diff.scriptResults
+      hitSource,
+      diff.scriptResults,
+      failedTransactionIds
     )
 
     val emptyData = Map.empty[(Address, String), Option[DataEntry[_]]]
@@ -276,7 +280,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   protected def doRollback(targetBlockId: ByteStr): Seq[(Block, ByteStr)]
 
-  def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[(Block, ByteStr)]] = {
+  override def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[(Block, ByteStr)]] = {
     for {
       height <- heightOf(targetBlockId)
         .toRight(s"No block with signature: $targetBlockId found in blockchain")

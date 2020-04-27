@@ -24,7 +24,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.database.{DBExt, Keys, openDB}
-import com.wavesplatform.events.{BlockchainUpdateTriggersImpl, BlockchainUpdated}
+import com.wavesplatform.events.{BlockchainUpdateTriggersImpl, BlockchainUpdated, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.api.ActivationApiRoute
@@ -103,6 +103,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val blockchainUpdatesScheduler = singleThread("blockchain-updates", reporter = log.error("Error on sending blockchain updates", _))
   private val blockchainUpdated          = ConcurrentSubject.publish[BlockchainUpdated](scheduler)
+  private val utxEvents                  = ConcurrentSubject.publish[UtxEvent](scheduler)
   private val blockchainUpdateTriggers   = new BlockchainUpdateTriggersImpl(blockchainUpdated)
 
   private val (blockchainUpdater, levelDB) = StorageFactory(settings, db, time, spendableBalanceChanged, blockchainUpdateTriggers)
@@ -131,7 +132,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val utxStorage =
-      new UtxPoolImpl(time, blockchainUpdater, spendableBalanceChanged, settings.utxSettings, enablePriorityPool = settings.minerSettings.enable)
+      new UtxPoolImpl(
+        time,
+        blockchainUpdater,
+        spendableBalanceChanged,
+        settings.utxSettings,
+        enablePriorityPool = settings.minerSettings.enable,
+        utxEvents.onNext
+      )
     maybeUtx = Some(utxStorage)
 
     val timer                 = new HashedWheelTimer()
@@ -222,6 +230,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] = utxSynchronizer.publish(tx)
       override def spendableBalanceChanged: Observable[(Address, Asset)]                         = app.spendableBalanceChanged
       override def actorSystem: ActorSystem                                                      = app.actorSystem
+      override def utxEvents: Observable[UtxEvent]                                               = app.utxEvents
       override def blockchainUpdated: Observable[BlockchainUpdated]                              = app.blockchainUpdated
 
       override val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
@@ -233,9 +242,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         utxSynchronizer.publish,
         loadBlockAt
       )
-      override val blocksApi: CommonBlocksApi             = CommonBlocksApi(blockchainUpdater, loadBlockMetaAt, loadBlockAt)
-      override val accountsApi: CommonAccountsApi         = CommonAccountsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
-      override val assetsApi: CommonAssetsApi             = CommonAssetsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
+      override val blocksApi: CommonBlocksApi     = CommonBlocksApi(blockchainUpdater, loadBlockMetaAt, loadBlockAt)
+      override val accountsApi: CommonAccountsApi = CommonAccountsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
+      override val assetsApi: CommonAssetsApi     = CommonAssetsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
     }
 
     extensions = settings.extensions.map { extensionClassName =>
@@ -344,7 +353,15 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
         BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi),
-        TransactionsApiRoute(settings.restAPISettings, extensionContext.transactionsApi, wallet, blockchainUpdater, () => utxStorage.size, utxSynchronizer, time),
+        TransactionsApiRoute(
+          settings.restAPISettings,
+          extensionContext.transactionsApi,
+          wallet,
+          blockchainUpdater,
+          () => utxStorage.size,
+          utxSynchronizer,
+          time
+        ),
         NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater),
         WalletApiRoute(settings.restAPISettings, wallet),
         UtilsApiRoute(time, settings.restAPISettings, blockchainUpdater.estimator, limitedScheduler),
@@ -370,7 +387,15 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           configRoot,
           loadBalanceHistory
         ),
-        AssetsApiRoute(settings.restAPISettings, wallet, utxSynchronizer, blockchainUpdater, time, extensionContext.accountsApi, extensionContext.assetsApi),
+        AssetsApiRoute(
+          settings.restAPISettings,
+          wallet,
+          utxSynchronizer,
+          blockchainUpdater,
+          time,
+          extensionContext.accountsApi,
+          extensionContext.assetsApi
+        ),
         ActivationApiRoute(settings.restAPISettings, settings.featuresSettings, blockchainUpdater),
         LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time, extensionContext.accountsApi),
         AliasApiRoute(settings.restAPISettings, extensionContext.transactionsApi, wallet, utxSynchronizer, time, blockchainUpdater),
@@ -430,10 +455,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       shutdownAndWait(microblockSynchronizerScheduler, "MicroblockSynchronizer")
       shutdownAndWait(scoreObserverScheduler, "ScoreObserver")
       shutdownAndWait(extensionLoaderScheduler, "ExtensionLoader")
+
+      appenderScheduler.execute(() => levelDB.close())
+
       shutdownAndWait(appenderScheduler, "Appender", 5.minutes.some, tryForce = false)
 
       log.info("Closing storage")
-      levelDB.close()
       db.close()
 
       time.close()

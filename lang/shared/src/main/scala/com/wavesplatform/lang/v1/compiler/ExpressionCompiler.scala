@@ -48,6 +48,18 @@ object ExpressionCompiler {
     }
   }
 
+
+  def compileUntyped(input: String, ctx: CompilerContext): Either[String, EXPR] = {
+    Parser.parseExpr(input) match {
+      case fastparse.core.Parsed.Success(xs, _) =>
+        ExpressionCompiler(ctx, xs) match {
+          case Left(err)              => Left(err.toString)
+          case Right((expr, _)) => Right(expr)
+        }
+      case f @ fastparse.core.Parsed.Failure(_, _, _) => Left(f.toString)
+    }
+  }
+
   def compileWithParseResult(
       input: String,
       ctx: CompilerContext,

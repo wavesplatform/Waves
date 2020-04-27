@@ -4,14 +4,11 @@ import java.nio.ByteBuffer
 
 import com.google.common.io.ByteStreams.newDataOutput
 import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
-import com.google.protobuf.ByteString
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.Block.{NgBlockVersion, ProtoBlockVersion, RewardBlockVersion}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.SignatureLength
-import com.wavesplatform.protobuf.block.PBBlock
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.serialization.ByteBufferOps
@@ -24,19 +21,7 @@ import scala.util.Try
 object BlockHeaderSerializer {
   def toBytes(header: BlockHeader): Array[Byte] =
     if (header.version >= Block.ProtoBlockVersion) {
-      PBBlock.Header.toByteArray(
-        PBBlock.Header(
-          AddressScheme.current.chainId,
-          ByteString.copyFrom(header.reference.arr),
-          header.baseTarget,
-          ByteString.copyFrom(header.generationSignature),
-          header.featureVotes.map(_.toInt).sorted,
-          header.timestamp,
-          header.version,
-          ByteString.copyFrom(header.generator.arr),
-          header.rewardVote
-        )
-      )
+      PBUtils.encodeDeterministic(PBBlocks.protobuf(header))
     } else {
       val ndo = newDataOutput()
 

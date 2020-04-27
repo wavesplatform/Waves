@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs
 
 import cats._
-import cats.implicits._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.OverdraftValidationProvider._
@@ -23,7 +22,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 
-import scala.util.{Left, Right, Try}
+import scala.util.{Left, Right}
 
 object CommonValidation {
 
@@ -135,7 +134,7 @@ object CommonValidation {
     def scriptActivation(sc: Script): Either[ActivationError, T] = {
 
       val v3Activation = activationBarrier(BlockchainFeatures.Ride4DApps)
-      val v4Activation = activationBarrier(BlockchainFeatures.MultiPaymentInvokeScript)
+      val v4Activation = activationBarrier(BlockchainFeatures.BlockV5)
 
       def scriptVersionActivation(sc: Script): Either[ActivationError, T] = sc.stdLibVersion match {
         case V1 | V2 | V3 if sc.containsArray    => v4Activation
@@ -260,12 +259,4 @@ object CommonValidation {
         )
       case _ => Right(tx)
     }
-
-  def validateOverflow(dataList: Traversable[Long], errMsg: String): Either[ValidationError, Unit] = {
-    Try(dataList.foldLeft(0L)(Math.addExact))
-      .fold(
-        _ => GenericError(errMsg).asLeft[Unit],
-        _ => ().asRight[ValidationError]
-      )
-  }
 }

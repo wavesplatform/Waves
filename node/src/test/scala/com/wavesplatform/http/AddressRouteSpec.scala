@@ -48,12 +48,22 @@ class AddressRouteSpec
   private val commonAccountApi = mock[CommonAccountsApi]("globalAccountApi")
 
   private val route =
-    seal(AddressApiRoute(restAPISettings, testWallet, blockchain, utxPoolSynchronizer, new TestTime, Schedulers.timeBoundedFixedPool(
-      new HashedWheelTimer(),
-      5.seconds,
-      1,
-      "rest-time-limited"
-    ), commonAccountApi).route)
+    seal(
+      AddressApiRoute(
+        restAPISettings,
+        testWallet,
+        blockchain,
+        utxPoolSynchronizer,
+        new TestTime,
+        Schedulers.timeBoundedFixedPool(
+          new HashedWheelTimer(),
+          5.seconds,
+          1,
+          "rest-time-limited"
+        ),
+        commonAccountApi
+      ).route
+    )
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")
@@ -216,9 +226,12 @@ class AddressRouteSpec
       verifierFuncOpt = Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
     )
 
-    val contractScript = ContractScript(V3, contractWithMeta).explicitGet()
+    val contractScript       = ContractScript(V3, contractWithMeta).explicitGet()
+    val callableComplexities = Map("a" -> 1L, "b" -> 2L, "c" -> 3L, "verify" -> 10L)
     (commonAccountApi.script _).expects(allAccounts(3).toAddress).returning(Some(AccountScriptInfo(allAccounts(3), contractScript, 11L))).once()
-    (blockchain.accountScript _).when(allAccounts(3).toAddress).returns(Some(AccountScriptInfo(allAccounts(3), contractScript, 11L)))
+    (blockchain.accountScript _)
+      .when(allAccounts(3).toAddress)
+      .returns(Some(AccountScriptInfo(allAccounts(3), contractScript, 11L, complexitiesByEstimator = Map(1 -> callableComplexities))))
 
     Get(routePath(s"/scriptInfo/${allAddresses(3)}")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -230,6 +243,8 @@ class AddressRouteSpec
       //      testContract,
       //      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
       (response \ "complexity").as[Long] shouldBe 11
+      (response \ "verifierComplexity").as[Long] shouldBe 11
+      (response \ "callableComplexities").as[Map[String, Long]] shouldBe callableComplexities - "verify"
       (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
@@ -264,6 +279,31 @@ class AddressRouteSpec
     Get(routePath(s"/scriptInfo/${allAddresses(5)}")) ~> route ~> check {
       val json = responseAs[JsValue]
       (json \ "message").as[String] shouldBe "The request took too long to complete"
+    }
+
+    val contractWithoutVerifier = contractWithMeta.copy(verifierFuncOpt = None)
+    val contractWithoutVerifierComplexities = Map("a" -> 1L, "b" -> 2L, "c" -> 3L)
+    (blockchain.accountScript _)
+      .when(allAccounts(6).toAddress)
+      .onCall(
+        (_: AddressOrAlias) =>
+          Some(
+            AccountScriptInfo(
+              allAccounts(6),
+              ContractScript(V3, contractWithoutVerifier).explicitGet(),
+              0L,
+              complexitiesByEstimator = Map(1 -> contractWithoutVerifierComplexities)
+            )
+          )
+      )
+
+    Get(routePath(s"/scriptInfo/${allAddresses(6)}")) ~> route ~> check {
+      val response = responseAs[JsObject]
+      (response \ "address").as[String] shouldBe allAddresses(6)
+      (response \ "complexity").as[Long] shouldBe 0
+      (response \ "verifierComplexity").as[Long] shouldBe 0
+      (response \ "callableComplexities").as[Map[String, Long]] shouldBe contractWithoutVerifierComplexities
+      (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
   }
 

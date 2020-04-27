@@ -47,6 +47,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
         Set.empty,
         from
       )
+      .map { case (h, tx, _) => h -> tx }
       .toSeq
   }
 

@@ -3,7 +3,6 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.serialization.{ByteBufferOps, Deser}
 import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
 import com.wavesplatform.transaction.{Proofs, TxVersion}
@@ -80,15 +79,4 @@ object TransferTxSerializer {
       parseCommonPart(TxVersion.V1, buf).copy(proofs = Proofs(signature))
     }
   }
-
-  def tryParseTransfer(bytes: Array[Byte]): Option[TransferTransaction] =
-    Option(bytes).filter(_.length > 3).flatMap { txBytes =>
-      parseBytes(txBytes.tail).toOption
-        .orElse {
-          (for {
-            pbTxOpt <- Try(PBSignedTransaction.parseFrom(txBytes.tail)).toOption
-            tx      <- PBTransactions.vanilla(pbTxOpt).toOption
-          } yield tx).collect { case t: TransferTransaction => t }
-        }
-    }
 }

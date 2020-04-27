@@ -9,7 +9,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{DBSettings, FunctionalitySettings}
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
@@ -18,8 +18,6 @@ import monix.reactive.Observer
 import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations.{Setup, TearDown}
 import org.scalacheck.{Arbitrary, Gen}
-
-import scala.concurrent.duration._
 
 trait BaseState {
   import BaseState._
@@ -33,7 +31,7 @@ trait BaseState {
   }
 
   private val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)
-  val state: LevelDBWriter     = TestLevelDB.withFunctionalitySettings(db, portfolioChanges, fsSettings, DBSettings("", false, false, 100000, 2000, (120 * 60 * 1000).millis))
+  val state: LevelDBWriter     = TestLevelDB.withFunctionalitySettings(db, portfolioChanges, fsSettings)
 
   private var _richAccount: KeyPair = _
   def richAccount: KeyPair          = _richAccount

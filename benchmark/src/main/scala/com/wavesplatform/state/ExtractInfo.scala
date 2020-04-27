@@ -13,7 +13,6 @@ import com.wavesplatform.state.bench.DataTestData
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Authorized, CreateAliasTransaction, DataTransaction, Transaction}
 import com.wavesplatform.utils.ScorexLogging
-import monix.reactive.subjects.PublishSubject
 import org.iq80.leveldb.{DB, Options}
 import scodec.bits.BitVector
 
@@ -49,7 +48,7 @@ object ExtractInfo extends App with ScorexLogging {
   }
 
   try {
-    val state = new LevelDBWriter(db, PublishSubject(), wavesSettings.blockchainSettings, wavesSettings.dbSettings, 10)
+    val state = LevelDBWriter.readOnly(db, wavesSettings)
 
     def nonEmptyBlockHeights(from: Int): Iterator[Integer] =
       for {

@@ -226,18 +226,33 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
     }
   }
 
-  "regression" - {
+  "old calculator" - {
     "delay" in {
-      FairPoSCalculator.calculateDelay(BigInt(1), 100L, 10000000000000L) shouldBe 705491
-      FairPoSCalculator.calculateDelay(BigInt(2), 200L, 20000000000000L) shouldBe 607358
-      FairPoSCalculator.calculateDelay(BigInt(3), 300L, 30000000000000L) shouldBe 549956
+      FairPoSCalculator.V1.calculateDelay(BigInt(1), 100L, 10000000000000L) shouldBe 705491
+      FairPoSCalculator.V1.calculateDelay(BigInt(2), 200L, 20000000000000L) shouldBe 607358
+      FairPoSCalculator.V1.calculateDelay(BigInt(3), 300L, 30000000000000L) shouldBe 549956
     }
 
     "base target" in {
-      FairPoSCalculator.calculateBaseTarget(100L, 30, 100L, 100000000000L, Some(99000L), 100000L) shouldBe 99L
-      FairPoSCalculator.calculateBaseTarget(100L, 10, 100L, 100000000000L, None, 100000000000L) shouldBe 100L
-      FairPoSCalculator.calculateBaseTarget(100L, 10, 100L, 100000000000L, Some(99999700000L), 100000000000L) shouldBe 100L
-      FairPoSCalculator.calculateBaseTarget(100L, 30, 100L, 100000000000L, Some(1L), 1000000L) shouldBe 101L
+      FairPoSCalculator.V1.calculateBaseTarget(100L, 30, 100L, 100000000000L, Some(99000L), 100000L) shouldBe 99L
+      FairPoSCalculator.V1.calculateBaseTarget(100L, 10, 100L, 100000000000L, None, 100000000000L) shouldBe 100L
+      FairPoSCalculator.V1.calculateBaseTarget(100L, 10, 100L, 100000000000L, Some(99999700000L), 100000000000L) shouldBe 100L
+      FairPoSCalculator.V1.calculateBaseTarget(100L, 30, 100L, 100000000000L, Some(1L), 1000000L) shouldBe 101L
+    }
+  }
+
+  "new calculator" - {
+    "delay" in {
+      FairPoSCalculator.V2.calculateDelay(BigInt(1), 100L, 10000000000000L) shouldBe 715491
+      FairPoSCalculator.V2.calculateDelay(BigInt(2), 200L, 20000000000000L) shouldBe 617358
+      FairPoSCalculator.V2.calculateDelay(BigInt(3), 300L, 30000000000000L) shouldBe 559956
+    }
+
+    "base target" in {
+      FairPoSCalculator.V2.calculateBaseTarget(100L, 30, 100L, 100000000000L, Some(99000L), 100000L) shouldBe 99L
+      FairPoSCalculator.V2.calculateBaseTarget(100L, 10, 100L, 100000000000L, None, 100000000000L) shouldBe 100L
+      FairPoSCalculator.V2.calculateBaseTarget(100L, 10, 100L, 100000000000L, Some(99999700000L), 100000000000L) shouldBe 100L
+      FairPoSCalculator.V2.calculateBaseTarget(100L, 30, 100L, 100000000000L, Some(1L), 1000000L) shouldBe 101L
     }
   }
 
@@ -250,8 +265,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
       ignoreSpendableBalanceChanged,
       TestFunctionalitySettings.Stub.copy(
         preActivatedFeatures = Map(BlockchainFeatures.FairPoS.id -> 0) ++ (if (VRFActivated) Map(BlockchainFeatures.BlockV5.id -> 0) else Map())
-      ),
-      dbSettings
+      )
     )
     val settings0 = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
@@ -326,7 +340,7 @@ object FPPoSSelectorTest {
 
       val delay: Long = 60000
 
-      val bt = FairPoSCalculator.calculateBaseTarget(
+      val bt = FairPoSCalculator.V2.calculateBaseTarget(
         60,
         height + ind - 1,
         forkChain.head._1.header.baseTarget,
@@ -438,6 +452,6 @@ object FPPoSSelectorTest {
 
   def calcDelay(gs: Array[Byte], prevBT: Long, effBalance: Long): Long = {
     val hit = PoSCalculator.hit(gs)
-    FairPoSCalculator.calculateDelay(hit, prevBT, effBalance)
+    FairPoSCalculator.V2.calculateDelay(hit, prevBT, effBalance)
   }
 }

@@ -171,8 +171,8 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
   }
 
   property("invalid base16 definition") {
-    parse("base16'mid-size'") shouldBe CONST_BYTESTR(AnyPos, PART.INVALID(AnyPos, "m isn't base16/hex digit"))
-    parse("base16'123'") shouldBe CONST_BYTESTR(AnyPos, PART.INVALID(AnyPos, "Need internal bytes number"))
+    parse("base16'mid-size'") shouldBe CONST_BYTESTR(Pos(0, 16), PART.INVALID(Pos(8, 15), "Unrecognized character: m"), None)
+    parse("base16'123'") shouldBe CONST_BYTESTR(Pos(0, 11), PART.INVALID(Pos(8, 10), "Invalid input length 3"))
   }
 
   property("literal too long") {
@@ -671,7 +671,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
 
   property("pattern matching - allow shadowing") {
     val code =
-      """match p { 
+      """match p {
         |  case p: PointA | PointB => true
         |  case _ => false
         |}""".stripMargin

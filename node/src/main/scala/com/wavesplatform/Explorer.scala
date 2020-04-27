@@ -9,14 +9,13 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.AddressPortfolio
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.database.{DBExt, KeyTags, Keys, LevelDBWriter, openDB}
+import com.wavesplatform.database.{DBExt, KeyTags, Keys, LevelDBWriter, openDB, readTransactionBytes}
+import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.{Blockchain, Diff, Height, Portfolio, TxNum}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
-import monix.execution.UncaughtExceptionReporter
-import monix.reactive.Observer
 import org.iq80.leveldb.DB
 
 import scala.annotation.tailrec
@@ -62,9 +61,8 @@ object Explorer extends ScorexLogging {
 
     log.info(s"Data directory: ${settings.dbSettings.directory}")
 
-    val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)
-    val db               = openDB(settings.dbSettings.directory)
-    val reader           = new LevelDBWriter(db, portfolioChanges, settings.blockchainSettings, settings.dbSettings, 10)
+    val db     = openDB(settings.dbSettings.directory)
+    val reader = LevelDBWriter.readOnly(db, settings)
 
     val blockchainHeight = reader.height
     log.info(s"Blockchain height is $blockchainHeight")
@@ -166,7 +164,7 @@ object Explorer extends ScorexLogging {
           log.info(s"Last address id: $lastAddressId")
 
         case "AD" =>
-          val result        = new util.HashMap[Address, java.lang.Integer]()
+          val result = new util.HashMap[Address, java.lang.Integer]()
 
           db.iterateOver(KeyTags.IdToAddress) { e =>
             result.compute(
@@ -243,11 +241,13 @@ object Explorer extends ScorexLogging {
 
               val k = entry.getKey
               println(k.toList.map(_.toInt & 0xff))
-              val v = entry.getValue
 
               for {
                 idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
-                tx  <- TransactionParsers.parseBytes(v)
+                tx  =  readTransactionBytes(entry.getValue) match {
+                  case (_, Left(legacyBytes)) => TransactionParsers.parseBytes(legacyBytes).get
+                  case (_, Right(newBytes))   => PBTransactions.vanilla(PBSignedTransaction.parseFrom(newBytes)).explicitGet()
+                }
               } txs.append((TxNum(idx), tx))
             }
           } finally iterator.close()

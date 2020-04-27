@@ -83,20 +83,21 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
 
   test("write") {
     val data = 10
-    val invokeTx = sender.invokeScript(
+
+    val invokeTx = sender.validateInvokeScript( // Since BlockV5 broadcasting InvokeTx does not return trace
       caller,
       contract,
       func = Some("write"),
       args = List(CONST_LONG(data)),
       fee = 0.005.waves,
-      waitForTx = true
     )
 
-    val id = invokeTx._1.id
     val js = invokeTx._2
 
     (js \ "trace" \ 0 \ "result" \ "vars" \ 0 \ "name").as[String] shouldBe "value"
     (js \ "trace" \ 0 \ "result" \ "vars" \ 0 \ "value").as[String] shouldBe data.toString
+
+   val id = sender.signedBroadcast(invokeTx._1, waitForTx = true).id
 
     nodes.waitForHeightAriseAndTxPresent(id)
 
@@ -117,7 +118,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
 
     txInfoShouldBeEqual(txInfo, txStateChanges)
 
-    val expected = StateChangesDetails(Seq(DataResponse("integer", 10, "result")), Seq(), Seq(), Seq(), Seq())
+    val expected = StateChangesDetails(Seq(DataResponse("integer", 10, "result")), Seq(), Seq(), Seq(), Seq(), None)
     txStateChanges.stateChanges.get shouldBe expected
     callerStateChanges.head.stateChanges.get shouldBe expected
     dAppStateChanges.head.stateChanges.get shouldBe expected
@@ -162,7 +163,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
     txInfoShouldBeEqual(txInfo, dAppStateChanges.head)
     txInfoShouldBeEqual(txInfo, recipientStateChanges.head)
 
-    val expected = StateChangesDetails(Seq(), Seq(TransfersInfoResponse(recipient, Some(simpleAsset), 10)), Seq(), Seq(), Seq())
+    val expected = StateChangesDetails(Seq(), Seq(TransfersInfoResponse(recipient, Some(simpleAsset), 10)), Seq(), Seq(), Seq(), None)
     txStateChanges.stateChanges.get shouldBe expected
     callerStateChanges.head.stateChanges.get shouldBe expected
     dAppStateChanges.head.stateChanges.get shouldBe expected
@@ -209,7 +210,8 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       Seq(TransfersInfoResponse(caller, None, 10)),
       Seq(),
       Seq(),
-      Seq()
+      Seq(),
+      None
     )
     txStateChanges.stateChanges.get shouldBe expected
     callerStateChanges.head.stateChanges.get shouldBe expected

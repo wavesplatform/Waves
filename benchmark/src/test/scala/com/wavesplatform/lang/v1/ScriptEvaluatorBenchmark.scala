@@ -196,7 +196,7 @@ class Median {
 
     FUNCTION_CALL(
       PureContext.getListMedian,
-      List(ARR(listOfLong))
+      List(ARR(listOfLong, false).explicitGet())
     )
   }
 }

@@ -25,8 +25,8 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class OverdraftTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithState with Inside {
   private val InvokeFee    = FeeConstants(InvokeScriptTransaction.typeId) * FeeValidation.FeeUnit
-  private val SetScriptFee = FeeConstants(SetScriptTransaction.typeId)    * FeeValidation.FeeUnit
-  private val IssueFee     = FeeConstants(IssueTransaction.typeId)        * FeeValidation.FeeUnit
+  private val SetScriptFee = FeeConstants(SetScriptTransaction.typeId) * FeeValidation.FeeUnit
+  private val IssueFee     = FeeConstants(IssueTransaction.typeId) * FeeValidation.FeeUnit
 
   private val dAppVersionsWithActivation: List[(StdLibVersion, Boolean)] =
     DirectiveDictionary[StdLibVersion].all
@@ -45,10 +45,12 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
       } yield (genesis, setDApp, ci, activation)
     ) {
       case (genesis, setDApp, ci, activation) =>
-        assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), features(activation)) {
-          _ should produce(
-            s"Fee in WAVES for InvokeScriptTransaction (1 in WAVES) with 0 total scripts invoked does not exceed minimal value of $InvokeFee WAVES"
-          )
+        assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), features(activation)) { r =>
+          if (activation) r should produce("AccountBalanceError")
+          else
+            r should produce(
+              s"Fee in WAVES for InvokeScriptTransaction (1 in WAVES) with 0 total scripts invoked does not exceed minimal value of $InvokeFee WAVES"
+            )
         }
     }
   }
@@ -61,8 +63,9 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
       } yield (genesis, setDApp, ci, activation)
     ) {
       case (genesis, setDApp, ci, activation) =>
-        assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), features(activation)) {
-          _ shouldBe 'right
+        assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), features(activation)) { r =>
+          if (activation) r should produce("AccountBalanceError")
+          else r shouldBe 'right
         }
     }
   }
@@ -90,7 +93,7 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
     ) {
       case (genesis, setDApp, ci, issue, activation) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ List(setDApp, issue))), TestBlock.create(Seq(ci)), features(activation)) {
-          _ shouldBe 'right
+          _ should produce("AccountBalanceError")
         }
     }
   }
@@ -110,9 +113,9 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
   }
 
   private def paymentPreconditions(
-    withEnoughFee: Boolean,
-    withPayment: Boolean,
-    dApp: Script
+      withEnoughFee: Boolean,
+      withPayment: Boolean,
+      dApp: Script
   ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction)] =
     for {
       master  <- accountGen
@@ -135,7 +138,7 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
     }.explicitGet()
 
   private def splitPaymentPreconditions(
-    version: StdLibVersion
+      version: StdLibVersion
   ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction)] =
     for {
       master  <- accountGen
@@ -143,7 +146,7 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
       ts      <- timestampGen
       issue   <- issueV2TransactionGen(invoker, Gen.const(None), feeParam = Some(IssueFee))
     } yield {
-      val count = ContractLimits.MaxAttachedPaymentAmount
+      val count    = ContractLimits.MaxAttachedPaymentAmount
       val payments = (1 to count).map(_ => Payment(issue.quantity / count + 1, IssuedAsset(issue.id.value())))
       for {
         genesis  <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
@@ -160,13 +163,13 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
 
   private def payingDApp(version: StdLibVersion): Script = {
     val transfer = s"ScriptTransfer(i.caller, $InvokeFee, unit)"
-    val body = if (version >= V4) s"[$transfer]" else s"TransferSet([$transfer])"
+    val body     = if (version >= V4) s"[$transfer]" else s"TransferSet([$transfer])"
     dApp(body, version)
   }
 
   private def payingAssetDApp(version: StdLibVersion, assetId: ByteStr): Script = {
     val transfer = s"ScriptTransfer(i.caller, $InvokeFee, base58'${assetId.toString}')"
-    val body = if (version >= V4) s"[$transfer]" else s"TransferSet([$transfer])"
+    val body     = if (version >= V4) s"[$transfer]" else s"TransferSet([$transfer])"
     dApp(body, version)
   }
 
@@ -182,17 +185,17 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
          |
        """.stripMargin
 
-    val expr = Parser.parseContract(script).get.value
+    val expr     = Parser.parseContract(script).get.value
     val contract = compileContractFromExpr(expr, version)
     ContractScript(version, contract).explicitGet()
   }
 
   private def features(withV4: Boolean) = {
-    val v4ForkO = if (withV4) Seq(BlockchainFeatures.MultiPaymentInvokeScript) else Seq()
+    val v4ForkO = if (withV4) Seq(BlockchainFeatures.BlockV5) else Seq()
     val parameters = Seq(
       BlockchainFeatures.SmartAccounts,
       BlockchainFeatures.SmartAssets,
-      BlockchainFeatures.Ride4DApps,
+      BlockchainFeatures.Ride4DApps
     ) ++ v4ForkO
     TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = parameters.map(_.id -> 0).toMap)
   }

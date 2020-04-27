@@ -110,7 +110,7 @@ class MicroBlockMinerImpl(
     Task(allChannels.broadcast(MicroBlockInv(account, blockId, microBlock.reference)))
 
   private def appendMicroBlock(microBlock: MicroBlock): Task[BlockId] =
-    MicroblockAppender(blockchainUpdater, utx, appenderScheduler, verify = false)(microBlock)
+    MicroblockAppender(blockchainUpdater, utx, appenderScheduler)(microBlock)
       .flatMap {
         case Left(err) => Task.raiseError(MicroBlockAppendError(microBlock, err))
         case Right(v)  => Task.now(v)

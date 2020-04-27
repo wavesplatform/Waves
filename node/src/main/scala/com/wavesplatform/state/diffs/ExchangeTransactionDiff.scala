@@ -7,10 +7,10 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
+import com.wavesplatform.transaction.{Asset, TxVersion}
 
 import scala.util.{Right, Try}
 
@@ -98,7 +98,7 @@ object ExchangeTransactionDiff {
 
       accountsComplexity = List(tx.sender.toAddress, buyer, seller)
         .flatMap(blockchain.accountScript)
-        .map(_.maxComplexity)
+        .map(_.verifierComplexity)
 
       scriptsComplexity = assetsComplexity.sum + accountsComplexity.sum
     } yield {

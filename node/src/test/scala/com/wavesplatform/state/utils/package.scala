@@ -3,10 +3,12 @@ package com.wavesplatform.state
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.AddressTransactions
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.{DBResource, LevelDBWriter}
-import com.wavesplatform.settings.{BlockchainSettings, DBSettings, FunctionalitySettings, GenesisSettings, RewardsSettings}
-import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.database.{DBResource, LevelDBWriter, TestStorageFactory}
+import com.wavesplatform.events.BlockchainUpdateTriggers
+import com.wavesplatform.settings.TestSettings._
+import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, RewardsSettings, TestSettings}
 import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.utils.SystemTime
 import monix.reactive.Observer
 import org.iq80.leveldb.DB
 
@@ -20,26 +22,23 @@ package object utils {
       fromId: Option[ByteStr]
   ): Seq[(Height, Transaction)] = {
     val resource = DBResource(db)
-    try AddressTransactions.allAddressTransactions(resource, diff, address, None, types, fromId).toSeq
+    try AddressTransactions.allAddressTransactions(resource, diff, address, None, types, fromId).map { case (h, tx, _) => h -> tx }.toSeq
     finally resource.close()
   }
-
-  def nftList(address: Address): Seq[IssueTransaction] = ???
 
   object TestLevelDB {
     def withFunctionalitySettings(
         writableDB: DB,
         spendableBalanceChanged: Observer[(Address, Asset)],
-        fs: FunctionalitySettings,
-        dbSettings: DBSettings
+        fs: FunctionalitySettings
     ): LevelDBWriter =
-      new LevelDBWriter(
+      TestStorageFactory(
+        TestSettings.Default.withFunctionalitySettings(fs),
         writableDB,
+        SystemTime,
         spendableBalanceChanged,
-        createTestBlockchainSettings(fs),
-        dbSettings,
-        10
-      )
+        BlockchainUpdateTriggers.noop
+      )._2
 
     def createTestBlockchainSettings(fs: FunctionalitySettings): BlockchainSettings =
       BlockchainSettings('T', fs, GenesisSettings.TESTNET, RewardsSettings.TESTNET)
