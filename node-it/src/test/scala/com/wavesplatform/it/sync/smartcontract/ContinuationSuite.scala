@@ -50,7 +50,7 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
          |
          | @Callable(inv)
          | func foo() = {
-         |  let a = ${List.fill(40)("sigVerify(base64'',base64'',base64'')").mkString("||")}
+         |  let a = ${List.fill(150)("sigVerify(base64'',base64'',base64'')").mkString("||")}
          |  [BooleanEntry("a", a), BinaryEntry("sender", inv.caller.bytes)]
          | }
          |
@@ -64,7 +64,7 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     assertBadRequestAndMessage(
       setScriptTx,
-      "State check failed. Reason: Contract function (foo) is too complex: 8175 > 4000"
+      "State check failed. Reason: Contract function (foo) is too complex: 30615 > 4000"
     )
   }
 
@@ -91,7 +91,7 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
       waitForTx = true
     )
     nodes.waitForHeightAriseAndTxPresent(invokeScriptTx._1.id)
-
+    nodes.waitForHeight(sender.height + 2)
     nodes.foreach { node =>
       node.getDataByKey(dApp, "a") shouldBe BooleanDataEntry("a", false)
       node.getDataByKey(dApp, "sender") shouldBe BinaryDataEntry("sender", Base58.decode(caller))
@@ -113,8 +113,8 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
       invokeScriptTx,
       "State check failed. Reason: " +
         "Fee in WAVES for InvokeScriptTransaction (900000 in WAVES) " +
-        "with 3 invocation steps " +
-        "does not exceed minimal value of 1500000 WAVES."
+        "with 8 invocation steps " +
+        "does not exceed minimal value of 4000000 WAVES."
     )
   }
 }
