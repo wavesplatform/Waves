@@ -650,8 +650,8 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
     }
   }
 
-  ignore("big function assignment chain") {
-    val count = 2000
+  property("big function assignment chain") {
+    val count = 3000
     val script =
       s"""
          | func a0() = {
@@ -664,7 +664,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
     println(eval(script, 10000))
   }
 
-  ignore("big let assignment chain with function") {
+  property("big let assignment chain with function") {
     val count = 5000
     val script =
       s"""
