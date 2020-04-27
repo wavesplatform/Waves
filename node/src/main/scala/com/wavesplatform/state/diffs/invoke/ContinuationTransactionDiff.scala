@@ -89,8 +89,9 @@ object ContinuationTransactionDiff {
       continuationStopDiff = Diff.stateOps(continuationStates = Map(tx.invokeScriptTransactionId -> ContinuationState.Finished))
 
       resultDiff <- scriptResult._1 match {
-        case ScriptResultV3(dataItems, transfers) => doProcessActions(dataItems ::: transfers).map(_ |+| continuationStopDiff)
-        case ScriptResultV4(actions)              => doProcessActions(actions).map(_ |+| continuationStopDiff)
+        case ScriptResultV3(dataItems, transfers) =>
+          doProcessActions(dataItems ::: transfers).map(_.copy(transactions = Map()) |+| continuationStopDiff)
+        case ScriptResultV4(actions) => doProcessActions(actions).map(_.copy(transactions = Map()) |+| continuationStopDiff)
         case ir: IncompleteResult =>
           TracedResult.wrapValue[Diff, ValidationError](
             Diff.stateOps(continuationStates = Map(tx.invokeScriptTransactionId -> ContinuationState.InProgress(ir.expr)))
