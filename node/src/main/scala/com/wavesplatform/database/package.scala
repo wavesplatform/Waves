@@ -20,7 +20,6 @@ import com.wavesplatform.database.protobuf.DataEntry.Value
 import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.lang.v1.Serde
-import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.state._
@@ -232,28 +231,27 @@ package object database extends ScorexLogging {
     b.array()
   }
 
-  def readContinuationStates(bytes: Array[Byte]): Map[ByteStr, EXPR] = {
+  def readContinuationStates(bytes: Array[Byte]): Map[ByteStr, ContinuationState] = {
     if (bytes == null || bytes.isEmpty)
       Map()
     else {
       val input = newDataInput(bytes)
-      val size = input.readInt()
+      val size  = input.readInt()
       (1 to size).map { _ =>
         val invokeTxIdLength = input.readByte()
-        val invokeTxId = input.readByteStr(invokeTxIdLength)
+        val invokeTxId       = input.readByteStr(invokeTxIdLength)
 
         val exprBytesLength = input.readInt()
-        val exprBytes = input.readBytes(exprBytesLength)
-        val expr = Serde.deserialize(exprBytes).explicitGet()._1
-
-        (invokeTxId, expr)
+        val exprBytes       = input.readBytes(exprBytesLength)
+        val expr            = Serde.deserialize(exprBytes).explicitGet()._1
+        (invokeTxId, ContinuationState.InProgress(expr))
       }.toMap
     }
   }
 
-  def writeContinuationStates(states: Map[ByteStr, EXPR]): Array[Byte] = {
-    val output = newDataOutput()
-    val unfinished = states.filterNot(_._2 == null)
+  def writeContinuationStates(states: Map[ByteStr, ContinuationState]): Array[Byte] = {
+    val output     = newDataOutput()
+    val unfinished = states.collect { case (invokeTxId, ContinuationState.InProgress(expr)) => (invokeTxId, expr) }
     output.writeInt(unfinished.size)
     unfinished.foreach {
       case (invokeTxId, expr) =>

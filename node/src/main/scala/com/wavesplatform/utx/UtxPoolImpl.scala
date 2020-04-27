@@ -17,7 +17,7 @@ import com.wavesplatform.settings.UtxSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
+import com.wavesplatform.state.{Blockchain, ContinuationState, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AlreadyInTheState, GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction._
@@ -362,14 +362,13 @@ class UtxPoolImpl(
 
       val continuationTransactions =
         blockchain.continuationStates
-          .filterNot(_._2 == null)
-          .map {
-            case (invokeTxId, expr) => ContinuationTransaction(expr, invokeTxId, time.getTimestamp())
-          }
+          .collect { case (invokeTxId, ContinuationState.InProgress(expr)) => ContinuationTransaction(expr, invokeTxId, time.getTimestamp()) }
 
       val startTransactions =
         if (continuationTransactions.isEmpty) None
         else Some(continuationTransactions.toSeq)
+
+      println("TRANSACTIONS: " + startTransactions)
 
       loop(PackResult(startTransactions, Monoid[Diff].empty, initialConstraint, 0, Set.empty, Set.empty))
     }

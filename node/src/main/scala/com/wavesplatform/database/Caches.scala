@@ -10,7 +10,6 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
@@ -152,9 +151,9 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
   @volatile
-  protected var continuationStatesCache: Map[ByteStr, EXPR] = loadContinuationStates()
-  protected def loadContinuationStates(): Map[ByteStr, EXPR]
-  override def continuationStates: Map[ByteStr, EXPR] = continuationStatesCache
+  protected var continuationStatesCache: Map[ByteStr, ContinuationState] = loadContinuationStates()
+  protected def loadContinuationStates(): Map[ByteStr, ContinuationState]
+  override def continuationStates: Map[ByteStr, ContinuationState] = continuationStatesCache
 
   //noinspection ScalaStyle
   protected def doAppend(
@@ -178,7 +177,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       hitSource: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult],
       failedTransactionIds: Set[ByteStr],
-      continuationStates: Map[ByteStr, EXPR]
+      continuationStates: Map[ByteStr, ContinuationState]
   ): Unit
 
   override def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], hitSource: ByteStr, block: Block): Unit = {

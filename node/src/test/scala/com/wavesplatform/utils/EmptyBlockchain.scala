@@ -6,7 +6,6 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
@@ -84,5 +83,5 @@ case object EmptyBlockchain extends Blockchain {
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = Map.empty
 
-  override def continuationStates: Map[ByteStr, Terms.EXPR] = Map.empty
+  override def continuationStates: Map[ByteStr, ContinuationState] = Map.empty
 }

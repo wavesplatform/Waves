@@ -9,7 +9,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{Global, ValidationError}
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Diff}
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain, ContinuationState, Diff}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
@@ -86,13 +86,15 @@ object ContinuationTransactionDiff {
         blockTime
       )
 
-      continuationStopDiff = Diff.stateOps(continuationStates = Map(tx.invokeScriptTransactionId -> null))
+      continuationStopDiff = Diff.stateOps(continuationStates = Map(tx.invokeScriptTransactionId -> ContinuationState.Finished))
 
       resultDiff <- scriptResult._1 match {
         case ScriptResultV3(dataItems, transfers) => doProcessActions(dataItems ::: transfers).map(_ |+| continuationStopDiff)
         case ScriptResultV4(actions)              => doProcessActions(actions).map(_ |+| continuationStopDiff)
         case ir: IncompleteResult =>
-          TracedResult.wrapValue[Diff, ValidationError](Diff.stateOps(continuationStates = Map(tx.invokeScriptTransactionId -> ir.expr)))
+          TracedResult.wrapValue[Diff, ValidationError](
+            Diff.stateOps(continuationStates = Map(tx.invokeScriptTransactionId -> ContinuationState.InProgress(ir.expr)))
+          )
       }
 
     } yield resultDiff

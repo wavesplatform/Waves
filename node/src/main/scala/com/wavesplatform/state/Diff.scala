@@ -138,6 +138,12 @@ object Sponsorship {
     }
 }
 
+sealed trait ContinuationState
+object ContinuationState {
+  case class InProgress(expr: EXPR) extends ContinuationState
+  case object Finished              extends ContinuationState
+}
+
 case class Diff(
     transactions: collection.Map[ByteStr, (Transaction, Set[Address], Boolean)],
     portfolios: Map[Address, Portfolio],
@@ -153,7 +159,7 @@ case class Diff(
     scriptsRun: Int,
     scriptsComplexity: Long,
     scriptResults: Map[ByteStr, InvokeScriptResult],
-    continuationStates: Map[ByteStr, EXPR]
+    continuationStates: Map[ByteStr, ContinuationState]
 )
 
 object Diff {
@@ -169,7 +175,7 @@ object Diff {
       accountData: Map[Address, AccountDataInfo] = Map.empty,
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
-      continuationStates: Map[ByteStr, EXPR] = Map.empty
+      continuationStates: Map[ByteStr, ContinuationState] = Map.empty
   ): Diff =
     Diff(
       transactions = LinkedHashMap(),
@@ -204,8 +210,8 @@ object Diff {
       scriptsRun: Int = 0,
       scriptsComplexity: Long = 0,
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
-      continuationStates: Map[ByteStr, EXPR] = Map.empty
-): Diff =
+      continuationStates: Map[ByteStr, ContinuationState] = Map.empty
+  ): Diff =
     Diff(
       // should be changed to VectorMap after 2.13 https://github.com/scala/scala/pull/6854
       transactions = LinkedHashMap((tx.id(), (tx, (portfolios.keys ++ accountData.keys).toSet, true))),

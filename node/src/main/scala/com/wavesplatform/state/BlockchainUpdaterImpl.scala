@@ -15,7 +15,6 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.metrics.{TxsInBlockchainStats, _}
 import com.wavesplatform.mining.{MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
@@ -656,7 +655,7 @@ class BlockchainUpdaterImpl(
     }
   }
 
-  override def continuationStates: Map[ByteStr, Terms.EXPR] = readLock {
+  override def continuationStates: Map[ByteStr, ContinuationState] = readLock {
     compositeBlockchain.continuationStates
   }
 

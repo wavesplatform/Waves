@@ -7,7 +7,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -76,7 +75,7 @@ trait Blockchain {
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
   def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A]
 
-  def continuationStates: Map[ByteStr, EXPR]
+  def continuationStates: Map[ByteStr, ContinuationState]
 }
 
 object Blockchain {

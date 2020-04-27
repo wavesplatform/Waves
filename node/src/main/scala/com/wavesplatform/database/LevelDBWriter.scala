@@ -17,7 +17,6 @@ import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings, WavesSettings}
 import com.wavesplatform.state.reader.LeaseDetails
@@ -275,7 +274,7 @@ abstract class LevelDBWriter private[database] (
     stateFeatures ++ settings.functionalitySettings.preActivatedFeatures
   }
 
-  override protected def loadContinuationStates: Map[ByteStr, EXPR] =
+  override protected def loadContinuationStates: Map[ByteStr, ContinuationState] =
     readOnly(_.get(Keys.continuationStates))
 
   override def wavesAmount(height: Int): BigInt = readOnly { db =>
@@ -364,7 +363,7 @@ abstract class LevelDBWriter private[database] (
       hitSource: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult],
       failedTransactionIds: Set[ByteStr],
-      continuationStates: Map[ByteStr, EXPR]
+      continuationStates: Map[ByteStr, ContinuationState]
   ): Unit = {
     log.trace(s"Persisting block ${block.id()} at height $height")
     readWrite { rw =>

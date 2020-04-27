@@ -155,7 +155,9 @@ object InvokeScriptTransactionDiff {
                 case ScriptResultV3(dataItems, transfers) => doProcessActions(dataItems ::: transfers)
                 case ScriptResultV4(actions)              => doProcessActions(actions)
                 case ir: IncompleteResult =>
-                  TracedResult.wrapValue[Diff, ValidationError](Diff(tx = tx, continuationStates = Map(tx.id.value -> ir.expr)))
+                  TracedResult.wrapValue[Diff, ValidationError](
+                    Diff(tx = tx, continuationStates = Map(tx.id.value -> ContinuationState.InProgress(ir.expr)))
+                  )
               }
             } yield resultDiff
           } else TracedResult.wrapValue(InvokeDiffsCommon.paymentsPart(tx, dAppAddress, feeInfo._2))
