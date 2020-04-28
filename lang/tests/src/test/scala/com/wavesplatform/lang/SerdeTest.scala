@@ -1,12 +1,14 @@
 package com.wavesplatform.lang
 
+import java.nio.charset.StandardCharsets
+
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.testing.ScriptGen
@@ -18,9 +20,9 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   "roundtrip" - {
-    "CONST_LONG"    in roundTripTest(CONST_LONG(1))
+    "CONST_LONG" in roundTripTest(CONST_LONG(1))
     "CONST_BYTESTR" in roundTripTest(CONST_BYTESTR(ByteStr.fromBytes(1)).explicitGet())
-    "CONST_STRING"  in roundTripTest(CONST_STRING("foo").explicitGet())
+    "CONST_STRING" in roundTripTest(CONST_STRING("foo").explicitGet())
 
     "IF" in roundTripTest(IF(TRUE, CONST_LONG(0), CONST_LONG(1)))
 
@@ -123,6 +125,26 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
     measureBase64Deser("AgQAAAABYgEAAAAEAAAAAAkAAAAA/wACCQAB9wAAAAEFAAAAAWIJAAH3AAAAAQUAAAABYi+LkdA=")
     measureBase64Deser("AgQAAAABYgEAAAAEAAAAAAkAAAAAAAACCQAB9wD/AAEFAAAAAWIJAAH3AAAAAQUAAAABYtKFiCk=")
     measureBase64Deser("AgQAAAABYgEAAAAEAAAAAAkAAAAAAAACCQAB9wAAAAEFAAAAAWIJAAH3AP8AAQUAAAABYpURGZc=")
+  }
+
+  "too big string" in {
+    val maxString = "a" * Terms.DATA_ENTRY_VALUE_MAX
+    val expr1     = Serde.serialize(CONST_STRING(maxString, reduceLimit = false).explicitGet())
+    Serde.deserialize(expr1).map(_._1) shouldBe CONST_STRING(maxString)
+
+    val tooBigString = maxString + "a"
+    val expr2        = Serde.serialize(CONST_STRING(tooBigString, reduceLimit = false).explicitGet())
+    Serde.deserialize(expr2) should produce("String size=32768 exceeds 32767 bytes")
+  }
+
+  "too big bytes" in {
+    val maxBytes = ("a" * Terms.DATA_ENTRY_VALUE_MAX).getBytes(StandardCharsets.UTF_8)
+    val expr1    = Serde.serialize(CONST_BYTESTR(maxBytes, reduceLimit = false).explicitGet())
+    Serde.deserialize(expr1).map(_._1) shouldBe CONST_BYTESTR(maxBytes)
+
+    val tooBigBytes = maxBytes :+ (1: Byte)
+    val expr2       = Serde.serialize(CONST_BYTESTR(tooBigBytes, reduceLimit = false).explicitGet())
+    Serde.deserialize(expr2) should produce("ByteStr size=32768 exceeds 32767 bytes")
   }
 
   def measureTime[A](f: => A): (A, Long) = {

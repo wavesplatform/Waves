@@ -1,5 +1,7 @@
 package com.wavesplatform.lang.compiler
 
+import java.nio.charset.StandardCharsets
+
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common
@@ -7,7 +9,7 @@ import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.v1.compiler.CompilerContext.VariableInfo
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
@@ -49,6 +51,17 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       case Right(x)    => Right(x) shouldBe expectedResult
       case e @ Left(_) => e shouldBe expectedResult
     }
+  }
+
+  property("string limit") {
+    val maxString = "a" * Terms.DATA_ENTRY_VALUE_MAX
+    val expr = Parser.parseExpr(s""" "$maxString" """).get.value
+    ExpressionCompiler(compilerContext, expr).map(_._1) shouldBe CONST_STRING(maxString)
+
+    val tooBigString = maxString + "a"
+    val expr2 = Parser.parseExpr(s""" "$tooBigString" """).get.value
+    ExpressionCompiler(compilerContext, expr2) should produce("String size=32768 exceeds 32767 bytes")
+
   }
 
   treeTypeTest("GETTER")(

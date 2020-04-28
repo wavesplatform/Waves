@@ -1,5 +1,7 @@
 package com.wavesplatform.lang.v1.compiler
 
+import java.nio.charset.StandardCharsets
+
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
@@ -124,10 +126,13 @@ object Terms {
       val limit =
         if (reduceLimit) DATA_ENTRY_VALUE_MAX
         else DATA_TX_BYTES_MAX
+
+      val actualSize = bs.size
+
       Either.cond(
-        bs.size <= limit,
+        actualSize <= limit,
         new CONST_BYTESTR(bs),
-        s"ByteStr exceeds $limit bytes"
+        s"ByteStr size=$actualSize exceeds $limit bytes"
       )
     }
 
@@ -154,10 +159,12 @@ object Terms {
         if (reduceLimit) DATA_ENTRY_VALUE_MAX
         else DATA_TX_BYTES_MAX
 
+      val actualSize = s.getBytes(StandardCharsets.UTF_8).length
+
       Either.cond(
-        s.getBytes("UTF-8").length <= limit,
+        actualSize <= limit,
         new CONST_STRING(s),
-        s"String exceeds $limit bytes"
+        s"String size=$actualSize exceeds $limit bytes"
       )
     }
 
