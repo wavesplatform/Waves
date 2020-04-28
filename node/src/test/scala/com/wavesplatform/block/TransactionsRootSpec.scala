@@ -28,7 +28,7 @@ class TransactionsRootSpec
       sender    <- accountGen
       recipient <- accountGen
       txsLength <- Gen.choose(1, 1000)
-      txs       <- Gen.listOfN(txsLength, versionedTransferGeneratorP(sender, recipient, Waves, Waves))
+      txs       <- Gen.listOfN(txsLength, versionedTransferGeneratorP(sender, recipient.toAddress, Waves, Waves))
     } yield (signer, txs)
 
   val validProofsScenario: Gen[(List[Transaction], Int)] =
@@ -103,7 +103,7 @@ class TransactionsRootSpec
       (signer, txs)    <- commonGen
       anotherSender    <- accountGen
       anotherRecipient <- accountGen
-      tx               <- versionedTransferGeneratorP(anotherSender, anotherRecipient, Waves, Waves)
+      tx               <- versionedTransferGeneratorP(anotherSender, anotherRecipient.toAddress, Waves, Waves)
       block            <- versionedBlockGen(txs, signer, Block.ProtoBlockVersion)
     } yield (block, tx)
 

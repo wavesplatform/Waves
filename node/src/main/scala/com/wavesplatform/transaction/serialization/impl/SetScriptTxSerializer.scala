@@ -25,8 +25,8 @@ object SetScriptTxSerializer {
       case TxVersion.V1 =>
         Bytes.concat(
           Array(builder.typeId, version, chainId),
-          sender,
-          Deser.serializeOptionOfArrayWithLength(script)(s => s.bytes()),
+          sender.arr,
+          Deser.serializeOptionOfArrayWithLength(script)(s => s.bytes().arr),
           Longs.toByteArray(fee),
           Longs.toByteArray(timestamp)
         )

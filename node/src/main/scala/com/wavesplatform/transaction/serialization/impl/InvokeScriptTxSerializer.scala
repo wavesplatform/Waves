@@ -57,8 +57,8 @@ object InvokeScriptTxSerializer {
       case TxVersion.V1 =>
         Bytes.concat(
           Array(builder.typeId, version, chainId),
-          sender,
-          dAppAddressOrAlias.bytes.arr,
+          sender.arr,
+          dAppAddressOrAlias.bytes,
           Deser.serializeOption(funcCallOpt)(Serde.serialize(_)),
           Deser.serializeArrays(payments.map(pmt => Longs.toByteArray(pmt.amount) ++ pmt.assetId.byteRepr)),
           Longs.toByteArray(fee),

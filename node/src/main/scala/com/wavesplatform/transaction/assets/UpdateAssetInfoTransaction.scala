@@ -105,5 +105,5 @@ object UpdateAssetInfoTransaction extends TransactionParser {
       feeAmount: TxAmount,
       feeAsset: Asset
   ): Either[ValidationError, UpdateAssetInfoTransaction] =
-    create(version, sender, assetId, name, description, timestamp, feeAmount, feeAsset, Proofs.empty).map(_.signWith(sender))
+    create(version, sender.publicKey, assetId, name, description, timestamp, feeAmount, feeAsset, Proofs.empty).map(_.signWith(sender.privateKey))
 }

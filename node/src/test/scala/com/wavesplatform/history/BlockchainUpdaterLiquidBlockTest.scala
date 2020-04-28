@@ -35,7 +35,7 @@ class BlockchainUpdaterLiquidBlockTest
 
       val prevBlock = unsafeBlock(
         reference = randomSig,
-        txs = Seq(GenesisTransaction.create(richAccount, ENOUGH_AMT, 0).explicitGet()),
+        txs = Seq(GenesisTransaction.create(richAccount.toAddress, ENOUGH_AMT, 0).explicitGet()),
         signer = TestBlock.defaultSigner,
         version = 3,
         timestamp = 0

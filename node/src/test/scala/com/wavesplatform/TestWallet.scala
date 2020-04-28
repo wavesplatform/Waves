@@ -1,5 +1,6 @@
 package com.wavesplatform
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.wallet.Wallet
 
@@ -8,5 +9,5 @@ trait TestWallet {
 }
 
 object TestWallet {
-  private[TestWallet] lazy val instance = Wallet(WalletSettings(None, Some("123"), None))
+  private[TestWallet] lazy val instance = Wallet(WalletSettings(None, Some("123"), Some(ByteStr.empty)))
 }

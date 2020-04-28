@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.grpc
 
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync._
@@ -61,7 +60,7 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
               ScriptCompiler(
                 s"""
                |match tx {
-               |  case s : SetAssetScriptTransaction => s.sender == addressFromPublicKey(base58'${ByteStr(secondAcc.publicKey).toString}')
+               |  case s : SetAssetScriptTransaction => s.sender == addressFromPublicKey(base58'${secondAcc.publicKey}')
                |  case _ => false
                |}
                """.stripMargin,

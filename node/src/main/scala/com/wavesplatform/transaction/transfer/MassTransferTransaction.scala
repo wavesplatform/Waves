@@ -112,7 +112,7 @@ object MassTransferTransaction extends TransactionParser {
       timestamp: TxTimestamp,
       attachment: Option[Attachment]
   ): Either[ValidationError, MassTransferTransaction] =
-    signed(version, sender, assetId, transfers, fee, timestamp, attachment, sender)
+    signed(version, sender.publicKey, assetId, transfers, fee, timestamp, attachment, sender.privateKey)
 
   def parseTransfersList(transfers: List[Transfer]): Validation[List[ParsedTransfer]] = {
     transfers.traverse {

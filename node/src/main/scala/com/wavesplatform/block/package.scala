@@ -30,11 +30,11 @@ package object block {
 
   // Sign
   private[block] implicit class BlockSignOps(block: Block) {
-    def sign(signer: PrivateKey): Block = block.copy(signature = crypto.sign(signer, ByteStr(block.bytesWithoutSignature())))
+    def sign(signer: PrivateKey): Block = block.copy(signature = crypto.sign(signer, block.bytesWithoutSignature()))
   }
 
   private[block] implicit class MicroBlockSignOps(microBlock: MicroBlock) {
-    def sign(signer: PrivateKey): MicroBlock = microBlock.copy(signature = crypto.sign(signer, ByteStr(microBlock.bytesWithoutSignature())))
+    def sign(signer: PrivateKey): MicroBlock = microBlock.copy(signature = crypto.sign(signer, microBlock.bytesWithoutSignature()))
   }
 
   def transactionProof(transaction: Transaction, transactionData: Seq[Transaction]): Option[TransactionProof] =
@@ -54,5 +54,5 @@ package object block {
 
   def mkTransactionsRoot(version: Byte, transactionData: Seq[Transaction]): ByteStr =
     if (version < Block.ProtoBlockVersion) ByteStr.empty
-    else ByteStr(mkLevels(transactionData.map(PBTransactions.protobuf(_).toByteArray)).transactionsRoot)
+    else mkLevels(transactionData.map(PBTransactions.protobuf(_).toByteArray)).transactionsRoot
 }

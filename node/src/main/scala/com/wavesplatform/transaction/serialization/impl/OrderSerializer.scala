@@ -3,7 +3,6 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.protobuf.transaction.PBOrders
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.serialization.ByteBufferOps
@@ -19,9 +18,9 @@ object OrderSerializer {
     Json.obj(
       "version"          -> version,
       "id"               -> idStr(),
-      "sender"           -> senderPublicKey.stringRepr,
-      "senderPublicKey"  -> Base58.encode(senderPublicKey),
-      "matcherPublicKey" -> Base58.encode(matcherPublicKey),
+      "sender"           -> senderPublicKey.toAddress,
+      "senderPublicKey"  -> senderPublicKey,
+      "matcherPublicKey" -> matcherPublicKey,
       "assetPair"        -> assetPair.json,
       "orderType"        -> orderType.toString,
       "amount"           -> amount,
@@ -40,8 +39,8 @@ object OrderSerializer {
     version match {
       case Order.V1 =>
         Bytes.concat(
-          senderPublicKey,
-          matcherPublicKey,
+          senderPublicKey.arr,
+          matcherPublicKey.arr,
           assetPair.bytes,
           orderType.bytes,
           Longs.toByteArray(price),
@@ -54,8 +53,8 @@ object OrderSerializer {
       case Order.V2 =>
         Bytes.concat(
           Array(version),
-          senderPublicKey,
-          matcherPublicKey,
+          senderPublicKey.arr,
+          matcherPublicKey.arr,
           assetPair.bytes,
           orderType.bytes,
           Longs.toByteArray(price),
@@ -68,8 +67,8 @@ object OrderSerializer {
       case Order.V3 =>
         Bytes.concat(
           Array(version),
-          senderPublicKey,
-          matcherPublicKey,
+          senderPublicKey.arr,
+          matcherPublicKey.arr,
           assetPair.bytes,
           orderType.bytes,
           Longs.toByteArray(price),
@@ -88,7 +87,7 @@ object OrderSerializer {
   def toBytes(ord: Order): Array[Byte] = {
     import ord._
     version match {
-      case Order.V1            => Bytes.concat(this.bodyBytes(ord), proofs.toSignature)
+      case Order.V1            => Bytes.concat(this.bodyBytes(ord), proofs.toSignature.arr)
       case Order.V2 | Order.V3 => Bytes.concat(this.bodyBytes(ord), proofs.bytes())
     }
   }

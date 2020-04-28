@@ -58,7 +58,7 @@ object PureContext {
   lazy val sumByteStr: BaseFunction[NoContext] =
     createRawOp(SUM_OP, BYTESTR, BYTESTR, SUM_BYTES, 10) {
       case (CONST_BYTESTR(a), CONST_BYTESTR(b)) =>
-        if(a.length + b.length <= MaxStringResult) {
+        if(a.arr.length + b.arr.length <= MaxStringResult) {
           CONST_BYTESTR(a ++ b)
         } else {
           Left("ByteVector is too large")

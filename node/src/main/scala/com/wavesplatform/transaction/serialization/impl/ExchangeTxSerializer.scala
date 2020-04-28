@@ -70,7 +70,7 @@ object ExchangeTxSerializer {
 
   def toBytes(tx: ExchangeTransaction): Array[Byte] = {
     tx.version match {
-      case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), tx.proofs.toSignature)
+      case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), tx.proofs.toSignature.arr)
       case TxVersion.V2 => Bytes.concat(this.bodyBytes(tx), tx.proofs.bytes())
       case _            => PBTransactionSerializer.bytes(tx)
     }

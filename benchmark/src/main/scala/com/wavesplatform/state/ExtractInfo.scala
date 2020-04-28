@@ -6,6 +6,7 @@ import java.util.concurrent.ThreadLocalRandom
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{DBExt, Keys, LevelDBFactory, LevelDBWriter, loadBlock}
 import com.wavesplatform.lang.v1.traits.DataType
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
@@ -101,7 +102,7 @@ object ExtractInfo extends App with ScorexLogging {
       test <- b.transactionData
         .collect {
           case tx: DataTransaction =>
-            val addr = tx.sender.toAddress.bytes
+            val addr = ByteStr(tx.sender.toAddress.bytes)
             tx.data.collectFirst {
               case x: IntegerDataEntry => DataTestData(addr, x.key, DataType.Long)
               case x: BooleanDataEntry => DataTestData(addr, x.key, DataType.Boolean)

@@ -2,24 +2,23 @@ package com.wavesplatform.account
 
 import java.nio.ByteBuffer
 
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.TxValidationError._
 
 trait AddressOrAlias {
   def stringRepr: String
-  def bytes: ByteStr
+  def bytes: Array[Byte]
   def chainId: Byte
 
   override def toString: String = stringRepr
 
   override def equals(obj: Any): Boolean = obj match {
-    case a: AddressOrAlias => bytes == a.bytes
+    case a: AddressOrAlias => java.util.Arrays.equals(bytes, a.bytes)
     case _                 => false
   }
 
-  override def hashCode(): Int = java.util.Arrays.hashCode(bytes.arr)
+  override def hashCode(): Int = java.util.Arrays.hashCode(bytes)
 }
 
 object AddressOrAlias {

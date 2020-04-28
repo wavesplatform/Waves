@@ -39,8 +39,8 @@ class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[Raw
         out.add(RawBytes(BlockIdsSpec.messageCode, BlockIdsSpec.serializeData(s)))
       } else {
         val supported = s.signatures
-          .dropWhile(_.length != crypto.SignatureLength)
-          .takeWhile(_.length == crypto.SignatureLength)
+          .dropWhile(_.arr.length != crypto.SignatureLength)
+          .takeWhile(_.arr.length == crypto.SignatureLength)
         out.add(RawBytes(SignaturesSpec.messageCode, SignaturesSpec.serializeData(s.copy(signatures = supported))))
       }
 

@@ -24,7 +24,7 @@ object ReissueTxSerializer {
   def bodyBytes(tx: ReissueTransaction): Array[Byte] = {
     import tx._
     lazy val baseBytes = Bytes.concat(
-      sender,
+      sender.arr,
       asset.id.arr,
       Longs.toByteArray(quantity),
       if (reissuable) Array(1: Byte) else Array(0: Byte),
@@ -49,7 +49,7 @@ object ReissueTxSerializer {
 
   def toBytes(tx: ReissueTransaction): Array[Byte] = {
     tx.version match {
-      case TxVersion.V1 => Bytes.concat(Array(tx.typeId), tx.proofs.toSignature, this.bodyBytes(tx)) // Signature before body, typeId appears twice
+      case TxVersion.V1 => Bytes.concat(Array(tx.typeId), tx.proofs.toSignature.arr, this.bodyBytes(tx)) // Signature before body, typeId appears twice
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
       case _            => PBTransactionSerializer.bytes(tx)
     }

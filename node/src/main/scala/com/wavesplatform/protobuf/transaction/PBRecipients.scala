@@ -2,7 +2,6 @@ package com.wavesplatform.protobuf.transaction
 import com.google.common.primitives.Bytes
 import com.google.protobuf.ByteString
 import com.wavesplatform.account._
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -14,7 +13,7 @@ object PBRecipients {
     case _          => sys.error("Should not happen " + addressOrAlias)
   }
 
-  def toAddress(bytes: ByteStr, chainId: Byte): Either[ValidationError, Address] = bytes.length match {
+  def toAddress(bytes: Array[Byte], chainId: Byte): Either[ValidationError, Address] = bytes.length match {
     case Address.HashLength => // Compressed address
       val withHeader = Bytes.concat(Array(Address.AddressVersion, chainId), bytes)
       val checksum   = Address.calcCheckSum(withHeader)
@@ -48,5 +47,5 @@ object PBRecipients {
 
   @inline
   final def publicKeyHash(address: Address): Array[Byte] =
-    address.bytes.arr.slice(2, address.bytes.arr.length - Address.ChecksumLength)
+    address.bytes.slice(2, address.bytes.length - Address.ChecksumLength)
 }

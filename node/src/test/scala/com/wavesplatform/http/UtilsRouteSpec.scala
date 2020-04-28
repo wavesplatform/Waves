@@ -596,7 +596,6 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
     Post(routePath("/script/estimate"), dAppBase64) ~> route ~> check {
       val json = responseAs[JsValue]
-      println(json)
       (json \ "script").as[String] shouldBe dAppBase64
       (json \ "complexity").as[Long] shouldBe 68
       (json \ "verifierComplexity").as[Long] shouldBe 11
@@ -606,7 +605,6 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
     Post(routePath("/script/estimate"), dAppWithoutVerifierBase64) ~> route ~> check {
       val json = responseAs[JsValue]
-      println(json)
       (json \ "script").as[String] shouldBe dAppWithoutVerifierBase64
       (json \ "complexity").as[Long] shouldBe 68
       (json \ "verifierComplexity").as[Long] shouldBe 0
@@ -616,7 +614,6 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
     Post(routePath("/script/estimate"), emptyDAppBase64) ~> route ~> check {
       val json = responseAs[JsValue]
-      println(json)
       (json \ "script").as[String] shouldBe emptyDAppBase64
       (json \ "complexity").as[Long] shouldBe 0
       (json \ "verifierComplexity").as[Long] shouldBe 0

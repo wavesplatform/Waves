@@ -37,7 +37,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
   val preconditionsAndSetScript: Gen[(GenesisTransaction, SetScriptTransaction)] = for {
     master <- accountGen
     ts     <- timestampGen
-    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+    genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
     fee    <- smallFeeGen
     script <- Gen.option(scriptGen)
   } yield (genesis, SetScriptTransaction.selfSigned(1.toByte, master, script, fee, ts).explicitGet())
@@ -62,7 +62,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
       version <- Gen.oneOf(SetScriptTransaction.supportedVersions.toSeq)
       master  <- accountGen
       ts      <- timestampGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       fee <- smallFeeGen
     } yield (genesis, SetScriptTransaction.selfSigned(1.toByte, master, Some(script), fee, ts).explicitGet())
 
@@ -71,7 +71,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
       case (genesis, setScript) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), fs) {
           case (blockDiff, newState) =>
-            newState.accountScript(setScript.sender).map(_.script) shouldBe setScript.script
+            newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
         }
     }
   }
@@ -81,7 +81,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
       case (genesis, setScript) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), fs) {
           case (blockDiff, newState) =>
-            newState.accountScript(setScript.sender).map(_.script) shouldBe setScript.script
+            newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
         }
     }
   }
@@ -102,7 +102,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
     val setup = for {
       master <- accountGen
       ts     <- positiveLongGen
-      genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       expr    = BLOCK(LET("x", CONST_LONG(3)), CONST_BOOLEAN(true))
       script  = ExprScript(V1, expr, checkSize = false).explicitGet()
       tx      = SetScriptTransaction.selfSigned(1.toByte, master, Some(script), 100000, ts + 1).explicitGet()
@@ -272,7 +272,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
         case (genesis, setScript) =>
           assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), settings) {
             case (blockDiff, newState) =>
-              newState.accountScript(setScript.sender).map(_.script) shouldBe setScript.script
+              newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
           }
       }
     }

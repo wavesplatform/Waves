@@ -4,6 +4,7 @@ import cats.Id
 import cats.syntax.monoid._
 import com.google.common.primitives.Ints
 import com.wavesplatform.common.merkle.Merkle._
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values._
@@ -143,7 +144,7 @@ class MerkleTest extends PropSpec with PropertyChecks with Matchers {
     forAll(Gen.oneOf(leafs.zipWithIndex)) { case (leaf, index) =>
       val proofs = mkProofs(index, levels)
 
-      eval(scriptCreateRootSrc(proofs, hash(leaf), index), V4) shouldBe CONST_BYTESTR(levels.head.head)
+      eval(scriptCreateRootSrc(proofs, hash(leaf), index), V4) shouldBe CONST_BYTESTR(ByteStr(levels.head.head))
     }
   }
 

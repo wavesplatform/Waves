@@ -26,7 +26,7 @@ object SetAssetScriptTxSerializer {
       case TxVersion.V1 =>
         Bytes.concat(
           Array(builder.typeId, version, chainId),
-          sender,
+          sender.arr,
           asset.id.arr,
           Longs.toByteArray(fee),
           Longs.toByteArray(timestamp),
