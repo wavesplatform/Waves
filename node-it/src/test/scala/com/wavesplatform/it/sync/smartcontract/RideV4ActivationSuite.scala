@@ -1,9 +1,10 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
-import com.wavesplatform.api.http.ApiError.{NonPositiveAmount, ScriptExecutionError, StateCheckFailed}
+import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -14,7 +15,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.{Assertion, CancelAfterFailure, Ignore}
+import org.scalatest.{Assertion, CancelAfterFailure}
 
 import scala.concurrent.duration._
 
@@ -24,12 +25,12 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.Builder(Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((16, activationHeight - 1)))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.BlockV5.id, activationHeight - 1)))
       .buildNonConflicting()
 
-  private val smartAccV4  = pkByAddress(firstAddress).stringRepr
-  private val callerAcc = pkByAddress(secondAddress).stringRepr
-  private val smartAccV3  = pkByAddress(thirdAddress).stringRepr
+  private val smartAccV4  = firstAddress
+  private val callerAcc = secondAddress
+  private val smartAccV3  = thirdAddress
 
   private var asset: Asset = _
 
@@ -85,17 +86,11 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
       |this.quantity > 0
       |""".stripMargin
 
-  test("prerequisite: issue asset") {
-    val assetId = sender.issue(smartAccV3, quantity = 1000, waitForTx = true).id
-    asset = IssuedAsset(ByteStr.decodeBase58(assetId).get)
-    sender.setScript(smartAccV3, Some(dAppV3.compiled), waitForTx = true)
-  }
-
   test("can't set V4 contracts before the feature activation") {
     def assertFeatureNotActivated[R](f: => R): Assertion = assertApiError(f) { e =>
       e.statusCode shouldBe 400
       e.id shouldBe StateCheckFailed.Id
-      e.message should include("Ride V4 and multiple attached payments for Invoke Script Transaction feature has not been activated")
+      e.message should include("Ride V4, VRF, Protobuf, Failed transactions feature has not been activated")
     }
 
     assertFeatureNotActivated(sender.setScript(smartAccV4, Some(dAppV4.compiled)))
@@ -208,8 +203,8 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
       sender.invokeScript(callerAcc, smartAccV3, payment = Seq(Payment(1, Waves), Payment(1, Waves)), waitForTx = true)
     ) { error =>
       error.statusCode shouldBe 400
-      error.id shouldBe ScriptExecutionError.Id
       error.message should include("DApp version 3 < 4 doesn't support multiple payment attachment")
+      error.id shouldBe StateCheckFailed.Id
     }
   }
 
@@ -353,6 +348,12 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
     )(_.statusCode shouldBe 400)
   }
 
+  protected override def beforeAll(): Unit = {
+    super.beforeAll()
+    val assetId = sender.issue(smartAccV3, quantity = 1000, waitForTx = true).id
+    asset = IssuedAsset(ByteStr.decodeBase58(assetId).get)
+    sender.setScript(smartAccV3, Some(dAppV3.compiled), waitForTx = true)
+  }
 }
 
 object RideV4ActivationSuite {

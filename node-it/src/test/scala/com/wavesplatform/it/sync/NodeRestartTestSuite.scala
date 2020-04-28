@@ -4,6 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{ReportingTestName, WaitForHeight2}
@@ -36,7 +37,7 @@ class NodeRestartTestSuite extends FreeSpec with Matchers with WaitForHeight2 wi
     val txJson = TransferTransaction
       .selfSigned(
         1.toByte,
-        nodeB.privateKey,
+        nodeB.keyPair,
         AddressOrAlias.fromString(nodeA.address).explicitGet(),
         Waves,
         1.waves,
@@ -51,7 +52,7 @@ class NodeRestartTestSuite extends FreeSpec with Matchers with WaitForHeight2 wi
     val tx = nodeB.signedBroadcast(txJson, waitForTx = true)
     nodeA.waitForTransaction(tx.id)
 
-    val txHeight = nodeA.transactionInfo(tx.id).height
+    val txHeight = nodeA.transactionInfo[TransactionInfo](tx.id).height
 
     nodes.waitForHeightArise()
 

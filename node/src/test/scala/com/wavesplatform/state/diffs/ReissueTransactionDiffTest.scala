@@ -34,7 +34,7 @@ class ReissueTransactionDiffTest
       reissue      <- reissueTx(issuer, IssuedAsset(issue.assetId), BeforeActivationFee)
       b2 = TestBlock.create(
         ntpNow,
-        b1.uniqueId,
+        b1.id(),
         Seq(issue),
         issuer
       )
@@ -60,13 +60,13 @@ class ReissueTransactionDiffTest
       reissue      <- reissueTx(issuer, IssuedAsset(issue1.assetId), AfterActivationFee)
       b2 = TestBlock.create(
         ntpNow,
-        b1.uniqueId,
+        b1.id(),
         Seq(issue1),
         issuer
       )
       b3 = TestBlock.create(
         ntpNow,
-        b2.uniqueId,
+        b2.id(),
         Seq(issue2),
         issuer
       )
@@ -99,18 +99,18 @@ class ReissueTransactionDiffTest
       issuer <- accountGen
       block = TestBlock.create(
         ntpNow,
-        Seq(GenesisTransaction.create(issuer, Constants.TotalWaves * Constants.UnitsInWave, ntpNow).explicitGet())
+        Seq(GenesisTransaction.create(issuer.toAddress, Constants.TotalWaves * Constants.UnitsInWave, ntpNow).explicitGet())
       )
     } yield (issuer, block)
 
   private def issueTx(issuer: KeyPair): Gen[IssueTransaction] =
     for {
-      name        <- genBoundedBytes(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
-      description <- genBoundedBytes(0, IssueTransaction.MaxAssetNameLength)
+      name        <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
+      description <- genBoundedString(0, IssueTransaction.MaxAssetNameLength)
       quantity    <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
       decimals    <- Gen.choose(0: Byte, 8: Byte)
       fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
-      tx          <- createLegacyIssue(issuer, name, description, quantity, decimals, true, fee, ntpNow)
+      tx          <- createLegacyIssue(issuer, name.getBytes, description.getBytes, quantity, decimals, true, fee, ntpNow)
     } yield tx
 
   private def reissueTx(reissuer: KeyPair, assetId: IssuedAsset, fee: Long): Gen[(ReissueTransaction, ReissueTransaction, ReissueTransaction)] =
@@ -135,7 +135,7 @@ object ReissueTransactionDiffTest {
       blocksForFeatureActivation = 1,
       preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures ++ Seq(
         BlockchainFeatures.FeeSponsorship.id           -> 0,
-        BlockchainFeatures.MultiPaymentInvokeScript.id -> 3
+        BlockchainFeatures.BlockV5.id -> 3
       )
     )
 

@@ -4,7 +4,8 @@ private[node] case class BlockInfoResponse(
   timestamp: Long,
   height: Int,
   `nxt-consensus`: NxtData,
-  generator: ByteString
+  generator: ByteString,
+  VRF: Option[ByteString]
 )
 
 private[node] case class NxtData(

@@ -59,8 +59,19 @@ object WavesContext {
     )
   }
 
-  private def fromV3Funcs(v: StdLibVersion) =
-    extractedFuncs(v) ++ Array(assetInfoF(v), blockInfoByHeightF, stringFromAddressF)
+  private def fromV3Funcs(proofsEnabled: Boolean, v: StdLibVersion) =
+    extractedFuncs(v) ++ Array(
+      assetInfoF(v),
+      blockInfoByHeightF(v),
+      transferTxByIdF(proofsEnabled, v),
+      stringFromAddressF
+    )
+
+  private def fromV4Funcs(proofsEnabled: Boolean, version: StdLibVersion) =
+    fromV3Funcs(proofsEnabled, version) ++ Array(
+      calculateAssetIdF,
+      transactionFromProtoBytesF(proofsEnabled, version)
+    )
 
   private def variableFuncs(version: StdLibVersion, c: ContentType, proofsEnabled: Boolean) = {
     val commonFuncs =
@@ -74,12 +85,12 @@ object WavesContext {
         getBinaryByIndexF(version),
         getStringByIndexF(version),
       )
-    lazy val v4Funcs = fromV3Funcs(version) :+ transferTxByIdF(proofsEnabled, version) :+ parseBlockHeaderF
+
     val versionSpecificFuncs =
       version match {
         case V1 | V2 => Array(txByIdF(proofsEnabled, version))
-        case V3      => fromV3Funcs(version) :+ transferTxByIdF(proofsEnabled, version)
-        case V4      => v4Funcs
+        case V3      => fromV3Funcs(proofsEnabled, version)
+        case V4      => fromV4Funcs(proofsEnabled, version)
      }
     commonFuncs ++ versionSpecificFuncs
   }
@@ -97,13 +108,12 @@ object WavesContext {
       case V3 | V4 =>
         val `this` = if (isTokenContext) assetThis(version) else accountThis
         val txO    = if (contentType == Expression) Map(txVal) else Map()
-        val common = Map(sell, buy, lastBlock, `this`)
+        val common = Map(sell, buy, lastBlock(version), `this`)
         common ++ txO
     }
   }
 
   private def variableTypes(version: StdLibVersion, proofsEnabled: Boolean) =
     buildWavesTypes(proofsEnabled, version)           ++
-    (if (version >= V3) dAppTypes(version) else Nil)  ++
-    (if (version >= V4) List(blockHeader)  else Nil)
+    (if (version >= V3) dAppTypes(version) else Nil)
 }

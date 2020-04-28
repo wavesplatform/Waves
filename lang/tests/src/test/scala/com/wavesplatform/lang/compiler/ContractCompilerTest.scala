@@ -5,7 +5,7 @@ import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.{Common, Global}
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
@@ -815,7 +815,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |     BinaryEntry("key", base58''),
           |     DeleteEntry("key"),
           |     ScriptTransfer(i.caller, 1, base58''),
-          |     Issue(unit, 4, "description", true, "name", 1000, 0),
+          |     Issue("name", "description", 1000, 4, true, unit, 0),
           |     Reissue(base58'', false, 1),
           |     Burn(base58'', 1)
           |   ]

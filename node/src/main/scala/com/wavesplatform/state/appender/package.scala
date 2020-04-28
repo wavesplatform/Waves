@@ -74,12 +74,12 @@ package object appender extends ScorexLogging {
   )(block: Block): Either[ValidationError, Option[Int]] =
     for {
       _ <- Either.cond(
-        !blockchainUpdater.hasScript(block.sender),
+        !blockchainUpdater.hasAccountScript(block.sender.toAddress),
         (),
         BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block)
       )
       hitSource <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime(), block) { (height, parent) =>
-        val balance = blockchainUpdater.generatingBalance(block.sender, parent)
+        val balance = blockchainUpdater.generatingBalance(block.sender.toAddress, Some(parent))
         Either.cond(
           blockchainUpdater.isEffectiveBalanceValid(height, block, balance),
           balance,
@@ -120,7 +120,7 @@ package object appender extends ScorexLogging {
           _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
           _                <- pos.validateBaseTarget(height, block, parent, grandParent)
           hitSource        <- pos.validateGenerationSignature(block)
-          _                <- pos.validateBlockDelay(height, block, parent, effectiveBalance).orElse(checkExceptions(height, block))
+          _                <- pos.validateBlockDelay(height, block.header, parent, effectiveBalance).orElse(checkExceptions(height, block))
         } yield hitSource
       }
       .left
@@ -132,29 +132,18 @@ package object appender extends ScorexLogging {
   private def checkExceptions(height: Int, block: Block): Either[ValidationError, Unit] = {
     Either
       .cond(
-        exceptions.contains((height, block.uniqueId)),
+        exceptions.contains((height, block.id())),
         (),
         GenericError(s"Block time ${block.header.timestamp} less than expected")
       )
   }
 
-  private def validateBlockVersion(height: Int, block: Block, blockchain: Blockchain): Either[ValidationError, Unit] = {
-    val version3Height  = blockchain.settings.functionalitySettings.blockVersion3AfterHeight
-    val versionAtHeight = blockchain.blockVersionAt(height)
-    for {
-      _ <- Either.cond(
-        height > version3Height
-          || block.header.version == Block.GenesisBlockVersion
-          || block.header.version == Block.PlainBlockVersion,
-        (),
-        GenericError(s"Block Version 3 can only appear at height greater than $version3Height")
-      )
-      _ <- Either.cond(
-        versionAtHeight <= block.header.version,
-        (),
-        GenericError(s"Block Version ${block.header.version} is lower than $versionAtHeight")
-      )
-    } yield ()
+  private def validateBlockVersion(parentHeight: Int, block: Block, blockchain: Blockchain): Either[ValidationError, Unit] = {
+    Either.cond(
+      blockchain.blockVersionAt(parentHeight + 1) == block.header.version,
+      (),
+      GenericError(s"Block version should be equal to ${blockchain.blockVersionAt(parentHeight + 1)}")
+    )
   }
 
   private[this] object metrics {

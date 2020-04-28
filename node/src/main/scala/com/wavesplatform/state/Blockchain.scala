@@ -1,15 +1,16 @@
 package com.wavesplatform.state
 
-import com.wavesplatform.account.{Address, Alias, PublicKey}
-import com.wavesplatform.block.Block.{BlockId, BlockInfo}
-import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
+import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state.extensions.{AddressTransactions, BlockchainExtensions, Distributions}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
@@ -20,25 +21,12 @@ trait Blockchain {
   def height: Int
   def score: BigInt
 
-  def blockInfo(height: Int): Option[BlockInfo]
-  def blockInfo(blockId: ByteStr): Option[BlockInfo]
+  def blockHeader(height: Int): Option[SignedBlockHeader]
+  def hitSource(height: Int): Option[ByteStr]
 
-  def lastBlock: Option[Block]
   def carryFee: Long
-  def blockBytes(height: Int): Option[Array[Byte]]
-  def blockBytes(blockId: ByteStr): Option[Array[Byte]]
 
   def heightOf(blockId: ByteStr): Option[Int]
-
-  /** Returns the most recent block IDs, starting from the most recent  one */
-  def lastBlockIds(howMany: Int): Seq[ByteStr]
-
-  /** Returns a chain of blocks starting with the block with the given ID (from oldest to newest) */
-  def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]]
-
-  def parentHeader(block: BlockHeader, back: Int = 1): Option[BlockHeader]
-
-  def totalFee(height: Int): Option[Long]
 
   /** Features related */
   def approvedFeatures: Map[Short, Int]
@@ -47,13 +35,12 @@ trait Blockchain {
 
   /** Block reward related */
   def blockReward(height: Int): Option[Long]
-  def lastBlockReward: Option[Long]
   def blockRewardVotes(height: Int): Seq[Long]
 
   def wavesAmount(height: Int): BigInt
 
   def transferById(id: ByteStr): Option[(Int, TransferTransaction)]
-  def transactionInfo(id: ByteStr): Option[(Int, Transaction)]
+  def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)]
   def transactionHeight(id: ByteStr): Option[Int]
 
   def containsTransaction(tx: Transaction): Boolean
@@ -67,41 +54,102 @@ trait Blockchain {
   def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
-  def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot]
+  def balanceOnlySnapshots(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)]
+  def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot]
 
-  def accountScriptWithComplexity(address: Address): Option[(PublicKey, Script, Long, Map[String, Long])]
-  def accountScript(address: Address): Option[Script] = accountScriptWithComplexity(address).map(_._2)
-  def hasScript(address: Address): Boolean
+  def accountScript(address: Address): Option[AccountScriptInfo]
+  def hasAccountScript(address: Address): Boolean
 
-  def assetScriptWithComplexity(id: IssuedAsset): Option[(PublicKey, Script, Long)]
-  def assetScript(id: IssuedAsset): Option[Script] = assetScriptWithComplexity(id).map(_._2)
-  def hasAssetScript(id: IssuedAsset): Boolean
+  def assetScript(id: IssuedAsset): Option[(Script, Long)]
 
-  def accountDataKeys(address: Address): Set[String]
   def accountData(acc: Address, key: String): Option[DataEntry[_]]
-  def accountData(acc: Address): AccountDataInfo
 
   def leaseBalance(address: Address): LeaseBalance
 
   def balance(address: Address, mayBeAssetId: Asset = Waves): Long
 
-  def collectActiveLeases(from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction]
+  def collectActiveLeases(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction]
 
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
     *
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
   def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A]
-
-  def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult]
-
-  /**
-    * Retrieves hit source for the block at height.
-    */
-  def hitSourceAtHeight(height: Int): Option[ByteStr]
 }
 
-object Blockchain extends BlockchainExtensions {
-  override implicit def addressTransactions(value: Blockchain): AddressTransactions = super.addressTransactions(value)
+object Blockchain {
+  implicit class BlockchainExt(private val blockchain: Blockchain) extends AnyVal {
+    def isEmpty: Boolean = blockchain.height == 0
 
-  override implicit def distributions(value: Blockchain): Distributions = super.distributions(value)
+    def parentHeader(block: BlockHeader, back: Int = 1): Option[BlockHeader] =
+      blockchain
+        .heightOf(block.reference)
+        .map(_ - (back - 1).max(0))
+        .flatMap(h => blockchain.blockHeader(h).map(_.header))
+
+    def contains(block: Block): Boolean       = blockchain.contains(block.id())
+    def contains(blockId: ByteStr): Boolean = blockchain.heightOf(blockId).isDefined
+
+    def blockId(atHeight: Int): Option[ByteStr] = blockchain.blockHeader(atHeight).map(_.id())
+
+    def lastBlockHeader: Option[SignedBlockHeader] = blockchain.blockHeader(blockchain.height)
+    def lastBlockId: Option[ByteStr]               = lastBlockHeader.map(_.id())
+    def lastBlockTimestamp: Option[Long]           = lastBlockHeader.map(_.header.timestamp)
+    def lastBlockIds(howMany: Int): Seq[ByteStr]   = (blockchain.height to blockchain.height - howMany by -1).flatMap(blockId)
+
+    def resolveAlias(aoa: AddressOrAlias): Either[ValidationError, Address] =
+      aoa match {
+        case a: Address => Right(a)
+        case a: Alias   => blockchain.resolveAlias(a)
+      }
+
+    def canCreateAlias(alias: Alias): Boolean = blockchain.resolveAlias(alias) match {
+      case Left(AliasDoesNotExist(_)) => true
+      case _                          => false
+    }
+
+    def effectiveBalance(address: Address, confirmations: Int, block: Option[BlockId] = blockchain.lastBlockId): Long = {
+      val blockHeight = block.flatMap(b => blockchain.heightOf(b)).getOrElse(blockchain.height)
+      val bottomLimit = (blockHeight - confirmations + 1).max(1).min(blockHeight)
+      val balances    = blockchain.balanceSnapshots(address, bottomLimit, block)
+      if (balances.isEmpty) 0L else balances.view.map(_.effectiveBalance).min
+    }
+
+    def balance(address: Address, atHeight: Int, confirmations: Int): Long = {
+      val bottomLimit = (atHeight - confirmations + 1).max(1).min(atHeight)
+      val blockId   = blockchain.blockHeader(atHeight).getOrElse(throw new IllegalArgumentException(s"Invalid block height: $atHeight")).id()
+      val balances    = blockchain.balanceSnapshots(address, bottomLimit, Some(blockId))
+      if (balances.isEmpty) 0L else balances.view.map(_.regularBalance).min
+    }
+
+    def unsafeHeightOf(id: ByteStr): Int =
+      blockchain
+        .heightOf(id)
+        .getOrElse(throw new IllegalStateException(s"Can't find a block: $id"))
+
+    def wavesPortfolio(address: Address): Portfolio = Portfolio(
+      blockchain.balance(address),
+      blockchain.leaseBalance(address),
+      Map.empty
+    )
+
+    def isMiningAllowed(height: Int, effectiveBalance: Long): Boolean =
+      GeneratingBalanceProvider.isMiningAllowed(blockchain, height, effectiveBalance)
+
+    def isEffectiveBalanceValid(height: Int, block: Block, effectiveBalance: Long): Boolean =
+      GeneratingBalanceProvider.isEffectiveBalanceValid(blockchain, height, block, effectiveBalance)
+
+    def generatingBalance(account: Address, blockId: Option[BlockId] = None): Long =
+      GeneratingBalanceProvider.balance(blockchain, account, blockId)
+
+    def allActiveLeases: Seq[LeaseTransaction] = blockchain.collectActiveLeases(_ => true)
+
+    def lastBlockReward: Option[Long] = blockchain.blockReward(blockchain.height)
+
+    def hasAssetScript(asset: IssuedAsset): Boolean = blockchain.assetScript(asset).isDefined
+
+    def vrf(atHeight: Int): Option[ByteStr] =
+      blockchain
+        .blockHeader(atHeight)
+        .flatMap(header => if (header.header.version >= Block.ProtoBlockVersion) blockchain.hitSource(atHeight) else None)
+  }
 }

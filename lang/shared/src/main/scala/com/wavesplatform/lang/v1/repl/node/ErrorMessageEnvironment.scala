@@ -1,8 +1,9 @@
 package com.wavesplatform.lang.v1.repl.node
 
-import com.wavesplatform.lang.v1.traits.{DataType, Environment}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
-import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, BlockInfo, Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 
 import scala.concurrent.Future
 
@@ -21,8 +22,9 @@ object ErrorMessageEnvironment extends Environment[Future] {
   override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Future[Option[Any]]                   = unavailable
   override def resolveAlias(name: String): Future[Either[String, Recipient.Address]]                                   = unavailable
   override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Future[Either[String, Long]] = unavailable
-  override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                              = unavailable
   override def multiPaymentAllowed: Boolean                                                                            = unavailable
+  override def txId: ByteStr                                                                                           = unavailable
+  override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                                       = unavailable
 }
 
 class BlockchainUnavailableException extends RuntimeException {

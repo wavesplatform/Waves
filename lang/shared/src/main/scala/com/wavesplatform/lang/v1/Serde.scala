@@ -3,12 +3,12 @@ package com.wavesplatform.lang.v1
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
+import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import cats.implicits._
-import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.utils.Serialize._
-import monix.eval.{Coeval, CoevalLift}
+import com.wavesplatform.lang.v1.compiler.Terms._
+import monix.eval.Coeval
 
 import scala.util.Try
 
@@ -47,6 +47,8 @@ object Serde {
           out.writeInt(args.size)
           args.foreach(out.writeString)
         } *> aux(body)
+      case _: FAILED_DEC =>
+        Coeval.raiseError(new Exception("Attempt to serialize failed declaration."))
     }
   }
 
@@ -124,7 +126,7 @@ object Serde {
               (1 to argsCount)
                 .toStream
                 .traverse(_ => evaluatedOnly(desAux(bb)))
-                .map(elements => ARR(elements.toIndexedSeq))
+                .map(elements => ARR(elements.toIndexedSeq, false).explicitGet)
             else
               tooBigArray(bb)
           )

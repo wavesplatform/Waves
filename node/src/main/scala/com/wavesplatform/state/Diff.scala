@@ -3,6 +3,7 @@ package com.wavesplatform.state
 import cats.data.Ior
 import cats.implicits._
 import cats.kernel.{Monoid, Semigroup}
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
@@ -12,6 +13,8 @@ import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, Transaction}
 import play.api.libs.json._
+
+import scala.collection.mutable.LinkedHashMap
 
 case class LeaseBalance(in: Long, out: Long)
 
@@ -41,10 +44,13 @@ object VolumeAndFee {
   }
 }
 
-case class AssetInfo(name: Either[ByteStr, String], description: Either[ByteStr, String], lastUpdatedAt: Height)
+case class AssetInfo(name: ByteString, description: ByteString, lastUpdatedAt: Height)
 
 object AssetInfo {
   implicit val sg: Semigroup[AssetInfo] = (x, y) => y
+
+  def apply(name: String, description: String, lastUpdatedAt: Height): AssetInfo =
+    AssetInfo(ByteString.copyFromUtf8(name), ByteString.copyFromUtf8(description), lastUpdatedAt)
 }
 
 case class AssetStaticInfo(source: TransactionId, issuer: PublicKey, decimals: Int, nft: Boolean)
@@ -61,13 +67,13 @@ object AssetVolumeInfo {
 case class AssetDescription(
     source: ByteStr,
     issuer: PublicKey,
-    name: Either[ByteStr, String],
-    description: Either[ByteStr, String],
+    name: ByteString,
+    description: ByteString,
     decimals: Int,
     reissuable: Boolean,
     totalVolume: BigInt,
     lastUpdatedAt: Height,
-    script: Option[Script],
+    script: Option[(Script, Long)],
     sponsorship: Long,
     nft: Boolean
 )
@@ -116,29 +122,31 @@ object Sponsorship {
       .map(h => h + blockchain.settings.functionalitySettings.activationWindowSize(h))
       .getOrElse(Int.MaxValue)
 
-  def toWaves(assetFee: Long, sponsorship: Long): Long = {
-    if (sponsorship == 0) return Long.MaxValue
-    val waves = BigInt(assetFee) * FeeValidation.FeeUnit / sponsorship
-    waves.bigInteger.longValueExact()
-  }
+  def toWaves(assetFee: Long, sponsorship: Long): Long =
+    if (sponsorship == 0) Long.MaxValue
+    else {
+      val waves = BigInt(assetFee) * FeeValidation.FeeUnit / sponsorship
+      waves.bigInteger.longValueExact()
+    }
 
-  def fromWaves(wavesFee: Long, sponsorship: Long): Long = {
-    if (wavesFee == 0 || sponsorship == 0) return 0
-    val assetFee = BigInt(wavesFee) * sponsorship / FeeValidation.FeeUnit
-    assetFee.bigInteger.longValueExact()
-  }
+  def fromWaves(wavesFee: Long, sponsorship: Long): Long =
+    if (wavesFee == 0 || sponsorship == 0) 0
+    else {
+      val assetFee = BigInt(wavesFee) * sponsorship / FeeValidation.FeeUnit
+      assetFee.bigInteger.longValueExact()
+    }
 }
 
 case class Diff(
-    transactions: Map[ByteStr, (Transaction, Set[Address])],
+    transactions: collection.Map[ByteStr, (Transaction, Set[Address], Boolean)],
     portfolios: Map[Address, Portfolio],
     issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)],
     updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
     aliases: Map[Alias, Address],
     orderFills: Map[ByteStr, VolumeAndFee],
     leaseState: Map[ByteStr, Boolean],
-    scripts: Map[Address, Option[(PublicKey, Script, Long, Map[String, Long])]],
-    assetScripts: Map[IssuedAsset, Option[(PublicKey, Script, Long)]],
+    scripts: Map[Address, Option[AccountScriptInfo]],
+    assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
     accountData: Map[Address, AccountDataInfo],
     sponsorship: Map[IssuedAsset, Sponsorship],
     scriptsRun: Int,
@@ -154,14 +162,14 @@ object Diff {
       aliases: Map[Alias, Address] = Map.empty,
       orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
       leaseState: Map[ByteStr, Boolean] = Map.empty,
-      scripts: Map[Address, Option[(PublicKey, Script, Long, Map[String, Long])]] = Map.empty,
-      assetScripts: Map[IssuedAsset, Option[(PublicKey, Script, Long)]] = Map.empty,
+      scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,
+      assetScripts: Map[IssuedAsset, Option[(Script, Long)]] = Map.empty,
       accountData: Map[Address, AccountDataInfo] = Map.empty,
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
   ): Diff =
     Diff(
-      transactions = Map(),
+      transactions = LinkedHashMap(),
       portfolios = portfolios,
       issuedAssets = issuedAssets,
       updatedAssets = updatedAssets,
@@ -185,8 +193,8 @@ object Diff {
       aliases: Map[Alias, Address] = Map.empty,
       orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
       leaseState: Map[ByteStr, Boolean] = Map.empty,
-      scripts: Map[Address, Option[(PublicKey, Script, Long, Map[String, Long])]] = Map.empty,
-      assetScripts: Map[IssuedAsset, Option[(PublicKey, Script, Long)]] = Map.empty,
+      scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,
+      assetScripts: Map[IssuedAsset, Option[(Script, Long)]] = Map.empty,
       accountData: Map[Address, AccountDataInfo] = Map.empty,
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptsRun: Int = 0,
@@ -194,7 +202,8 @@ object Diff {
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
   ): Diff =
     Diff(
-      transactions = Map((tx.id(), (tx, (portfolios.keys ++ accountData.keys).toSet))),
+      // should be changed to VectorMap after 2.13 https://github.com/scala/scala/pull/6854
+      transactions = LinkedHashMap((tx.id(), (tx, (portfolios.keys ++ accountData.keys).toSet, true))),
       portfolios = portfolios,
       issuedAssets = issuedAssets,
       updatedAssets = updatedAssets,
@@ -211,7 +220,7 @@ object Diff {
     )
 
   val empty =
-    new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, 0, 0, Map.empty)
+    new Diff(LinkedHashMap(), Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, 0, 0, Map.empty)
 
   implicit val diffMonoid: Monoid[Diff] = new Monoid[Diff] {
     override def empty: Diff = Diff.empty

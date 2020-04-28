@@ -8,13 +8,13 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.serialization.impl.GenesisTxSerializer
-import com.wavesplatform.transaction.validation.TxValidator
+import com.wavesplatform.transaction.validation.{TxConstraints, TxValidator}
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
 import scala.util.Try
 
-case class GenesisTransaction private (recipient: Address, amount: Long, timestamp: Long, signature: ByteStr) extends Transaction {
+case class GenesisTransaction private (recipient: Address, amount: Long, timestamp: Long, signature: ByteStr, chainId: Byte) extends Transaction {
   override val builder                 = GenesisTransaction
   override val assetFee: (Asset, Long) = (Waves, 0)
   override val id: Coeval[ByteStr]     = Coeval.evalOnce(signature)
@@ -25,7 +25,9 @@ case class GenesisTransaction private (recipient: Address, amount: Long, timesta
 }
 
 object GenesisTransaction extends TransactionParser {
-  override val typeId: TxType                    = 1
+  type TransactionT = GenesisTransaction
+
+  override val typeId: TxType                    = 1: Byte
   override val supportedVersions: Set[TxVersion] = Set(1)
 
   val serializer = GenesisTxSerializer
@@ -34,7 +36,10 @@ object GenesisTransaction extends TransactionParser {
     serializer.parseBytes(bytes)
 
   implicit val validator: TxValidator[GenesisTransaction] =
-    tx => Validated.condNel(tx.amount >= 0, tx, TxValidationError.NegativeAmount(tx.amount, "waves"))
+    tx => TxConstraints.seq(tx)(
+      Validated.condNel(tx.amount >= 0, tx, TxValidationError.NegativeAmount(tx.amount, "waves")),
+      TxConstraints.addressChainId(tx.recipient, tx.chainId)
+    )
 
   def generateSignature(recipient: Address, amount: Long, timestamp: Long): Array[Byte] = {
     val payload = Bytes.concat(Ints.toByteArray(typeId), Longs.toByteArray(timestamp), recipient.bytes, Longs.toByteArray(amount))
@@ -44,6 +49,6 @@ object GenesisTransaction extends TransactionParser {
 
   def create(recipient: Address, amount: Long, timestamp: Long): Either[ValidationError, GenesisTransaction] = {
     val signature = ByteStr(GenesisTransaction.generateSignature(recipient, amount, timestamp))
-    GenesisTransaction(recipient, amount, timestamp, signature).validatedEither
+    GenesisTransaction(recipient, amount, timestamp, signature, recipient.chainId).validatedEither
   }
 }

@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.utils
 
-import com.wavesplatform.account.{Address, Alias, PublicKey}
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -20,9 +20,9 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.{Attachment, MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxVersion}
+import com.wavesplatform.utils._
 import org.scalatest.prop.TableDrivenPropertyChecks
 import scorex.crypto.encode.Base64
-import com.wavesplatform.utils._
 
 class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
   private val publicKey         = PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get
@@ -55,7 +55,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     tsOrderFrom,
     tsOrderTo,
     1,
-    proofs = Proofs(Base58.tryDecodeWithLimit("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get)
+    proofs = Proofs(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get)
   )
 
   private val sell = Order(
@@ -69,7 +69,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     tsOrderFrom,
     tsOrderTo,
     2,
-    proofs = Proofs(Base58.tryDecodeWithLimit("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
+    proofs = Proofs(ByteStr.decodeBase58("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
   )
 
   private val exV1 = ExchangeTransaction
@@ -134,7 +134,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .create(
       Transaction.V1,
       publicKey,
-      Alias.create("myalias").right.get,
+      "myalias",
       minFee,
       ts,
       Proofs(ByteStr.decodeBase58("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").get)
@@ -146,7 +146,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .create(
       Transaction.V2,
       publicKey,
-      Alias.create("myalias").right.get,
+      "myalias",
       minFee,
       ts,
       Proofs(Seq(ByteStr.decodeBase58("26U7rQTwpdma5GYSZb5bNygVCtSuWL6DKet1Nauf5J57v19mmfnq434YrkKYJqvYt2ydQBUT3P7Xgj5ZVDVAcc5k").get))
@@ -323,34 +323,37 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .right
     .get
 
+  private val recipient = Address.fromString(sender.address).right.get
   private val transferV1 = TransferTransaction(
     1.toByte,
     publicKey,
-    Address.fromString(sender.address).right.get,
+    recipient,
     Waves,
     1900000,
     Waves,
     minFee,
     None,
     ts,
-    Proofs(Seq(ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get))
+    Proofs(Seq(ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get)),
+    recipient.chainId
   )
 
   private val transferV2 = TransferTransaction(
     2.toByte,
     publicKey,
-    Address.fromString(sender.address).right.get,
+    recipient,
     Waves,
     100000000,
     Waves,
     minFee,
     None,
     ts,
-    Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))
+    Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)),
+    recipient.chainId
   )
 
   private val invokeScript = InvokeScriptTransaction
-    .create(1.toByte, PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").right.get, PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").right.get, Some(
+    .create(1.toByte, PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").right.get, PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").right.get.toAddress, Some(
         Terms.FUNCTION_CALL(
           function = FunctionHeader.User("testfunc"),
           args = List(TRUE)

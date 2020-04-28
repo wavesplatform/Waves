@@ -115,7 +115,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
   }
 
   def withEnv(f: Env => Unit): Unit = {
-    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
+    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
 
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val minerSettings = settings0.minerSettings.copy(quorum = 0)
@@ -132,10 +132,10 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
       featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
     )
 
-    val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdated)
+    val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers)
     val pos = new PoSSelector(bcu, settings.blockchainSettings, settings.synchronizationSettings)
 
-    val utxPoolStub                        = new UtxPoolImpl(ntpTime, bcu, ignoreSpendableBalanceChanged, settings0.utxSettings)
+    val utxPoolStub                        = new UtxPoolImpl(ntpTime, bcu, ignoreSpendableBalanceChanged, settings0.utxSettings, enablePriorityPool = true)
     val schedulerService: SchedulerService = Scheduler.singleThread("appender")
 
     try {
@@ -146,11 +146,11 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
           .containerOfN[Array, Byte](32, Arbitrary.arbitrary[Byte])
           .map(bs => KeyPair(bs))
           .map { account =>
-            val tx           = GenesisTransaction.create(account, ENOUGH_AMT, ts + 1).explicitGet()
+            val tx           = GenesisTransaction.create(account.toAddress, ENOUGH_AMT, ts + 1).explicitGet()
             val genesisBlock = TestBlock.create(ts + 2, List(tx))
             val secondBlock = TestBlock.create(
               ts + 3,
-              genesisBlock.uniqueId,
+              genesisBlock.id(),
               Seq.empty,
               account
             )
@@ -176,7 +176,7 @@ object BlockWithMaxBaseTargetTest {
   final case class Env(
       settings: WavesSettings,
       pos: PoSSelector,
-      bcu: BlockchainUpdater with NG,
+      bcu: Blockchain with BlockchainUpdater with NG,
       utxPool: UtxPoolImpl,
       schedulerService: SchedulerService,
       miner: KeyPair,

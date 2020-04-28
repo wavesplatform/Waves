@@ -3,7 +3,6 @@ package com.wavesplatform.history
 import com.wavesplatform._
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
@@ -17,13 +16,9 @@ import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import monix.execution.Scheduler.Implicits.global
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-
-import scala.concurrent.Await
-import scala.concurrent.duration.Duration
 
 class BlockchainUpdaterNFTTest
     extends PropSpec
@@ -38,23 +33,20 @@ class BlockchainUpdaterNFTTest
     forAll(Preconditions.nftTransfer()) {
       case (issue, Seq(firstAccount, secondAccount), Seq(genesisBlock, issueBlock, keyBlock, postBlock), Seq(microBlock)) =>
         withDomain(settingsWithFeatures(BlockchainFeatures.NG, BlockchainFeatures.ReduceNFTFee)) { d =>
-          def nftList(address: Address): Seq[ByteStr] =
-            Await.result(d.blockchainUpdater.nftObservable(address, None).map(_._2.source).toListL.runToFuture, Duration.Inf)
-
           d.blockchainUpdater.processBlock(genesisBlock) shouldBe 'right
           d.blockchainUpdater.processBlock(issueBlock) shouldBe 'right
           d.blockchainUpdater.processBlock(keyBlock) shouldBe 'right
 
-          nftList(firstAccount) shouldBe Seq(issue.id())
-          nftList(secondAccount) shouldBe Nil
+          d.nftList(firstAccount).map(_._1.id) shouldBe Seq(issue.id())
+          d.nftList(secondAccount) shouldBe Nil
 
           d.blockchainUpdater.processMicroBlock(microBlock) shouldBe 'right
-          nftList(firstAccount) shouldBe Nil
-          nftList(secondAccount) shouldBe Seq(issue.id())
+          d.nftList(firstAccount) shouldBe Nil
+          d.nftList(secondAccount).map(_._1.id) shouldBe Seq(issue.id())
 
           d.blockchainUpdater.processBlock(postBlock) shouldBe 'right
-          nftList(firstAccount) shouldBe Nil
-          nftList(secondAccount) shouldBe Seq(issue.id())
+          d.nftList(firstAccount) shouldBe Nil
+          d.nftList(secondAccount).map(_._1.id) shouldBe Seq(issue.id())
         }
     }
   }
@@ -62,24 +54,28 @@ class BlockchainUpdaterNFTTest
   property("nft list should be consistent with invokescript") {
     forAll(Preconditions.nftInvokeScript()) {
       case (issue, Seq(firstAccount, secondAccount), Seq(genesisBlock, issueBlock, keyBlock, postBlock), Seq(microBlock)) =>
-        withDomain(settingsWithFeatures(BlockchainFeatures.NG, BlockchainFeatures.ReduceNFTFee, BlockchainFeatures.SmartAccounts, BlockchainFeatures.Ride4DApps)) { d =>
-          def nftList(address: Address): Seq[ByteStr] =
-            Await.result(d.blockchainUpdater.nftObservable(address, None).map(_._2.source).toListL.runToFuture, Duration.Inf)
-
+        withDomain(
+          settingsWithFeatures(
+            BlockchainFeatures.NG,
+            BlockchainFeatures.ReduceNFTFee,
+            BlockchainFeatures.SmartAccounts,
+            BlockchainFeatures.Ride4DApps
+          )
+        ) { d =>
           d.blockchainUpdater.processBlock(genesisBlock) shouldBe 'right
           d.blockchainUpdater.processBlock(issueBlock) shouldBe 'right
           d.blockchainUpdater.processBlock(keyBlock) shouldBe 'right
 
-          nftList(firstAccount) shouldBe Seq(issue.id())
-          nftList(secondAccount) shouldBe Nil
+          d.nftList(firstAccount).map(_._1.id) shouldBe Seq(issue.id())
+          d.nftList(secondAccount) shouldBe Nil
 
           d.blockchainUpdater.processMicroBlock(microBlock) shouldBe 'right
-          nftList(firstAccount) shouldBe Nil
-          nftList(secondAccount) shouldBe Seq(issue.id())
+          d.nftList(firstAccount) shouldBe Nil
+          d.nftList(secondAccount).map(_._1.id) shouldBe Seq(issue.id())
 
           d.blockchainUpdater.processBlock(postBlock) shouldBe 'right
-          nftList(firstAccount) shouldBe Nil
-          nftList(secondAccount) shouldBe Seq(issue.id())
+          d.nftList(firstAccount) shouldBe Nil
+          d.nftList(secondAccount).map(_._1.id) shouldBe Seq(issue.id())
         }
     }
   }
@@ -93,11 +89,11 @@ class BlockchainUpdaterNFTTest
         secondAccount <- accountGen
         blockTime = ntpNow
         issue    <- QuickTX.nftIssue(richAccount, Gen.const(blockTime))
-        transfer <- QuickTX.transferAsset(IssuedAsset(issue.assetId), richAccount, secondAccount, 1, Gen.const(blockTime))
+        transfer <- QuickTX.transferAsset(IssuedAsset(issue.assetId), richAccount, secondAccount.toAddress, 1, Gen.const(blockTime))
       } yield {
         val genesisBlock = unsafeBlock(
           reference = randomSig,
-          txs = Seq(GenesisTransaction.create(richAccount, diffs.ENOUGH_AMT, 0).explicitGet()),
+          txs = Seq(GenesisTransaction.create(richAccount.toAddress, diffs.ENOUGH_AMT, 0).explicitGet()),
           signer = TestBlock.defaultSigner,
           version = 3.toByte,
           timestamp = 0
@@ -176,7 +172,10 @@ class BlockchainUpdaterNFTTest
       } yield {
         val genesisBlock = unsafeBlock(
           reference = randomSig,
-          txs = Seq(GenesisTransaction.create(richAccount, diffs.ENOUGH_AMT, 0).explicitGet(), GenesisTransaction.create(secondAccount, 1000000, 0).explicitGet()),
+          txs = Seq(
+            GenesisTransaction.create(richAccount.toAddress, diffs.ENOUGH_AMT, 0).explicitGet(),
+            GenesisTransaction.create(secondAccount.toAddress, 1000000, 0).explicitGet()
+          ),
           signer = TestBlock.defaultSigner,
           version = 3,
           timestamp = 0

@@ -27,7 +27,7 @@ object Bindings {
   )
 
   private def proofsPart(existingProofs: IndexedSeq[ByteStr]) =
-    "proofs" -> ARR((existingProofs ++ Seq.fill(8 - existingProofs.size)(ByteStr.empty)).map(b => CONST_BYTESTR(b).explicitGet()))
+    "proofs" -> ARR(existingProofs.map(b => CONST_BYTESTR(b).explicitGet) ++ Seq.fill(8 - existingProofs.size)(CONST_BYTESTR(ByteStr.empty).explicitGet), false).explicitGet
 
   private def provenTxPart(tx: Proven, proofsEnabled: Boolean): Map[String, EVALUATED] = {
     val commonPart = combine(Map(
@@ -64,7 +64,7 @@ object Bindings {
   private def buildPayments(payments: AttachedPayments): (String, EVALUATED) =
     payments match {
       case AttachedPayments.Single(p) => "payment"  -> fromOptionCO(p.map(mapPayment))
-      case AttachedPayments.Multi(p)  => "payments" -> ARR(p.map(mapPayment).toVector)
+      case AttachedPayments.Multi(p)  => "payments" -> ARR(p.map(mapPayment).toVector, false).explicitGet
     }
 
   private def mapPayment(payment: (Long, Option[ByteStr])): CaseObj = {
@@ -123,7 +123,7 @@ object Bindings {
         Proven(h = Header(id = ct.id, fee = 0, timestamp = ct.timestamp, version = 0),
                sender = ct.sender,
                bodyBytes = ByteStr.empty,
-               senderPk = ByteStr.empty,
+               senderPk = ct.senderPk,
                proofs = IndexedSeq.empty),
         feeAssetId = None,
         assetId = ct.assetId,
@@ -142,7 +142,7 @@ object Bindings {
         h = Header(id = r.txId, fee = 0, timestamp = r.timestamp, version = 0),
         sender = r.sender,
         bodyBytes = ByteStr.empty,
-        senderPk = ByteStr.empty,
+        senderPk = r.senderPk,
         proofs = IndexedSeq.empty
       ),
       r.reissue.quantity,
@@ -157,7 +157,7 @@ object Bindings {
         h = Header(id = b.txId, fee = 0, timestamp = b.timestamp, version = 0),
         sender = b.sender,
         bodyBytes = ByteStr.empty,
-        senderPk = ByteStr.empty,
+        senderPk = b.senderPk,
         proofs = IndexedSeq.empty
       ),
       b.burn.quantity,
@@ -174,12 +174,12 @@ object Bindings {
       case transfer: Tx.Transfer => transferTransactionObject(transfer, proofsEnabled, version)
       case Tx.Issue(p, quantity, name, description, reissuable, decimals, scriptOpt) =>
         CaseObj(
-          buildIssueTransactionType(proofsEnabled),
+          buildIssueTransactionType(proofsEnabled, version),
           combine(
             Map(
               "quantity"    -> quantity,
-              "name"        -> name,
-              "description" -> description,
+              "name"        -> (if (version >= V4) name.toUTF8String else name),
+              "description" -> (if (version >= V4) description.toUTF8String else description),
               "reissuable"  -> reissuable,
               "decimals"    -> decimals,
               "script"      -> scriptOpt
@@ -347,23 +347,6 @@ object Bindings {
       )
     )
 
-  def blockHeaderObject(header: BlockHeader): CaseObj =
-    CaseObj(
-      blockHeader,
-      Map[String, EVALUATED](
-        "timestamp"           -> header.timestamp,
-        "version"             -> header.version,
-        "reference"           -> header.reference,
-        "generator"           -> header.generator,
-        "generatorPublicKey"  -> header.generatorPublicKey,
-        "signature"           -> header.signature,
-        "baseTarget"          -> header.baseTarget,
-        "generationSignature" -> header.generationSignature,
-        "transactionCount"    -> header.transactionCount,
-        "featureVotes"        -> header.featureVotes.map(CONST_LONG)
-      )
-    )
-
   def transferTransactionObject(tx: Tx.Transfer, proofsEnabled: Boolean, version: StdLibVersion): CaseObj =
     CaseObj(
       buildTransferTransactionType(proofsEnabled, version),
@@ -402,9 +385,8 @@ object Bindings {
     )
   }
 
-  def buildLastBlockInfo(blockInf: BlockInfo) =
-    CaseObj(
-      blockInfo,
+  def buildBlockInfo(blockInf: BlockInfo, version: StdLibVersion) = {
+    val commonFields: Map[String, EVALUATED] =
       Map(
         "timestamp"           -> blockInf.timestamp,
         "height"              -> blockInf.height.toLong,
@@ -413,6 +395,11 @@ object Bindings {
         "generator"           -> CaseObj(addressType, Map("bytes" -> blockInf.generator)),
         "generatorPublicKey"  -> blockInf.generatorPublicKey
       )
-    )
 
+    val vrfFieldOpt: Map[String, EVALUATED] =
+      if (version >= V4) Map[String, EVALUATED]("vrf" -> blockInf.vrf)
+      else Map()
+
+    CaseObj(blockInfo(version), commonFields ++ vrfFieldOpt)
+  }
 }

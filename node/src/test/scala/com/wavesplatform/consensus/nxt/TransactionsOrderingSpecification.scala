@@ -13,12 +13,13 @@ import scala.util.Random
 
 class TransactionsOrderingSpecification extends PropSpec with Assertions with Matchers {
 
+  private val kp: KeyPair = KeyPair(ByteStr(new Array[Byte](32)))
   property("TransactionsOrdering.InBlock should sort correctly") {
     val correctSeq = Seq(
       TransferTransaction
         .selfSigned(
           1.toByte,
-          KeyPair(Array.fill(32)(0: Byte)),
+          kp,
           Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           Waves,
           100000,
@@ -32,7 +33,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransaction
         .selfSigned(
           1.toByte,
-          KeyPair(Array.fill(32)(0: Byte)),
+          kp,
           Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           Waves,
           100000,
@@ -46,7 +47,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransaction
         .selfSigned(
           1.toByte,
-          KeyPair(Array.fill(32)(0: Byte)),
+          kp,
           Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           Waves,
           100000,
@@ -60,7 +61,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransaction
         .selfSigned(
           1.toByte,
-          KeyPair(Array.fill(32)(0: Byte)),
+          kp,
           Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           Waves,
           100000,
@@ -74,7 +75,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransaction
         .selfSigned(
           1.toByte,
-          KeyPair(Array.fill(32)(0: Byte)),
+          kp,
           Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           Waves,
           100000,
@@ -97,7 +98,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransaction
         .selfSigned(
           1.toByte,
-          KeyPair(Array.fill(32)(0: Byte)),
+          kp,
           Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           Waves,
           100000,
@@ -111,7 +112,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransaction
         .selfSigned(
           1.toByte,
-          KeyPair(Array.fill(32)(0: Byte)),
+          kp,
           Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           Waves,
           100000,
@@ -125,7 +126,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransaction
         .selfSigned(
           1.toByte,
-          KeyPair(Array.fill(32)(0: Byte)),
+          kp,
           Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           Waves,
           100000,
@@ -139,7 +140,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransaction
         .selfSigned(
           1.toByte,
-          KeyPair(Array.fill(32)(0: Byte)),
+          kp,
           Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           Waves,
           100000,
@@ -153,7 +154,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransaction
         .selfSigned(
           1.toByte,
-          KeyPair(Array.fill(32)(0: Byte)),
+          kp,
           Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           Waves,
           100000,
@@ -176,7 +177,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransaction
         .selfSigned(
           1.toByte,
-          KeyPair(Array.fill(32)(0: Byte)),
+          kp,
           Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           Waves,
           100000,
@@ -190,7 +191,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransaction
         .selfSigned(
           1.toByte,
-          KeyPair(Array.fill(32)(0: Byte)),
+          kp,
           Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           Waves,
           100000,
@@ -211,7 +212,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransaction
         .selfSigned(
           1.toByte,
-          KeyPair(Array.fill(32)(0: Byte)),
+          kp,
           Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           Waves,
           100000,
@@ -225,7 +226,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransaction
         .selfSigned(
           1.toByte,
-          KeyPair(Array.fill(32)(0: Byte)),
+          kp,
           Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           Waves,
           100000,

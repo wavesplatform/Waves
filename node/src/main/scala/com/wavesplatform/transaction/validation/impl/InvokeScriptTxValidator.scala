@@ -1,9 +1,8 @@
 package com.wavesplatform.transaction.validation.impl
 
-import cats.implicits._
 import cats.data.NonEmptyList
 import cats.data.Validated.{Invalid, Valid}
-import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CaseObj, EVALUATED}
+import cats.implicits._
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.TxValidationError.{GenericError, NonPositiveAmount, TooBigArray}
@@ -34,6 +33,7 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
       else tx.bytes().length <= ContractLimits.MaxInvokeScriptSizeInBytes
 
     V.seq(tx)(
+      V.addressChainId(dAppAddressOrAlias, chainId),
       V.cond(
         funcCallOpt.isEmpty || funcCallOpt.get.args.size <= ContractLimits.MaxInvokeScriptArgs,
         GenericError(s"InvokeScript can't have more than ${ContractLimits.MaxInvokeScriptArgs} arguments")

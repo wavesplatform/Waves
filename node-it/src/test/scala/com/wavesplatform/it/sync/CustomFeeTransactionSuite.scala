@@ -78,7 +78,7 @@ object CustomFeeTransactionSuite {
   private val pk   = KeyPair.fromSeed(seed).explicitGet()
   val assetTx = IssueTransaction(
       TxVersion.V1,
-      sender = pk,
+      sender = pk.publicKey,
       "asset".utf8Bytes,
       "asset description".utf8Bytes,
       quantity = defaultAssetQuantity,
@@ -88,7 +88,7 @@ object CustomFeeTransactionSuite {
       fee = 1.waves,
       timestamp = System.currentTimeMillis()
     )
-    .signWith(pk)
+    .signWith(pk.privateKey)
 
   val assetId = assetTx.id()
 

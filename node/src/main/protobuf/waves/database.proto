@@ -2,17 +2,61 @@ syntax = "proto3";
 package waves.api;
 option java_package = "com.wavesplatform.database.protobuf";
 
-message AssetDetails {
-    message BytesOrString {
-        oneof value {
-            bytes bytes = 1;
-            string string = 2;
-        }
-    }
+import "waves/block.proto";
+import "waves/transaction.proto";
 
-    BytesOrString name = 1;
-    BytesOrString description = 2;
+message AssetDetails {
+    bytes name = 1;
+    bytes description = 2;
     int32 last_renamed_at = 3;
     bool reissuable = 4;
     bytes total_volume = 5;
+}
+
+message BlockMeta {
+    Block.Header header = 1;
+    bytes signature = 2;
+    bytes header_hash = 3;
+    int32 height = 4;
+    int32 size = 5;
+    int32 transaction_count = 6;
+    int64 total_fee_in_waves = 7;
+    int64 reward = 8;
+    bytes vrf = 9;
+}
+
+message TransactionData {
+    oneof transaction {
+        bytes legacy_bytes = 1;
+        SignedTransaction new_transaction = 2;
+    }
+    bool failed = 3;
+}
+
+message AccountScriptInfo {
+    message ComplexityByVersion {
+        int32 version = 1;
+        map<string, int64> callable_complexity = 2;
+    }
+
+    bytes public_key = 1;
+    bytes script_bytes = 2;
+    int64 max_complexity = 3;
+    repeated ComplexityByVersion callable_complexity = 4;
+}
+
+message StaticAssetInfo {
+    bytes source_id = 1;
+    bytes issuer_public_key = 2;
+    int32 decimals = 3;
+    bool is_nft = 4;
+}
+
+message DataEntry {
+    oneof value {
+        int64 int_value = 1;
+        bool bool_value = 2;
+        bytes binary_value = 3;
+        string string_value = 4;
+    }
 }

@@ -21,19 +21,24 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
 
   def iterator: DBIterator = db.iterator(readOptions)
 
-  def iterateOver(prefix: Short)(f: DBEntry => Unit): Unit = db.iterateOver(prefix)(f)
+  def iterateOver(tag: KeyTags.KeyTag)(f: DBEntry => Unit): Unit = iterateOver(tag.prefixBytes)(f)
 
-  def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit): Unit = db.iterateOver(prefix)(f)
+  def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit): Unit = {
+    val iterator = db.iterator(readOptions)
+    try {
+      iterator.seek(prefix)
+      while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)) f(iterator.next())
+    } finally iterator.close()
+  }
 
   def read[T](keyName: String, prefix: Array[Byte], seek: Array[Byte], n: Int)(deserialize: DBEntry => T): Vector[T] = {
     val iter = iterator
-    @tailrec def loop(aux: Vector[T], restN: Int, totalBytesRead: Long): (Vector[T], Long) = {
+    @tailrec def loop(aux: Vector[T], restN: Int, totalBytesRead: Long): (Vector[T], Long) =
       if (restN > 0 && iter.hasNext) {
         val elem = iter.next()
         if (elem.getKey.startsWith(prefix)) loop(aux :+ deserialize(elem), restN - 1, totalBytesRead + elem.getValue.length)
         else (aux, totalBytesRead)
       } else (aux, totalBytesRead)
-    }
 
     try {
       iter.seek(seek)

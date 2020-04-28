@@ -24,11 +24,11 @@ class BlockchainUpdaterGeneratorFeeNextBlockOrMicroBlockTest
     sender    <- accountGen
     recipient <- accountGen
     ts        <- positiveIntGen
-    genesis: GenesisTransaction        = GenesisTransaction.create(sender, ENOUGH_AMT, ts).explicitGet()
-    somePayment: TransferTransaction = createWavesTransfer(sender, recipient, 1, 10, ts + 1).explicitGet()
+    genesis: GenesisTransaction        = GenesisTransaction.create(sender.toAddress, ENOUGH_AMT, ts).explicitGet()
+    somePayment: TransferTransaction = createWavesTransfer(sender, recipient.toAddress, 1, 10, ts + 1).explicitGet()
     // generator has enough balance for this transaction if gets fee for block before applying it
-    generatorPaymentOnFee: TransferTransaction = createWavesTransfer(defaultSigner, recipient, 11, 1, ts + 2).explicitGet()
-    someOtherPayment: TransferTransaction      = createWavesTransfer(sender, recipient, 1, 1, ts + 3).explicitGet()
+    generatorPaymentOnFee: TransferTransaction = createWavesTransfer(defaultSigner, recipient.toAddress, 11, 1, ts + 2).explicitGet()
+    someOtherPayment: TransferTransaction      = createWavesTransfer(sender, recipient.toAddress, 1, 1, ts + 3).explicitGet()
   } yield (genesis, somePayment, generatorPaymentOnFee, someOtherPayment)
 
   property("generator should get fees before applying block before applyMinerFeeWithTransactionAfter in two blocks") {

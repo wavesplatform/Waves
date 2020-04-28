@@ -1,18 +1,19 @@
 package com.wavesplatform.transaction.smart
 
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.state.{AssetDescription, Blockchain, Height}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.Verifier.ValidationResult
-import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.{NTPTime, TransactionGen}
@@ -30,7 +31,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
       Seq(tx.buyOrder.assetPair.amountAsset, tx.buyOrder.assetPair.priceAsset)
         .collect { case asset: IssuedAsset => asset }
         .foreach { asset =>
-          (bc.assetDescription _).when(asset).returns(mkAssetDescription(asset.id, tx.sender, 8))
+          (bc.assetDescription _).when(asset).returns(mkAssetDescription(asset.id, tx.sender, 8, None))
           (bc.assetScript _).when(asset).returns(None)
           (bc.activatedFeatures _).when().returns(Map())
         }
@@ -40,41 +41,42 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
           |  case o: Order => height >= 0
           |  case _ => true
           |}""".stripMargin
-      val script = ScriptCompiler(scriptText, isAssetScript = false, estimator).explicitGet()._1
+      val (script, complexity) = ScriptCompiler(scriptText, isAssetScript = false, estimator).explicitGet()
 
       (bc.accountScript _).when(tx.sellOrder.sender.toAddress).returns(None)
-      (bc.accountScript _).when(tx.buyOrder.sender.toAddress).returns(Some(script))
+      (bc.accountScript _).when(tx.buyOrder.sender.toAddress).returns(Some(AccountScriptInfo(tx.buyOrder.sender, script, complexity)))
       (bc.accountScript _).when(tx.sender.toAddress).returns(None)
 
       (bc.height _).when().returns(0)
 
-      Verifier(bc)(tx).resultE shouldBe 'right
+      Verifier(bc)(tx).flatMap(tx => Verifier.assets(bc)(tx)).resultE shouldBe 'right
     }
   }
 
   property("ExchangeTransaction - matcherFeeAssetId's in custom exchange transaction should be verified") {
     forAll(exchangeTransactionV2WithArbitraryFeeAssetsInOrdersGen) { tx =>
-      val (invalidScript, _) = ScriptCompiler.compile("(5 / 0) == 2", estimator).explicitGet()
-      val falseScript        = ExprScript(Terms.FALSE).explicitGet()
+      val (invalidScript, comp) = ScriptCompiler.compile("(5 / 0) == 2", estimator).explicitGet()
+      val falseScript           = ExprScript(Terms.FALSE).explicitGet()
 
-      setFeeAssetScriptsAndVerify(Some(invalidScript), None)(tx) should produce("ScriptExecutionError")        // buy order:  matcherFeeAsset has invalid script
-      setFeeAssetScriptsAndVerify(None, Some(falseScript))(tx) should produce("TransactionNotAllowedByScript") // sell order: matcherFeeAsset script gives false as a result
+      setFeeAssetScriptsAndVerify(Some(invalidScript -> comp), None)(tx) should produce("ScriptExecutionError") // buy order:  matcherFeeAsset has invalid script
+      setFeeAssetScriptsAndVerify(None, Some((falseScript, 1)))(tx) should produce("TransactionNotAllowedByScript") // sell order: matcherFeeAsset script gives false as a result
       setFeeAssetScriptsAndVerify(None, None)(tx) shouldBe 'right
     }
   }
 
-  private def mkAssetDescription(assetId: ByteStr, matcherAccount: PublicKey, decimals: Int): Option[AssetDescription] =
-    Some(AssetDescription(assetId, matcherAccount, Right(""), Right(""), decimals, reissuable = false, BigInt(0), Height(0), None, 0, decimals == 0))
+  private def mkAssetDescription(assetId: ByteStr, matcherAccount: PublicKey, decimals: Int, scriptOption: Option[(Script, Long)]): Option[AssetDescription] =
+    Some(AssetDescription(assetId, matcherAccount, ByteString.EMPTY, ByteString.EMPTY, decimals, reissuable = false, BigInt(0), Height(0), scriptOption, 0, decimals == 0))
 
   private val exchangeTransactionV2Gen: Gen[ExchangeTransaction] = for {
     sender1: KeyPair <- accountGen
     sender2: KeyPair <- accountGen
-    assetPair                  <- assetPairGen
-    r                          <- exchangeV2GeneratorP(sender1, sender2, assetPair.amountAsset, assetPair.priceAsset, orderVersions = Set(2, 3))
+    assetPair        <- assetPairGen
+    r                <- exchangeV2GeneratorP(sender1, sender2, assetPair.amountAsset, assetPair.priceAsset, orderVersions = Set(2, 3))
   } yield r
 
-  private def setFeeAssetScriptsAndVerify(buyFeeAssetScript: Option[Script], sellFeeAssetScript: Option[Script])(
-      tx: ExchangeTransaction): ValidationResult[Transaction] = {
+  private def setFeeAssetScriptsAndVerify(buyFeeAssetScript: Option[(Script, Long)], sellFeeAssetScript: Option[(Script, Long)])(
+      tx: ExchangeTransaction
+  ): ValidationResult[Transaction] = {
 
     val blockchain = stub[Blockchain]
 
@@ -84,11 +86,10 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
 
     activate(BlockchainFeatures.SmartAccountTrading -> 0, BlockchainFeatures.OrderV3 -> 0, BlockchainFeatures.SmartAssets -> 0)
 
-    def prepareAssets(assetsAndScripts: (Asset, Option[Script])*): Unit = assetsAndScripts foreach {
+    def prepareAssets(assetsAndScripts: (Asset, Option[(Script, Long)])*): Unit = assetsAndScripts foreach {
       case (asset: IssuedAsset, scriptOption) =>
-        (blockchain.assetDescription _).when(asset).returns(mkAssetDescription(asset.id, tx.sender, 8))
+        (blockchain.assetDescription _).when(asset).returns(mkAssetDescription(asset.id, tx.sender, 8, scriptOption))
         (blockchain.assetScript _).when(asset).returns(scriptOption)
-        (blockchain.hasAssetScript _).when(asset).returns(scriptOption.isDefined)
       case _ =>
     }
 
@@ -105,6 +106,6 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
 
     (blockchain.height _).when().returns(0)
 
-    Verifier(blockchain)(tx).resultE
+    Verifier(blockchain)(tx).flatMap(tx => Verifier.assets(blockchain)(tx)).resultE
   }
 }

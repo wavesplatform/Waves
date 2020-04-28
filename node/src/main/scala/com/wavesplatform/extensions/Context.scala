@@ -2,10 +2,12 @@ package com.wavesplatform.extensions
 
 import akka.actor.ActorSystem
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.common._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.events.{BlockchainUpdated, UtxEvent}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.{Blockchain, BlockchainUpdated}
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.Time
@@ -22,8 +24,14 @@ trait Context {
   def wallet: Wallet
   def utx: UtxPool
 
+  def transactionsApi: CommonTransactionsApi
+  def blocksApi: CommonBlocksApi
+  def accountsApi: CommonAccountsApi
+  def assetsApi: CommonAssetsApi
+
   def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean]
   def spendableBalanceChanged: Observable[(Address, Asset)]
   def blockchainUpdated: Observable[BlockchainUpdated]
+  def utxEvents: Observable[UtxEvent]
   def actorSystem: ActorSystem
 }

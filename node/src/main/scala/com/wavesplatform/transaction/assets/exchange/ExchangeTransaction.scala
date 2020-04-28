@@ -1,13 +1,12 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.wavesplatform.account.{PrivateKey, PublicKey}
+import com.wavesplatform.account.{AddressScheme, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.ExchangeTxSerializer
 import com.wavesplatform.transaction.validation.impl.ExchangeTxValidator
-import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -15,15 +14,16 @@ import scala.util.Try
 
 case class ExchangeTransaction(
     version: TxVersion,
-    buyOrder: Order,
-    sellOrder: Order,
+    order1: Order,
+    order2: Order,
     amount: Long,
     price: Long,
     buyMatcherFee: Long,
     sellMatcherFee: Long,
     fee: Long,
     timestamp: Long,
-    proofs: Proofs
+    proofs: Proofs,
+    chainId: Byte
 ) extends VersionedTransaction
     with ProvenTransaction
     with TxWithFee.InWaves
@@ -31,9 +31,10 @@ case class ExchangeTransaction(
     with SigProofsSwitch
     with LegacyPBSwitch.V3 {
 
+  val (buyOrder, sellOrder) = if (order1.orderType == OrderType.BUY) (order1, order2) else (order2, order1)
+
   override def builder: TransactionParser = ExchangeTransaction
 
-  @ApiModelProperty(hidden = true)
   override val sender: PublicKey = buyOrder.matcherPublicKey
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(ExchangeTransaction.serializer.bodyBytes(this))
@@ -47,6 +48,8 @@ case class ExchangeTransaction(
 }
 
 object ExchangeTransaction extends TransactionParser {
+  type TransactionT = ExchangeTransaction
+
   implicit val validator = ExchangeTxValidator
   val serializer         = ExchangeTxSerializer
 
@@ -58,27 +61,28 @@ object ExchangeTransaction extends TransactionParser {
 
   override def supportedVersions: Set[TxVersion] = Set(1, 2, 3)
 
-  val typeId: TxType = 7
+  val typeId: TxType = 7: Byte
 
   def create(
       version: TxVersion,
-      buyOrder: Order,
-      sellOrder: Order,
+      order1: Order,
+      order2: Order,
       amount: Long,
       price: Long,
       buyMatcherFee: Long,
       sellMatcherFee: Long,
       fee: Long,
       timestamp: Long,
-      proofs: Proofs = Proofs.empty
+      proofs: Proofs = Proofs.empty,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ExchangeTransaction] =
-    ExchangeTransaction(version, buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs).validatedEither
+    ExchangeTransaction(version, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs, chainId).validatedEither
 
   def signed(
       version: TxVersion,
       matcher: PrivateKey,
-      buyOrder: Order,
-      sellOrder: Order,
+      order1: Order,
+      order2: Order,
       amount: Long,
       price: Long,
       buyMatcherFee: Long,
@@ -86,5 +90,5 @@ object ExchangeTransaction extends TransactionParser {
       fee: Long,
       timestamp: Long
   ): Either[ValidationError, ExchangeTransaction] =
-    create(version, buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty).map(_.signWith(matcher))
+    create(version, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty).map(_.signWith(matcher))
 }

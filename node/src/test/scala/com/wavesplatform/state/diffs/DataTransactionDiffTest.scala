@@ -3,24 +3,25 @@ package com.wavesplatform.state.diffs
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry}
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
+class DataTransactionDiffTest extends PropSpec with PropertyChecks with TransactionGen with NoShrink with WithState {
 
   val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.DataTransaction.id -> 0))
 
   val baseSetup: Gen[(GenesisTransaction, KeyPair, Long)] = for {
     master <- accountGen
     ts     <- positiveLongGen
-    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+    genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
   } yield (genesis, master, ts)
 
   def data(sender: KeyPair, data: List[DataEntry[_]], fee: Long, timestamp: Long): DataTransaction =
@@ -58,31 +59,26 @@ class DataTransactionDiffTest extends PropSpec with PropertyChecks with Matchers
         assertDiffAndState(Seq(genesis), blocks(0), fs) {
           case (totalDiff, state) =>
             assertBalanceInvariant(totalDiff)
-            state.balance(sender) shouldBe (ENOUGH_AMT - txs(0).fee)
-            state.accountData(sender, item1.key) shouldBe Some(item1)
-            state.accountData(sender).data.get(item1.key) shouldBe Some(item1)
+            state.balance(sender.toAddress) shouldBe (ENOUGH_AMT - txs(0).fee)
+            state.accountData(sender.toAddress, item1.key) shouldBe Some(item1)
         }
 
         val item2 = items(1)
         assertDiffAndState(Seq(genesis, blocks(0)), blocks(1), fs) {
           case (totalDiff, state) =>
             assertBalanceInvariant(totalDiff)
-            state.balance(sender) shouldBe (ENOUGH_AMT - txs.take(2).map(_.fee).sum)
-            state.accountData(sender, item1.key) shouldBe Some(item1)
-            state.accountData(sender).data.get(item1.key) shouldBe Some(item1)
-            state.accountData(sender, item2.key) shouldBe Some(item2)
-            state.accountData(sender).data.get(item2.key) shouldBe Some(item2)
+            state.balance(sender.toAddress) shouldBe (ENOUGH_AMT - txs.take(2).map(_.fee).sum)
+            state.accountData(sender.toAddress, item1.key) shouldBe Some(item1)
+            state.accountData(sender.toAddress, item2.key) shouldBe Some(item2)
         }
 
         val item3 = items(2)
         assertDiffAndState(Seq(genesis, blocks(0), blocks(1)), blocks(2), fs) {
           case (totalDiff, state) =>
             assertBalanceInvariant(totalDiff)
-            state.balance(sender) shouldBe (ENOUGH_AMT - txs.map(_.fee).sum)
-            state.accountData(sender, item1.key) shouldBe Some(item3)
-            state.accountData(sender).data.get(item1.key) shouldBe Some(item3)
-            state.accountData(sender, item2.key) shouldBe Some(item2)
-            state.accountData(sender).data.get(item2.key) shouldBe Some(item2)
+            state.balance(sender.toAddress) shouldBe (ENOUGH_AMT - txs.map(_.fee).sum)
+            state.accountData(sender.toAddress, item1.key) shouldBe Some(item3)
+            state.accountData(sender.toAddress, item2.key) shouldBe Some(item2)
         }
     }
   }

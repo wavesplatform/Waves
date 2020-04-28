@@ -1,28 +1,28 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.account.{KeyPair, Address}
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.{Asset, GenesisTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
 
   val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.MassTransfer.id -> 0))
 
   val baseSetup: Gen[(GenesisTransaction, KeyPair)] = for {
     master <- accountGen
     ts     <- positiveLongGen
-    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+    genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
   } yield (genesis, master)
 
   property("MassTransfer preserves balance invariant") {
@@ -45,20 +45,22 @@ class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with 
             case (totalDiff, newState) =>
               assertBalanceInvariant(totalDiff)
 
-              val totalAmount     = transfer.transfers.map(_.amount).sum
-              val fees            = issue.fee + transfer.fee
-              val senderPortfolio = newState.portfolio(transfer.sender)
+              val totalAmount = transfer.transfers.map(_.amount).sum
+              val fees        = issue.fee + transfer.fee
               transfer.assetId match {
                 case aid @ IssuedAsset(_) =>
-                  senderPortfolio shouldBe Portfolio(ENOUGH_AMT - fees, LeaseBalance.empty, Map(aid -> (ENOUGH_AMT - totalAmount)))
-                case Waves => senderPortfolio.balance shouldBe (ENOUGH_AMT - fees - totalAmount)
+                  newState.balance(transfer.sender.toAddress) shouldBe ENOUGH_AMT - fees
+                  newState.balance(transfer.sender.toAddress, aid) shouldBe ENOUGH_AMT - totalAmount
+                case Waves =>
+                  newState.balance(transfer.sender.toAddress) shouldBe ENOUGH_AMT - fees - totalAmount
               }
               for (ParsedTransfer(recipient, amount) <- transfer.transfers) {
-                val recipientPortfolio = newState.portfolio(recipient.asInstanceOf[Address])
                 if (transfer.sender.toAddress != recipient) {
                   transfer.assetId match {
-                    case aid @ IssuedAsset(_) => recipientPortfolio shouldBe Portfolio(0, LeaseBalance.empty, Map(aid -> amount))
-                    case Waves                => recipientPortfolio shouldBe Portfolio(amount, LeaseBalance.empty, Map.empty)
+                    case aid @ IssuedAsset(_) =>
+                      newState.balance(recipient.asInstanceOf[Address], aid) shouldBe amount
+                    case Waves =>
+                      newState.balance(recipient.asInstanceOf[Address]) shouldBe amount
                   }
                 }
               }
@@ -82,7 +84,7 @@ class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with 
     forAll(setup) {
       case (genesis, transfer) =>
         assertDiffEi(Seq(block(Seq(genesis))), block(Seq(transfer)), fs) { blockDiffEi =>
-          blockDiffEi should produce("AliasDoesNotExist")
+          blockDiffEi should produce("does not exist")
         }
     }
   }

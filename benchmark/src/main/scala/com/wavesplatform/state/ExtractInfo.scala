@@ -6,16 +6,14 @@ import java.util.concurrent.ThreadLocalRandom
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.Block
-import com.wavesplatform.block.Block.BlockInfo
-import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.database.{DBExt, Keys, LevelDBFactory, LevelDBWriter, loadBlock}
 import com.wavesplatform.lang.v1.traits.DataType
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.bench.DataTestData
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Authorized, CreateAliasTransaction, DataTransaction, Transaction}
 import com.wavesplatform.utils.ScorexLogging
-import monix.execution.UncaughtExceptionReporter
-import monix.reactive.Observer
 import org.iq80.leveldb.{DB, Options}
 import scodec.bits.BitVector
 
@@ -51,18 +49,18 @@ object ExtractInfo extends App with ScorexLogging {
   }
 
   try {
-    val state = new LevelDBWriter(db, Observer.empty(UncaughtExceptionReporter.default), wavesSettings.blockchainSettings, wavesSettings.dbSettings)
+    val state = LevelDBWriter.readOnly(db, wavesSettings)
 
     def nonEmptyBlockHeights(from: Int): Iterator[Integer] =
       for {
         height     <- randomInts(from, state.height)
-        BlockInfo(_, _, transactionCount, _) <- state.blockInfo(height)
-        if transactionCount > 0
+        m <- db.get(Keys.blockMetaAt(Height(height.toInt)))
+        if m.transactionCount > 0
       } yield height
 
     def nonEmptyBlocks(from: Int): Iterator[Block] =
       nonEmptyBlockHeights(from)
-        .flatMap(state.blockAt(_))
+        .flatMap(h => db.readOnly(ro => loadBlock(Height(h.toInt), ro)))
 
     val aliasTxs = nonEmptyBlocks(benchSettings.aliasesFromHeight)
       .flatMap(_.transactionData)
@@ -104,7 +102,7 @@ object ExtractInfo extends App with ScorexLogging {
       test <- b.transactionData
         .collect {
           case tx: DataTransaction =>
-            val addr = tx.sender.toAddress.bytes
+            val addr = ByteStr(tx.sender.toAddress.bytes)
             tx.data.collectFirst {
               case x: IntegerDataEntry => DataTestData(addr, x.key, DataType.Long)
               case x: BooleanDataEntry => DataTestData(addr, x.key, DataType.Boolean)

@@ -1,8 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats._
-import cats.implicits._
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.OverdraftValidationProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
@@ -23,19 +22,19 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 
-import scala.util.{Left, Right, Try}
+import scala.util.{Left, Right}
 
 object CommonValidation {
 
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain, blockTime: Long, tx: T): Either[ValidationError, T] =
     if (blockTime >= blockchain.settings.functionalitySettings.allowTemporaryNegativeUntil) {
       def checkTransfer(
-        sender: Address,
-        assetId: Asset,
-        amount: Long,
-        feeAssetId: Asset,
-        feeAmount: Long,
-        allowFeeOverdraft: Boolean = false
+          sender: Address,
+          assetId: Asset,
+          amount: Long,
+          feeAssetId: Asset,
+          feeAmount: Long,
+          allowFeeOverdraft: Boolean = false
       ) = {
         val amountDiff = assetId match {
           case aid @ IssuedAsset(_) => Portfolio(0, LeaseBalance.empty, Map(aid -> -amount))
@@ -76,31 +75,30 @@ object CommonValidation {
       }
 
       tx match {
-        case ptx: PaymentTransaction if blockchain.balance(ptx.sender, Waves) < (ptx.amount + ptx.fee) =>
+        case ptx: PaymentTransaction if blockchain.balance(ptx.sender.toAddress, Waves) < (ptx.amount + ptx.fee) =>
           Left(
             GenericError(
               "Attempt to pay unavailable funds: balance " +
-                s"${blockchain.balance(ptx.sender, Waves)} is less than ${ptx.amount + ptx.fee}"
+                s"${blockchain.balance(ptx.sender.toAddress, Waves)} is less than ${ptx.amount + ptx.fee}"
             )
           )
-        case ttx: TransferTransaction     => checkTransfer(ttx.sender, ttx.assetId, ttx.amount, ttx.feeAssetId, ttx.fee)
-        case mtx: MassTransferTransaction => checkTransfer(mtx.sender, mtx.assetId, mtx.transfers.map(_.amount).sum, Waves, mtx.fee)
+        case ttx: TransferTransaction     => checkTransfer(ttx.sender.toAddress, ttx.assetId, ttx.amount, ttx.feeAssetId, ttx.fee)
+        case mtx: MassTransferTransaction => checkTransfer(mtx.sender.toAddress, mtx.assetId, mtx.transfers.map(_.amount).sum, Waves, mtx.fee)
         case citx: InvokeScriptTransaction =>
           val foldPayments: Iterable[Payment] => Iterable[Payment] =
             if (blockchain.useCorrectPaymentCheck)
               _.groupBy(_.assetId)
-                .map { case (assetId, p) => Payment(p.map(_.amount).sum, assetId) }
-            else
+                .map { case (assetId, p) => Payment(p.map(_.amount).sum, assetId) } else
               identity
 
           for {
             address <- blockchain.resolveAlias(citx.dAppAddressOrAlias)
             allowFeeOverdraft = blockchain.accountScript(address) match {
-              case Some(ContractScriptImpl(version, _)) if version >= V4 && blockchain.useCorrectPaymentCheck => true
-              case _ => false
+              case Some(AccountScriptInfo(_, ContractScriptImpl(version, _), _, _)) if version >= V4 && blockchain.useCorrectPaymentCheck => true
+              case _                                                                                          => false
             }
             check <- foldPayments(citx.payments)
-              .map(p => checkTransfer(citx.sender, p.assetId, p.amount, citx.feeAssetId, citx.fee, allowFeeOverdraft))
+              .map(p => checkTransfer(citx.sender.toAddress, p.assetId, p.amount, citx.feeAssetId, citx.fee, allowFeeOverdraft))
               .find(_.isLeft)
               .getOrElse(Right(tx))
           } yield check
@@ -116,8 +114,16 @@ object CommonValidation {
       Either.cond(!blockchain.containsTransaction(tx), tx, AlreadyInTheState(id, blockchain.transactionInfo(id).get._1))
   }
 
-  def disallowBeforeActivationTime[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] = {
+  def disallowFromAnotherNetwork[T <: Transaction](tx: T, currentChainId: Byte): Either[ValidationError, T] =
+    Either.cond(
+      tx.chainId == currentChainId,
+      tx,
+      GenericError(
+        s"Data from other network: expected: ${AddressScheme.current.chainId}(${AddressScheme.current.chainId.toChar}), actual: ${tx.chainId}(${tx.chainId.toChar})"
+      )
+    )
 
+  def disallowBeforeActivationTime[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] = {
     def activationBarrier(b: BlockchainFeature, msg: Option[String] = None): Either[ActivationError, T] =
       Either.cond(
         blockchain.isFeatureActivated(b, blockchain.height),
@@ -128,7 +134,7 @@ object CommonValidation {
     def scriptActivation(sc: Script): Either[ActivationError, T] = {
 
       val v3Activation = activationBarrier(BlockchainFeatures.Ride4DApps)
-      val v4Activation = activationBarrier(BlockchainFeatures.MultiPaymentInvokeScript)
+      val v4Activation = activationBarrier(BlockchainFeatures.BlockV5)
 
       def scriptVersionActivation(sc: Script): Either[ActivationError, T] = sc.stdLibVersion match {
         case V1 | V2 | V3 if sc.containsArray    => v4Activation
@@ -153,18 +159,23 @@ object CommonValidation {
     def generic1or2Barrier(t: VersionedTransaction, name: String) = {
       if (t.version == 1.toByte) Right(tx)
       else if (t.version == 2.toByte) activationBarrier(BlockchainFeatures.SmartAccounts)
-      else Left(GenericError(s"Unknown version of $name transaction: ${t.version}"))
+      else Right(tx)
     }
 
-    tx match {
-      case _: PaymentTransaction => Right(tx)
-      case _: GenesisTransaction => Right(tx)
+    val versionsBarrier = tx match {
+      case p: LegacyPBSwitch if p.isProtobufVersion =>
+        activationBarrier(BlockchainFeatures.BlockV5)
 
       case v: VersionedTransaction if !v.builder.supportedVersions.contains(v.version) =>
         Left(GenericError(s"Invalid tx version: $v"))
 
-      case p: LegacyPBSwitch if p.isProtobufVersion =>
-        activationBarrier(BlockchainFeatures.BlockV5)
+      case _ =>
+        Right(tx)
+    }
+
+    val typedBarrier = tx match {
+      case _: PaymentTransaction => Right(tx)
+      case _: GenesisTransaction => Right(tx)
 
       case e: ExchangeTransaction if e.version == TxVersion.V1 => Right(tx)
       case exv2: ExchangeTransaction if exv2.version >= TxVersion.V2 =>
@@ -193,7 +204,7 @@ object CommonValidation {
       case sast: SetAssetScriptTransaction =>
         activationBarrier(BlockchainFeatures.SmartAssets).flatMap { _ =>
           sast.script match {
-            case None     => Left(GenericError("Cannot set empty script"))
+            case None     => Right(tx)
             case Some(sc) => scriptActivation(sc)
           }
         }
@@ -212,6 +223,11 @@ object CommonValidation {
 
       case _ => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
+
+    for {
+      _ <- versionsBarrier
+      _ <- typedBarrier
+    } yield tx
   }
 
   def disallowTxFromFuture[T <: Transaction](settings: FunctionalitySettings, time: Long, tx: T): Either[ValidationError, T] = {
@@ -243,12 +259,4 @@ object CommonValidation {
         )
       case _ => Right(tx)
     }
-
-  def validateOverflow(dataList: Traversable[Long], errMsg: String): Either[ValidationError, Unit] = {
-    Try(dataList.foldLeft(0L)(Math.addExact))
-      .fold(
-        _ => GenericError(errMsg).asLeft[Unit],
-        _ => ().asRight[ValidationError]
-      )
-  }
 }

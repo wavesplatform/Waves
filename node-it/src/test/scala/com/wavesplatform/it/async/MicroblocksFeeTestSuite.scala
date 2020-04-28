@@ -45,38 +45,38 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with CancelAfterFai
 
   "fee distribution when NG activates" in {
     val f = for {
-      height <- traverse(nodes)(_.height).map(_.max)
+      _ <- traverse(nodes)(_.height).map(_.max)
 
       _ <- traverse(nodes)(_.waitForHeight(microblockActivationHeight - 1))
       _ <- txRequestsGen(200, 2.waves)
-      _ <- traverse(nodes)(_.waitForHeight(microblockActivationHeight + 2))
+      _ <- traverse(nodes)(_.waitForHeight(microblockActivationHeight + 3))
 
       initialBalances <- notMiner.debugStateAt(microblockActivationHeight - 1) //100%
 
       balancesBeforeActivation <- notMiner.debugStateAt(microblockActivationHeight) // 100%
-      blockBeforeActivation    <- notMiner.blockAt(microblockActivationHeight)
+      blockBeforeActivation    <- notMiner.blockHeadersAt(microblockActivationHeight)
 
       balancesOnActivation <- notMiner.debugStateAt(microblockActivationHeight + 1) // 40%
-      blockOnActivation    <- notMiner.blockAt(microblockActivationHeight + 1)
+      blockOnActivation    <- notMiner.blockHeadersAt(microblockActivationHeight + 1)
 
       balancesAfterActivation <- notMiner.debugStateAt(microblockActivationHeight + 2) // 60% of previous + 40% of current
-      blockAfterActivation    <- notMiner.blockAt(microblockActivationHeight + 2)
+      blockAfterActivation    <- notMiner.blockHeadersAt(microblockActivationHeight + 2)
     } yield {
 
       balancesBeforeActivation(blockBeforeActivation.generator) shouldBe {
         nodes.head.settings.blockchainSettings.rewardsSettings.initial +
-          initialBalances(blockBeforeActivation.generator) + blockBeforeActivation.fee
+          initialBalances(blockBeforeActivation.generator) + blockBeforeActivation.totalFee
       }
 
       balancesOnActivation(blockOnActivation.generator) shouldBe {
         nodes.head.settings.blockchainSettings.rewardsSettings.initial +
-          balancesBeforeActivation(blockOnActivation.generator) + blockOnActivation.fee * 4 / 10
+          balancesBeforeActivation(blockOnActivation.generator) + blockOnActivation.totalFee * 4 / 10
       }
 
       balancesAfterActivation(blockAfterActivation.generator) shouldBe {
         nodes.head.settings.blockchainSettings.rewardsSettings.initial +
-          balancesOnActivation(blockAfterActivation.generator) + blockOnActivation.fee * 6 / 10 +
-          blockAfterActivation.fee * 4 / 10
+          balancesOnActivation(blockAfterActivation.generator) + blockOnActivation.totalFee * 6 / 10 +
+          blockAfterActivation.totalFee * 4 / 10
       }
     }
 
@@ -103,7 +103,7 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with CancelAfterFai
   override protected def nodeConfigs: Seq[Config] = Seq(
     notMinerConfig.withFallback(Default.head),
     notMinerConfig.withFallback(Default(1)),
-    minerConfig.withFallback(Default(2)),
+    notMinerConfig.withFallback(Default(2)),
     minerConfig.withFallback(Default(3))
   )
 }

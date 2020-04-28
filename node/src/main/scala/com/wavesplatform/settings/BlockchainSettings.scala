@@ -71,6 +71,7 @@ case class FunctionalitySettings(
     maxTransactionTimeForwardOffset: FiniteDuration = 90.minutes,
     lastTimeBasedForkParameter: Long = 0L,
     leaseExpiration: Int = 1000000,
+    estimatorPreCheckHeight: Int = 0,
     minAssetInfoUpdateInterval: Int = 100000
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int        = blockVersion3AfterHeight
@@ -86,6 +87,7 @@ case class FunctionalitySettings(
     (blocksForFeatureActivation > 0) && (blocksForFeatureActivation <= featureCheckBlocksPeriod),
     s"blocksForFeatureActivation must be in range 1 to $featureCheckBlocksPeriod"
   )
+  require(minAssetInfoUpdateInterval >= 0, "minAssetInfoUpdateInterval must be greater than or equal to 0")
 
   def activationWindowSize(height: Int): Int =
     featureCheckBlocksPeriod * (if (height <= doubleFeaturesPeriodsAfterHeight) 1 else 2)
@@ -112,7 +114,8 @@ object FunctionalitySettings {
     lastTimeBasedForkParameter = 1530161445559L,
     resetEffectiveBalancesAtHeight = 462000,
     blockVersion3AfterHeight = 795000,
-    doubleFeaturesPeriodsAfterHeight = 810000
+    doubleFeaturesPeriodsAfterHeight = 810000,
+    estimatorPreCheckHeight = 1847610
   )
 
   val TESTNET = apply(
@@ -121,14 +124,16 @@ object FunctionalitySettings {
     resetEffectiveBalancesAtHeight = 51500,
     blockVersion3AfterHeight = 161700,
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
-    lastTimeBasedForkParameter = 1492560000000L
+    lastTimeBasedForkParameter = 1492560000000L,
+    estimatorPreCheckHeight = 817380
   )
 
   val STAGENET = apply(
     featureCheckBlocksPeriod = 100,
     blocksForFeatureActivation = 40,
     doubleFeaturesPeriodsAfterHeight = 1000000000,
-    preActivatedFeatures = (1 to 13).map(_.toShort -> 0).toMap
+    preActivatedFeatures = (1 to 13).map(_.toShort -> 0).toMap,
+    minAssetInfoUpdateInterval = 10
   )
 
   val configPath = "waves.blockchain.custom.functionality"

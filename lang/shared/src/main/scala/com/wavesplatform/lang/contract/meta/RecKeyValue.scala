@@ -18,7 +18,7 @@ case class RecKeyValueFolder[V, R <% V](
     }
 
   def foldRoot(dic: Dic): R = {
-    val result = dic.m.map { case (k, v) => k -> fold(v) }
+    val result = dic.m.mapValues(fold)
     fromDic(result.toSeq)
   }
 }

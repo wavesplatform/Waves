@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.serialization.impl
 
-import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.transaction.{LegacyPBSwitch, ProvenTransaction, SigProofsSwitch, VersionedTransaction}
 import play.api.libs.json.{JsArray, JsObject, JsString, Json}
 
@@ -10,8 +9,8 @@ object BaseTxJson {
     Json.obj(
       "type"            -> typeId,
       "id"              -> id().toString,
-      "sender"          -> sender.stringRepr,
-      "senderPublicKey" -> Base58.encode(sender),
+      "sender"          -> sender.toAddress,
+      "senderPublicKey" -> sender,
       "fee"             -> assetFee._2,
       "feeAssetId"      -> assetFee._1.maybeBase58Repr,
       "timestamp"       -> timestamp,
@@ -24,7 +23,7 @@ object BaseTxJson {
       case v: VersionedTransaction => Json.obj("version" -> v.version)
       case _                       => Json.obj()
     }) ++ (tx match {
-      case pbs: LegacyPBSwitch if pbs.isProtobufVersion => Json.obj("chainId" -> tx.chainByte)
+      case pbs: LegacyPBSwitch if pbs.isProtobufVersion => Json.obj("chainId" -> tx.chainId)
       case _                                            => Json.obj()
     })
   }

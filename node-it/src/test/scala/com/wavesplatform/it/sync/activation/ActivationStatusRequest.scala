@@ -6,10 +6,12 @@ import org.scalactic.source.Position
 import org.scalatest.Matchers
 
 trait ActivationStatusRequest extends Matchers {
-  def assertVotingStatus(fas: FeatureActivationStatus,
-                         supportedBlocks: Int,
-                         blockchainFeatureStatus: BlockchainFeatureStatus,
-                         nodeFeatureStatus: NodeFeatureStatus)(implicit pos: Position): Unit = {
+  def assertVotingStatus(
+      fas: FeatureActivationStatus,
+      supportedBlocks: Int,
+      blockchainFeatureStatus: BlockchainFeatureStatus,
+      nodeFeatureStatus: NodeFeatureStatus
+  )(implicit pos: Position): Unit = {
     withClue("supportedBlocks") {
       fas.supportingBlocks should contain(supportedBlocks)
     }
@@ -39,6 +41,18 @@ trait ActivationStatusRequest extends Matchers {
     }
     withClue("blockchainStatus") {
       fas.blockchainStatus shouldBe BlockchainFeatureStatus.Activated
+    }
+    withClue("nodeStatus") {
+      fas.nodeStatus shouldBe nodeFeatureStatus
+    }
+  }
+
+  def assertUndefinedStatus(fas: FeatureActivationStatus, nodeFeatureStatus: NodeFeatureStatus)(implicit pos: Position): Unit = {
+    withClue("supportedBlocks") {
+      fas.supportingBlocks should contain(0)
+    }
+    withClue("blockchainStatus") {
+      fas.blockchainStatus shouldBe BlockchainFeatureStatus.Undefined
     }
     withClue("nodeStatus") {
       fas.nodeStatus shouldBe nodeFeatureStatus

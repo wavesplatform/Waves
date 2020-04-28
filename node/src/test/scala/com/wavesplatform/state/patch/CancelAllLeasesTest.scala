@@ -1,6 +1,7 @@
 package com.wavesplatform.state.patch
 
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs._
@@ -8,10 +9,10 @@ import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class CancelAllLeasesTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class CancelAllLeasesTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
 
   private val settings =
     TestFunctionalitySettings.Enabled.copy(resetEffectiveBalancesAtHeight = 5, lastTimeBasedForkParameter = Long.MaxValue / 2)
@@ -24,12 +25,12 @@ class CancelAllLeasesTest extends PropSpec with PropertyChecks with Matchers wit
         otherAccount  <- accountGen
         otherAccount2 <- accountGen
         ts            <- Gen.choose(0, settings.lastTimeBasedForkParameter)
-        genesis: GenesisTransaction  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-        genesis2: GenesisTransaction = GenesisTransaction.create(otherAccount, ENOUGH_AMT, ts).explicitGet()
-        (lease, _) <- leaseAndCancelGeneratorP(master, recipient, ts)
+        genesis: GenesisTransaction  = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+        genesis2: GenesisTransaction = GenesisTransaction.create(otherAccount.toAddress, ENOUGH_AMT, ts).explicitGet()
+        (lease, _) <- leaseAndCancelGeneratorP(master, recipient.toAddress, ts)
         fee2       <- smallFeeGen
         unleaseOther = LeaseCancelTransaction.signed(1.toByte, otherAccount.publicKey, lease.id(), fee2, ts + 1, otherAccount.privateKey).explicitGet()
-        (lease2, _) <- leaseAndCancelGeneratorP(master, otherAccount2, ts)
+        (lease2, _) <- leaseAndCancelGeneratorP(master, otherAccount2.toAddress, ts)
       } yield (genesis, genesis2, lease, unleaseOther, lease2, ts)
 
     forAll(setupAndLeaseInResetBlock) {
