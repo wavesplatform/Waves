@@ -98,7 +98,7 @@ object BlockAppender extends ScorexLogging {
     def createApplySpan(block: Block) = {
       Kamon
         .spanBuilder("block-appender")
-        .tag("id", BlockStats.id(block.uniqueId))
+        .tag("id", BlockStats.id(block.id()))
         .tag("parent-id", BlockStats.id(block.header.reference))
         .start(Instant.ofEpochMilli(block.header.timestamp))
     }
