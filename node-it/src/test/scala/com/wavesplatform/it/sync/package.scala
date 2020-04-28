@@ -22,6 +22,7 @@ package object sync {
   val burnFee: Long                    = 0.001.waves
   val invokeFee: Long                  = 0.009.waves
   val sponsorFee: Long                 = 1.waves
+  val sponsorReducedFee: Long          = 0.001.waves
   val setAssetScriptFee: Long          = 1.waves
   val setScriptFee: Long               = 0.01.waves
   val transferAmount: Long             = 10.waves
