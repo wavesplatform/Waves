@@ -1,33 +1,38 @@
 package com.wavesplatform.database
 
-trait Key[V] {
-  def name: String
-  def keyBytes: Array[Byte]
+import com.google.common.base.CaseFormat
+import com.google.common.io.BaseEncoding
+import com.google.common.primitives.{Bytes, Shorts}
+
+abstract class Key[V](prefix: Short, val name: String, val suffix: Array[Byte]) {
+  val keyBytes: Array[Byte] = Bytes.concat(Shorts.toByteArray(prefix), suffix)
   def parse(bytes: Array[Byte]): V
   def encode(v: V): Array[Byte]
 
-  override lazy val toString: String = BigInt(keyBytes).toString(16)
+  override lazy val toString: String = s"$name($prefix,${BaseEncoding.base16().encode(suffix)})"
 
-  override def equals(obj: scala.Any): Boolean = obj match {
+  override def equals(obj: Any): Boolean = obj match {
     case that: Key[V] => java.util.Arrays.equals(this.keyBytes, that.keyBytes)
     case _            => false
   }
 
-  override def hashCode(): Int =
-    java.util.Arrays.hashCode(keyBytes)
+  override def hashCode(): Int = java.util.Arrays.hashCode(keyBytes)
 }
 
 object Key {
-  def apply[V](keyName: String, key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[V] = new Key[V] {
-    override def name: String = keyName
+  private[this] val converter = CaseFormat.UPPER_CAMEL.converterTo(CaseFormat.LOWER_HYPHEN)
 
-    override def keyBytes: Array[Byte] = key
+  def apply[V](keyTag: KeyTags.KeyTag, keySuffix: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[V] =
+    new Key[V](keyTag.id.toShort, converter.convert(keyTag.toString), keySuffix) {
+      override def parse(bytes: Array[Byte]): V = parser(bytes)
+      override def encode(v: V): Array[Byte]    = encoder(v)
+    }
 
-    override def parse(bytes: Array[Byte]) = parser(bytes)
-
-    override def encode(v: V) = encoder(v)
-  }
-
-  def opt[V](name: String, key: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[Option[V]] =
-    apply[Option[V]](name, key, Option(_).map(parser), _.fold[Array[Byte]](null)(encoder))
+  def opt[V](keyTag: KeyTags.KeyTag, keySuffix: Array[Byte], parser: Array[Byte] => V, encoder: V => Array[Byte]): Key[Option[V]] =
+    apply[Option[V]](
+      keyTag,
+      keySuffix,
+      Option(_).map(parser),
+      _.fold[Array[Byte]](Array.emptyByteArray)(encoder)
+    )
 }

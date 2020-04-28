@@ -21,63 +21,76 @@ object PBEvents {
 
   def protobuf(event: events.BlockchainUpdated): BlockchainUpdated =
     event match {
-      case events.BlockAppended(sig, height, block, blockStateUpdate, transactionStateUpdates) =>
+      case events.BlockAppended(sig, height, block, updatedWavesAmount, blockStateUpdate, transactionStateUpdates) =>
         val blockUpdate = Some(blockStateUpdate).filterNot(_.isEmpty).map(protobufStateUpdate)
         val txsUpdates  = transactionStateUpdates.map(protobufStateUpdate)
 
         BlockchainUpdated(
-          id = sig,
+          id = sig.toByteString,
           height = height,
           update = BlockchainUpdated.Update.Append(
             PBAppend(
               transactionIds = getIds(block.transactionData),
               stateUpdate = blockUpdate,
               transactionStateUpdates = txsUpdates,
-              body = PBAppend.Body.Block(PBBlocks.protobuf(block))
+              body = PBAppend.Body.Block(
+                PBAppend.BlockAppend(
+                  block = Some(PBBlocks.protobuf(block)),
+                  updatedWavesAmount = updatedWavesAmount
+                )
+              )
             )
           )
         )
-      case events.MicroBlockAppended(sig, height, microBlock, microBlockStateUpdate, transactionStateUpdates) =>
+      case events.MicroBlockAppended(totalBlockId, height, microBlock, microBlockStateUpdate, transactionStateUpdates) =>
         val microBlockUpdate = Some(microBlockStateUpdate).filterNot(_.isEmpty).map(protobufStateUpdate)
         val txsUpdates       = transactionStateUpdates.map(protobufStateUpdate)
 
         BlockchainUpdated(
-          id = sig,
+          id = totalBlockId.toByteString,
           height = height,
           update = BlockchainUpdated.Update.Append(
             PBAppend(
               transactionIds = getIds(microBlock.transactionData),
               stateUpdate = microBlockUpdate,
               transactionStateUpdates = txsUpdates,
-              body = PBAppend.Body.MicroBlock(PBMicroBlocks.protobuf(microBlock))
+              body = PBAppend.Body.MicroBlock(
+                PBAppend.MicroBlockAppend(
+                  microBlock = Some(PBMicroBlocks.protobuf(microBlock, totalBlockId))
+                )
+              )
             )
           )
         )
       case events.RollbackCompleted(to, height) =>
         BlockchainUpdated(
-          id = to,
+          id = to.toByteString,
           height = height,
-          update = BlockchainUpdated.Update.Rollback(PBRollback.BLOCK)
+          update = BlockchainUpdated.Update.Rollback(
+            PBRollback(PBRollback.RollbackType.BLOCK)
+          )
         )
       case events.MicroBlockRollbackCompleted(toSig, height) =>
         BlockchainUpdated(
-          id = toSig,
+          id = toSig.toByteString,
           height = height,
-          update = BlockchainUpdated.Update.Rollback(PBRollback.MICROBLOCK)
+          update = BlockchainUpdated.Update.Rollback(
+            PBRollback(PBRollback.RollbackType.MICROBLOCK)
+          )
         )
     }
 
-  private def toString(bytes: ByteStr): String = new String(bytes, StandardCharsets.UTF_8)
+  private def toString(bytes: ByteStr): String = new String(bytes.arr, StandardCharsets.UTF_8)
 
   private def protobufAssetStateUpdate(a: events.AssetStateUpdate): AssetStateUpdate =
     AssetStateUpdate(
-      assetId = a.asset.id,
+      assetId = a.asset.id.toByteString,
       decimals = a.decimals,
       name = toString(a.name),
       description = toString(a.description),
       reissuable = a.reissuable,
       volume = a.volume.longValue,
-      script = a.script.map(PBTransactions.toPBScript),
+      script = PBTransactions.toPBScript(a.script.map(_._1)),
       sponsorship = a.sponsorship.getOrElse(0),
       nft = a.nft,
       assetExistedBefore = a.assetExistedBefore,
@@ -101,5 +114,5 @@ object PBEvents {
     )
   }
 
-  private def getIds(txs: Seq[Transaction]): Seq[ByteString] = txs.map(t => ByteString.copyFrom(t.id().arr)),
+  private def getIds(txs: Seq[Transaction]): Seq[ByteString] = txs.map(t => ByteString.copyFrom(t.id().arr))
 }

@@ -11,7 +11,7 @@ class LeasingTransactionsGrpcSuite extends GrpcBaseTransactionSuite {
   private val errorMessage = "Reason: Cannot lease more than own"
 
   test("leasing waves decreases lessor's eff.b. and increases lessee's eff.b.; lessor pays fee") {
-    for (v <- supportedVersions) {
+    for (v <- leaseTxSupportedVersions) {
       val firstBalance     = sender.wavesBalance(firstAddress)
       val secondBalance    = sender.wavesBalance(secondAddress)
 
@@ -31,7 +31,7 @@ class LeasingTransactionsGrpcSuite extends GrpcBaseTransactionSuite {
   }
 
   test("cannot lease non-own waves") {
-    for (v <- supportedVersions) {
+    for (v <- leaseTxSupportedVersions) {
       val leaseTx = sender.broadcastLease(firstAcc, PBRecipients.create(secondAcc.toAddress), leasingAmount, minFee, version = v, waitForTx = true)
       val leaseTxId = PBTransactions.vanilla(leaseTx).explicitGet().id().toString
       val secondEffBalance = sender.wavesBalance(secondAddress).effective
@@ -53,7 +53,7 @@ class LeasingTransactionsGrpcSuite extends GrpcBaseTransactionSuite {
   }
 
   test("can not make leasing without having enough balance") {
-    for (v <- supportedVersions) {
+    for (v <- leaseTxSupportedVersions) {
       val firstBalance = sender.wavesBalance(firstAddress)
       val secondBalance = sender.wavesBalance(secondAddress)
 
@@ -84,7 +84,7 @@ class LeasingTransactionsGrpcSuite extends GrpcBaseTransactionSuite {
   }
 
   test("lease cancellation reverts eff.b. changes; lessor pays fee for both lease and cancellation") {
-    for (v <- supportedVersions) {
+    for (v <- leaseTxSupportedVersions) {
       val firstBalance = sender.wavesBalance(firstAddress)
       val secondBalance = sender.wavesBalance(secondAddress)
 
@@ -103,7 +103,7 @@ class LeasingTransactionsGrpcSuite extends GrpcBaseTransactionSuite {
   }
 
   test("lease cancellation can be done only once") {
-    for (v <- supportedVersions) {
+    for (v <- leaseTxSupportedVersions) {
       val firstBalance = sender.wavesBalance(firstAddress)
       val secondBalance = sender.wavesBalance(secondAddress)
 
@@ -128,7 +128,7 @@ class LeasingTransactionsGrpcSuite extends GrpcBaseTransactionSuite {
   }
 
   test("only sender can cancel lease transaction") {
-    for (v <- supportedVersions) {
+    for (v <- leaseTxSupportedVersions) {
       val firstBalance = sender.wavesBalance(firstAddress)
       val secondBalance = sender.wavesBalance(secondAddress)
 
@@ -152,12 +152,12 @@ class LeasingTransactionsGrpcSuite extends GrpcBaseTransactionSuite {
   }
 
   test("can not make leasing to yourself") {
-    for (v <- supportedVersions) {
+    for (v <- leaseTxSupportedVersions) {
       val firstBalance = sender.wavesBalance(firstAddress)
       assertGrpcError(
         sender.broadcastLease(firstAcc, PBRecipients.create(firstAcc.toAddress), leasingAmount, minFee, v),
-        "ToSelf",
-        Code.INTERNAL
+        "Transaction to yourself",
+        Code.INVALID_ARGUMENT
       )
       sender.wavesBalance(firstAddress).regular shouldBe firstBalance.regular
       sender.wavesBalance(firstAddress).effective shouldBe firstBalance.effective

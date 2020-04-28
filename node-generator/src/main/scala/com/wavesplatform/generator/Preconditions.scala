@@ -80,7 +80,7 @@ object Preconditions {
             case CreateAccountP(seed, balance, scriptOption) =>
               val acc = GeneratorSettings.toKeyPair(seed)
               val transferTx = TransferTransaction
-                .selfSigned(2.toByte, settings.faucet, acc, Waves, balance, Waves, Fee, None, time.correctedTime())
+                .selfSigned(2.toByte, settings.faucet, acc.toAddress, Waves, balance, Waves, Fee, None, time.correctedTime())
                 .explicitGet()
               val scriptAndTx = scriptOption.map { file =>
                 val scriptText         = new String(Files.readAllBytes(Paths.get(file)))
@@ -101,7 +101,7 @@ object Preconditions {
           .selfSigned(
             2.toByte,
             settings.faucet,
-            acc.keyPair,
+            acc.keyPair.toAddress,
             IssuedAsset(issuedAsset.assetId),
             balance,
             Waves,
@@ -139,7 +139,7 @@ object Preconditions {
 
       LeaseP(
         GeneratorSettings.toKeyPair(from),
-        GeneratorSettings.toKeyPair(to),
+        GeneratorSettings.toKeyPair(to).toAddress,
         amount,
         repeat
       )

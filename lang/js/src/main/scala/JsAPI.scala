@@ -7,14 +7,13 @@ import com.wavesplatform.lang.directives.Directive.extractDirectives
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveParser, DirectiveSet}
 import com.wavesplatform.lang.script.ScriptPreprocessor
-import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, ContractLimits}
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.{Global, Version}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -37,8 +36,11 @@ object JsAPI {
   private def pureContext(version: StdLibVersion)   = PureContext.build(Global, version).withEnvironment[Environment]
   private val letBLockVersions: Set[StdLibVersion]  = Set(V1, V2)
 
-  private val fullContractContext: CTX[Environment] =
-    buildContractContext(V3)
+  private val fullDAppContext: Map[StdLibVersion, CTX[Environment]] =
+    DirectiveDictionary[StdLibVersion].all
+      .filter(_ >= V3)
+      .map(v => (v, buildContractContext(v)))
+      .toMap
 
   private def buildScriptContext(v: StdLibVersion, isTokenContext: Boolean, isContract: Boolean): CTX[Environment] =
     Monoid.combineAll(Seq(pureContext(v), cryptoContext(v), wavesContext(v, isTokenContext, isContract)))
@@ -83,15 +85,17 @@ object JsAPI {
 
   @JSExportTopLevel("contractLimits")
   def contractLimits(): js.Dynamic = {
+    import ContractLimits._
     js.Dynamic.literal(
-      "MaxComplexityByVersion"     -> ((ver: Int) => ContractLimits.MaxComplexityByVersion(DirectiveDictionary[StdLibVersion].idMap(ver))),
-      "MaxExprSizeInBytes"         -> ContractLimits.MaxExprSizeInBytes,
-      "MaxContractSizeInBytes"     -> ContractLimits.MaxContractSizeInBytes,
-      "MaxInvokeScriptArgs"        -> ContractLimits.MaxInvokeScriptArgs,
-      "MaxInvokeScriptSizeInBytes" -> ContractLimits.MaxInvokeScriptSizeInBytes,
-      "MaxWriteSetSizeInBytes"     -> ContractLimits.MaxWriteSetSizeInBytes,
-      "MaxPaymentAmount"           -> ContractLimits.MaxCallableActionsAmount,
-      "MaxAttachedPaymentAmount"   -> ContractLimits.MaxAttachedPaymentAmount
+      "MaxComplexityByVersion"                -> ((ver: Int) => MaxComplexityByVersion(DirectiveDictionary[StdLibVersion].idMap(ver))),
+      "MaxAccountVerifierComplexityByVersion" -> ((ver: Int) => MaxAccountVerifierComplexityByVersion(DirectiveDictionary[StdLibVersion].idMap(ver))),
+      "MaxExprSizeInBytes"                    -> MaxExprSizeInBytes,
+      "MaxContractSizeInBytes"                -> MaxContractSizeInBytes,
+      "MaxInvokeScriptArgs"                   -> MaxInvokeScriptArgs,
+      "MaxInvokeScriptSizeInBytes"            -> MaxInvokeScriptSizeInBytes,
+      "MaxWriteSetSizeInBytes"                -> MaxWriteSetSizeInBytes,
+      "MaxPaymentAmount"                      -> MaxCallableActionsAmount,
+      "MaxAttachedPaymentAmount"              -> MaxAttachedPaymentAmount
     )
   }
 
@@ -133,9 +137,10 @@ object JsAPI {
 
   private def parseAndCompileScript(ds: DirectiveSet, input: String) = {
     val stdLibVer = ds.stdLibVersion
+    val isAsset = ds.scriptType == Asset
     ds.contentType match {
       case Expression =>
-        val ctx = buildScriptContext(stdLibVer, ds.scriptType == Asset, ds.contentType == DAppType)
+        val ctx = buildScriptContext(stdLibVer, isAsset, ds.contentType == DAppType)
         Global
           .parseAndCompileExpression(input, ctx.compilerContext, letBLockVersions.contains(stdLibVer), stdLibVer, estimator)
           .map {
@@ -148,9 +153,9 @@ object JsAPI {
               )
           }
       case Library =>
-        val ctx = buildScriptContext(stdLibVer, ds.scriptType == Asset, ds.contentType == DAppType)
+        val ctx = buildScriptContext(stdLibVer, isAsset, ds.contentType == DAppType)
         Global
-          .compileDecls(input, ctx.compilerContext, letBLockVersions.contains(stdLibVer), stdLibVer, estimator)
+          .compileDecls(input, ctx.compilerContext, letBLockVersions.contains(stdLibVer), stdLibVer, isAsset, estimator)
           .map {
             case (bytes, ast, complexity) =>
               js.Dynamic.literal(
@@ -161,7 +166,7 @@ object JsAPI {
           }
       case DAppType =>
         Global
-          .parseAndCompileContract(input, fullContractContext.compilerContext, stdLibVer, estimator)
+          .parseAndCompileContract(input, fullDAppContext(ds.stdLibVersion).compilerContext, stdLibVer, estimator)
           .map {
             case (bytes, complexityWithMap, exprDApp, compErrorList) =>
               js.Dynamic.literal(
@@ -196,11 +201,12 @@ object JsAPI {
 
   private def compileScript(ds: DirectiveSet, input: String) = {
     val ver = ds.stdLibVersion
+    val isAsset = ds.scriptType == Asset
     ds.contentType match {
       case Expression =>
-        val ctx = buildScriptContext(ver, ds.scriptType == Asset, ds.contentType == DAppType)
+        val ctx = buildScriptContext(ver, isAsset, ds.contentType == DAppType)
         Global
-          .compileExpression(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, estimator)
+          .compileExpression(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, isAsset, estimator)
           .map {
             case (bytes, ast, complexity) =>
               js.Dynamic.literal(
@@ -210,9 +216,9 @@ object JsAPI {
               )
           }
       case Library =>
-        val ctx = buildScriptContext(ver, ds.scriptType == Asset, ds.contentType == DAppType)
+        val ctx = buildScriptContext(ver, isAsset, ds.contentType == DAppType)
         Global
-          .compileDecls(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, estimator)
+          .compileDecls(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, isAsset, estimator)
           .map {
             case (bytes, ast, complexity) =>
               js.Dynamic.literal(
@@ -224,7 +230,7 @@ object JsAPI {
       case DAppType =>
         // Just ignore stdlib version here
         Global
-          .compileContract(input, fullContractContext.compilerContext, ver, estimator)
+          .compileContract(input, fullDAppContext(ds.stdLibVersion).compilerContext, ver, estimator)
           .map {
             case (bytes, ast, complexity, complexityByFunc) =>
               js.Dynamic.literal(
@@ -282,5 +288,5 @@ object JsAPI {
         )
       )
       .toJSPromise
-  
+
 }

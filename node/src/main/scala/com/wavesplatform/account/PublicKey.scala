@@ -14,10 +14,10 @@ object PublicKey extends TaggedType[ByteStr] {
 
   val KeyStringLength: Int = base58Length(KeyLength)
 
-  val empty = apply(ByteStr.empty)
-
-  def apply(publicKey: ByteStr): PublicKey =
+  def apply(publicKey: ByteStr): PublicKey = {
+    require(publicKey.arr.length == KeyLength, s"invalid public key length: ${publicKey.arr.length}")
     interner.intern(publicKey @@ this)
+  }
 
   def apply(publicKey: Array[Byte]): PublicKey =
     apply(ByteStr(publicKey))
@@ -31,11 +31,9 @@ object PublicKey extends TaggedType[ByteStr] {
   def unapply(arg: Array[Byte]): Option[PublicKey] =
     Some(apply(arg))
 
-  implicit def toAddress(pk: PublicKey): Address =
-    pk.toAddress
-
   implicit class PublicKeyImplicitOps(private val pk: PublicKey) extends AnyVal {
-    def toAddress: Address = Address.fromPublicKey(pk)
+    def toAddress: Address                = Address.fromPublicKey(pk)
+    def toAddress(chainId: Byte): Address = Address.fromPublicKey(pk, chainId)
   }
 
   implicit lazy val jsonFormat: Format[PublicKey] = Format[PublicKey](

@@ -29,6 +29,18 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
       ) should produce("not Contract")
   }
 
+  property("can't be created with empty script") {
+    val gen = for {
+      acc   <- accountGen
+      asset <- bytes32gen
+      fee   <- smallFeeGen
+      ts    <- timestampGen
+      txEi = SetAssetScriptTransaction.selfSigned(TxVersion.V2, acc, IssuedAsset(ByteStr(asset)), None, fee, ts)
+    } yield txEi
+
+    forAll(gen)(_ should produce("Cannot set empty script"))
+  }
+
   override def transactionParser: TransactionParser = SetAssetScriptTransaction
 
   override def updateProofs(tx: SetAssetScriptTransaction, p: Proofs): SetAssetScriptTransaction = tx.copy(1.toByte, proofs = p)
@@ -36,7 +48,7 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
   override def generator: Gen[(Seq[Transaction], SetAssetScriptTransaction)] = setAssetScriptTransactionGen
   override def assertTxs(f: Transaction, second: SetAssetScriptTransaction): Unit = f match {
     case first: SetAssetScriptTransaction =>
-      first.sender.stringRepr shouldEqual second.sender.stringRepr
+      first.sender shouldEqual second.sender
       first.timestamp shouldEqual second.timestamp
       first.fee shouldEqual second.fee
       first.version shouldEqual second.version

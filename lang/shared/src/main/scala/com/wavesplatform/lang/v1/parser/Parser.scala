@@ -94,6 +94,10 @@ object Parser {
     .filter { case (_, x, _) => !keywords.contains(x) }
     .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
 
+  val correctLFunName: P[PART[String]] = (Index ~~ (char ~~ ("_".? ~~ (digit | char)).repX()).! ~~ Index)
+    .filter { case (_, x, _) => !keywords.contains(x) }
+    .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
+
   val anyVarName: P[PART[String]] = (Index ~~ (char ~~ (digit | char).repX()).! ~~ Index).map {
     case (start, x, end) =>
       if (keywords.contains(x)) PART.INVALID(Pos(start, end), s"keywords are restricted: $x")
@@ -128,6 +132,10 @@ object Parser {
     REF(Pos(x.position.start, x.position.end), x)
   }
 
+  val lfunP: P[REF] = P(correctLFunName).map { x =>
+    REF(Pos(x.position.start, x.position.end), x)
+  }
+
   val ifP: P[IF] = {
     def optionalPart(keyword: String, branch: String): P[EXPR] = (Index ~ (keyword ~/ Index ~ baseExpr.?).?).map {
       case (ifTruePos, ifTrueRaw) =>
@@ -158,7 +166,7 @@ object Parser {
 
   val functionCallArgs: P[Seq[EXPR]] = comment ~ baseExpr.rep(sep = comment ~ "," ~ comment) ~ comment
 
-  val maybeFunctionCallP: P[EXPR] = (Index ~~ refP ~~ P("(" ~/ functionCallArgs ~ ")").? ~~ Index).map {
+  val maybeFunctionCallP: P[EXPR] = (Index ~~ lfunP ~~ P("(" ~/ functionCallArgs ~ ")").? ~~ Index).map {
     case (start, REF(_, functionName, _, _), Some(args), accessEnd) => FUNCTION_CALL(Pos(start, accessEnd), functionName, args.toList)
     case (_, id, None, _)                                     => id
   }
@@ -256,7 +264,7 @@ object Parser {
   )
 
   val maybeAccessP: P[EXPR] =
-    P(Index ~~ extractableAtom ~~ Index ~~ NoCut(accessP).rep)
+    P(Index ~~ extractableAtom ~~ Index ~~ NoCut(accessP).repX)
       .map {
         case (start, obj, objEnd, accessors) =>
           accessors.foldLeft(obj) {
@@ -276,7 +284,7 @@ object Parser {
           val innerStart = start + 8
           val innerEnd   = end - 1
           val decoded = base match {
-            case "16" => Global.base16Decode(xs)
+            case "16" => Global.base16Decode(xs, checkLength = false)
             case "58" => Global.base58Decode(xs)
             case "64" => Global.base64Decode(xs)
           }

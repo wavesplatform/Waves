@@ -132,7 +132,8 @@ object FunctionalitySettings {
     featureCheckBlocksPeriod = 100,
     blocksForFeatureActivation = 40,
     doubleFeaturesPeriodsAfterHeight = 1000000000,
-    preActivatedFeatures = (1 to 13).map(_.toShort -> 0).toMap
+    preActivatedFeatures = (1 to 13).map(_.toShort -> 0).toMap,
+    minAssetInfoUpdateInterval = 10
   )
 
   val configPath = "waves.blockchain.custom.functionality"

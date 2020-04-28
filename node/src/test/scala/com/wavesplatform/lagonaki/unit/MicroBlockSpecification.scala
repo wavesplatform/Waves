@@ -26,9 +26,9 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory wi
   test("MicroBlock with txs bytes/parse roundtrip") {
 
     val ts                       = System.currentTimeMillis() - 5000
-    val tr: TransferTransaction  = TransferTransaction.selfSigned(1.toByte, sender, gen, Waves, 5, Waves, 2, None, ts + 1).explicitGet()
+    val tr: TransferTransaction  = TransferTransaction.selfSigned(1.toByte, sender, gen.toAddress, Waves, 5, Waves, 2, None, ts + 1).explicitGet()
     val assetId                  = IssuedAsset(ByteStr(Array.fill(AssetIdLength)(Random.nextInt(100).toByte)))
-    val tr2: TransferTransaction = TransferTransaction.selfSigned(1.toByte, sender, gen, assetId, 5, Waves, 2, None, ts + 2).explicitGet()
+    val tr2: TransferTransaction = TransferTransaction.selfSigned(1.toByte, sender, gen.toAddress, assetId, 5, Waves, 2, None, ts + 2).explicitGet()
 
     val transactions = Seq(tr, tr2)
 
@@ -41,7 +41,7 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory wi
     assert(microBlock.signature == parsedBlock.signature)
     assert(microBlock.sender == parsedBlock.sender)
     assert(microBlock.totalResBlockSig == parsedBlock.totalResBlockSig)
-    assert(microBlock.prevResBlockSig == parsedBlock.prevResBlockSig)
+    assert(microBlock.reference == parsedBlock.reference)
     assert(microBlock.transactionData == parsedBlock.transactionData)
     assert(microBlock == parsedBlock)
   }
@@ -57,11 +57,10 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory wi
   test("MicroBlock cannot contain more than Miner.MaxTransactionsPerMicroblock") {
 
     val transaction =
-      TransferTransaction.selfSigned(1.toByte, sender, gen, Waves, 5, Waves, 1000, None, System.currentTimeMillis()).explicitGet()
+      TransferTransaction.selfSigned(1.toByte, sender, gen.toAddress, Waves, 5, Waves, 1000, None, System.currentTimeMillis()).explicitGet()
     val transactions = Seq.fill(Miner.MaxTransactionsPerMicroblock + 1)(transaction)
 
     val eitherBlockOrError = MicroBlock.buildAndSign(3.toByte, sender, transactions, prevResBlockSig, totalResBlockSig)
-
     eitherBlockOrError should produce("too many txs in MicroBlock")
   }
 }

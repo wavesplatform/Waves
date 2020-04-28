@@ -34,7 +34,7 @@ class IssueTransactionV2Specification
     forAll(issueV2TransactionGen()) { tx: IssueTransaction =>
       val recovered = IssueTransaction.parseBytes(tx.bytes()).get
 
-      tx.sender.stringRepr shouldEqual recovered.sender.stringRepr
+      tx.sender shouldEqual recovered.sender
       tx.timestamp shouldEqual recovered.timestamp
       tx.decimals shouldEqual recovered.decimals
       tx.name shouldEqual recovered.name
@@ -42,7 +42,7 @@ class IssueTransactionV2Specification
       tx.script shouldEqual recovered.script
       tx.reissuable shouldEqual recovered.reissuable
       tx.fee shouldEqual recovered.fee
-      tx.chainByte shouldEqual recovered.chainByte
+      tx.chainId shouldEqual recovered.chainId
       tx.bytes() shouldEqual recovered.bytes()
     }
   }

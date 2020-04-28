@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.smart.performance
 
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -15,12 +16,12 @@ import com.wavesplatform.state.diffs.smart._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
+class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
 
   private val AmtOfTxs = 10000
 
@@ -43,10 +44,10 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
       ts        <- positiveIntGen
       amt       <- smallFeeGen
       fee       <- smallFeeGen
-      genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       setScript <- selfSignedSetScriptTransactionGenP(master, ExprScript(typed).explicitGet())
-      transfer       = simpleSendGen(master, recipient, ts)
-      scriptTransfer = scriptedSendGen(master, recipient, ts)
+      transfer       = simpleSendGen(master, recipient.publicKey, ts)
+      scriptTransfer = scriptedSendGen(master, recipient.publicKey, ts)
       transfers       <- Gen.listOfN(AmtOfTxs, transfer)
       scriptTransfers <- Gen.listOfN(AmtOfTxs, scriptTransfer)
     } yield (genesis, setScript, transfers, scriptTransfers)

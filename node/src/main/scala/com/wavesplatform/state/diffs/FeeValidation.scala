@@ -91,7 +91,7 @@ object FeeValidation {
 
             (baseFee * multiplier).toLong
           case _: ReissueTransaction =>
-            val multiplier = if (blockchain.isFeatureActivated(BlockchainFeatures.MultiPaymentInvokeScript)) DAppV4Multiplier else 1
+            val multiplier = if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) DAppV4Multiplier else 1
             (baseFee * multiplier).toLong
           case _ => baseFee
         }
@@ -154,7 +154,7 @@ object FeeValidation {
 
   private def feeAfterSmartAccounts(blockchain: Blockchain, tx: Transaction)(inputFee: FeeInfo): FeeInfo = {
     val smartAccountScriptsCount: Int = tx match {
-      case tx: Transaction with Authorized => if (blockchain.hasScript(tx.sender)) 1 else 0
+      case tx: Transaction with Authorized => if (blockchain.hasAccountScript(tx.sender.toAddress)) 1 else 0
       case _                               => 0
     }
 

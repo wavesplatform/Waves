@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.grpc
 
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync._
@@ -26,42 +25,6 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
     isAssetScript = true,
     estimator
   ).explicitGet()._1
-
-  protected override def beforeAll(): Unit = {
-    super.beforeAll()
-    assetWOScript = PBTransactions
-      .vanilla(
-        sender.broadcastIssue(
-          source = firstAcc,
-          name = "AssetWOScript",
-          quantity = someAssetAmount,
-          decimals = 0,
-          reissuable = false,
-          fee = issueFee,
-          waitForTx = true
-        )
-      )
-      .explicitGet()
-      .id()
-      .toString
-
-    assetWScript = PBTransactions
-      .vanilla(
-        sender.broadcastIssue(
-          source = firstAcc,
-          name = "AssetWOScript",
-          quantity = someAssetAmount,
-          decimals = 0,
-          reissuable = false,
-          fee = issueFee,
-          script = Right(Some(script)),
-          waitForTx = true
-        )
-      )
-      .explicitGet()
-      .id()
-      .toString
-  }
 
   test("issuer cannot change script on asset w/o initial script") {
     val firstBalance    = sender.wavesBalance(firstAddress).available
@@ -97,7 +60,7 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
               ScriptCompiler(
                 s"""
                |match tx {
-               |  case s : SetAssetScriptTransaction => s.sender == addressFromPublicKey(base58'${ByteStr(secondAcc.publicKey).toString}')
+               |  case s : SetAssetScriptTransaction => s.sender == addressFromPublicKey(base58'${secondAcc.publicKey}')
                |  case _ => false
                |}
                """.stripMargin,
@@ -136,6 +99,7 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
     val firstEffBalance = sender.wavesBalance(firstAddress).effective
 
     sender.setAssetScript(firstAcc, assetWScript, Right(Some(script2)), setAssetScriptFee, waitForTx = true)
+    sender.assetInfo(assetWScript).script.flatMap(sd => PBTransactions.toVanillaScript(sd.scriptBytes)) should contain (script2)
 
     sender.wavesBalance(firstAddress).available shouldBe firstBalance - setAssetScriptFee
     sender.wavesBalance(firstAddress).effective shouldBe firstEffBalance - setAssetScriptFee
@@ -226,5 +190,42 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
     sender.wavesBalance(thirdAddress).available shouldBe balance
     sender.wavesBalance(thirdAddress).effective shouldBe effBalance
 
+  }
+
+
+  protected override def beforeAll(): Unit = {
+    super.beforeAll()
+    assetWOScript = PBTransactions
+      .vanilla(
+        sender.broadcastIssue(
+          source = firstAcc,
+          name = "AssetWOScript",
+          quantity = someAssetAmount,
+          decimals = 0,
+          reissuable = false,
+          fee = issueFee,
+          waitForTx = true
+        )
+      )
+      .explicitGet()
+      .id()
+      .toString
+
+    assetWScript = PBTransactions
+      .vanilla(
+        sender.broadcastIssue(
+          source = firstAcc,
+          name = "AssetWOScript",
+          quantity = someAssetAmount,
+          decimals = 0,
+          reissuable = false,
+          fee = issueFee,
+          script = Right(Some(script)),
+          waitForTx = true
+        )
+      )
+      .explicitGet()
+      .id()
+      .toString
   }
 }

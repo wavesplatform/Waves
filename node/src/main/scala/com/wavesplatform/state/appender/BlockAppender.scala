@@ -11,7 +11,7 @@ import com.wavesplatform.mining.Miner
 import com.wavesplatform.network._
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.BlockchainUpdater
-import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, InvalidSignature}
+import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, InvalidSignature}
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPoolImpl
 import io.netty.channel.Channel
@@ -35,7 +35,7 @@ object BlockAppender extends ScorexLogging {
     Task {
       if (blockchainUpdater.isLastBlockId(newBlock.header.reference))
         appendBlock(blockchainUpdater, utxStorage, pos, time, verify)(newBlock).map(_ => Some(blockchainUpdater.score))
-      else if (blockchainUpdater.contains(newBlock.uniqueId) || blockchainUpdater.isLastBlockId(newBlock.uniqueId))
+      else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
         Right(None)
       else
         Left(BlockAppendError("Block is not a child of the last block", newBlock))
@@ -57,7 +57,7 @@ object BlockAppender extends ScorexLogging {
 
     val append =
       (for {
-        _ <- EitherT(Task(newBlock.signaturesValid()))
+        _ <- EitherT(Task(Either.cond(newBlock.signatureValid(), (), GenericError("Invalid block signature"))))
         _ = span.mark("block.signatures-validated")
         validApplication <- EitherT(apply(blockchainUpdater, time, utxStorage, pos, scheduler)(newBlock))
       } yield validApplication).value

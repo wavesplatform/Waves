@@ -16,7 +16,7 @@ object SetScriptTxSerializer {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
       "script" -> script.map(_.bytes().base64)
-    ) ++ (if (tx.version == TxVersion.V1) Json.obj("chainId" -> chainByte) else Json.obj())
+    ) ++ (if (tx.version == TxVersion.V1) Json.obj("chainId" -> chainId) else Json.obj())
   }
 
   def bodyBytes(tx: SetScriptTransaction): Array[Byte] = {
@@ -24,9 +24,9 @@ object SetScriptTxSerializer {
     version match {
       case TxVersion.V1 =>
         Bytes.concat(
-          Array(builder.typeId, version, chainByte),
-          sender,
-          Deser.serializeOptionOfArrayWithLength(script)(s => s.bytes()),
+          Array(builder.typeId, version, chainId),
+          sender.arr,
+          Deser.serializeOptionOfArrayWithLength(script)(s => s.bytes().arr),
           Longs.toByteArray(fee),
           Longs.toByteArray(timestamp)
         )
@@ -53,6 +53,6 @@ object SetScriptTxSerializer {
     val fee       = buf.getLong
     val timestamp = buf.getLong
     val proofs    = buf.getProofs
-    SetScriptTransaction(TxVersion.V1, sender, script, fee, timestamp, proofs)
+    SetScriptTransaction(TxVersion.V1, sender, script, fee, timestamp, proofs, AddressScheme.current.chainId)
   }
 }

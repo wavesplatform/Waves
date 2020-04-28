@@ -5,23 +5,10 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.serialization.impl.LeaseTxSerializer
 import com.wavesplatform.transaction.validation.impl.LeaseTxValidator
-import com.wavesplatform.transaction.{
-  FastHashId,
-  LegacyPBSwitch,
-  Proofs,
-  SigProofsSwitch,
-  TransactionParser,
-  TxAmount,
-  TxTimestamp,
-  TxType,
-  TxVersion,
-  TxWithFee,
-  VersionedTransaction
-}
+import com.wavesplatform.transaction._
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.reflect.ClassTag
 import scala.util.Try
 
 final case class LeaseTransaction(
@@ -31,7 +18,8 @@ final case class LeaseTransaction(
     amount: TxAmount,
     fee: TxAmount,
     timestamp: TxTimestamp,
-    proofs: Proofs
+    proofs: Proofs,
+    chainId: Byte
 ) extends SigProofsSwitch
     with VersionedTransaction
     with TxWithFee.InWaves
@@ -45,9 +33,9 @@ final case class LeaseTransaction(
 
 object LeaseTransaction extends TransactionParser {
   type TransactionT = LeaseTransaction
-  val classTag: ClassTag[LeaseTransaction] = ClassTag(classOf[LeaseTransaction])
-  val supportedVersions: Set[TxVersion]    = Set(1, 2, 3)
-  val typeId: TxType                       = 8
+
+  val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
+  val typeId: TxType                    = 8: Byte
 
   implicit val validator = LeaseTxValidator
   val serializer         = LeaseTxSerializer
@@ -67,7 +55,7 @@ object LeaseTransaction extends TransactionParser {
       timestamp: TxTimestamp,
       proofs: Proofs
   ): Either[ValidationError, TransactionT] =
-    LeaseTransaction(version, sender, recipient, amount, fee, timestamp, proofs).validatedEither
+    LeaseTransaction(version, sender, recipient, amount, fee, timestamp, proofs, recipient.chainId).validatedEither
 
   def signed(
       version: TxVersion,
@@ -88,5 +76,5 @@ object LeaseTransaction extends TransactionParser {
       fee: TxAmount,
       timestamp: TxTimestamp
   ): Either[ValidationError, TransactionT] =
-    signed(version, sender, recipient, amount, fee, timestamp, sender)
+    signed(version, sender.publicKey, recipient, amount, fee, timestamp, sender.privateKey)
 }

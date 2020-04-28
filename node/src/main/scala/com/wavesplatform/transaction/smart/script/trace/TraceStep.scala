@@ -101,7 +101,7 @@ case class InvokeScriptTrace(
   private def dataItemJson(item: DataItem[_]) =
     Json.obj(
       "key"   -> item.key,
-      "value" -> item.value.toString
+      "value" -> Option(item.value).map(_.toString).getOrElse("null").toString
     )
 
   private def issueJson(issue: Issue) =

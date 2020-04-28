@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.assets
 
-import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -20,7 +20,8 @@ case class SponsorFeeTransaction(
     minSponsoredAssetFee: Option[TxAmount],
     fee: TxAmount,
     timestamp: TxTimestamp,
-    proofs: Proofs
+    proofs: Proofs,
+    chainId: Byte
 ) extends ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InWaves
@@ -37,7 +38,9 @@ case class SponsorFeeTransaction(
 }
 
 object SponsorFeeTransaction extends TransactionParser {
-  override val typeId: TxType                    = 14
+  type TransactionT = SponsorFeeTransaction
+
+  override val typeId: TxType                    = 14: Byte
   override val supportedVersions: Set[TxVersion] = Set(1, 2)
 
   implicit val validator: TxValidator[SponsorFeeTransaction] = SponsorFeeTxValidator
@@ -57,9 +60,10 @@ object SponsorFeeTransaction extends TransactionParser {
       minSponsoredAssetFee: Option[TxTimestamp],
       fee: TxAmount,
       timestamp: TxTimestamp,
-      proofs: Proofs
+      proofs: Proofs,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SponsorFeeTransaction] =
-    SponsorFeeTransaction(version, sender, asset, minSponsoredAssetFee, fee, timestamp, proofs).validatedEither
+    SponsorFeeTransaction(version, sender, asset, minSponsoredAssetFee, fee, timestamp, proofs, chainId).validatedEither
 
   def signed(
       version: TxVersion,
@@ -80,5 +84,5 @@ object SponsorFeeTransaction extends TransactionParser {
       fee: TxAmount,
       timestamp: TxTimestamp
   ): Either[ValidationError, SponsorFeeTransaction] =
-    signed(version, sender, asset, minSponsoredAssetFee, fee, timestamp, sender)
+    signed(version, sender.publicKey, asset, minSponsoredAssetFee, fee, timestamp, sender.privateKey)
 }

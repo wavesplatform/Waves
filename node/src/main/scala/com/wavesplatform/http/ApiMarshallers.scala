@@ -1,11 +1,16 @@
 package com.wavesplatform.http
 
-import akka.http.scaladsl.marshalling.{Marshaller, PredefinedToEntityMarshallers, ToEntityMarshaller, ToResponseMarshaller}
+import akka.NotUsed
+import akka.http.scaladsl.common.EntityStreamingSupport
+import akka.http.scaladsl.marshalling._
 import akka.http.scaladsl.model.MediaTypes.{`application/json`, `text/plain`}
-import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromEntityUnmarshallers, Unmarshaller}
+import akka.http.scaladsl.util.FastFuture
+import akka.stream.scaladsl.{Flow, Source}
 import akka.util.ByteString
 import com.wavesplatform.api.http.ApiError
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.trace.{TraceStep, TracedResult}
@@ -65,6 +70,10 @@ trait ApiMarshallers {
       }
     }
 
+  implicit val byteStrUnmarshaller: Unmarshaller[String, ByteStr] = Unmarshaller.strict[String, ByteStr] { s =>
+    ByteStr.decodeBase58(s).get
+  }
+
   // preserve support for extracting plain strings from requests
   implicit val stringUnmarshaller: FromEntityUnmarshaller[String] = PredefinedFromEntityUnmarshallers.stringUnmarshaller
   implicit val intUnmarshaller: FromEntityUnmarshaller[Int]       = stringUnmarshaller.map(_.toInt)
@@ -79,10 +88,57 @@ trait ApiMarshallers {
         .compose(writes.writes)
     )
 
-
-
   // preserve support for using plain strings as request entities
-  implicit val stringMarshaller = PredefinedToEntityMarshallers.stringMarshaller(`text/plain`)
+  implicit val stringMarshaller: ToEntityMarshaller[String] = PredefinedToEntityMarshallers.stringMarshaller(`text/plain`)
+
+  def jsonStream(prefix: String, delimiter: String, suffix: String): EntityStreamingSupport =
+    EntityStreamingSupport
+      .json()
+      .withContentType(ContentType(CustomJson.jsonWithNumbersAsStrings))
+      .withFramingRenderer(Flow[ByteString].intersperse(ByteString(prefix), ByteString(delimiter), ByteString(suffix)))
+
+  private def selectMarshallingForContentType[T](marshallings: Seq[Marshalling[T]], contentType: ContentType): Option[() ⇒ T] = {
+    contentType match {
+      case _: ContentType.Binary | _: ContentType.WithFixedCharset | _: ContentType.WithMissingCharset ⇒
+        marshallings collectFirst { case Marshalling.WithFixedContentType(`contentType`, marshal) ⇒ marshal }
+      case ContentType.WithCharset(mediaType, charset) ⇒
+        marshallings collectFirst {
+          case Marshalling.WithFixedContentType(`contentType`, marshal) ⇒ marshal
+          case Marshalling.WithOpenCharset(`mediaType`, marshal)        ⇒ () ⇒ marshal(charset)
+        }
+    }
+  }
+
+  def jsonStreamMarshaller(prefix: String = "[", delimiter: String = ",", suffix: String = "]"): ToResponseMarshaller[Source[JsValue, NotUsed]] = {
+    val pjm             = playJsonMarshaller[JsValue].map(_.dataBytes)
+    val framingRenderer = Flow[ByteString].intersperse(ByteString(prefix), ByteString(delimiter), ByteString(suffix))
+    Marshaller[Source[JsValue, NotUsed], HttpResponse] { implicit ec => source =>
+      val availableMarshallingsPerElement = source.mapAsync(1) { t =>
+        pjm(t)(ec)
+      }
+      FastFuture.successful(List(`application/json`, CustomJson.jsonWithNumbersAsStrings).map { contentType =>
+        Marshalling.WithFixedContentType(
+          contentType,
+          () => {
+            val bestMarshallingPerElement = availableMarshallingsPerElement map { marshallings ⇒
+              selectMarshallingForContentType(marshallings, contentType)
+                .orElse {
+                  marshallings collectFirst { case Marshalling.Opaque(marshal) ⇒ marshal }
+                }
+                .getOrElse(throw new NoStrictlyCompatibleElementMarshallingAvailableException[JsValue](contentType, marshallings))
+            }
+
+            val marshalledElements: Source[ByteString, NotUsed] =
+              bestMarshallingPerElement
+                .flatMapConcat(_.apply()) // marshal!
+                .via(framingRenderer)
+
+            HttpResponse(entity = HttpEntity(contentType, marshalledElements))
+          }
+        )
+      })
+    }
+  }
 }
 
 object ApiMarshallers extends ApiMarshallers

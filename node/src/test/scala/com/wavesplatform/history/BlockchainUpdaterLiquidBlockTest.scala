@@ -35,7 +35,7 @@ class BlockchainUpdaterLiquidBlockTest
 
       val prevBlock = unsafeBlock(
         reference = randomSig,
-        txs = Seq(GenesisTransaction.create(richAccount, ENOUGH_AMT, 0).explicitGet()),
+        txs = Seq(GenesisTransaction.create(richAccount.toAddress, ENOUGH_AMT, 0).explicitGet()),
         signer = TestBlock.defaultSigner,
         version = 3,
         timestamp = 0
@@ -64,7 +64,7 @@ class BlockchainUpdaterLiquidBlockTest
           } yield ()
 
           val r = microBlocks.foldLeft(blocksApplied) {
-            case (Right(_), curr) => d.blockchainUpdater.processMicroBlock(curr)
+            case (Right(_), curr) => d.blockchainUpdater.processMicroBlock(curr).map(_ => ())
             case (x, _)           => x
           }
 

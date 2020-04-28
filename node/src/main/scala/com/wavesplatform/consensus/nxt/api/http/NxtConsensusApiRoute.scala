@@ -1,50 +1,56 @@
 package com.wavesplatform.consensus.nxt.api.http
 
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.account.Address
-import com.wavesplatform.api.http.{ApiError, ApiRoute, CommonApiFunctions}
+import com.wavesplatform.api.http.ApiError.BlockDoesNotExist
+import com.wavesplatform.api.http._
+import com.wavesplatform.block.BlockHeader
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 
-case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchain) extends ApiRoute with CommonApiFunctions {
+
+case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchain) extends ApiRoute {
 
   override val route: Route =
     pathPrefix("consensus") {
       algo ~ basetarget ~ baseTargetId ~ generationSignature ~ generationSignatureId ~ generatingBalance
     }
 
-  def generatingBalance: Route = (path("generatingbalance" / Segment) & get) { address =>
-    Address.fromString(address) match {
-      case Left(_) => complete(ApiError.InvalidAddress)
-      case Right(account) =>
-        complete(Json.obj("address" -> account.stringRepr, "balance" -> blockchain.generatingBalance(account)))
-    }
+  def generatingBalance: Route = (path("generatingbalance" / AddrSegment) & get) { address =>
+    complete(Json.obj("address" -> address.stringRepr, "balance" -> blockchain.generatingBalance(address)))
   }
 
-  def generationSignatureId: Route = (path("generationsignature" / Segment) & get) { encodedSignature =>
-    withBlock(blockchain, encodedSignature) { block =>
-      complete(Json.obj("generationSignature" -> block.header.generationSignature.toString))
+  private def headerForId(blockId: ByteStr, f: BlockHeader => JsObject) =
+    complete {
+      (for {
+        height <- blockchain.heightOf(blockId)
+        meta   <- blockchain.blockHeader(height)
+      } yield f(meta.header)).toRight[ApiError](BlockDoesNotExist)
     }
+
+  def generationSignatureId: Route = (path("generationsignature" / BlockId) & get) { signature =>
+    headerForId(signature, m => Json.obj("generationSignature" -> m.generationSignature.toString))
+  }
+
+  def baseTargetId: Route = (path("basetarget" / Signature) & get) { signature =>
+    headerForId(signature, m => Json.obj("baseTarget" -> m.baseTarget))
   }
 
   def generationSignature: Route = (path("generationsignature") & get) {
-    complete(Json.obj("generationSignature" -> blockchain.lastBlock.get.header.generationSignature.toString))
-  }
-
-  def baseTargetId: Route = (path("basetarget" / Segment) & get) { encodedSignature =>
-    withBlock(blockchain, encodedSignature) { block =>
-      complete(Json.obj("baseTarget" -> block.header.baseTarget))
-    }
+    complete(
+      blockchain.lastBlockHeader
+        .map(m => Json.obj("generationSignature" -> m.header.generationSignature.toString))
+        .toRight(BlockDoesNotExist)
+    )
   }
 
   def basetarget: Route = (path("basetarget") & get) {
     complete(
-      Json.obj(
-        "baseTarget" -> blockchain.lastBlock.get.header.baseTarget,
-        "score"      -> blockchain.score.toString()
-      )
+      blockchain.lastBlockHeader
+        .map(m => Json.obj("baseTarget" -> m.header.baseTarget))
+        .toRight(BlockDoesNotExist)
     )
   }
 

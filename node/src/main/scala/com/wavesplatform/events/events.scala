@@ -15,7 +15,7 @@ final case class AssetStateUpdate(
     description: ByteStr,
     reissuable: Boolean,
     volume: BigInt,
-    script: Option[Script],
+    script: Option[(Script, Long)],
     sponsorship: Option[Long],
     nft: Boolean,
     assetExistedBefore: Boolean,
@@ -38,6 +38,7 @@ final case class BlockAppended(
     toId: ByteStr,
     toHeight: Int,
     block: Block,
+    updatedWavesAmount: Long,
     blockStateUpdate: StateUpdate,
     transactionStateUpdates: Seq[StateUpdate]
 ) extends BlockchainUpdated

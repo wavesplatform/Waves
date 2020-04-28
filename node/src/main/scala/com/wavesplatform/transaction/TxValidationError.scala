@@ -1,10 +1,12 @@
 package com.wavesplatform.transaction
+
 import cats.Id
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.evaluator.Log
+import com.wavesplatform.transaction.TxValidationError.FailedScriptError.Reason
 import com.wavesplatform.transaction.assets.exchange.Order
 
 import scala.util.Either
@@ -28,7 +30,7 @@ object TxValidationError {
   case class BlockFromFuture(ts: Long)                         extends ValidationError
   case class AlreadyInTheState(txId: ByteStr, txHeight: Int)   extends ValidationError
   case class AccountBalanceError(errs: Map[Address, String])   extends ValidationError
-  case class AliasDoesNotExist(a: Alias)                       extends ValidationError
+  case class AliasDoesNotExist(a: Alias)                       extends ValidationError { override def toString: String = s"Alias '$a' does not exists." }
   case class AliasIsDisabled(a: Alias)                         extends ValidationError
   case class OrderValidationError(order: Order, err: String)   extends ValidationError
   case class SenderIsBlacklisted(addr: String)                 extends ValidationError
@@ -46,21 +48,104 @@ object TxValidationError {
     override def toString: String = s"InvalidSignature(${s.toString + " reason: " + details})"
   }
 
-  trait HasScriptType extends ValidationError {
-    def isAssetScript: Boolean
+  trait HasScriptType extends ValidationError
+
+  /** Errors which can produce failed transaction */
+  sealed trait FailedScriptError extends Product with Serializable with ValidationError {
+    def reason: Reason = Reason.Asset
+    def error: String
   }
 
-  case class ScriptExecutionError(error: String, log: Log[Id], isAssetScript: Boolean) extends ValidationError with HasScriptType {
-    override def toString: String = {
-      val target = if (isAssetScript) "Asset" else "Account"
-      s"ScriptExecutionError(error = $error, type = $target, log =${logToString(log)})"
+  object FailedScriptError {
+    sealed trait Reason extends Product with Serializable {
+      def code: Int
+    }
+    object Reason {
+      final case object DApp extends Reason {
+        val code: Int = 1
+      }
+      final case object InsufficientFee extends Reason {
+        val code: Int = 2
+      }
+      final case object AssetInAction extends Reason {
+        val code: Int = 3
+      }
+      final case object Asset extends Reason {
+        val code: Int = 4
+      }
     }
   }
 
-  case class TransactionNotAllowedByScript(log: Log[Id], isAssetScript: Boolean) extends ValidationError with HasScriptType {
-    override def toString: String = {
-      val target = if (isAssetScript) "Asset" else "Account"
-      s"TransactionNotAllowedByScript(type = $target, log =${logToString(log)})"
+  sealed trait ScriptExecutionError extends ValidationError with HasScriptType {
+    def error: String
+    def log: Log[Id]
+    def target: String
+
+    override def toString: String = s"ScriptExecutionError(error = $error, type = $target, log =${logToString(log)})"
+  }
+
+  object ScriptExecutionError {
+    def apply(error: String, log: Log[Id], isAssetScript: Boolean): ScriptExecutionError =
+      if (isAssetScript) ByAssetScript(error, log, Reason.Asset) else ByAccountScript(error, log)
+
+    def asset(error: String, log: Log[Id], reason: Reason): ScriptExecutionError with FailedScriptError = ByAssetScript(error, log, reason)
+    def dApp(error: String, log: Log[Id]): ScriptExecutionError with FailedScriptError                  = ByDAppScript(error, log)
+    def dApp(error: String): ScriptExecutionError with FailedScriptError                                = ByDAppScript(error, List.empty)
+
+    def unapply(e: ScriptExecutionError): Option[(String, Log[Id], Boolean)] =
+      e match {
+        case ByAccountScript(error, log)  => Some((error, log, false))
+        case ByDAppScript(error, log)     => Some((error, log, false))
+        case ByAssetScript(error, log, _) => Some((error, log, true))
+      }
+
+    private final case class ByAccountScript(error: String, log: Log[Id]) extends ScriptExecutionError {
+      override val target: String = "Account"
+    }
+
+    private final case class ByDAppScript(error: String, log: Log[Id]) extends ScriptExecutionError with FailedScriptError {
+      override val target: String = "DApp"
+      override val reason: Reason = Reason.DApp
+    }
+
+    private final case class ByAssetScript(error: String, log: Log[Id], override val reason: Reason)
+        extends ScriptExecutionError
+        with FailedScriptError {
+      override val target: String = "Asset"
+    }
+  }
+
+  case class InsufficientInvokeActionFee(error: String) extends ValidationError with FailedScriptError {
+    override def toString: String = s"ScriptExecutionError(error = $error)"
+    override val reason: Reason   = Reason.InsufficientFee
+  }
+
+  sealed trait TransactionNotAllowedByScript extends ValidationError with HasScriptType {
+    def log: Log[Id]
+    def target: String
+
+    override def toString: String = s"TransactionNotAllowedByScript(type = $target, log =${logToString(log)})"
+  }
+
+  object TransactionNotAllowedByScript {
+    def apply(log: Log[Id], isAssetScript: Boolean): TransactionNotAllowedByScript =
+      if (isAssetScript) ByAssetScript(log, Reason.Asset) else ByAccountScript(log)
+
+    def asset(log: Log[Id], reason: Reason): TransactionNotAllowedByScript with FailedScriptError = ByAssetScript(log, reason)
+
+    def unapply(e: TransactionNotAllowedByScript): Option[(Log[Id], Boolean)] =
+      e match {
+        case ByAccountScript(log)  => Some((log, false))
+        case ByAssetScript(log, _) => Some((log, true))
+      }
+
+    private final case class ByAccountScript(log: Log[Id]) extends TransactionNotAllowedByScript {
+      override val target: String = "Account"
+    }
+
+    private final case class ByAssetScript(log: Log[Id], override val reason: Reason) extends TransactionNotAllowedByScript with FailedScriptError {
+      override val target: String = "Asset"
+      override def error: String  = "Transaction is not allowed by token-script"
     }
   }
 
@@ -69,8 +154,7 @@ object TxValidationError {
     else {
       log
         .map {
-          case (name, Right(v)) => s"$name = ${v.prettyString(1)}"
-//          case (name, Right(v))          => s"$name = ${val str = v.toString; if (str.isEmpty) "<empty>" else v}"
+          case (name, Right(v))    => s"$name = ${v.prettyString(1)}"
           case (name, l @ Left(_)) => s"$name = $l"
         }
         .map("\t" + _)
@@ -78,7 +162,7 @@ object TxValidationError {
     }
 
   case class MicroBlockAppendError(err: String, microBlock: MicroBlock) extends ValidationError {
-    override def toString: String = s"MicroBlockAppendError($err, ${microBlock.totalResBlockSig} ~> ${microBlock.prevResBlockSig.trim}])"
+    override def toString: String = s"MicroBlockAppendError($err, ${microBlock.totalResBlockSig} ~> ${microBlock.reference.trim}])"
   }
 
   case object EmptyDataKey extends ValidationError {

@@ -55,10 +55,6 @@
       "name": "node"
     }
   ],
-  "schemes": [
-    "http",
-    "https"
-  ],
   "paths": {
     "/addresses": {
       "get": {
@@ -952,6 +948,34 @@
               "$ref": "#/definitions/Block"
             }
           }
+        },
+        "deprecated": true
+      }
+    },
+    "/blocks/{id}": {
+      "get": {
+        "tags": [
+          "blocks"
+        ],
+        "summary": "Block by id",
+        "description": "Get block by its id",
+        "operationId": "block_by_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Base58-encoded block id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/Block"
+            }
+          }
         }
       }
     },
@@ -1056,19 +1080,19 @@
         }
       }
     },
-    "/blocks/delay/{signature}/{blockNum}": {
+    "/blocks/delay/{id}/{blockNum}": {
       "get": {
         "tags": [
           "blocks"
         ],
         "summary": "Average block delay",
-        "description": "Average delay in milliseconds between last `blockNum` blocks starting from block with `signature`",
+        "description": "Average delay in milliseconds between last `blockNum` blocks starting from block with `id`",
         "operationId": "delay_1",
         "parameters": [
           {
-            "name": "signature",
+            "name": "id",
             "in": "path",
-            "description": "Base58-encoded block signature",
+            "description": "Base58-encoded block id",
             "required": true,
             "type": "string"
           },
@@ -1175,19 +1199,19 @@
         }
       }
     },
-    "/blocks/height/{signature}": {
+    "/blocks/height/{id}": {
       "get": {
         "tags": [
           "blocks"
         ],
         "summary": "Block height",
-        "description": "Height of a block by its signature",
+        "description": "Height of a block by its id",
         "operationId": "heightEncoded_1",
         "parameters": [
           {
-            "name": "signature",
+            "name": "id",
             "in": "path",
-            "description": "Base58-encoded block signature",
+            "description": "Base58-encoded block id",
             "required": true,
             "type": "string"
           }
@@ -1226,6 +1250,33 @@
             "description": "Block height",
             "required": true,
             "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/BlockHeader"
+            }
+          }
+        }
+      }
+    },
+    "/blocks/headers/{id}": {
+      "get": {
+        "tags": [
+          "blocks"
+        ],
+        "summary": "Block header by id",
+        "description": "Get header of specified block",
+        "operationId": "block_header_by_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Base58-encoded block id",
+            "required": true,
+            "type": "string"
           }
         ],
         "responses": {
@@ -2103,58 +2154,6 @@
                 "NTP": {
                   "type": "integer",
                   "format": "int64"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/utils/sign/{privateKey}": {
-      "post": {
-        "tags": [
-          "utils"
-        ],
-        "summary": "Hash",
-        "description": "Return FastCryptographicHash of specified message",
-        "operationId": "sign_1",
-        "produces": [
-          "application/json"
-        ],
-        "parameters": [
-          {
-            "name": "privateKey",
-            "in": "path",
-            "description": "privateKey",
-            "required": true,
-            "type": "string",
-            "x-example": "3kMEhU5z3v8bmer1ERFUUhW58Dtuhyo9hE5vrhjqAWYT"
-          },
-          {
-            "in": "body",
-            "name": "message",
-            "description": "Message to hash (base58 string)",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "schema": {
-              "type": "object",
-              "required": [
-                "message",
-                "signature"
-              ],
-              "properties": {
-                "message": {
-                  "type": "string"
-                },
-                "signature": {
-                  "type": "string"
                 }
               }
             }
@@ -3691,19 +3690,19 @@
         ]
       }
     },
-    "/debug/rollback-to/{signature}": {
+    "/debug/rollback-to/{id}": {
       "delete": {
         "tags": [
           "debug"
         ],
-        "summary": "Block signature",
-        "description": "Rollback the state to the block with a given signature",
+        "summary": "Block id",
+        "description": "Rollback the state to the block with a given id",
         "operationId": "rollbackTo_1",
         "parameters": [
           {
-            "name": "signature",
+            "name": "id",
             "in": "path",
-            "description": "Base58-encoded block signature",
+            "description": "Base58-encoded block id",
             "required": true,
             "type": "string"
           }
@@ -4383,6 +4382,9 @@
         "signature": {
           "type": "string"
         },
+        "id": {
+          "type": "string"
+        },
         "nxt-consensus": {
           "type": "object",
           "required": [
@@ -4462,6 +4464,9 @@
           "type": "string"
         },
         "signature": {
+          "type": "string"
+        },
+        "id": {
           "type": "string"
         },
         "nxt-consensus": {
@@ -4770,6 +4775,9 @@
         "confirmations": {
           "type": "integer",
           "format": "int32"
+        },
+        "applicationStatus": {
+          "type": "string"
         }
       }
     }

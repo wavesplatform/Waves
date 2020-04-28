@@ -7,10 +7,10 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
+import com.wavesplatform.transaction.{Asset, TxVersion}
 
 import scala.util.{Right, Try}
 
@@ -57,13 +57,13 @@ object ExchangeTransactionDiff {
         (),
         GenericError(s"Smart assets can't participate in ExchangeTransactions (SmartAssetsFeature is disabled)")
       )
-      buyerScripted = blockchain.hasScript(buyer)
+      buyerScripted = blockchain.hasAccountScript(buyer)
       _ <- Either.cond(
         smartTradesEnabled || !buyerScripted,
         (),
         GenericError(s"Buyer $buyer can't participate in ExchangeTransaction because it has assigned Script (SmartAccountsTrades is disabled)")
       )
-      sellerScripted = blockchain.hasScript(seller)
+      sellerScripted = blockchain.hasAccountScript(seller)
       _ <- Either.cond(
         smartTradesEnabled || !sellerScripted,
         (),
@@ -80,7 +80,7 @@ object ExchangeTransactionDiff {
       scripts = {
         import com.wavesplatform.features.FeatureProvider._
 
-        val addressScripted = Some(tx.sender.toAddress).count(blockchain.hasScript)
+        val addressScripted = Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
 
         // Don't count before Ride4DApps activation
         val ordersScripted = Seq(buyerScripted, sellerScripted)
@@ -93,12 +93,12 @@ object ExchangeTransactionDiff {
       }
 
       assetsComplexity = assetIds
-        .flatMap(blockchain.assetScriptWithComplexity)
-        .map(_._3)
+        .flatMap(blockchain.assetScript)
+        .map(_._2)
 
       accountsComplexity = List(tx.sender.toAddress, buyer, seller)
-        .flatMap(blockchain.accountScriptWithComplexity)
-        .map(_._3)
+        .flatMap(blockchain.accountScript)
+        .map(_.verifierComplexity)
 
       scriptsComplexity = assetsComplexity.sum + accountsComplexity.sum
     } yield {

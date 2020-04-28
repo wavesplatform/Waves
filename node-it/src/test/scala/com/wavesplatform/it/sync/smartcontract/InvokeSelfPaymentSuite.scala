@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.api.http.ApiError.StateCheckFailed
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -16,9 +15,9 @@ import org.scalatest.CancelAfterFailure
 
 class InvokeSelfPaymentSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  private val caller = pkByAddress(firstAddress).stringRepr
-  private val dAppV4 = pkByAddress(secondAddress).stringRepr
-  private val dAppV3 = pkByAddress(thirdAddress).stringRepr
+  private val caller = firstAddress
+  private val dAppV4 = secondAddress
+  private val dAppV3 = thirdAddress
 
   private var asset1: IssuedAsset = _
   private def asset1Id = asset1.id.toString
@@ -64,7 +63,7 @@ class InvokeSelfPaymentSuite extends BaseTransactionSuite with CancelAfterFailur
       caller,
       List(Transfer(dAppV4, 1000), Transfer(dAppV3, 1000)),
       smartMinFee,
-      Some(asset1Id),
+      assetId = Some(asset1Id),
       waitForTx = true
     )
   }
@@ -74,12 +73,9 @@ class InvokeSelfPaymentSuite extends BaseTransactionSuite with CancelAfterFailur
       Seq(Payment(1, Waves)),
       Seq(Payment(1, asset1)),
       Seq(Payment(1, Waves), Payment(1, asset1))
-    )) assertApiError(
-      sender.invokeScript(dAppV4, dAppV4, payment = payment, fee = smartMinFee + smartFee)
-    ) { error =>
-      error.statusCode shouldBe 400
-      error.id shouldBe StateCheckFailed.Id
-      error.message should include("DApp self-payment is forbidden since V4")
+    )) {
+      val tx = sender.invokeScript(dAppV4, dAppV4, payment = payment, fee = smartMinFee + smartFee, waitForTx = true)._1.id
+      sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("DApp self-payment is forbidden since V4")
     }
   }
 
@@ -91,12 +87,9 @@ class InvokeSelfPaymentSuite extends BaseTransactionSuite with CancelAfterFailur
     for (args <- List(
       List(CONST_STRING("WAVES").explicitGet()),
       List(CONST_STRING(asset1Id).explicitGet())
-    )) assertApiError(
-      sender.invokeScript(caller, dAppV4, Some("paySelf"), args)
-    ) { error =>
-      error.statusCode shouldBe 400
-      error.id shouldBe StateCheckFailed.Id
-      error.message should include("DApp self-transfer is forbidden since V4")
+    )) {
+      val tx = sender.invokeScript(caller, dAppV4, Some("paySelf"), args, waitForTx = true)._1.id
+      sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("DApp self-transfer is forbidden since V4")
     }
   }
 

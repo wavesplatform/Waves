@@ -29,7 +29,7 @@ package object transaction {
   type TxTimestamp = Long
   type TxByteArray = Array[Byte]
 
-  implicit class TransactionValidationOps[T: TxValidator](tx: T) {
+  implicit class TransactionValidationOps[T <: Transaction: TxValidator](tx: T) {
     def validatedNel: ValidatedNel[ValidationError, T] = implicitly[TxValidator[T]].validate(tx)
     def validatedEither: Either[ValidationError, T]    = this.validatedNel.toEither.left.map(_.head)
   }

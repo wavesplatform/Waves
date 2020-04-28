@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.assets
 
-import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -21,7 +21,8 @@ case class ReissueTransaction(
     reissuable: Boolean,
     fee: Long,
     timestamp: Long,
-    proofs: Proofs
+    proofs: Proofs,
+    chainId: Byte
 ) extends VersionedTransaction
     with ProvenTransaction
     with SigProofsSwitch
@@ -40,7 +41,9 @@ case class ReissueTransaction(
 }
 
 object ReissueTransaction extends TransactionParser {
-  override val typeId: TxType                    = 5
+  type TransactionT = ReissueTransaction
+
+  override val typeId: TxType                    = 5: Byte
   override def supportedVersions: Set[TxVersion] = Set(1, 2, 3)
 
   implicit val validator: TxValidator[ReissueTransaction] = ReissueTxValidator
@@ -60,9 +63,10 @@ object ReissueTransaction extends TransactionParser {
       reissuable: Boolean,
       fee: Long,
       timestamp: Long,
-      proofs: Proofs
+      proofs: Proofs,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ReissueTransaction] =
-    ReissueTransaction(version, sender, asset, quantity, reissuable, fee, timestamp, proofs).validatedEither
+    ReissueTransaction(version, sender, asset, quantity, reissuable, fee, timestamp, proofs, chainId).validatedEither
 
   def signed(
       version: TxVersion,
@@ -85,5 +89,5 @@ object ReissueTransaction extends TransactionParser {
       fee: Long,
       timestamp: Long
   ): Either[ValidationError, ReissueTransaction] =
-    signed(version, sender, asset, quantity, reissuable, fee, timestamp, sender)
+    signed(version, sender.publicKey, asset, quantity, reissuable, fee, timestamp, sender.privateKey)
 }

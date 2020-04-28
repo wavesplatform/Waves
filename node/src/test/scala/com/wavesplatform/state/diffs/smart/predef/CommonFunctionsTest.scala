@@ -96,7 +96,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
                                                       |""".stripMargin,
           Coproduct(massTransfer)
         )
-        resultAddress shouldBe evaluated(massTransfer.transfers(0).address.bytes)
+        resultAddress shouldBe evaluated(ByteStr(massTransfer.transfers(0).address.bytes))
         val resultLen = runScript(
           """
                                            |match tx {

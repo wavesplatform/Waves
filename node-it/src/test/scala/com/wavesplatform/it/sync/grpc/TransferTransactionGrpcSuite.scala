@@ -4,6 +4,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync._
+import com.wavesplatform.protobuf.transaction.Attachment.Attachment
 import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
 import io.grpc.Status.Code
 
@@ -20,7 +21,7 @@ class TransferTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
   }
 
   test("asset transfer changes sender's and recipient's asset balance by transfer amount and waves by fee") {
-    for (v <- supportedVersions) {
+    for (v <- transferTxSupportedVersions) {
       val issuedAsset      = sender.broadcastIssue(firstAcc, "name", someAssetAmount, 8, true, issueFee, waitForTx = true)
       val issuedAssetId    = PBTransactions.vanilla(issuedAsset).explicitGet().id().toString
       val firstBalance     = sender.wavesBalance(firstAddress).available
@@ -49,7 +50,7 @@ class TransferTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
   }
 
   test("waves transfer changes waves balances and eff.b. by transfer amount and fee") {
-    for (v <- supportedVersions) {
+    for (v <- transferTxSupportedVersions) {
       val firstBalance     = sender.wavesBalance(firstAddress).available
       val firstEffBalance  = sender.wavesBalance(firstAddress).effective
       val secondBalance    = sender.wavesBalance(secondAddress).available
@@ -67,7 +68,7 @@ class TransferTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
   test("invalid signed waves transfer should not be in UTX or blockchain") {
     val invalidTimestampFromFuture = ntpTime.correctedTime() + 91.minutes.toMillis
     val invalidTimestampFromPast   = ntpTime.correctedTime() - 121.minutes.toMillis
-    for (v <- supportedVersions) {
+    for (v <- transferTxSupportedVersions) {
       val firstBalance     = sender.wavesBalance(firstAddress).available
       val firstEffBalance  = sender.wavesBalance(firstAddress).effective
       val secondBalance    = sender.wavesBalance(secondAddress).available
@@ -113,7 +114,7 @@ class TransferTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
   }
 
   test("can not make transfer without having enough waves balance") {
-    for (v <- supportedVersions) {
+    for (v <- transferTxSupportedVersions) {
       val firstBalance     = sender.wavesBalance(firstAddress).available
       val firstEffBalance  = sender.wavesBalance(firstAddress).effective
       val secondBalance    = sender.wavesBalance(secondAddress).available
@@ -133,7 +134,7 @@ class TransferTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
   }
 
   test("can not make assets transfer without having enough assets balance") {
-    for (v <- supportedVersions) {
+    for (v <- transferTxSupportedVersions) {
       val firstAssetBalance  = sender.assetsBalance(firstAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L)
       val secondAssetBalance = sender.assetsBalance(secondAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L)
 
@@ -155,5 +156,74 @@ class TransferTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
       sender.assetsBalance(secondAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe secondAssetBalance
     }
   }
+  test("able to pass typed attachment to transfer transaction V3") {
+    val txWithStringAtt = PBTransactions
+      .vanilla(
+        sender.broadcastTransfer(
+          firstAcc,
+          Recipient().withPublicKeyHash(secondAddress),
+          transferAmount,
+          minFee,
+          version = 3,
+          attachment = Attachment.StringValue("somestring"),
+          waitForTx = true
+        )
+      )
+      .explicitGet()
+      .id()
+      .toString
 
+    val txWithBoolAtt = PBTransactions
+      .vanilla(
+        sender.broadcastTransfer(
+          firstAcc,
+          Recipient().withPublicKeyHash(secondAddress),
+          transferAmount,
+          minFee,
+          version = 3,
+          attachment = Attachment.BoolValue(false),
+          waitForTx = true
+        )
+      )
+      .explicitGet()
+      .id()
+      .toString
+
+    val txWithIntAtt = PBTransactions
+      .vanilla(
+        sender.broadcastTransfer(
+          firstAcc,
+          Recipient().withPublicKeyHash(secondAddress),
+          transferAmount,
+          minFee,
+          version = 3,
+          attachment = Attachment.IntValue(123),
+          waitForTx = true
+        )
+      )
+      .explicitGet()
+      .id()
+      .toString
+
+    val txWithBinaryAtt = PBTransactions
+      .vanilla(
+        sender.broadcastTransfer(
+          firstAcc,
+          Recipient().withPublicKeyHash(secondAddress),
+          transferAmount,
+          minFee,
+          version = 3,
+          attachment = Attachment.BinaryValue(firstAddress),
+          waitForTx = true
+        )
+      )
+      .explicitGet()
+      .id()
+      .toString
+
+    sender.getTransaction(txWithStringAtt).getTransaction.getTransfer.getAttachment.getStringValue shouldBe "somestring"
+    sender.getTransaction(txWithBoolAtt).getTransaction.getTransfer.getAttachment.getBoolValue shouldBe false
+    sender.getTransaction(txWithIntAtt).getTransaction.getTransfer.getAttachment.getIntValue shouldBe 123
+    sender.getTransaction(txWithBinaryAtt).getTransaction.getTransfer.getAttachment.getBinaryValue shouldBe firstAddress
+  }
 }

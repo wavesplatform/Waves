@@ -4,7 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.{FeatureActivationStatus, NodeFeatureStatus}
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.BlockHeaders
+import com.wavesplatform.it.api.BlockHeader
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{NodeConfigs, ReportingTestName}
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
@@ -54,7 +54,7 @@ class NotActivateFeatureTestSuite
   }
 
   "supported blocks is not increased when nobody votes for feature" in {
-    val generatedBlocks: Seq[BlockHeaders] = nodes.head.blockHeadersSeq(1, votingInterval - 1)
+    val generatedBlocks: Seq[BlockHeader] = nodes.head.blockHeadersSeq(1, votingInterval - 1)
     val featuresMapInGeneratedBlocks       = generatedBlocks.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
     val votesForFeature1                   = featuresMapInGeneratedBlocks.getOrElse(votingFeatureNum, Seq.empty).length
 

@@ -4,7 +4,9 @@ import cats.data.Validated
 import cats.data.Validated.{Invalid, Valid}
 import cats.syntax.validated._
 import com.google.protobuf.ByteString
+import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
 import com.wavesplatform.transaction.{Asset, TxValidationError, TxVersion, VersionedTransaction}
@@ -70,6 +72,20 @@ object TxConstraints {
       )
   }
 
+  def chainIds(chainId: Byte, ids: Byte*): ValidatedV[Byte] = {
+    val chainIds = ids.distinct
+    if (chainIds.length <= 1 && chainIds.headOption.forall(_ == chainId)) Valid(chainId)
+    else GenericError(s"One of chain ids not match: $ids").invalidNel
+  }
+
+  def addressChainId(addr: AddressOrAlias, chainId: Byte): ValidatedV[AddressOrAlias] =
+    Validated
+      .condNel(
+        addr.chainId == chainId,
+        addr,
+        GenericError("Address or alias from other network")
+      )
+
   // Transaction specific
   def transferAttachment(allowTyped: Boolean, attachment: Option[Attachment]): ValidatedV[Option[Attachment]] = {
     import Attachment.AttachmentExt
@@ -78,7 +94,7 @@ object TxConstraints {
       cond(attachment match {
         case Some(Attachment.Bin(_)) | None => true
         case _                              => allowTyped
-      }, TxValidationError.TooBigArray)
+      }, GenericError("Typed attachment not allowed"))
     )
   }
 
@@ -86,7 +102,7 @@ object TxConstraints {
     asset.fold(Validated.validNel[ValidationError, A](asset)) { ia =>
       Validated
         .condNel(
-          ia.id.length == com.wavesplatform.crypto.DigestLength,
+          ia.id.arr.length == com.wavesplatform.crypto.DigestLength,
           asset,
           TxValidationError.InvalidAssetId
         )

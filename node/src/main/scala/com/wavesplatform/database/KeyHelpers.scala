@@ -2,38 +2,29 @@ package com.wavesplatform.database
 
 import java.nio.ByteBuffer
 
-import com.google.common.primitives.{Ints, Longs, Shorts}
-import com.wavesplatform.common.state.ByteStr
+import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.wavesplatform.state.TxNum
 
 object KeyHelpers {
-  def h(prefix: Short, height: Int): Array[Byte] =
-    ByteBuffer.allocate(6).putShort(prefix).putInt(height).array()
+  def h(height: Int): Array[Byte] = Ints.toByteArray(height)
 
-  def hBytes(prefix: Short, height: Int, bytes: Array[Byte]) =
-    ByteBuffer.allocate(6 + bytes.length).putShort(prefix).putInt(height).put(bytes).array()
+  def hBytes(bytes: Array[Byte], height: Int): Array[Byte] =
+    ByteBuffer.allocate(4 + bytes.length).put(bytes).putInt(height).array()
 
-  def bytes(prefix: Short, bytes: Array[Byte]) =
-    ByteBuffer.allocate(2 + bytes.length).putShort(prefix).put(bytes).array()
+  def hAddr(height: Int, addressId: AddressId): Array[Byte] = hBytes(addressId.toByteArray, height)
 
-  def addr(prefix: Short, addressId: BigInt) = bytes(prefix, addressId.toByteArray)
+  def hNum(height: Int, num: TxNum): Array[Byte] = Bytes.concat(Ints.toByteArray(height), Shorts.toByteArray(num))
 
-  def hash(prefix: Short, hashBytes: ByteStr) = bytes(prefix, hashBytes.arr)
+  def historyKey(keyTag: KeyTags.KeyTag, suffix: Array[Byte]): Key[Seq[Int]] = Key(keyTag, suffix, readIntSeq, writeIntSeq)
 
-  def hAddr(prefix: Short, height: Int, addressId: BigInt): Array[Byte] = hBytes(prefix, height, addressId.toByteArray)
+  def intKey(keyTag: KeyTags.KeyTag, default: Int = 0): Key[Int] =
+    Key(keyTag, Array.emptyByteArray, Option(_).fold(default)(Ints.fromByteArray), Ints.toByteArray)
 
-  def hNum(prefix: Short, height: Int, num: TxNum): Array[Byte] = hBytes(prefix, height, Shorts.toByteArray(num))
+  def longKey(keyTag: KeyTags.KeyTag, default: Long = 0): Key[Long] =
+    Key(keyTag, Array.emptyByteArray, Option(_).fold(default)(Longs.fromByteArray), Longs.toByteArray)
 
-  def historyKey(name: String, prefix: Short, b: Array[Byte]) = Key(name, bytes(prefix, b), readIntSeq, writeIntSeq)
-
-  def intKey(name: String, prefix: Short, default: Int = 0): Key[Int] =
-    Key(name, Shorts.toByteArray(prefix), Option(_).fold(default)(Ints.fromByteArray), Ints.toByteArray)
-
-  def longKey(name: String, prefix: Short, default: Long = 0): Key[Long] =
-    Key(name, Longs.toByteArray(prefix), Option(_).fold(default)(Longs.fromByteArray), Longs.toByteArray)
-
-  def bytesSeqNr(name: String, prefix: Short, b: Array[Byte], default: Int = 0): Key[Int] =
-    Key(name, bytes(prefix, b), Option(_).fold(default)(Ints.fromByteArray), Ints.toByteArray)
+  def bytesSeqNr(keyTag: KeyTags.KeyTag, suffix: Array[Byte], default: Int = 0): Key[Int] =
+    Key(keyTag, suffix, Option(_).fold(default)(Ints.fromByteArray), Ints.toByteArray)
 
   def unsupported[A](message: String): A => Array[Byte] = _ => throw new UnsupportedOperationException(message)
 }
