@@ -1,9 +1,11 @@
 package com.wavesplatform.state.diffs.invoke
 
+import cats.Id
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, DApp}
+import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, ScriptResultV3, ScriptResultV4}
@@ -39,7 +41,7 @@ object ContinuationTransactionDiff {
 
       ctx = PureContext.build(Global, script.stdLibVersion).withEnvironment[Environment] |+|
         CryptoContext.build(Global, script.stdLibVersion).withEnvironment[Environment] |+|
-        WavesContext.build(directives)
+        WavesContext.build(directives).copy(vars = Map())
 
       input <- TracedResult(
         buildThisValue(Coproduct[TxOrd](invokeScriptTransaction: Transaction), blockchain, directives, None).left.map(GenericError(_))
@@ -56,7 +58,7 @@ object ContinuationTransactionDiff {
       )
       scriptResult <- {
         val r = ContractEvaluator
-          .applyV2(ctx.evaluationContext(environment), tx.expr, script.stdLibVersion, tx.invokeScriptTransactionId)
+          .applyV2(ctx.evaluationContext(environment), Map[String, LazyVal[Id]](), tx.expr, script.stdLibVersion, tx.invokeScriptTransactionId)
           .left
           .map { case (error, log) => ScriptExecutionError.dApp(error, log) }
         TracedResult(

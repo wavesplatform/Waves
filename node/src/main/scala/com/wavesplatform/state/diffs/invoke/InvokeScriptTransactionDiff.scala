@@ -110,16 +110,18 @@ object InvokeScriptTransactionDiff {
 
                   val result = for {
                     evaluator <- Try {
+                      val wavesContext = WavesContext.build(directives)
                       ContractEvaluator.applyV2(
                         Monoid
                           .combineAll(
                             Seq(
                               PureContext.build(Global, version).withEnvironment[Environment],
                               CryptoContext.build(Global, version).withEnvironment[Environment],
-                              WavesContext.build(directives)
+                              wavesContext.copy(vars = Map())
                             )
                           )
                           .evaluationContext(environment),
+                        wavesContext.evaluationContext(environment).letDefs,
                         contract,
                         invocation,
                         version

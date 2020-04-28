@@ -368,8 +368,6 @@ class UtxPoolImpl(
         if (continuationTransactions.isEmpty) None
         else Some(continuationTransactions.toSeq)
 
-      println("TRANSACTIONS: " + startTransactions)
-
       loop(PackResult(startTransactions, Monoid[Diff].empty, initialConstraint, 0, Set.empty, Set.empty))
     }
 

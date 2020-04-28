@@ -50,7 +50,10 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
          |
          | @Callable(inv)
          | func foo() = {
-         |  let a = ${List.fill(150)("sigVerify(base64'',base64'',base64'')").mkString("||")}
+         |  let a =
+         |    height == $activationHeight                                                  &&
+         |    !(${List.fill(150)("sigVerify(base64'',base64'',base64'')").mkString("||")}) &&
+         |    height == $activationHeight
          |  [BooleanEntry("a", a), BinaryEntry("sender", inv.caller.bytes)]
          | }
          |
@@ -64,7 +67,7 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     assertBadRequestAndMessage(
       setScriptTx,
-      "State check failed. Reason: Contract function (foo) is too complex: 30615 > 4000"
+      "State check failed. Reason: Contract function (foo) is too complex: 30624 > 4000"
     )
   }
 
@@ -93,7 +96,7 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
     nodes.waitForHeightAriseAndTxPresent(invokeScriptTx._1.id)
     nodes.waitForHeight(sender.height + 2)
     nodes.foreach { node =>
-      node.getDataByKey(dApp, "a") shouldBe BooleanDataEntry("a", false)
+      node.getDataByKey(dApp, "a") shouldBe BooleanDataEntry("a", true)
       node.getDataByKey(dApp, "sender") shouldBe BinaryDataEntry("sender", Base58.decode(caller))
     }
   }
