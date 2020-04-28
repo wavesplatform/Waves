@@ -13,7 +13,7 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.CancelAfterFailure
+import org.scalatest.{Assertion, CancelAfterFailure}
 
 class RideIssueTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
   override protected def nodeConfigs: Seq[Config] =
@@ -64,15 +64,15 @@ class RideIssueTransactionSuite extends BaseTransactionSuite with CancelAfterFai
           """.stripMargin
     )
 
-  def compile(script: String) =
-    ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1.bytes().base64
-
   test("check issuing asset name and description using V3 and V4 script") {
     assertSuccessIssue(firstAddress, issueCheckV3)
     assertSuccessIssue(secondAddress, issueCheckV4)
   }
 
-  def assertSuccessIssue(address: String, script: String) = {
+  def compile(script: String): String =
+    ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1.bytes().base64
+
+  def assertSuccessIssue(address: String, script: String): Assertion = {
     val setScriptId = sender.setScript(address, Some(script), setScriptFee, waitForTx = true).id
 
     val scriptInfo = sender.addressScriptInfo(address)
