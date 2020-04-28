@@ -33,7 +33,7 @@ object Bindings {
     val commonPart = combine(Map(
                                "sender"          -> senderObject(tx.sender),
                                "senderPublicKey" -> tx.senderPk,
-                               "bodyBytes"       -> tx.bodyBytes
+                               "bodyBytes"       -> CONST_BYTESTR(tx.bodyBytes, reduceLimit = false).explicitGet()
                              ),
                              headerPart(tx.h))
 

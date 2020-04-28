@@ -31,7 +31,7 @@ object DataEntry {
 
   val MaxKeySize   = 100
   val MaxPBKeySize = 400
-  val MaxValueSize = Short.MaxValue
+  val MaxValueSize = Short.MaxValue // uses for RIDE CONST_STRING and CONST_BYTESTR limits
 
   object Type extends Enumeration {
     val Integer = Value(0)
