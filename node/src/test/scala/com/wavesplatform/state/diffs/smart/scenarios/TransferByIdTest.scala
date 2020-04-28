@@ -44,7 +44,7 @@ class TransferByIdTest extends PropSpec with ScalaCheckPropertyChecks with WithS
       master    <- accountGen
       recipient <- accountGen
       ts        <- positiveIntGen
-      genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       setScript <- selfSignedSetScriptTransactionGenP(master, ExprScript(V3, expr).explicitGet())
       transfer <- Gen.oneOf[TransferTransaction](
         transferGeneratorP(ts, master, recipient.toAddress, ENOUGH_AMT / 2),

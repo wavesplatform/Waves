@@ -14,7 +14,7 @@ import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, Portfolio, Sponsorship}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError.{CanFail, GenericError, UnsupportedTransactionType}
+import com.wavesplatform.transaction.TxValidationError.{FailedScriptError, GenericError, UnsupportedTransactionType}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
@@ -31,21 +31,36 @@ object TransactionDiffer {
       blockchain: Blockchain,
       tx: Transaction
   ): TracedResult[ValidationError, Diff] =
-    validate(prevBlockTs, currentBlockTs, verify)(blockchain, tx) match {
+    validate(prevBlockTs, currentBlockTs, verify, skipFailing = false)(blockchain, tx) match {
       case isFailedTransaction(error) if acceptFailed(blockchain) => failedTransactionDiff(blockchain, tx, error).traced
       case result                                                 => result
     }
 
-  def validate(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, verify: Boolean = true)(
+  /** Validates transaction but since BlockV5 skips ability to fail (does not execute asset scripts and dApp script for ExchangeTx and InvokeScriptTx) */
+  def skipFailing(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, verify: Boolean = true)(
       blockchain: Blockchain,
       tx: Transaction
   ): TracedResult[ValidationError, Diff] = {
-    val verifyAssets = verify || (mayFail(tx) && acceptFailed(blockchain))
+    validate(prevBlockTimestamp, currentBlockTimestamp, verify = verify, skipFailing = mayFail(tx) && acceptFailed(blockchain))(blockchain, tx)
+  }
+
+  /**
+    * Validates transaction.
+    * @param skipFailing skip execution of the DApp and asset scripts
+    * @param verify validate common checks, proofs and asset scripts execution. If `skipFailing` is true asset scripts will not be executed
+    */
+  private def validate(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, verify: Boolean, skipFailing: Boolean)(
+      blockchain: Blockchain,
+      tx: Transaction
+  ): TracedResult[ValidationError, Diff] = {
+    // do not validate assets if `skipFailing` is `true` because assets verification is the only way (other than DApp execution) to fail the transaction
+    // otherwise validate assets if `verify` is `true` or the transaction may fail
+    val verifyAssets = if (skipFailing) false else verify || (mayFail(tx) && acceptFailed(blockchain))
     val result = for {
       _    <- if (verify) validateCommon(blockchain, tx, prevBlockTimestamp, currentBlockTimestamp).traced else success
       _    <- validateFunds(blockchain, tx).traced
       _    <- if (verify) validateProofs(blockchain, tx) else success
-      diff <- transactionDiff(blockchain, tx, currentBlockTimestamp)
+      diff <- transactionDiff(blockchain, tx, currentBlockTimestamp, skipFailing)
       _    <- validateBalance(blockchain, tx.typeId, diff).traced
       _    <- if (verifyAssets) validateAssets(blockchain, tx) else success
     } yield diff
@@ -96,12 +111,17 @@ object TransactionDiffer {
     stats.balanceValidation.measureForType(txType)(BalanceDiffValidation(blockchain)(diff).as(()))
 
   // diff making related
-  private def transactionDiff(blockchain: Blockchain, tx: Transaction, currentBlockTs: Long): TracedResult[ValidationError, Diff] =
+  private def transactionDiff(
+      blockchain: Blockchain,
+      tx: Transaction,
+      currentBlockTs: Long,
+      skipFailing: Boolean
+  ): TracedResult[ValidationError, Diff] =
     stats.transactionDiffValidation.measureForType(tx.typeId) {
       tx match {
         case gtx: GenesisTransaction     => GenesisTransactionDiff(blockchain.height)(gtx).traced
         case ptx: PaymentTransaction     => PaymentTransactionDiff(blockchain)(ptx).traced
-        case ci: InvokeScriptTransaction => InvokeScriptTransactionDiff(blockchain, currentBlockTs)(ci)
+        case ci: InvokeScriptTransaction => InvokeScriptTransactionDiff(blockchain, currentBlockTs, skipExecution = skipFailing)(ci)
         case etx: ExchangeTransaction    => ExchangeTransactionDiff(blockchain)(etx).traced
         case ptx: ProvenTransaction      => provenTransactionDiff(blockchain, currentBlockTs)(ptx)
         case _                           => UnsupportedTransactionType.asLeft.traced
@@ -214,11 +234,11 @@ object TransactionDiffer {
   private object isFailedTransaction {
     def unapply(result: TracedResult[ValidationError, Diff]): Option[Option[ErrorMessage]] =
       result match {
-        case TracedResult(Left(TransactionValidationError(e: CanFail, tx)), _) => Some(errorMessage(e, tx))
-        case _                                                                 => None
+        case TracedResult(Left(TransactionValidationError(e: FailedScriptError, tx)), _) => Some(errorMessage(e, tx))
+        case _                                                                           => None
       }
 
-    def errorMessage(cf: CanFail, tx: Transaction): Option[ErrorMessage] =
+    def errorMessage(cf: FailedScriptError, tx: Transaction): Option[ErrorMessage] =
       tx match {
         case _: InvokeScriptTransaction => Some(ErrorMessage(cf.reason.code, cf.error))
         case _                          => None

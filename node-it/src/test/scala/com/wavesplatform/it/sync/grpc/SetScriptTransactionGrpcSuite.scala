@@ -2,7 +2,6 @@ package com.wavesplatform.it.sync.grpc
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncGrpcApi._
@@ -25,8 +24,8 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         s"""
         match tx {
           case t: Transaction => {
-            let A = base58'${ByteStr(secondAcc.publicKey)}'
-            let B = base58'${ByteStr(thirdAcc.publicKey)}'
+            let A = base58'${secondAcc.publicKey}'
+            let B = base58'${thirdAcc.publicKey}'
             let AC = sigVerify(tx.bodyBytes,tx.proofs[0],A)
             let BC = sigVerify(tx.bodyBytes,tx.proofs[1],B)
             AC && BC
@@ -70,7 +69,7 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
       val unsignedTransfer = PBTransaction(
         chainId = AddressScheme.current.chainId,
-        senderPublicKey = ByteString.copyFrom(contract.publicKey),
+        senderPublicKey = ByteString.copyFrom(contract.publicKey.arr),
         fee = Some(Amount.of(ByteString.EMPTY, transferFee)),
         timestamp = System.currentTimeMillis(),
         version = 2,
@@ -83,9 +82,9 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         )
       )
       val sig1 =
-        ByteString.copyFrom(crypto.sign(secondAcc, PBTransactions.vanilla(SignedTransaction(Some(unsignedTransfer))).explicitGet().bodyBytes()))
+        ByteString.copyFrom(crypto.sign(secondAcc.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsignedTransfer))).explicitGet().bodyBytes()).arr)
       val sig2 =
-        ByteString.copyFrom(crypto.sign(thirdAcc, PBTransactions.vanilla(SignedTransaction(Some(unsignedTransfer))).explicitGet().bodyBytes()))
+        ByteString.copyFrom(crypto.sign(thirdAcc.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsignedTransfer))).explicitGet().bodyBytes()).arr)
 
       sender.broadcast(unsignedTransfer, Seq(sig1, sig2), waitForTx = true)
 
@@ -99,16 +98,16 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val (contract, contractAddr) = if (v < 2) (firstAcc, firstAddress) else (secondAcc, secondAddress)
       val unsignedSetScript = PBTransaction(
         chainId = AddressScheme.current.chainId,
-        senderPublicKey = ByteString.copyFrom(contract.publicKey),
+        senderPublicKey = ByteString.copyFrom(contract.publicKey.arr),
         fee = Some(Amount.of(ByteString.EMPTY, setScriptFee + smartFee)),
         timestamp = System.currentTimeMillis(),
         version = v,
         data = PBTransaction.Data.SetScript(SetScriptTransactionData())
       )
       val sig1 =
-        ByteString.copyFrom(crypto.sign(secondAcc, PBTransactions.vanilla(SignedTransaction(Some(unsignedSetScript))).explicitGet().bodyBytes()))
+        ByteString.copyFrom(crypto.sign(secondAcc.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsignedSetScript))).explicitGet().bodyBytes()).arr)
       val sig2 =
-        ByteString.copyFrom(crypto.sign(thirdAcc, PBTransactions.vanilla(SignedTransaction(Some(unsignedSetScript))).explicitGet().bodyBytes()))
+        ByteString.copyFrom(crypto.sign(thirdAcc.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsignedSetScript))).explicitGet().bodyBytes()).arr)
 
       sender.broadcast(unsignedSetScript, Seq(sig1, sig2), waitForTx = true)
 

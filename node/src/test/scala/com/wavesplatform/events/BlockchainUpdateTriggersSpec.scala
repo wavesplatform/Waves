@@ -32,7 +32,7 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
   private val initialAmount: Long = WAVES_AMOUNT / 2
   private val genesis = TestBlock.create(
     0,
-    Seq(GenesisTransaction.create(master, initialAmount, 0).explicitGet(), GenesisTransaction.create(rich, initialAmount, 0).explicitGet()),
+    Seq(GenesisTransaction.create(master.toAddress, initialAmount, 0).explicitGet(), GenesisTransaction.create(rich.toAddress, initialAmount, 0).explicitGet()),
     master
   )
   override protected def initBlockchain(blockchainUpdater: Blockchain with BlockchainUpdater): Unit = {
@@ -151,10 +151,10 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
         sender        <- accountGen
         recipient     <- accountGen
         amount        <- Gen.choose(1L, initialAmount - Constants.UnitsInWave)
-        master2sender <- transferGeneratorPV2(1, master, sender, amount)
+        master2sender <- transferGeneratorPV2(1, master, sender.toAddress, amount)
         fee           <- Gen.choose(1, master2sender.amount - 1)
         sender2recipient = TransferTransaction
-          .selfSigned(2.toByte, sender, recipient, Waves, master2sender.amount - fee, Waves, fee, None, 2)
+          .selfSigned(2.toByte, sender, recipient.toAddress, Waves, master2sender.amount - fee, Waves, fee, None, 2)
           .explicitGet()
       } yield (sender, recipient, master2sender, sender2recipient)
     } {
@@ -279,7 +279,7 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
           // merge issue/reissue diffs as if they were produced by a single invoke
           val invokeTxDiff = assetsDummyBlockDiff.transactionDiffs
             .foldLeft(Diff.empty)(Diff.diffMonoid.combine)
-            .copy(transactions = Map((invoke.id(), (invoke, Set(master), true))))
+            .copy(transactions = Map((invoke.id(), (invoke, Set(master.toAddress), true))))
           val invokeBlockDetailedDiff = assetsDummyBlockDiff.copy(transactionDiffs = Seq(invokeTxDiff))
 
           produceEvent(_.onProcessBlock(invokeBlock, invokeBlockDetailedDiff, None, blockchain)) match {

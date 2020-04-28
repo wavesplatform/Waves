@@ -86,7 +86,7 @@ object OrderJson {
     val eproofs =
       proofs
         .map(p => Proofs(p.map(ByteStr.apply)))
-        .orElse(signature.map(s => Proofs(s)))
+        .orElse(signature.map(s => Proofs(ByteStr(s))))
         .getOrElse(Proofs.empty)
 
     Order(version, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, eproofs)

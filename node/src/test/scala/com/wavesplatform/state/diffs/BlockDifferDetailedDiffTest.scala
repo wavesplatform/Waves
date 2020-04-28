@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import com.wavesplatform.BlockGen
-import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
@@ -41,8 +41,8 @@ class BlockDifferDetailedDiffTest extends FreeSpec with Matchers with PropertyCh
         master <- accountGen
         ts     <- positiveIntGen
         genesisBlock = TestBlock
-          .create(ts, Seq(GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()))
-      } yield (KeyPair.toAddress(master), genesisBlock)
+          .create(ts, Seq(GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()))
+      } yield (master.toAddress, genesisBlock)
 
       forAll(genesisBlockGen) {
         case (master, b) =>
@@ -67,9 +67,9 @@ class BlockDifferDetailedDiffTest extends FreeSpec with Matchers with PropertyCh
         amount1 <- Gen.choose[Long](2, ENOUGH_AMT - 1)
         amount2 <- Gen.choose[Long](1, amount1 - 1)
 
-        genesis   = GenesisTransaction.create(a1, ENOUGH_AMT, ts).explicitGet()
-        transfer1 = createWavesTransfer(a1, a2, amount1, transactionFee, ts + 10).explicitGet()
-        transfer2 = createWavesTransfer(a2, a1, amount2, transactionFee, ts + 20).explicitGet()
+        genesis   = GenesisTransaction.create(a1.toAddress, ENOUGH_AMT, ts).explicitGet()
+        transfer1 = createWavesTransfer(a1, a2.toAddress, amount1, transactionFee, ts + 10).explicitGet()
+        transfer2 = createWavesTransfer(a2, a1.toAddress, amount2, transactionFee, ts + 20).explicitGet()
         block = TestBlock
           .create(
             a1,
@@ -79,7 +79,7 @@ class BlockDifferDetailedDiffTest extends FreeSpec with Matchers with PropertyCh
               transfer2
             )
           )
-      } yield (KeyPair.toAddress(a1), KeyPair.toAddress(a2), amount1, amount2, block)
+      } yield (a1.toAddress, a2.toAddress, amount1, amount2, block)
 
       "transaction diffs are correct" in
         forAll(genesisTransfersBlockGen) {
@@ -127,15 +127,15 @@ class BlockDifferDetailedDiffTest extends FreeSpec with Matchers with PropertyCh
               amount1 <- Gen.choose[Long](2, ENOUGH_AMT - 1)
               amount2 <- Gen.choose[Long](1, amount1 - 1)
 
-              genesis   = GenesisTransaction.create(a1, ENOUGH_AMT, ts).explicitGet()
-              transfer1 = createWavesTransfer(a1, a2, amount1, transactionFee, ts + 10).explicitGet()
-              transfer2 = createWavesTransfer(a2, a1, amount2, transactionFee, ts + 20).explicitGet()
+              genesis   = GenesisTransaction.create(a1.toAddress, ENOUGH_AMT, ts).explicitGet()
+              transfer1 = createWavesTransfer(a1, a2.toAddress, amount1, transactionFee, ts + 10).explicitGet()
+              transfer2 = createWavesTransfer(a2, a1.toAddress, amount2, transactionFee, ts + 20).explicitGet()
               history = Seq(
                 TestBlock.create(a1, Seq(genesis)),
                 TestBlock.create(a1, Seq(transfer1))
               )
               block = TestBlock.create(miner, Seq(transfer2))
-            } yield (history, block, KeyPair.toAddress(miner))
+            } yield (history, block, miner.toAddress)
 
             forAll(blocksNgMinerGen) {
               case (history, block, ngMiner) =>

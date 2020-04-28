@@ -19,8 +19,8 @@ object CreateAliasTxSerializer {
     import tx._
 
     lazy val base = Bytes.concat(
-      sender,
-      Deser.serializeArrayWithLength(alias.bytes.arr),
+      sender.arr,
+      Deser.serializeArrayWithLength(alias.bytes),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp)
     )
@@ -33,7 +33,7 @@ object CreateAliasTxSerializer {
   }
 
   def toBytes(tx: CreateAliasTransaction): Array[Byte] = tx.version match {
-    case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), tx.signature)
+    case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), tx.signature.arr)
     case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
     case _            => PBTransactionSerializer.bytes(tx)
   }

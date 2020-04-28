@@ -10,7 +10,7 @@ import com.wavesplatform.transaction.Transaction
 import scala.util.{Random, Try}
 
 object TestBlock {
-  val defaultSigner = KeyPair(Array.fill(KeyLength)(0: Byte))
+  val defaultSigner: KeyPair = KeyPair(ByteStr(new Array[Byte](KeyLength)))
 
   val random: Random = new Random()
 
@@ -69,7 +69,7 @@ object TestBlock {
         generationSignature =
           if (version < Block.ProtoBlockVersion) ByteStr(Array.fill(Block.GenerationSignatureLength)(0: Byte))
           else ByteStr(Array.fill(Block.GenerationVRFSignatureLength)(0: Byte)),
-        generator = signer,
+        generator = signer.publicKey,
         featureVotes = features,
         rewardVote = rewardVote,
         transactionData = txs
@@ -86,7 +86,7 @@ object TestBlock {
           ref,
           2L,
           randomOfLength(Block.GenerationSignatureLength),
-          defaultSigner,
+          defaultSigner.publicKey,
           Seq.empty,
           -1L,
           ByteStr.empty
@@ -105,7 +105,7 @@ object TestBlock {
         ref,
         2L,
         randomOfLength(Block.GenerationSignatureLength),
-        defaultSigner,
+        defaultSigner.publicKey,
         features,
         -1L,
         Seq.empty

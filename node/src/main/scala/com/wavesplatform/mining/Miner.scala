@@ -217,7 +217,7 @@ class MinerImpl(
           s"Invalid next block generation time: $expectedTS"
         )
       } yield result
-    } else Left(s"Balance $balance of ${account.stringRepr} is lower than required for generation")
+    } else Left(s"Balance $balance of ${account.toAddress} is lower than required for generation")
   }
 
   private def nextBlockGenOffsetWithConditions(account: KeyPair): Either[String, FiniteDuration] = {
@@ -257,7 +257,7 @@ class MinerImpl(
                   Task.raiseError(new RuntimeException(err.toString))
 
                 case Right(Some(score)) =>
-                  log.debug(s"Forged and applied $block by ${account.stringRepr} with cumulative score $score")
+                  log.debug(s"Forged and applied $block by ${account.toAddress} with cumulative score $score")
                   BlockStats.mined(block, blockchainUpdater.height)
                   allChannels.broadcast(BlockForged(block))
                   scheduleMining()
@@ -282,7 +282,7 @@ class MinerImpl(
   def scheduleMining(): Unit = {
     Miner.blockMiningStarted.increment()
 
-    val nonScriptedAccounts = wallet.privateKeyAccounts.filterNot(blockchainUpdater.hasAccountScript(_))
+    val nonScriptedAccounts = wallet.privateKeyAccounts.filterNot(kp => blockchainUpdater.hasAccountScript(kp.toAddress))
     scheduledAttempts := CompositeCancelable.fromSet(nonScriptedAccounts.map { account =>
       generateBlockTask(account)
         .onErrorHandle(err => log.warn(s"Error mining Block: $err"))

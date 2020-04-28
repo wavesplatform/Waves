@@ -9,16 +9,14 @@ import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.lang.{Common, Global}
-import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
+import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{Account, Expression, V2, V3}
+import com.wavesplatform.lang.directives.values.{V2, V3}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
-import com.wavesplatform.lang.v1.BaseGlobal
 import com.wavesplatform.lang.v1.compiler.ContractCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
@@ -27,7 +25,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
-import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.{Schedulers, Time}
@@ -599,7 +596,6 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
     Post(routePath("/script/estimate"), dAppBase64) ~> route ~> check {
       val json = responseAs[JsValue]
-      println(json)
       (json \ "script").as[String] shouldBe dAppBase64
       (json \ "complexity").as[Long] shouldBe 68
       (json \ "verifierComplexity").as[Long] shouldBe 11
@@ -609,7 +605,6 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
     Post(routePath("/script/estimate"), dAppWithoutVerifierBase64) ~> route ~> check {
       val json = responseAs[JsValue]
-      println(json)
       (json \ "script").as[String] shouldBe dAppWithoutVerifierBase64
       (json \ "complexity").as[Long] shouldBe 68
       (json \ "verifierComplexity").as[Long] shouldBe 0
@@ -619,7 +614,6 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
     Post(routePath("/script/estimate"), emptyDAppBase64) ~> route ~> check {
       val json = responseAs[JsValue]
-      println(json)
       (json \ "script").as[String] shouldBe emptyDAppBase64
       (json \ "complexity").as[Long] shouldBe 0
       (json \ "verifierComplexity").as[Long] shouldBe 0

@@ -3,7 +3,6 @@ package com.wavesplatform.it.sync.transactions
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ApiError.{InvalidName, StateCheckFailed, TooBigArrayAllocation}
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.{Miners, NotMiner}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{Transaction, TransactionInfo}
@@ -59,7 +58,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   test("able to update name/description of issued asset") {
     val nextTerm = sender.transactionInfo[TransactionInfo](assetId).height + updateInterval + 1
     nodes.waitForHeight(nextTerm)
-    val issuerBalance       = sender.balanceDetails(issuer.publicKey.stringRepr)
+    val issuerBalance       = sender.balanceDetails(issuer.publicKey.toAddress.toString)
     val updateAssetInfoTxId = notMiner.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)._1.id
     checkUpdateAssetInfoTx(notMiner.utx().head, "updatedName", "updatedDescription")
     miner.waitForTransaction(updateAssetInfoTxId)
@@ -78,13 +77,13 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
       "updatedDescription"
     )
 
-    checkUpdateAssetInfoTxInfo(sender.transactionsByAddress(issuer.publicKey.stringRepr, 1).head, "updatedName", "updatedDescription")
+    checkUpdateAssetInfoTxInfo(sender.transactionsByAddress(issuer.publicKey.toAddress.toString, 1).head, "updatedName", "updatedDescription")
     checkUpdateAssetInfoTxInfo(sender.transactionInfo[TransactionInfo](updateAssetInfoTxId), "updatedName", "updatedDescription")
 
     sender.assetsDetails(assetId).name shouldBe "updatedName"
     sender.assetsDetails(assetId).description shouldBe "updatedDescription"
 
-    sender.balanceDetails(issuer.publicKey.stringRepr).available shouldBe issuerBalance.available - minFee
+    sender.balanceDetails(issuer.publicKey.toAddress.toString).available shouldBe issuerBalance.available - minFee
     nodes.waitForHeightArise()
   }
 
@@ -128,7 +127,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
       "secondUpdatedDescription"
     )
 
-    checkUpdateAssetInfoTxInfo(sender.transactionsByAddress(issuer.publicKey.stringRepr, 1).head, "secondUpdate", "secondUpdatedDescription")
+    checkUpdateAssetInfoTxInfo(sender.transactionsByAddress(issuer.publicKey.toAddress.toString, 1).head, "secondUpdate", "secondUpdatedDescription")
     checkUpdateAssetInfoTxInfo(sender.transactionInfo[TransactionInfo](updateAssetInfoTxId), "secondUpdate", "secondUpdatedDescription")
 
     sender.assetsDetails(otherAssetId).name shouldBe "secondUpdate"
@@ -221,7 +220,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
       error.message shouldBe s"State check failed. Reason: Transaction involves 1 scripted assets. Requires $smartFee extra fee." +
         s" Fee for UpdateAssetInfoTransaction (${smartMinFee - 1} in WAVES) does not exceed minimal value of $smartMinFee WAVES."
     }
-    sender.setScript(issuer.publicKey.stringRepr, Some(script), waitForTx = true)
+    sender.setScript(issuer.publicKey.toAddress.toString, Some(script), waitForTx = true)
     assertApiError(sender.updateAssetInfo(issuer, smartAssetId, "updatedName", "updatedDescription", minFee + 2 * smartFee - 1)) { error =>
       error.id shouldBe StateCheckFailed.Id
       error.message shouldBe s"State check failed. Reason: Transaction sent from smart account. Requires $smartFee extra fee." +
@@ -252,7 +251,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
       "updatedDescription"
     )
 
-    checkUpdateAssetInfoTxInfo(sender.transactionsByAddress(issuer.publicKey.stringRepr, 1).head, "updatedName", "updatedDescription")
+    checkUpdateAssetInfoTxInfo(sender.transactionsByAddress(issuer.publicKey.toAddress.toString, 1).head, "updatedName", "updatedDescription")
     checkUpdateAssetInfoTxInfo(sender.transactionInfo[TransactionInfo](updateAssetInfoTxId), "updatedName", "updatedDescription")
 
     sender.assetsDetails(nftId).name shouldBe "updatedName"
@@ -260,13 +259,13 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   }
 
   test("reissue/burn/setassetscript should not affect update interval") {
-    sender.reissue(issuer.stringRepr, assetId, 100, reissuable = true, version = TxVersion.V2, waitForTx = true)
+    sender.reissue(issuer.toAddress.toString, assetId, 100, reissuable = true, version = TxVersion.V2, waitForTx = true)
     sender.updateAssetInfo(issuer, assetId, "afterReissue", "asset after reissue", waitForTx = true)
     sender.assetsDetails(assetId).name shouldBe "afterReissue"
     sender.assetsDetails(assetId).description shouldBe "asset after reissue"
 
     sender.waitForHeight(sender.height + updateInterval + 1, 2.minutes)
-    sender.burn(issuer.stringRepr, assetId, 100, version = TxVersion.V2, fee = smartMinFee, waitForTx = true)
+    sender.burn(issuer.toAddress.toString, assetId, 100, version = TxVersion.V2, fee = smartMinFee, waitForTx = true)
     sender.updateAssetInfo(issuer, assetId, "afterBurn", "asset after burn", waitForTx = true)
     sender.assetsDetails(assetId).name shouldBe "afterBurn"
     sender.assetsDetails(assetId).description shouldBe "asset after burn"
@@ -274,7 +273,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     sender.waitForHeight(sender.height + updateInterval + 1, 2.minutes)
     sender.setAssetScript(
       smartAssetId,
-      issuer.stringRepr,
+      issuer.toAddress.toString,
       script = Some(scriptBase64),
       version = TxVersion.V2,
       fee = setAssetScriptFee + 2 * smartFee,

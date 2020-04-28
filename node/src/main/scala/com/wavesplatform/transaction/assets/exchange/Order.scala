@@ -105,7 +105,7 @@ object Order {
       matcherFee: TxAmount,
       matcherFeeAssetId: Asset = Asset.Waves
   ): Order =
-    Order(version, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId).signWith(sender)
+    Order(version, sender.publicKey, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId).signWith(sender.privateKey)
 
   def buy(
       version: TxVersion,

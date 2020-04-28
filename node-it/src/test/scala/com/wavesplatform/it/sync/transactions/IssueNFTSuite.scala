@@ -32,8 +32,8 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
     val assetDescription = "my asset description"
 
     firstNode.transfer(
-      firstNode.privateKey.stringRepr,
-      firstNodeIssuer.stringRepr,
+      firstNode.keyPair.toAddress.toString,
+      firstNodeIssuer.toAddress.toString,
       10.waves,
       0.001.waves,
       waitForTx = true

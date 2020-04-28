@@ -2,15 +2,16 @@ package com.wavesplatform.state
 
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils._
-import com.wavesplatform.utils._
 import com.wavesplatform.lang.v1.traits.domain.{Burn, Issue, Reissue}
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
+import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.utils._
 import play.api.libs.json._
 
 final case class InvokeScriptResult(
@@ -114,14 +115,14 @@ object InvokeScriptResult {
 
   private def toVanillaIssue(r: PBInvokeScriptResult.Issue): Issue = {
     assert(r.script.isEmpty)
-    Issue(r.assetId.toByteArray, None, r.decimals, r.description, r.reissuable, r.name, r.amount, r.nonce)
+    Issue(r.assetId.toByteStr, None, r.decimals, r.description, r.reissuable, r.name, r.amount, r.nonce)
   }
 
   private def toVanillaReissue(r: PBInvokeScriptResult.Reissue) =
-    Reissue(r.assetId.toByteArray, r.isReissuable, r.amount)
+    Reissue(r.assetId.toByteStr, r.isReissuable, r.amount)
 
   private def toVanillaBurn(b: PBInvokeScriptResult.Burn) =
-    Burn(b.assetId.toByteArray, b.amount)
+    Burn(b.assetId.toByteStr, b.amount)
 
   private def toVanillaErrorMessage(b: PBInvokeScriptResult.ErrorMessage) =
     ErrorMessage(b.code, b.text)

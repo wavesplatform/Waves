@@ -61,14 +61,8 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
                   .getOrElse(fork1.head)
 
               val gs =
-                if (vrfActivated)
-                  blockForHit._2.arr
-                else
-                  PoSCalculator
-                    .generationSignature(
-                      blockForHit._2,
-                      miner1
-                    )
+                if (vrfActivated) blockForHit._2.arr
+                else PoSCalculator.generationSignature(blockForHit._2, miner1.publicKey)
               calcDelay(gs, fork1.head._1.header.baseTarget, miner1Balance)
             }
 
@@ -84,14 +78,8 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
                   .getOrElse(fork2.head)
 
               val gs =
-                if (vrfActivated)
-                  blockForHit._2.arr
-                else
-                  PoSCalculator
-                    .generationSignature(
-                      blockForHit._2,
-                      miner1
-                    )
+                if (vrfActivated) blockForHit._2.arr
+                else PoSCalculator.generationSignature(blockForHit._2, miner1.publicKey)
               calcDelay(gs, fork2.head._1.header.baseTarget, miner1Balance)
             }
 
@@ -322,19 +310,21 @@ object FPPoSSelectorTest {
 
       val (gs, hitSource) =
         if (blockVersion < Block.ProtoBlockVersion) {
-          val gs = PoSCalculator
-            .generationSignature(
-              blockForHit._2,
-              miner.publicKey
-            )
+          val gs = ByteStr(
+            PoSCalculator
+              .generationSignature(
+                blockForHit._2,
+                miner.publicKey
+              )
+          )
           (gs, gs)
         } else {
           val gs = PoSCalculator
             .generationVRFSignature(
-              blockForHit._2,
+              blockForHit._2.arr,
               miner.privateKey
             )
-          val gi = crypto.verifyVRF(ByteStr(gs), blockForHit._2, miner.publicKey).explicitGet().arr
+          val gi = crypto.verifyVRF(gs, blockForHit._2.arr, miner.publicKey).explicitGet()
           (gs, gi)
         }
 
@@ -355,7 +345,7 @@ object FPPoSSelectorTest {
           forkChain.head._1.header.timestamp + delay,
           forkChain.head._1.id(),
           bt,
-          ByteStr(gs),
+          gs,
           Seq.empty,
           miner,
           Seq.empty,
@@ -363,7 +353,7 @@ object FPPoSSelectorTest {
         )
         .explicitGet()
 
-      (newBlock, ByteStr(hitSource)) :: forkChain
+      (newBlock, hitSource) :: forkChain
     }
   }
 
@@ -372,10 +362,10 @@ object FPPoSSelectorTest {
       updateBT: Long => Long = identity,
       updateGS: ByteStr => ByteStr = identity
   ): Block = {
-    val height                                 = blockchain.height
+    val height          = blockchain.height
     val lastBlockHeader = blockchain.lastBlockHeader.get
-    val ggParentTS                             = blockchain.blockHeader(height - 2).map(_.header.timestamp)
-    val minerBalance                           = blockchain.effectiveBalance(miner.toAddress, 0)
+    val ggParentTS      = blockchain.blockHeader(height - 2).map(_.header.timestamp)
+    val minerBalance    = blockchain.effectiveBalance(miner.toAddress, 0)
     val delay = updateDelay(
       pos
         .getValidBlockDelay(
@@ -417,7 +407,7 @@ object FPPoSSelectorTest {
   val accountGen: Gen[KeyPair] =
     Gen
       .containerOfN[Array, Byte](32, Arbitrary.arbitrary[Byte])
-      .map(seed => KeyPair(seed: ByteStr))
+      .map(seed => KeyPair(ByteStr(seed)))
 
   def chainGen(balances: List[Long], blockCount: Int, blockVersion: Byte = Block.PlainBlockVersion)(t: Time): Gen[(Seq[KeyPair], Seq[Block])] = {
     val ts = t.correctedTime()
@@ -429,7 +419,7 @@ object FPPoSSelectorTest {
         for {
           (acc, balance) <- accountsWithBalances
           i = accountsWithBalances.indexOf((acc, balance))
-        } yield (acc, GenesisTransaction.create(acc, balance, ts + i).explicitGet())
+        } yield (acc, GenesisTransaction.create(acc.toAddress, balance, ts + i).explicitGet())
       }
       .map { txs =>
         val lastTxTimestamp = txs.lastOption.map(_._2.timestamp) getOrElse ts

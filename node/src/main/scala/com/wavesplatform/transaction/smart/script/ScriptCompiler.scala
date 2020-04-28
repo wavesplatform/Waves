@@ -8,7 +8,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script, ScriptPreprocessor}
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler}
-import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.utils._
 
 object ScriptCompiler extends ScorexLogging {

@@ -7,7 +7,7 @@ import play.api.libs.json._
 
 trait SignedTransaction extends ProvenTransaction with Signed {
 
-  protected override def proofField = {
+  protected override def proofField: Seq[(String, JsValue)] = {
     val sig = JsString(this.signature.toString)
     Seq("signature" -> sig, "proofs" -> JsArray(Seq(sig)))
   }
@@ -16,5 +16,5 @@ trait SignedTransaction extends ProvenTransaction with Signed {
 
   def proofs: Proofs = Proofs(signature)
 
-  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature.arr, bodyBytes(), sender))
+  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature, bodyBytes(), sender))
 }

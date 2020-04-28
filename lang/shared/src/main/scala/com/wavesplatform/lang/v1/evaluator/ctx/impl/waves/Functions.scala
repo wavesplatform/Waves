@@ -525,7 +525,7 @@ object Functions {
         override def ev[F[_] : Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
           input match {
             case (env, List(CONST_BYTESTR(bytes))) =>
-              (env.transferTransactionFromProto(bytes)
+              (env.transferTransactionFromProto(bytes.arr)
                   .map(transactionObject(_, proofsEnabled, version)): EVALUATED)
                   .asRight[ExecutionError]
                   .pure[F]

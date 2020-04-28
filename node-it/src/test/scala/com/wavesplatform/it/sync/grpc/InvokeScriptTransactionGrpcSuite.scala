@@ -19,11 +19,11 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import io.grpc.Status.Code
 
 class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
-  private val (firstContract, firstContractAddr) = (firstAcc, firstAddress)
+  private val (firstContract, firstContractAddr)   = (firstAcc, firstAddress)
   private val (secondContract, secondContractAddr) = (secondAcc, secondAddress)
-  private val thirdContract = KeyPair("thirdContract".getBytes("UTF-8"))
-  private val thirdContractAddr = PBRecipients.create(Address.fromPublicKey(thirdContract.publicKey)).getPublicKeyHash
-  private val caller = thirdAcc
+  private val thirdContract                        = KeyPair("thirdContract".getBytes("UTF-8"))
+  private val thirdContractAddr                    = PBRecipients.create(Address.fromPublicKey(thirdContract.publicKey)).getPublicKeyHash
+  private val caller                               = thirdAcc
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -67,7 +67,7 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         |func bar() = [IntegerEntry("", 2)]
         |
         """.stripMargin
-    val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1
+    val script  = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1
     val script2 = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3).explicitGet()._1
     sender.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(thirdContractAddr), 10.waves, minFee, waitForTx = true)
     sender.setScript(firstContract, Right(Some(script)), setScriptFee, waitForTx = true)
@@ -90,7 +90,7 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         waitForTx = true
       )
 
-      sender.getDataByKey(contract, "a") shouldBe List(DataEntry("a", DataEntry.Value.BinaryValue(ByteString.copyFrom(arg))))
+      sender.getDataByKey(contract, "a") shouldBe List(DataEntry("a", DataEntry.Value.BinaryValue(ByteString.copyFrom(arg.arr))))
       sender.getDataByKey(contract, "sender") shouldBe List(
         DataEntry("sender", DataEntry.Value.BinaryValue(ByteString.copyFrom(caller.toAddress.bytes)))
       )
@@ -114,7 +114,7 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
   test("verifier works") {
     for (v <- invokeScrTxSupportedVersions) {
-      val contract = if (v < 2) firstContractAddr else secondContractAddr
+      val contract    = if (v < 2) firstContractAddr else secondContractAddr
       val dAppBalance = sender.wavesBalance(contract)
       assertGrpcError(
         sender.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(contract), transferAmount, 1.waves),
@@ -126,26 +126,26 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   }
 
   test("not able to set an empty key by InvokeScriptTransaction with version >= 2") {
-    assertGrpcError(
-      sender.broadcastInvokeScript(
-        caller,
-        Recipient().withPublicKeyHash(secondContractAddr),
-        Some(FUNCTION_CALL(FunctionHeader.User("emptyKey"), List.empty)),
-        fee = 1.waves,
-        version = TxVersion.V2
-      ),
-      "State check failed. Reason: Empty keys aren't allowed in tx version >= 2",
-      Code.INVALID_ARGUMENT)
+    val tx1 = sender.broadcastInvokeScript(
+      caller,
+      Recipient().withPublicKeyHash(secondContractAddr),
+      Some(FUNCTION_CALL(FunctionHeader.User("emptyKey"), List.empty)),
+      fee = 1.waves,
+      version = TxVersion.V2,
+      waitForTx = true
+    )
 
-    assertGrpcError(
-      sender.broadcastInvokeScript(
-        caller,
-        Recipient().withPublicKeyHash(thirdContractAddr),
-        Some(FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)),
-        fee = 1.waves,
-        version = TxVersion.V2
-      ),
-      "State check failed. Reason: Empty keys aren't allowed in tx version >= 2",
-      Code.INVALID_ARGUMENT)
+    sender.stateChanges(tx1.id)._2.errorMessage.get.text should include("Empty keys aren't allowed in tx version >= 2")
+
+    val tx2 = sender.broadcastInvokeScript(
+      caller,
+      Recipient().withPublicKeyHash(thirdContractAddr),
+      Some(FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)),
+      fee = 1.waves,
+      version = TxVersion.V2,
+      waitForTx = true
+    )
+
+    sender.stateChanges(tx2.id)._2.errorMessage.get.text should include("Empty keys aren't allowed in tx version >= 2")
   }
 }

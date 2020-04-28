@@ -6,15 +6,14 @@ import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http.requests.DataRequest
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.crypto
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.meta.Dic
-import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
-import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.protobuf.api
@@ -117,14 +116,14 @@ case class AddressApiRoute(
 
   def balances: Route = (path("balance") & get & parameters('height.as[Int].?) & parameters('address.*) & parameters('asset.?)) {
     (height, addresses, assetId) =>
-      complete(balancesJson(height.getOrElse(blockchain.height), addresses.toSeq, assetId.fold(Waves: Asset)(a => IssuedAsset(Base58.decode(a)))))
+      complete(balancesJson(height.getOrElse(blockchain.height), addresses.toSeq, assetId.fold(Waves: Asset)(a => IssuedAsset(ByteStr.decodeBase58(a).get))))
   }
 
   def balancesPost: Route = (path("balance") & (post & entity(as[JsObject]))) { request =>
     val height    = (request \ "height").asOpt[Int]
     val addresses = (request \ "addresses").as[Seq[String]]
     val assetId   = (request \ "asset").asOpt[String]
-    complete(balancesJson(height.getOrElse(blockchain.height), addresses, assetId.fold(Waves: Asset)(a => IssuedAsset(Base58.decode(a)))))
+    complete(balancesJson(height.getOrElse(blockchain.height), addresses, assetId.fold(Waves: Asset)(a => IssuedAsset(ByteStr.decodeBase58(a).get))))
   }
 
   def balanceDetails: Route = (path("balance" / "details" / AddrSegment) & get) { address =>
@@ -160,7 +159,7 @@ case class AddressApiRoute(
     (path("seed" / Segment) & get & withAuth) { address =>
       complete(for {
         pk   <- wallet.findPrivateKey(address)
-        seed <- wallet.exportAccountSeed(pk)
+        seed <- wallet.exportAccountSeed(pk.toAddress)
       } yield Json.obj("address" -> address, "seed" -> Base58.encode(seed)))
     }
   }
@@ -203,27 +202,21 @@ case class AddressApiRoute(
   }
 
   def root: Route = (path("addresses") & get) {
-    val accounts = wallet.privateKeyAccounts
-    val json     = JsArray(accounts.map(a => JsString(a.stringRepr)))
-    complete(json)
+    complete(wallet.privateKeyAccounts.map(_.toAddress))
   }
 
   def seq: Route = {
     (path("seq" / IntNumber / IntNumber) & get) {
       case (start, end) =>
         if (start >= 0 && end >= 0 && start - end < MaxAddressesPerRequest) {
-          val json = JsArray(
-            wallet.privateKeyAccounts.map(a => JsString(a.stringRepr)).slice(start, end)
-          )
-
-          complete(json)
+          complete(wallet.privateKeyAccounts.map(_.toAddress).slice(start, end))
         } else complete(TooBigArrayAllocation)
     }
   }
 
   def create: Route = (path("addresses") & post & withAuth) {
     wallet.generateNewAccount() match {
-      case Some(pka) => complete(Json.obj("address" -> pka.stringRepr))
+      case Some(pka) => complete(Json.obj("address" -> pka.toAddress))
       case None      => complete(Unknown)
     }
   }
@@ -285,9 +278,9 @@ case class AddressApiRoute(
         .privateKeyAccount(address)
         .map(pk => {
           val messageBytes = message.utf8Bytes
-          val signature    = crypto.sign(pk, messageBytes)
+          val signature    = crypto.sign(pk.privateKey, messageBytes)
           val msg          = if (encode) Base58.encode(messageBytes) else message
-          Signed(msg, Base58.encode(pk.publicKey), Base58.encode(signature))
+          Signed(msg, Base58.encode(pk.publicKey.arr), signature.toString)
         })
       complete(res)
     }
@@ -303,7 +296,7 @@ case class AddressApiRoute(
   }
 
   private def verifySigned(msg: Try[Array[Byte]], signature: String, publicKey: String, address: Address) = {
-    (msg, Base58.tryDecodeWithLimit(signature), Base58.tryDecodeWithLimit(publicKey)) match {
+    (msg, ByteStr.decodeBase58(signature), Base58.tryDecodeWithLimit(publicKey)) match {
       case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
         val account = PublicKey(pubKeyBytes)
         val isValid = account.toAddress == address && crypto.verify(signatureBytes, msgBytes, PublicKey(pubKeyBytes))

@@ -57,7 +57,8 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
             ._1
             .bytes
             .value
-            .base64)
+            .base64
+        )
       )
       .id
 
@@ -86,7 +87,8 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
             ._1
             .bytes
             .value
-            .base64)
+            .base64
+        )
       )
       .id
 
@@ -114,7 +116,8 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
             ._1
             .bytes
             .value
-            .base64)
+            .base64
+        )
       )
       .id
 
@@ -137,7 +140,9 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
   }
 
   test("_set scripts to dApp and smartCaller account") {
-    val dAppScript        = ScriptCompiler.compile(s"""
+    val dAppScript = ScriptCompiler
+      .compile(
+        s"""
           |{-# STDLIB_VERSION 3 #-}
           |{-# CONTENT_TYPE DAPP #-}
           |
@@ -195,10 +200,16 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
           |func justWriteData() = {
           |  WriteSet([DataEntry("a", "a")])
           |}
-        """.stripMargin, estimator).explicitGet()._1
+        """.stripMargin,
+        estimator
+      )
+      .explicitGet()
+      ._1
     val dAppSetScriptTxId = sender.setScript(dApp, Some(dAppScript.bytes().base64)).id
 
-    val smartCallerScript        = ScriptCompiler.compile("""
+    val smartCallerScript = ScriptCompiler
+      .compile(
+        """
           |{-# STDLIB_VERSION 3 #-}
           |{-# CONTENT_TYPE DAPP #-}
           |
@@ -212,7 +223,11 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
           |    case _ => false
           |  }
           |}
-        """.stripMargin, estimator).explicitGet()._1
+        """.stripMargin,
+        estimator
+      )
+      .explicitGet()
+      ._1
     val smartCallerSetScriptTxId = sender.setScript(smartCaller, Some(smartCallerScript.bytes().base64)).id
 
     nodes.waitForHeightAriseAndTxPresent(smartCallerSetScriptTxId)
@@ -242,15 +257,21 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
 
   test("max fee is 0.053 Waves (0.005 + extraFee(1 smart caller + 1 payment + 10 transfers))") {
     val paymentAmount = 20
-    assertBadRequestAndMessage(
-      sender.invokeScript(
+
+    val tx = sender
+      .invokeScript(
         smartCaller,
         dApp,
         Some("spendMaxFee"),
         payment = Seq(Payment(paymentAmount, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
-        fee = 0.05299999.waves
-      ),
-      s"with 12 total scripts invoked does not exceed minimal value of 5300000"
+        fee = 0.05299999.waves,
+        waitForTx = true
+      )
+      ._1
+      .id
+
+    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include(
+      "with 12 total scripts invoked does not exceed minimal value of 5300000"
     )
 
     val invokeScriptTxId = sender
@@ -261,8 +282,11 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
         payment = Seq(Payment(paymentAmount, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
         fee = 5300000
       )
-      ._1.id
+      ._1
+      .id
     nodes.waitForHeightAriseAndTxPresent(invokeScriptTxId)
+
+    sender.debugStateChanges(invokeScriptTxId).stateChanges.get.errorMessage shouldBe 'empty
   }
 
   test("can't invoke with insufficient payment for @Verifier") {
@@ -277,7 +301,8 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
           payment = Seq(Payment(amountLessThanVerifierLimit, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
           fee = smartMinFee + smartFee + smartFee // scripted asset + dApp
         )
-        ._1.id,
+        ._1
+        .id,
       "Transaction is not allowed by account-script"
     )
   }
@@ -294,7 +319,8 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
           payment = Seq(Payment(amountGreaterThanAccountScriptLimit, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
           fee = smartMinFee
         )
-        ._1.id,
+        ._1
+        .id,
       "does not exceed minimal value of 900000 WAVES"
     )
   }
@@ -302,16 +328,18 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
   test("can't invoke with small fee for one of smart assets") {
     val amountGreaterThanAccountScriptLimit = 20
 
-    assertBadRequestAndMessage(
-      sender
-        .invokeScript(
-          caller,
-          dApp,
-          Some("payAsset2GetAsset1"),
-          payment = Seq(Payment(amountGreaterThanAccountScriptLimit, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
-          fee = smartMinFee + smartFee
-        )
-        ._1.id,
+    val tx = sender
+      .invokeScript(
+        caller,
+        dApp,
+        Some("payAsset2GetAsset1"),
+        payment = Seq(Payment(amountGreaterThanAccountScriptLimit, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
+        fee = smartMinFee + smartFee,
+        waitForTx = true
+      )
+      ._1
+      .id
+    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include(
       "with 2 total scripts invoked does not exceed minimal value of 1300000"
     )
   }
@@ -327,7 +355,8 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
         payment = Seq(Payment(amountGreaterThanAccountScriptLimit, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
         fee = smartMinFee + smartFee + smartFee
       )
-      ._1.id
+      ._1
+      .id
 
     nodes.waitForHeightAriseAndTxPresent(invokeScriptId)
   }
@@ -335,57 +364,57 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
   test("can't invoke with payment if asset script disallows InvokeScript") {
     val amountGreaterThanDAppScriptLimit = 16
 
-    assertBadRequestAndMessage(
-      sender
-        .invokeScript(
-          caller,
-          dApp,
-          Some("payAsset1GetAsset2"),
-          payment = Seq(Payment(amountGreaterThanDAppScriptLimit, IssuedAsset(ByteStr.decodeBase58(asset1).get))),
-          fee = smartMinFee + smartFee + smartFee
-        )
-        ._1.id,
-      "Transaction is not allowed by token-script"
-    )
+    val tx = sender
+      .invokeScript(
+        caller,
+        dApp,
+        Some("payAsset1GetAsset2"),
+        payment = Seq(Payment(amountGreaterThanDAppScriptLimit, IssuedAsset(ByteStr.decodeBase58(asset1).get))),
+        fee = smartMinFee + smartFee + smartFee,
+        waitForTx = true
+      )
+      ._1
+      .id
+    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("Transaction is not allowed by token-script")
   }
 
   test("can't invoke a function with payment less than dApp script's limit") {
     val amountLessThanDAppScriptLimit = 15
 
-    assertBadRequestAndMessage(
-      sender
-        .invokeScript(
-          caller,
-          dApp,
-          Some("payAsset2GetAsset1"),
-          payment = Seq(Payment(amountLessThanDAppScriptLimit, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
-          fee = smartMinFee + smartFee + smartFee
-        )
-        ._1.id,
-      s"need payment in 15+ tokens of asset2 $asset2"
-    )
+    val tx = sender
+      .invokeScript(
+        caller,
+        dApp,
+        Some("payAsset2GetAsset1"),
+        payment = Seq(Payment(amountLessThanDAppScriptLimit, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
+        fee = smartMinFee + smartFee + smartFee,
+        waitForTx = true
+      )
+      ._1
+      .id
+    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include(s"need payment in 15+ tokens of asset2 $asset2")
   }
 
   test("can't invoke a function with payment less than asset script's limit") {
     val amountGreaterThanDAppScriptLimit = 16
 
-    assertBadRequestAndMessage(
-      sender.invokeScript(
+    val tx = sender
+      .invokeScript(
         caller,
         dApp,
         Some("payAsset2GetAsset3"),
         payment = Seq(Payment(amountGreaterThanDAppScriptLimit, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
-        fee = smartMinFee + smartFee + smartFee
-      ),
-      "Transaction is not allowed by token-script"
-    )
+        fee = smartMinFee + smartFee + smartFee,
+        waitForTx = true
+      )
+      ._1
+      .id
+    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("Transaction is not allowed by token-script")
   }
 
   test("can't invoke a function that transfers less than asset script's limit") {
-    assertBadRequestAndMessage(
-      sender.invokeScript(caller, dApp, Some("get10ofAsset1"), fee = smartMinFee + smartFee),
-      s"Transaction is not allowed by token-script"
-    )
+    val tx = sender.invokeScript(caller, dApp, Some("get10ofAsset1"), fee = smartMinFee + smartFee, waitForTx = true)._1.id
+    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("Transaction is not allowed by token-script")
   }
 
 }

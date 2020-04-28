@@ -270,7 +270,7 @@ object SyncHttpApi extends Assertions {
     ): Transaction = {
       val tx = IssueTransaction(
         TxVersion.V2,
-        sender = source,
+        sender = source.publicKey,
         name.utf8Bytes,
         description.utf8Bytes,
         quantity = quantity,
@@ -279,7 +279,7 @@ object SyncHttpApi extends Assertions {
         script = script.map(x => Script.fromBase64String(x).explicitGet()),
         fee = fee,
         timestamp = System.currentTimeMillis()
-      ).signWith(source)
+      ).signWith(source.privateKey)
 
       maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = waitForTx)
     }
@@ -720,6 +720,19 @@ object SyncHttpApi extends Assertions {
       sync(async(n).invokeScript(caller, dappAddress, func, args, payment, fee, feeAssetId, version)) match {
         case (tx, js) => maybeWaitForTransaction(tx, waitForTx) -> js
       }
+    }
+
+    def validateInvokeScript(
+        caller: String,
+        dappAddress: String,
+        func: Option[String] = None,
+        args: List[Terms.EXPR] = List.empty,
+        payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
+        fee: Long = smartMinFee,
+        feeAssetId: Option[String] = None,
+        version: TxVersion = TxVersion.V1
+    ): (JsValue, JsValue) = {
+      sync(async(n).validateInvokeScript(caller, dappAddress, func, args, payment, fee, feeAssetId, version))
     }
 
     def updateAssetInfo(

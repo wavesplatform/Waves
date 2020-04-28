@@ -1,16 +1,16 @@
 package com.wavesplatform.lang.script.v1
 
+import cats.implicits._
+import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.utils._
+import com.wavesplatform.lang.v1.BaseGlobal
 import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.{BaseGlobal, ContractLimits}
-import monix.eval.Coeval
-import cats.implicits._
-import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import monix.eval.Coeval
 
 object ExprScript {
 

@@ -55,12 +55,12 @@ object Keys {
 
   def changedAddresses(height: Int): Key[Seq[AddressId]] = Key(ChangedAddresses, h(height), readAddressIds, writeAddressIds)
 
-  def addressIdOfAlias(alias: Alias): Key[Option[AddressId]] = Key.opt(AddressIdOfAlias, alias.bytes.arr, AddressId.fromByteArray, _.toByteArray)
+  def addressIdOfAlias(alias: Alias): Key[Option[AddressId]] = Key.opt(AddressIdOfAlias, alias.bytes, AddressId.fromByteArray, _.toByteArray)
 
   val lastAddressId: Key[Option[Long]] = Key.opt(LastAddressId, Array.emptyByteArray, Longs.fromByteArray, _.toByteArray)
 
-  def addressId(address: Address): Key[Option[AddressId]] = Key.opt(AddressIdTag, address.bytes.arr, AddressId.fromByteArray, _.toByteArray)
-  def idToAddress(addressId: AddressId): Key[Address]            = Key(IdToAddress, addressId.toByteArray, Address.fromBytes(_).explicitGet(), _.bytes.arr)
+  def addressId(address: Address): Key[Option[AddressId]] = Key.opt(AddressIdTag, address.bytes, AddressId.fromByteArray, _.toByteArray)
+  def idToAddress(addressId: AddressId): Key[Address]            = Key(IdToAddress, addressId.toByteArray, Address.fromBytes(_).explicitGet(), _.bytes)
 
   def addressScriptHistory(addressId: AddressId): Key[Seq[Int]] = historyKey(AddressScriptHistory, addressId.toByteArray)
   def addressScript(addressId: AddressId)(height: Int): Key[Option[AccountScriptInfo]] =

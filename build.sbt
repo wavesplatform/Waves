@@ -108,7 +108,7 @@ inScope(Global)(
     scalaVersion := "2.12.9",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
-    V.fallback := (1, 2, 3),
+    V.fallback := (1, 2, 4),
     organizationHomepage := Some(url("https://wavesplatform.com")),
     scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/Waves"), "git@github.com:wavesplatform/Waves.git", None)),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
@@ -192,7 +192,7 @@ checkPRRaw := {
 def checkPR: Command = Command.command("checkPR") { state =>
   val updatedState = Project
     .extract(state)
-    .appendWithoutSession(Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings", "-Ywarn-unused:-imports")), state)
+    .appendWithoutSession(Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings")), state)
   Project.extract(updatedState).runTask(root / checkPRRaw, updatedState)
   state
 }

@@ -45,8 +45,8 @@ object PaymentTransaction extends TransactionParser {
   implicit val validator: TxValidator[PaymentTransaction] = PaymentTxValidator
 
   def create(sender: KeyPair, recipient: Address, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
-    create(sender, recipient, amount, fee, timestamp, ByteStr.empty).right.map(unsigned => {
-      unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
+    create(sender.publicKey, recipient, amount, fee, timestamp, ByteStr.empty).right.map(unsigned => {
+      unsigned.copy(signature = crypto.sign(sender.privateKey, unsigned.bodyBytes()))
     })
   }
 

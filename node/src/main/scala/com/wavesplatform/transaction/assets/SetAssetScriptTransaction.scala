@@ -86,5 +86,5 @@ object SetAssetScriptTransaction extends TransactionParser {
       fee: TxAmount,
       timestamp: TxTimestamp
   ): Either[ValidationError, SetAssetScriptTransaction] =
-    signed(version, sender, asset, script, fee, timestamp, sender)
+    signed(version, sender.publicKey, asset, script, fee, timestamp, sender.privateKey)
 }
