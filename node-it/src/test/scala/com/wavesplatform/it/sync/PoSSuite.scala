@@ -120,7 +120,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
     val height = nodes.head.height
     val block  = forgeBlock(height, signerPK)(updateBaseTarget = _ + 2)
 
-    val signature = ByteStr(crypto.sign(otherNodePK, block.bytes()))
+    val signature = crypto.sign(otherNodePK.privateKey, block.bytes())
     val resignedBlock =
       block
         .copy(signature = signature)
@@ -227,7 +227,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
     val height = nodes.head.height
     val block  = forgeBlock(height, signerPK)(updateBaseTarget = _ + 2)
 
-    val signature = ByteStr(crypto.sign(otherNodePK, block.bytes()))
+    val signature = crypto.sign(otherNodePK.privateKey, block.bytes())
     val resignedBlock =
       block
         .copy(signature = signature)
@@ -336,15 +336,15 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
     val (lastBlockId, lastBlockTS, lastBlockCData, lastBlockVRF) = blockInfo(height)
     val genSig: ByteStr =
       if (height + 1 < vrfActivationHeight)
-        ByteStr(generatorSignature(lastBlockCData.generationSignature.arr, signerPK))
+        ByteStr(generatorSignature(lastBlockCData.generationSignature.arr, signerPK.publicKey))
       else
-        crypto.signVRF(signerPK, lastBlockVRF.getOrElse(lastBlockCData.generationSignature))
+        crypto.signVRF(signerPK.privateKey, lastBlockVRF.getOrElse(lastBlockCData.generationSignature).arr)
 
     val hitSource =
       if (height + 1 < vrfActivationHeight)
         genSig
       else
-        crypto.verifyVRF(genSig, lastBlockVRF.getOrElse(lastBlockCData.generationSignature), signerPK.publicKey).explicitGet()
+        crypto.verifyVRF(genSig, lastBlockVRF.getOrElse(lastBlockCData.generationSignature).arr, signerPK.publicKey).explicitGet()
 
     val posCalculator = if (height + 1 < vrfActivationHeight) FairPoSCalculator.V1 else FairPoSCalculator.V2
     val version       = if (height + 1 < vrfActivationHeight) 3.toByte else 5.toByte
@@ -354,7 +354,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
         .calculateDelay(
           hit(hitSource.arr),
           lastBlockCData.baseTarget,
-          nodes.head.accountBalances(signerPK.stringRepr)._2
+          nodes.head.accountBalances(signerPK.toAddress.toString)._2
         )
     )
 

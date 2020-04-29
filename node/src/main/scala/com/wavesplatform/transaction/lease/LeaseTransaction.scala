@@ -76,5 +76,5 @@ object LeaseTransaction extends TransactionParser {
       fee: TxAmount,
       timestamp: TxTimestamp
   ): Either[ValidationError, TransactionT] =
-    signed(version, sender, recipient, amount, fee, timestamp, sender)
+    signed(version, sender.publicKey, recipient, amount, fee, timestamp, sender.privateKey)
 }

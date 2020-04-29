@@ -27,9 +27,9 @@ object RealTransactionWrapper {
   private def proven(tx: ProvenTransaction, txIdOpt: Option[ByteStr] = None): Proven =
     Proven(
       header(tx, txIdOpt),
-      Recipient.Address(ByteStr(tx.sender.bytes.arr)),
+      Recipient.Address(ByteStr(tx.sender.toAddress.bytes)),
       ByteStr(tx.bodyBytes()),
-      ByteStr(tx.sender),
+      tx.sender,
       tx.proofs.proofs.map(_.arr).map(ByteStr(_)).toIndexedSeq
     )
 
@@ -37,9 +37,9 @@ object RealTransactionWrapper {
   implicit def ord(o: Order): Ord =
     Ord(
       id = ByteStr(o.id.value.arr),
-      sender = Recipient.Address(ByteStr(o.sender.bytes.arr)),
-      senderPublicKey = ByteStr(o.senderPublicKey),
-      matcherPublicKey = ByteStr(o.matcherPublicKey),
+      sender = Recipient.Address(ByteStr(o.sender.toAddress.bytes)),
+      senderPublicKey = o.senderPublicKey,
+      matcherPublicKey = o.matcherPublicKey,
       assetPair = o.assetPair,
       orderType = o.orderType match {
         case BUY  => OrdType.Buy
@@ -56,7 +56,7 @@ object RealTransactionWrapper {
     )
 
   implicit def aoaToRecipient(aoa: AddressOrAlias): Recipient = aoa match {
-    case a: Address => Recipient.Address(ByteStr(a.bytes.arr))
+    case a: Address => Recipient.Address(ByteStr(a.bytes))
     case a: Alias   => Recipient.Alias(a.name)
   }
 
@@ -70,7 +70,16 @@ object RealTransactionWrapper {
       case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, g.recipient).asRight
       case t: TransferTransaction => mapTransferTx(t, stdLibVersion).asRight
       case i: IssueTransaction =>
-        Tx.Issue(proven(i), i.quantity, i.name.toByteArray, i.description.toByteArray, i.reissuable, i.decimals, i.script.map(_.bytes())).asRight
+        Tx.Issue(
+            proven(i),
+            i.quantity,
+            ByteStr(i.name.toByteArray),
+            ByteStr(i.description.toByteArray),
+            i.reissuable,
+            i.decimals,
+            i.script.map(_.bytes())
+          )
+          .asRight
       case r: ReissueTransaction     => Tx.ReIssue(proven(r), r.quantity, r.asset.id, r.reissuable).asRight
       case b: BurnTransaction        => Tx.Burn(proven(b), b.quantity, b.asset.id).asRight
       case b: LeaseTransaction       => Tx.Lease(proven(b), b.amount, b.recipient).asRight
@@ -132,12 +141,12 @@ object RealTransactionWrapper {
     )
 
   private def convertAttachment(attachment: Option[Attachment], version: StdLibVersion): TransferAttachment = version match {
-    case V1 | V2 | V3 => ByteStrValue(attachment.toBytes)
+    case V1 | V2 | V3 => ByteStrValue(ByteStr(attachment.toBytes))
     case V4 =>
       attachment.fold[TransferAttachment](EmptyAttachment) {
         case Attachment.Num(value)  => IntValue(value)
         case Attachment.Bool(value) => BooleanValue(value)
-        case Attachment.Bin(value)  => ByteStrValue(value)
+        case Attachment.Bin(value)  => ByteStrValue(ByteStr(value))
         case Attachment.Str(value)  => StringValue(value)
       }
   }

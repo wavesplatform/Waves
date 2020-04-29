@@ -45,8 +45,8 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
        |    let payRecipient = pay.recipient == Address(base58'${p.recipient.stringRepr}')
        |
        |    let bodyBytes = pay.bodyBytes == base64'${ByteStr(p.bodyBytes.apply()).base64}'
-       |    let sender = pay.sender == addressFromPublicKey(base58'${ByteStr(p.sender).toString}')
-       |    let senderPublicKey = pay.senderPublicKey == base58'${ByteStr(p.sender).toString}'
+       |    let sender = pay.sender == addressFromPublicKey(base58'${p.sender}')
+       |    let senderPublicKey = pay.senderPublicKey == base58'${p.sender}'
        |    let signature = pay.proofs[0]== base58'${p.signature.toString}'
        |    let empty1 = pay.proofs[1]== base58''
        |    let empty2 = pay.proofs[2]== base58''
@@ -72,8 +72,8 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
     recipient <- otherAccountGen(candidate = master)
     ts        <- positiveIntGen
     fee       <- smallFeeGen
-    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT * 3, ts).explicitGet()
-    payment                     = PaymentTransaction.create(master, recipient, ENOUGH_AMT * 2, fee, ts).explicitGet()
+    genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT * 3, ts).explicitGet()
+    payment                     = PaymentTransaction.create(master, recipient.toAddress, ENOUGH_AMT * 2, fee, ts).explicitGet()
     untypedScript               = Parser.parseExpr(script(genesis, payment)).get.value
     typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1)
       .explicitGet()

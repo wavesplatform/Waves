@@ -20,8 +20,8 @@ object PaymentTxSerializer {
     Bytes.concat(
       Array(builder.typeId),
       Longs.toByteArray(timestamp),
-      sender,
-      recipient.bytes.arr,
+      sender.arr,
+      recipient.bytes,
       Longs.toByteArray(amount),
       Longs.toByteArray(fee)
     )
@@ -32,15 +32,15 @@ object PaymentTxSerializer {
     Bytes.concat(
       Ints.toByteArray(builder.typeId), // 4 bytes
       Longs.toByteArray(timestamp),
-      sender,
-      recipient.bytes.arr,
+      sender.arr,
+      recipient.bytes,
       Longs.toByteArray(amount),
       Longs.toByteArray(fee)
     )
   }
 
   def toBytes(tx: PaymentTransaction): Array[Byte] = {
-    Bytes.concat(this.hashBytes(tx), tx.signature)
+    Bytes.concat(this.hashBytes(tx), tx.signature.arr)
   }
 
   def parseBytes(bytes: Array[Byte]): Try[PaymentTransaction] = Try {

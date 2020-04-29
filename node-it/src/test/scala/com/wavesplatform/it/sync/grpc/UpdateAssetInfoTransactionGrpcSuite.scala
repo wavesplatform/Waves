@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.grpc
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs.Miners
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync._
@@ -27,39 +27,38 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
 
-    assetId = Base58.encode(
-      PBTransactions
-        .vanilla(
-          sender.broadcastIssue(
-            issuer,
-            "asset",
-            someAssetAmount,
-            8,
-            reissuable = true,
-            script = Right(None),
-            fee = issueFee,
-            description = "description",
-            version = 1,
-            waitForTx = true
-          )
+    assetId = PBTransactions
+      .vanilla(
+        sender.broadcastIssue(
+          issuer,
+          "asset",
+          someAssetAmount,
+          8,
+          reissuable = true,
+          script = Right(None),
+          fee = issueFee,
+          description = "description",
+          version = 1,
+          waitForTx = true
         )
-        .explicitGet()
-        .id()
-    )
+      )
+      .explicitGet()
+      .id()
+      .toString
     issueHeight = sender.height
   }
 
   test("able to update name/description of issued asset") {
     val nextTerm = issueHeight + updateInterval + 1
     sender.waitForHeight(nextTerm)
-    val updateAssetInfoTxId = Base58.encode(
+    val updateAssetInfoTxId =
       PBTransactions
         .vanilla(
           sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)
         )
         .explicitGet()
         .id()
-    )
+        .toString
     sender.waitForTransaction(updateAssetInfoTxId)
 
     sender.assetInfo(assetId).name shouldBe "updatedName"
@@ -138,7 +137,7 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
   test("check increased fee for smart sender/asset") {
     val scriptText = s"""true""".stripMargin
     val script     = ScriptCompiler(scriptText, isAssetScript = true, ScriptEstimatorV2).explicitGet()._1
-    val smartAssetId = Base58.encode(
+    val smartAssetId =
       PBTransactions
         .vanilla(
           sender.broadcastIssue(
@@ -155,7 +154,7 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
         )
         .explicitGet()
         .id()
-    )
+        .toString
     sender.waitForHeight(sender.height + updateInterval + 1, 3.minutes)
     assertGrpcError(
       sender.updateAssetInfo(issuer, smartAssetId, "updatedName", "updatedDescription", minFee + smartFee - 1),

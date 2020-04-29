@@ -19,17 +19,17 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
   private val acc2 = pkByAddress(thirdAddress)
 
   test("set contract, make leasing and cancel leasing") {
-    val (balance1, eff1) = miner.accountBalances(acc0.stringRepr)
+    val (balance1, eff1) = miner.accountBalances(acc0.toAddress.toString)
     val (balance2, eff2) = miner.accountBalances(thirdAddress)
 
-    sender.transfer(sender.address, acc0.stringRepr, 10 * transferAmount, minFee, waitForTx = true).id
+    sender.transfer(sender.address, acc0.toAddress.toString, 10 * transferAmount, minFee, waitForTx = true).id
 
     miner.assertBalances(firstAddress, balance1 + 10 * transferAmount, eff1 + 10 * transferAmount)
 
     val scriptText = s"""
-        let pkA = base58'${ByteStr(acc0.publicKey)}'
-        let pkB = base58'${ByteStr(acc1.publicKey)}'
-        let pkC = base58'${ByteStr(acc2.publicKey)}'
+        let pkA = base58'${acc0.publicKey}'
+        let pkB = base58'${acc1.publicKey}'
+        let pkC = base58'${acc2.publicKey}'
 
         match tx {
           case ltx: LeaseTransaction => sigVerify(ltx.bodyBytes,ltx.proofs[0],pkA) && sigVerify(ltx.bodyBytes,ltx.proofs[2],pkC)
@@ -39,14 +39,14 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
         """.stripMargin
 
     val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1.bytes().base64
-    sender.setScript(acc0.stringRepr, Some(script), setScriptFee, waitForTx = true).id
+    sender.setScript(acc0.toAddress.toString, Some(script), setScriptFee, waitForTx = true).id
 
     val unsignedLeasing =
       LeaseTransaction
         .create(
           2.toByte,
-          acc0,
-          acc2,
+          acc0.publicKey,
+          acc2.toAddress,
           transferAmount,
           minFee + 0.2.waves,
           System.currentTimeMillis(),
@@ -54,8 +54,8 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
         )
         .explicitGet()
 
-    val sigLeasingA = ByteStr(crypto.sign(acc0, unsignedLeasing.bodyBytes()))
-    val sigLeasingC = ByteStr(crypto.sign(acc2, unsignedLeasing.bodyBytes()))
+    val sigLeasingA = crypto.sign(acc0.privateKey, unsignedLeasing.bodyBytes())
+    val sigLeasingC = crypto.sign(acc2.privateKey, unsignedLeasing.bodyBytes())
 
     val signedLeasing =
       unsignedLeasing.copy(proofs = Proofs(Seq(sigLeasingA, ByteStr.empty, sigLeasingC)))
@@ -74,7 +74,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
       LeaseCancelTransaction
         .create(
           version = 2.toByte,
-          sender = acc0,
+          sender = acc0.publicKey,
           leaseId = ByteStr.decodeBase58(leasingId).get,
           fee = minFee + 0.2.waves,
           timestamp = System.currentTimeMillis(),
@@ -82,8 +82,8 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
         )
         .explicitGet()
 
-    val sigLeasingCancelA = ByteStr(crypto.sign(acc0, unsignedCancelLeasing.bodyBytes()))
-    val sigLeasingCancelB = ByteStr(crypto.sign(acc1, unsignedCancelLeasing.bodyBytes()))
+    val sigLeasingCancelA = crypto.sign(acc0.privateKey, unsignedCancelLeasing.bodyBytes())
+    val sigLeasingCancelB = crypto.sign(acc1.privateKey, unsignedCancelLeasing.bodyBytes())
 
     val signedLeasingCancel =
       unsignedCancelLeasing.copy(proofs = Proofs(Seq(ByteStr.empty, sigLeasingCancelA, sigLeasingCancelB)))

@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{EitherExt2, _}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -133,15 +133,19 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
       ),
       BinaryDataEntry(
         "key",
-        Base64.decode(
-          "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA9TuTafHJ0vfVBzFmF0jpUgcYt9Evuqkrk5BYZQyMPK5mB6YCEKDpK+C57oEhKf4sWNhxhBy5pwOQVCXQFO+IWLyTreVDKg091gAosZNFES5uC1hHmMKJUUHoXirEa1Zk6dgc9ErtCe3tJmA5FwVeGG1zg+4PUR3DTBIbPojVFu0GneMU9/p2Yp42PmOwuCzBHSWJxLGqL6wFvQKevT12vesNRSpF+d4Dl6IxDONojJDuPhPdHYIRNaQiSiEWtZ2pwg5WCUTwyl9ZpUM8Cx5e3pwbaqq3vufsbImAAR0QtTbgfi/YaEXj5lrd3Y1T4QWJczEeQHsdKXNkY0ZaErzRVwIDAQAB"
-        )
+        ByteStr
+          .decodeBase64(
+            "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA9TuTafHJ0vfVBzFmF0jpUgcYt9Evuqkrk5BYZQyMPK5mB6YCEKDpK+C57oEhKf4sWNhxhBy5pwOQVCXQFO+IWLyTreVDKg091gAosZNFES5uC1hHmMKJUUHoXirEa1Zk6dgc9ErtCe3tJmA5FwVeGG1zg+4PUR3DTBIbPojVFu0GneMU9/p2Yp42PmOwuCzBHSWJxLGqL6wFvQKevT12vesNRSpF+d4Dl6IxDONojJDuPhPdHYIRNaQiSiEWtZ2pwg5WCUTwyl9ZpUM8Cx5e3pwbaqq3vufsbImAAR0QtTbgfi/YaEXj5lrd3Y1T4QWJczEeQHsdKXNkY0ZaErzRVwIDAQAB"
+          )
+          .get
       ),
       BinaryDataEntry(
         "s",
-        Base64.decode(
-          "E1CFy1u245yo1UNJXVXtW/4H8YSVt+98S7ackF4r1reeJHXL3z8V4rUyiq8B2qVg39GBfGiP82UJlmLbOP9BEztIPdMyLI+mQUBdEPQ35oziXxbJndqnqJozdoSaYUfq4UpEk334y7l6E4xOQmW7IsMhgG+T4+oK6AKXtNxLCB4Dpcaz7xM+kdsi/37usNvKcAfitx3bKdSL0ukFsaDLGuyingqIcofa7lj4s/xybWI1d4xcjhRUFbOzslnWeuoxePUZ/UJvg2wOhG/HtTVbfVc6z0nvS+yfju/AqAiPUdcsfu8dfu5xZsxf0HiXU6vweFWUHV5tY6SauZuopkcJEw=="
-        )
+        ByteStr
+          .decodeBase64(
+            "E1CFy1u245yo1UNJXVXtW/4H8YSVt+98S7ackF4r1reeJHXL3z8V4rUyiq8B2qVg39GBfGiP82UJlmLbOP9BEztIPdMyLI+mQUBdEPQ35oziXxbJndqnqJozdoSaYUfq4UpEk334y7l6E4xOQmW7IsMhgG+T4+oK6AKXtNxLCB4Dpcaz7xM+kdsi/37usNvKcAfitx3bKdSL0ukFsaDLGuyingqIcofa7lj4s/xybWI1d4xcjhRUFbOzslnWeuoxePUZ/UJvg2wOhG/HtTVbfVc6z0nvS+yfju/AqAiPUdcsfu8dfu5xZsxf0HiXU6vweFWUHV5tY6SauZuopkcJEw=="
+          )
+          .get
       )
     )
     sender.putData(smartAcc, data, 0.3.waves, waitForTx = true)

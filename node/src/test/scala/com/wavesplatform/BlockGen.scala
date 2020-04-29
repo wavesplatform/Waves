@@ -75,5 +75,5 @@ trait BlockGen extends TransactionGen { _: Suite =>
 object BlockGen {
   val minTransactionsInBlockCount         = 1
   val maxTransactionsInBlockCount         = 100
-  val predefinedSignerPrivateKey: KeyPair = KeyPair((1 to 10).map(_.toByte).toArray)
+  val predefinedSignerPrivateKey: KeyPair = KeyPair(ByteStr(Array.tabulate(10)(_.toByte)))
 }

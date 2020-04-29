@@ -76,7 +76,7 @@ class TransactionsRouteSpec
             "type"            -> 4,
             "version"         -> version,
             "amount"          -> 1000000,
-            "senderPublicKey" -> Base58.encode(sender.publicKey),
+            "senderPublicKey" -> sender.publicKey.toString,
             "recipient"       -> recipient.toAddress
           )
         } yield (sender.publicKey, tx)
@@ -100,7 +100,7 @@ class TransactionsRouteSpec
           tx = Json.obj(
             "type"            -> 11,
             "version"         -> version,
-            "senderPublicKey" -> Base58.encode(sender.publicKey),
+            "senderPublicKey" -> Base58.encode(sender.publicKey.arr),
             "transfers" -> Json.arr(
               Json.obj(
                 "recipient" -> recipient1.toAddress,
@@ -137,7 +137,7 @@ class TransactionsRouteSpec
             "version"         -> version,
             "amount"          -> 1000000,
             "feeAssetId"      -> assetId.toString,
-            "senderPublicKey" -> Base58.encode(sender.publicKey),
+            "senderPublicKey" -> Base58.encode(sender.publicKey.arr),
             "recipient"       -> recipient.toAddress
           )
         } yield (sender.publicKey, tx, IssuedAsset(assetId))
@@ -154,13 +154,13 @@ class TransactionsRouteSpec
 
       "with sponsorship" in {
         val assetId: IssuedAsset = IssuedAsset(issueGen.sample.get.assetId)
-        val sender: PublicKey    = accountGen.sample.get
+        val sender: PublicKey    = accountGen.sample.get.publicKey
         val transferTx = Json.obj(
           "type"            -> 4,
           "version"         -> 2,
           "amount"          -> 1000000,
           "feeAssetId"      -> assetId.id.toString,
-          "senderPublicKey" -> Base58.encode(sender),
+          "senderPublicKey" -> Base58.encode(sender.arr),
           "recipient"       -> accountGen.sample.get.toAddress
         )
 
@@ -175,13 +175,13 @@ class TransactionsRouteSpec
 
       "with sponsorship, smart token and smart account" in {
         val assetId: IssuedAsset = IssuedAsset(issueGen.sample.get.assetId)
-        val sender: PublicKey    = accountGen.sample.get
+        val sender: PublicKey    = accountGen.sample.get.publicKey
         val transferTx = Json.obj(
           "type"            -> 4,
           "version"         -> 2,
           "amount"          -> 1000000,
           "feeAssetId"      -> assetId.id.toString,
-          "senderPublicKey" -> Base58.encode(sender),
+          "senderPublicKey" -> Base58.encode(sender.arr),
           "recipient"       -> accountGen.sample.get.toAddress
         )
 
@@ -198,7 +198,7 @@ class TransactionsRouteSpec
 
   routePath("/address/{address}/limit/{limit}") - {
     val bytes32StrGen = bytes32gen.map(Base58.encode)
-    val addressGen    = accountGen.map(_.stringRepr)
+    val addressGen    = accountGen.map(_.toAddress.toString)
 
     "handles parameter errors with corresponding responses" - {
       "invalid address" in {
@@ -426,8 +426,8 @@ class TransactionsRouteSpec
         val ist = Json.obj(
           "type"       -> InvokeScriptTransaction.typeId,
           "version"    -> Gen.oneOf(InvokeScriptTransaction.supportedVersions.toSeq).sample.get,
-          "sender"     -> acc1.stringRepr,
-          "dApp"       -> acc2.stringRepr,
+          "sender"     -> acc1.toAddress,
+          "dApp"       -> acc2.toAddress,
           "call"       -> func,
           "payment"    -> Seq[Payment](),
           "fee"        -> 500000,

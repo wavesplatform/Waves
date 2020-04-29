@@ -39,12 +39,12 @@ class BlockchainUpdaterSponsoredFeeBlockTest
     bob                         <- accountGen
     (feeAsset, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(alice)
     wavesFee                    = Sponsorship.toWaves(sponsorTx.minSponsoredAssetFee.get, sponsorTx.minSponsoredAssetFee.get)
-    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+    genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
     masterToAlice: TransferTransaction = TransferTransaction
       .selfSigned(
         1.toByte,
         master,
-        alice,
+        alice.toAddress,
         Waves,
         feeAsset.fee + sponsorTx.fee + transferAssetWavesFee + wavesFee,
         Waves,
@@ -58,7 +58,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
       .selfSigned(
         1.toByte,
         alice,
-        bob,
+        bob.toAddress,
         Asset.fromCompatId(Some(feeAsset.id())),
         feeAsset.quantity / 2,
         Waves,
@@ -72,7 +72,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
       .selfSigned(
         1.toByte,
         bob,
-        master,
+        master.toAddress,
         Asset.fromCompatId(Some(feeAsset.id())),
         amtTx,
         Asset.fromCompatId(Some(feeAsset.id())),
@@ -86,7 +86,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
       .selfSigned(
         1.toByte,
         bob,
-        master,
+        master.toAddress,
         Asset.fromCompatId(Some(feeAsset.id())),
         amtTx,
         Asset.fromCompatId(Some(feeAsset.id())),

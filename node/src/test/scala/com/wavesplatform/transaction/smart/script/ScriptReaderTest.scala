@@ -45,7 +45,7 @@ class ScriptReaderTest extends PropSpec with PropertyChecks with Matchers with T
     scriptEthList.foreach(_ shouldBe 'right)
 
     scriptEthList.foreach { scriptEth =>
-      ScriptReader.fromBytes(scriptEth.explicitGet()._1.bytes()) shouldBe 'right
+      ScriptReader.fromBytes(scriptEth.explicitGet()._1.bytes().arr) shouldBe 'right
     }
   }
 

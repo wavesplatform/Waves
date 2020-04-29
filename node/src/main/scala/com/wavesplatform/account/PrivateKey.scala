@@ -3,9 +3,11 @@ package com.wavesplatform.account
 import com.wavesplatform.common.state.ByteStr
 import play.api.libs.json.{Format, Writes}
 import supertagged._
+import com.wavesplatform.crypto.KeyLength
 
 object PrivateKey extends TaggedType[ByteStr] {
   def apply(privateKey: ByteStr): PrivateKey = {
+    require(privateKey.arr.length == KeyLength, s"invalid public key length: ${privateKey.arr.length}")
     privateKey @@ PrivateKey
   }
 

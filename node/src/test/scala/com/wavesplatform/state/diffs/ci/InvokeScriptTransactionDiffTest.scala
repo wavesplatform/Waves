@@ -165,7 +165,7 @@ class InvokeScriptTransactionDiffTest
         FUNCTION_CALL(
           User(FieldNames.ScriptTransfer),
           List(
-            FUNCTION_CALL(User("Address"), List(CONST_BYTESTR(recipientAddress.bytes).explicitGet())),
+            FUNCTION_CALL(User("Address"), List(CONST_BYTESTR(ByteStr(recipientAddress.bytes)).explicitGet())),
             CONST_LONG(recipientAmount),
             a.fold(REF("unit"): EXPR)(asset => CONST_BYTESTR(asset.id).explicitGet())
           )
@@ -208,7 +208,7 @@ class InvokeScriptTransactionDiffTest
           User(FieldNames.ScriptTransfer),
           List(
             recipientAddress match {
-              case recipientAddress: Address => FUNCTION_CALL(User("Address"), List(CONST_BYTESTR(recipientAddress.bytes).explicitGet()))
+              case recipientAddress: Address => FUNCTION_CALL(User("Address"), List(CONST_BYTESTR(ByteStr(recipientAddress.bytes)).explicitGet()))
               case recipientAddress: Alias   => FUNCTION_CALL(User("Alias"), List(CONST_STRING(recipientAddress.name).explicitGet()))
             },
             CONST_LONG(recipientAmount),
@@ -345,7 +345,6 @@ class InvokeScriptTransactionDiffTest
         )
     }
 
-    compiler.ContractCompiler(ctx.compilerContext, expr, stdLibVersion).left.map(println)
     compiler.ContractCompiler(ctx.compilerContext, expr, stdLibVersion).right.get
   }
 
@@ -361,8 +360,8 @@ class InvokeScriptTransactionDiffTest
       master  <- masterGen
       invoker <- invokerGen
       ts      <- timestampGen
-      genesis: GenesisTransaction  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      genesis2: GenesisTransaction = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
+      genesis: GenesisTransaction  = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+      genesis2: GenesisTransaction = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
       fee         <- feeGen
       arg         <- genBoundedString(1, 32)
       funcBinding <- Gen.const("funcForTesting")
@@ -378,7 +377,7 @@ class InvokeScriptTransactionDiffTest
         .selfSigned(
           1.toByte,
           invoker,
-          master,
+          master.toAddress,
           Some(fc),
           payment.toSeq,
           if (sponsored) {
@@ -431,8 +430,8 @@ class InvokeScriptTransactionDiffTest
       master  <- masterGen
       invoker <- if (selfSend) Gen.const(master) else invokerGen
       ts      <- timestampGen
-      genesis: GenesisTransaction  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      genesis2: GenesisTransaction = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
+      genesis: GenesisTransaction  = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+      genesis2: GenesisTransaction = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
       fee         <- feeGen
       arg         <- genBoundedStringBytes(1, 32)
       funcBinding <- funcNameGen
@@ -449,7 +448,7 @@ class InvokeScriptTransactionDiffTest
         .selfSigned(
           txVersion,
           invoker,
-          master,
+          master.toAddress,
           fc,
           payment.toSeq,
           if (sponsored) sponsoredFee else fee,
@@ -475,8 +474,8 @@ class InvokeScriptTransactionDiffTest
       master  <- masterGen
       invoker <- invokerGen
       ts      <- timestampGen
-      genesis: GenesisTransaction  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      genesis2: GenesisTransaction = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
+      genesis: GenesisTransaction  = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+      genesis2: GenesisTransaction = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
       fee         <- feeGen
       arg         <- genBoundedStringBytes(1, 32)
       funcBinding <- funcNameGen
@@ -493,7 +492,7 @@ class InvokeScriptTransactionDiffTest
         .selfSigned(
           1.toByte,
           invoker,
-          master,
+          master.toAddress,
           fc,
           payment.toSeq,
           if (sponsored) {
@@ -524,8 +523,8 @@ class InvokeScriptTransactionDiffTest
       master  <- masterGen
       invoker <- invokerGen
       ts      <- timestampGen
-      genesis: GenesisTransaction  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      genesis2: GenesisTransaction = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
+      genesis: GenesisTransaction  = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+      genesis2: GenesisTransaction = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
       fee         <- feeGen
       arg         <- genBoundedStringBytes(1, 32)
       funcBinding <- validAliasStringGen
@@ -590,12 +589,12 @@ class InvokeScriptTransactionDiffTest
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), fs) {
           case (blockDiff, newState) =>
             blockDiff.scriptsRun shouldBe 1
-            newState.accountData(genesis(0).recipient, "sender") shouldBe Some(BinaryDataEntry("sender", ci.sender.toAddress.bytes))
+            newState.accountData(genesis(0).recipient, "sender") shouldBe Some(BinaryDataEntry("sender", ByteStr(ci.sender.toAddress.bytes)))
             newState.accountData(genesis(0).recipient, "argument") shouldBe Some(
               BinaryDataEntry("argument", ci.funcCallOpt.get.args.head.asInstanceOf[CONST_BYTESTR].bs)
             )
 
-            blockDiff.transactions(ci.id())._2.contains(setScript.sender) shouldBe true
+            blockDiff.transactions(ci.id())._2.contains(setScript.sender.toAddress) shouldBe true
         }
 
     }
@@ -636,14 +635,14 @@ class InvokeScriptTransactionDiffTest
     forAll(for {
       a  <- accountGen
       am <- smallFeeGen
-      contractGen = paymentContractGen(a, am) _
+      contractGen = paymentContractGen(a.toAddress, am) _
       r <- preconditionsAndSetContract(contractGen)
     } yield (a, am, r._1, r._2, r._3)) {
       case (acc, amount, genesis, setScript, ci) =>
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), fs) {
           case (blockDiff, newState) =>
             blockDiff.scriptsRun shouldBe 1
-            newState.balance(acc, Waves) shouldBe amount
+            newState.balance(acc.toAddress, Waves) shouldBe amount
         }
     }
   }
@@ -652,7 +651,7 @@ class InvokeScriptTransactionDiffTest
     forAll(for {
       a  <- accountGen
       am <- smallFeeGen
-      contractGen = paymentContractGen(a, am) _
+      contractGen = paymentContractGen(a.toAddress, am) _
       r <- preconditionsAndSetContract(contractGen)
     } yield (a, am, r._1, r._2, r._3)) {
       case (_, _, genesis, setScript, ci) =>
@@ -667,13 +666,13 @@ class InvokeScriptTransactionDiffTest
     forAll(for {
       a  <- accountGen
       am <- smallFeeGen
-      contractGen = defaultPaymentContractGen(a, am) _
+      contractGen = defaultPaymentContractGen(a.toAddress, am) _
       r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), sponsored = false, isCIDefaultFunc = true)
     } yield (a, am, r._1, r._2, r._3)) {
       case (acc, amount, genesis, setScript, ci) =>
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), fs) {
           case (blockDiff, newState) =>
-            newState.balance(acc, Waves) shouldBe amount
+            newState.balance(acc.toAddress, Waves) shouldBe amount
         }
     }
   }
@@ -683,7 +682,7 @@ class InvokeScriptTransactionDiffTest
       ts  <- timestampGen
       fee <- ciFee(0)
       a   <- accountGen
-      genesis2: GenesisTransaction = GenesisTransaction.create(a, fee, ts).explicitGet()
+      genesis2: GenesisTransaction = GenesisTransaction.create(a.toAddress, fee, ts).explicitGet()
       alias                        = Alias.create("alias").explicitGet()
       aliasTx <- createAliasGen(a, alias, fee, ts)
       am      <- smallFeeGen
@@ -698,7 +697,7 @@ class InvokeScriptTransactionDiffTest
           features
         ) {
           case (blockDiff, newState) =>
-            newState.balance(acc, Waves) shouldBe amount
+            newState.balance(acc.toAddress, Waves) shouldBe amount
         }
     }
   }
@@ -708,7 +707,7 @@ class InvokeScriptTransactionDiffTest
       ts  <- timestampGen
       fee <- ciFee(0)
       a   <- accountGen
-      genesis2: GenesisTransaction = GenesisTransaction.create(a, fee, ts).explicitGet()
+      genesis2: GenesisTransaction = GenesisTransaction.create(a.toAddress, fee, ts).explicitGet()
       alias                        = Alias.create("alias").explicitGet()
       aliasTx <- createAliasGen(a, alias, fee, ts)
       am      <- smallFeeGen
@@ -728,7 +727,7 @@ class InvokeScriptTransactionDiffTest
       proofCount <- Gen.oneOf(0, 2)
       a          <- accountGen
       am         <- smallFeeGen
-      contractGen = defaultPaymentContractGen(a, am) _
+      contractGen = defaultPaymentContractGen(a.toAddress, am) _
       r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), sponsored = false, isCIDefaultFunc = true)
     } yield (a, am, r._1, r._2, r._3, proofCount)) {
       case (acc, amount, genesis, setScript, ci, proofCount) =>
@@ -750,7 +749,7 @@ class InvokeScriptTransactionDiffTest
     forAll(for {
       a  <- accountGen
       am <- smallFeeGen
-      contractGen = defaultPaymentContractGen(a, am) _
+      contractGen = defaultPaymentContractGen(a.toAddress, am) _
       r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), sponsored = false, isCIDefaultFunc = true)
     } yield (a, am, r._1, r._2, r._3)) {
       case (acc, amount, genesis, setScript, ci) =>
@@ -770,14 +769,14 @@ class InvokeScriptTransactionDiffTest
     forAll(for {
       a  <- accountGen
       am <- smallFeeGen
-      contractGen = paymentContractGen(a, am) _
+      contractGen = paymentContractGen(a.toAddress, am) _
       r <- preconditionsAndSetContractWithAlias(contractGen)
     } yield (a, am, r._1, r._3, r._6, r._4)) {
       case (acc, amount, genesis, setScript, aliasTx, ciWithAlias) =>
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(aliasTx, setScript))), TestBlock.create(Seq(ciWithAlias), Block.ProtoBlockVersion), fs) {
           case (blockDiff, newState) =>
             blockDiff.scriptsRun shouldBe 1
-            newState.balance(acc, Waves) shouldBe amount
+            newState.balance(acc.toAddress, Waves) shouldBe amount
         }
     }
   }
@@ -786,7 +785,7 @@ class InvokeScriptTransactionDiffTest
     forAll(for {
       a  <- accountGen
       am <- smallFeeGen
-      contractGen = paymentContractGen(a, am) _
+      contractGen = paymentContractGen(a.toAddress, am) _
       r <- preconditionsAndSetContractWithAlias(contractGen)
     } yield (a, am, r._1, r._3, r._6, r._5)) {
       case (acc, amount, genesis, setScript, aliasTx, ciWithFakeAlias) =>
@@ -800,7 +799,7 @@ class InvokeScriptTransactionDiffTest
     forAll(for {
       a  <- accountGen
       am <- smallFeeGen
-      contractGen = paymentContractGen(a, am, List.fill(11)(Waves)) _
+      contractGen = paymentContractGen(a.toAddress, am, List.fill(11)(Waves)) _
       r <- preconditionsAndSetContract(contractGen)
     } yield (a, am, r._1, r._2, r._3)) {
       case (acc, amount, genesis, setScript, ci) =>
@@ -817,12 +816,12 @@ class InvokeScriptTransactionDiffTest
     forAll(for {
       a  <- accountGen
       am <- smallFeeGen
-      contractGen = paymentContractGen(a, am) _
+      contractGen = paymentContractGen(a.toAddress, am) _
       invoker <- accountGen
       ts      <- timestampGen
       asset = IssueTransaction(
         TxVersion.V2,
-        invoker,
+        invoker.publicKey,
         "Asset#1".utf8Bytes,
         Array.emptyByteArray,
         1000000,
@@ -831,7 +830,7 @@ class InvokeScriptTransactionDiffTest
         Some(assetAllowed),
         enoughFee,
         ts
-      ).signWith(invoker)
+      ).signWith(invoker.privateKey)
       r <- preconditionsAndSetContract(
         contractGen,
         invokerGen = Gen.oneOf(Seq(invoker)),
@@ -843,9 +842,9 @@ class InvokeScriptTransactionDiffTest
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), fs) {
           case (blockDiff, newState) =>
             blockDiff.scriptsRun shouldBe 2
-            newState.balance(acc, Waves) shouldBe amount
-            newState.balance(invoker, IssuedAsset(asset.id())) shouldBe (asset.quantity - 1)
-            newState.balance(dAppAddress, IssuedAsset(asset.id())) shouldBe 1
+            newState.balance(acc.toAddress, Waves) shouldBe amount
+            newState.balance(invoker.toAddress, IssuedAsset(asset.id())) shouldBe (asset.quantity - 1)
+            newState.balance(dAppAddress.toAddress, IssuedAsset(asset.id())) shouldBe 1
         }
     }
   }
@@ -860,7 +859,7 @@ class InvokeScriptTransactionDiffTest
 
       transferringAsset = IssueTransaction(
         TxVersion.V2,
-        invoker,
+        invoker.publicKey,
         "Asset#1".utf8Bytes,
         Array.emptyByteArray,
         quantity,
@@ -869,11 +868,11 @@ class InvokeScriptTransactionDiffTest
         Some(assetAllowed),
         enoughFee,
         ts
-      ).signWith(invoker)
+      ).signWith(invoker.privateKey)
 
       attachedAsset = IssueTransaction(
         TxVersion.V2,
-        invoker,
+        invoker.publicKey,
         "Asset#2".utf8Bytes,
         Array.emptyByteArray,
         quantity,
@@ -882,9 +881,9 @@ class InvokeScriptTransactionDiffTest
         Some(assetAllowed),
         enoughFee,
         ts
-      ).signWith(invoker)
+      ).signWith(invoker.privateKey)
 
-      contractGen = paymentContractGen(master, am, List(IssuedAsset(transferringAsset.id()))) _
+      contractGen = paymentContractGen(master.toAddress, am, List(IssuedAsset(transferringAsset.id()))) _
 
       r <- preconditionsAndSetContract(
         contractGen,
@@ -920,12 +919,12 @@ class InvokeScriptTransactionDiffTest
     forAll(for {
       a  <- accountGen
       am <- smallFeeGen
-      contractGen = paymentContractGen(a, am) _
+      contractGen = paymentContractGen(a.toAddress, am) _
       invoker <- accountGen
       ts      <- timestampGen
       asset = IssueTransaction(
         TxVersion.V2,
-        invoker,
+        invoker.publicKey,
         "Asset#1".utf8Bytes,
         Array.emptyByteArray,
         1000000,
@@ -934,7 +933,7 @@ class InvokeScriptTransactionDiffTest
         Some(assetBanned),
         enoughFee,
         ts
-      ).signWith(invoker)
+      ).signWith(invoker.privateKey)
       r <- preconditionsAndSetContract(
         contractGen,
         invokerGen = Gen.oneOf(Seq(invoker)),
@@ -963,7 +962,7 @@ class InvokeScriptTransactionDiffTest
       ts     <- timestampGen
       asset = IssueTransaction(
         TxVersion.V2,
-        master,
+        master.publicKey,
         "Asset#1".utf8Bytes,
         Array.emptyByteArray,
         quantity,
@@ -972,16 +971,16 @@ class InvokeScriptTransactionDiffTest
         Some(assetAllowed),
         enoughFee,
         ts
-      ).signWith(master)
-      contractGen = paymentContractGen(a, am, List(IssuedAsset(asset.id()))) _
+      ).signWith(master.privateKey)
+      contractGen = paymentContractGen(a.toAddress, am, List(IssuedAsset(asset.id()))) _
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(1))
     } yield (a, am, r._1, r._2, r._3, asset, master)) {
       case (acc, amount, genesis, setScript, ci, asset, master) =>
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(asset, ci), Block.ProtoBlockVersion), fs) {
           case (blockDiff, newState) =>
             blockDiff.scriptsRun shouldBe 3
-            newState.balance(master, IssuedAsset(asset.id())) shouldBe (asset.quantity - amount)
-            newState.balance(acc, IssuedAsset(asset.id())) shouldBe amount
+            newState.balance(master.toAddress, IssuedAsset(asset.id())) shouldBe (asset.quantity - amount)
+            newState.balance(acc.toAddress, IssuedAsset(asset.id())) shouldBe amount
         }
     }
   }
@@ -995,7 +994,7 @@ class InvokeScriptTransactionDiffTest
       ts     <- timestampGen
       asset = IssueTransaction(
         TxVersion.V2,
-        master,
+        master.publicKey,
         "Asset#1".utf8Bytes,
         Array.emptyByteArray,
         quantity,
@@ -1004,8 +1003,8 @@ class InvokeScriptTransactionDiffTest
         Some(assetBanned),
         enoughFee,
         ts
-      ).signWith(master)
-      contractGen = paymentContractGen(a, am, List(IssuedAsset(asset.id()))) _
+      ).signWith(master.privateKey)
+      contractGen = paymentContractGen(a.toAddress, am, List(IssuedAsset(asset.id()))) _
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(1))
     } yield (a, am, r._1, r._2, r._3, asset, master)) {
       case (acc, amount, genesis, setScript, ci, asset, master) =>
@@ -1024,7 +1023,7 @@ class InvokeScriptTransactionDiffTest
       ts     <- timestampGen
       asset1 = IssueTransaction(
         TxVersion.V2,
-        master,
+        master.publicKey,
         "Asset#1".utf8Bytes,
         Array.emptyByteArray,
         quantity,
@@ -1033,10 +1032,10 @@ class InvokeScriptTransactionDiffTest
         Some(assetAllowed),
         enoughFee,
         ts
-      ).signWith(master)
+      ).signWith(master.privateKey)
       asset2 = IssueTransaction(
         TxVersion.V2,
-        master,
+        master.publicKey,
         "Asset#2".utf8Bytes,
         Array.emptyByteArray,
         quantity,
@@ -1045,8 +1044,8 @@ class InvokeScriptTransactionDiffTest
         Some(assetBanned),
         enoughFee,
         ts
-      ).signWith(master)
-      contractGen = paymentContractGen(a, am, List(IssuedAsset(asset1.id()), IssuedAsset(asset2.id()))) _
+      ).signWith(master.privateKey)
+      contractGen = paymentContractGen(a.toAddress, am, List(IssuedAsset(asset1.id()), IssuedAsset(asset2.id()))) _
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(2))
     } yield (a, am, r._1, r._2, r._3, asset1, asset2, master)) {
       case (acc, amount, genesis, setScript, ci, asset1, asset2, master) =>
@@ -1079,7 +1078,7 @@ class InvokeScriptTransactionDiffTest
 
       attachedAsset = IssueTransaction(
         TxVersion.V2,
-        invoker,
+        invoker.publicKey,
         "Asset#1".utf8Bytes,
         Array.emptyByteArray,
         1000000,
@@ -1088,11 +1087,11 @@ class InvokeScriptTransactionDiffTest
         Some(assetAllowed),
         enoughFee,
         ts
-      ).signWith(invoker)
+      ).signWith(invoker.privateKey)
 
       transferringAsset = IssueTransaction(
         TxVersion.V2,
-        invoker,
+        invoker.publicKey,
         "Asset#2".utf8Bytes,
         Array.emptyByteArray,
         1000000,
@@ -1101,10 +1100,10 @@ class InvokeScriptTransactionDiffTest
         Some(throwingAsset),
         enoughFee,
         ts
-      ).signWith(invoker)
+      ).signWith(invoker.privateKey)
 
       r <- preconditionsAndSetContract(
-        paymentContractGen(a, am, List(IssuedAsset(transferringAsset.id()))),
+        paymentContractGen(a.toAddress, am, List(IssuedAsset(transferringAsset.id()))),
         invokerGen = Gen.oneOf(Seq(invoker)),
         payment = Some(Payment(1, IssuedAsset(attachedAsset.id()))),
         feeGen = ciFee(2)
@@ -1138,7 +1137,7 @@ class InvokeScriptTransactionDiffTest
       ts     <- timestampGen
       asset = IssueTransaction(
         TxVersion.V2,
-        master,
+        master.publicKey,
         "Asset#1" utf8Bytes,
         Array.emptyByteArray,
         quantity,
@@ -1147,14 +1146,14 @@ class InvokeScriptTransactionDiffTest
         Some(assetAllowed),
         enoughFee,
         ts
-      ).signWith(master)
-      contractGen = paymentContractGen(a, -1, List(IssuedAsset(asset.id()))) _
+      ).signWith(master.privateKey)
+      contractGen = paymentContractGen(a.toAddress, -1, List(IssuedAsset(asset.id()))) _
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(1))
     } yield (a, am, r._1, r._2, r._3, asset, master, ts)) {
       case (acc, amount, genesis, setScript, ci, asset, master, ts) =>
         val t =
           TransferTransaction
-            .selfSigned(2.toByte, master, acc, IssuedAsset(asset.id()), asset.quantity / 10, Waves, enoughFee, None, ts)
+            .selfSigned(2.toByte, master, acc.toAddress, IssuedAsset(asset.id()), asset.quantity / 10, Waves, enoughFee, None, ts)
             .explicitGet()
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(asset, t, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
           blockDiffEi should produce("Negative amount")
@@ -1171,7 +1170,7 @@ class InvokeScriptTransactionDiffTest
       funcBinding <- validAliasStringGen
       fee         <- ciFee(1)
       fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet()))
-      ci = InvokeScriptTransaction.selfSigned(1.toByte, invoker, master, Some(fc), Seq(Payment(-1, Waves)), fee, Waves, ts)
+      ci = InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, Some(fc), Seq(Payment(-1, Waves)), fee, Waves, ts)
     } yield ci) { _ should produce("NonPositiveAmount") }
   }
 
@@ -1184,7 +1183,7 @@ class InvokeScriptTransactionDiffTest
       ts     <- timestampGen
       asset = IssueTransaction(
         TxVersion.V2,
-        master,
+        master.publicKey,
         "Asset#1".utf8Bytes,
         Array.emptyByteArray,
         quantity,
@@ -1193,8 +1192,8 @@ class InvokeScriptTransactionDiffTest
         Some(assetBanned),
         enoughFee,
         ts
-      ).signWith(master)
-      contractGen = paymentContractGen(a, am, List(IssuedAsset(asset.id()))) _
+      ).signWith(master.privateKey)
+      contractGen = paymentContractGen(a.toAddress, am, List(IssuedAsset(asset.id()))) _
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(0))
     } yield (a, am, r._1, r._2, r._3, asset, master)) {
       case (acc, amount, genesis, setScript, ci, asset, master) =>
@@ -1208,12 +1207,12 @@ class InvokeScriptTransactionDiffTest
     forAll(for {
       a  <- accountGen
       am <- smallFeeGen
-      contractGen = paymentContractGen(a, am) _
+      contractGen = paymentContractGen(a.toAddress, am) _
       invoker <- accountGen
       ts      <- timestampGen
       asset = IssueTransaction(
         TxVersion.V2,
-        invoker,
+        invoker.publicKey,
         "Asset#1".utf8Bytes,
         Array.emptyByteArray,
         1000000,
@@ -1222,7 +1221,7 @@ class InvokeScriptTransactionDiffTest
         Some(assetAllowed),
         enoughFee,
         ts
-      ).signWith(invoker)
+      ).signWith(invoker.privateKey)
       r <- preconditionsAndSetContract(
         contractGen,
         invokerGen = Gen.oneOf(Seq(invoker)),
@@ -1241,7 +1240,7 @@ class InvokeScriptTransactionDiffTest
     forAll(for {
       a  <- accountGen
       am <- smallFeeGen
-      contractGen = paymentContractGen(a, am) _
+      contractGen = paymentContractGen(a.toAddress, am) _
       invoker <- accountGen
       ts      <- timestampGen
       r <- preconditionsAndSetContract(
@@ -1262,7 +1261,7 @@ class InvokeScriptTransactionDiffTest
     forAll(for {
       a  <- accountGen
       am <- smallFeeGen
-      contractGen = paymentContractGen(a, Long.MaxValue / 2 + 2, List.fill(4)(Waves)) _
+      contractGen = paymentContractGen(a.toAddress, Long.MaxValue / 2 + 2, List.fill(4)(Waves)) _
       invoker <- accountGen
       ts      <- timestampGen
       r       <- preconditionsAndSetContract(contractGen, invokerGen = Gen.oneOf(Seq(invoker)), payment = Some(Payment(1, Waves)), feeGen = ciFee(1))
@@ -1278,7 +1277,7 @@ class InvokeScriptTransactionDiffTest
     forAll(for {
       a  <- accountGen
       am <- smallFeeGen
-      contractGen = paymentContractGen(a, am) _
+      contractGen = paymentContractGen(a.toAddress, am) _
       r  <- preconditionsAndSetContract(contractGen, sponsored = true)
       ts <- timestampGen
     } yield (ts, a, am, r._1, r._2, r._3, r._4, r._5, r._6)) {
@@ -1288,7 +1287,7 @@ class InvokeScriptTransactionDiffTest
             .selfSigned(
               2.toByte,
               master,
-              ci.sender,
+              ci.sender.toAddress,
               IssuedAsset(sponsoredAsset.id()),
               sponsoredAsset.quantity / 10,
               Waves,
@@ -1304,9 +1303,9 @@ class InvokeScriptTransactionDiffTest
         ) {
           case (blockDiff, newState) =>
             blockDiff.scriptsRun shouldBe 1
-            newState.balance(acc, Waves) shouldBe amount
-            newState.balance(ci.sender, IssuedAsset(sponsoredAsset.id())) shouldBe (sponsoredAsset.quantity / 10 - ci.fee)
-            newState.balance(master, IssuedAsset(sponsoredAsset.id())) shouldBe (sponsoredAsset.quantity - sponsoredAsset.quantity / 10 + ci.fee)
+            newState.balance(acc.toAddress, Waves) shouldBe amount
+            newState.balance(ci.sender.toAddress, IssuedAsset(sponsoredAsset.id())) shouldBe (sponsoredAsset.quantity / 10 - ci.fee)
+            newState.balance(master.toAddress, IssuedAsset(sponsoredAsset.id())) shouldBe (sponsoredAsset.quantity - sponsoredAsset.quantity / 10 + ci.fee)
         }
     }
   }
@@ -1425,7 +1424,7 @@ class InvokeScriptTransactionDiffTest
       am            <- smallFeeGen
       senderBinging <- validAliasStringGen
       argBinding    <- validAliasStringGen
-      contractGen   <- Gen.const((someStr: String) => Gen.const(paymentContract(senderBinging, argBinding, "default", a, am, List(Waves))))
+      contractGen   <- Gen.const((someStr: String) => Gen.const(paymentContract(senderBinging, argBinding, "default", a.toAddress, am, List(Waves))))
       r             <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), sponsored = false, isCIDefaultFunc = true)
     } yield (a, am, r._1, r._2, r._3)) {
       case (acc, amount, genesis, setScript, ci) =>
@@ -1441,7 +1440,7 @@ class InvokeScriptTransactionDiffTest
       am            <- smallFeeGen
       senderBinging <- validAliasStringGen
       argBinding    <- validAliasStringGen
-      contractGen   <- Gen.const((someStr: String) => Gen.const(paymentContract(senderBinging, argBinding, "undefault", a, am, List(Waves))))
+      contractGen   <- Gen.const((someStr: String) => Gen.const(paymentContract(senderBinging, argBinding, "undefault", a.toAddress, am, List(Waves))))
       r             <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), sponsored = false, isCIDefaultFunc = true)
     } yield (a, am, r._1, r._2, r._3)) {
       case (acc, amount, genesis, setScript, ci) =>
@@ -1455,7 +1454,7 @@ class InvokeScriptTransactionDiffTest
     forAll(for {
       acc <- accountGen
       am  <- smallFeeGen
-      contractGen = paymentContractGen(acc, am, assets = List(Waves)) _
+      contractGen = paymentContractGen(acc.toAddress, am, assets = List(Waves)) _
       r <- preconditionsAndSetContract(
         contractGen,
         invokerGen = Gen.const(acc),
@@ -1476,7 +1475,7 @@ class InvokeScriptTransactionDiffTest
     forAll(for {
       acc <- accountGen
       am  <- smallFeeGen
-      contractGen = paymentContractGen(acc, am, assets = Nil, version = V4) _
+      contractGen = paymentContractGen(acc.toAddress, am, assets = Nil, version = V4) _
       r <- preconditionsAndSetContract(
         contractGen,
         invokerGen = Gen.const(acc),
@@ -1498,7 +1497,7 @@ class InvokeScriptTransactionDiffTest
     forAll(for {
       acc <- accountGen
       am  <- smallFeeGen
-      contractGen = paymentContractGen(acc, am, assets = List(Waves), version = V4) _
+      contractGen = paymentContractGen(acc.toAddress, am, assets = List(Waves), version = V4) _
       r <- preconditionsAndSetContract(
         contractGen,
         invokerGen = Gen.const(acc),
@@ -1525,7 +1524,7 @@ class InvokeScriptTransactionDiffTest
       ts     <- timestampGen
       asset = IssueTransaction(
         TxVersion.V2,
-        master,
+        master.publicKey,
         "Asset#1".utf8Bytes,
         Array.emptyByteArray,
         quantity,
@@ -1534,8 +1533,8 @@ class InvokeScriptTransactionDiffTest
         Some(assetUsingThis),
         enoughFee,
         ts
-      ).signWith(master)
-      contractGen = paymentContractGen(a, am, List(IssuedAsset(asset.id()))) _
+      ).signWith(master.privateKey)
+      contractGen = paymentContractGen(a.toAddress, am, List(IssuedAsset(asset.id()))) _
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(1))
     } yield (a, am, r._1, r._2, r._3, asset, master)) {
       case (acc, amount, genesis, setScript, ci, asset, master) =>
@@ -1545,8 +1544,8 @@ class InvokeScriptTransactionDiffTest
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(asset, ci), Block.ProtoBlockVersion), features) {
           case (blockDiff, newState) =>
             blockDiff.scriptsRun shouldBe 3
-            newState.balance(master, IssuedAsset(asset.id())) shouldBe (asset.quantity - amount)
-            newState.balance(acc, IssuedAsset(asset.id())) shouldBe amount
+            newState.balance(master.toAddress, IssuedAsset(asset.id())) shouldBe (asset.quantity - amount)
+            newState.balance(acc.toAddress, IssuedAsset(asset.id())) shouldBe amount
         }
     }
   }
@@ -1599,7 +1598,7 @@ class InvokeScriptTransactionDiffTest
 
         fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V2, invoker, master, Some(fc), Seq(), fee, Waves, ts + 3)
+          .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 3)
           .explicitGet()
       } yield (assetTx, invokeTx, master, script, funcBinding)
 
@@ -1610,7 +1609,7 @@ class InvokeScriptTransactionDiffTest
         (blockchain.assetScript _).expects(*).returning(None)
         (blockchain.accountScript _)
           .expects(master.toAddress)
-          .returning(Some(AccountScriptInfo(master, script.explicitGet(), 10L, Map(1 -> Map(funcBinding -> 10L)))))
+          .returning(Some(AccountScriptInfo(master.publicKey, script.explicitGet(), 10L, Map(1 -> Map(funcBinding -> 10L)))))
           .anyNumberOfTimes()
         (blockchain.accountScript _).expects(invoke.sender.toAddress).returning(None).anyNumberOfTimes()
         (blockchain.hasAccountScript _).expects(invoke.sender.toAddress).returning(false).anyNumberOfTimes()
@@ -1621,7 +1620,7 @@ class InvokeScriptTransactionDiffTest
         (blockchain.height _).expects().returning(1).anyNumberOfTimes()
         (blockchain.assetDescription _)
           .expects(*)
-          .returning(Some(AssetDescription(asset.id(), master, ByteString.EMPTY, ByteString.EMPTY, 1, false, BigInt(1), Height(1), None, 0L, false)))
+          .returning(Some(AssetDescription(asset.id(), master.publicKey, ByteString.EMPTY, ByteString.EMPTY, 1, false, BigInt(1), Height(1), None, 0L, false)))
         InvokeScriptTransactionDiff
           .apply(blockchain, invoke.timestamp)(invoke)
           .resultE should produce("is already issued")
@@ -1649,8 +1648,8 @@ class InvokeScriptTransactionDiffTest
       master  <- accountGen
       invoker <- accountGen
       ts      <- timestampGen
-      genesis1Tx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      genesis2Tx = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
+      genesis1Tx = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+      genesis2Tx = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
       assetTx     <- issueV2TransactionGen(master, None, reissuableParam = Some(true))
       fee         <- ciFee()
       funcBinding <- funcNameGen
@@ -1659,7 +1658,7 @@ class InvokeScriptTransactionDiffTest
       setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
       fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
       invokeTx = InvokeScriptTransaction
-        .selfSigned(TxVersion.V2, invoker, master, Some(fc), Seq(), fee, Waves, ts + 3)
+        .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 3)
         .explicitGet()
     } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, assetTx, setScriptTx))
 
@@ -1703,8 +1702,8 @@ class InvokeScriptTransactionDiffTest
       master  <- accountGen
       invoker <- accountGen
       ts      <- timestampGen
-      genesis1Tx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      genesis2Tx = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
+      genesis1Tx = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+      genesis2Tx = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
       fee         <- ciFee(nonNftIssue = 1)
       funcBinding <- funcNameGen
       contract    = transferIssueContract(funcBinding)
@@ -1712,7 +1711,7 @@ class InvokeScriptTransactionDiffTest
       setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
       fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
       invokeTx = InvokeScriptTransaction
-        .selfSigned(TxVersion.V2, invoker, master, Some(fc), Seq(), fee, Waves, ts + 3)
+        .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 3)
         .explicitGet()
     } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
 
@@ -1756,8 +1755,8 @@ class InvokeScriptTransactionDiffTest
       master  <- accountGen
       invoker <- accountGen
       ts      <- timestampGen
-      genesis1Tx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      genesis2Tx = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
+      genesis1Tx = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+      genesis2Tx = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
       fee         <- ciFee()
       funcBinding <- funcNameGen
       contract    = transferNonIssueContract(funcBinding)
@@ -1765,7 +1764,7 @@ class InvokeScriptTransactionDiffTest
       setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
       fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
       invokeTx = InvokeScriptTransaction
-        .selfSigned(TxVersion.V2, invoker, master, Some(fc), Seq(), fee, Waves, ts + 3)
+        .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 3)
         .explicitGet()
     } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
 
@@ -1809,8 +1808,8 @@ class InvokeScriptTransactionDiffTest
       master  <- accountGen
       invoker <- accountGen
       ts      <- timestampGen
-      genesis1Tx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      genesis2Tx = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
+      genesis1Tx = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+      genesis2Tx = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
       fee         <- ciFee(nonNftIssue = 2)
       funcBinding <- funcNameGen
       contract    = doubleIssueContract(funcBinding)
@@ -1818,7 +1817,7 @@ class InvokeScriptTransactionDiffTest
       setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
       fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
       invokeTx = InvokeScriptTransaction
-        .selfSigned(TxVersion.V2, invoker, master, Some(fc), Seq(), fee, Waves, ts + 3)
+        .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 3)
         .explicitGet()
     } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
 
@@ -1848,7 +1847,7 @@ class InvokeScriptTransactionDiffTest
           invoke.dAppAddressOrAlias shouldBe invoke.sender.toAddress
 
           val dv           = diff.explicitGet()
-          val senderChange = dv.portfolios(invoke.sender).balanceOf(sponsorFee.asset)
+          val senderChange = dv.portfolios(invoke.sender.toAddress).balanceOf(sponsorFee.asset)
           senderChange shouldBe 0L
         }
     }
@@ -1868,7 +1867,7 @@ class InvokeScriptTransactionDiffTest
           acc             <- accountGen
           amt             <- Gen.choose(1, issueTx.quantity)
           arg             <- genBoundedStringBytes(1, 32)
-          paymentContract <- paymentContractGen(acc, amt, List(IssuedAsset(issueTx.assetId)), V4)(funcBinding)
+          paymentContract <- paymentContractGen(acc.toAddress, amt, List(IssuedAsset(issueTx.assetId)), V4)(funcBinding)
         } yield (fee, Waves, paymentContract, List(CONST_BYTESTR(ByteStr(arg)).explicitGet()))
       )
     }
@@ -1879,9 +1878,9 @@ class InvokeScriptTransactionDiffTest
         other   <- accountGen
         invoker <- accountGen
         ts      <- timestampGen
-        g1Tx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-        g2Tx = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
-        g3Tx = GenesisTransaction.create(other, ENOUGH_AMT, ts).explicitGet()
+        g1Tx = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+        g2Tx = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+        g3Tx = GenesisTransaction.create(other.toAddress, ENOUGH_AMT, ts).explicitGet()
         (i1Tx, sTx, _, _) <- sponsorFeeCancelSponsorFeeGen(other)
         i2Tx = IssueTransaction
           .selfSigned(TxVersion.V2, invoker, "Asset", "", 1000000, 8, false, Some(throwingAsset), enoughFee, ts)
@@ -1895,7 +1894,7 @@ class InvokeScriptTransactionDiffTest
         ssTx   = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
         fc     = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), args)
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V2, invoker, master, Some(fc), Seq(), fee, feeAsset, ts + 3)
+          .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, feeAsset, ts + 3)
           .explicitGet()
       } yield (invokeTx, (ENOUGH_AMT - enoughFee, i1Tx.quantity), Seq(g1Tx, g2Tx, g3Tx, i1Tx, i2Tx, sTx, tTx, ssTx))
 
@@ -1920,11 +1919,11 @@ class InvokeScriptTransactionDiffTest
         other   <- accountGen
         invoker <- accountGen
         ts      <- timestampGen
-        g1Tx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-        g2Tx = GenesisTransaction.create(other, ENOUGH_AMT, ts).explicitGet()
+        g1Tx = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+        g2Tx = GenesisTransaction.create(other.toAddress, ENOUGH_AMT, ts).explicitGet()
         (iTx, sTx, _, _) <- sponsorFeeCancelSponsorFeeGen(other)
         sponsoredAsset = IssuedAsset(iTx.assetId)
-        tTx            = TransferTransaction.selfSigned(TxVersion.V3, other, master, sponsoredAsset, iTx.quantity / 2, Waves, enoughFee, None, ts).explicitGet()
+        tTx            = TransferTransaction.selfSigned(TxVersion.V3, other, master.toAddress, sponsoredAsset, iTx.quantity / 2, Waves, enoughFee, None, ts).explicitGet()
         wavesFee <- ciFee(1)
         sponsoredFee = Sponsorship.fromWaves(wavesFee, sTx.minSponsoredAssetFee.get)
         (feeAsset, fee) <- Gen.oneOf((Waves, wavesFee), (sponsoredAsset, sponsoredFee))
@@ -1935,7 +1934,7 @@ class InvokeScriptTransactionDiffTest
         ssTx   = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
         fc     = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet()))
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V2, invoker, master, Some(fc), Seq(), fee, feeAsset, ts + 3)
+          .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, feeAsset, ts + 3)
           .explicitGet()
       } yield (invokeTx, Seq(g1Tx, g2Tx, iTx, sTx, tTx, ssTx))
 
