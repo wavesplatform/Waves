@@ -18,7 +18,7 @@ class EvaluatorV2(
 ) {
 
   def apply(expr: EXPR, limit: Int): (EXPR, Int) = {
-    var ref    = expr.deepCopy
+    var ref    = expr.deepCopy.value
     val unused = root(ref, v => Eval.later { ref = v }, limit, Nil).value
     (ref, unused)
   }
@@ -135,7 +135,7 @@ class EvaluatorV2(
                       .map { signature =>
                         val argsWithExpr =
                           (signature.args zip fc.args)
-                            .foldRight(signature.body.deepCopy) {
+                            .foldRight(signature.body.deepCopy.value) {
                               case ((argName, argValue), argsWithExpr) =>
                                 BLOCK(LET(argName, argValue), argsWithExpr)
                             }
