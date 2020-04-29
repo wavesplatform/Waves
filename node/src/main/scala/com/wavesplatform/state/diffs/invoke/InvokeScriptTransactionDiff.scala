@@ -1,11 +1,11 @@
 package com.wavesplatform.state.diffs.invoke
 
-import cats.kernel.Monoid
-import cats.syntax.either._
+import cats.implicits._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.FunctionCallPolicyProvider._
 import com.wavesplatform.lang._
+import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
@@ -23,13 +23,13 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
+import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import monix.eval.Coeval
 import shapeless.Coproduct
 
-import scala.util.{Failure, Right, Success, Try}
+import scala.util.{Right, Try}
 
 object InvokeScriptTransactionDiff {
 
@@ -53,7 +53,7 @@ object InvokeScriptTransactionDiff {
           feeInfo <- TracedResult(InvokeDiffsCommon.calcFee(blockchain, tx))
 
           directives <- TracedResult.wrapE(DirectiveSet(version, Account, DAppType).leftMap(GenericError.apply))
-          payments   <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DApp).leftMap(GenericError.apply))
+          payments   <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DAppTarget).leftMap(GenericError.apply))
           input      <- TracedResult.wrapE(buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, None).leftMap(GenericError.apply))
 
           invocationComplexity <- TracedResult {
@@ -109,31 +109,10 @@ object InvokeScriptTransactionDiff {
                     tx.id()
                   )
 
-                  val result = for {
-                    evaluator <- Try {
-                      val wavesContext = WavesContext.build(directives)
-                      ContractEvaluator.applyV2(
-                        Monoid
-                          .combineAll(
-                            Seq(
-                              PureContext.build(Global, version).withEnvironment[Environment],
-                              CryptoContext.build(Global, version).withEnvironment[Environment],
-                              wavesContext.copy(vars = Map())
-                            )
-                          )
-                          .evaluationContext(environment),
-                        wavesContext.evaluationContext(environment).letDefs,
-                        contract,
-                        invocation,
-                        version
-                      )
-                    } match {
-                      case Success(r) => r
-                      case Failure(e) => Left((e.getMessage, List.empty))
-                    }
-                  } yield evaluator
-
-                  result.leftMap { case (error, log) => ScriptExecutionError.dApp(error, log) }
+                  val evaluate = if (blockchain.settings.useEvaluatorV2) evaluateV2 _ else evaluateV1 _
+                  Try(evaluate(version, contract, directives, invocation, environment))
+                    .fold(e => Left((e.getMessage, Nil)), identity)
+                    .leftMap { case (error, log) => ScriptExecutionError.dApp(error, log) }
                 })
                 TracedResult(
                   scriptResultE,
@@ -169,6 +148,38 @@ object InvokeScriptTransactionDiff {
       case Left(l) => TracedResult(Left(l))
       case _       => TracedResult(Left(GenericError(s"No contract at address ${tx.dAppAddressOrAlias}")))
     }
+  }
+
+  private def evaluateV1(
+      version: StdLibVersion,
+      contract: DApp,
+      directives: DirectiveSet,
+      invocation: ContractEvaluator.Invocation,
+      environment: WavesEnvironment
+  ) = {
+    val ctx =
+      PureContext.build(Global, version).withEnvironment[Environment] |+|
+        CryptoContext.build(Global, version).withEnvironment[Environment] |+|
+        WavesContext.build(directives)
+
+    ContractEvaluator(ctx.evaluationContext(environment), contract, invocation, version)
+  }
+
+  private def evaluateV2(
+      version: StdLibVersion,
+      contract: DApp,
+      directives: DirectiveSet,
+      invocation: ContractEvaluator.Invocation,
+      environment: WavesEnvironment
+  ) = {
+    val wavesContext = WavesContext.build(directives)
+    val ctx =
+      PureContext.build(Global, version).withEnvironment[Environment] |+|
+        CryptoContext.build(Global, version).withEnvironment[Environment] |+|
+        wavesContext.copy(vars = Map())
+
+    val freezingLets = wavesContext.evaluationContext(environment).letDefs
+    ContractEvaluator.applyV2(ctx.evaluationContext(environment), freezingLets, contract, invocation, version)
   }
 
   private def checkCall(fc: FUNCTION_CALL, blockchain: Blockchain): Either[ExecutionError, Unit] = {
