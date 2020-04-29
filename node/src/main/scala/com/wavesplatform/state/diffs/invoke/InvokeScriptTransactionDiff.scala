@@ -3,6 +3,8 @@ package com.wavesplatform.state.diffs.invoke
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.FunctionCallPolicyProvider._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.contract.DApp
@@ -60,14 +62,24 @@ object InvokeScriptTransactionDiff {
             InvokeDiffsCommon.getInvocationComplexity(blockchain, tx, callableComplexities, dAppAddress)
           }
 
-          _ <- TracedResult {
-            val stepLimit = ContractLimits.MaxComplexityByVersion(version)
-            val stepsNumber =
-              if (invocationComplexity % stepLimit == 0)
-                invocationComplexity / stepLimit
-              else
-                invocationComplexity / stepLimit + 1
+          stepLimit = ContractLimits.MaxComplexityByVersion(version)
+          stepsNumber =
+            if (invocationComplexity % stepLimit == 0)
+              invocationComplexity / stepLimit
+            else
+              invocationComplexity / stepLimit + 1
 
+          // just for reliability
+          _ <- TracedResult {
+            if (stepsNumber > 1 && !blockchain.settings.useEvaluatorV2)
+              Left(GenericError("EvaluatorV2 should be enabled for continuations"))
+            else if (stepsNumber > 1 && !blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction))
+              Left(GenericError(s"${BlockchainFeatures.ContinuationTransaction} should be activated for continuations"))
+            else
+              Right(())
+          }
+
+          _ <- TracedResult {
             val minFee    = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber
             val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
             val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
@@ -81,8 +93,6 @@ object InvokeScriptTransactionDiff {
               )
             )
           }
-
-          verifierComplexity = blockchain.accountScript(tx.sender.toAddress).map(_.verifierComplexity).getOrElse(0L)
 
           result <- if (!skipExecution) {
             for {
@@ -119,6 +129,8 @@ object InvokeScriptTransactionDiff {
                   List(InvokeScriptTrace(tx.dAppAddressOrAlias, functionCall, scriptResultE.map(_._1), scriptResultE.fold(_.log, _._2)))
                 )
               }
+
+              verifierComplexity = blockchain.accountScript(tx.sender.toAddress).map(_.verifierComplexity).getOrElse(0L)
 
               doProcessActions = InvokeDiffsCommon.processActions(
                 _,
