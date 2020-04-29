@@ -2,13 +2,14 @@ package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -27,10 +28,10 @@ class BlockchainUpdaterMicroblockSunnyDayTest
     bob    <- accountGen
     ts     <- positiveIntGen
     fee    <- smallFeeGen
-    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-    masterToAlice: TransferTransaction <- wavesTransferGeneratorP(ts, master, alice)
-    aliceToBob  = createWavesTransfer(alice, bob, masterToAlice.amount - fee - 1, fee, ts).explicitGet()
-    aliceToBob2 = createWavesTransfer(alice, bob, masterToAlice.amount - fee - 1, fee, ts + 1).explicitGet()
+    genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+    masterToAlice: TransferTransaction <- wavesTransferGeneratorP(ts, master, alice.toAddress)
+    aliceToBob  = createWavesTransfer(alice, bob.toAddress, masterToAlice.amount - fee - 1, fee, ts).explicitGet()
+    aliceToBob2 = createWavesTransfer(alice, bob.toAddress, masterToAlice.amount - fee - 1, fee, ts + 1).explicitGet()
   } yield (genesis, masterToAlice, aliceToBob, aliceToBob2)
 
   property("all txs in different blocks: B0 <- B1 <- B2 <- B3!") {
@@ -132,7 +133,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest
       case (domain, (genesis, masterToAlice, aliceToBob, aliceToBob2)) =>
         val block0                 = buildBlockOfTxs(randomSig, Seq(genesis))
         val (block1, microBlocks1) = chainBaseAndMicro(block0.id(), masterToAlice, Seq(Seq(aliceToBob)))
-        val otherSigner            = KeyPair(Array.fill(KeyLength)(1: Byte))
+        val otherSigner            = KeyPair(ByteStr(Array.fill(KeyLength)(1: Byte)))
         val block2                 = customBuildBlockOfTxs(block0.id(), Seq(masterToAlice, aliceToBob2), otherSigner, 1, masterToAlice.timestamp, DefaultBaseTarget / 2)
         domain.blockchainUpdater.processBlock(block0).explicitGet()
         domain.blockchainUpdater.processBlock(block1).explicitGet()
@@ -161,7 +162,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest
           da.blockchainUpdater.processBlock(block2a).explicitGet()
           da.blockchainUpdater.processBlock(block3a).explicitGet()
 
-          da.balance(miner)
+          da.balance(miner.toAddress)
         }
 
         val minerBBalance = withDomain(MicroblocksActivatedAt0WavesSettings) { db =>
@@ -174,7 +175,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest
           db.blockchainUpdater.processBlock(block2b).explicitGet()
           db.blockchainUpdater.processBlock(block3b).explicitGet()
 
-          db.balance(miner)
+          db.balance(miner.toAddress)
         }
 
         minerABalance shouldBe minerBBalance

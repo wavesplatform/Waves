@@ -1,7 +1,6 @@
 package com.wavesplatform.api.grpc
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
@@ -50,7 +49,7 @@ trait PBImplicitConversions {
       header.featureVotes.map(shortToInt),
       header.timestamp,
       header.version,
-      ByteString.copyFrom(header.generator),
+      header.generator,
       header.rewardVote,
       ByteString.copyFrom(header.transactionsRoot.arr)
     )
@@ -66,9 +65,10 @@ trait PBImplicitConversions {
   }
 
   implicit class PBByteStringConversions(bytes: ByteString) {
-    def toByteStr          = ByteStr(bytes.toByteArray)
-    def toPublicKey        = PublicKey(bytes.toByteArray)
-    def toAddress: Address = PBRecipients.toAddress(this.toByteStr, AddressScheme.current.chainId).fold(ve => throw new IllegalArgumentException(ve.toString), identity)
+    def toByteStr   = ByteStr(bytes.toByteArray)
+    def toPublicKey = PublicKey(bytes.toByteArray)
+    def toAddress: Address =
+      PBRecipients.toAddress(bytes.toByteArray, AddressScheme.current.chainId).fold(ve => throw new IllegalArgumentException(ve.toString), identity)
   }
 
   implicit def vanillaByteStrToPBByteString(bs: ByteStr): ByteString = bs.toPBByteString

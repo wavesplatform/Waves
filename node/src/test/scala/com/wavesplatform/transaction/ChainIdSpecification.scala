@@ -107,7 +107,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             ts,
             ByteStr.empty,
             otherChainId
-          ).validatedEither.right.map(u => u.copy(signature = ByteStr(crypto.sign(sender.privateKey, u.bodyBytes())))).right.get
+          ).validatedEither.right.map(u => u.copy(signature = crypto.sign(sender.privateKey, u.bodyBytes()))).right.get
         )
     }
   }
@@ -194,7 +194,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
           BurnTransaction(
             TxVersion.V3,
             sender.publicKey,
-            IssuedAsset(bytes32gen.sample.get),
+            IssuedAsset(ByteStr(bytes32gen.sample.get)),
             amount,
             fee,
             ts,
@@ -242,7 +242,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
   property("ExchangeTransaction validation") {
     forAll(addressOrAliasWithVersion(ExchangeTransaction.supportedVersions)) {
       case (_, _, sender, amount, fee, ts) =>
-        val pair = AssetPair(Waves, IssuedAsset(bytes32gen.sample.get))
+        val pair = AssetPair(Waves, IssuedAsset(ByteStr(bytes32gen.sample.get)))
         validateFromOtherNetwork(
           ExchangeTransaction(
             TxVersion.V3,
@@ -290,7 +290,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
           LeaseCancelTransaction(
             TxVersion.V3,
             sender.publicKey,
-            bytes32gen.sample.get,
+            ByteStr(bytes32gen.sample.get),
             fee,
             ts,
             Proofs.empty,
@@ -326,7 +326,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
           ReissueTransaction(
             TxVersion.V3,
             sender.publicKey,
-            IssuedAsset(bytes32gen.sample.get),
+            IssuedAsset(ByteStr(bytes32gen.sample.get)),
             quantity,
             true,
             fee,
@@ -345,7 +345,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
           SetAssetScriptTransaction(
             TxVersion.V2,
             sender.publicKey,
-            IssuedAsset(bytes32gen.sample.get),
+            IssuedAsset(ByteStr(bytes32gen.sample.get)),
             Some(scriptGen.sample.get),
             fee,
             ts,
@@ -380,7 +380,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
           SponsorFeeTransaction(
             TxVersion.V2,
             sender.publicKey,
-            IssuedAsset(bytes32gen.sample.get),
+            IssuedAsset(ByteStr(bytes32gen.sample.get)),
             None,
             fee,
             ts,
@@ -398,7 +398,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
           UpdateAssetInfoTransaction(
             version,
             sender.publicKey,
-            IssuedAsset(bytes32gen.sample.get),
+            IssuedAsset(ByteStr(bytes32gen.sample.get)),
             "name",
             "description",
             fee,

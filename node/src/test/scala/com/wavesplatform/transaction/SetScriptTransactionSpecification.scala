@@ -17,7 +17,7 @@ class SetScriptTransactionSpecification extends GenericTransactionSpecification[
 
   def assertTxs(f: Transaction, second: SetScriptTransaction): Unit = f match {
     case first: SetScriptTransaction =>
-      first.sender.stringRepr shouldEqual second.sender.stringRepr
+      first.sender shouldEqual second.sender
       first.timestamp shouldEqual second.timestamp
       first.fee shouldEqual second.fee
       first.version shouldEqual second.version
@@ -66,8 +66,8 @@ class SetScriptTransactionSpecification extends GenericTransactionSpecification[
   property("SetScriptTransaction id doesn't depend on proof (spec)") {
     forAll(accountGen, proofsGen, proofsGen, contractOrExpr) {
       case (acc: KeyPair, proofs1, proofs2, script) =>
-        val tx1 = SetScriptTransaction.create(1.toByte, acc, Some(script), 1, 1, proofs1).explicitGet()
-        val tx2 = SetScriptTransaction.create(1.toByte, acc, Some(script), 1, 1, proofs2).explicitGet()
+        val tx1 = SetScriptTransaction.create(1.toByte, acc.publicKey, Some(script), 1, 1, proofs1).explicitGet()
+        val tx2 = SetScriptTransaction.create(1.toByte, acc.publicKey, Some(script), 1, 1, proofs2).explicitGet()
         tx1.id() shouldBe tx2.id()
     }
   }

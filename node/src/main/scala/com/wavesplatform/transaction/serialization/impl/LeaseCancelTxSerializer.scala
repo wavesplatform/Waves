@@ -4,6 +4,7 @@ import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.transaction.lease.LeaseCancelTransaction
@@ -19,7 +20,7 @@ object LeaseCancelTxSerializer {
 
   def bodyBytes(tx: LeaseCancelTransaction): Array[Byte] = {
     import tx._
-    val baseBytes = Bytes.concat(sender, Longs.toByteArray(fee), Longs.toByteArray(timestamp), leaseId)
+    val baseBytes = Bytes.concat(sender.arr, Longs.toByteArray(fee), Longs.toByteArray(timestamp), leaseId.arr)
 
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
@@ -30,7 +31,7 @@ object LeaseCancelTxSerializer {
 
   def toBytes(tx: LeaseCancelTransaction): Array[Byte] = {
     tx.version match {
-      case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), tx.proofs.toSignature)
+      case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), tx.proofs.toSignature.arr)
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
       case _            => PBTransactionSerializer.bytes(tx)
     }
@@ -42,7 +43,7 @@ object LeaseCancelTxSerializer {
       val fee       = buf.getLong
       val timestamp = buf.getLong
       val leaseId   = buf.getByteArray(crypto.DigestLength)
-      LeaseCancelTransaction(version, sender, leaseId, fee, timestamp, Nil, AddressScheme.current.chainId)
+      LeaseCancelTransaction(version, sender, ByteStr(leaseId), fee, timestamp, Nil, AddressScheme.current.chainId)
     }
 
     require(bytes.length > 2, "buffer underflow while parsing transaction")

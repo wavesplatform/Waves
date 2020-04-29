@@ -3,6 +3,7 @@ package com.wavesplatform.mining
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, SignedBlockHeader}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
@@ -77,7 +78,7 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
     (blockchainUpdater.activatedFeatures _).when().returning(Map.empty)
     (blockchainUpdater.approvedFeatures _).when().returning(Map.empty)
     (blockchainUpdater.continuationStates _).when().returning(Map.empty)
-    (blockchainUpdater.hitSource _).when(*).returns(Some(new Array[Byte](32)))
+    (blockchainUpdater.hitSource _).when(*).returns(Some(ByteStr(new Array[Byte](32))))
     (blockchainUpdater.bestLastBlockInfo _)
       .when(*)
       .returning(

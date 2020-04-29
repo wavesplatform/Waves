@@ -68,7 +68,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
       master    <- accountGen
       recipient <- accountGen
       genesisBlock = TestBlock
-        .create(ts, Seq(GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()))
+        .create(ts, Seq(GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()))
       b1 = TestBlock
         .create(
           ts + 10,
@@ -180,7 +180,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
           for {
             master    <- accountGen
             recipient <- accountGen
-            genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+            genesis = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
             transfers = Seq(
               createTransfer(master, recipient.toAddress, ts + 1),
               createTransfer(master, recipient.toAddress, ts + 2),

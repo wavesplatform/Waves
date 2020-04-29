@@ -139,7 +139,7 @@ object InvokeDiffsCommon {
             transferList.flatMap(_.assetId).map(IssuedAsset) ++
             reissueList.map(r => IssuedAsset(r.assetId)) ++
             burnList.map(b => IssuedAsset(b.assetId))
-        val totalScriptsInvoked = smartAssetInvocations.count(blockchain.hasAssetScript) + (if (blockchain.hasAccountScript(tx.sender)) 1 else 0)
+        val totalScriptsInvoked = smartAssetInvocations.count(blockchain.hasAssetScript) + (if (blockchain.hasAccountScript(tx.sender.toAddress)) 1 else 0)
         val minIssueFee         = issueList.count(i => !blockchain.isNFT(i)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
         val dAppInvocationFee   = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber
         val minWaves            = totalScriptsInvoked * ScriptExtraFee + dAppInvocationFee + minIssueFee
@@ -229,7 +229,7 @@ object InvokeDiffsCommon {
     if (blockchain.disallowSelfPayment && version >= V4)
       if (tx.payments.nonEmpty && tx.sender.toAddress == dAppAddress)
         ScriptExecutionError.dApp("DApp self-payment is forbidden since V4").asLeft[Unit]
-      else if (transfers.exists(_.recipient.bytes == dAppAddress.bytes))
+      else if (transfers.exists(_.recipient.bytes == ByteStr(dAppAddress.bytes)))
         ScriptExecutionError.dApp("DApp self-transfer is forbidden since V4").asLeft[Unit]
       else
         ().asRight[ScriptExecutionError]
@@ -281,7 +281,7 @@ object InvokeDiffsCommon {
       diffAcc match {
         case TracedResult(Right(curDiff), _) =>
           val blockchain   = CompositeBlockchain(sblockchain, Some(curDiff))
-          val actionSender = Recipient.Address(tx.dAppAddressOrAlias.bytes)
+          val actionSender = Recipient.Address(ByteStr(tx.dAppAddressOrAlias.bytes))
 
           def applyTransfer(transfer: AssetTransfer, pk: PublicKey): TracedResult[ValidationError, Diff] = {
             val AssetTransfer(addressRepr, amount, asset) = transfer
@@ -403,7 +403,7 @@ object InvokeDiffsCommon {
               applyTransfer(t, if (blockchain.isFeatureActivated(BlockV5)) {
                 pk
               } else {
-                PublicKey(ByteStr.empty)
+                PublicKey(Array.emptyByteArray)
               })
             case d: DataItem[_] => applyDataItem(d)
             case i: Issue       => applyIssue(tx, pk, i)
@@ -428,7 +428,7 @@ object InvokeDiffsCommon {
         blockchain,
         script,
         isAssetScript = true,
-        scriptContainerAddress = if (blockchain.passCorrectAssetId) assetId else tx.dAppAddressOrAlias.bytes
+        scriptContainerAddress = if (blockchain.passCorrectAssetId) assetId else ByteStr(tx.dAppAddressOrAlias.bytes)
       ) match {
         case (log, Left(error))  => Left(ScriptExecutionError.asset(error, log, FailedScriptError.Reason.AssetInAction))
         case (log, Right(FALSE)) => Left(TransactionNotAllowedByScript.asset(log, FailedScriptError.Reason.AssetInAction))

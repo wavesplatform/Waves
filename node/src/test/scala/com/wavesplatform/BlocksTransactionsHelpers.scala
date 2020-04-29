@@ -24,7 +24,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
 
     def transfer(
         from: KeyPair,
-        to: AddressOrAlias = accountGen.sample.get,
+        to: AddressOrAlias = accountGen.sample.get.toAddress,
         amount: Long = smallFeeGen.sample.get,
         timestamp: Gen[Long] = timestampGen
     ): Gen[Transaction] =
@@ -34,7 +34,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
 
     def transferV2(
         from: KeyPair,
-        to: AddressOrAlias = accountGen.sample.get,
+        to: AddressOrAlias = accountGen.sample.get.toAddress,
         amount: Long = smallFeeGen.sample.get,
         timestamp: Gen[Long] = timestampGen
     ): Gen[Transaction] =
@@ -45,7 +45,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     def transferAsset(
         asset: IssuedAsset,
         from: KeyPair,
-        to: AddressOrAlias = accountGen.sample.get,
+        to: AddressOrAlias = accountGen.sample.get.toAddress,
         amount: Long = smallFeeGen.sample.get,
         timestamp: Gen[Long] = timestampGen
     ): Gen[Transaction] =
@@ -55,7 +55,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
 
     def lease(
         from: KeyPair,
-        to: AddressOrAlias = accountGen.sample.get,
+        to: AddressOrAlias = accountGen.sample.get.toAddress,
         amount: Long = smallFeeGen.sample.get,
         timestamp: Gen[Long] = timestampGen
     ): Gen[LeaseTransaction] =
@@ -78,7 +78,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         timestamp <- timestamp
       } yield IssueTransaction(
         TxVersion.V1,
-        from,
+        from.publicKey,
         "test".utf8Bytes,
         Array.emptyByteArray,
         1,
@@ -87,7 +87,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         script = None,
         100000000L,
         timestamp
-      ).signWith(from)
+      ).signWith(from.privateKey)
 
     def setScript(from: KeyPair, script: Script, timestamp: Gen[Long] = timestampGen): Gen[SetScriptTransaction] =
       for {
@@ -135,9 +135,9 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         ts: Long
     ): (Block, MicroBlock) = {
       val newTotalBlock = unsafeBlock(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
-      val unsigned = new MicroBlock(version, signer, txs, prevTotal.id(), newTotalBlock.signature, ByteStr.empty)
-      val signature = crypto.sign(signer, unsigned.bytes())
-      val signed    = unsigned.copy(signature = ByteStr(signature))
+      val unsigned      = new MicroBlock(version, signer.publicKey, txs, prevTotal.id(), newTotalBlock.signature, ByteStr.empty)
+      val signature     = crypto.sign(signer.privateKey, unsigned.bytes())
+      val signed        = unsigned.copy(signature = signature)
       (newTotalBlock, signed)
     }
 
@@ -155,7 +155,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         reference = reference,
         baseTarget = bTarget,
         generationSignature = com.wavesplatform.history.generationSignature,
-        generator = signer,
+        generator = signer.publicKey,
         featureVotes = Seq.empty,
         rewardVote = -1L,
         transactionData = txs
@@ -163,7 +163,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
       val toSign =
         if (version < Block.ProtoBlockVersion) unsigned.bytes()
         else PBBlocks.protobuf(unsigned).header.get.toByteArray
-      unsigned.copy(signature = ByteStr(crypto.sign(signer, toSign)))
+      unsigned.copy(signature = crypto.sign(signer.privateKey, toSign))
     }
   }
 }

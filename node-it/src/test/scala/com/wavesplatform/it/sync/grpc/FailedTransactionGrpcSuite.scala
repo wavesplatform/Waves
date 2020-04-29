@@ -45,7 +45,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
   protected override def beforeAll(): Unit = {
     super.beforeAll()
 
-    sender.broadcastTransfer(sender.privateKey, Recipient().withPublicKeyHash(contractAddr), 100.waves, minFee, waitForTx = true)
+    sender.broadcastTransfer(sender.keyPair, Recipient().withPublicKeyHash(contractAddr), 100.waves, minFee, waitForTx = true)
 
     smartAsset = PBTransactions
       .vanillaUnsafe(

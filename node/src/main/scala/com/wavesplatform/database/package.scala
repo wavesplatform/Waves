@@ -321,14 +321,14 @@ package object database extends ScorexLogging {
   def writeBlockMeta(data: BlockMeta): Array[Byte] =
     pb.BlockMeta(
         Some(PBBlocks.protobuf(data.header)),
-        ByteString.copyFrom(data.signature),
-        data.headerHash.fold(ByteString.EMPTY)(hh => ByteString.copyFrom(hh)),
+        ByteString.copyFrom(data.signature.arr),
+        data.headerHash.fold(ByteString.EMPTY)(hh => ByteString.copyFrom(hh.arr)),
         data.height,
         data.size,
         data.transactionCount,
         data.totalFeeInWaves,
         data.reward.getOrElse(-1L),
-        data.vrf.fold(ByteString.EMPTY)(vrf => ByteString.copyFrom(vrf))
+        data.vrf.fold(ByteString.EMPTY)(vrf => ByteString.copyFrom(vrf.arr))
       )
       .toByteArray
 
@@ -488,7 +488,7 @@ package object database extends ScorexLogging {
     pb.AccountScriptInfo.toByteArray(
       pb.AccountScriptInfo(
         ByteString.copyFrom(scriptInfo.publicKey.arr),
-        ByteString.copyFrom(scriptInfo.script.bytes()),
+        ByteString.copyFrom(scriptInfo.script.bytes().arr),
         scriptInfo.verifierComplexity,
         scriptInfo.complexitiesByEstimator.map {
           case (version, complexities) =>

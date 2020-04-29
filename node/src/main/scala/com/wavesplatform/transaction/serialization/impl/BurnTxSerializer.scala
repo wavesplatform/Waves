@@ -23,7 +23,7 @@ object BurnTxSerializer {
   def bodyBytes(tx: BurnTransaction): Coeval[Array[Byte]] = Coeval.evalOnce {
     import tx._
     lazy val baseBytes = Bytes.concat(
-      sender,
+      sender.arr,
       asset.id.arr,
       Longs.toByteArray(quantity),
       Longs.toByteArray(fee),
@@ -38,7 +38,7 @@ object BurnTxSerializer {
   }
 
   def toBytes(tx: BurnTransaction): Coeval[Array[Byte]] = tx.version match {
-    case TxVersion.V1 => tx.bodyBytes.map(bb => Bytes.concat(bb, tx.proofs.toSignature))
+    case TxVersion.V1 => tx.bodyBytes.map(bb => Bytes.concat(bb, tx.proofs.toSignature.arr))
     case TxVersion.V2 => tx.bodyBytes.map(bb => Bytes.concat(Array(0: Byte), bb, tx.proofs.bytes()))
     case _            => Coeval.evalOnce(PBTransactionSerializer.bytes(tx))
   }

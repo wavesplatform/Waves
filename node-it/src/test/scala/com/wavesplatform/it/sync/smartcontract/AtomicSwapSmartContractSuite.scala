@@ -143,7 +143,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val unsigned =
       TransferTransaction(
         version = 2.toByte,
-        sender = pkByAddress(swapBC1),
+        sender = pkByAddress(swapBC1).publicKey,
         recipient = AddressOrAlias.fromString(BobBC1).explicitGet(),
         assetId = Waves,
         amount = transferAmount,
@@ -156,7 +156,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
       )
 
     val proof    = ByteStr(secretText.getBytes("UTF-8"))
-    val sigAlice = ByteStr(crypto.sign(AlicesPK, unsigned.bodyBytes()))
+    val sigAlice = crypto.sign(AlicesPK.privateKey, unsigned.bodyBytes())
     val signed   = unsigned.copy(proofs = Proofs(Seq(proof, sigAlice)))
 
     nodes.waitForHeightArise()

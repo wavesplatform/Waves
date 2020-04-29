@@ -3,7 +3,6 @@ package com.wavesplatform.generator.utils
 import java.util.concurrent.ThreadLocalRandom
 
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.utils.Implicits._
 import com.wavesplatform.lang.script.Script
@@ -58,7 +57,7 @@ object Gen {
 
     val src =
       s"""
-         |let oracle = Address(base58'${oracle.stringRepr}')
+         |let oracle = Address(base58'${oracle.toAddress}')
          |
          |match tx {
          |  case _: SetScriptTransaction => true
@@ -76,7 +75,7 @@ object Gen {
     val keyLets =
       accountsWithIndexes map {
         case (acc, i) =>
-          s"let accountPK$i = base58'${ByteStr(acc.publicKey).toString}'"
+          s"let accountPK$i = base58'${acc.publicKey}'"
       } mkString "\n"
 
     val signedLets =

@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs.invoke
 import cats.kernel.Monoid
 import cats.syntax.either._
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.FunctionCallPolicyProvider._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.directives.DirectiveSet
@@ -81,19 +82,19 @@ object InvokeScriptTransactionDiff {
             )
           }
 
-          verifierComplexity = blockchain.accountScript(tx.sender).map(_.verifierComplexity).getOrElse(0L)
+          verifierComplexity = blockchain.accountScript(tx.sender.toAddress).map(_.verifierComplexity).getOrElse(0L)
 
           result <- if (!skipExecution) {
             for {
               scriptResult <- {
                 val scriptResultE = stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
-                  val invoker = tx.sender.toAddress.bytes
+                  val invoker = tx.sender.toAddress
                   val invocation = ContractEvaluator.Invocation(
                     functionCall,
-                    Recipient.Address(invoker),
+                    Recipient.Address(ByteStr(invoker.bytes)),
                     tx.sender,
                     payments,
-                    tx.dAppAddressOrAlias.bytes,
+                    ByteStr(tx.dAppAddressOrAlias.bytes),
                     tx.id.value,
                     tx.fee,
                     tx.feeAssetId.compatId
@@ -103,7 +104,7 @@ object InvokeScriptTransactionDiff {
                     Coeval.evalOnce(input),
                     Coeval(blockchain.height),
                     blockchain,
-                    Coeval(tx.dAppAddressOrAlias.bytes),
+                    Coeval(ByteStr(tx.dAppAddressOrAlias.bytes)),
                     directives,
                     tx.id()
                   )

@@ -27,7 +27,15 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
   (wallet.privateKeyAccount _).when(senderPrivateKey.toAddress).onCall((_: Address) => Right(senderPrivateKey)).anyNumberOfTimes()
 
   "/transfer" - {
-    val route: Route = AssetsApiRoute(restAPISettings, wallet, DummyUtxPoolSynchronizer.accepting, state, new TestTime(), mock[CommonAccountsApi], mock[CommonAssetsApi]).route
+    val route: Route = AssetsApiRoute(
+      restAPISettings,
+      wallet,
+      DummyUtxPoolSynchronizer.accepting,
+      state,
+      new TestTime(),
+      mock[CommonAccountsApi],
+      mock[CommonAssetsApi]
+    ).route
 
     def posting[A: Writes](v: A): RouteTestResult = Post(routePath("/transfer"), v).addHeader(ApiKeyHeader) ~> route
 
@@ -37,9 +45,9 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
         feeAssetId = None,
         amount = 1 * Waves,
         fee = Waves / 3,
-        sender = senderPrivateKey.stringRepr,
+        sender = senderPrivateKey.toAddress.toString,
         attachment = Some("attachment"),
-        recipient = receiverPrivateKey.stringRepr,
+        recipient = receiverPrivateKey.toAddress.toString,
         timestamp = Some(System.currentTimeMillis())
       )
 
@@ -56,9 +64,9 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
         amount = 1 * Waves,
         feeAssetId = None,
         fee = Waves / 3,
-        sender = senderPrivateKey.stringRepr,
+        sender = senderPrivateKey.toAddress.toString,
         attachment = None,
-        recipient = receiverPrivateKey.stringRepr,
+        recipient = receiverPrivateKey.toAddress.toString,
         timestamp = Some(System.currentTimeMillis())
       )
 

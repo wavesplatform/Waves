@@ -18,8 +18,8 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
       master    <- accountGen
       recipient <- accountGen
       ts        <- positiveIntGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      payments <- Gen.listOfN(paymentsAmt, wavesTransferGeneratorP(ts, master, recipient))
+      genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+      payments <- Gen.listOfN(paymentsAmt, wavesTransferGeneratorP(ts, master, recipient.toAddress))
     } yield (genesis, payments)
 
   property("can apply valid blocks") {

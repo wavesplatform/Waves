@@ -17,27 +17,9 @@ import scorex.crypto.encode.{Base58 => ScorexBase58}
 class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
 
   private def parse(x: String): EXPR = Parser.parseExpr(x) match {
-    case Success(r, _)            => r
-    case e: Failure[Char, String] => catchParseError(x, e)
+    case Success(r, _)    => r
+    case Failure(_, _, _) => throw new TestFailedException("Test failed", 0)
   }
-
-  private def catchParseError(x: String, e: Failure[Char, String]): Nothing = {
-    import e.{index => i}
-    println(s"val code1 = new String(Array[Byte](${x.getBytes("UTF-8").mkString(",")}))")
-    println(s"""val code2 = "${escapedCode(x)}"""")
-    println(s"Can't parse (len=${x.length}): <START>\n$x\n<END>\nError: $e\nPosition ($i): '${x.slice(i, i + 1)}'\nTraced:\n${e.extra.traced.fullStack
-      .mkString("\n")}")
-    throw new TestFailedException("Test failed", 0)
-  }
-
-  private def escapedCode(s: String): String =
-    s.flatMap {
-      case '"'  => "\\\""
-      case '\n' => "\\n"
-      case '\r' => "\\r"
-      case '\t' => "\\t"
-      case x    => x.toChar.toString
-    }.mkString
 
   private def cleanOffsets(l: LET): LET =
     l.copy(Pos(0, 0), name = cleanOffsets(l.name), value = cleanOffsets(l.value), types = l.types.map(cleanOffsets(_)))
@@ -48,17 +30,17 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
   }
 
   private def cleanOffsets(expr: EXPR): EXPR = expr match {
-    case x: CONST_LONG                       => x.copy(position = Pos(0, 0))
-    case x: REF                              => x.copy(position = Pos(0, 0), key = cleanOffsets(x.key))
-    case x: CONST_STRING                     => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
-    case x: CONST_BYTESTR                    => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
-    case x: TRUE                             => x.copy(position = Pos(0, 0))
-    case x: FALSE                            => x.copy(position = Pos(0, 0))
-    case x: BINARY_OP                        => x.copy(position = Pos(0, 0), a = cleanOffsets(x.a), b = cleanOffsets(x.b))
-    case x: IF                               => x.copy(position = Pos(0, 0), cond = cleanOffsets(x.cond), ifTrue = cleanOffsets(x.ifTrue), ifFalse = cleanOffsets(x.ifFalse))
+    case x: CONST_LONG                             => x.copy(position = Pos(0, 0))
+    case x: REF                                    => x.copy(position = Pos(0, 0), key = cleanOffsets(x.key))
+    case x: CONST_STRING                           => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
+    case x: CONST_BYTESTR                          => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
+    case x: TRUE                                   => x.copy(position = Pos(0, 0))
+    case x: FALSE                                  => x.copy(position = Pos(0, 0))
+    case x: BINARY_OP                              => x.copy(position = Pos(0, 0), a = cleanOffsets(x.a), b = cleanOffsets(x.b))
+    case x: IF                                     => x.copy(position = Pos(0, 0), cond = cleanOffsets(x.cond), ifTrue = cleanOffsets(x.ifTrue), ifFalse = cleanOffsets(x.ifFalse))
     case x @ BLOCK(_, l: Expressions.LET, _, _, _) => x.copy(position = Pos(0, 0), let = cleanOffsets(l), body = cleanOffsets(x.body))
-    case x: FUNCTION_CALL                    => x.copy(position = Pos(0, 0), name = cleanOffsets(x.name), args = x.args.map(cleanOffsets(_)))
-    case _                                   => throw new NotImplementedError(s"toString for ${expr.getClass.getSimpleName}")
+    case x: FUNCTION_CALL                          => x.copy(position = Pos(0, 0), name = cleanOffsets(x.name), args = x.args.map(cleanOffsets(_)))
+    case _                                         => throw new NotImplementedError(s"toString for ${expr.getClass.getSimpleName}")
   }
 
   private def genElementCheck(gen: Gen[EXPR]): Unit = {
@@ -166,8 +148,16 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
 
   property("valid non-empty base16 definition") {
     parse("base16'0123456789abcdef123456789ABCDEF0ABCDEFfabcde'") shouldBe
-        CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr(Array[Short](
-          0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0xAB, 0xCD, 0xEF, 0xfa, 0xbc, 0xde).map(_.toByte))))
+      CONST_BYTESTR(
+        AnyPos,
+        PART.VALID(
+          AnyPos,
+          ByteStr(
+            Array[Short](0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0xAB, 0xCD, 0xEF, 0xfa, 0xbc,
+              0xde).map(_.toByte)
+          )
+        )
+      )
   }
 
   property("invalid base16 definition") {
@@ -256,10 +246,12 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
         |c""".stripMargin
     parse(s) shouldBe BLOCK(
       AnyPos,
-      FUNC(AnyPos,
-           PART.VALID(AnyPos, "q"),
-           Seq((PART.VALID(AnyPos, "x"), Seq((PART.VALID(AnyPos, "Int"), None), (PART.VALID(AnyPos, "String"), None)))),
-           CONST_LONG(AnyPos, 42)),
+      FUNC(
+        AnyPos,
+        PART.VALID(AnyPos, "q"),
+        Seq((PART.VALID(AnyPos, "x"), Seq((PART.VALID(AnyPos, "Int"), None), (PART.VALID(AnyPos, "String"), None)))),
+        CONST_LONG(AnyPos, 42)
+      ),
       REF(AnyPos, PART.VALID(AnyPos, "c"))
     )
   }
@@ -397,10 +389,12 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
     val script = "then + 1"
     parse(script) shouldBe BINARY_OP(
       AnyPos,
-      IF(AnyPos,
-         INVALID(AnyPos, "expected a condition"),
-         INVALID(AnyPos, "expected a true branch's expression"),
-         INVALID(AnyPos, "expected a false branch")),
+      IF(
+        AnyPos,
+        INVALID(AnyPos, "expected a condition"),
+        INVALID(AnyPos, "expected a true branch's expression"),
+        INVALID(AnyPos, "expected a false branch")
+      ),
       BinaryOperation.SUM_OP,
       CONST_LONG(AnyPos, 1)
     )
@@ -410,10 +404,12 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
     val script = "else + 1"
     parse(script) shouldBe BINARY_OP(
       AnyPos,
-      IF(AnyPos,
-         INVALID(AnyPos, "expected a condition"),
-         INVALID(AnyPos, "expected a true branch"),
-         INVALID(AnyPos, "expected a false branch's expression")),
+      IF(
+        AnyPos,
+        INVALID(AnyPos, "expected a condition"),
+        INVALID(AnyPos, "expected a true branch"),
+        INVALID(AnyPos, "expected a false branch's expression")
+      ),
       BinaryOperation.SUM_OP,
       CONST_LONG(AnyPos, 1)
     )
@@ -582,7 +578,11 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
     val encodedText = ScorexBase58.encode(text.getBytes("UTF-8"))
 
     parse(s"sha256(base58'$encodedText')".stripMargin) shouldBe
-      FUNCTION_CALL(Pos(0, 96), PART.VALID(Pos(0, 6), "sha256"), List(CONST_BYTESTR(Pos(7, 95), PART.VALID(Pos(15, 94), ByteStr(text.getBytes("UTF-8"))))))
+      FUNCTION_CALL(
+        Pos(0, 96),
+        PART.VALID(Pos(0, 6), "sha256"),
+        List(CONST_BYTESTR(Pos(7, 95), PART.VALID(Pos(15, 94), ByteStr(text.getBytes("UTF-8")))))
+      )
   }
 
   property("crypto functions: blake2b256") {
@@ -1262,33 +1262,45 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
   }
 
   property("operations priority") {
-    parse("a-b+c") shouldBe BINARY_OP(AnyPos,
-                                      BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "a")), SUB_OP, REF(AnyPos, PART.VALID(AnyPos, "b"))),
-                                      SUM_OP,
-                                      REF(AnyPos, PART.VALID(AnyPos, "c")))
-    parse("a+b-c") shouldBe BINARY_OP(AnyPos,
-                                      BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "a")), SUM_OP, REF(AnyPos, PART.VALID(AnyPos, "b"))),
-                                      SUB_OP,
-                                      REF(AnyPos, PART.VALID(AnyPos, "c")))
-    parse("a+b*c") shouldBe BINARY_OP(AnyPos,
-                                      REF(AnyPos, PART.VALID(AnyPos, "a")),
-                                      SUM_OP,
-                                      BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "b")), MUL_OP, REF(AnyPos, PART.VALID(AnyPos, "c"))))
-    parse("a*b-c") shouldBe BINARY_OP(AnyPos,
-                                      BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "a")), MUL_OP, REF(AnyPos, PART.VALID(AnyPos, "b"))),
-                                      SUB_OP,
-                                      REF(AnyPos, PART.VALID(AnyPos, "c")))
-    parse("a/b*c") shouldBe BINARY_OP(AnyPos,
-                                      BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "a")), DIV_OP, REF(AnyPos, PART.VALID(AnyPos, "b"))),
-                                      MUL_OP,
-                                      REF(AnyPos, PART.VALID(AnyPos, "c")))
+    parse("a-b+c") shouldBe BINARY_OP(
+      AnyPos,
+      BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "a")), SUB_OP, REF(AnyPos, PART.VALID(AnyPos, "b"))),
+      SUM_OP,
+      REF(AnyPos, PART.VALID(AnyPos, "c"))
+    )
+    parse("a+b-c") shouldBe BINARY_OP(
+      AnyPos,
+      BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "a")), SUM_OP, REF(AnyPos, PART.VALID(AnyPos, "b"))),
+      SUB_OP,
+      REF(AnyPos, PART.VALID(AnyPos, "c"))
+    )
+    parse("a+b*c") shouldBe BINARY_OP(
+      AnyPos,
+      REF(AnyPos, PART.VALID(AnyPos, "a")),
+      SUM_OP,
+      BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "b")), MUL_OP, REF(AnyPos, PART.VALID(AnyPos, "c")))
+    )
+    parse("a*b-c") shouldBe BINARY_OP(
+      AnyPos,
+      BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "a")), MUL_OP, REF(AnyPos, PART.VALID(AnyPos, "b"))),
+      SUB_OP,
+      REF(AnyPos, PART.VALID(AnyPos, "c"))
+    )
+    parse("a/b*c") shouldBe BINARY_OP(
+      AnyPos,
+      BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "a")), DIV_OP, REF(AnyPos, PART.VALID(AnyPos, "b"))),
+      MUL_OP,
+      REF(AnyPos, PART.VALID(AnyPos, "c"))
+    )
 
     parse("a<b==c>=d") shouldBe BINARY_OP(
       AnyPos,
-      BINARY_OP(AnyPos,
-                BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "b")), EQ_OP, REF(AnyPos, PART.VALID(AnyPos, "c"))),
-                LT_OP,
-                REF(AnyPos, PART.VALID(AnyPos, "a"))),
+      BINARY_OP(
+        AnyPos,
+        BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "b")), EQ_OP, REF(AnyPos, PART.VALID(AnyPos, "c"))),
+        LT_OP,
+        REF(AnyPos, PART.VALID(AnyPos, "a"))
+      ),
       GE_OP,
       REF(AnyPos, PART.VALID(AnyPos, "d"))
     )

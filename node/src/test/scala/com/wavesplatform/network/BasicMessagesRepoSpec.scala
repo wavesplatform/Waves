@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream
 
 import com.google.protobuf.{ByteString, CodedOutputStream, WireFormat}
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.mining.MiningConstraints
 import com.wavesplatform.protobuf.block._
 import com.wavesplatform.protobuf.transaction._
@@ -79,7 +80,7 @@ class BasicMessagesRepoSpec extends FreeSpec with Matchers with TransactionGen {
         PBTransaction(
           Byte.MaxValue,
           ByteString.copyFrom(bytes32gen.sample.get),
-          Some(PBAmounts.fromAssetAndAmount(IssuedAsset(bytes32gen.sample.get), Long.MaxValue)),
+          Some(PBAmounts.fromAssetAndAmount(IssuedAsset(ByteStr(bytes32gen.sample.get)), Long.MaxValue)),
           Long.MaxValue,
           Byte.MaxValue
         )
