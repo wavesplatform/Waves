@@ -3,9 +3,10 @@ package com.wavesplatform.state.diffs.invoke
 import cats.Id
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, DApp}
-import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal}
+import com.wavesplatform.lang.v1.evaluator.ctx.LazyVal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, ScriptResultV3, ScriptResultV4}
@@ -52,7 +53,7 @@ object ContinuationTransactionDiff {
         Coeval.evalOnce(input),
         Coeval(invokeHeight),
         blockchain,
-        Coeval(dAppAddress.bytes),
+        Coeval(ByteStr(dAppAddress.bytes)),
         directives,
         tx.invokeScriptTransactionId
       )
@@ -73,7 +74,7 @@ object ContinuationTransactionDiff {
 
       feeInfo <- TracedResult(InvokeDiffsCommon.calcFee(blockchain, invokeScriptTransaction))
 
-      verifierComplexity = blockchain.accountScript(invokeScriptTransaction.sender).map(_.verifierComplexity).getOrElse(0L)
+      verifierComplexity = blockchain.accountScript(invokeScriptTransaction.sender.toAddress).map(_.verifierComplexity).getOrElse(0L)
 
       doProcessActions = InvokeDiffsCommon.processActions(
         _,

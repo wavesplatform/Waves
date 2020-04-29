@@ -255,7 +255,7 @@ package object database extends ScorexLogging {
     output.writeInt(unfinished.size)
     unfinished.foreach {
       case (invokeTxId, expr) =>
-        output.writeByte(invokeTxId.length)
+        output.writeByte(invokeTxId.size)
         output.writeByteStr(invokeTxId)
 
         val exprBytes = Serde.serialize(expr, allowObjects = true)

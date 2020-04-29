@@ -297,7 +297,7 @@ object PBTransactions {
         Serde
           .deserialize(expr.toByteArray, allowObjects = true)
           .bimap(
-            GenericError(_), { case (expr, _) => ContinuationTransaction(expr, invokeTransactionId, timestamp) }
+            GenericError(_), { case (expr, _) => ContinuationTransaction(expr, invokeTransactionId.toByteStr, timestamp) }
           )
 
       case _ =>
@@ -613,8 +613,8 @@ object PBTransactions {
       case tx @ vt.smart.ContinuationTransaction(expr, invokeScriptTransactionId, _) =>
         val exprBytes = ByteString.copyFrom(Serde.serialize(expr, allowObjects = true))
         val data =
-          Data.Continuation(ContinuationTransactionData(invokeScriptTransactionId, exprBytes))
-        PBTransactions.create(chainId = tx.chainId, timestamp = tx.timestamp, version = tx.version, data = data)
+          Data.Continuation(ContinuationTransactionData(invokeScriptTransactionId.toByteString, exprBytes))
+        PBTransactions.create(sender = PublicKey(ByteStr.empty), chainId = tx.chainId, timestamp = tx.timestamp, version = tx.version, data = data)
 
       case _ =>
         throw new IllegalArgumentException(s"Unsupported transaction: $tx")
