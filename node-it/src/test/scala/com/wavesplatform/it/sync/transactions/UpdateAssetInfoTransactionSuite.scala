@@ -135,7 +135,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   }
 
   test("able to update asset info after rollback to update height") {
-    nodes.rollback(secondUpdateInfoHeight - 1, returnToUTX = false)
+    nodes.blackListAndRollback(secondUpdateInfoHeight - 1, returnToUTX = false)
     sender.assetsDetails(otherAssetId).name shouldBe "otherAsset"
     sender.assetsDetails(otherAssetId).description shouldBe "otherDescription"
 
@@ -143,14 +143,14 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   }
 
   test("able to update asset info after rollback to issue height") {
-    val assetId                                       = sender.broadcastIssue(issuer, "asset", "description", 1, 0, false, script = None, waitForTx = true).id
+    val assetId                                       = sender.broadcastIssue(issuer, "asset", "description", 1, 0, reissuable = false, script = None, waitForTx = true).id
     val issueHeight                                   = sender.transactionInfo[TransactionInfo](assetId).height
     val (firstUpdatedName, firstUpdatedDescription)   = ("updatedName", "updatedDescription")
     val (secondUpdatedName, secondUpdatedDescription) = ("updatedName2", "updatedDescription2")
 
     sender.waitForHeight(sender.height + updateInterval + 1, 3.minutes)
     sender.updateAssetInfo(issuer, assetId, firstUpdatedName, firstUpdatedDescription, waitForTx = true)._1.id
-    nodes.rollback(issueHeight - 1, returnToUTX = true)
+    nodes.blackListAndRollback(issueHeight - 1, returnToUTX = true)
 
     sender.waitForTransaction(assetId)
     val newIssueHeight = sender.transactionInfo[TransactionInfo](assetId).height

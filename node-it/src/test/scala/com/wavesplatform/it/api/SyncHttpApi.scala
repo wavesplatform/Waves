@@ -626,6 +626,9 @@ object SyncHttpApi extends Assertions {
     def blacklist(address: InetSocketAddress): Unit =
       sync(async(n).blacklist(address))
 
+    def clearBlackList(): Unit =
+      sync(async(n).clearBlackList())
+
     def debugMinerInfo(): Seq[State] =
       sync(async(n).debugMinerInfo())
 
@@ -800,6 +803,17 @@ object SyncHttpApi extends Assertions {
         },
         ConditionAwaitTime
       )
+    }
+
+    def blackListAndRollback(height: Int, returnToUTX: Boolean = true): Unit = {
+      nodes.foreach( n =>
+        nodes.filter(_ != n).foreach(n2 => n.blacklist(n2.networkAddress)))
+
+      nodes.rollback(height, returnToUTX)
+
+      nodes.foreach(n => n.clearBlackList())
+      nodes.foreach(n =>
+        nodes.filter(_ != n).foreach(n2 => n.connect(n2.networkAddress)))
     }
 
     def rollbackToBlockId(id: String): Unit = {

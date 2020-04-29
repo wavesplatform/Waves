@@ -51,7 +51,7 @@ class RollbackSuite
     val stateHeight = sender.height
     val stateAfterFirstTry = nodes.head.debugStateAt(stateHeight)
 
-    nodes.rollback(startHeight)
+    nodes.blackListAndRollback(startHeight)
 
     nodes.waitFor[Int]("empty utx")(1.second)(_.utxSize, _.forall(_ == 0))
 
@@ -80,7 +80,7 @@ class RollbackSuite
 
     sender.debugStateAt(sender.height).size shouldBe stateBeforeApply.size + 190
 
-    nodes.rollback(startHeight, returnToUTX = false)
+    nodes.blackListAndRollback(startHeight, returnToUTX = false)
 
     nodes.waitFor[Int]("empty utx")(1.second)(_.utxSize, _.forall(_ == 0))
 
@@ -102,7 +102,8 @@ class RollbackSuite
 
     val txHeight = sender.waitForTransaction(aliasTxId).height
 
-    nodes.rollback(txHeight - 1, returnToUTX = false)
+
+    nodes.blackListAndRollback(txHeight - 1, returnToUTX = false)
     nodes.waitForHeight(txHeight + 1)
 
     val secondAliasTxId = sender.createAlias(firstAddress, alias, transferAmount).id
@@ -130,14 +131,14 @@ class RollbackSuite
     val data2 = sender.getData(firstAddress)
     assert(data2 == List(entry3, entry2))
 
-    nodes.rollback(tx1height, returnToUTX = false)
+    nodes.blackListAndRollback(tx1height, returnToUTX = false)
     nodes.waitForSameBlockHeadersAt(tx1height)
 
     val data1 = node.getData(firstAddress)
     assert(data1 == List(entry1))
     sender.transactionsByAddress(firstAddress, 10) should contain theSameElementsAs txsBefore1
 
-    nodes.rollback(tx1height - 1, returnToUTX = false)
+    nodes.blackListAndRollback(tx1height - 1, returnToUTX = false)
     nodes.waitForSameBlockHeadersAt(tx1height - 1)
 
     val data0 = node.getData(firstAddress)
@@ -166,7 +167,7 @@ class RollbackSuite
     val sponsorSecondId = sender.sponsorAsset(sender.address, sponsorAssetId, baseFee = 2 * 100L, fee = issueFee).id
     nodes.waitForHeightAriseAndTxPresent(sponsorSecondId)
 
-    nodes.rollback(height, returnToUTX = false)
+    nodes.blackListAndRollback(height, returnToUTX = false)
 
     nodes.waitForHeightArise()
 
@@ -207,11 +208,7 @@ class RollbackSuite
     nodes.waitForHeightAriseAndTxPresent(tx)
 
     //as rollback is too fast, we should blacklist nodes from each other before rollback
-    sender.blacklist(miner.networkAddress)
-    miner.blacklist(sender.networkAddress)
-    nodes.rollback(height)
-    sender.connect(miner.networkAddress)
-    miner.connect(sender.networkAddress)
+    nodes.blackListAndRollback(height)
 
     nodes.waitForSameBlockHeadersAt(height)
 

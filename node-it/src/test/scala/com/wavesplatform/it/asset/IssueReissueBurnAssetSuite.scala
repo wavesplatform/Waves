@@ -290,14 +290,15 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
         case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, None)) if issue.name == simpleReissuableAsset.name =>
       }
 
-      val height = nodes.waitForHeightArise()
+      val height = sender.height
       nodes.waitForHeightArise()
       invokeScript(acc, "reissueIssueAndNft", assetId = asset, fee = invocationCost(1))
       burn(acc, CallableMethod, simpleAsset, 5000)
       burn(acc, TransactionMethod, asset, 10000)
       nodes.waitForHeightArise()
 
-      nodes.rollback(height, returnToUTX = false)
+      nodes.blackListAndRollback(height, returnToUTX = false)
+
       assertQuantity(asset)(simpleReissuableAsset.quantity)
       sender.assertAssetBalance(acc, asset, simpleReissuableAsset.quantity)
       sender.assertAssetBalance(acc, simpleAsset, simpleReissuableAsset.quantity)
@@ -388,7 +389,6 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
         payment = payments
       )
 
-    if (wait) nodes.waitForTransaction(tx._1.id)
     tx._1
   }
 

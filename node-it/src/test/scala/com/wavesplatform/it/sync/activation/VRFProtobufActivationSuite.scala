@@ -36,9 +36,9 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   protected override def beforeAll(): Unit = {
     super.beforeAll()
     val (defaultName, defaultDescription) = ("asset", "description")
-    assetId = sender.broadcastIssue(senderAcc, defaultName, defaultDescription, someAssetAmount, 8, true, script = None, waitForTx = true).id
+    assetId = sender.broadcastIssue(senderAcc, defaultName, defaultDescription, someAssetAmount, 8, reissuable = true, script = None, waitForTx = true).id
     sender.waitForHeight(7, 3.minutes)
-    otherAssetId = sender.broadcastIssue(senderAcc, defaultName, defaultDescription, someAssetAmount, 8, true, script = None, waitForTx = true).id
+    otherAssetId = sender.broadcastIssue(senderAcc, defaultName, defaultDescription, someAssetAmount, 8, reissuable = true, script = None, waitForTx = true).id
   }
 
   test("miner generates block v4 before activation") {
@@ -178,7 +178,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
 
   test("rollback to height before activation/at activation/after activation height") {
     //rollback to activation height
-    nodes.rollback(activationHeight, returnToUTX = true)
+    nodes.blackListAndRollback(activationHeight, returnToUTX = true)
 
     val blockAtActivationHeight1 = sender.blockAt(activationHeight)
     blockAtActivationHeight1.version.get shouldBe Block.ProtoBlockVersion
@@ -192,7 +192,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     returnedTxIds.foreach(sender.waitForTransaction(_, timeout = 8 minutes))
 
     //rollback to height one block before activation height
-    nodes.rollback(activationHeight - 1, returnToUTX = false)
+    nodes.blackListAndRollback(activationHeight - 1, returnToUTX = false)
 
     val blockBeforeActivationHeight = sender.blockAt(activationHeight - 1)
     blockBeforeActivationHeight.version.get shouldBe Block.RewardBlockVersion
