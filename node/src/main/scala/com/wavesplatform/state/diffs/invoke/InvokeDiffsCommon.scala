@@ -403,7 +403,7 @@ object InvokeDiffsCommon {
               applyTransfer(t, if (blockchain.isFeatureActivated(BlockV5)) {
                 pk
               } else {
-                PublicKey(Array.emptyByteArray)
+                PublicKey(new Array[Byte](32))
               })
             case d: DataItem[_] => applyDataItem(d)
             case i: Issue       => applyIssue(tx, pk, i)
