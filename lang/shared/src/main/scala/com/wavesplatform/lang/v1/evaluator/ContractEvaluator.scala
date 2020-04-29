@@ -110,7 +110,7 @@ object ContractEvaluator {
       version: StdLibVersion,
       transactionId: ByteStr
   ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] = {
-    val exprWithLets = freezingLets.toStream.foldLeft(expr.deepCopy) {
+    val exprWithLets = freezingLets.toStream.foldLeft(expr) {
       case (buildingExpr, (letName, letValue)) =>
         BLOCK(LET(letName, letValue.value.value.explicitGet()), buildingExpr)
     }

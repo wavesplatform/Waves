@@ -18,8 +18,8 @@ class EvaluatorV2(
 ) {
 
   def apply(expr: EXPR, limit: Int): (EXPR, Int) = {
-    var ref    = expr
-    val unused = root(expr, v => Eval.later { ref = v }, limit, Nil).value
+    var ref    = expr.deepCopy
+    val unused = root(ref, v => Eval.later { ref = v }, limit, Nil).value
     (ref, unused)
   }
 

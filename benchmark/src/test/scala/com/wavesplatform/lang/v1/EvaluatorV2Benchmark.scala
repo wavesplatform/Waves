@@ -54,9 +54,7 @@ class Funcs {
       """.stripMargin
 
   val parsed = Parser.parseExpr(script).get.value
-  val originalExpr = ExpressionCompiler(pureContext.compilerContext, parsed).explicitGet()._1
-
-  def expr = originalExpr.deepCopy
+  val expr = ExpressionCompiler(pureContext.compilerContext, parsed).explicitGet()._1
 }
 
 @State(Scope.Benchmark)
@@ -72,8 +70,7 @@ class Lets {
       """.stripMargin
 
   val parsed = Parser.parseExpr(script).get.value
-  val originalExpr   = ExpressionCompiler(pureContext.compilerContext, parsed).explicitGet()._1
-  def expr = originalExpr.deepCopy
+  val expr   = ExpressionCompiler(pureContext.compilerContext, parsed).explicitGet()._1
 }
 
 @State(Scope.Benchmark)
@@ -120,6 +117,5 @@ class CustomFunc {
       """.stripMargin
 
   val parsed = Parser.parseExpr(script).get.value
-  val originalExpr   = ExpressionCompiler(pureContext.compilerContext, parsed).explicitGet()._1
-  def expr = originalExpr.deepCopy
+  val expr   = ExpressionCompiler(pureContext.compilerContext, parsed).explicitGet()._1
 }
