@@ -178,6 +178,11 @@ object SyncGrpcApi extends Assertions {
       balances.map(b => Base58.encode(b.getAsset.assetId.toByteArray) -> b.getAsset.amount).toMap
     }
 
+    def nftList(address: ByteString): Seq[String] = {
+      accounts.getNFTBalances(BalancesRequest.of(address, Seq.empty))
+        .map(b => Base58.encode(b.getAsset.assetId.toByteArray)).toSeq
+    }
+
     def assertAssetBalance(acc: ByteString, assetIdString: String, balance: Long): Unit = {
       val actual = assetsBalance(acc, Seq(assetIdString)).getOrElse(assetIdString, 0L)
       assert(actual == balance, s"Asset balance mismatch, required=$balance, actual=$actual")
