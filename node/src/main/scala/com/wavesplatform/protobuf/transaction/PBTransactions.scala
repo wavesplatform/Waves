@@ -614,7 +614,7 @@ object PBTransactions {
         val exprBytes = ByteString.copyFrom(Serde.serialize(expr, allowObjects = true))
         val data =
           Data.Continuation(ContinuationTransactionData(invokeScriptTransactionId.toByteString, exprBytes))
-        PBTransactions.create(sender = PublicKey(ByteStr.empty), chainId = tx.chainId, timestamp = tx.timestamp, version = tx.version, data = data)
+        PBTransactions.create(sender = PublicKey(new Array[Byte](32)), chainId = tx.chainId, timestamp = tx.timestamp, version = tx.version, data = data)
 
       case _ =>
         throw new IllegalArgumentException(s"Unsupported transaction: $tx")
