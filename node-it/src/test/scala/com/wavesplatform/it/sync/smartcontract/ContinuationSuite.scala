@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
@@ -97,7 +98,7 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
     nodes.waitForHeight(sender.height + 2)
     nodes.foreach { node =>
       node.getDataByKey(dApp, "a") shouldBe BooleanDataEntry("a", true)
-      node.getDataByKey(dApp, "sender") shouldBe BinaryDataEntry("sender", Base58.decode(caller))
+      node.getDataByKey(dApp, "sender") shouldBe BinaryDataEntry("sender", ByteStr(Base58.decode(caller)))
     }
   }
 
