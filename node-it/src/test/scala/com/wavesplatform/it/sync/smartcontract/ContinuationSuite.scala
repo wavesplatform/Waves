@@ -28,6 +28,7 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
     NodeConfigs
       .Builder(Default, 2, Seq.empty)
       .overrideBase(_.preactivatedFeatures((BlockchainFeatures.ContinuationTransaction.id, activationHeight)))
+      .overrideBase(_.raw("waves.blockchain.use-evaluator-v2 = true"))
       .buildNonConflicting()
 
   private val dApp   = firstAddress
