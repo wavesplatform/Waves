@@ -29,7 +29,6 @@ import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.{NoShrink, TransactionGen}
-import org.scalacheck.Gen
 import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
