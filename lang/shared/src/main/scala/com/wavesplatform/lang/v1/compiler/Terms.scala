@@ -31,13 +31,13 @@ object Terms {
     def toStr: Coeval[String] =
       for {
         e <- value.toStr
-      } yield "LET(" ++ name.toString ++ "," ++ e ++ ")"
+      } yield "LET(" ++ name ++ "," ++ e ++ ")"
   }
   case class FUNC(name: String, args: List[String], body: EXPR) extends DECLARATION {
     def toStr: Coeval[String] =
       for {
         e <- body.toStr
-      } yield "FUNC(" ++ name.toString ++ "," ++ args.toString ++ "," ++ e ++ ")"
+      } yield "FUNC(" ++ name ++ "," ++ args.toString ++ "," ++ e ++ ")"
   }
 
   sealed abstract class EXPR {
@@ -55,7 +55,7 @@ object Terms {
     def toStr: Coeval[String] =
       for {
         e <- expr.toStr
-      } yield "GETTER(" ++ e ++ "," ++ field.toString ++ ")"
+      } yield "GETTER(" ++ e ++ "," ++ field ++ ")"
   }
   @Deprecated
   case class LET_BLOCK(let: LET, body: EXPR) extends EXPR {
@@ -81,7 +81,7 @@ object Terms {
       } yield "IF(" ++ c ++ "," ++ t ++ "," ++ f ++ ")"
   }
   case class REF(key: String) extends EXPR {
-    override def toString: String = "REF(" ++ key.toString ++ ")"
+    override def toString: String = "REF(" ++ key ++ ")"
     def toStr: Coeval[String]     = Coeval.now(toString)
   }
   case class FUNCTION_CALL(function: FunctionHeader, args: List[EXPR]) extends EXPR {
@@ -105,9 +105,9 @@ object Terms {
     override def toString: String = bs.toString
     override def prettyString(level: Int): String = {
       if (bs.size > 1024) {
-        "base64'" ++ Base64.encode(bs) ++ "'"
+        "base64'" ++ Base64.encode(bs.arr) ++ "'"
       } else {
-        "base58'" ++ Base58.encode(bs) ++ "'"
+        "base58'" ++ Base58.encode(bs.arr) ++ "'"
       }
     }
     override val weight: Long = bs.size
@@ -143,7 +143,7 @@ object Terms {
   class CONST_STRING private (val s: String) extends EVALUATED {
     override def toString: String                 = s
     override def prettyString(level: Int): String = "\"" ++ escape(s) ++ "\""
-    override val weight: Long                     = s.getBytes.size
+    override val weight: Long                     = s.getBytes.length
 
     override def equals(obj: Any): Boolean =
       obj match {
@@ -195,8 +195,8 @@ object Terms {
     override val weight: Long     = 1L
   }
 
-  lazy val TRUE  = CONST_BOOLEAN(true)
-  lazy val FALSE = CONST_BOOLEAN(false)
+  lazy val TRUE: CONST_BOOLEAN  = CONST_BOOLEAN(true)
+  lazy val FALSE: CONST_BOOLEAN = CONST_BOOLEAN(false)
 
   case class CaseObj private (caseType: CASETYPEREF, fields: Map[String, EVALUATED]) extends EVALUATED {
     override def toString: String = TermPrinter.string(this)
@@ -210,7 +210,7 @@ object Terms {
     def apply(caseType: CASETYPEREF, fields: Map[String, EVALUATED]): CaseObj = {
       val obj = new CaseObj(caseType, fields)
       if (obj.weight > MaxWeight) {
-        throw new Exception(s"the object ${caseType.name} is too heavy. Actual weight: ${obj.weight}, limit: ${MaxWeight}")
+        throw new Exception(s"the object ${caseType.name} is too heavy. Actual weight: ${obj.weight}, limit: $MaxWeight")
       } else {
         obj
       }

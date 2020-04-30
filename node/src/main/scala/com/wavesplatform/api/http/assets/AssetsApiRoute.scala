@@ -69,7 +69,7 @@ case class AssetsApiRoute(
     } ~ (path("sponsor") & withAuth) {
       broadcast[SponsorFeeRequest](TransactionFactory.sponsor(_, wallet, time))
     } ~ (path("order") & withAuth)(jsonPost[Order] { order =>
-      wallet.privateKeyAccount(order.senderPublicKey).map(pk => Order.sign(order, pk))
+      wallet.privateKeyAccount(order.senderPublicKey.toAddress).map(pk => Order.sign(order, pk.privateKey))
     }) ~ pathPrefix("broadcast")(
       path("issue")(broadcast[IssueRequest](_.toTx)) ~
         path("reissue")(broadcast[ReissueRequest](_.toTx)) ~
@@ -321,7 +321,7 @@ object AssetsApiRoute {
         "assetId"        -> JsString(id.id.toString),
         "issueHeight"    -> JsNumber(height),
         "issueTimestamp" -> JsNumber(timestamp),
-        "issuer"         -> JsString(description.issuer.stringRepr),
+        "issuer"         -> JsString(description.issuer.toAddress.toString),
         "name"           -> JsString(name),
         "description"    -> JsString(desc),
         "decimals"       -> JsNumber(description.decimals),

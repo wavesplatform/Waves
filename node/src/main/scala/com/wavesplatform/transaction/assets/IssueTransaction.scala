@@ -147,7 +147,7 @@ object IssueTransaction extends TransactionParser {
       fee: Long,
       timestamp: Long
   ): Either[ValidationError, IssueTransaction] =
-    signed(version, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, sender)
+    signed(version, sender.publicKey, name, description, quantity, decimals, reissuable, script, fee, timestamp, sender.privateKey)
 
   override def parseBytes(bytes: Array[TxType]): Try[IssueTransaction] = serializer.parseBytes(bytes)
 

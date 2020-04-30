@@ -25,12 +25,12 @@ class CancelAllLeasesTest extends PropSpec with PropertyChecks with WithState wi
         otherAccount  <- accountGen
         otherAccount2 <- accountGen
         ts            <- Gen.choose(0, settings.lastTimeBasedForkParameter)
-        genesis: GenesisTransaction  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-        genesis2: GenesisTransaction = GenesisTransaction.create(otherAccount, ENOUGH_AMT, ts).explicitGet()
-        (lease, _) <- leaseAndCancelGeneratorP(master, recipient, ts)
+        genesis: GenesisTransaction  = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+        genesis2: GenesisTransaction = GenesisTransaction.create(otherAccount.toAddress, ENOUGH_AMT, ts).explicitGet()
+        (lease, _) <- leaseAndCancelGeneratorP(master, recipient.toAddress, ts)
         fee2       <- smallFeeGen
         unleaseOther = LeaseCancelTransaction.signed(1.toByte, otherAccount.publicKey, lease.id(), fee2, ts + 1, otherAccount.privateKey).explicitGet()
-        (lease2, _) <- leaseAndCancelGeneratorP(master, otherAccount2, ts)
+        (lease2, _) <- leaseAndCancelGeneratorP(master, otherAccount2.toAddress, ts)
       } yield (genesis, genesis2, lease, unleaseOther, lease2, ts)
 
     forAll(setupAndLeaseInResetBlock) {

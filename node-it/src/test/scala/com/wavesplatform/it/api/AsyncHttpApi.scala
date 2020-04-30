@@ -810,7 +810,7 @@ object AsyncHttpApi extends Assertions {
         proofs = Proofs.empty,
         timestamp = System.currentTimeMillis(),
         chainId = AddressScheme.current.chainId
-      ).signWith(matcher)
+      ).signWith(matcher.privateKey)
 
       val json = if (validate) tx.validatedEither.right.get.json() else tx.json()
       signedBroadcast(json, amountsAsStrings)

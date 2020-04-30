@@ -40,8 +40,8 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
     for ((o1ver, o2ver, tver) <- versions) {
       val ts                       = ntpTime.correctedTime()
       val expirationTimestamp      = ts + Order.MaxLiveTime
-      val buy                      = Order.buy(o1ver, buyer, matcher, pair, amount, price, ts, expirationTimestamp, matcherFee)
-      val sell                     = Order.sell(o2ver, seller, matcher, pair, amount, price, ts, expirationTimestamp, matcherFee)
+      val buy                      = Order.buy(o1ver, buyer, matcher.publicKey, pair, amount, price, ts, expirationTimestamp, matcherFee)
+      val sell                     = Order.sell(o2ver, seller, matcher.publicKey, pair, amount, price, ts, expirationTimestamp, matcherFee)
       val buyerWavesBalanceBefore  = sender.wavesBalance(buyerAddress).available
       val sellerWavesBalanceBefore = sender.wavesBalance(sellerAddress).available
       val buyerAssetBalanceBefore  = sender.assetsBalance(buyerAddress, Seq(exchAssetId)).getOrElse(exchAssetId, 0L)
@@ -99,8 +99,8 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
       val ts                  = ntpTime.correctedTime()
       val expirationTimestamp = ts + Order.MaxLiveTime
       val assetPair           = AssetPair.createAssetPair("WAVES", feeAssetId.toString).get
-      val buy                 = Order.buy(o1ver, buyer, matcher, assetPair, amount, price, ts, expirationTimestamp, matcherFee, matcherFeeOrder1)
-      val sell                = Order.sell(o2ver, seller, matcher, assetPair, amount, price, ts, expirationTimestamp, matcherFee, matcherFeeOrder2)
+      val buy                 = Order.buy(o1ver, buyer, matcher.publicKey, assetPair, amount, price, ts, expirationTimestamp, matcherFee, matcherFeeOrder1)
+      val sell                = Order.sell(o2ver, seller, matcher.publicKey, assetPair, amount, price, ts, expirationTimestamp, matcherFee, matcherFeeOrder2)
 
       sender.exchange(matcher, sell, buy, amount, price, matcherFee, matcherFee, matcherFee, ts, 3, waitForTx = true)
 
@@ -114,7 +114,7 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
   test("cannot exchange non-issued assets") {
     val exchAsset: IssueTransaction = IssueTransaction(
       TxVersion.V1,
-      sender.privateKey,
+      sender.publicKey,
       "myasset".utf8Bytes,
       "my asset description".utf8Bytes,
       quantity = someAssetAmount,
@@ -123,7 +123,7 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
       script = None,
       fee = 1.waves,
       timestamp = System.currentTimeMillis()
-    ).signWith(sender.privateKey)
+    ).signWith(sender.keyPair.privateKey)
     for ((o1ver, o2ver, tver) <- versions) {
 
       val assetId             = exchAsset.id().toString
@@ -132,8 +132,8 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
       val price               = 2 * Order.PriceConstant
       val amount              = 1
       val pair                = AssetPair.createAssetPair("WAVES", assetId).get
-      val buy                 = Order.buy(o1ver, buyer, matcher, pair, amount, price, ts, expirationTimestamp, matcherFee)
-      val sell                = Order.sell(o2ver, seller, matcher, pair, amount, price, ts, expirationTimestamp, matcherFee)
+      val buy                 = Order.buy(o1ver, buyer, matcher.publicKey, pair, amount, price, ts, expirationTimestamp, matcherFee)
+      val sell                = Order.sell(o2ver, seller, matcher.publicKey, pair, amount, price, ts, expirationTimestamp, matcherFee)
 
       assertGrpcError(
         sender.exchange(matcher, buy, sell, amount, price, matcherFee, matcherFee, matcherFee, ts, tver),

@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync._
@@ -106,7 +106,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
       nodes.waitForHeightAriseAndTxPresent(invokeScriptTx._1.id)
 
       sender.getDataByKey(contract, "a") shouldBe BinaryDataEntry("a", arg)
-      sender.getDataByKey(contract, "sender") shouldBe BinaryDataEntry("sender", Base58.decode(caller))
+      sender.getDataByKey(contract, "sender") shouldBe BinaryDataEntry("sender", ByteStr.decodeBase58(caller).get)
     }
   }
 

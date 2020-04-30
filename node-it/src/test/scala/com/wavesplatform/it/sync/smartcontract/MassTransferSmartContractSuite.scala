@@ -35,7 +35,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
             let totalAmountToGov = commonAmount == 2000000000
             let massTxSize = size(ttx.transfers) == 2
 
-            let accountPK = base58'${ByteStr(notMiner.publicKey)}'
+            let accountPK = base58'${notMiner.publicKey}'
             let accSig = sigVerify(ttx.bodyBytes,ttx.proofs[0],accountPK)
 
             let txToUsers = (massTxSize && totalAmountToUsers)
@@ -78,7 +78,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
         .create(1.toByte, notMiner.publicKey, Waves, transfers, calcMassTransferFee(2) + smartFee, currTime, None, Proofs.empty)
         .explicitGet()
 
-    val accountSig = ByteStr(crypto.sign(notMiner.privateKey, unsigned.bodyBytes()))
+    val accountSig = crypto.sign(notMiner.keyPair.privateKey, unsigned.bodyBytes())
     val signed     = unsigned.copy(1.toByte, proofs = Proofs(Seq(accountSig)))
     val toUsersID  = notMiner.signedBroadcast(signed.json(), waitForTx = true).id
 
@@ -92,7 +92,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
       MassTransferTransaction
         .create(1.toByte, notMiner.publicKey, Waves, transfersToGov, calcMassTransferFee(2) + smartFee, currTime, None, Proofs.empty)
         .explicitGet()
-    val accountSigToGovFail = ByteStr(crypto.sign(notMiner.privateKey, unsignedToGov.bodyBytes()))
+    val accountSigToGovFail = crypto.sign(notMiner.keyPair.privateKey, unsignedToGov.bodyBytes())
     val signedToGovFail     = unsignedToGov.copy(1.toByte, proofs = Proofs(Seq(accountSigToGovFail)))
 
     assertBadRequestAndResponse(
@@ -108,7 +108,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
         .create(1.toByte, notMiner.publicKey, Waves, transfersToGov, calcMassTransferFee(2) + smartFee, System.currentTimeMillis(), None, Proofs.empty)
         .explicitGet()
 
-    val accountSigToGov = ByteStr(crypto.sign(notMiner.privateKey, unsignedToGovSecond.bodyBytes()))
+    val accountSigToGov = crypto.sign(notMiner.keyPair.privateKey, unsignedToGovSecond.bodyBytes())
     val signedToGovGood = unsignedToGovSecond.copy(1.toByte, proofs = Proofs(Seq(accountSigToGov, ByteStr(Base58.tryDecodeWithLimit(toUsersID).get))))
     notMiner.signedBroadcast(signedToGovGood.json(), waitForTx = true).id
   }

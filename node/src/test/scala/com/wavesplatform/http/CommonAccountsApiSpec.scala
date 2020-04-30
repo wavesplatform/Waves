@@ -29,7 +29,7 @@ class CommonAccountsApiSpec
         acc <- accountGen
         ts = System.currentTimeMillis()
         fee <- smallFeeGen
-        genesis        = GenesisTransaction.create(acc, diffs.ENOUGH_AMT, ts).explicitGet()
+        genesis        = GenesisTransaction.create(acc.toAddress, diffs.ENOUGH_AMT, ts).explicitGet()
         data1          = DataTransaction.selfSigned(1.toByte, acc, Seq(entry1), fee, ts).explicitGet()
         data2          = DataTransaction.selfSigned(1.toByte, acc, Seq(entry2), fee, ts).explicitGet()
         data3          = DataTransaction.selfSigned(1.toByte, acc, Seq(entry3), fee, ts).explicitGet()
@@ -41,7 +41,7 @@ class CommonAccountsApiSpec
         case (acc, block1, mb1, block2, mb2) =>
           withDomain(domainSettingsWithFS(TestFunctionalitySettings.withFeatures(BlockchainFeatures.NG, BlockchainFeatures.DataTransaction))) { d =>
             val commonAccountsApi             = CommonAccountsApi(d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, d.blockchainUpdater)
-            def dataList(): Set[DataEntry[_]] = commonAccountsApi.dataStream(acc, None).toListL.runSyncUnsafe().toSet
+            def dataList(): Set[DataEntry[_]] = commonAccountsApi.dataStream(acc.toAddress, None).toListL.runSyncUnsafe().toSet
 
             d.appendBlock(block1)
             dataList() shouldBe empty

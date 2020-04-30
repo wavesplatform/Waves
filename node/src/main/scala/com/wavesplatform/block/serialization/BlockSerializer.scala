@@ -26,11 +26,11 @@ object BlockHeaderSerializer {
       val ndo = newDataOutput()
 
       ndo.writeByte(header.version)
-      ndo.write(header.reference)
+      ndo.write(header.reference.arr)
       ndo.writeLong(header.baseTarget)
-      ndo.write(header.generationSignature)
+      ndo.write(header.generationSignature.arr)
       ndo.writeLong(header.timestamp)
-      ndo.write(header.generator)
+      ndo.write(header.generator.arr)
 
       ndo.writeInt(header.featureVotes.size)
       header.featureVotes.foreach(s => ndo.writeShort(s))
@@ -61,7 +61,7 @@ object BlockHeaderSerializer {
       else Json.obj("desiredReward" -> JsNumber(blockHeader.rewardVote))
 
     val generatorJson =
-      Json.obj("generator" -> blockHeader.generator.stringRepr, "generatorPublicKey" -> blockHeader.generator.toString)
+      Json.obj("generator" -> blockHeader.generator.toAddress, "generatorPublicKey" -> blockHeader.generator)
 
     Json.obj(
       "version"   -> blockHeader.version,

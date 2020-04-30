@@ -15,7 +15,7 @@ class GenesisBlockUpdateSpec extends FreeSpec with Matchers with BlockGen with S
   val genesisAppendWithWavesAmountGen: Gen[(BlockAppended, Long)] = for {
     master      <- accountGen
     wavesAmount <- Gen.choose(1L, ENOUGH_AMT)
-    gt = GenesisTransaction.create(master, wavesAmount, 0).explicitGet()
+    gt = GenesisTransaction.create(master.toAddress, wavesAmount, 0).explicitGet()
     b <- blockGen(Seq(gt), master)
     ba = appendBlock(b)
   } yield (ba, wavesAmount)

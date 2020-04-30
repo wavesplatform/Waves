@@ -80,7 +80,7 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
       TransferTransaction
         .selfSigned(
           2.toByte,
-          miner.privateKey,
+          miner.keyPair,
           AddressOrAlias.fromString(secondAddress).explicitGet(),
           Waves,
           amount,

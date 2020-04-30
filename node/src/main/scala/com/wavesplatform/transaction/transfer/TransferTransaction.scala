@@ -103,5 +103,5 @@ object TransferTransaction extends TransactionParser {
       attachment: Option[Attachment],
       timestamp: TxTimestamp
   ): Either[ValidationError, TransferTransaction] =
-    signed(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, sender)
+    signed(version, sender.publicKey, recipient, asset, amount, feeAsset, fee, attachment, timestamp, sender.privateKey)
 }

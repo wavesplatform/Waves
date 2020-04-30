@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -112,7 +113,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
   test("can't set script with user function to asset before Ride4DApps activation") {
     assertBadRequestAndMessage(
       sender.setAssetScript(
-        Asset.IssuedAsset("Test".getBytes("UTF-8")).id.toString,
+        Asset.IssuedAsset(ByteStr("Test".getBytes("UTF-8"))).id.toString,
         smartAcc,
         issueFee,
         Some(scriptV2)

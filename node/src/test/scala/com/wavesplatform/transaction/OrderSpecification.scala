@@ -3,7 +3,7 @@ package com.wavesplatform.transaction
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType, _}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import com.wavesplatform.transaction.smart.Verifier
 import com.wavesplatform.{NTPTime, TransactionGen}
 import org.scalatest._
@@ -38,7 +38,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
   property("Order timestamp validation") {
     forAll(orderGen) { order =>
       val time = ntpTime.correctedTime()
-      order.updateTimestamp(-1).isValid(time) shouldBe not(valid)
+      order.copy(timestamp = -1).isValid(time) shouldBe not(valid)
     }
   }
 
@@ -85,23 +85,23 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
         Random.nextBytes(rndAsset)
 
         Verifier.verifyAsEllipticCurveSignature(order) shouldBe an[Right[_, _]]
-        Verifier.verifyAsEllipticCurveSignature(order.updateSender(pka)) should produce(err)
-        Verifier.verifyAsEllipticCurveSignature(order.updateMatcher(pka)) should produce(err)
+        Verifier.verifyAsEllipticCurveSignature(order.copy(senderPublicKey = pka.publicKey)) should produce(err)
+        Verifier.verifyAsEllipticCurveSignature(order.copy(matcherPublicKey = pka.publicKey)) should produce(err)
         val assetPair = order.assetPair
         Verifier.verifyAsEllipticCurveSignature(
           order
-            .updatePair(assetPair.copy(amountAsset = IssuedAsset(ByteStr(rndAsset))))
+            .copy(assetPair = assetPair.copy(amountAsset = IssuedAsset(ByteStr(rndAsset))))
         ) should produce(err)
         Verifier.verifyAsEllipticCurveSignature(
           order
-            .updatePair(assetPair.copy(priceAsset = IssuedAsset(ByteStr(rndAsset))))
+            .copy(assetPair = assetPair.copy(priceAsset = IssuedAsset(ByteStr(rndAsset))))
         ) should produce(err)
-        Verifier.verifyAsEllipticCurveSignature(order.updateType(OrderType.reverse(order.orderType))) should produce(err)
-        Verifier.verifyAsEllipticCurveSignature(order.updatePrice(order.price + 1)) should produce(err)
-        Verifier.verifyAsEllipticCurveSignature(order.updateAmount(order.amount + 1)) should produce(err)
-        Verifier.verifyAsEllipticCurveSignature(order.updateExpiration(order.expiration + 1)) should produce(err)
-        Verifier.verifyAsEllipticCurveSignature(order.updateFee(order.matcherFee + 1)) should produce(err)
-        Verifier.verifyAsEllipticCurveSignature(order.updateProofs(Proofs(Seq(ByteStr(pka.publicKey ++ pka.publicKey))))) should produce(err)
+        Verifier.verifyAsEllipticCurveSignature(order.copy(orderType = OrderType.reverse(order.orderType))) should produce(err)
+        Verifier.verifyAsEllipticCurveSignature(order.copy(price = order.price + 1)) should produce(err)
+        Verifier.verifyAsEllipticCurveSignature(order.copy(amount = order.amount + 1)) should produce(err)
+        Verifier.verifyAsEllipticCurveSignature(order.copy(expiration = order.expiration + 1)) should produce(err)
+        Verifier.verifyAsEllipticCurveSignature(order.copy(matcherFee = order.matcherFee + 1)) should produce(err)
+        Verifier.verifyAsEllipticCurveSignature(order.copy(proofs = Proofs(Seq(ByteStr(pka.publicKey.arr ++ pka.publicKey.arr))))) should produce(err)
     }
   }
 
@@ -112,7 +112,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
         val buy = Order.buy(
           Order.V1,
           sender = sender,
-          matcher = matcher,
+          matcher = matcher.publicKey,
           pair = pair,
           amount = amount,
           price = price,
@@ -125,7 +125,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
         val sell = Order.sell(
           Order.V1,
           sender = sender,
-          matcher = matcher,
+          matcher = matcher.publicKey,
           pair = pair,
           amount = amount,
           price = price,

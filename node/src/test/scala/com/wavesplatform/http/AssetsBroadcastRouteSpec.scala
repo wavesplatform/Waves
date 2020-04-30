@@ -194,7 +194,7 @@ class AssetsBroadcastRouteSpec
     val versionedTransferRequest = createSignedVersionedTransferRequest(
       TransferTransaction(
         version = 2.toByte,
-        sender = senderPrivateKey,
+        sender = senderPrivateKey.publicKey,
         recipient = receiverPrivateKey.toAddress,
         assetId = Asset.Waves,
         amount = 1 * Waves,
@@ -229,7 +229,7 @@ class AssetsBroadcastRouteSpec
   protected def createSignedTransferRequest(tx: TransferTransaction): SignedTransferV1Request = {
     import tx._
     SignedTransferV1Request(
-      Base58.encode(tx.sender),
+      Base58.encode(tx.sender.arr),
       assetId.maybeBase58Repr,
       recipient.stringRepr,
       amount,
@@ -244,7 +244,7 @@ class AssetsBroadcastRouteSpec
   protected def createSignedVersionedTransferRequest(tx: TransferTransaction): SignedTransferV2Request = {
     import tx._
     SignedTransferV2Request(
-      Base58.encode(tx.sender),
+      Base58.encode(tx.sender.arr),
       assetId.maybeBase58Repr,
       recipient.stringRepr,
       amount,

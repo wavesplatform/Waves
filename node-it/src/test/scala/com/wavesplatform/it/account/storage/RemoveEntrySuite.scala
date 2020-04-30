@@ -165,7 +165,7 @@ class RemoveEntrySuite extends BaseSuite {
       case "writeString"      => List(CONST_STRING(key).explicitGet(), CONST_STRING(value).explicitGet())
       case "writeInteger"     => List(CONST_STRING(key).explicitGet(), CONST_LONG(value.toLong))
       case "writeBoolean"     => List(CONST_STRING(key).explicitGet(), CONST_BOOLEAN(value.toBoolean))
-      case "writeBinary"      => List(CONST_STRING(key).explicitGet(), CONST_BYTESTR(value.getBytes()).explicitGet)
+      case "writeBinary"      => List(CONST_STRING(key).explicitGet(), CONST_BYTESTR(ByteStr(value.getBytes())).explicitGet())
       case "delete"           => List(CONST_STRING(key).explicitGet())
       case "write4"           => List.empty
       case "delete100Entries" => List.empty

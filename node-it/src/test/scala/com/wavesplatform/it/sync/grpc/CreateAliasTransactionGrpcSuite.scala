@@ -1,7 +1,6 @@
 package com.wavesplatform.it.sync.grpc
 
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncGrpcApi._
@@ -27,7 +26,7 @@ class CreateAliasTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPT
       sender.wavesBalance(aliasCreatorAddr).available shouldBe creatorBalance - minFee
       sender.wavesBalance(aliasCreatorAddr).effective shouldBe creatorEffBalance - minFee
 
-      sender.resolveAlias(alias) shouldBe PBRecipients.toAddress(ByteStr(aliasCreatorAddr.toByteArray), AddressScheme.current.chainId).explicitGet()
+      sender.resolveAlias(alias) shouldBe PBRecipients.toAddress(aliasCreatorAddr.toByteArray, AddressScheme.current.chainId).explicitGet()
 
       sender.broadcastTransfer(aliasCreator, Recipient().withAlias(alias), transferAmount, minFee, waitForTx = true)
 
@@ -75,7 +74,7 @@ class CreateAliasTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPT
       for (v <- aliasTxSupportedVersions) {
         sender.broadcastCreateAlias(aliasCreator, s"$alias$v", minFee, version = v, waitForTx = true)
         sender.resolveAlias(s"$alias$v") shouldBe PBRecipients
-          .toAddress(ByteStr(aliasCreatorAddr.toByteArray), AddressScheme.current.chainId)
+          .toAddress(aliasCreatorAddr.toByteArray, AddressScheme.current.chainId)
           .explicitGet()
       }
     }

@@ -45,12 +45,12 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
             val assetBalance = issues
               .map(_.id.value)
               .map(IssuedAsset)
-              .map(asset => asset -> blockchain.balance(dAppAcc, asset))
+              .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
               .toMap
 
-            diff.portfolios(dAppAcc).assets shouldBe assetBalance
-            diff.portfolios(dAppAcc).balance shouldBe -wavesTransfer
-            diff.portfolios(invoker).balance shouldBe wavesTransfer - fee
+            diff.portfolios(dAppAcc.toAddress).assets shouldBe assetBalance
+            diff.portfolios(dAppAcc.toAddress).balance shouldBe -wavesTransfer
+            diff.portfolios(invoker.toAddress).balance shouldBe wavesTransfer - fee
         }
     }
   }
@@ -74,10 +74,10 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
             val assetBalance = issues
               .map(_.id.value)
               .map(IssuedAsset)
-              .map(asset => asset -> blockchain.balance(dAppAcc, asset))
+              .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
               .toMap
 
-            diff.portfolios(dAppAcc).assets shouldBe assetBalance
+            diff.portfolios(dAppAcc.toAddress).assets shouldBe assetBalance
         }
     }
   }
@@ -167,12 +167,12 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
             val assetBalance = issues
               .map(_.id.value)
               .map(IssuedAsset)
-              .map(asset => asset -> blockchain.balance(dAppAcc, asset))
+              .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
               .toMap
 
-            diff.portfolios(dAppAcc).assets shouldBe assetBalance
-            diff.portfolios(dAppAcc).balance shouldBe -wavesTransfer
-            diff.portfolios(invoker).balance shouldBe wavesTransfer - fee
+            diff.portfolios(dAppAcc.toAddress).assets shouldBe assetBalance
+            diff.portfolios(dAppAcc.toAddress).balance shouldBe -wavesTransfer
+            diff.portfolios(invoker.toAddress).balance shouldBe wavesTransfer - fee
         }
     }
   }
@@ -221,8 +221,8 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
       specialIssue <- issueV2TransactionGen(invoker, additionalAssetScript.fold(Gen.const(none[Script]))(_.map(Some(_))))
     } yield {
       for {
-        genesis     <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
-        genesis2    <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
+        genesis     <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
+        genesis2    <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
         setVerifier <- SetScriptTransaction.selfSigned(1.toByte, invoker, Some(accountScript), fee, ts + 2)
         setDApp     <- SetScriptTransaction.selfSigned(1.toByte, master, Some(dApp(invoker)), fee, ts + 2)
         (issues, payments) = if (repeatAdditionalAsset) {
@@ -234,7 +234,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
           val payments = issues.map(i => Payment(1, IssuedAsset(i.id.value)))
           (issues, payments)
         }
-        ci <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master, None, payments, fee, Waves, ts + 3)
+        ci <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, payments, fee, Waves, ts + 3)
       } yield (List(genesis, genesis2), setVerifier, setDApp, ci, issues, master, invoker, fee)
     }.explicitGet()
 
@@ -283,7 +283,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
          |
          | @Callable(i)
          | func default() = $resultSyntax([ScriptTransfer(
-         |    Address(base58'${transferRecipient.stringRepr}'),
+         |    Address(base58'${transferRecipient.toAddress}'),
          |    $transferPaymentAmount,
          |    unit
          | )])

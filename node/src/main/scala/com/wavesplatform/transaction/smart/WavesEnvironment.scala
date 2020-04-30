@@ -51,7 +51,7 @@ class WavesEnvironment(
 
   override def transferTransactionById(id: Array[Byte]): Option[Tx] =
     blockchain
-      .transferById(id)
+      .transferById(ByteStr(id))
       .map(t => RealTransactionWrapper.mapTransferTx(t._2, ds.stdLibVersion))
 
   override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any] = {
@@ -85,7 +85,7 @@ class WavesEnvironment(
       .left
       .map(_.toString)
       .right
-      .map(a => Recipient.Address(ByteStr(a.bytes.arr)))
+      .map(a => Recipient.Address(ByteStr(a.bytes)))
 
   override def chainId: Byte = nByte
 
@@ -106,12 +106,12 @@ class WavesEnvironment(
   override def tthis: Address = Recipient.Address(address())
 
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
-    blockchain.assetDescription(IssuedAsset(id)).map { assetDesc =>
+    blockchain.assetDescription(IssuedAsset(ByteStr(id))).map { assetDesc =>
       ScriptAssetInfo(
-        id = id,
+        id = ByteStr(id),
         quantity = assetDesc.totalVolume.toLong,
         decimals = assetDesc.decimals,
-        issuer = Address(assetDesc.issuer.toAddress.bytes),
+        issuer = Address(ByteStr(assetDesc.issuer.toAddress.bytes)),
         issuerPk = assetDesc.issuer,
         reissuable = assetDesc.reissuable,
         scripted = assetDesc.script.nonEmpty,
@@ -135,8 +135,8 @@ class WavesEnvironment(
       height = bHeight,
       baseTarget = blockH.baseTarget,
       generationSignature = blockH.generationSignature,
-      generator = blockH.generator.toAddress.bytes,
-      generatorPublicKey = ByteStr(blockH.generator),
+      generator = ByteStr(blockH.generator.toAddress.bytes),
+      generatorPublicKey = blockH.generator,
       if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None
     )
   }
