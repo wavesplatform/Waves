@@ -58,8 +58,9 @@ object ContinuationTransactionDiff {
         tx.invokeScriptTransactionId
       )
       scriptResult <- {
+        val expr = blockchain.continuationStates(tx.invokeScriptTransactionId).asInstanceOf[ContinuationState.InProgress].expr
         val r = ContractEvaluator
-          .applyV2(ctx.evaluationContext(environment), Map[String, LazyVal[Id]](), tx.expr, script.stdLibVersion, tx.invokeScriptTransactionId)
+          .applyV2(ctx.evaluationContext(environment), Map[String, LazyVal[Id]](), expr, script.stdLibVersion, tx.invokeScriptTransactionId)
           .leftMap { case (error, log) => ScriptExecutionError.dApp(error, log) }
         TracedResult(
           r,

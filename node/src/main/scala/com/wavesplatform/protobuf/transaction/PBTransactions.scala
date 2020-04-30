@@ -1,12 +1,10 @@
 package com.wavesplatform.protobuf.transaction
 
-import cats.implicits._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
-import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.Attachment.Attachment.{BinaryValue, BoolValue, IntValue, StringValue}
@@ -293,12 +291,8 @@ object PBTransactions {
           chainId
         )
 
-      case Data.Continuation(ContinuationTransactionData(invokeTransactionId, expr)) =>
-        Serde
-          .deserialize(expr.toByteArray, allowObjects = true)
-          .bimap(
-            GenericError(_), { case (expr, _) => ContinuationTransaction(expr, invokeTransactionId.toByteStr, timestamp) }
-          )
+      case Data.Continuation(ContinuationTransactionData(invokeTransactionId)) =>
+        Right(ContinuationTransaction(invokeTransactionId.toByteStr, timestamp))
 
       case _ =>
         Left(TxValidationError.UnsupportedTransactionType)
@@ -610,10 +604,9 @@ object PBTransactions {
 
         PBTransactions.create(sender, chainId, feeAmount, feeAsset, timestamp, version, proofs, Data.UpdateAssetInfo(data))
 
-      case tx @ vt.smart.ContinuationTransaction(expr, invokeScriptTransactionId, _) =>
-        val exprBytes = ByteString.copyFrom(Serde.serialize(expr, allowObjects = true))
+      case tx @ vt.smart.ContinuationTransaction(invokeScriptTransactionId, _) =>
         val data =
-          Data.Continuation(ContinuationTransactionData(invokeScriptTransactionId.toByteString, exprBytes))
+          Data.Continuation(ContinuationTransactionData(invokeScriptTransactionId.toByteString))
         PBTransactions.create(sender = PublicKey(new Array[Byte](32)), chainId = tx.chainId, timestamp = tx.timestamp, version = tx.version, data = data)
 
       case _ =>

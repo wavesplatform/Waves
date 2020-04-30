@@ -3,7 +3,6 @@ package com.wavesplatform.transaction.smart
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.{ContinuationTxSerializer, PBTransactionSerializer}
@@ -14,7 +13,6 @@ import play.api.libs.json.JsObject
 import scala.util.Try
 
 case class ContinuationTransaction(
-    expr: EXPR,
     invokeScriptTransactionId: ByteStr,
     timestamp: TxTimestamp
 ) extends Transaction
