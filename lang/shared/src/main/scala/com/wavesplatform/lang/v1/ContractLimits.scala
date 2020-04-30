@@ -39,7 +39,7 @@ object ContractLimits {
   val EMPTYARR_WEIGHT = 20L
   val ELEM_WEIGHT     = 20L
   val MaxWeight =
-    Terms.DATA_TX_BYTES_MAX * 2L                                           // MaxBytes dublicate in bodyBytes and data
+    Terms.DataTxMaxProtoBytes * 2L                                         // MaxBytes dublicate in bodyBytes and data
   +32L + 8L + 8L + 8L                                                      // header
   +OBJ_WEIGHT + FIELD_WEIGHT + 32L                                         // address object
   +EMPTYARR_WEIGHT + (ELEM_WEIGHT + 64L) * 8L                              // proofs

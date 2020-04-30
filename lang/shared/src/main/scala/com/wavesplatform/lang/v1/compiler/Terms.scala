@@ -13,7 +13,8 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import monix.eval.Coeval
 
 object Terms {
-  val DATA_TX_BYTES_MAX: Int    = 150 * 1024     // should be the same as DataTransaction.MAX_BYTES
+  val DataTxMaxBytes: Int       = 150 * 1024     // should be the same as DataTransaction.MaxBytes
+  val DataTxMaxProtoBytes: Int  = 165890         // should be the same as DataTransaction.MaxProtoBytes
   val DATA_ENTRY_VALUE_MAX: Int = Short.MaxValue // should be the same as DataEntry.MaxValueSize
 
   sealed abstract class DECLARATION {
@@ -122,10 +123,17 @@ object Terms {
   }
 
   object CONST_BYTESTR {
+    /*
+    sealed trait Limit
+    case object DataEntrySize   extends Limit
+    case object DataTxSize      extends Limit
+    case object ProtoDataTxSize extends Limit
+     */
+
     def apply(bs: ByteStr, reduceLimit: Boolean = true): Either[ExecutionError, EVALUATED] = {
       val limit =
         if (reduceLimit) DATA_ENTRY_VALUE_MAX
-        else DATA_TX_BYTES_MAX
+        else DataTxMaxBytes
 
       val actualSize = bs.size
 
@@ -157,7 +165,7 @@ object Terms {
     def apply(s: String, reduceLimit: Boolean = true): Either[ExecutionError, EVALUATED] = {
       val limit =
         if (reduceLimit) DATA_ENTRY_VALUE_MAX
-        else DATA_TX_BYTES_MAX
+        else DataTxMaxBytes
 
       val actualSize = s.getBytes(StandardCharsets.UTF_8).length
 

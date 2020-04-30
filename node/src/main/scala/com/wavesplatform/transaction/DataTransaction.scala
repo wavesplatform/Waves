@@ -41,7 +41,7 @@ object DataTransaction extends TransactionParser {
   type TransactionT = DataTransaction
 
   val MaxBytes: Int      = 150 * 1024 // implicitly used for RIDE CONST_STRING and CONST_BYTESTR
-  val MaxProtoBytes: Int = 165890
+  val MaxProtoBytes: Int = 165890     // implicitly used for RIDE CONST_BYTESTR
   val MaxEntryCount: Int = 100
 
   override val typeId: TxType                    = 12: Byte

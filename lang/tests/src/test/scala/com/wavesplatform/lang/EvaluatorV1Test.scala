@@ -3,27 +3,28 @@ package com.wavesplatform.lang
 import java.nio.ByteBuffer
 
 import cats.Id
-import cats.implicits._
 import cats.data.EitherT
 import cats.kernel.Monoid
+import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, EnvironmentFunctions, PureContext, _}
-import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1, Log}
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
+import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1, FunctionIds, Log}
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
@@ -35,30 +36,30 @@ import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
 class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  implicit val version : StdLibVersion = V4
+  implicit val version: StdLibVersion = V4
 
-  private def pureContext(implicit version : StdLibVersion)  = PureContext.build(Global, version)
+  private def pureContext(implicit version: StdLibVersion) = PureContext.build(Global, version)
 
-  private def defaultCryptoContext(implicit version : StdLibVersion) = CryptoContext.build(Global, version)
+  private def defaultCryptoContext(implicit version: StdLibVersion) = CryptoContext.build(Global, version)
 
   val blockBuilder: Gen[(LET, EXPR) => EXPR] = Gen.oneOf(true, false).map(if (_) BLOCK.apply else LET_BLOCK.apply)
 
-  private def defaultFullContext(implicit version : StdLibVersion): CTX[Environment] =
+  private def defaultFullContext(implicit version: StdLibVersion): CTX[Environment] =
     Monoid.combineAll(
       Seq(
-        defaultCryptoContext.withEnvironment[Environment],
-        pureContext.withEnvironment[Environment],
+        defaultCryptoContext(version).withEnvironment[Environment],
+        pureContext(version).withEnvironment[Environment],
         WavesContext.build(
           DirectiveSet(version, Account, Expression).explicitGet()
         )
       )
     )
 
-  private def pureEvalContext(implicit version : StdLibVersion): EvaluationContext[NoContext, Id] =
+  private def pureEvalContext(implicit version: StdLibVersion): EvaluationContext[NoContext, Id] =
     PureContext.build(Global, version).evaluationContext
 
   private val noContextEvaluator = new EvaluatorV1[Id, NoContext]()
-  private val defaultEvaluator = new EvaluatorV1[Id, Environment]()
+  private val defaultEvaluator   = new EvaluatorV1[Id, Environment]()
 
   private def ev[T <: EVALUATED](context: EvaluationContext[NoContext, Id] = pureEvalContext, expr: EXPR): Either[ExecutionError, T] =
     noContextEvaluator.apply[T](context, expr)
@@ -97,18 +98,22 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         expr = block(
           LET("x", CONST_LONG(3)),
           CONST_LONG(3)
-        )) shouldBe evaluated(3)
+        )
+      ) shouldBe evaluated(3)
     }
   }
 
   property("successful on x = y") {
     forAll(blockBuilder) { block =>
       ev[EVALUATED](
-        expr = block(LET("x", CONST_LONG(3)),
-                     block(
-                       LET("y", REF("x")),
-                       FUNCTION_CALL(sumLong.header, List(REF("x"), REF("y")))
-                     ))) shouldBe evaluated(6)
+        expr = block(
+          LET("x", CONST_LONG(3)),
+          block(
+            LET("y", REF("x")),
+            FUNCTION_CALL(sumLong.header, List(REF("x"), REF("y")))
+          )
+        )
+      ) shouldBe evaluated(6)
     }
   }
 
@@ -124,7 +129,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         expr = block(
           LET("x", CONST_LONG(3)),
           FUNCTION_CALL(PureContext.eq.header, List(REF("x"), CONST_LONG(2)))
-        )) shouldBe evaluated(false)
+        )
+      ) shouldBe evaluated(false)
     }
   }
 
@@ -134,7 +140,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         expr = block(
           LET("x", CONST_LONG(3)),
           block(LET("y", CONST_LONG(3)), FUNCTION_CALL(PureContext.eq.header, List(REF("x"), REF("y"))))
-        )) shouldBe evaluated(true)
+        )
+      ) shouldBe evaluated(true)
     }
   }
 
@@ -147,24 +154,27 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
             LET("y", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)))),
             FUNCTION_CALL(PureContext.eq.header, List(REF("x"), REF("y")))
           )
-        )) shouldBe evaluated(true)
+        )
+      ) shouldBe evaluated(true)
     }
   }
 
   property("successful on deep type resolution") {
     forAll(blockBuilder) { block =>
-      ev[EVALUATED](expr = IF(FUNCTION_CALL(PureContext.eq.header, List(CONST_LONG(1), CONST_LONG(2))),
-                              simpleDeclarationAndUsage(3, block),
-                              CONST_LONG(4))) shouldBe evaluated(4)
+      ev[EVALUATED](
+        expr = IF(FUNCTION_CALL(PureContext.eq.header, List(CONST_LONG(1), CONST_LONG(2))), simpleDeclarationAndUsage(3, block), CONST_LONG(4))
+      ) shouldBe evaluated(4)
     }
   }
 
   property("successful on same value names in different branches") {
     forAll(blockBuilder) { block =>
       val expr =
-        IF(FUNCTION_CALL(PureContext.eq.header, List(CONST_LONG(1), CONST_LONG(2))),
-           simpleDeclarationAndUsage(3, block),
-           simpleDeclarationAndUsage(4, block))
+        IF(
+          FUNCTION_CALL(PureContext.eq.header, List(CONST_LONG(1), CONST_LONG(2))),
+          simpleDeclarationAndUsage(3, block),
+          simpleDeclarationAndUsage(4, block)
+        )
       ev[EVALUATED](expr = expr) shouldBe evaluated(4)
     }
   }
@@ -177,13 +187,15 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val pointType     = CASETYPEREF("Point", List("X" -> LONG, "Y" -> LONG))
     val pointInstance = CaseObj(pointType, Map("X"    -> 3L, "Y"   -> 4L))
     ev[EVALUATED](
-      context = Monoid.combine(pureEvalContext,
-                               EvaluationContext[NoContext, Id](
-                                 Contextful.empty[Id],
-                                 typeDefs = Map.empty,
-                                 letDefs = Map(("p", LazyVal.fromEvaluated[Id](pointInstance))),
-                                 functions = Map.empty
-                               )),
+      context = Monoid.combine(
+        pureEvalContext,
+        EvaluationContext[NoContext, Id](
+          Contextful.empty[Id],
+          typeDefs = Map.empty,
+          letDefs = Map(("p", LazyVal.fromEvaluated[Id](pointInstance))),
+          functions = Map.empty
+        )
+      ),
       expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p"), "X"), CONST_LONG(2)))
     ) shouldBe evaluated(5)
   }
@@ -208,7 +220,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         typeDefs = Map.empty,
         letDefs = Map(
           ("p", LazyVal.fromEvaluated[Id](pointInstance)),
-          ("badVal", LazyVal.apply[Id](EitherT.leftT[({type L[A] = EvalF[Id, A]})#L, EVALUATED]("Error")))
+          ("badVal", LazyVal.apply[Id](EitherT.leftT[({ type L[A] = EvalF[Id, A] })#L, EVALUATED]("Error")))
         ),
         functions = Map.empty
       )
@@ -231,13 +243,15 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
           evaluated(1L)
       }
 
-      val context = Monoid.combine(pureEvalContext,
-                                   EvaluationContext[NoContext, Id](
-                                     Contextful.empty[Id],
-                                     typeDefs = Map.empty,
-                                     letDefs = Map.empty,
-                                     functions = Map(f.header -> f)
-                                   ))
+      val context = Monoid.combine(
+        pureEvalContext,
+        EvaluationContext[NoContext, Id](
+          Contextful.empty[Id],
+          typeDefs = Map.empty,
+          letDefs = Map.empty,
+          functions = Map(f.header -> f)
+        )
+      )
 
       ev[EVALUATED](
         context = context,
@@ -293,7 +307,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
               "bar" -> "bAr",
               "buz" -> 1L
             )
-          ))
+          )
+        )
     }
     val fooTransform =
       NativeFunction[NoContext]("transformFoo", 1: Long, 260: Short, fooType, ("foo", fooType)) {
@@ -342,12 +357,12 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("returns an success if sigVerify_NKb return a success") {
-    implicit val version = V4
+    implicit val version        = V4
     val seed                    = "seed".getBytes("UTF-8")
     val (privateKey, publicKey) = Curve25519.createKeyPair(seed)
 
-    for(i <- 0 to 3) {
-      val bodyBytes = ("m" * ((16 << i)*1024)).getBytes("UTF-8")
+    for (i <- 0 to 3) {
+      val bodyBytes = ("m" * ((16 << i) * 1024)).getBytes("UTF-8")
       val signature = Curve25519.sign(privateKey, bodyBytes)
 
       val r = sigVerifyTest(bodyBytes, publicKey, signature, Some(i.toShort))
@@ -355,14 +370,13 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     }
   }
 
-
   property("fail if sigVerify_NKb limits exhausted") {
-    implicit val version = V4
+    implicit val version        = V4
     val seed                    = "seed".getBytes("UTF-8")
     val (privateKey, publicKey) = Curve25519.createKeyPair(seed)
 
-    for(i <- 0 to 3) {
-      val bodyBytes = ("m" * ((16 << i)*1024 + 1)).getBytes("UTF-8")
+    for (i <- 0 to 3) {
+      val bodyBytes = ("m" * ((16 << i) * 1024 + 1)).getBytes("UTF-8")
       val signature = Curve25519.sign(privateKey, bodyBytes)
 
       val r = sigVerifyTest(bodyBytes, publicKey, signature, Some(i.toShort))
@@ -697,8 +711,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   private def hashTest(bodyBytes: Array[Byte], hash: String, lim: Int)(implicit version: StdLibVersion): Either[ExecutionError, ByteStr] = {
-   val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
-      ("b", (BYTESTR, ContextfulVal.pure[NoContext](ByteStr(bodyBytes)))),
+    val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
+      ("b", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(bodyBytes), reduceLimit = false).explicitGet())))
     )
 
     val context: CTX[NoContext] = Monoid.combineAll(
@@ -706,13 +720,14 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         pureContext,
         defaultCryptoContext,
         CTX[NoContext](Seq(), vars, Array.empty[BaseFunction[NoContext]])
-      ))
+      )
+    )
 
     val script = s"""{-# STDLIB_VERSION 4 #-} ${hash}_${16 << lim}Kb(b)"""
 
     val expr = ExpressionCompiler
-        .compileUntyped(script, context.compilerContext)
-        .explicitGet()
+      .compileUntyped(script, context.compilerContext)
+      .explicitGet()
 
     ev[EVALUATED](
       context = context.evaluationContext[Id],
@@ -731,7 +746,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       h <- hashes
       i <- 0 to 3
     } {
-      val bodyBytes = ("m" * ((16 << i)*1024)).getBytes("UTF-8")
+      val bodyBytes = ("m" * ((16 << i) * 1024)).getBytes("UTF-8")
 
       val r = hashTest(bodyBytes, h, i.toShort)
       r shouldBe 'Right
@@ -741,20 +756,20 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("fail if hash functions (*_NKb) limits exhausted") {
     implicit val version = V4
 
-    for{
+    for {
       h <- hashes
       i <- 0 to 3
     } {
-      val bodyBytes = ("m" * ((16 << i)*1024 + 1)).getBytes("UTF-8")
+      val bodyBytes = ("m" * ((16 << i) * 1024 + 1)).getBytes("UTF-8")
 
       val r = hashTest(bodyBytes, h, i.toShort)
       r shouldBe 'Left
     }
   }
 
-
-
-  private def sigVerifyTest(bodyBytes: Array[Byte], publicKey: PublicKey, signature: Signature, lim_n: Option[Short] = None)(implicit version: StdLibVersion): Either[ExecutionError, Boolean] = {
+  private def sigVerifyTest(bodyBytes: Array[Byte], publicKey: PublicKey, signature: Signature, lim_n: Option[Short] = None)(
+      implicit version: StdLibVersion
+  ): Either[ExecutionError, Boolean] = {
     val txType = CASETYPEREF(
       "Transaction",
       List(
@@ -767,7 +782,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val txObj = CaseObj(
       txType,
       Map(
-        "bodyBytes" -> ByteStr(bodyBytes),
+        "bodyBytes" -> CONST_BYTESTR(ByteStr(bodyBytes), reduceLimit = false).explicitGet(),
         "senderPk"  -> ByteStr(publicKey),
         "proof0"    -> ByteStr(signature)
       )
@@ -782,7 +797,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
           letDefs = Map("tx" -> LazyVal.fromEvaluated[Id](txObj)),
           functions = Seq.empty
         )
-      ))
+      )
+    )
 
     ev[EVALUATED](
       context = context,
@@ -806,7 +822,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         pureContext,
         defaultCryptoContext,
         CTX[NoContext](Seq(), Map(), Array.empty[BaseFunction[NoContext]])
-      ))
+      )
+    )
 
     com.wavesplatform.lang.v1.parser.Parser.parseExpr(script) match {
       case fastparse.core.Parsed.Success(xs, _) =>
@@ -817,19 +834,24 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
             .explicitGet()
             ._1
         )
-      case fastparse.core.Parsed.Failure(_,index,_) => (List(), Left(s"Parse error at $index"))
+      case fastparse.core.Parsed.Failure(_, index, _) => (List(), Left(s"Parse error at $index"))
     }
   }
 
-  private def recCmp(cnt: Int)(f: ((String => String) => String) = (gen =>  gen("x") ++ gen("y") ++ s"x${cnt+1} == y${cnt+1}")): (Log[Id], Either[ExecutionError, Boolean]) = {
+  private def recCmp(cnt: Int)(
+      f: ((String => String) => String) = (gen => gen("x") ++ gen("y") ++ s"x${cnt + 1} == y${cnt + 1}")
+  ): (Log[Id], Either[ExecutionError, Boolean]) = {
     val context: CTX[NoContext] = Monoid.combineAll(
       Seq(
         pureContext,
         defaultCryptoContext,
         CTX[NoContext](Seq(), Map(), Array.empty[BaseFunction[NoContext]])
-      ))
+      )
+    )
 
-    def gen(a: String) = (0 to cnt).foldLeft(s"""let ${a}0="qqqq";""") { (c, n) => c ++ s"""let $a${n+1}=[$a$n,$a$n,$a$n];""" }
+    def gen(a: String) = (0 to cnt).foldLeft(s"""let ${a}0="qqqq";""") { (c, n) =>
+      c ++ s"""let $a${n + 1}=[$a$n,$a$n,$a$n];"""
+    }
     val script = f(gen)
 
     val r = noContextEvaluator.applyWithLogging[EVALUATED](
@@ -861,23 +883,23 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("recData fail by ARR") {
-    val cnt = 8
-    val (log, result) = recCmp(cnt)(gen => gen("x") ++ s"x${cnt+1}.size() == 3")
+    val cnt           = 8
+    val (log, result) = recCmp(cnt)(gen => gen("x") ++ s"x${cnt + 1}.size() == 3")
 
     result shouldBe 'Left
   }
 
   property("recData use uncomparable data") {
-    val cnt = 7
-    val (log, result) = recCmp(cnt)(gen => gen("x") ++ s"x${cnt+1}[1].size() == 3")
+    val cnt           = 7
+    val (log, result) = recCmp(cnt)(gen => gen("x") ++ s"x${cnt + 1}[1].size() == 3")
 
     result shouldBe Right(true)
   }
 
   property("List weight correct") {
-   val (log, Right(ARR(Seq(a,b)))) = recArrWeight("[[0] ++ [1], 0::1::nil]")
+    val (log, Right(ARR(Seq(a, b)))) = recArrWeight("[[0] ++ [1], 0::1::nil]")
 
-   a.weight shouldBe b.weight
+    a.weight shouldBe b.weight
   }
 
   private def genRCO(cnt: Int) = {
@@ -890,31 +912,42 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("recursive caseobject") {
     val environment = emptyBlockchainEnvironment()
-    val term = genRCO(3)
+    val term        = genRCO(3)
 
-    defaultEvaluator.apply[CONST_BOOLEAN](defaultFullContext.evaluationContext(environment), FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, term))) shouldBe evaluated(true)
+    defaultEvaluator.apply[CONST_BOOLEAN](
+      defaultFullContext.evaluationContext(environment),
+      FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, term))
+    ) shouldBe evaluated(true)
   }
 
   property("recursive caseobject fail by compare") {
     val environment = emptyBlockchainEnvironment()
-    val term = genRCO(4)
+    val term        = genRCO(4)
 
-    defaultEvaluator.apply[CONST_BOOLEAN](defaultFullContext.evaluationContext(environment), FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, term))) shouldBe 'Left
+    defaultEvaluator.apply[CONST_BOOLEAN](
+      defaultFullContext.evaluationContext(environment),
+      FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, term))
+    ) shouldBe 'Left
   }
 
   property("recursive caseobject compare with unit") {
     val environment = emptyBlockchainEnvironment()
-    val term = genRCO(4)
+    val term        = genRCO(4)
 
-    defaultEvaluator.apply[CONST_BOOLEAN](defaultFullContext.evaluationContext(environment), FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, REF("unit")))) shouldBe evaluated(false)
+    defaultEvaluator.apply[CONST_BOOLEAN](
+      defaultFullContext.evaluationContext(environment),
+      FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, REF("unit")))
+    ) shouldBe evaluated(false)
   }
 
-  private def multiSig(bodyBytes: Array[Byte],
-                       senderPK: PublicKey,
-                       alicePK: PublicKey,
-                       bobPK: PublicKey,
-                       aliceProof: Signature,
-                       bobProof: Signature): (Log[Id], Either[ExecutionError, Boolean]) = {
+  private def multiSig(
+      bodyBytes: Array[Byte],
+      senderPK: PublicKey,
+      alicePK: PublicKey,
+      bobPK: PublicKey,
+      aliceProof: Signature,
+      bobProof: Signature
+  ): (Log[Id], Either[ExecutionError, Boolean]) = {
     val txType = CASETYPEREF(
       "Transaction",
       List(
@@ -946,7 +979,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         pureContext,
         defaultCryptoContext,
         CTX[NoContext](Seq(txType), vars, Array.empty[BaseFunction[NoContext]])
-      ))
+      )
+    )
 
     val script =
       s"""
@@ -1058,12 +1092,14 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       FUNCTION_CALL(sumLong.header, List(REF("x"), REF("x")))
     }
 
-    val context = Monoid.combine(pureEvalContext,
-                                 EvaluationContext.build(
-                                   typeDefs = Map.empty,
-                                   letDefs = Map.empty,
-                                   functions = Seq(f, doubleFst)
-                                 ))
+    val context = Monoid.combine(
+      pureEvalContext,
+      EvaluationContext.build(
+        typeDefs = Map.empty,
+        letDefs = Map.empty,
+        functions = Seq(f, doubleFst)
+      )
+    )
 
     // g(...(g(f(1000)))))
     val expr = (1 to 6).foldLeft(FUNCTION_CALL(f.header, List(CONST_LONG(1000)))) {
@@ -1089,13 +1125,13 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val context = Monoid.combine(
       pureEvalContext,
       EvaluationContext.build(
-          typeDefs = Map.empty,
-          letDefs = Map(
-            "x" -> LazyVal.fromEvaluated[Id](3L),
-            "y" -> LazyVal.fromEvaluated[Id](100L)
-          ),
-          functions = Seq(doubleFn, subFn)
-        )
+        typeDefs = Map.empty,
+        letDefs = Map(
+          "x" -> LazyVal.fromEvaluated[Id](3L),
+          "y" -> LazyVal.fromEvaluated[Id](100L)
+        ),
+        functions = Seq(doubleFn, subFn)
+      )
     )
 
     // sub(dub(x), 7)
@@ -1105,5 +1141,26 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     // sub(7, dub(x))
     val expr2 = FUNCTION_CALL(subFn.header, List(CONST_LONG(7), FUNCTION_CALL(doubleFn.header, List(REF("x")))))
     ev[EVALUATED](context, expr2) shouldBe evaluated(1)
+  }
+
+  property("fromBase16String limit 32768 digits from V4") {
+    val string32Kb                   = ("fedcba9876543210" * (32 * 1024 / 16))
+    def script(base16String: String) =
+      FUNCTION_CALL(
+        Native(FunctionIds.FROMBASE16),
+        List(CONST_STRING(base16String, reduceLimit = false).explicitGet())
+      )
+
+    def bytes(base16String: String) =
+      ByteStr(BaseEncoding.base16().decode(base16String.toUpperCase))
+
+    val v3Ctx = defaultFullContext(V3).evaluationContext(emptyBlockchainEnvironment())
+    val v4Ctx = defaultFullContext(V4).evaluationContext(emptyBlockchainEnvironment())
+
+    defaultEvaluator[EVALUATED](v3Ctx, script(string32Kb)) shouldBe CONST_BYTESTR(bytes(string32Kb))
+    defaultEvaluator[EVALUATED](v4Ctx, script(string32Kb)) shouldBe CONST_BYTESTR(bytes(string32Kb))
+
+    defaultEvaluator[EVALUATED](v3Ctx, script(string32Kb + "aa")) shouldBe CONST_BYTESTR(bytes(string32Kb + "aa"))
+    defaultEvaluator[EVALUATED](v4Ctx, script(string32Kb + "aa")) shouldBe Left("Base16 decode input length=32770 should not exceed 32768")
   }
 }

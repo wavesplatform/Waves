@@ -606,7 +606,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     for (i <- 65528 to 65535) array(i) = 1
     val src =
       s""" arr.toInt(65528) """
-    val arrVal = ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(array)).explicitGet())
+    val arrVal = ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(array, reduceLimit = false)).explicitGet())
     eval[EVALUATED](
       src,
       ctxt = CTX[NoContext](
@@ -1563,7 +1563,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   private def bytes(base16String: String) = ByteStr(BaseEncoding.base16().decode(base16String.toUpperCase))
 
   property("fromBase16String limit 32768 digits from V4") {
-    val string32Kb                   = "fedcba9876543210" * (32 * 1024 / 16)
+    val string32Kb                   = ("fedcba9876543210" * (32 * 1024 / 16)).dropRight(2)
     def script(base16String: String) = s"""fromBase16String("$base16String")"""
 
     eval(script(string32Kb), version = V3) shouldBe CONST_BYTESTR(bytes(string32Kb))
