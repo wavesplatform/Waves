@@ -46,9 +46,7 @@ object BlockAppender extends ScorexLogging {
       scheduler: Scheduler,
       verify: Boolean = true
   )(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
-    Task {
-      doApply(blockchainUpdater, time, utxStorage, pos, verify)(newBlock)
-    }.executeOn(scheduler)
+    Task(doApply(blockchainUpdater, time, utxStorage, pos, verify)(newBlock)).executeOn(scheduler)
 
   def apply(
       blockchainUpdater: BlockchainUpdater with Blockchain,

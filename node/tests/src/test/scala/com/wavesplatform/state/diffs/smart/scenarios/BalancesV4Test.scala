@@ -2,11 +2,12 @@ package com.wavesplatform.state.diffs.smart.scenarios
 
 import cats.implicits._
 import com.wavesplatform.account.Alias
+import com.wavesplatform.block.TestBlock
+import com.wavesplatform.account.Alias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Asset => AssetType, DApp => DAppType, _}
@@ -75,9 +76,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
     lease2    = LeaseTransaction.selfSigned(2.toByte, acc1, dapp.toAddress, 10 * Constants.UnitsInWave, MinFee, ts + 3).explicitGet()
     leaseD    = LeaseTransaction.selfSigned(2.toByte, dapp, acc1.toAddress, 1 * Constants.UnitsInWave, MinFee, ts + 3).explicitGet()
     cancel1   = LeaseCancelTransaction.signed(1.toByte, acc1.publicKey, lease1.id(), MinFee, ts + 4, acc1.privateKey).explicitGet()
-    t = TransferTransaction
-      .selfSigned(TxVersion.V2, dapp, acc1.toAddress, Waves, 1 * Constants.UnitsInWave + MinFee, Waves, InvokeScriptTxFee, ByteStr.empty, ts + 5)
-      .explicitGet()
+    t         = SignedTx.transfer(TxVersion.V2, dapp, acc1.toAddress, Waves, 1 * Constants.UnitsInWave + MinFee, Waves, InvokeScriptTxFee, ByteStr.empty, ts + 5)
   } yield {
     (genesis ++ Seq(setScript, lease1, lease2), Seq(cancel1, leaseD, t), acc1, dapp, ci)
   }

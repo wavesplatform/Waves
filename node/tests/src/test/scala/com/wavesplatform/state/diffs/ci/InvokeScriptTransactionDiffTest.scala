@@ -27,7 +27,7 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import com.wavesplatform.settings.{TestFunctionalitySettings, TestSettings}
+import com.wavesplatform.settings.{TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
@@ -1598,7 +1598,7 @@ class InvokeScriptTransactionDiffTest
     compileContractFromExpr(expr, V4)
   }
 
-  property("issuing asset with existed id should produce error") {
+  property("issuing asset with existing id should produce error") {
     val uniqueAssetIdScenario =
       for {
         master  <- accountGen
@@ -1620,7 +1620,6 @@ class InvokeScriptTransactionDiffTest
     val blockchain: Blockchain = mock[Blockchain]
     forAll(uniqueAssetIdScenario) {
       case (asset, invoke, master, script, funcBinding) =>
-        (blockchain.settings _).expects().returning(TestSettings.Default.blockchainSettings).anyNumberOfTimes()
         (blockchain.assetScript _).expects(*).returning(None)
         (blockchain.accountScript _)
           .expects(master.toAddress)

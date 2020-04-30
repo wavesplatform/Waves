@@ -23,7 +23,8 @@ import play.api.libs.json.{JsObject, Json}
 
 class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks with Matchers with EitherMatchers with TransactionGen {
 
-  val publicKey = "73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK"
+  private val publicKey = PublicKey(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get)
+  private val address = publicKey.toAddress
 
   property("InvokeScriptTransaction serialization roundtrip") {
     forAll(invokeScriptGen(paymentListGen)) { transaction: InvokeScriptTransaction =>
@@ -74,19 +75,19 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
 
   property("decode pre-encoded bytes") {
     val bytes = Base64.decode(
-      "ABABRFnfcU6tj7ELaOMRU60BmUEXZSyzyWDG4yxX597CilhGAUSJ/UXOr7T3dYRD2dI6xLKS+XNccQNSaToBCQEAAAADZm9vAAAAAQEAAAAFYWxpY2UAAQApAAAAAAAAAAcBWd9xTq2PsQto4xFTrQGZQRdlLLPJYMbjLFfn3sKKWEYAAAAAAAGGoAAAAAFjgvl7hQEAAQBAL4aaBFut6sRjmJqyUMSsW344/xjKn74k0tXmtbAMnZhCIysagYHWE578HZUBuKPxN/3v8OxBmN3lSChpsYrsCg=="
+      "ABABVFnfcU6tj7ELaOMRU60BmUEXZSyzyWDG4yxX597CilhGAVRewPqA+Z1914TfBt/z+m12Y6x3AVxAShIBCQEAAAADZm9vAAAAAQEAAAAFYWxpY2UAAQApAAAAAAAAAAcBWd9xTq2PsQto4xFTrQGZQRdlLLPJYMbjLFfn3sKKWEYAAAAAAAGGoAAAAAFjgvl7hQEAAQBAL4aaBFut6sRjmJqyUMSsW344/xjKn74k0tXmtbAMnZhCIysagYHWE578HZUBuKPxN/3v8OxBmN3lSChpsYrsCg=="
     )
     val json = Json.parse(s"""{
                          "type": 16,
-                         "id": "F4Kf5GZqAEnfTgaK9Zj9CypXApE6M4yYGR2DQ3yMhjwF",
-                         "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",
+                         "id": "9dDhnisRgSviJhLDUK2AYHpB8ycd6ammtkRRswAmMn8y",
+                         "sender": "$address",
                          "senderPublicKey": "$publicKey",
                          "fee": 100000,
                          "feeAssetId": null,
                          "timestamp": 1526910778245,
                          "proofs": ["x7T161SxvUxpubEAKv4UL5ucB5pquAhTryZ8Qrd347TPuQ4yqqpVMQ2B5FpeFXGnpyLvb7wGeoNsyyjh5R61u7F"],
                          "version": 1,
-                         "dApp" : "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+                         "dApp" : "$address",
                          "call": {
                             "function" : "foo",
                              "args" : [
@@ -110,15 +111,15 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
   property("JSON format validation for InvokeScriptTransaction") {
     val js = Json.parse(s"""{
                          "type": 16,
-                         "id": "F4Kf5GZqAEnfTgaK9Zj9CypXApE6M4yYGR2DQ3yMhjwF",
-                         "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",
+                         "id": "J1LqcE16AYfL2LfPZVse9gtWHAV6ZsseJzT6dMhGD9ek",
+                         "sender": "$address",
                          "senderPublicKey": "$publicKey",
                          "fee": 100000,
                          "feeAssetId": null,
                          "timestamp": 1526910778245,
                          "proofs": ["x7T161SxvUxpubEAKv4UL5ucB5pquAhTryZ8Qrd347TPuQ4yqqpVMQ2B5FpeFXGnpyLvb7wGeoNsyyjh5R61u7F"],
                          "version": 1,
-                         "dApp" : "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+                         "dApp" : "3N2VhktvJsrW4PwMiFte3YsSeRgtideThTs",
                          "call": {
                             "function" : "foo",
                              "args" : [
@@ -145,7 +146,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
             List(Terms.CONST_BYTESTR(ByteStr(Base64.tryDecode("YWxpY2U=").get)).explicitGet())
           )
         ),
-        Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
+        Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(publicKey))),
         100000,
         Waves,
         1526910778245L
@@ -160,15 +161,15 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
   property("JSON format validation for InvokeScriptTransaction without FUNCTION_CALL") {
     val js = Json.parse(s"""{
                          "type": 16,
-                         "id": "CoAdpSKQWNJEieS9StynH8VwmaSPbKSFKEYWinkTGHBF",
-                         "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",
+                         "id": "etdrhfKHguSAuqgAipW2vb2VmtHe4PNenoRETRqxjir",
+                         "sender": "$address",
                          "senderPublicKey": "$publicKey",
                          "fee": 100000,
                          "feeAssetId": null,
                          "timestamp": 1526910778245,
                          "proofs": ["3frswEnyFZjTzBQ5pdNEJbPzvLp7Voz8sqZT3n7xsuVDdYGcasXgFNzb8HCrpNXYoDWLsHqrUSqcQfQJ8CRWjp4U"],
                          "version": 1,
-                         "dApp" : "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+                         "dApp" : "3N2VhktvJsrW4PwMiFte3YsSeRgtideThTs",
                          "payment" : [{
                             "amount" : 7,
                             "assetId" : "$publicKey"
@@ -182,7 +183,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
         KeyPair("test3".getBytes("UTF-8")),
         KeyPair("test4".getBytes("UTF-8")).toAddress,
         None,
-        Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
+        Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(publicKey))),
         100000,
         Waves,
         1526910778245L
@@ -197,7 +198,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
   property("Signed InvokeScriptTransactionRequest parser") {
     val req = SignedInvokeScriptRequest(
       Some(1.toByte),
-      senderPublicKey = publicKey,
+      senderPublicKey = publicKey.toString,
       fee = 1,
       feeAssetId = None,
       call = Some(
@@ -207,7 +208,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
         )
       ),
       payment = Some(Seq(Payment(1, Waves))),
-      dApp = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+      dApp = address.toString,
       timestamp = 11,
       proofs =
         Proofs(List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").map(s => ByteStr.decodeBase58(s).get))
@@ -217,11 +218,10 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
 
   property(s"can't have more than ${ContractLimits.MaxInvokeScriptArgs} args") {
     import com.wavesplatform.common.state.diffs.ProduceError._
-    val pk = PublicKey.fromBase58String(publicKey).explicitGet()
     InvokeScriptTransaction.create(
       1.toByte,
-      pk,
-      pk.toAddress,
+      publicKey,
+      address,
       Some(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Range(0, 23).map(_ => Terms.CONST_LONG(0)).toList)),
       Seq(),
       1,
@@ -232,12 +232,10 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
   }
 
   property(s"can call a func with ARR") {
-    val pk = PublicKey.fromBase58String(publicKey).explicitGet()
-    InvokeScriptTransaction
-      .create(
-        1.toByte,
-        pk,
-        pk.toAddress,
+    InvokeScriptTransaction.create(
+      1.toByte,
+      publicKey,
+        address,
         Some(
           Terms.FUNCTION_CALL(
             FunctionHeader.User("foo"),
@@ -255,11 +253,10 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
 
   property(s"can't call a func with non native(simple) args - CaseObj") {
     import com.wavesplatform.common.state.diffs.ProduceError._
-    val pk = PublicKey.fromBase58String(publicKey).explicitGet()
     InvokeScriptTransaction.create(
       1.toByte,
-      pk,
-      pk.toAddress,
+      publicKey,
+      address,
       Some(
         Terms.FUNCTION_CALL(
           FunctionHeader.User("foo"),
@@ -277,11 +274,10 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
   property("can't be more 5kb") {
     val largeString = "abcde" * 1024
     import com.wavesplatform.common.state.diffs.ProduceError._
-    val pk = PublicKey.fromBase58String(publicKey).explicitGet()
     InvokeScriptTransaction.create(
       1.toByte,
-      pk,
-      pk.toAddress,
+      publicKey,
+      address,
       Some(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_STRING(largeString).explicitGet()))),
       Seq(),
       1,
@@ -294,7 +290,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
   property("can't have zero amount") {
     val req = SignedInvokeScriptRequest(
       Some(1.toByte),
-      senderPublicKey = publicKey,
+      senderPublicKey = publicKey.toString,
       fee = 1,
       feeAssetId = None,
       call = Some(
@@ -304,7 +300,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
         )
       ),
       payment = Some(Seq(Payment(0, Waves))),
-      dApp = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+      dApp = address.toString,
       timestamp = 11,
       proofs =
         Proofs(List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").map(s => ByteStr.decodeBase58(s).get))
@@ -315,7 +311,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
   property("can't have negative amount") {
     val req = SignedInvokeScriptRequest(
       Some(1.toByte),
-      senderPublicKey = publicKey,
+      senderPublicKey = publicKey.toString,
       fee = 1,
       feeAssetId = None,
       call = Some(
@@ -325,7 +321,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
         )
       ),
       payment = Some(Seq(Payment(-1, Waves))),
-      dApp = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+      dApp = address.toString,
       timestamp = 11,
       proofs =
         Proofs(List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").map(s => ByteStr.decodeBase58(s).get))
