@@ -1,7 +1,7 @@
 package com.wavesplatform.metrics
 
 import com.wavesplatform.utils.LoggerFacade
-import kamon.metric.{Histogram, MeasurementUnit, Metric}
+import kamon.metric.{MeasurementUnit, Metric}
 
 object Instrumented {
   private[this] val NanosInMS = 1000000L
