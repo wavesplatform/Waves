@@ -1,7 +1,5 @@
 package com.wavesplatform.lang.compiler
 
-import java.nio.charset.StandardCharsets
-
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common
