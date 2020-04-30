@@ -22,7 +22,7 @@ import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, Portfolio}
+import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, Portfolio, StateHash}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -58,7 +58,8 @@ case class DebugApiRoute(
     mbsCacheSizesReporter: Coeval[MicroBlockSynchronizer.CacheSizes],
     scoreReporter: Coeval[RxScoreObserver.Stats],
     configRoot: ConfigObject,
-    loadBalanceHistory: Address => Seq[(Int, Long)]
+    loadBalanceHistory: Address => Seq[(Int, Long)],
+    loadStateHash: Int => Option[StateHash]
 ) extends ApiRoute
     with AuthRoute
     with ScorexLogging {
@@ -71,7 +72,7 @@ case class DebugApiRoute(
 
   override val settings: RestAPISettings = ws.restAPISettings
   override lazy val route: Route = pathPrefix("debug") {
-    stateChanges ~ balanceHistory ~ validate ~ withAuth {
+    stateChanges ~ balanceHistory ~ stateHash ~ validate ~ withAuth {
       state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ configInfo ~ print
     }
   }
@@ -274,6 +275,19 @@ case class DebugApiRoute(
               .take(limit)
           }
         }
+      }
+    }
+
+  def stateHash: Route =
+    (get & path("stateHash" / IntNumber)) { height =>
+      val result = for {
+        sh      <- loadStateHash(height)
+        h <- blockchain.blockHeader(height)
+      } yield Json.toJson(sh).as[JsObject] ++ Json.obj("blockId" -> h.id().toString)
+
+      result match {
+        case Some(value) => complete(value)
+        case None        => complete(StatusCodes.NotFound)
       }
     }
 
