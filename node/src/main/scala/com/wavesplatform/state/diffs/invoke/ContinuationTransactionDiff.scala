@@ -6,6 +6,7 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, DApp}
+import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.evaluator.ctx.LazyVal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -40,10 +41,6 @@ object ContinuationTransactionDiff {
         DirectiveSet(script.stdLibVersion, Account, DApp).left.map(GenericError(_))
       )
 
-      ctx = PureContext.build(Global, script.stdLibVersion).withEnvironment[Environment] |+|
-        CryptoContext.build(Global, script.stdLibVersion).withEnvironment[Environment] |+|
-        WavesContext.build(directives).copy(vars = Map())
-
       input <- TracedResult(
         buildThisValue(Coproduct[TxOrd](invokeScriptTransaction: Transaction), blockchain, directives, None).left.map(GenericError(_))
       )
@@ -58,9 +55,15 @@ object ContinuationTransactionDiff {
         tx.invokeScriptTransactionId
       )
       scriptResult <- {
+        val ctx =
+          PureContext.build(Global, script.stdLibVersion).withEnvironment[Environment] |+|
+          CryptoContext.build(Global, script.stdLibVersion).withEnvironment[Environment] |+|
+          WavesContext.build(directives).copy(vars = Map())
+
         val expr = blockchain.continuationStates(tx.invokeScriptTransactionId).asInstanceOf[ContinuationState.InProgress].expr
+        val limit = ContractLimits.MaxComplexityByVersion(script.stdLibVersion)
         val r = ContractEvaluator
-          .applyV2(ctx.evaluationContext(environment), Map[String, LazyVal[Id]](), expr, script.stdLibVersion, tx.invokeScriptTransactionId)
+          .applyV2(ctx.evaluationContext(environment), Map[String, LazyVal[Id]](), expr, script.stdLibVersion, tx.invokeScriptTransactionId, limit)
           .leftMap { case (error, log) => ScriptExecutionError.dApp(error, log) }
         TracedResult(
           r,

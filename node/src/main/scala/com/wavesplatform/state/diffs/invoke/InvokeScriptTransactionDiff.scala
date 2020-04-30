@@ -4,6 +4,7 @@ import cats.implicits._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.FunctionCallPolicyProvider._
 import com.wavesplatform.lang._
@@ -119,7 +120,17 @@ object InvokeScriptTransactionDiff {
                     tx.id()
                   )
 
-                  val evaluate = if (blockchain.settings.useEvaluatorV2) evaluateV2 _ else evaluateV1 _
+                  val evaluate =
+                    if (blockchain.settings.useEvaluatorV2) {
+                      //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
+                      val evaluatorV2Limit =
+                        if (blockchain.estimator.version == 2)
+                          Int.MaxValue
+                        else
+                          ContractLimits.MaxComplexityByVersion(version)
+                      evaluateV2(_, _, _, _, _, evaluatorV2Limit)
+                    } else evaluateV1 _
+
                   Try(evaluate(version, contract, directives, invocation, environment))
                     .fold(e => Left((e.getMessage, Nil)), identity)
                     .leftMap { case (error, log) => ScriptExecutionError.dApp(error, log) }
@@ -182,7 +193,8 @@ object InvokeScriptTransactionDiff {
       contract: DApp,
       directives: DirectiveSet,
       invocation: ContractEvaluator.Invocation,
-      environment: WavesEnvironment
+      environment: WavesEnvironment,
+      limit: Int
   ) = {
     val wavesContext = WavesContext.build(directives)
     val ctx =
@@ -191,7 +203,7 @@ object InvokeScriptTransactionDiff {
         wavesContext.copy(vars = Map())
 
     val freezingLets = wavesContext.evaluationContext(environment).letDefs
-    ContractEvaluator.applyV2(ctx.evaluationContext(environment), freezingLets, contract, invocation, version)
+    ContractEvaluator.applyV2(ctx.evaluationContext(environment), freezingLets, contract, invocation, version, limit)
   }
 
   private def checkCall(fc: FUNCTION_CALL, blockchain: Blockchain): Either[ExecutionError, Unit] = {

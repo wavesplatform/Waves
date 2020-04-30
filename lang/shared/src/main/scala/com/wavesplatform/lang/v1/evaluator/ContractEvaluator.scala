@@ -8,12 +8,12 @@ import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.VerifierFunction
 import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal, LoggedEvaluationContext}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.{AttachedPayments, Ord, Recipient, Tx}
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 
 import scala.collection.mutable.ListBuffer
 import scala.util.Try
@@ -97,18 +97,20 @@ object ContractEvaluator {
       freezingLets: Map[String, LazyVal[Id]],
       dApp: DApp,
       i: Invocation,
-      version: StdLibVersion
+      version: StdLibVersion,
+      limit: Int
   ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] =
     buildExprFromInvocation(dApp, i, version)
       .leftMap((_, Nil))
-      .flatMap(applyV2(ctx, freezingLets, _, version, i.transactionId))
+      .flatMap(applyV2(ctx, freezingLets, _, version, i.transactionId, limit))
 
   def applyV2(
       ctx: EvaluationContext[Environment, Id],
       freezingLets: Map[String, LazyVal[Id]],
       expr: EXPR,
       version: StdLibVersion,
-      transactionId: ByteStr
+      transactionId: ByteStr,
+      limit: Int
   ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] = {
     val exprWithLets = freezingLets.toStream.foldLeft(expr) {
       case (buildingExpr, (letName, letValue)) =>
@@ -117,7 +119,7 @@ object ContractEvaluator {
     val log       = ListBuffer[LogItem[Id]]()
     val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => log.append((name, value)), ctx)
     val evaluator = new EvaluatorV2(loggedCtx, version)
-    Try(evaluator(exprWithLets, ContractLimits.MaxComplexityByVersion(version))).toEither
+    Try(evaluator(exprWithLets, limit)).toEither
       .leftMap(_.getMessage)
       .flatMap {
         case (value: EVALUATED, _)          => ScriptResult.fromObj(ctx, transactionId, value, version)
