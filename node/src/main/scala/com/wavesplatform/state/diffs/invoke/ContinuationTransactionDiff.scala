@@ -33,7 +33,7 @@ object ContinuationTransactionDiff {
       scriptInfo <- TracedResult(
         blockchain
           .accountScript(dAppAddress)
-          .toRight(GenericError("ERROR"))
+          .toRight(GenericError(s"Cannot find dApp with address=$dAppAddress"))
       )
       AccountScriptInfo(dAppPublicKey, script, _, callableComplexities) = scriptInfo
       directives <- TracedResult(
@@ -60,8 +60,7 @@ object ContinuationTransactionDiff {
       scriptResult <- {
         val r = ContractEvaluator
           .applyV2(ctx.evaluationContext(environment), Map[String, LazyVal[Id]](), tx.expr, script.stdLibVersion, tx.invokeScriptTransactionId)
-          .left
-          .map { case (error, log) => ScriptExecutionError.dApp(error, log) }
+          .leftMap { case (error, log) => ScriptExecutionError.dApp(error, log) }
         TracedResult(
           r,
           List(InvokeScriptTrace(invokeScriptTransaction.dAppAddressOrAlias, invokeScriptTransaction.funcCall, r.map(_._1), r.fold(_.log, _._2)))
@@ -94,7 +93,8 @@ object ContinuationTransactionDiff {
       resultDiff <- scriptResult._1 match {
         case ScriptResultV3(dataItems, transfers) =>
           doProcessActions(dataItems ::: transfers).map(_.copy(transactions = Map()) |+| continuationStopDiff)
-        case ScriptResultV4(actions) => doProcessActions(actions).map(_.copy(transactions = Map()) |+| continuationStopDiff)
+        case ScriptResultV4(actions) =>
+          doProcessActions(actions).map(_.copy(transactions = Map()) |+| continuationStopDiff)
         case ir: IncompleteResult =>
           TracedResult.wrapValue[Diff, ValidationError](
             Diff.stateOps(continuationStates = Map(tx.invokeScriptTransactionId -> ContinuationState.InProgress(ir.expr)))
