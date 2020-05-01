@@ -712,7 +712,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   private def hashTest(bodyBytes: Array[Byte], hash: String, lim: Int)(implicit version: StdLibVersion): Either[ExecutionError, ByteStr] = {
     val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
-      ("b", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(bodyBytes), reduceLimit = false).explicitGet())))
+      ("b", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(bodyBytes), limit = CONST_BYTESTR.DataTxSize).explicitGet())))
     )
 
     val context: CTX[NoContext] = Monoid.combineAll(
@@ -782,7 +782,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val txObj = CaseObj(
       txType,
       Map(
-        "bodyBytes" -> CONST_BYTESTR(ByteStr(bodyBytes), reduceLimit = false).explicitGet(),
+        "bodyBytes" -> CONST_BYTESTR(ByteStr(bodyBytes), limit = CONST_BYTESTR.ProtoDataTxSize).explicitGet(),
         "senderPk"  -> ByteStr(publicKey),
         "proof0"    -> ByteStr(signature)
       )

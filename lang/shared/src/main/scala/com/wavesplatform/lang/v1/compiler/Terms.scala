@@ -15,7 +15,7 @@ import monix.eval.Coeval
 object Terms {
   val DataTxMaxBytes: Int       = 150 * 1024     // should be the same as DataTransaction.MaxBytes
   val DataTxMaxProtoBytes: Int  = 165890         // should be the same as DataTransaction.MaxProtoBytes
-  val DATA_ENTRY_VALUE_MAX: Int = Short.MaxValue // should be the same as DataEntry.MaxValueSize
+  val DataEntryValueMax: Int    = Short.MaxValue // should be the same as DataEntry.MaxValueSize
 
   sealed abstract class DECLARATION {
     def name: String
@@ -123,26 +123,17 @@ object Terms {
   }
 
   object CONST_BYTESTR {
-    /*
-    sealed trait Limit
-    case object DataEntrySize   extends Limit
-    case object DataTxSize      extends Limit
-    case object ProtoDataTxSize extends Limit
-     */
+    sealed abstract class Limit(val value: Int)
+    case object DataEntrySize   extends Limit(DataEntryValueMax)
+    case object DataTxSize      extends Limit(DataTxMaxBytes)
+    case object ProtoDataTxSize extends Limit(DataTxMaxProtoBytes)
 
-    def apply(bs: ByteStr, reduceLimit: Boolean = true): Either[ExecutionError, EVALUATED] = {
-      val limit =
-        if (reduceLimit) DATA_ENTRY_VALUE_MAX
-        else DataTxMaxBytes
-
-      val actualSize = bs.size
-
+    def apply(bs: ByteStr, limit: Limit = DataEntrySize): Either[ExecutionError, EVALUATED] =
       Either.cond(
-        actualSize <= limit,
+        bs.size <= limit.value,
         new CONST_BYTESTR(bs),
-        s"ByteStr size=$actualSize exceeds $limit bytes"
+        s"ByteStr size=${bs.size} exceeds ${limit.value} bytes"
       )
-    }
 
     def unapply(arg: CONST_BYTESTR): Option[ByteStr] =
       Some(arg.bs)
@@ -164,7 +155,7 @@ object Terms {
   object CONST_STRING {
     def apply(s: String, reduceLimit: Boolean = true): Either[ExecutionError, EVALUATED] = {
       val limit =
-        if (reduceLimit) DATA_ENTRY_VALUE_MAX
+        if (reduceLimit) DataEntryValueMax
         else DataTxMaxBytes
 
       val actualSize = s.getBytes(StandardCharsets.UTF_8).length

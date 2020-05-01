@@ -47,7 +47,7 @@ object PureContext {
   lazy val sumString: BaseFunction[NoContext] =
     createRawOp(SUM_OP, STRING, STRING, SUM_STRING, 10) {
       case (CONST_STRING(a), CONST_STRING(b)) =>
-        if (a.length + b.length <= Terms.DATA_ENTRY_VALUE_MAX) {
+        if (a.length + b.length <= Terms.DataEntryValueMax) {
           CONST_STRING(a + b)
         } else {
           Left("String is too large")
@@ -57,7 +57,7 @@ object PureContext {
   lazy val sumByteStr: BaseFunction[NoContext] =
     createRawOp(SUM_OP, BYTESTR, BYTESTR, SUM_BYTES, 10) {
       case (CONST_BYTESTR(a), CONST_BYTESTR(b)) =>
-        if (a.arr.length + b.arr.length <= Terms.DATA_ENTRY_VALUE_MAX) {
+        if (a.arr.length + b.arr.length <= Terms.DataEntryValueMax) {
           CONST_BYTESTR(a ++ b)
         } else {
           Left("ByteVector is too large")

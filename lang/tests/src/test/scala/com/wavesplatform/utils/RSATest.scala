@@ -137,7 +137,7 @@ class RSATest extends PropSpec with PropertyChecks with Matchers with BeforeAndA
           val signature = privateSignature.sign
 
           val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
-             ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), reduceLimit = false).explicitGet()))),
+             ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet()))),
            )
           val ctx: CTX[NoContext] = PureContext.build(Global, V4) |+| CryptoContext.build(Global, V4) |+| CTX[NoContext](Seq(), vars, Array.empty[BaseFunction[NoContext]])
 
@@ -163,7 +163,7 @@ class RSATest extends PropSpec with PropertyChecks with Matchers with BeforeAndA
           val signature = privateSignature.sign
 
           val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
-             ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), reduceLimit = false).explicitGet()))),
+             ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet()))),
            )
           val ctx: CTX[NoContext] = PureContext.build(Global, V4) |+| CryptoContext.build(Global, V4) |+| CTX[NoContext](Seq(), vars, Array.empty[BaseFunction[NoContext]])
 
@@ -188,7 +188,7 @@ class RSATest extends PropSpec with PropertyChecks with Matchers with BeforeAndA
         val signature = privateSignature.sign
 
         val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
-           ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), reduceLimit = false).explicitGet()))),
+           ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet()))),
          )
         val ctx: CTX[NoContext] = PureContext.build(Global, V4) |+| CryptoContext.build(Global, V4) |+| CTX[NoContext](Seq(), vars, Array.empty[BaseFunction[NoContext]])
 
@@ -212,7 +212,7 @@ class RSATest extends PropSpec with PropertyChecks with Matchers with BeforeAndA
         val signature = privateSignature.sign
 
         val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
-           ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), reduceLimit = false).explicitGet()))),
+           ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet()))),
          )
         val ctx: CTX[NoContext] = PureContext.build(Global, V3) |+| CryptoContext.build(Global, V3) |+| CTX[NoContext](Seq(), vars, Array.empty[BaseFunction[NoContext]])
 
@@ -236,7 +236,7 @@ class RSATest extends PropSpec with PropertyChecks with Matchers with BeforeAndA
         val signature = privateSignature.sign
 
         val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
-           ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), reduceLimit = false).explicitGet()))),
+           ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet()))),
          )
         val ctx: CTX[NoContext] = PureContext.build(Global, V3) |+| CryptoContext.build(Global, V3) |+| CTX[NoContext](Seq(), vars, Array.empty[BaseFunction[NoContext]])
 

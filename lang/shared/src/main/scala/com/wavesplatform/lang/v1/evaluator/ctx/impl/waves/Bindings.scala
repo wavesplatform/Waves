@@ -29,11 +29,15 @@ object Bindings {
   private def proofsPart(existingProofs: IndexedSeq[ByteStr]) =
     "proofs" -> ARR(existingProofs.map(b => CONST_BYTESTR(b).explicitGet) ++ Seq.fill(8 - existingProofs.size)(CONST_BYTESTR(ByteStr.empty).explicitGet), false).explicitGet
 
-  private def provenTxPart(tx: Proven, proofsEnabled: Boolean): Map[String, EVALUATED] = {
+  private def provenTxPart(tx: Proven, proofsEnabled: Boolean, version: StdLibVersion): Map[String, EVALUATED] = {
+    val limit =
+      if (version >= V4) CONST_BYTESTR.ProtoDataTxSize
+      else CONST_BYTESTR.DataTxSize
+
     val commonPart = combine(Map(
                                "sender"          -> senderObject(tx.sender),
                                "senderPublicKey" -> tx.senderPk,
-                               "bodyBytes"       -> CONST_BYTESTR(tx.bodyBytes, reduceLimit = false).explicitGet()
+                               "bodyBytes"       -> CONST_BYTESTR(tx.bodyBytes, limit).explicitGet()
                              ),
                              headerPart(tx.h))
 
@@ -135,7 +139,7 @@ object Bindings {
       version
     )
 
-  def mapReissuePseudoTx(r: ReissuePseudoTx): CaseObj =
+  def mapReissuePseudoTx(r: ReissuePseudoTx, version: StdLibVersion): CaseObj =
     reissueTransactionObject(
       proofsEnabled = false,
       Proven(
@@ -147,10 +151,11 @@ object Bindings {
       ),
       r.reissue.quantity,
       r.reissue.assetId,
-      r.reissue.isReissuable
+      r.reissue.isReissuable,
+      version
     )
 
-  def mapBurnPseudoTx(b: BurnPseudoTx): CaseObj =
+  def mapBurnPseudoTx(b: BurnPseudoTx, version: StdLibVersion): CaseObj =
     burnTransactionObject(
       proofsEnabled = false,
       Proven(
@@ -161,7 +166,8 @@ object Bindings {
         proofs = IndexedSeq.empty
       ),
       b.burn.quantity,
-      b.burn.assetId
+      b.burn.assetId,
+      version
     )
 
   def transactionObject(tx: Tx, proofsEnabled: Boolean, version: StdLibVersion = V3): CaseObj =
@@ -170,7 +176,7 @@ object Bindings {
         CaseObj(genesisTransactionType, Map("amount" -> CONST_LONG(amount)) ++ headerPart(h) + mapRecipient(recipient))
       case Tx.Payment(p, amount, recipient) =>
         CaseObj(buildPaymentTransactionType(proofsEnabled),
-                Map("amount" -> CONST_LONG(amount)) ++ provenTxPart(p, proofsEnabled) + mapRecipient(recipient))
+                Map("amount" -> CONST_LONG(amount)) ++ provenTxPart(p, proofsEnabled, version) + mapRecipient(recipient))
       case transfer: Tx.Transfer => transferTransactionObject(transfer, proofsEnabled, version)
       case Tx.Issue(p, quantity, name, description, reissuable, decimals, scriptOpt) =>
         CaseObj(
@@ -184,13 +190,13 @@ object Bindings {
               "decimals"    -> decimals,
               "script"      -> scriptOpt
             ),
-            provenTxPart(p, proofsEnabled)
+            provenTxPart(p, proofsEnabled, version)
           )
         )
       case ReIssue(p, quantity, assetId, reissuable) =>
-        reissueTransactionObject(proofsEnabled, p, quantity, assetId, reissuable)
+        reissueTransactionObject(proofsEnabled, p, quantity, assetId, reissuable, version)
       case Tx.Burn(p, quantity, assetId) =>
-        burnTransactionObject(proofsEnabled, p, quantity, assetId)
+        burnTransactionObject(proofsEnabled, p, quantity, assetId, version)
       case CI(p, addressOrAlias, payments, feeAssetId, funcName, funcArgs) =>
         CaseObj(
           buildInvokeScriptTransactionType(proofsEnabled, version),
@@ -202,14 +208,14 @@ object Bindings {
               "args"       -> funcArgs
             ),
             Map(buildPayments(payments)),
-            provenTxPart(p, proofsEnabled)
+            provenTxPart(p, proofsEnabled, version)
           )
         )
 
       case Lease(p, amount, recipient) =>
         CaseObj(
           buildLeaseTransactionType(proofsEnabled),
-          combine(Map("amount" -> amount), provenTxPart(p, proofsEnabled) + mapRecipient(recipient))
+          combine(Map("amount" -> amount), provenTxPart(p, proofsEnabled, version) + mapRecipient(recipient))
         )
       case LeaseCancel(p, leaseId) =>
         CaseObj(
@@ -217,14 +223,14 @@ object Bindings {
           combine(Map(
                     "leaseId" -> leaseId,
                   ),
-                  provenTxPart(p, proofsEnabled))
+                  provenTxPart(p, proofsEnabled, version))
         )
       case CreateAlias(p, alias) =>
         CaseObj(buildCreateAliasTransactionType(proofsEnabled),
                 combine(Map(
                           "alias" -> alias,
                         ),
-                        provenTxPart(p, proofsEnabled)))
+                        provenTxPart(p, proofsEnabled, version)))
       case MassTransfer(p, assetId, transferCount, totalAmount, transfers, attachment) =>
         CaseObj(
           buildMassTransferTransactionType(proofsEnabled, version),
@@ -237,20 +243,20 @@ object Bindings {
               "totalAmount"   -> totalAmount,
               "attachment"    -> attachment.evaluated
             ),
-            provenTxPart(p, proofsEnabled)
+            provenTxPart(p, proofsEnabled, version)
           )
         )
       case SetScript(p, scriptOpt) =>
-        CaseObj(buildSetScriptTransactionType(proofsEnabled), Map("script" -> fromOptionBV(scriptOpt)) ++ provenTxPart(p, proofsEnabled))
+        CaseObj(buildSetScriptTransactionType(proofsEnabled), Map("script" -> fromOptionBV(scriptOpt)) ++ provenTxPart(p, proofsEnabled, version))
       case SetAssetScript(p, assetId, scriptOpt) =>
         CaseObj(
           buildSetAssetScriptTransactionType(proofsEnabled),
-          combine(Map("script" -> fromOptionBV(scriptOpt), "assetId" -> assetId), provenTxPart(p, proofsEnabled))
+          combine(Map("script" -> fromOptionBV(scriptOpt), "assetId" -> assetId), provenTxPart(p, proofsEnabled, version))
         )
       case Sponsorship(p, assetId, minSponsoredAssetFee) =>
         CaseObj(
           buildSponsorFeeTransactionType(proofsEnabled),
-          combine(Map("assetId" -> assetId, "minSponsoredAssetFee" -> minSponsoredAssetFee), provenTxPart(p, proofsEnabled))
+          combine(Map("assetId" -> assetId, "minSponsoredAssetFee" -> minSponsoredAssetFee), provenTxPart(p, proofsEnabled, version))
         )
       case Data(p, data) =>
         def mapValue(e: Any): (EVALUATED, CASETYPEREF) =
@@ -279,7 +285,7 @@ object Bindings {
           buildDataTransactionType(proofsEnabled, version),
           combine(
             Map("data" -> data.map(mapDataEntry)),
-            provenTxPart(p, proofsEnabled)
+            provenTxPart(p, proofsEnabled, version)
           )
         )
       case Exchange(p, amount, price, buyMatcherFee, sellMatcherFee, buyOrder, sellOrder) =>
@@ -294,7 +300,7 @@ object Bindings {
               "buyMatcherFee"  -> buyMatcherFee,
               "sellMatcherFee" -> sellMatcherFee,
             ),
-            provenTxPart(p, proofsEnabled)
+            provenTxPart(p, proofsEnabled, version)
           )
         )
       case UpdateAssetInfo(p, assetId, name, description) =>
@@ -306,7 +312,7 @@ object Bindings {
               "name" -> name,
               "description" -> description
             ),
-            provenTxPart(p, proofsEnabled)
+            provenTxPart(p, proofsEnabled, version)
           )
         )
     }
@@ -316,7 +322,8 @@ object Bindings {
     p: Proven,
     quantity: Long,
     assetId: ByteStr,
-    reissuable: Boolean
+    reissuable: Boolean,
+    version: StdLibVersion
   ): CaseObj =
     CaseObj(
       buildReissueTransactionType(proofsEnabled),
@@ -326,7 +333,7 @@ object Bindings {
           "assetId" -> assetId,
           "reissuable" -> reissuable,
         ),
-        provenTxPart(p, proofsEnabled)
+        provenTxPart(p, proofsEnabled, version)
       )
     )
 
@@ -334,7 +341,8 @@ object Bindings {
     proofsEnabled: Boolean,
     p: Proven,
     quantity: Long,
-    assetId: ByteStr
+    assetId: ByteStr,
+    version: StdLibVersion
   ): CaseObj =
     CaseObj(
       buildBurnTransactionType(proofsEnabled),
@@ -343,7 +351,7 @@ object Bindings {
           "quantity" -> quantity,
           "assetId"  -> assetId
         ),
-        provenTxPart(p, proofsEnabled)
+        provenTxPart(p, proofsEnabled, version)
       )
     )
 
@@ -357,7 +365,7 @@ object Bindings {
           "assetId"    -> tx.assetId,
           "attachment" -> tx.attachment.evaluated
         ),
-        provenTxPart(tx.p, proofsEnabled) + mapRecipient(tx.recipient)
+        provenTxPart(tx.p, proofsEnabled, version) + mapRecipient(tx.recipient)
       )
     )
 

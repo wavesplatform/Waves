@@ -52,7 +52,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
   }
 
   property("string limit") {
-    val maxString = "a" * Terms.DATA_ENTRY_VALUE_MAX
+    val maxString = "a" * Terms.DataEntryValueMax
     val expr = Parser.parseExpr(s""" "$maxString" """).get.value
     ExpressionCompiler(compilerContext, expr).map(_._1) shouldBe CONST_STRING(maxString)
 

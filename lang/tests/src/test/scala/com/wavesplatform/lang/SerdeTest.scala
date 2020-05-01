@@ -128,7 +128,7 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
   }
 
   "too big string" in {
-    val maxString = "a" * Terms.DATA_ENTRY_VALUE_MAX
+    val maxString = "a" * Terms.DataEntryValueMax
     val expr1     = Serde.serialize(CONST_STRING(maxString, reduceLimit = false).explicitGet())
     Serde.deserialize(expr1).map(_._1) shouldBe CONST_STRING(maxString)
 
@@ -138,12 +138,12 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
   }
 
   "too big bytes" in {
-    val maxBytes = ("a" * Terms.DATA_ENTRY_VALUE_MAX).getBytes(StandardCharsets.UTF_8)
-    val expr1    = Serde.serialize(CONST_BYTESTR(ByteStr(maxBytes), reduceLimit = false).explicitGet())
+    val maxBytes = ("a" * Terms.DataEntryValueMax).getBytes(StandardCharsets.UTF_8)
+    val expr1    = Serde.serialize(CONST_BYTESTR(ByteStr(maxBytes)).explicitGet())
     Serde.deserialize(expr1).map(_._1) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
 
     val tooBigBytes = maxBytes :+ (1: Byte)
-    val expr2       = Serde.serialize(CONST_BYTESTR(ByteStr(tooBigBytes), reduceLimit = false).explicitGet())
+    val expr2       = Serde.serialize(CONST_BYTESTR(ByteStr(tooBigBytes), limit = CONST_BYTESTR.DataTxSize).explicitGet())
     Serde.deserialize(expr2) should produce("ByteStr size=32768 exceeds 32767 bytes")
   }
 

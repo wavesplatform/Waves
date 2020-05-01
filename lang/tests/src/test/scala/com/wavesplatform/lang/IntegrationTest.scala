@@ -606,7 +606,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     for (i <- 65528 to 65535) array(i) = 1
     val src =
       s""" arr.toInt(65528) """
-    val arrVal = ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(array), reduceLimit = false).explicitGet())
+    val arrVal = ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(array), limit = CONST_BYTESTR.DataTxSize).explicitGet())
     eval[EVALUATED](
       src,
       ctxt = CTX[NoContext](
@@ -1570,8 +1570,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("string limit") {
-    val almostMaxString               = "a" * (Terms.DATA_ENTRY_VALUE_MAX - 1)
-    val maxBytes                      = ("a" * Terms.DATA_ENTRY_VALUE_MAX).getBytes(StandardCharsets.UTF_8)
+    val almostMaxString               = "a" * (Terms.DataEntryValueMax - 1)
+    val maxBytes                      = ("a" * Terms.DataEntryValueMax).getBytes(StandardCharsets.UTF_8)
     val constructingTooBigString      = s""" "$almostMaxString" + "aa" """
     val constructingMaxStringAndBytes = s""" ("$almostMaxString" + "a").toBytes() """
 
@@ -1583,7 +1583,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("bytes limit") {
-    val bytes = ByteStr(("a" * (Terms.DATA_ENTRY_VALUE_MAX / 4)).getBytes(StandardCharsets.UTF_8))
+    val bytes = ByteStr(("a" * (Terms.DataEntryValueMax / 4)).getBytes(StandardCharsets.UTF_8))
     val constructingMaxBytes =
       s""" base64'${bytes.base64Raw}' +
          | base64'${bytes.base64Raw}' +
@@ -1594,11 +1594,11 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val constructingTooBigBytes = constructingMaxBytes + "+ base58'a'"
 
     inside(eval[EVALUATED](constructingMaxBytes, version = V3)) {
-      case Right(CONST_BYTESTR(bytes)) => bytes.size shouldBe Terms.DATA_ENTRY_VALUE_MAX
+      case Right(CONST_BYTESTR(bytes)) => bytes.size shouldBe Terms.DataEntryValueMax
     }
 
     inside(eval[EVALUATED](constructingMaxBytes, version = V4)) {
-      case Right(CONST_BYTESTR(bytes)) => bytes.size shouldBe Terms.DATA_ENTRY_VALUE_MAX
+      case Right(CONST_BYTESTR(bytes)) => bytes.size shouldBe Terms.DataEntryValueMax
     }
 
     eval(constructingTooBigBytes, version = V3) should produce("ByteVector is too large")
