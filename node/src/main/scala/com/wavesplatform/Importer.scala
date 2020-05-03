@@ -225,7 +225,7 @@ object Importer extends ScorexLogging {
     sys.addShutdownHook {
       quit = true
       Await.ready(Future.sequence(extensions.map(_.shutdown())), settings.extensionsShutdownTimeout)
-      Await.result(Kamon.stopAllReporters(), 10.seconds)
+      Await.result(Kamon.stopModules(), 10.seconds)
       lock.synchronized {
         blockchainUpdater.shutdown()
         levelDb.close()
