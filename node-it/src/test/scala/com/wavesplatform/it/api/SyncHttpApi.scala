@@ -358,7 +358,7 @@ object SyncHttpApi extends Assertions {
         sourceAddress: String,
         assetId: String,
         baseFee: Long,
-        fee: Long = sponsorFee,
+        fee: Long = sponsorReducedFee,
         version: Byte = 1,
         waitForTx: Boolean = false,
         amountsAsStrings: Boolean = false
