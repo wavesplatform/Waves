@@ -24,14 +24,17 @@ class DataTransactionBodyBytesByteVectorSuite extends BaseTransactionSuite {
       .withDefault(1)
       .buildNonConflicting()
 
-  val scriptV3 =
+  private val maxDataTxV1bodyBytesSize = 153530
+  // actually lower than Terms.DataTxMaxBytes
+
+  private val scriptV3 =
     compile(
       s"""
          |{-# STDLIB_VERSION 3 #-}
          |{-# CONTENT_TYPE EXPRESSION #-}
          |
-         | tx.bodyBytes.size() == 153530  # actually lower than ${Terms.DataTxMaxBytes}
-         """.stripMargin
+         | tx.bodyBytes.size() == $maxDataTxV1bodyBytesSize
+       """.stripMargin
     )
 
   val scriptV4 =
@@ -40,8 +43,9 @@ class DataTransactionBodyBytesByteVectorSuite extends BaseTransactionSuite {
          |{-# STDLIB_VERSION 4 #-}
          |{-# CONTENT_TYPE EXPRESSION #-}
          |
-         | tx.bodyBytes.size() == ${Terms.DataTxMaxProtoBytes}
-         """.stripMargin
+         | tx.bodyBytes.size() == ${Terms.DataTxMaxProtoBytes}        &&
+         | sigVerify(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)
+       """.stripMargin
     )
 
   private val maxDataEntriesV1 =
