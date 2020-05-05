@@ -1,8 +1,13 @@
 package com.wavesplatform.lang.v1.compiler
 
+import java.nio.charset.StandardCharsets
+
 import cats.Show
+import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
+import com.wavesplatform.lang.v1.parser.Expressions
+import com.wavesplatform.lang.v1.parser.Expressions.{Declaration, PART}
 
 sealed trait CompilationError {
   def start: Int
@@ -50,6 +55,17 @@ object CompilationError {
 
   final case class BadFunctionSignatureSameArgNames(start: Int, end: Int, name: String) extends CompilationError {
     val message = s"Function '$name' declared with duplicating argument names"
+  }
+
+  final case class TooLongDeclarationName(start: Int, end: Int, decl: Declaration) extends CompilationError {
+    private val declType = decl match {
+      case _: Expressions.LET => "Let"
+      case _: Expressions.FUNC => "Function"
+    }
+    private val name = decl.name.asInstanceOf[PART.VALID[String]].v
+    private val size = name.getBytes(StandardCharsets.UTF_8).length
+
+    val message = s"$declType '$name' size=$size exceeds ${ContractLimits.MaxDeclarationNameInBytes}"
   }
 
   final case class FunctionNotFound(start: Int, end: Int, name: String, argTypes: List[String]) extends CompilationError {

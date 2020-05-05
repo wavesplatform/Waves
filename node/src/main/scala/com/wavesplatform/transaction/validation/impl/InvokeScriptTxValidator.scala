@@ -41,10 +41,10 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
       V.cond(
         funcCallOpt.isEmpty || (funcCallOpt.get.function match {
           case FunctionHeader.User(internalName, _) =>
-            internalName.utf8Bytes.length <= ContractLimits.MaxAnnotatedFunctionNameInBytes
+            internalName.utf8Bytes.length <= ContractLimits.MaxDeclarationNameInBytes
           case _ => true
         }),
-        GenericError(s"Callable function name size in bytes must be less than ${ContractLimits.MaxAnnotatedFunctionNameInBytes} bytes")
+        GenericError(s"Callable function name size in bytes must be less than ${ContractLimits.MaxDeclarationNameInBytes} bytes")
       ),
       checkAmounts(payments),
       V.fee(fee),

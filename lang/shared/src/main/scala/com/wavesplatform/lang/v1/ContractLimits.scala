@@ -20,8 +20,8 @@ object ContractLimits {
   val MaxContractMetaSizeInBytes = 1024
 
   // As in Scala
-  val MaxInvokeScriptArgs             = 22
-  val MaxAnnotatedFunctionNameInBytes = 255
+  val MaxInvokeScriptArgs       = 22
+  val MaxDeclarationNameInBytes = 255
 
   // Data	0.001 per kilobyte, rounded up, fee for CI is 0.005
   val MaxInvokeScriptSizeInBytes = 5 * 1024

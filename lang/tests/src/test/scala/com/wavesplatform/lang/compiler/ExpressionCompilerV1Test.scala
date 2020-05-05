@@ -8,14 +8,14 @@ import com.wavesplatform.lang.v1.compiler.CompilerContext.VariableInfo
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, Terms}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
 import com.wavesplatform.lang.v1.parser.Expressions.Pos
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.testing.ScriptGen
-import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -60,6 +60,51 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     val expr2 = Parser.parseExpr(s""" "$tooBigString" """).get.value
     ExpressionCompiler(compilerContext, expr2) should produce("String size=32768 exceeds 32767 bytes")
 
+  }
+
+  property("expression compilation fails if function name length is longer than 255 bytes") {
+    val tooLongName = "a" * (ContractLimits.MaxDeclarationNameInBytes + 1)
+    val funcExpr = {
+      val script =
+        s"""
+           |func $tooLongName() = 1
+           |true
+        """.stripMargin
+      Parser.parseExpr(script).get.value
+    }
+    val letExpr = {
+      val script =
+        s"""
+           |let $tooLongName = 1
+           |true
+        """.stripMargin
+      Parser.parseExpr(script).get.value
+    }
+    ExpressionCompiler(compilerContext, funcExpr) should produce("exceeds 255")
+    ExpressionCompiler(compilerContext, letExpr)  should produce("exceeds 255")
+
+  }
+
+  property("expression compiles if declaration name length is equal to 255 bytes") {
+    val maxName = "a" * ContractLimits.MaxDeclarationNameInBytes
+    val funcExpr = {
+      val script =
+        s"""
+           |func $maxName() = 1
+           |true
+        """.stripMargin
+      Parser.parseExpr(script).get.value
+    }
+    val letExpr = {
+      val script =
+        s"""
+           |let $maxName = 1
+           |true
+        """.stripMargin
+      Parser.parseExpr(script).get.value
+    }
+    ExpressionCompiler(compilerContext, funcExpr) shouldBe 'right
+    ExpressionCompiler(compilerContext, letExpr) shouldBe 'right
   }
 
   treeTypeTest("GETTER")(
