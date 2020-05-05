@@ -14,7 +14,7 @@ import monix.eval.Coeval
 
 object Terms {
   val DataTxMaxBytes: Int       = 150 * 1024     // should be the same as DataTransaction.MaxBytes
-  val DataTxMaxProtoBytes: Int  = 165890         // should be the same as DataTransaction.MaxProtoBytes
+  val DataTxMaxProtoBytes: Int  = 165947         // depends from DataTransaction.MaxProtoBytes
   val DataEntryValueMax: Int    = Short.MaxValue // should be the same as DataEntry.MaxValueSize
 
   sealed abstract class DECLARATION {
