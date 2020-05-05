@@ -12,6 +12,8 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events.{BlockchainUpdateTriggersImpl, BlockchainUpdated, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
@@ -114,7 +116,7 @@ object Importer extends ScorexLogging {
           override def spendableBalanceChanged: Observable[(Address, Asset)] = ???
           override def actorSystem: ActorSystem                              = ???
           override def blockchainUpdated: Observable[BlockchainUpdated]      = blockchainUpdatedObservable
-        override def utxEvents: Observable[UtxEvent]                       = Observable.empty
+          override def utxEvents: Observable[UtxEvent]                       = Observable.empty
           override def transactionsApi                                       = ???
           override def blocksApi                                             = ???
           override def accountsApi                                           = ???
@@ -134,7 +136,7 @@ object Importer extends ScorexLogging {
     }
 
   @volatile private var quit = false
-  private val lock = new Object
+  private val lock           = new Object
 
   def startImport(
       scheduler: Scheduler,
@@ -164,8 +166,12 @@ object Importer extends ScorexLogging {
           if (blocksToSkip > 0) {
             blocksToSkip -= 1
           } else {
+            val blockV5 = blockchainUpdater.isFeatureActivated(
+              BlockchainFeatures.BlockV5,
+              blockchainUpdater.height + 1
+            )
             val Success(block) =
-              if (importOptions.format == Formats.Binary) Block.parseBytes(buffer)
+              if (importOptions.format == Formats.Binary && !blockV5) Block.parseBytes(buffer)
               else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(buffer)), unsafe = true)
 
             if (blockchainUpdater.lastBlockId.contains(block.header.reference)) {
@@ -219,7 +225,7 @@ object Importer extends ScorexLogging {
     sys.addShutdownHook {
       quit = true
       Await.ready(Future.sequence(extensions.map(_.shutdown())), settings.extensionsShutdownTimeout)
-      Await.result(Kamon.stopAllReporters(), 10.seconds)
+      Await.result(Kamon.stopModules(), 10.seconds)
       lock.synchronized {
         blockchainUpdater.shutdown()
         levelDb.close()

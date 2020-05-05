@@ -38,6 +38,7 @@ import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.state.{Blockchain, Diff, Height}
+import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.Schedulers._
@@ -49,8 +50,6 @@ import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.HashedWheelTimer
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
-import kamon.influxdb.InfluxDBReporter
-import kamon.system.SystemMetrics
 import monix.eval.{Coeval, Task}
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
 import monix.reactive.Observable
@@ -504,13 +503,12 @@ object Application {
     //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
     Kamon.reconfigure(config)
     sys.addShutdownHook { () =>
-      Kamon.stopAllReporters()
+      Try(Await.result(Kamon.stopModules(), 30 seconds))
       Metrics.shutdown()
     }
 
     if (config.getBoolean("kamon.enable")) {
-      Kamon.addReporter(new InfluxDBReporter())
-      SystemMetrics.startCollecting()
+      Kamon.loadModules()
     }
 
     settings
@@ -549,28 +547,26 @@ object Application {
       SystemInformationReporter.report(settings.config)
     }
 
-    val time             = new NTP(settings.ntpServer)
-    val isMetricsStarted = Metrics.start(settings.metrics, time)
+    val time = new NTP(settings.ntpServer)
+    Metrics.start(settings.metrics, time)
+
+    def dumpMinerConfig(): Unit = {
+      import settings.synchronizationSettings.microBlockSynchronizer
+      import settings.{minerSettings => miner}
+
+      Metrics.write(
+        Point
+          .measurement("config")
+          .addField("miner-micro-block-interval", miner.microBlockInterval.toMillis)
+          .addField("miner-max-transactions-in-micro-block", miner.maxTransactionsInMicroBlock)
+          .addField("miner-min-micro-block-age", miner.minMicroBlockAge.toMillis)
+          .addField("mbs-wait-response-timeout", microBlockSynchronizer.waitResponseTimeout.toMillis)
+      )
+    }
 
     RootActorSystem.start("wavesplatform", settings.config) { actorSystem =>
-      isMetricsStarted.foreach { started =>
-        if (started) {
-          import settings.synchronizationSettings.microBlockSynchronizer
-          import settings.{minerSettings => miner}
-
-          Metrics.write(
-            Point
-              .measurement("config")
-              .addField("miner-micro-block-interval", miner.microBlockInterval.toMillis)
-              .addField("miner-max-transactions-in-micro-block", miner.maxTransactionsInMicroBlock)
-              .addField("miner-min-micro-block-age", miner.minMicroBlockAge.toMillis)
-              .addField("mbs-wait-response-timeout", microBlockSynchronizer.waitResponseTimeout.toMillis)
-          )
-        }
-      }
-
+      dumpMinerConfig()
       log.info(s"${Constants.AgentName} Blockchain Id: ${settings.blockchainSettings.addressSchemeCharacter}")
-
       new Application(actorSystem, settings, settings.config.root(), time).run()
     }
   }
