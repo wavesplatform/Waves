@@ -127,7 +127,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       .issue(firstAddress, "FeeAsset", "Asset for fee of Smart Asset", someAssetAmount, 2, reissuable = false, issueFee, waitForTx = true)
       .id
 
-    sender.sponsorAsset(firstAddress, feeAsset, baseFee = 2, fee = sponsorFee + smartFee, waitForTx = true)
+    sender.sponsorAsset(firstAddress, feeAsset, baseFee = 2, fee = sponsorReducedFee + smartFee, waitForTx = true)
 
     val scr = ScriptCompiler(
       s"""
