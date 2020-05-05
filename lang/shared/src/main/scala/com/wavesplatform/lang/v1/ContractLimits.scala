@@ -27,7 +27,10 @@ object ContractLimits {
   val MaxInvokeScriptSizeInBytes = 5 * 1024
   val MaxWriteSetSizeInBytes     = 5 * 1024
   val MaxWriteSetSize            = 100
-  val MaxKeySizeInBytes          = 100
+
+  // should conform DataEntry limits
+  val MaxKeySizeInBytesByVersion: StdLibVersion => Int =
+    v => if (v >= V4) 400 else 100
 
   // Mass Transfer	0.001 + 0.0005*N, rounded up to 0.001, fee for CI is 0.005
   val MaxCallableActionsAmount = 10

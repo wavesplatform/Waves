@@ -181,7 +181,7 @@ object InvokeScriptTransactionDiff {
 
               dataEntries = dataItems.map(dataItemToEntry)
 
-              _ <- TracedResult(checkDataEntries(tx, dataEntries)).leftMap(ScriptExecutionError.dApp)
+              _ <- TracedResult(checkDataEntries(tx, dataEntries, version)).leftMap(ScriptExecutionError.dApp)
               _ <- TracedResult(
                 Either.cond(
                   actions.length - dataEntries.length <= ContractLimits.MaxCallableActionsAmount,
@@ -312,17 +312,23 @@ object InvokeScriptTransactionDiff {
       )
   }
 
-  private[this] def checkDataEntries(tx: InvokeScriptTransaction, dataEntries: Seq[DataEntry[_]]): Either[String, Unit] =
+  private[this] def checkDataEntries(
+      tx: InvokeScriptTransaction,
+      dataEntries: Seq[DataEntry[_]],
+      stdLibVersion: StdLibVersion
+  ): Either[String, Unit] =
     for {
       _ <- Either.cond(
         dataEntries.length <= ContractLimits.MaxWriteSetSize,
         (),
         s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize} entries"
       )
+
+      maxKeySize = ContractLimits.MaxKeySizeInBytesByVersion(stdLibVersion)
       _ <- Either.cond(
-        dataEntries.forall(_.key.utf8Bytes.length <= ContractLimits.MaxKeySizeInBytes),
+        dataEntries.forall(_.key.utf8Bytes.length <= maxKeySize),
         (),
-        s"Key size must be less than ${ContractLimits.MaxKeySizeInBytes}"
+        s"Key size must be less than $maxKeySize"
       )
 
       totalDataBytes = dataEntries.map(_.toBytes.length).sum

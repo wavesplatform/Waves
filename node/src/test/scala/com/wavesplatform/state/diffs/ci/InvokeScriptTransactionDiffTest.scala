@@ -1343,23 +1343,35 @@ class InvokeScriptTransactionDiffTest
     }
   }
 
-  property("can't write entry with key size > 100") {
+  property("can't write entry with key size greater than limit") {
     forAll(for {
-      r <- preconditionsAndSetContract(s => writeSetWithKeyLength(s, ContractLimits.MaxKeySizeInBytes + 1))
-    } yield (r._1, r._2, r._3)) {
-      case (genesis, setScript, ci) =>
-        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+      version <- Gen.oneOf(V3, V4)
+      r <- preconditionsAndSetContract(s => writeSetWithKeyLength(s, ContractLimits.MaxKeySizeInBytesByVersion(version) + 1))
+    } yield (r._1, r._2, r._3, version)) {
+      case (genesis, setScript, ci, version) =>
+
+        val settings =
+          if (version == V3) fs
+          else fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
+
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), settings) {
           _ should produce("Key size must be less than")
         }
     }
   }
 
-  property("can write entry with key <= 100") {
+  property("can write entry with key size equals limit") {
     forAll(for {
-      r <- preconditionsAndSetContract(s => writeSetWithKeyLength(s, ContractLimits.MaxKeySizeInBytes))
-    } yield (r._1, r._2, r._3)) {
-      case (genesis, setScript, ci) =>
-        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+      version <- Gen.oneOf(V3, V4)
+      r <- preconditionsAndSetContract(s => writeSetWithKeyLength(s, ContractLimits.MaxKeySizeInBytesByVersion(version)))
+    } yield (r._1, r._2, r._3, version)) {
+      case (genesis, setScript, ci, version) =>
+
+        val settings =
+          if (version == V3) fs
+          else fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
+
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), settings) {
           _ shouldBe 'right
         }
     }
