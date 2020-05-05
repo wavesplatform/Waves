@@ -56,17 +56,6 @@ class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) 
     responseObserver.completeWith(responseStream)
   }
 
-  override def getNFTBalances(request: BalancesRequest, responseObserver: StreamObserver[BalanceResponse]): Unit = {
-    val addressOption: Option[Address] = if (request.address.isEmpty) None else Some(request.address.toAddress)
-
-    val responseStream = addressOption match {
-      case Some(address) => commonApi.nftList(address, None).map { case (a, _) => assetBalanceResponse((a, 1)) }
-      case _ => Observable.empty
-    }
-
-    responseObserver.completeWith(responseStream)
-  }
-
   override def getScript(request: AccountRequest): Future[ScriptData] = Future {
     commonApi.script(request.address.toAddress) match {
       case Some(desc) => ScriptData(PBTransactions.toPBScript(Some(desc.script)), desc.script.expr.toString, desc.verifierComplexity)
