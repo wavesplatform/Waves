@@ -309,7 +309,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
       .explicitGet()
       ._1
 
-    miner.broadcastTransfer(sender.privateKey, PBRecipients.create(address), initialWavesBalance, minFee, waitForTx = true)
+    miner.broadcastTransfer(sender.keyPair, PBRecipients.create(address.toAddress), initialWavesBalance, minFee, waitForTx = true)
 
     miner.waitForTransaction(
       miner
@@ -350,7 +350,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
     val tx = miner
       .broadcastInvokeScript(
         address,
-        PBRecipients.create(address),
+        PBRecipients.create(address.toAddress),
         fee = fee,
         waitForTx = wait,
         functionCall = Some(fc),

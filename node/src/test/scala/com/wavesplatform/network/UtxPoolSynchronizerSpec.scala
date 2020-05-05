@@ -33,7 +33,7 @@ class UtxPoolSynchronizerSpec extends FreeSpec with Matchers with BeforeAndAfter
 
     "accepts only those transactions from network which can be validated quickly" in withUPS(countTransactions) { ups =>
       1 to 10 foreach { i =>
-        ups.publish(GenesisTransaction.create(PublicKey(Array.emptyByteArray), i * 10L, 0L).explicitGet())
+        ups.publish(GenesisTransaction.create(PublicKey(new Array[Byte](32)).toAddress, i * 10L, 0L).explicitGet())
       }
       latch.await()
       counter.get() shouldEqual 0

@@ -40,7 +40,7 @@ object Wallet extends ScorexLogging {
 
   def generateNewAccount(seed: Array[Byte], nonce: Int): KeyPair = {
     val accountSeed = generateAccountSeed(seed, nonce)
-    KeyPair(accountSeed)
+    KeyPair(ByteStr(accountSeed))
   }
 
   def generateAccountSeed(seed: Array[Byte], nonce: Int): Array[Byte] =
@@ -82,8 +82,10 @@ object Wallet extends ScorexLogging {
         if (file.isFile && file.length() > 0) {
           loadOrImport(maybeFile.get) match {
             case Failure(exception) =>
-              throw new IllegalArgumentException(s"Failed to open existing wallet file '${maybeFile.get}' maybe provided password is incorrect",
-                                                 exception)
+              throw new IllegalArgumentException(
+                s"Failed to open existing wallet file '${maybeFile.get}' maybe provided password is incorrect",
+                exception
+              )
             case Success(value) => value
           }
         } else {
@@ -99,7 +101,7 @@ object Wallet extends ScorexLogging {
 
     private[this] val accountsCache: TrieMap[String, KeyPair] = {
       val accounts = walletData.accountSeeds.map(KeyPair(_))
-      TrieMap(accounts.map(acc => acc.stringRepr -> acc).toSeq: _*)
+      TrieMap(accounts.map(acc => acc.toAddress.toString -> acc).toSeq: _*)
     }
 
     override def seed: Array[Byte] =
@@ -127,7 +129,7 @@ object Wallet extends ScorexLogging {
     override def deleteAccount(account: KeyPair): Boolean = WalletLock.write {
       val before = walletData.accountSeeds.size
       walletData = walletData.copy(accountSeeds = walletData.accountSeeds - ByteStr(account.seed))
-      accountsCache -= account.stringRepr
+      accountsCache -= account.toAddress.toString
       this.saveWalletFile()
       before > walletData.accountSeeds.size
     }
@@ -148,9 +150,9 @@ object Wallet extends ScorexLogging {
     private[this] def generateNewAccountWithoutSave(nonce: Int): Option[KeyPair] = WalletLock.write {
       val account = Wallet.generateNewAccount(seed, nonce)
 
-      val address = account.stringRepr
+      val address = account.toAddress.toString
       if (!accountsCache.contains(address)) {
-        accountsCache += account.stringRepr -> account
+        accountsCache += account.toAddress.toString -> account
         walletData = walletData.copy(accountSeeds = walletData.accountSeeds + ByteStr(account.seed))
         log.info("Added account #" + privateKeyAccounts.size)
         Some(account)

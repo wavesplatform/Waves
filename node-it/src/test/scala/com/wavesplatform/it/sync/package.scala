@@ -2,7 +2,7 @@ package com.wavesplatform.it
 
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
 import com.wavesplatform.api.http.requests.IssueRequest
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi.AssertiveApiError
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.Script
@@ -81,7 +81,7 @@ package object sync {
     IssueRequest(
       Some(tx.version),
       None,
-      Some(Base58.encode(tx.sender)),
+      Some(tx.sender.toString),
       tx.name.toStringUtf8,
       tx.description.toStringUtf8,
       quantity,

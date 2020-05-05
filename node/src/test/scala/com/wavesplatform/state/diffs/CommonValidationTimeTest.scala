@@ -20,7 +20,7 @@ class CommonValidationTimeTest extends PropSpec with PropertyChecks with Matcher
       recipient   <- accountGen
       amount      <- positiveLongGen
       fee         <- smallFeeGen
-      transfer1 = createWavesTransfer(master, recipient, amount, fee, prevBlockTs - Enabled.maxTransactionTimeBackOffset.toMillis - 1)
+      transfer1 = createWavesTransfer(master, recipient.toAddress, amount, fee, prevBlockTs - Enabled.maxTransactionTimeBackOffset.toMillis - 1)
         .explicitGet()
     } yield (prevBlockTs, blockTs, height, transfer1)) {
       case (prevBlockTs, blockTs, height, transfer1) =>
@@ -40,7 +40,7 @@ class CommonValidationTimeTest extends PropSpec with PropertyChecks with Matcher
       recipient   <- accountGen
       amount      <- positiveLongGen
       fee         <- smallFeeGen
-      transfer1 = createWavesTransfer(master, recipient, amount, fee, blockTs + Enabled.maxTransactionTimeForwardOffset.toMillis + 1)
+      transfer1 = createWavesTransfer(master, recipient.toAddress, amount, fee, blockTs + Enabled.maxTransactionTimeForwardOffset.toMillis + 1)
         .explicitGet()
     } yield (prevBlockTs, blockTs, height, transfer1)) {
       case (prevBlockTs, blockTs, height, transfer1) =>

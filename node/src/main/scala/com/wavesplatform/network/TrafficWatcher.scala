@@ -24,10 +24,8 @@ class TrafficWatcher extends ChannelDuplexHandler {
   private def createHistogram(dir: String, spec: BasicMessagesRepo.Spec): Histogram =
     Kamon
       .histogram("traffic", MeasurementUnit.information.bytes)
-      .refine(
-        "type" -> spec.messageName,
-        "dir"  -> dir
-      )
+      .withTag("type", spec.messageName)
+      .withTag("dir", dir)
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = {
     msg match {

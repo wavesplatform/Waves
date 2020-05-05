@@ -22,7 +22,6 @@ import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
-import kamon.metric.TimerMetric
 import monix.eval.Task
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.{CanBlock, SchedulerService}
@@ -217,7 +216,7 @@ class MinerImpl(
           s"Invalid next block generation time: $expectedTS"
         )
       } yield result
-    } else Left(s"Balance $balance of ${account.stringRepr} is lower than required for generation")
+    } else Left(s"Balance $balance of ${account.toAddress} is lower than required for generation")
   }
 
   private def nextBlockGenOffsetWithConditions(account: KeyPair): Either[String, FiniteDuration] = {
@@ -257,7 +256,7 @@ class MinerImpl(
                   Task.raiseError(new RuntimeException(err.toString))
 
                 case Right(Some(score)) =>
-                  log.debug(s"Forged and applied $block by ${account.stringRepr} with cumulative score $score")
+                  log.debug(s"Forged and applied $block by ${account.toAddress} with cumulative score $score")
                   BlockStats.mined(block, blockchainUpdater.height)
                   allChannels.broadcast(BlockForged(block))
                   scheduleMining()
@@ -282,7 +281,7 @@ class MinerImpl(
   def scheduleMining(): Unit = {
     Miner.blockMiningStarted.increment()
 
-    val nonScriptedAccounts = wallet.privateKeyAccounts.filterNot(blockchainUpdater.hasAccountScript(_))
+    val nonScriptedAccounts = wallet.privateKeyAccounts.filterNot(kp => blockchainUpdater.hasAccountScript(kp.toAddress))
     scheduledAttempts := CompositeCancelable.fromSet(nonScriptedAccounts.map { account =>
       generateBlockTask(account)
         .onErrorHandle(err => log.warn(s"Error mining Block: $err"))
@@ -311,15 +310,16 @@ class MinerImpl(
 
   override def state: MinerDebugInfo.State = debugStateRef.get.runSyncUnsafe(1.second)(minerScheduler, CanBlock.permit)
 
+  //noinspection TypeAnnotation
   private[this] object metrics {
-    val blockBuildTimeStats: TimerMetric      = Kamon.timer("miner.pack-and-forge-block-time")
-    val microBlockBuildTimeStats: TimerMetric = Kamon.timer("miner.forge-microblock-time")
+    val blockBuildTimeStats      = Kamon.timer("miner.pack-and-forge-block-time")
+    val microBlockBuildTimeStats = Kamon.timer("miner.forge-microblock-time")
   }
 }
 
 object Miner {
-  private[mining] val blockMiningStarted = Kamon.counter("block-mining-started")
-  private[mining] val microMiningStarted = Kamon.counter("micro-mining-started")
+  private[mining] val blockMiningStarted = Kamon.counter("block-mining-started").withoutTags()
+  private[mining] val microMiningStarted = Kamon.counter("micro-mining-started").withoutTags()
 
   val MaxTransactionsPerMicroblock: Int = 500
 

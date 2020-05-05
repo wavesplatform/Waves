@@ -22,7 +22,7 @@ class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with 
   val baseSetup: Gen[(GenesisTransaction, KeyPair)] = for {
     master <- accountGen
     ts     <- positiveLongGen
-    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+    genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
   } yield (genesis, master)
 
   property("MassTransfer preserves balance invariant") {
@@ -49,10 +49,10 @@ class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with 
               val fees        = issue.fee + transfer.fee
               transfer.assetId match {
                 case aid @ IssuedAsset(_) =>
-                  newState.balance(transfer.sender) shouldBe ENOUGH_AMT - fees
-                  newState.balance(transfer.sender, aid) shouldBe ENOUGH_AMT - totalAmount
+                  newState.balance(transfer.sender.toAddress) shouldBe ENOUGH_AMT - fees
+                  newState.balance(transfer.sender.toAddress, aid) shouldBe ENOUGH_AMT - totalAmount
                 case Waves =>
-                  newState.balance(transfer.sender) shouldBe ENOUGH_AMT - fees - totalAmount
+                  newState.balance(transfer.sender.toAddress) shouldBe ENOUGH_AMT - fees - totalAmount
               }
               for (ParsedTransfer(recipient, amount) <- transfer.transfers) {
                 if (transfer.sender.toAddress != recipient) {

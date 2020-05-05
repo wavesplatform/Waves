@@ -103,5 +103,5 @@ object InvokeScriptTransaction extends TransactionParser {
       feeAssetId: Asset,
       timestamp: TxTimestamp
   ): Either[ValidationError, InvokeScriptTransaction] =
-    signed(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, sender)
+    signed(version, sender.publicKey, dappAddress, fc, p, fee, feeAssetId, timestamp, sender.privateKey)
 }

@@ -12,7 +12,7 @@ object LeaseCancelTxValidator extends TxValidator[LeaseCancelTransaction] {
     import tx._
     V.seq(tx)(
       V.fee(fee),
-      V.cond(leaseId.length == crypto.DigestLength, GenericError("Lease transaction id is invalid"))
+      V.cond(leaseId.arr.length == crypto.DigestLength, GenericError("Lease transaction id is invalid"))
     )
   }
 }

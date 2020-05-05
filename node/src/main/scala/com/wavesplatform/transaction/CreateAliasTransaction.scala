@@ -38,7 +38,7 @@ final case class CreateAliasTransaction(
       case TxVersion.V1 | TxVersion.V2 => Bytes.concat(Array(builder.typeId), alias.bytes)
       case _                           => bodyBytes()
     }
-    crypto.fastHash(payload)
+    ByteStr(crypto.fastHash(payload))
   }
 }
 
@@ -79,5 +79,5 @@ object CreateAliasTransaction extends TransactionParser {
     create(version, sender, alias, fee, timestamp, Nil).map(_.signWith(signer))
 
   def selfSigned(version: TxVersion, sender: KeyPair, alias: Alias, fee: TxAmount, timestamp: TxTimestamp): Either[ValidationError, TransactionT] =
-    signed(version, sender, alias.name, fee, timestamp, sender)
+    signed(version, sender.publicKey, alias.name, fee, timestamp, sender.privateKey)
 }

@@ -122,7 +122,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         script = Some(
           ScriptCompiler(
             s"""match tx {
-               |case s : SetAssetScriptTransaction => s.sender == addressFromPublicKey(base58'${ByteStr(pkByAddress(secondAddress).publicKey).toString}')
+               |case s : SetAssetScriptTransaction => s.sender == addressFromPublicKey(base58'${pkByAddress(secondAddress).publicKey}')
                |case _ => false
                |}
                |""".stripMargin,
@@ -220,7 +220,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
           assetId: IssuedAsset = IssuedAsset(ByteStr.decodeBase58(assetWScript).get)
       ): SetAssetScriptTransaction =
         SetAssetScriptTransaction
-          .signed(version = v, sender.privateKey, assetId, Some(script), fee, timestamp, sender.privateKey)
+          .signed(version = v, sender.keyPair.publicKey, assetId, Some(script), fee, timestamp, sender.keyPair.privateKey)
           .right
           .get
 
@@ -345,7 +345,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
           accountA,
           Some(
             ScriptCompiler(
-              s"""|let pkB = base58'${ByteStr(accountB.publicKey)}'
+              s"""|let pkB = base58'${accountB.publicKey}'
                   |match tx {
                   |  case s : SetAssetScriptTransaction => sigVerify(s.bodyBytes,s.proofs[0],pkB)
                   |  case _ => true
@@ -369,7 +369,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
       val nonIssuerUnsignedTx = SetAssetScriptTransaction(
         version = v,
-        accountA,
+        accountA.publicKey,
         IssuedAsset(ByteStr.decodeBase58(assetWithScript).get),
         Some(unchangeableScript),
         setAssetScriptFee + smartFee,
@@ -378,7 +378,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         accountA.toAddress.chainId
       )
 
-      val sigTxB = ByteStr(crypto.sign(accountB, nonIssuerUnsignedTx.bodyBytes()))
+      val sigTxB = crypto.sign(accountB.privateKey, nonIssuerUnsignedTx.bodyBytes())
 
       val signedTxByB =
         nonIssuerUnsignedTx.copy(proofs = Proofs(Seq(sigTxB)))
@@ -391,7 +391,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       //try to change unchangeable script
       val nonIssuerUnsignedTx2 = SetAssetScriptTransaction(
         version = v,
-        accountA,
+        accountA.publicKey,
         IssuedAsset(ByteStr.decodeBase58(assetWithScript).get),
         Some(script),
         setAssetScriptFee + smartFee,
@@ -400,7 +400,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         accountA.toAddress.chainId
       )
 
-      val sigTxB2 = ByteStr(crypto.sign(accountB, nonIssuerUnsignedTx2.bodyBytes()))
+      val sigTxB2 = crypto.sign(accountB.privateKey, nonIssuerUnsignedTx2.bodyBytes())
 
       val signedTxByB2 =
         nonIssuerUnsignedTx2.copy(proofs = Proofs(Seq(sigTxB2)))

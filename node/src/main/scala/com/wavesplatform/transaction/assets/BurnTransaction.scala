@@ -85,6 +85,6 @@ object BurnTransaction extends TransactionParser {
       fee: Long,
       timestamp: Long
   ): Either[ValidationError, BurnTransaction] = {
-    signed(version, sender, asset, quantity, fee, timestamp, sender)
+    signed(version, sender.publicKey, asset, quantity, fee, timestamp, sender.privateKey)
   }
 }

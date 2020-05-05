@@ -39,7 +39,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
   }
 
   test("put and remove keys") {
-    val address = sender.privateKey.toAddress.stringRepr
+    val address = sender.keyPair.toAddress.stringRepr
 
     def dataEntries(i: Int): List[DataEntry[_]] =
       List(
@@ -72,7 +72,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
         (1 to 25).map(k => EmptyDataEntry(s"unknown-$k"))                 // 20 unknown keys to remove
 
     val updateAndRemoveTxId =
-      sender.broadcastData(sender.privateKey, updateAndRemoveDataEntries, calcDataFee(updateAndRemoveDataEntries, TxVersion.V2)).id
+      sender.broadcastData(sender.keyPair, updateAndRemoveDataEntries, calcDataFee(updateAndRemoveDataEntries, TxVersion.V2)).id
 
     nodes.waitForHeightAriseAndTxPresent(updateAndRemoveTxId)
 
@@ -81,7 +81,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     // can reuse removed keys
     val reusedData = putDataEntries.takeRight(25).map(updateDataEntry)
     val reuseTxId =
-      sender.broadcastData(sender.privateKey, reusedData, calcDataFee(reusedData, TxVersion.V1), version = TxVersion.V1).id
+      sender.broadcastData(sender.keyPair, reusedData, calcDataFee(reusedData, TxVersion.V1), version = TxVersion.V1).id
 
     nodes.waitForHeightAriseAndTxPresent(reuseTxId)
 
@@ -90,25 +90,25 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     // can't update and remove keys in the same transaction
     val sameKeyEntries = updateAndRemoveDataEntries.tail :+ EmptyDataEntry(updateAndRemoveDataEntries(1).key)
     assertApiError(
-      sender.broadcastData(sender.privateKey, sameKeyEntries, calcDataFee(sameKeyEntries, TxVersion.V2), version = TxVersion.V2),
+      sender.broadcastData(sender.keyPair, sameKeyEntries, calcDataFee(sameKeyEntries, TxVersion.V2), version = TxVersion.V2),
       CustomValidationError("Duplicated keys found")
     )
 
     //able to "remove" nonexistent key (account state won't be changed, but transaction should be succesfully broadcasted)
-    sender.broadcastData(sender.privateKey, List(EmptyDataEntry("nonexistentkey")), calcDataFee(List(EmptyDataEntry("nonexistentkey")), TxVersion.V2), waitForTx = true)
+    sender.broadcastData(sender.keyPair, List(EmptyDataEntry("nonexistentkey")), calcDataFee(List(EmptyDataEntry("nonexistentkey")), TxVersion.V2), waitForTx = true)
     sender.getData(sender.address).filter(_.key == "nonexistentkey") shouldBe List.empty
 
     // max number of data entries is 100
     val tooLargeSizeDataEntries = updateAndRemoveDataEntries ++ (1 to 11).map(k => EmptyDataEntry(s"another-unknown-$k"))
     assertApiError(
-      sender.broadcastData(sender.privateKey, tooLargeSizeDataEntries, calcDataFee(tooLargeSizeDataEntries, TxVersion.V2), version = TxVersion.V2),
+      sender.broadcastData(sender.keyPair, tooLargeSizeDataEntries, calcDataFee(tooLargeSizeDataEntries, TxVersion.V2), version = TxVersion.V2),
       TooBigArrayAllocation
     )
 
     // max key size is 400 byte
-    val tooLargeKeyDataEntries = List(BinaryDataEntry("a" * 401, "value".getBytes("utf-8")))
+    val tooLargeKeyDataEntries = List(BinaryDataEntry("a" * 401, ByteStr("value".getBytes("utf-8"))))
     assertApiError(
-      sender.broadcastData(sender.privateKey, tooLargeKeyDataEntries, calcDataFee(tooLargeKeyDataEntries, TxVersion.V2), version = TxVersion.V2),
+      sender.broadcastData(sender.keyPair, tooLargeKeyDataEntries, calcDataFee(tooLargeKeyDataEntries, TxVersion.V2), version = TxVersion.V2),
       TooBigArrayAllocation
     )
 
@@ -116,7 +116,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     nodes.waitForHeightArise()
     val putDataEntries2 = List(IntegerDataEntry("del", 42))
     val putDataTxId = sender.putData(address, putDataEntries2, calcDataFee(putDataEntries2, TxVersion.V1) * 10).id
-    val removeDataTxId = sender.broadcastData(sender.privateKey, List(EmptyDataEntry("del")), calcDataFee(List(EmptyDataEntry("del")), TxVersion.V2)).id
+    val removeDataTxId = sender.broadcastData(sender.keyPair, List(EmptyDataEntry("del")), calcDataFee(List(EmptyDataEntry("del")), TxVersion.V2)).id
     nodes.waitForTransaction(putDataTxId)
     nodes.waitForTransaction(removeDataTxId)
     sender.getData(address).filter(_.key == "del") shouldBe List.empty
@@ -475,5 +475,5 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       timestamp: Long = System.currentTimeMillis,
       version: TxVersion
   ): DataTransaction =
-    DataTransaction.selfSigned(1.toByte, sender.privateKey, entries, fee, timestamp).explicitGet()
+    DataTransaction.selfSigned(1.toByte, sender.keyPair, entries, fee, timestamp).explicitGet()
 }

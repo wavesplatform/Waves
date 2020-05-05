@@ -26,7 +26,7 @@ object PBEvents {
         val txsUpdates  = transactionStateUpdates.map(protobufStateUpdate)
 
         BlockchainUpdated(
-          id = sig,
+          id = sig.toByteString,
           height = height,
           update = BlockchainUpdated.Update.Append(
             PBAppend(
@@ -47,7 +47,7 @@ object PBEvents {
         val txsUpdates       = transactionStateUpdates.map(protobufStateUpdate)
 
         BlockchainUpdated(
-          id = totalBlockId,
+          id = totalBlockId.toByteString,
           height = height,
           update = BlockchainUpdated.Update.Append(
             PBAppend(
@@ -64,7 +64,7 @@ object PBEvents {
         )
       case events.RollbackCompleted(to, height) =>
         BlockchainUpdated(
-          id = to,
+          id = to.toByteString,
           height = height,
           update = BlockchainUpdated.Update.Rollback(
             PBRollback(PBRollback.RollbackType.BLOCK)
@@ -72,7 +72,7 @@ object PBEvents {
         )
       case events.MicroBlockRollbackCompleted(toSig, height) =>
         BlockchainUpdated(
-          id = toSig,
+          id = toSig.toByteString,
           height = height,
           update = BlockchainUpdated.Update.Rollback(
             PBRollback(PBRollback.RollbackType.MICROBLOCK)
@@ -80,11 +80,11 @@ object PBEvents {
         )
     }
 
-  private def toString(bytes: ByteStr): String = new String(bytes, StandardCharsets.UTF_8)
+  private def toString(bytes: ByteStr): String = new String(bytes.arr, StandardCharsets.UTF_8)
 
   private def protobufAssetStateUpdate(a: events.AssetStateUpdate): AssetStateUpdate =
     AssetStateUpdate(
-      assetId = a.asset.id,
+      assetId = a.asset.id.toByteString,
       decimals = a.decimals,
       name = toString(a.name),
       description = toString(a.description),

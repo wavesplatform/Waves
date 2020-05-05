@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.common.utils.Base58
 import play.api.libs.json._
 
 trait ProvenTransaction extends Transaction with Proven {
@@ -12,8 +11,8 @@ trait ProvenTransaction extends Transaction with Proven {
     Json.obj(
       "type"            -> typeId,
       "id"              -> id().toString,
-      "sender"          -> sender.stringRepr,
-      "senderPublicKey" -> Base58.encode(sender),
+      "sender"          -> sender.toAddress,
+      "senderPublicKey" -> sender,
       "fee"             -> assetFee._2,
       "feeAssetId"      -> assetFee._1.maybeBase58Repr,
       "timestamp"       -> timestamp

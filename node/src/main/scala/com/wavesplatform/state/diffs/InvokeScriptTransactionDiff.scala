@@ -109,13 +109,13 @@ object InvokeScriptTransactionDiff {
             for {
               scriptResult <- {
                 val scriptResultE = stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
-                  val invoker = tx.sender.toAddress.bytes
+                  val invoker = tx.sender.toAddress
                   val invocation = ContractEvaluator.Invocation(
                     functionCall,
-                    Recipient.Address(invoker),
+                    Recipient.Address(ByteStr(invoker.bytes)),
                     tx.sender,
                     payments,
-                    tx.dAppAddressOrAlias.bytes,
+                    ByteStr(tx.dAppAddressOrAlias.bytes),
                     tx.id.value,
                     tx.fee,
                     tx.feeAssetId.compatId
@@ -125,7 +125,7 @@ object InvokeScriptTransactionDiff {
                     Coeval.evalOnce(input),
                     Coeval(blockchain.height),
                     blockchain,
-                    Coeval(tx.dAppAddressOrAlias.bytes),
+                    Coeval(ByteStr(tx.dAppAddressOrAlias.bytes)),
                     directives,
                     tx.id()
                   )
@@ -194,7 +194,7 @@ object InvokeScriptTransactionDiff {
               _ <- TracedResult(Either.cond(transferList.map(_.amount).forall(_ >= 0), (), ScriptExecutionError.dApp("Negative amount")))
               _ <- TracedResult(checkOverflow(transferList.map(_.amount)))
 
-              verifierComplexity = blockchain.accountScript(tx.sender).map(_.verifierComplexity)
+              verifierComplexity = blockchain.accountScript(tx.sender.toAddress).map(_.verifierComplexity)
               assetsComplexity = (tx.checkedAssets.map(_.id) ++ transferList.flatMap(_.assetId))
                 .flatMap(id => blockchain.assetScript(IssuedAsset(id)))
                 .map(_._2)
@@ -206,7 +206,7 @@ object InvokeScriptTransactionDiff {
                     reissueList.map(r => IssuedAsset(r.assetId)) ++
                     burnList.map(b => IssuedAsset(b.assetId))
                 val totalScriptsInvoked =
-                  smartAssetInvocations.count(blockchain.hasAssetScript) + (if (blockchain.hasAccountScript(tx.sender)) 1 else 0)
+                  smartAssetInvocations.count(blockchain.hasAssetScript) + (if (blockchain.hasAccountScript(tx.sender.toAddress)) 1 else 0)
                 val minIssueFee = issueList.count(i => !blockchain.isNFT(i)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
                 val minWaves    = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + minIssueFee
                 val txName      = Constants.TransactionNames(InvokeScriptTransaction.typeId)
@@ -297,7 +297,7 @@ object InvokeScriptTransactionDiff {
     if (blockchain.disallowSelfPayment && version >= V4)
       if (tx.payments.nonEmpty && tx.sender.toAddress == dAppAddress)
         ScriptExecutionError.dApp("DApp self-payment is forbidden since V4").asLeft[Unit]
-      else if (transfers.exists(_.recipient.bytes == dAppAddress.bytes))
+      else if (transfers.exists(_.recipient.bytes == ByteStr(dAppAddress.bytes)))
         ScriptExecutionError.dApp("DApp self-transfer is forbidden since V4").asLeft[Unit]
       else
         ().asRight[ScriptExecutionError]
@@ -368,7 +368,7 @@ object InvokeScriptTransactionDiff {
       diffAcc match {
         case TracedResult(Right(curDiff), _) =>
           val blockchain   = CompositeBlockchain(sblockchain, Some(curDiff))
-          val actionSender = Recipient.Address(tx.dAppAddressOrAlias.bytes)
+          val actionSender = Recipient.Address(ByteStr(tx.dAppAddressOrAlias.bytes))
 
           def applyTransfer(transfer: AssetTransfer, pk: PublicKey): TracedResult[ValidationError, Diff] = {
             val AssetTransfer(addressRepr, amount, asset) = transfer
@@ -445,7 +445,7 @@ object InvokeScriptTransactionDiff {
                   script =>
                     Diff(
                       tx = itx,
-                      portfolios = Map(pk.toAddress -> Portfolio(balance = 0, lease = LeaseBalance.empty, assets = Map(asset -> issue.quantity))),
+                      portfolios = Map(pk.toAddress -> Portfolio(lease = LeaseBalance.empty, assets = Map(asset -> issue.quantity))),
                       issuedAssets = Map(asset      -> ((staticInfo, info, volumeInfo))),
                       assetScripts = Map(asset      -> script.map(script => (script._1, script._2)))
                     )
@@ -490,7 +490,7 @@ object InvokeScriptTransactionDiff {
               applyTransfer(t, if (blockchain.isFeatureActivated(BlockV5)) {
                 pk
               } else {
-                PublicKey(ByteStr.empty)
+                PublicKey(new Array[Byte](32))
               })
             case d: DataItem[_] => applyDataItem(d)
             case i: Issue       => applyIssue(tx, pk, i)
@@ -514,7 +514,7 @@ object InvokeScriptTransactionDiff {
         blockchain,
         script,
         isAssetScript = true,
-        scriptContainerAddress = if (blockchain.passCorrectAssetId) assetId else tx.dAppAddressOrAlias.bytes
+        scriptContainerAddress = if (blockchain.passCorrectAssetId) assetId else ByteStr(tx.dAppAddressOrAlias.bytes)
       ) match {
         case (log, Left(error))  => Left(ScriptExecutionError.asset(error, log, FailedScriptError.Reason.AssetInAction))
         case (log, Right(FALSE)) => Left(TransactionNotAllowedByScript.asset(log, FailedScriptError.Reason.AssetInAction))

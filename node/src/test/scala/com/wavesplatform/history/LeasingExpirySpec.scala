@@ -43,13 +43,13 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
     aliasRecipient <- accountGen
     ts = ntpTime.getTimestamp()
     maxFeeAmount <- Gen.choose(100000L, 1 * Constants.UnitsInWave)
-    transfer     <- transferGeneratorP(ntpTime.getTimestamp(), lessor, aliasRecipient, maxFeeAmount)
+    transfer     <- transferGeneratorP(ntpTime.getTimestamp(), lessor, aliasRecipient.toAddress, maxFeeAmount)
     alias        <- aliasGen
     createAlias  <- createAliasGen(aliasRecipient, alias, transfer.amount, ntpTime.getTimestamp())
     genesisBlock = TestBlock.create(
       ts,
       Seq(
-        GenesisTransaction.create(lessor, Constants.TotalWaves * Constants.UnitsInWave, ntpTime.getTimestamp()).explicitGet(),
+        GenesisTransaction.create(lessor.toAddress, Constants.TotalWaves * Constants.UnitsInWave, ntpTime.getTimestamp()).explicitGet(),
         transfer,
         createAlias
       )
@@ -73,7 +73,7 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
   private def blockWithAliases(ref: ByteStr, lessor: KeyPair, alias: Alias): Gen[Block] =
     for {
       addressRecipient <- accountGen
-      l1               <- lease(lessor, addressRecipient)
+      l1               <- lease(lessor, addressRecipient.toAddress)
       l2               <- lease(lessor, alias)
     } yield TestBlock.create(ntpTime.getTimestamp(), ref, Seq(l1, l2))
 
@@ -84,7 +84,7 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
   }
 
   private def ensureEffectiveBalance(b: Blockchain, address: KeyPair, amount: Long)(implicit pos: Position): Unit =
-    b.effectiveBalance(address, 0) shouldBe amount
+    b.effectiveBalance(address.toAddress, 0) shouldBe amount
 
   private def mkEmptyBlock(ref: ByteStr): Block = TestBlock.create(ntpNow, ref, Seq.empty)
 
@@ -178,8 +178,8 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
     val manyLeases = for {
       (lessor, _, genesisBlock) <- genesis
       alias                     <- accountGen
-      l1                        <- lease(lessor, alias, amount)
-      l2                        <- lease(lessor, alias, amount / 2)
+      l1                        <- lease(lessor, alias.toAddress, amount)
+      l2                        <- lease(lessor, alias.toAddress, amount / 2)
       b2 = mkEmptyBlock(genesisBlock.id())
       b3 = mkEmptyBlock(b2.id())
       b4 = TestBlock.create(ntpNow, b3.id(), Seq(l1))
@@ -221,8 +221,8 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
     val leaseInTheCancelBlock = for {
       (lessor, _, genesisBlock) <- genesis
       miner                     <- accountGen
-      l1                        <- lease(lessor, miner, amount)
-      l2                        <- lease(lessor, miner, amount)
+      l1                        <- lease(lessor, miner.toAddress, amount)
+      l2                        <- lease(lessor, miner.toAddress, amount)
       b2 = mkEmptyBlock(genesisBlock.id())
       b3 = mkEmptyBlock(b2.id())
       b4 = TestBlock.create(ntpNow, b3.id(), Seq(l1))
@@ -238,7 +238,7 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
             // blocks before activation
             blocks.slice(0, 3).foreach(b => blockchainUpdater.processBlock(b).explicitGet())
             ensureEffectiveBalance(blockchainUpdater, miner, 0L)
-            ensureNoLeases(blockchainUpdater, Set(lessor.toAddress, miner))
+            ensureNoLeases(blockchainUpdater, Set(lessor.toAddress, miner.toAddress))
 
             // effective balance reflects new leases
             blockchainUpdater.processBlock(blocks(3)).explicitGet()
@@ -260,7 +260,7 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
     val blockWhereLeaseCancelled = for {
       (lessor, _, genesisBlock) <- genesis
       miner                     <- accountGen
-      lease                     <- lease(lessor, miner, amount)
+      lease                     <- lease(lessor, miner.toAddress, amount)
       b2 = mkEmptyBlock(genesisBlock.id())
       b3 = mkEmptyBlock(b2.id())
       b4 = TestBlock.create(ntpNow, b3.id(), Seq(lease))

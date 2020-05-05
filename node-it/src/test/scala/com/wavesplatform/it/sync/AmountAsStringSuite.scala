@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync
 
-import com.wavesplatform.account.{KeyPair, PublicKey}
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.account.KeyPair
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{Transaction, TransactionInfo}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -49,7 +49,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
 
   test("amount as string in exchange transaction") {
     val exchanger      = KeyPair("exchanger".getBytes)
-    val transferTxId   = sender.transfer(firstAddress, exchanger.stringRepr, transferAmount, minFee, waitForTx = true).id
+    val transferTxId   = sender.transfer(firstAddress, exchanger.toAddress.toString, transferAmount, minFee, waitForTx = true).id
     val transferTxInfo = sender.transactionInfo[TransactionInfo](transferTxId, amountsAsStrings = true)
     transferTxInfo.amount shouldBe Some(transferAmount)
     transferTxInfo.fee shouldBe minFee
@@ -203,7 +203,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
         "fee" -> 100000,
         "timestamp" -> System.currentTimeMillis(),
         "version" -> 1,
-        "senderPublicKey" -> PublicKey.fromBase58String(firstAddress).explicitGet()
+        "senderPublicKey" -> Base58.encode(new Array[Byte](32))
       )
     sender.calculateFee(tx, amountsAsStrings = true).feeAmount shouldBe minFee
   }
