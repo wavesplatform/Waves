@@ -260,7 +260,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
   property(s"min fee changed after ${BlockchainFeatures.BlockV5} activation") {
     val setup = for {
       (acc, name, desc, quantity, decimals, reissuable, fee, ts) <- issueParamGen
-      genesis = GenesisTransaction.create(acc, ENOUGH_AMT, ts).explicitGet()
+      genesis = GenesisTransaction.create(acc.toAddress, ENOUGH_AMT, ts).explicitGet()
       issue = IssueTransaction(TxVersion.V1, acc.publicKey, name, desc, quantity, decimals, reissuable, script = None, fee, ts)
         .signWith(acc.privateKey)
       minSponsoredAssetFee <- Gen.choose(1, issue.quantity / 11)
