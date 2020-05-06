@@ -22,11 +22,13 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
 
   import com.wavesplatform.state.diffs._
 
-  val ENOUGH_FEE: Long = 100000000
+  val ENOUGH_FEE: Long  = 100000000
+  val SPONSOR_FEE: Long = 100000
 
   val fs = TestFunctionalitySettings.Enabled
     .copy(
       preActivatedFeatures = Map(
+        BlockchainFeatures.BlockV5.id                         -> 0,
         BlockchainFeatures.NG.id                              -> 0,
         BlockchainFeatures.MassTransfer.id                    -> 0,
         BlockchainFeatures.SmartAccounts.id                   -> 0,
@@ -54,7 +56,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
         val contract             = transfer.sender
 
         val contractSpent: Long = ENOUGH_FEE + 1
-        val sponsorSpent: Long  = ENOUGH_FEE * 3 - 1 + ENOUGH_FEE * FeeValidation.FeeUnit
+        val sponsorSpent: Long  = ENOUGH_FEE * 2 + SPONSOR_FEE - 1 + ENOUGH_FEE * FeeValidation.FeeUnit
 
         val sponsor = setupTxs.flatten.collectFirst { case t: SponsorFeeTransaction => t.sender }.get
 
@@ -78,7 +80,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
         val contract             = setupTxs.flatten.collectFirst { case t: SponsorFeeTransaction => t.sender }.get
         val recipient            = transfer.sender
 
-        val contractSpent: Long  = ENOUGH_FEE * 4 + ENOUGH_FEE * FeeValidation.FeeUnit
+        val contractSpent: Long  = ENOUGH_FEE * 3 + SPONSOR_FEE + ENOUGH_FEE * FeeValidation.FeeUnit
         val recipientSpent: Long = 1
 
         assertDiffAndState(setupBlocks :+ TestBlock.create(Nil), transferBlock, fs) { (diff, blck) =>
@@ -104,20 +106,19 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
         .explicitGet()
       (script, _) = ScriptCompiler(s"false", isAssetScript = false, estimator).explicitGet()
       issueTx = IssueTransaction(
-          TxVersion.V1,
-          contract.publicKey,
-          "Asset#1".utf8Bytes,
-          "description".utf8Bytes,
-          Long.MaxValue,
-          8.toByte,
-          false,
-          None,
-          ENOUGH_FEE,
-          timestamp + 2
-        )
-          .signWith(contract.privateKey)
+        TxVersion.V1,
+        contract.publicKey,
+        "Asset#1".utf8Bytes,
+        "description".utf8Bytes,
+        Long.MaxValue,
+        8.toByte,
+        false,
+        None,
+        ENOUGH_FEE,
+        timestamp + 2
+      ).signWith(contract.privateKey)
       sponsorTx = SponsorFeeTransaction
-        .selfSigned(1.toByte, contract, IssuedAsset(issueTx.id()), Some(1), ENOUGH_FEE, timestamp + 4)
+        .selfSigned(1.toByte, contract, IssuedAsset(issueTx.id()), Some(1), SPONSOR_FEE, timestamp + 4)
         .explicitGet()
       transferToRecipient = TransferTransaction
         .selfSigned(
@@ -164,20 +165,19 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
         .explicitGet()
       (script, _) = ScriptCompiler(s"true", isAssetScript = false, estimator).explicitGet()
       issueTx = IssueTransaction(
-          TxVersion.V1,
-          sponsor.publicKey,
-          "Asset#1".utf8Bytes,
-          "description".utf8Bytes,
-          Long.MaxValue,
-          8.toByte,
-          false,
-          None,
-          ENOUGH_FEE,
-          timestamp + 2
-        )
-        .signWith(sponsor.privateKey)
+        TxVersion.V1,
+        sponsor.publicKey,
+        "Asset#1".utf8Bytes,
+        "description".utf8Bytes,
+        Long.MaxValue,
+        8.toByte,
+        false,
+        None,
+        ENOUGH_FEE,
+        timestamp + 2
+      ).signWith(sponsor.privateKey)
       sponsorTx = SponsorFeeTransaction
-        .selfSigned(1.toByte, sponsor, IssuedAsset(issueTx.id()), Some(1), ENOUGH_FEE, timestamp + 4)
+        .selfSigned(1.toByte, sponsor, IssuedAsset(issueTx.id()), Some(1), SPONSOR_FEE, timestamp + 4)
         .explicitGet()
       transferToContract = TransferTransaction
         .selfSigned(
