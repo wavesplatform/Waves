@@ -27,68 +27,74 @@ class EvaluatorV2(
   private def root(expr: EXPR, update: EXPR => Coeval[Unit], limit: Int, parentBlocks: List[BLOCK_DEF]): Coeval[Int] =
     expr match {
       case b: BLOCK_DEF =>
-        root(
-          expr = b.body,
-          update = {
-            case ev: EVALUATED => Coeval.defer(update(ev))
-            case nonEvaluated  => Coeval.delay(b.body = nonEvaluated)
-          },
-          limit = limit,
-          parentBlocks = b :: parentBlocks
+        Coeval.defer(
+          root(
+            expr = b.body,
+            update = {
+              case ev: EVALUATED => Coeval.defer(update(ev))
+              case nonEvaluated  => Coeval.delay(b.body = nonEvaluated)
+            },
+            limit = limit,
+            parentBlocks = b :: parentBlocks
+          )
         )
       case g: GETTER =>
-        root(
-          expr = g.expr,
-          update = v => Coeval.delay(g.expr = v),
-          limit = limit,
-          parentBlocks = parentBlocks
-        ).flatMap { unused =>
-          g.expr match {
-            case co: CaseObj if unused > 0 =>
-              update(co.fields(g.field)).map(_ => unused - 1)
-            case _: CaseObj =>
-              Coeval.now(unused)
-            case ev: EVALUATED =>
-              throw new IllegalArgumentException(s"GETTER of non-case-object $ev")
-            case _ =>
-              Coeval.now(unused)
+        Coeval.defer(
+          root(
+            expr = g.expr,
+            update = v => Coeval.delay(g.expr = v),
+            limit = limit,
+            parentBlocks = parentBlocks
+          ).flatMap { unused =>
+            g.expr match {
+              case co: CaseObj if unused > 0 =>
+                update(co.fields(g.field)).map(_ => unused - 1)
+              case _: CaseObj =>
+                Coeval.now(unused)
+              case ev: EVALUATED =>
+                throw new IllegalArgumentException(s"GETTER of non-case-object $ev")
+              case _ =>
+                Coeval.now(unused)
+            }
           }
-        }
+        )
       case i: IF =>
-        root(
-          expr = i.cond,
-          update = v => Coeval.delay(i.cond = v),
-          limit = limit,
-          parentBlocks = parentBlocks
-        ).flatMap { unused =>
-          if (unused < 0) throw new Error("Unused < 0")
-          i.cond match {
-            case TRUE | FALSE if unused == 0 =>
-              Coeval.now(unused)
-            case TRUE if unused > 0 =>
-              update(i.ifTrue).flatMap(
-                _ =>
-                  root(
-                    expr = i.ifTrue,
-                    update = update,
-                    limit = unused - 1,
-                    parentBlocks = parentBlocks
-                  )
-              )
-            case FALSE if unused > 0 =>
-              update(i.ifFalse).flatMap(
-                _ =>
-                  root(
-                    expr = i.ifFalse,
-                    update = update,
-                    limit = unused - 1,
-                    parentBlocks = parentBlocks
-                  )
-              )
-            case _: EVALUATED => throw new IllegalArgumentException("Non-boolean result in cond")
-            case _            => Coeval.now(unused)
+        Coeval.defer(
+          root(
+            expr = i.cond,
+            update = v => Coeval.delay(i.cond = v),
+            limit = limit,
+            parentBlocks = parentBlocks
+          ).flatMap { unused =>
+            if (unused < 0) throw new Error("Unused < 0")
+            i.cond match {
+              case TRUE | FALSE if unused == 0 =>
+                Coeval.now(unused)
+              case TRUE if unused > 0 =>
+                update(i.ifTrue).flatMap(
+                  _ =>
+                    root(
+                      expr = i.ifTrue,
+                      update = update,
+                      limit = unused - 1,
+                      parentBlocks = parentBlocks
+                    )
+                )
+              case FALSE if unused > 0 =>
+                update(i.ifFalse).flatMap(
+                  _ =>
+                    root(
+                      expr = i.ifFalse,
+                      update = update,
+                      limit = unused - 1,
+                      parentBlocks = parentBlocks
+                    )
+                )
+              case _: EVALUATED => throw new IllegalArgumentException("Non-boolean result in cond")
+              case _            => Coeval.now(unused)
+            }
           }
-        }
+        )
 
       case REF(key) =>
         Coeval.defer {
@@ -198,18 +204,19 @@ class EvaluatorV2(
       limit = limit,
       parentBlocks = nextParentBlocks
     ).flatMap { unused =>
-      if (unused < 0) throw new Error("Unused < 0")
-      else
-        let.value match {
-          case ev: EVALUATED if unused > 0 =>
-            update(ev).map(_ => unused - 1)
-          case _ =>
-            Coeval.now(unused)
-        }
-    }.onErrorHandle { e =>
-      if (!wasLogged) ctx.l(let.name)(Left(e.getMessage))
-      throw e
-    }
+        if (unused < 0) throw new Error("Unused < 0")
+        else
+          let.value match {
+            case ev: EVALUATED if unused > 0 =>
+              update(ev).map(_ => unused - 1)
+            case _ =>
+              Coeval.now(unused)
+          }
+      }
+      .onErrorHandle { e =>
+        if (!wasLogged) ctx.l(let.name)(Left(e.getMessage))
+        throw e
+      }
   }
 
   private def findGlobalVar(key: String, update: EVALUATED => Coeval[Unit], limit: Int): Option[Coeval[Int]] =
