@@ -138,7 +138,7 @@ object Terms {
       } yield "FUNCTION_CALL(" ++ function.toString ++ "," ++ e.toString ++ ")"
 
     override def deepCopy: Eval[EXPR] =
-      args.traverse(_.deepCopy).map(FUNCTION_CALL(function, _))
+      Eval.defer(args.traverse(_.deepCopy)).map(FUNCTION_CALL(function, _))
   }
 
   sealed trait EVALUATED extends EXPR {

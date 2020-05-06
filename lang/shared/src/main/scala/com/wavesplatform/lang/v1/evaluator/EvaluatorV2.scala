@@ -98,20 +98,24 @@ class EvaluatorV2(
           }
           .getOrElse(Eval.defer(visitRef(key, update, limit, parentBlocks)))
       case fc: FUNCTION_CALL =>
-        fc.args.indices.toStream
-          .foldM(limit) {
-            case (unused, argIndex) =>
-              if (unused < 0) throw new Error("Unused < 0")
-              else if (unused == 0)
-                Eval.now(unused)
-              else
-                root(
-                  expr = fc.args(argIndex),
-                  update = argValue => Eval.later(fc.args = fc.args.updated(argIndex, argValue)),
-                  limit = unused,
-                  parentBlocks
-                )
+        val evaluatedArgs =
+          Eval.defer {
+            fc.args.indices.toStream
+              .foldM(limit) {
+                case (unused, argIndex) =>
+                  if (unused < 0) throw new Error("Unused < 0")
+                  else if (unused == 0)
+                    Eval.now(unused)
+                  else
+                    root(
+                      expr = fc.args(argIndex),
+                      update = argValue => Eval.later(fc.args = fc.args.updated(argIndex, argValue)),
+                      limit = unused,
+                      parentBlocks
+                    )
+              }
           }
+        evaluatedArgs
           .flatMap { unusedArgsEval =>
             if (fc.args.forall(_.isInstanceOf[EVALUATED])) {
               fc.function match {
