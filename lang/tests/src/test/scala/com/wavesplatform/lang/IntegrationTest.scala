@@ -1,6 +1,7 @@
 package com.wavesplatform.lang
 
 import cats.Id
+import cats.implicits._
 import cats.kernel.Monoid
 import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.state.ByteStr
@@ -14,12 +15,11 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, FINAL, LONG, STRING}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, _}
-import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1}
+import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV2}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
@@ -27,7 +27,7 @@ import com.wavesplatform.lang.v1.traits.domain.Issue
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-import scala.util.Random
+import scala.util.{Random, Try}
 
 class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink {
   private def eval[T <: EVALUATED](
@@ -87,7 +87,13 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       )
 
     val typed = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => new EvaluatorV1[Id, C]().apply(ctx.evaluationContext(env), v._1))
+    val loggedCtx = LoggedEvaluationContext[C, Id](_ => _ => (), ctx.evaluationContext(env))
+      .asInstanceOf[LoggedEvaluationContext[Environment, Id]]
+    typed.flatMap(v =>
+      Try(new EvaluatorV2(loggedCtx, version).apply(v._1, Int.MaxValue)._1.asInstanceOf[T])
+        .toEither
+        .leftMap(_.getMessage)
+    )
   }
 
   property("simple let") {
