@@ -35,7 +35,6 @@ class RollbackSuite
 
   private val nodeAddresses        = nodeConfigs.map(_.getString("address")).toSet
   private def sender: Node         = nodes.last
-  private def miner: Node          = nodes.head
   private def firstAddress: String = sender.address
 
   test("Apply the same transfer transactions twice with return to UTX") {

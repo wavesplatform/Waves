@@ -135,6 +135,10 @@ object AsyncHttpApi extends Assertions {
     def post(path: String, body: String): Future[Response] =
       post(s"${n.nodeApiEndpoint}$path", (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json;charset=utf-8").setBody(body))
 
+    def post(path: String): Future[Response] =
+      post(s"${n.nodeApiEndpoint}$path", (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json;charset=utf-8"))
+
+
     def postForm(path: String, params: (String, String)*): Future[Response] =
       post(
         s"${n.nodeApiEndpoint}$path",
