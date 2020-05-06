@@ -91,9 +91,11 @@ class EvaluatorV2(
         }
 
       case REF(key) =>
-        visitRef(key, update, limit, parentBlocks)
-          .orElse(findGlobalVar(key, update, limit))
-          .getOrElse(throw new NoSuchElementException(s"A definition of '$key' not found"))
+        Coeval.defer {
+          visitRef(key, update, limit, parentBlocks)
+            .orElse(findGlobalVar(key, update, limit))
+            .getOrElse(throw new NoSuchElementException(s"A definition of '$key' not found"))
+        }
 
       case fc: FUNCTION_CALL =>
         val evaluatedArgs =
