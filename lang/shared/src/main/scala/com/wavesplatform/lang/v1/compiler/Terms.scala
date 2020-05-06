@@ -145,6 +145,7 @@ object Terms {
     def prettyString(level: Int): String = toString
     def toStr: Coeval[String]            = Coeval.now(toString)
     def weight: Long
+    var wasLogged: Boolean = false
 
     override def deepCopy: Eval[EXPR] =
       Eval.now(this)
