@@ -196,7 +196,7 @@ case class Block private[block] (override val timestamp: Long,
 
   override def toString: String =
     s"Block(${signerData.signature} -> ${reference.trim}, " +
-      s"txs=${transactionData.size}, features=$featureVotes${if (rewardVote >= 0) s", rewardVote=$rewardVote" else ""})"
+      s"generator=${signerData.generator.toAddress}, txs=${transactionData.size}, features=$featureVotes${if (rewardVote >= 0) s", rewardVote=$rewardVote" else ""})"
 
   def getHeader(): BlockHeader =
     new BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, featureVotes, rewardVote)
