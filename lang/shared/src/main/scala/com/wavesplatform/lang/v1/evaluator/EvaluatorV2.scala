@@ -90,13 +90,10 @@ class EvaluatorV2(
         }
 
       case REF(key) =>
-        ctx.ec.letDefs
-          .get(key)
-          .map { v =>
-            val globalValue = v.value.value.explicitGet()
-            update(globalValue).map(_ => limit - 1)
-          }
-          .getOrElse(Eval.defer(visitRef(key, update, limit, parentBlocks)))
+        visitRef(key, update, limit, parentBlocks)
+          .orElse(findGlobalVar(key, update, limit))
+          .getOrElse(throw new NoSuchElementException(s"A definition of '$key' not found"))
+
       case fc: FUNCTION_CALL =>
         val evaluatedArgs =
           Eval.defer {
@@ -163,12 +160,12 @@ class EvaluatorV2(
     }
 
   @tailrec
-  private def visitRef(key: String, update: EVALUATED => Eval[Unit], limit: Int, parentBlocks: List[BLOCK_DEF]): Eval[Int] =
+  private def visitRef(key: String, update: EVALUATED => Eval[Unit], limit: Int, parentBlocks: List[BLOCK_DEF]): Option[Eval[Int]] =
     parentBlocks match {
-      case LET_BLOCK(l @ LET(`key`, _), _) :: nextParentBlocks => evaluateRef(update, limit, l, nextParentBlocks)
-      case BLOCK(l @ LET(`key`, _), _) :: nextParentBlocks     => evaluateRef(update, limit, l, nextParentBlocks)
+      case LET_BLOCK(l @ LET(`key`, _), _) :: nextParentBlocks => Some(evaluateRef(update, limit, l, nextParentBlocks))
+      case BLOCK(l @ LET(`key`, _), _) :: nextParentBlocks     => Some(evaluateRef(update, limit, l, nextParentBlocks))
       case _ :: nextParentBlocks                               => visitRef(key, update, limit, nextParentBlocks)
-      case Nil                                                 => throw new NoSuchElementException(s"A definition of '$key' not found")
+      case Nil                                                 => None
     }
 
   private def evaluateRef(
@@ -193,8 +190,16 @@ class EvaluatorV2(
           case _ =>
             Eval.now(unused)
         }
-
     }
+
+  private def findGlobalVar(key: String, update: EVALUATED => Eval[Unit], limit: Int): Option[Eval[Int]] =
+    ctx.ec.letDefs
+      .get(key)
+      .map { v =>
+        val globalValue = v.value.value.explicitGet()
+        update(globalValue).map(_ => limit - 1)
+      }
+
   @tailrec
   private def findUserFunction(name: String, parentBlocks: List[BLOCK_DEF]): Option[FUNC] =
     parentBlocks match {
