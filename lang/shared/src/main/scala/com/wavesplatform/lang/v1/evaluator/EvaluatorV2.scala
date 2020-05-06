@@ -168,7 +168,7 @@ class EvaluatorV2(
       case LET_BLOCK(l @ LET(`key`, _), _) :: nextParentBlocks => evaluateRef(update, limit, l, nextParentBlocks)
       case BLOCK(l @ LET(`key`, _), _) :: nextParentBlocks     => evaluateRef(update, limit, l, nextParentBlocks)
       case _ :: nextParentBlocks                               => visitRef(key, update, limit, nextParentBlocks)
-      case Nil                                                 => throw new NoSuchElementException("")
+      case Nil                                                 => throw new NoSuchElementException(s"A definition of '$key' not found")
     }
 
   private def evaluateRef(
