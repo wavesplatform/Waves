@@ -11,10 +11,10 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.EmptyDataEntry
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, _}
+import com.wavesplatform.state.{EmptyDataEntry, SponsorshipValue}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
@@ -224,12 +224,31 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       } yield (List(genesis, genesis2), setDApp, ci, issue, master, reissueAmount, burnAmount)
     }.explicitGet()
 
-  def multiActionDApp(
-    assetId: ByteStr,
-    recipient: Address,
-    reissueAmount: Long,
-    burnAmount: Long,
-    transferAmount: Long
+  private def sponsorFeePreconditions
+      : Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction, KeyPair, Option[Long])] =
+    for {
+      master               <- accountGen
+      invoker              <- accountGen
+      ts                   <- timestampGen
+      fee                  <- ciFee(1)
+      issue                <- issueV2TransactionGen(senderGen = Gen.const(master), _scriptGen = Gen.const(None))
+      minSponsoredAssetFee <- Gen.oneOf(Gen.chooseNum(1, issue.quantity).map(Some(_)), Gen.const(Some(1L)))
+    } yield {
+      val dApp = Some(sponsorFeeDApp(issue.id.value, minSponsoredAssetFee))
+      for {
+        genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
+        genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
+        setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, dApp, fee, ts + 2)
+        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3)
+      } yield (List(genesis, genesis2), setDApp, ci, issue, master, minSponsoredAssetFee)
+    }.explicitGet()
+
+  private def multiActionDApp(
+      assetId: ByteStr,
+      recipient: Address,
+      reissueAmount: Long,
+      burnAmount: Long,
+      transferAmount: Long
   ): Script =
     dApp(
       s"""
@@ -356,6 +375,15 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
        """.stripMargin
     )
 
+  private def sponsorFeeDApp(assetId: ByteStr, minSponsoredAssetFee: Option[Long]): Script =
+    dApp(
+      s"""
+         | [
+         |   SponsorFee(base58'$assetId', ${minSponsoredAssetFee.getOrElse("unit")})
+         | ]
+       """.stripMargin
+    )
+
   private def dApp(body: String): Script = {
     val script =
       s"""
@@ -430,7 +458,11 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           d.portfolio(master.toAddress).map(_._2) shouldEqual Seq(amount)
           d.portfolio(invoker.toAddress) shouldEqual Seq()
 
-          d.blockchainUpdater.processBlock(TestBlock.create(System.currentTimeMillis(), tb2.signature, Seq.empty), ByteStr(new Array[Byte](32)), verify = false)
+          d.blockchainUpdater.processBlock(
+            TestBlock.create(System.currentTimeMillis(), tb2.signature, Seq.empty),
+            ByteStr(new Array[Byte](32)),
+            verify = false
+          )
 
           d.portfolio(master.toAddress).map(_._2) shouldEqual Seq(amount)
           d.portfolio(invoker.toAddress) shouldEqual Seq()
@@ -438,4 +470,20 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     }
   }
 
+  property("sponsor fee action results state") {
+    forAll(sponsorFeePreconditions) {
+      case (genesis, setScript, invoke, issue, _, minSponsoredAssetFee) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(genesis :+ setScript :+ issue)),
+          TestBlock.create(Seq(invoke)),
+          features
+        ) {
+          case (diff, blockchain) =>
+            val asset            = IssuedAsset(issue.id.value)
+            val sponsorshipValue = minSponsoredAssetFee.getOrElse(0L)
+            diff.sponsorship shouldBe Map(asset -> SponsorshipValue(sponsorshipValue))
+            blockchain.assetDescription(asset).map(_.sponsorship) shouldBe Some(sponsorshipValue)
+        }
+    }
+  }
 }
