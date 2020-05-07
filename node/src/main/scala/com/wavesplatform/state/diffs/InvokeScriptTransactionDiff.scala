@@ -41,6 +41,7 @@ import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
+import com.wavesplatform.transaction.validation.impl.SponsorFeeTxValidator
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils._
 import monix.eval.Coeval
@@ -469,7 +470,9 @@ object InvokeScriptTransactionDiff {
           }
 
           def applySponsorFee(sponsorFee: SponsorFee, pk: PublicKey): TracedResult[ValidationError, Diff] = {
-            val sponsorDiff = DiffsCommon.processSponsor(blockchain, dAppAddress, fee = 0, sponsorFee)
+            val sponsorDiff =
+              SponsorFeeTxValidator.checkMinSponsoredAssetFee(sponsorFee.minSponsoredAssetFee)
+                .flatMap(_ => DiffsCommon.processSponsor(blockchain, dAppAddress, fee = 0, sponsorFee))
             val pseudoTx = SponsorFeePseudoTx(sponsorFee, actionSender, pk, tx.id(), tx.timestamp)
             validateActionAsPseudoTx(sponsorDiff, sponsorFee.assetId, pseudoTx)
           }
