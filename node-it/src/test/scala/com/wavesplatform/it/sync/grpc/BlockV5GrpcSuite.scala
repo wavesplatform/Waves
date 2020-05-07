@@ -10,7 +10,6 @@ import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{GrpcIntegrationSuiteWithThreeAddress, NodeConfigs, ReportingTestName}
-import com.wavesplatform.protobuf.transaction.PBRecipients
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers, OptionValues}
 
 import scala.concurrent.duration._
