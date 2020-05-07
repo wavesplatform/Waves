@@ -297,15 +297,24 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
  
           |match assetInfo(fromBase58String("${smartAssetId1}")) {
           |case a:Asset =>
-          |a.name == "smartAsset" &&
-          |a.description == "description" &&
-          |a.quantity == ${someAssetAmount} &&
-          |a.id == fromBase58String("${smartAssetId1}") &&
-          |a.decimals == 8 &&
-          |a.issuer == Address(fromBase58String("${issuer.toAddress.toString}")) &&
-          |a.reissuable == true &&
-          |a.scripted == true &&
-          |a.minSponsoredFee == unit
+          | a.name == "smartAsset" &&
+          | this.name == "smartAsset" &&
+          | a.description == "description" &&
+          | this.description == "description" &&
+          | a.quantity == ${someAssetAmount} &&
+          | a.quantity == ${someAssetAmount} &&
+          | this.id == fromBase58String("${smartAssetId1}") &&
+          | a.decimals == 8 &&
+          | this.decimals == 8 &&
+          | a.issuer == Address(fromBase58String("${issuer.toAddress.toString}")) &&
+          | this.issuer == Address(fromBase58String("${issuer.toAddress.toString}")) &&
+          | a.issuerPublicKey == this.issuerPublicKey &&
+          | a.reissuable == true &&
+          | this.reissuable == true &&
+          | a.scripted == true &&
+          | this.scripted == true &&
+          | a.minSponsoredFee == unit &&
+          | this.minSponsoredFee == unit
           |case _ => false
           |}""".stripMargin
     val script1 = ScriptCompiler(scriptText1, isAssetScript = true, ScriptEstimatorV2).explicitGet()._1.bytes().base64
