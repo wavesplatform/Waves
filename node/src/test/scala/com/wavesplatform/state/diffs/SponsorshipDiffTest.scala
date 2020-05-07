@@ -21,7 +21,10 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
 
   def settings(sponsorshipActivationHeight: Int): FunctionalitySettings =
     TestFunctionalitySettings.Enabled.copy(
-      preActivatedFeatures = Map(BlockchainFeatures.FeeSponsorship.id -> sponsorshipActivationHeight),
+      preActivatedFeatures = Map(
+        BlockchainFeatures.FeeSponsorship.id -> sponsorshipActivationHeight,
+        BlockchainFeatures.BlockV5.id        -> 0
+      ),
       featureCheckBlocksPeriod = 1,
       blocksForFeatureActivation = 1
     )
@@ -83,7 +86,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
       master <- accountGen
       ts     <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
-      (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
+      (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master, reducedFee = true)
     } yield (genesis, issueTx, sponsorTx)
 
     forAll(setup) {
@@ -101,7 +104,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
       master <- accountGen
       ts     <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, 400000000, ts).explicitGet()
-      (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
+      (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master, reducedFee = true)
       recipient                  <- accountGen
       assetId = issueTx.id()
       assetOverspend = TransferTransaction
@@ -216,7 +219,8 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
       master     <- accountGen
       notSponsor <- accountGen
       ts         <- timestampGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, 400000000, ts).explicitGet()
+      genesis1: GenesisTransaction = GenesisTransaction.create(master.toAddress, 400000000, ts).explicitGet()
+      genesis2: GenesisTransaction = GenesisTransaction.create(notSponsor.toAddress, 400000000, ts).explicitGet()
       (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
       assetId = IssuedAsset(issueTx.id())
       senderNotIssuer = SponsorFeeTransaction
@@ -227,28 +231,33 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
         .selfSigned(1.toByte, notSponsor, assetId, None, 1 * Constants.UnitsInWave - 1, ts + 1)
         .right
         .get
-    } yield (genesis, issueTx, sponsorTx, senderNotIssuer, insufficientFee)
+      insufficientReducedFee = SponsorFeeTransaction
+        .selfSigned(1.toByte, notSponsor, assetId, None, (0.001 * Constants.UnitsInWave).toLong - 1, ts + 1)
+        .right
+        .get
+    } yield (Seq(genesis1, genesis2, issueTx, sponsorTx), senderNotIssuer, insufficientFee, insufficientReducedFee)
 
     forAll(setup) {
-      case (genesis, issueTx, sponsorTx, senderNotIssuer, insufficientFee) =>
-        val setupBlocks = Seq(block(Seq(genesis, issueTx, sponsorTx)))
+      case (preconditions, senderNotIssuer, insufficientFee, insufficientReducedFee) =>
+        val setupBlocks = Seq(block(preconditions), block(Seq()))
         assertDiffEi(setupBlocks, block(Seq(senderNotIssuer)), s) { blockDiffEi =>
           blockDiffEi should produce("Asset was issued by other address")
         }
-        assertDiffEi(setupBlocks, block(Seq(insufficientFee)), s) { blockDiffEi =>
-          blockDiffEi should produce("(99999999 in WAVES) does not exceed minimal value of 100000000 WAVES")
+        assertDiffEi(setupBlocks, block(Seq(insufficientReducedFee)), s) { blockDiffEi =>
+          blockDiffEi should produce("(99999 in WAVES) does not exceed minimal value of 100000 WAVES")
         }
     }
   }
 
-  property("cannot сhange sponsorship fee") {
+  property("cannot change sponsorship fee") {
     val s = settings(0)
     val setup = for {
       master     <- accountGen
       notSponsor <- accountGen
       ts         <- timestampGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, 400000000, ts).explicitGet()
-      (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
+      genesis1: GenesisTransaction = GenesisTransaction.create(master.toAddress, 400000000, ts).explicitGet()
+      genesis2: GenesisTransaction = GenesisTransaction.create(notSponsor.toAddress, 400000000, ts).explicitGet()
+      (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master, reducedFee = true)
       assetId = IssuedAsset(issueTx.id())
       minFee <- smallFeeGen
       senderNotIssuer = SponsorFeeTransaction
@@ -256,19 +265,19 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
         .right
         .get
       insufficientFee = SponsorFeeTransaction
-        .selfSigned(1.toByte, master, assetId, Some(minFee), 1 * Constants.UnitsInWave - 1, ts + 1)
+        .selfSigned(1.toByte, master, assetId, Some(minFee), (0.001 * Constants.UnitsInWave).toLong - 1, ts + 1)
         .right
         .get
-    } yield (genesis, issueTx, sponsorTx, senderNotIssuer, insufficientFee)
+    } yield (Seq(genesis1, genesis2, issueTx, sponsorTx), senderNotIssuer, insufficientFee)
 
     forAll(setup) {
-      case (genesis, issueTx, sponsorTx, senderNotIssuer, insufficientFee) =>
-        val setupBlocks = Seq(block(Seq(genesis, issueTx, sponsorTx)))
+      case (preconditions, senderNotIssuer, insufficientFee) =>
+        val setupBlocks = Seq(block(preconditions))
         assertDiffEi(setupBlocks, block(Seq(senderNotIssuer)), s) { blockDiffEi =>
           blockDiffEi should produce("Asset was issued by other address")
         }
         assertDiffEi(setupBlocks, block(Seq(insufficientFee)), s) { blockDiffEi =>
-          blockDiffEi should produce("(99999999 in WAVES) does not exceed minimal value of 100000000 WAVES")
+          blockDiffEi should produce("(99999 in WAVES) does not exceed minimal value of 100000 WAVES")
         }
     }
   }
@@ -310,7 +319,11 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
 
     forAll(setup) {
       case (genesis, issue, sponsor, assetTransfer, wavesTransfer, backWavesTransfer) =>
-        assertDiffAndState(Seq(block(Seq(genesis, issue, sponsor, assetTransfer, wavesTransfer))), block(Seq(backWavesTransfer)), s) {
+        assertDiffAndState(
+          Seq(block(Seq(genesis, issue, sponsor, assetTransfer, wavesTransfer))),
+          block(Seq(backWavesTransfer)),
+          s.copy(preActivatedFeatures = s.preActivatedFeatures + (BlockV5.id -> Int.MaxValue))
+        ) {
           case (_, state) =>
             state.balance(genesis.recipient) shouldBe 0
             state.balance(genesis.recipient, IssuedAsset(issue.id())) shouldBe issue.quantity
@@ -319,8 +332,10 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
         assertDiffEi(
           Seq(block(Seq(genesis, issue, sponsor, assetTransfer, wavesTransfer))),
           block(Seq(backWavesTransfer)),
-          s.copy(preActivatedFeatures = s.preActivatedFeatures + (BlockV5.id -> 0))
-        ) { ei => ei should produce("negative waves balance") }
+          s
+        ) { ei =>
+          ei should produce("negative waves balance")
+        }
     }
   }
 }

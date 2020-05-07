@@ -289,7 +289,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
     updateTikTok("reissue", setAssetScriptMinFee)
 
-    sender.sponsorAsset(contract, sponsoredAsset, 1, sponsorFee + smartFee, waitForTx = true)
+    sender.sponsorAsset(contract, sponsoredAsset, 1, sponsorReducedFee + smartFee, waitForTx = true)
     sender.transfer(contract, caller, assetAmount, smartMinFee, assetId = Some(sponsoredAsset), waitForTx = true)
 
     val prevBalance = sender.balance(contract).balance

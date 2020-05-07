@@ -397,7 +397,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
     "asset sponsorship" in forAll(for {
       sender      <- accountGen
-      sponsorship <- sponsorFeeCancelSponsorFeeGen(sender)
+      sponsorship <- sponsorFeeCancelSponsorFeeGen(sender, reducedFee = false)
     } yield {
       (sender, sponsorship)
     }) {
@@ -464,7 +464,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
     "carry fee" in forAll(for {
       sender      <- accountGen
-      sponsorship <- sponsorFeeCancelSponsorFeeGen(sender)
+      sponsorship <- sponsorFeeCancelSponsorFeeGen(sender, reducedFee = false)
       transfer    <- transferGeneratorP(sponsorship._1.timestamp, sender, sender.toAddress, 10000000000L)
     } yield {
       (sender, sponsorship, transfer)

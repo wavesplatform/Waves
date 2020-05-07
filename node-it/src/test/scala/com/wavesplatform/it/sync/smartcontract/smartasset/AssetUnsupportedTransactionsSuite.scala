@@ -68,7 +68,7 @@ class AssetUnsupportedTransactionsSuite extends BaseTransactionSuite with TableD
         waitForTx = true
       )
       .id
-    assertBadRequestAndMessage(sender.sponsorAsset(firstAddress, assetId, 100, sponsorFee + smartFee),
+    assertBadRequestAndMessage(sender.sponsorAsset(firstAddress, assetId, 100, sponsorReducedFee + smartFee),
                                "State check failed. Reason: Sponsorship smart assets is disabled.")
 
   }
