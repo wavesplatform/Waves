@@ -10,8 +10,8 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.lang.v1.traits.domain.{Burn, Reissue}
-import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, Diff, LeaseBalance, Portfolio}
+import com.wavesplatform.lang.v1.traits.domain.{Burn, Reissue, SponsorFee}
+import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, Diff, LeaseBalance, Portfolio, SponsorshipValue}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.ProvenTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -118,6 +118,20 @@ object DiffsCommon {
       Diff.stateOps(
         portfolios = Map(sender   -> portfolio),
         updatedAssets = Map(asset -> volumeInfo.rightIor)
+      )
+    }
+  }
+
+  def processSponsor(blockchain: Blockchain, sender: Address, fee: Long, sponsorFee: SponsorFee): Either[ValidationError, Diff] = {
+    val asset = IssuedAsset(sponsorFee.assetId)
+    DiffsCommon.validateAsset(blockchain, asset, sender, issuerOnly = true).flatMap { _ =>
+      Either.cond(
+        !blockchain.hasAssetScript(asset),
+        Diff.stateOps(
+          portfolios = Map(sender -> Portfolio(balance = -fee, lease = LeaseBalance.empty, assets = Map.empty)),
+          sponsorship = Map(asset -> SponsorshipValue(sponsorFee.minSponsoredAssetFee.getOrElse(0))),
+        ),
+        GenericError("Sponsorship smart assets is disabled.")
       )
     }
   }

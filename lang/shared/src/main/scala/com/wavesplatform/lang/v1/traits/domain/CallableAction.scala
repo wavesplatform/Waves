@@ -73,6 +73,11 @@ case class Burn(
     quantity: Long
 ) extends CallableAction
 
+case class SponsorFee(
+                       assetId: ByteStr,
+                       minSponsoredAssetFee: Option[Long]
+) extends CallableAction
+
 sealed trait DataItem[T] extends CallableAction {
   val key: String
   val value: T
