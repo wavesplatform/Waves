@@ -284,6 +284,36 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     }
   }
 
+  test("asset script can read asset info") {
+    val scriptTextT = s"""true""".stripMargin
+    val scriptT     = ScriptCompiler(scriptTextT, isAssetScript = true, ScriptEstimatorV2).explicitGet()._1.bytes().base64
+
+    val smartAssetId1 =
+      sender.broadcastIssue(issuer, "smartAsset", "description", someAssetAmount, 8, reissuable = true, script = Some(scriptT), waitForTx = true).id
+    val scriptText1 = s"""
+          |{-# STDLIB_VERSION 4 #-}
+          |{-# CONTENT_TYPE EXPRESSION #-}
+          |{-# SCRIPT_TYPE ASSET #-}
+ 
+          |match assetInfo(fromBase58String("${smartAssetId1}")) {
+          |case a:Asset =>
+          |a.name == "smartAsset" &&
+          |a.description == "description" &&
+          |a.quantity == ${someAssetAmount} &&
+          |a.id == fromBase58String("${smartAssetId1}") &&
+          |a.decimals == 8 &&
+          |a.issuer == Address(fromBase58String("${issuer.toAddress.toString}")) &&
+          |a.reissuable == true &&
+          |a.scripted == true &&
+          |a.minSponsoredFee == unit
+          |case _ => false
+          |}""".stripMargin
+    val script1 = ScriptCompiler(scriptText1, isAssetScript = true, ScriptEstimatorV2).explicitGet()._1.bytes().base64
+    sender.setAssetScript(smartAssetId1, issuer.toAddress.toString, setAssetScriptFee, Some(script1))
+
+    sender.burn(issuer.toAddress.toString, smartAssetId1, 1, minFee + 2 * smartFee, waitForTx = true)
+  }
+
   test("check increased fee for smart sender/asset") {
     val scriptText = s"""true""".stripMargin
     val script     = ScriptCompiler(scriptText, isAssetScript = true, ScriptEstimatorV2).explicitGet()._1.bytes().base64
@@ -306,6 +336,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     sender.updateAssetInfo(issuer, smartAssetId, "updatedName", "updatedDescription", minFee + 2 * smartFee, waitForTx = true)
     nodes.waitForHeightArise()
   }
+
 
   test("able to update name/description of nft") {
     val updateAssetInfoTxId = sender.updateAssetInfo(issuer, nftId, "updatedName", "updatedDescription", minFee + smartFee)._1.id
