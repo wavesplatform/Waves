@@ -37,7 +37,7 @@ class NodeRestartTestSuite extends FreeSpec with Matchers with WaitForHeight2 wi
     val txJson = TransferTransaction
       .selfSigned(
         1.toByte,
-        nodeB.privateKey,
+        nodeB.keyPair,
         AddressOrAlias.fromString(nodeA.address).explicitGet(),
         Waves,
         1.waves,

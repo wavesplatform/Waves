@@ -2,7 +2,7 @@ package com.wavesplatform.it
 
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
 import com.wavesplatform.api.http.requests.IssueRequest
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi.AssertiveApiError
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.Script
@@ -22,6 +22,7 @@ package object sync {
   val burnFee: Long                    = 0.001.waves
   val invokeFee: Long                  = 0.009.waves
   val sponsorFee: Long                 = 1.waves
+  val sponsorReducedFee: Long          = 0.001.waves
   val setAssetScriptFee: Long          = 1.waves
   val setScriptFee: Long               = 0.01.waves
   val transferAmount: Long             = 10.waves
@@ -80,7 +81,7 @@ package object sync {
     IssueRequest(
       Some(tx.version),
       None,
-      Some(Base58.encode(tx.sender)),
+      Some(tx.sender.toString),
       tx.name.toStringUtf8,
       tx.description.toStringUtf8,
       quantity,

@@ -71,8 +71,8 @@ class SponsorshipSuite
 
     sponsorWavesBalance = sender.accountBalances(sponsorAddress)._2
     minerWavesBalance = sender.accountBalances(miner.address)._2
-    minerWavesBalanceAfterFirstXferTest   = minerWavesBalance + 2 * issueFee + 2 * sponsorFee + 2 * minFee + 2 * FeeValidation.FeeUnit * SmallFee / minSponsorFee
-    sponsorWavesBalanceAfterFirstXferTest = sponsorWavesBalance - 2 * issueFee - 2 * sponsorFee - 2 * minFee - 2 * FeeValidation.FeeUnit * SmallFee / minSponsorFee
+    minerWavesBalanceAfterFirstXferTest   = minerWavesBalance + 2 * issueFee + 2 * sponsorReducedFee + 2 * minFee + 2 * FeeValidation.FeeUnit * SmallFee / minSponsorFee
+    sponsorWavesBalanceAfterFirstXferTest = sponsorWavesBalance - 2 * issueFee - 2 * sponsorReducedFee - 2 * minFee - 2 * FeeValidation.FeeUnit * SmallFee / minSponsorFee
 
     firstSponsorAssetId =
       sender
@@ -103,8 +103,8 @@ class SponsorshipSuite
 
     firstTransferTxToAlice = sender.transfer(sponsorAddress, aliceAddress, sponsorAssetTotal / 2, minFee, Some(firstSponsorAssetId), None, waitForTx = true).id
     secondTransferTxToAlice = sender.transfer(sponsorAddress, aliceAddress, sponsorAssetTotal / 2, minFee, Some(secondSponsorAssetId), None, waitForTx = true).id
-    firstSponsorTxId  = sender.sponsorAsset(sponsorAddress, firstSponsorAssetId, baseFee = Token, fee = sponsorFee, version = TxVersion.V1).id
-    secondSponsorTxId = sender.sponsorAsset(sponsorAddress, secondSponsorAssetId, baseFee = Token, fee = sponsorFee, version = TxVersion.V2).id
+    firstSponsorTxId  = sender.sponsorAsset(sponsorAddress, firstSponsorAssetId, baseFee = Token, fee = sponsorReducedFee, version = TxVersion.V1).id
+    secondSponsorTxId = sender.sponsorAsset(sponsorAddress, secondSponsorAssetId, baseFee = Token, fee = sponsorReducedFee, version = TxVersion.V2).id
   }
 
   "Fee in sponsored asset works fine for transaction" - {
@@ -434,8 +434,8 @@ class SponsorshipSuite
             waitForTx = true
           )
           .id
-      val sponsorTxId1 = sender.sponsorAsset(sponsorAddress, firstSponsorAssetId2, baseFee = Token, fee = sponsorFee, version = TxVersion.V1).id
-      val sponsorTxId2 = sender.sponsorAsset(sponsorAddress, secondSponsorAssetId2, baseFee = Token, fee = sponsorFee, version = TxVersion.V2).id
+      val sponsorTxId1 = sender.sponsorAsset(sponsorAddress, firstSponsorAssetId2, baseFee = Token, fee = sponsorReducedFee, version = TxVersion.V1).id
+      val sponsorTxId2 = sender.sponsorAsset(sponsorAddress, secondSponsorAssetId2, baseFee = Token, fee = sponsorReducedFee, version = TxVersion.V2).id
       sender.transfer(sponsorAddress, aliceAddress, sponsorAssetTotal / 2, minFee, Some(firstSponsorAssetId2), None, waitForTx = true).id
       sender.transfer(sponsorAddress, aliceAddress, sponsorAssetTotal / 2, minFee, Some(secondSponsorAssetId2), None, waitForTx = true).id
       nodes.waitForHeightAriseAndTxPresent(sponsorTxId1)
@@ -465,7 +465,7 @@ class SponsorshipSuite
       nodes.waitForHeightAriseAndTxPresent(aliceTransferWaves1)
       nodes.waitForHeightAriseAndTxPresent(aliceTransferWaves2)
 
-      val totalWavesFee = FeeValidation.FeeUnit * 2 * SmallFee / Token + 2 * issueFee + 2 * sponsorFee + 2 * burnFee + 2 * minFee + 2 * issueFee
+      val totalWavesFee = FeeValidation.FeeUnit * 2 * SmallFee / Token + 2 * issueFee + 2 * sponsorReducedFee + 2 * burnFee + 2 * minFee + 2 * issueFee
       miner.assertBalances(miner.address, minerBalance._1 + totalWavesFee, minerBalance._2 + totalWavesFee)
       sender.assertBalances(sponsorAddress, sponsorBalance._1 - totalWavesFee, sponsorBalance._2 - totalWavesFee)
       sender.assertAssetBalance(sponsorAddress, firstSponsorAssetId2, SmallFee + sponsorAssetTotal)
@@ -497,8 +497,8 @@ class SponsorshipSuite
           waitForTx = true
         )
         .id
-      val firstSponsorshipTxId = miner.sponsorAsset(miner.address, firstMinersAsset, baseFee = Token, fee = sponsorFee, version = TxVersion.V1).id
-      val secondSponsorshipTxId = miner.sponsorAsset(miner.address, secondMinersAsset, baseFee = Token, fee = sponsorFee, version = TxVersion.V2).id
+      val firstSponsorshipTxId = miner.sponsorAsset(miner.address, firstMinersAsset, baseFee = Token, fee = sponsorReducedFee, version = TxVersion.V1).id
+      val secondSponsorshipTxId = miner.sponsorAsset(miner.address, secondMinersAsset, baseFee = Token, fee = sponsorReducedFee, version = TxVersion.V2).id
       nodes.waitForHeightAriseAndTxPresent(firstSponsorshipTxId)
       nodes.waitForTransaction(secondSponsorshipTxId)
       val minerFirstTransferTxId =

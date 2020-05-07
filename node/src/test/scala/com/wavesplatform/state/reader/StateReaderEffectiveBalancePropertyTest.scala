@@ -19,7 +19,7 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with PropertyChec
     val setup: Gen[(GenesisTransaction, Int, Int, Int)] = for {
       master <- accountGen
       ts     <- positiveIntGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       emptyBlocksAmt <- Gen.choose(1, 10)
       atHeight       <- Gen.choose(1, 20)
       confirmations  <- Gen.choose(1, 20)
@@ -41,7 +41,7 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with PropertyChec
     val setup = for {
       master <- accountGen
       ts     <- positiveLongGen
-      genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       leaser <- accountGen
       xfer1  <- transferGeneratorPV2(ts + 1, master, leaser.toAddress, ENOUGH_AMT / 3)
       lease1 = LeaseTransaction.selfSigned(2.toByte, leaser, master.toAddress, xfer1.amount - Fee, Fee, ts + 2).explicitGet()
@@ -52,10 +52,10 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with PropertyChec
     forAll(setup) {
       case (leaser, genesis, xfer1, lease1, xfer2, lease2) =>
         assertDiffAndState(Seq(block(Seq(genesis)), block(Seq(xfer1, lease1))), block(Seq(xfer2, lease2)), fs) { (_, state) =>
-          val portfolio       = state.wavesPortfolio(lease1.sender)
+          val portfolio       = state.wavesPortfolio(lease1.sender.toAddress)
           val expectedBalance = xfer1.amount + xfer2.amount - 2 * Fee
           portfolio.balance shouldBe expectedBalance
-          state.generatingBalance(leaser, state.lastBlockId) shouldBe 0
+          state.generatingBalance(leaser.toAddress, state.lastBlockId) shouldBe 0
           portfolio.lease shouldBe LeaseBalance(0, expectedBalance)
           portfolio.effectiveBalance shouldBe 0
         }

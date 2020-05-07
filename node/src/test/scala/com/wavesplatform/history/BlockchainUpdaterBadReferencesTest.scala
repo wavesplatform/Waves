@@ -22,10 +22,10 @@ class BlockchainUpdaterBadReferencesTest
     master    <- accountGen
     recipient <- accountGen
     ts        <- positiveIntGen
-    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-    payment: TransferTransaction  <- wavesTransferGeneratorP(ts, master, recipient)
-    payment2: TransferTransaction <- wavesTransferGeneratorP(ts, master, recipient)
-    payment3: TransferTransaction <- wavesTransferGeneratorP(ts, master, recipient)
+    genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+    payment: TransferTransaction  <- wavesTransferGeneratorP(ts, master, recipient.toAddress)
+    payment2: TransferTransaction <- wavesTransferGeneratorP(ts, master, recipient.toAddress)
+    payment3: TransferTransaction <- wavesTransferGeneratorP(ts, master, recipient.toAddress)
   } yield (genesis, payment, payment2, payment3)
 
   property("microBlock: referenced (micro)block doesn't exist") {

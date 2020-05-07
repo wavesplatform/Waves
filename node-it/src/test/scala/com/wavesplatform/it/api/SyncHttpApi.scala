@@ -270,7 +270,7 @@ object SyncHttpApi extends Assertions {
     ): Transaction = {
       val tx = IssueTransaction(
         TxVersion.V2,
-        sender = source,
+        sender = source.publicKey,
         name.utf8Bytes,
         description.utf8Bytes,
         quantity = quantity,
@@ -279,7 +279,7 @@ object SyncHttpApi extends Assertions {
         script = script.map(x => Script.fromBase64String(x).explicitGet()),
         fee = fee,
         timestamp = System.currentTimeMillis()
-      ).signWith(source)
+      ).signWith(source.privateKey)
 
       maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = waitForTx)
     }
@@ -358,7 +358,7 @@ object SyncHttpApi extends Assertions {
         sourceAddress: String,
         assetId: String,
         baseFee: Long,
-        fee: Long = sponsorFee,
+        fee: Long = sponsorReducedFee,
         version: Byte = 1,
         waitForTx: Boolean = false,
         amountsAsStrings: Boolean = false

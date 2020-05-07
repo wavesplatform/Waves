@@ -99,7 +99,7 @@ class ReissueTransactionDiffTest
       issuer <- accountGen
       block = TestBlock.create(
         ntpNow,
-        Seq(GenesisTransaction.create(issuer, Constants.TotalWaves * Constants.UnitsInWave, ntpNow).explicitGet())
+        Seq(GenesisTransaction.create(issuer.toAddress, Constants.TotalWaves * Constants.UnitsInWave, ntpNow).explicitGet())
       )
     } yield (issuer, block)
 

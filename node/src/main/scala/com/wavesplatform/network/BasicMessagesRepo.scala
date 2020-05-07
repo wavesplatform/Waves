@@ -136,7 +136,7 @@ trait BlockIdSeqSpec[A <: AnyRef] extends MessageSpec[A] {
 }
 
 object GetSignaturesSpec extends SignaturesSeqSpec[GetSignatures] {
-  def isSupported(signatures: Seq[ByteStr]): Boolean             = signatures.forall(_.length == SignatureLength)
+  def isSupported(signatures: Seq[ByteStr]): Boolean             = signatures.forall(_.arr.length == SignatureLength)
   override def wrap(signatures: Seq[Array[Byte]]): GetSignatures = GetSignatures(signatures.map(ByteStr(_)))
   override def unwrap(v: GetSignatures): Seq[Array[MessageCode]] = v.signatures.map(_.arr)
   override val messageCode: MessageCode                          = 20: Byte
@@ -236,9 +236,8 @@ object MicroBlockInvSpec extends MessageSpec[MicroBlockInv] {
       }
     )
 
-  override def serializeData(inv: MicroBlockInv): Array[Byte] = {
-    inv.sender ++ inv.totalBlockId.arr ++ inv.reference.arr ++ inv.signature.arr
-  }
+  override def serializeData(inv: MicroBlockInv): Array[Byte] =
+    inv.sender.arr ++ inv.totalBlockId.arr ++ inv.reference.arr ++ inv.signature.arr
 
   override val maxLength: Int = 300
 }

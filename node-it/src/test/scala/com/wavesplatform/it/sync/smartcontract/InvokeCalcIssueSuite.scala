@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
@@ -45,7 +45,7 @@ class InvokeCalcIssueSuite extends BaseTransactionSuite with Matchers with Cance
         fee = invokeFee + issueFee, // dAppV4 contains 1 Issue action
         waitForTx = true
       )
-    val assetId = Base58.encode(sender.getDataByKey(smartAcc, "id").as[BinaryDataEntry].value)
+    val assetId = sender.getDataByKey(smartAcc, "id").as[BinaryDataEntry].value.toString
 
     sender
       .invokeScript(
@@ -56,7 +56,7 @@ class InvokeCalcIssueSuite extends BaseTransactionSuite with Matchers with Cance
         fee = invokeFee + issueFee, // dAppV4 contains 1 Issue action
         waitForTx = true
       )
-    val secondAssetId = Base58.encode(sender.getDataByKey(smartAcc, "id").as[BinaryDataEntry].value)
+    val secondAssetId = sender.getDataByKey(smartAcc, "id").as[BinaryDataEntry].value.toString
 
     sender.assetBalance(smartAcc, assetId).balance shouldBe 100
     sender.assetBalance(smartAcc, secondAssetId).balance shouldBe 100

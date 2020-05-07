@@ -25,11 +25,11 @@ class CancelLeaseOverflowTest extends PropSpec with PropertyChecks with WithStat
       fee       <- smallFeeGen
       ts        <- timestampGen
     } yield (
-      GenesisTransaction.create(sender1, amount + fee, ts).explicitGet(),
-      GenesisTransaction.create(sender2, amount + fee * 2, ts).explicitGet(),
-      LeaseTransaction.selfSigned(1.toByte, sender1, sender2, amount, fee, ts).explicitGet(),
-      LeaseTransaction.selfSigned(1.toByte, sender2, recipient, amount, fee, ts).explicitGet(),
-      TransferTransaction.selfSigned(1.toByte, sender2, recipient, Waves, amount, Waves, fee, None, ts).explicitGet()
+      GenesisTransaction.create(sender1.toAddress, amount + fee, ts).explicitGet(),
+      GenesisTransaction.create(sender2.toAddress, amount + fee * 2, ts).explicitGet(),
+      LeaseTransaction.selfSigned(1.toByte, sender1, sender2.toAddress, amount, fee, ts).explicitGet(),
+      LeaseTransaction.selfSigned(1.toByte, sender2, recipient.toAddress, amount, fee, ts).explicitGet(),
+      TransferTransaction.selfSigned(1.toByte, sender2, recipient.toAddress, Waves, amount, Waves, fee, None, ts).explicitGet()
     )
 
     forAll(leaseOverflowGen) {

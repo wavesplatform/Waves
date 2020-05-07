@@ -3,7 +3,7 @@ package com.wavesplatform.mining
 import java.util.concurrent.atomic.AtomicReference
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{AddressOrAlias, KeyPair, PublicKey}
+import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.block.serialization.{BlockHeaderSerializer, BlockSerializer}
 import com.wavesplatform.block.validation.Validators
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
@@ -72,19 +72,16 @@ class BlockV5Test
       Validators.validateBlock(blockWithBadVotes) shouldBe 'left
       Validators.validateBlock(block) shouldBe 'right
       Validators.validateBlock(
-        updateHeader(block, _.copy(generator = PublicKey(Array.fill(64)(0.toByte))))
-      ) shouldBe 'left
-      Validators.validateBlock(
         updateHeader(block, _.copy(version = Block.NgBlockVersion))
       ) shouldBe 'left
       Validators.validateBlock(
-        updateHeader(block, _.copy(generationSignature = Array.fill(32)(0.toByte)))
+        updateHeader(block, _.copy(generationSignature = ByteStr(new Array[Byte](32))))
       ) shouldBe 'left
       Validators.validateBlock(
         updateHeader(block, _.copy(featureVotes = Seq[Short](1, 1, 1)))
       ) shouldBe 'left
       Validators.validateBlock(
-        updateHeader(blockWithBadVotes, _.copy(version = Block.NgBlockVersion, generationSignature = Array.fill(32)(0.toByte)))
+        updateHeader(blockWithBadVotes, _.copy(version = Block.NgBlockVersion, generationSignature = ByteStr(new Array[Byte](32))))
       ) shouldBe 'right
     }
 
@@ -158,7 +155,7 @@ class BlockV5Test
             hitSourceAtActivationHeight shouldBe crypto
               .verifyVRF(
                 blockAtActivationHeight.header.generationSignature,
-                hitSourceBeforeActivationHeight,
+                hitSourceBeforeActivationHeight.arr,
                 minerAcc2.publicKey
               )
               .explicitGet()
@@ -179,7 +176,7 @@ class BlockV5Test
             hitSourceAfterActivationHeight shouldBe crypto
               .verifyVRF(
                 blockAfterActivationHeight.header.generationSignature,
-                hitSourceAtActivationHeight,
+                hitSourceAtActivationHeight.arr,
                 minerAcc1.publicKey
               )
               .explicitGet()
@@ -200,7 +197,7 @@ class BlockV5Test
             hitSourceAfterVRFUsing shouldBe crypto
               .verifyVRF(
                 blockAfterVRFUsing.header.generationSignature,
-                hitSourceAfterActivationHeight,
+                hitSourceAfterActivationHeight.arr,
                 minerAcc2.publicKey
               )
               .explicitGet()
@@ -243,7 +240,7 @@ class BlockV5Test
               nextHitSource shouldBe crypto
                 .verifyVRF(
                   lastBlock.header.generationSignature,
-                  hitSource,
+                  hitSource.arr,
                   minerAcc1.publicKey
                 )
                 .explicitGet()
@@ -345,11 +342,11 @@ class BlockV5Test
     (miner1, miner2, b1) <- genesis
     b2        = TestBlock.create(ntpNow, b1.id(), Seq.empty, miner1, version = Block.PlainBlockVersion)
     b3        = TestBlock.create(ntpNow, b2.id(), Seq.empty, miner1, version = Block.NgBlockVersion)
-    tx1       = createTx(miner1, miner2)
-    tx2       = createTx(miner2, miner1)
-    tx3       = createTx(miner1, miner2)
-    tx4       = createTx(miner2, miner1)
-    tx5       = createTx(miner1, miner2)
+    tx1       = createTx(miner1, miner2.toAddress)
+    tx2       = createTx(miner2, miner1.toAddress)
+    tx3       = createTx(miner1, miner2.toAddress)
+    tx4       = createTx(miner2, miner1.toAddress)
+    tx5       = createTx(miner1, miner2.toAddress)
     (b4, m4s) = chainBaseAndMicro(b3.id(), Seq.empty, Seq(Seq(tx1)), miner2, Block.NgBlockVersion, ntpNow)
     (b5, m5s) = chainBaseAndMicro(m4s.head.totalBlockId, Seq.empty, Seq(Seq(tx2)), miner1, Block.RewardBlockVersion, ntpNow)
     (b6, m6s) = chainBaseAndMicro(m5s.head.totalBlockId, Seq(tx3), Seq(Seq(tx4)), miner2, Block.ProtoBlockVersion, ntpNow)
@@ -376,12 +373,12 @@ class BlockV5Test
   }
 
   "blockId" should "be header hash" in {
-    implicit val byteStrLength: Length[ByteStr] = (obj: ByteStr) => obj.length
+    implicit val byteStrLength: Length[ByteStr] = (obj: ByteStr) => obj.arr.length
 
     val preconditions = for {
       acc <- accountGen
       ts      = System.currentTimeMillis()
-      genesis = GenesisTransaction.create(acc, diffs.ENOUGH_AMT, ts).explicitGet()
+      genesis = GenesisTransaction.create(acc.toAddress, diffs.ENOUGH_AMT, ts).explicitGet()
     } yield (acc, genesis)
 
     forAll(preconditions) {
@@ -448,8 +445,8 @@ class BlockV5Test
         ref = TestBlock.randomSignature(),
         signer = TestBlock.defaultSigner,
         txs = Seq(
-          GenesisTransaction.create(miner1, Constants.TotalWaves / 2 * Constants.UnitsInWave, ntpNow).explicitGet(),
-          GenesisTransaction.create(miner2, Constants.TotalWaves / 2 * Constants.UnitsInWave, ntpNow).explicitGet()
+          GenesisTransaction.create(miner1.toAddress, Constants.TotalWaves / 2 * Constants.UnitsInWave, ntpNow).explicitGet(),
+          GenesisTransaction.create(miner2.toAddress, Constants.TotalWaves / 2 * Constants.UnitsInWave, ntpNow).explicitGet()
         ),
         version = Block.GenesisBlockVersion
       )

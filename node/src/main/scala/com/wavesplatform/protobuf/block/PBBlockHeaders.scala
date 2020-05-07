@@ -11,15 +11,15 @@ object PBBlockHeaders {
 
     PBBlock.Header(
       AddressScheme.current.chainId,
-      ByteString.copyFrom(reference),
+      ByteString.copyFrom(reference.arr),
       baseTarget,
-      ByteString.copyFrom(generationSignature),
+      ByteString.copyFrom(generationSignature.arr),
       header.featureVotes.map(shortToInt),
       header.timestamp,
       header.version,
-      ByteString.copyFrom(generator),
+      ByteString.copyFrom(generator.arr),
       header.rewardVote,
-      ByteString.copyFrom(header.transactionsRoot)
+      ByteString.copyFrom(header.transactionsRoot.arr)
     )
   }
 

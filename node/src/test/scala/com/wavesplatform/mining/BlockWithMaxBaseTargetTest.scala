@@ -146,7 +146,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
           .containerOfN[Array, Byte](32, Arbitrary.arbitrary[Byte])
           .map(bs => KeyPair(bs))
           .map { account =>
-            val tx           = GenesisTransaction.create(account, ENOUGH_AMT, ts + 1).explicitGet()
+            val tx           = GenesisTransaction.create(account.toAddress, ENOUGH_AMT, ts + 1).explicitGet()
             val genesisBlock = TestBlock.create(ts + 2, List(tx))
             val secondBlock = TestBlock.create(
               ts + 3,

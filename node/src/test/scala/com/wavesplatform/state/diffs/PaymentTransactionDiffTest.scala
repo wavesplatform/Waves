@@ -18,9 +18,9 @@ class PaymentTransactionDiffTest extends PropSpec with PropertyChecks with WithS
     master    <- accountGen
     recipient <- otherAccountGen(candidate = master)
     ts        <- positiveIntGen
-    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-    paymentV2: PaymentTransaction <- paymentGeneratorP(master, recipient)
-    paymentV3: PaymentTransaction <- paymentGeneratorP(master, recipient)
+    genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+    paymentV2: PaymentTransaction <- paymentGeneratorP(master, recipient.toAddress)
+    paymentV3: PaymentTransaction <- paymentGeneratorP(master, recipient.toAddress)
   } yield (genesis, paymentV2, paymentV3)
 
   val settings = TestFunctionalitySettings.Enabled.copy(blockVersion3AfterHeight = 2)
