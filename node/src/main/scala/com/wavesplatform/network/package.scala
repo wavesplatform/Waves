@@ -73,7 +73,7 @@ package object network extends ScorexLogging {
 
     def broadcast(message: AnyRef, except: Set[Channel]): ChannelGroupFuture = {
       logBroadcast(message, except)
-      val st = broadcastTimeStats.refine("object", message.getClass.getSimpleName).start()
+      val st = broadcastTimeStats.withTag("object", message.getClass.getSimpleName).start()
       allChannels
         .writeAndFlush(message, { (channel: Channel) =>
           !except.contains(channel)
