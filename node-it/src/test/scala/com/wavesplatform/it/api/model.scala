@@ -329,6 +329,7 @@ case class StateChangesDetails(
     issues: Seq[IssueInfoResponse],
     reissues: Seq[ReissueInfoResponse],
     burns: Seq[BurnInfoResponse],
+    sponsorFees: Seq[SponsorFeeResponse],
     errorMessage: Option[ErrorMessageInfoResponse]
 )
 object StateChangesDetails {
@@ -570,7 +571,7 @@ object BurnTransactionInfo {
   )
 }
 
-case class DataResponse(`type`: String, value: Long, key: String)
+case class DataResponse(`type`: String, value: String, key: String)
 object DataResponse {
   implicit val dataResponseFormat: Format[DataResponse] = Json.format
 }
@@ -608,6 +609,11 @@ object ReissueInfoResponse {
 case class BurnInfoResponse(assetId: String, quantity: Long)
 object BurnInfoResponse {
   implicit val burnInfoFormat: Format[BurnInfoResponse] = Json.format
+}
+
+case class SponsorFeeResponse(assetId: String, minSponsoredAssetFee: Option[Long])
+object SponsorFeeResponse {
+  implicit val sponsorFeeFormat: Format[SponsorFeeResponse] = Json.format
 }
 
 case class ErrorMessageInfoResponse(code: Int, text: String)
