@@ -12,7 +12,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
-import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, Portfolio, Sponsorship}
+import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{FailedScriptError, GenericError, UnsupportedTransactionType}
 import com.wavesplatform.transaction._
@@ -224,7 +224,7 @@ object TransactionDiffer {
       maybeDApp  <- extractDAppAddress
     } yield {
       Diff.empty.copy(
-        transactions = mutable.LinkedHashMap((tx.id(), (tx, (portfolios.keys ++ maybeDApp.toList).toSet, false))),
+        transactions = mutable.LinkedHashMap((tx.id(), NewTransactionInfo(tx, (portfolios.keys ++ maybeDApp.toList).toSet, applied = false))),
         portfolios = portfolios,
         scriptResults = Map(tx.id() -> InvokeScriptResult(errorMessage = error))
       )

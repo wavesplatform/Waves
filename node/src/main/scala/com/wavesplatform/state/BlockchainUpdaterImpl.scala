@@ -14,7 +14,6 @@ import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.script.Script
 import com.wavesplatform.metrics.{TxsInBlockchainStats, _}
 import com.wavesplatform.mining.{MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
@@ -611,7 +610,7 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.hasAccountScript(address)
   }
 
-  override def assetScript(asset: IssuedAsset): Option[(Script, Long)] = readLock {
+  override def assetScript(asset: IssuedAsset): Option[AssetScriptInfo] = readLock {
     compositeBlockchain.assetScript(asset)
   }
 

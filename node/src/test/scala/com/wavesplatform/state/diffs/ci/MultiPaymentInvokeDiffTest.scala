@@ -102,7 +102,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
           TestBlock.create(Seq(ci)),
           features
         )(_ should matchPattern {
-          case Right(diff: Diff) if diff.transactions.exists(!_._2._3) =>
+          case Right(diff: Diff) if diff.transactions.exists(!_._2.applied) =>
         })
     }
   }

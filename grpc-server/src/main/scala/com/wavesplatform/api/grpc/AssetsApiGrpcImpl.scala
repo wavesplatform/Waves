@@ -3,6 +3,7 @@ package com.wavesplatform.api.grpc
 import com.wavesplatform.api.common.CommonAssetsApi
 import com.wavesplatform.api.http.ApiError.TransactionDoesNotExist
 import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.state.AssetScriptInfo
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import monix.execution.Scheduler
 
@@ -20,7 +21,7 @@ class AssetsApiGrpcImpl(assetsApi: CommonAssetsApi)(implicit sc: Scheduler) exte
           info.description.reissuable,
           info.description.totalVolume.longValue(),
           info.description.script.map {
-            case (script, complexity) =>
+            case AssetScriptInfo(script, complexity) =>
               ScriptData(
                 PBTransactions.toPBScript(Some(script)),
                 script.expr.toString,

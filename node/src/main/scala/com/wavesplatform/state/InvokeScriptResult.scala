@@ -3,6 +3,7 @@ package com.wavesplatform.state
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.v1.traits.domain.{Burn, Issue, Reissue}
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
@@ -29,7 +30,7 @@ object InvokeScriptResult {
 
   final case class Payment(address: Address, asset: Asset, amount: Long)
   object Payment {
-    implicit val jsonWrites = Json.writes[Payment]
+    implicit val jsonFormat = Json.format[Payment]
   }
 
   def paymentsFromPortfolio(addr: Address, portfolio: Portfolio): Seq[Payment] = {
@@ -38,22 +39,38 @@ object InvokeScriptResult {
     (assets.toVector ++ Some(waves)).filter(_.amount != 0)
   }
 
-  implicit val issueFormat = Writes[Issue] { iss =>
-    Json.obj(
-      "assetId"        -> iss.id,
-      "name"           -> iss.name,
-      "description"    -> iss.description,
-      "quantity"       -> iss.quantity,
-      "decimals"       -> iss.decimals,
-      "isReissuable"   -> iss.isReissuable,
-      "compiledScript" -> iss.compiledScript,
-      "nonce"          -> iss.nonce
-    )
-  }
-  implicit val reissueFormat      = Json.writes[Reissue]
-  implicit val burnFormat         = Json.writes[Burn]
-  implicit val errorMessageFormat = Json.writes[ErrorMessage]
-  implicit val jsonFormat         = Json.writes[InvokeScriptResult]
+  implicit val issueFormat = Format[Issue](
+    {
+      import ImplicitJsonFormats.byteStrFormat
+      import play.api.libs.functional.syntax._
+      (
+        (JsPath \ "assetId").read[ByteStr] and
+          (JsPath \ "compiledScript").readNullable[ByteStr] and
+          (JsPath \ "decimals").read[Int] and
+          (JsPath \ "description").read[String] and
+          (JsPath \ "isReissuable").read[Boolean] and
+          (JsPath \ "name").read[String] and
+          (JsPath \ "quantity").read[Long] and
+          (JsPath \ "nonce").read[Long]
+      )(Issue.apply _)
+    },
+    Writes { iss =>
+      Json.obj(
+        "assetId"        -> iss.id,
+        "name"           -> iss.name,
+        "description"    -> iss.description,
+        "quantity"       -> iss.quantity,
+        "decimals"       -> iss.decimals,
+        "isReissuable"   -> iss.isReissuable,
+        "compiledScript" -> iss.compiledScript,
+        "nonce"          -> iss.nonce
+      )
+    }
+  )
+  implicit val reissueFormat      = Json.format[Reissue]
+  implicit val burnFormat         = Json.format[Burn]
+  implicit val errorMessageFormat = Json.format[ErrorMessage]
+  implicit val jsonFormat         = Json.format[InvokeScriptResult]
 
   implicit val monoid = new Monoid[InvokeScriptResult] {
     override val empty: InvokeScriptResult =

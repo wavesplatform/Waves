@@ -6,7 +6,6 @@ import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -60,7 +59,7 @@ trait Blockchain {
   def accountScript(address: Address): Option[AccountScriptInfo]
   def hasAccountScript(address: Address): Boolean
 
-  def assetScript(id: IssuedAsset): Option[(Script, Long)]
+  def assetScript(id: IssuedAsset): Option[AssetScriptInfo]
 
   def accountData(acc: Address, key: String): Option[DataEntry[_]]
 

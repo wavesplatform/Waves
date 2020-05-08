@@ -197,7 +197,7 @@ object InvokeScriptTransactionDiff {
               verifierComplexity = blockchain.accountScript(tx.sender.toAddress).map(_.verifierComplexity)
               assetsComplexity = (tx.checkedAssets.map(_.id) ++ transferList.flatMap(_.assetId))
                 .flatMap(id => blockchain.assetScript(IssuedAsset(id)))
-                .map(_._2)
+                .map(_.complexity)
 
               scriptsInvoked <- TracedResult {
                 val smartAssetInvocations =
@@ -225,7 +225,7 @@ object InvokeScriptTransactionDiff {
               val transfers = compositeDiff.portfolios |+| feeInfo._2.mapValues(_.negate)
 
               val currentTxDiff         = compositeDiff.transactions(tx.id())
-              val currentTxDiffWithKeys = currentTxDiff.copy(_2 = currentTxDiff._2 ++ transfers.keys ++ compositeDiff.accountData.keys)
+              val currentTxDiffWithKeys = currentTxDiff.copy(affected = currentTxDiff.affected ++ transfers.keys ++ compositeDiff.accountData.keys)
               val updatedTxDiff         = compositeDiff.transactions.updated(tx.id(), currentTxDiffWithKeys)
 
               val isr = InvokeScriptResult(
@@ -389,7 +389,7 @@ object InvokeScriptTransactionDiff {
                 )
                 blockchain.assetScript(a) match {
                   case None => nextDiff.asRight[ValidationError]
-                  case Some((script, _)) =>
+                  case Some(AssetScriptInfo(script, _)) =>
                     val assetVerifierDiff =
                       if (blockchain.disallowSelfPayment) nextDiff
                       else
@@ -446,8 +446,8 @@ object InvokeScriptTransactionDiff {
                     Diff(
                       tx = itx,
                       portfolios = Map(pk.toAddress -> Portfolio(lease = LeaseBalance.empty, assets = Map(asset -> issue.quantity))),
-                      issuedAssets = Map(asset      -> ((staticInfo, info, volumeInfo))),
-                      assetScripts = Map(asset      -> script.map(script => (script._1, script._2)))
+                      issuedAssets = Map(asset      -> NewAssetInfo(staticInfo, info, volumeInfo)),
+                      assetScripts = Map(asset      -> script.map(script => AssetScriptInfo(script._1, script._2)))
                     )
                 )
             }
@@ -472,7 +472,7 @@ object InvokeScriptTransactionDiff {
           ): TracedResult[ValidationError, Diff] =
             blockchain.assetScript(IssuedAsset(assetId)) match {
               case None => actionDiff
-              case Some((script, _)) =>
+              case Some(AssetScriptInfo(script, _)) =>
                 val assetValidationDiff =
                   for {
                     result          <- actionDiff

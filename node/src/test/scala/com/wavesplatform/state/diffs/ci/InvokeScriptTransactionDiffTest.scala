@@ -594,7 +594,7 @@ class InvokeScriptTransactionDiffTest
               BinaryDataEntry("argument", ci.funcCallOpt.get.args.head.asInstanceOf[CONST_BYTESTR].bs)
             )
 
-            blockDiff.transactions(ci.id())._2.contains(setScript.sender.toAddress) shouldBe true
+            blockDiff.transactions(ci.id()).affected.contains(setScript.sender.toAddress) shouldBe true
         }
 
     }
