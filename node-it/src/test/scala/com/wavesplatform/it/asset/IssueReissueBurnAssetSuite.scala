@@ -291,7 +291,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       }
 
       nodes.waitForEmptyUtx()
-      val height = nodes.waitForHeightArise(2) - 2
+      val height = nodes.waitForHeightArise(2) - 1
 
       invokeScript(acc, "reissueIssueAndNft", assetId = asset1, fee = invocationCost(1))
       burn(acc, CallableMethod, asset2, 5000)
@@ -302,10 +302,10 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       nodes.waitForHeightArise(2)
 
       nodes.rollback(height, returnToUTX = false)
+      assertBadRequestAndMessage(sender.assetsDetails(asset3), "Failed to find")
+      assertBadRequestAndMessage(sender.assetsDetails(asset4), "Failed to find")
       assertQuantity(asset1)(simpleReissuableAsset.quantity)
       assertQuantity(asset2)(simpleReissuableAsset.quantity)
-      assertBadRequestAndMessage(sender.assetsDetails(asset3), "Not found")
-      assertBadRequestAndMessage(sender.assetsDetails(asset4), "Not found")
       sender.assertAssetBalance(acc, asset1, simpleReissuableAsset.quantity)
       sender.assertAssetBalance(acc, asset2, simpleReissuableAsset.quantity)
       sender.assetsBalance(acc).balances.map(_.assetId).toSet shouldBe Set(asset1, asset2)
