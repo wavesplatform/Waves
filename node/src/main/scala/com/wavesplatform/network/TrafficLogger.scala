@@ -45,7 +45,7 @@ class TrafficLogger(settings: TrafficLogger.Settings) extends ChannelDuplexHandl
 
   private def stringify(msg: Any): String = msg match {
     case tx: Transaction   => tx.json().toString()
-    case b: Block          => BlockHeaderSerializer.toJson(b.header).toString
+    case b: Block          => s"${b.id()}, header: ${BlockHeaderSerializer.toJson(b.header, b.bytes().length, b.transactionData.length, b.signature).toString}"
     case RawBytes(_, data) => Base64.encode(data)
     case other             => other.toString
   }
