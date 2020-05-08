@@ -305,7 +305,7 @@ class MinerImpl(
     log.info(s"Start mining microblocks")
     Miner.microMiningStarted.increment()
     microBlockAttempt := microBlockMiner
-      .generateMicroBlockSequence(account, lastBlock, constraints, restTotalConstraint)
+      .generateMicroBlockSequence(account, lastBlock, constraints, restTotalConstraint, 0)
       .runAsyncLogErr
     log.trace(s"MicroBlock mining scheduled for acc=${account.toAddress}")
   }

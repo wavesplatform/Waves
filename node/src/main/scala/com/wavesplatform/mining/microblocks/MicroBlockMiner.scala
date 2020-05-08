@@ -17,7 +17,8 @@ trait MicroBlockMiner {
       account: KeyPair,
       accumulatedBlock: Block,
       constraints: MiningConstraints,
-      restTotalConstraint: MiningConstraint
+      restTotalConstraint: MiningConstraint,
+      lastMicroBlock: Long
   ): Task[Unit]
 }
 

@@ -41,15 +41,16 @@ class MicroBlockMinerImpl(
       account: KeyPair,
       accumulatedBlock: Block,
       constraints: MiningConstraints,
-      restTotalConstraint: MiningConstraint
+      restTotalConstraint: MiningConstraint,
+      lastMicroBlock: Long
   ): Task[Unit] = {
-    generateOneMicroBlockTask(account, accumulatedBlock, constraints, restTotalConstraint)
+    generateOneMicroBlockTask(account, accumulatedBlock, constraints, restTotalConstraint, lastMicroBlock)
       .flatMap {
-        case Success(newBlock, newConstraint) =>
-          Task.defer(generateMicroBlockSequence(account, newBlock, constraints, newConstraint))
+        case res @ Success(newBlock, newConstraint) =>
+          Task.defer(generateMicroBlockSequence(account, newBlock, constraints, newConstraint, res.nanoTime))
         case Retry =>
           Task
-            .defer(generateMicroBlockSequence(account, accumulatedBlock, constraints, restTotalConstraint))
+            .defer(generateMicroBlockSequence(account, accumulatedBlock, constraints, restTotalConstraint, lastMicroBlock))
             .delayExecution(1 second)
         case Stop =>
           debugState
@@ -63,8 +64,9 @@ class MicroBlockMinerImpl(
       account: KeyPair,
       accumulatedBlock: Block,
       constraints: MiningConstraints,
-      restTotalConstraint: MiningConstraint
-  ): Task[MicroBlockMiningResult] = {
+      restTotalConstraint: MiningConstraint,
+      lastMicroBlock: Long
+  ) = {
     val packTask = Task.cancelable[(Option[Seq[Transaction]], MiningConstraint)] { cb =>
       @volatile var cancelled = false
       minerScheduler.execute { () =>
@@ -95,9 +97,16 @@ class MicroBlockMinerImpl(
 
     packTask.flatMap {
       case (Some(unconfirmed), updatedTotalConstraint) if unconfirmed.nonEmpty =>
-        log.trace(s"Generating microBlock for $account, constraints: $updatedTotalConstraint")
+        val delay = {
+          val delay         = System.nanoTime() - lastMicroBlock
+          val requiredDelay = settings.microBlockInterval.toNanos
+          if (delay >= requiredDelay) Duration.Zero else (requiredDelay - delay).nanos
+        }
 
         for {
+          _ <- Task.now(if (delay > Duration.Zero) log.trace(s"Sleeping ${delay.toMillis} ms before applying microBlock"))
+          _ <- Task.sleep(delay)
+          _ = log.trace(s"Generating microBlock for ${account.toAddress}, constraints: $updatedTotalConstraint")
           blocks <- forgeBlocks(account, accumulatedBlock, unconfirmed)
             .leftWiden[Throwable]
             .liftTo[Task]
@@ -161,7 +170,9 @@ class MicroBlockMinerImpl(
 object MicroBlockMinerImpl {
   sealed trait MicroBlockMiningResult
 
-  case object Stop                                                      extends MicroBlockMiningResult
-  case object Retry                                                     extends MicroBlockMiningResult
-  final case class Success(b: Block, totalConstraint: MiningConstraint) extends MicroBlockMiningResult
+  case object Stop  extends MicroBlockMiningResult
+  case object Retry extends MicroBlockMiningResult
+  final case class Success(b: Block, totalConstraint: MiningConstraint) extends MicroBlockMiningResult {
+    val nanoTime: Long = System.nanoTime()
+  }
 }
