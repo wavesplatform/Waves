@@ -4,6 +4,7 @@ import java.util
 
 import com.wavesplatform.account.Alias
 import com.wavesplatform.database.{KeyTags, Keys, RW, readTransactionBytes}
+import com.wavesplatform.state.patch.PatchLoader
 import com.wavesplatform.transaction.{CreateAliasTransaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
 
@@ -36,6 +37,7 @@ object DisableHijackedAliases extends ScorexLogging {
     } yield alias).toSet
 
     log.info(s"Collected ${aliases.size()} aliases, of which ${hijackedAliases.size} were hijacked")
+    PatchLoader.write("DisableHijackedAliases", rw.get(Keys.height) + 1, hijackedAliases.map(_.name))
 
     rw.put(Keys.disabledAliases, hijackedAliases)
 

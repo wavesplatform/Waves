@@ -243,4 +243,6 @@ object Diff {
         scriptsComplexity = older.scriptsComplexity + newer.scriptsComplexity
       )
   }
+
+  implicit val jsonFormat = Json.format[Diff]
 }

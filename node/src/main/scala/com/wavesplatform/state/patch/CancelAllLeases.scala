@@ -14,6 +14,8 @@ object CancelAllLeases extends ScorexLogging {
     portfolios.keys.foreach(addr => log.info(s"Resetting lease balance for $addr"))
     log.info("Finished collecting all active leases")
 
-    Diff.empty.copy(portfolios = portfolios, leaseState = leasesToCancel)
+    val diff = Diff.empty.copy(portfolios = portfolios, leaseState = leasesToCancel)
+    PatchLoader.write("CancelAllLeases", blockchain.height, diff)
+    diff
   }
 }
