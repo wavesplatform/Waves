@@ -302,8 +302,8 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       nodes.waitForHeightArise(2)
 
       nodes.rollback(height, returnToUTX = false)
-      assertBadRequestAndMessage(sender.assetsDetails(asset3), "Failed to find")
-      assertBadRequestAndMessage(sender.assetsDetails(asset4), "Failed to find")
+      assertBadRequestAndMessage(sender.assetsDetails(asset3), "Failed to get description")
+      assertBadRequestAndMessage(sender.assetsDetails(asset4), "Failed to get description")
       assertQuantity(asset1)(simpleReissuableAsset.quantity)
       assertQuantity(asset2)(simpleReissuableAsset.quantity)
       sender.assertAssetBalance(acc, asset1, simpleReissuableAsset.quantity)
