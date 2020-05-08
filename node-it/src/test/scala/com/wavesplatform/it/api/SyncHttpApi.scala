@@ -777,8 +777,8 @@ object SyncHttpApi extends Assertions {
     def waitForTransaction(transactionId: String)(implicit pos: Position): TransactionInfo =
       withTxIdMessage(transactionId)(sync(async(nodes).waitForTransaction(transactionId), TxInBlockchainAwaitTime))
 
-    def waitForHeightArise(): Int =
-      sync(async(nodes).waitForHeightArise(), TxInBlockchainAwaitTime)
+    def waitForHeightArise(offset: Int = 1): Int =
+      sync(async(nodes).waitForHeightArise(offset), TxInBlockchainAwaitTime)
 
     def waitForSameBlockHeadersAt(
         height: Int,
@@ -818,6 +818,10 @@ object SyncHttpApi extends Assertions {
         },
         ConditionAwaitTime
       )
+    }
+
+    def waitForEmptyUtx(): Boolean = {
+      waitFor[Int]("empty utx")(1 second)(_.utxSize, _.forall(_ == 0))
     }
   }
 }

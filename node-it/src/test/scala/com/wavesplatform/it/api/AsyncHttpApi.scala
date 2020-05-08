@@ -1047,11 +1047,12 @@ object AsyncHttpApi extends Assertions {
     def waitForTransaction(transactionId: String)(implicit p: Position): Future[TransactionInfo] =
       traverse(nodes)(_.waitForTransaction(transactionId)).map(_.head)
 
-    def waitForHeightArise(): Future[Int] =
+    def waitForHeightArise(offset: Int): Future[Int] =
       for {
         height <- height.map(_.max)
-        _      <- traverse(nodes)(_.waitForHeight(height + 1))
-      } yield height + 1
+        requiredHeight = height + offset
+        _      <- traverse(nodes)(_.waitForHeight(requiredHeight))
+      } yield requiredHeight
 
     def waitForSameBlockHeadersAt(height: Int, retryInterval: FiniteDuration = 5.seconds): Future[Boolean] = {
 

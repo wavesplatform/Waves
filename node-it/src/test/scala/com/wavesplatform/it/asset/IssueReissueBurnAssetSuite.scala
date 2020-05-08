@@ -282,26 +282,33 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
     }
 
     "rollback works" in {
-      val acc         = createDapp(script(simpleReissuableAsset))
-      val asset       = issueValidated(acc, simpleReissuableAsset)
-      val simpleAsset = issue(acc, TransactionMethod, simpleReissuableAsset, 1.1.waves).id
+      val acc    = createDapp(script(simpleReissuableAsset))
+      val asset1 = issueValidated(acc, simpleReissuableAsset)
+      val asset2 = issue(acc, TransactionMethod, simpleReissuableAsset, 1.1.waves).id
 
       sender.debugStateChangesByAddress(acc, 100).flatMap(_.stateChanges) should matchPattern {
         case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, None)) if issue.name == simpleReissuableAsset.name =>
       }
 
-      val height = nodes.waitForHeightArise()
-      nodes.waitForHeightArise()
-      invokeScript(acc, "reissueIssueAndNft", assetId = asset, fee = invocationCost(1))
-      burn(acc, CallableMethod, simpleAsset, 5000)
-      burn(acc, TransactionMethod, asset, 10000)
-      nodes.waitForHeightArise()
+      nodes.waitForEmptyUtx()
+      val height = nodes.waitForHeightArise(2) - 2
+
+      invokeScript(acc, "reissueIssueAndNft", assetId = asset1, fee = invocationCost(1))
+      burn(acc, CallableMethod, asset2, 5000)
+      burn(acc, CallableMethod, asset1, 10000)
+      val asset3 = issueValidated(acc, simpleReissuableAsset)
+      val asset4 = issue(acc, TransactionMethod, simpleReissuableAsset, 1.1.waves).id
+      nodes.waitForEmptyUtx()
+      nodes.waitForHeightArise(2)
 
       nodes.rollback(height, returnToUTX = false)
-      assertQuantity(asset)(simpleReissuableAsset.quantity)
-      sender.assertAssetBalance(acc, asset, simpleReissuableAsset.quantity)
-      sender.assertAssetBalance(acc, simpleAsset, simpleReissuableAsset.quantity)
-      sender.assetsBalance(acc).balances.map(_.assetId).toSet shouldBe Set(asset, simpleAsset)
+      assertQuantity(asset1)(simpleReissuableAsset.quantity)
+      assertQuantity(asset2)(simpleReissuableAsset.quantity)
+      assertBadRequestAndMessage(sender.assetsDetails(asset3), "Not found")
+      assertBadRequestAndMessage(sender.assetsDetails(asset4), "Not found")
+      sender.assertAssetBalance(acc, asset1, simpleReissuableAsset.quantity)
+      sender.assertAssetBalance(acc, asset2, simpleReissuableAsset.quantity)
+      sender.assetsBalance(acc).balances.map(_.assetId).toSet shouldBe Set(asset1, asset2)
       sender.nftList(acc, 10) shouldBe empty
       sender.debugStateChangesByAddress(acc, 100).flatMap(_.stateChanges) should matchPattern {
         case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, None)) if issue.name == simpleReissuableAsset.name =>
@@ -624,7 +631,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
        |  [
        |    Issue($issueParams, ${asset.nonce + 1}),
        |    Reissue(a, true, 100),
-       |    Burn(a, 100),
+       |    Burn(a, 200),
        |    Issue(${createIssueParams(nftAsset)}, 1)
        |  ]
        |}
