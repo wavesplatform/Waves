@@ -24,16 +24,18 @@ class AssetsApiGrpcImpl(assetsApi: CommonAssetsApi, accountsApi: CommonAccountsA
     result.explicitGetErr(TransactionDoesNotExist)
   }
 
-  override def getNFTList(request: NFTRequest, responseObserver: StreamObserver[AssetInfoResponse]): Unit = responseObserver.interceptErrors {
+  override def getNFTList(request: NFTRequest, responseObserver: StreamObserver[NFTResponse]): Unit = responseObserver.interceptErrors {
     val addressOption: Option[Address]    = if (request.address.isEmpty) None else Some(request.address.toAddress)
     val afterAssetId: Option[IssuedAsset] = if (request.afterAssetId.isEmpty) None else Some(IssuedAsset(ByteStr(request.afterAssetId.toByteArray)))
 
     val responseStream = addressOption match {
       case Some(address) =>
-        accountsApi.nftList(address, afterAssetId).map {
-          case (_, d) =>
-            assetInfoResponse(d)
-        }
+        accountsApi
+          .nftList(address, afterAssetId)
+          .map {
+            case (a, d) => NFTResponse(a.id.toPBByteString, Some(assetInfoResponse(d)))
+          }
+          .take(request.limit)
       case _ => Observable.empty
     }
 

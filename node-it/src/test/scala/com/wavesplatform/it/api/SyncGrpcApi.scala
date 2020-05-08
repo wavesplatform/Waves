@@ -179,8 +179,8 @@ object SyncGrpcApi extends Assertions {
       balances.map(b => Base58.encode(b.getAsset.assetId.toByteArray) -> b.getAsset.amount).toMap
     }
 
-    def nftList(address: ByteString, after: ByteString = ByteString.EMPTY): Seq[AssetInfoResponse] = {
-      assets.getNFTList(NFTRequest.of(address, after)).toList
+    def nftList(address: ByteString, limit: Int, after: ByteString = ByteString.EMPTY): Seq[NFTResponse] = {
+      assets.getNFTList(NFTRequest.of(address, limit, after)).toList
     }
 
     def assertAssetBalance(acc: ByteString, assetIdString: String, balance: Long): Unit = {
