@@ -103,7 +103,11 @@ class BlockchainUpdaterSponsoredFeeBlockTest
       .copy(
         featureCheckBlocksPeriod = 1,
         blocksForFeatureActivation = 1,
-        preActivatedFeatures = Map(BlockchainFeatures.FeeSponsorship.id -> 0, BlockchainFeatures.NG.id -> 0)
+        preActivatedFeatures = Map(
+          BlockchainFeatures.FeeSponsorship.id -> 0,
+          BlockchainFeatures.NG.id -> 0,
+          BlockchainFeatures.BlockV5.id -> 0
+        )
       )
   )
 

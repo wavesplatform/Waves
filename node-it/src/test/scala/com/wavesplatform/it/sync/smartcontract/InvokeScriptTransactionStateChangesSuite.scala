@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.smartcontract
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{DataResponse, DebugStateChanges, StateChangesDetails, TransactionInfo, TransfersInfoResponse}
-import com.wavesplatform.it.sync.setScriptFee
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CONST_STRING}
@@ -42,8 +42,8 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
                         List(Transfer(caller, 3000), Transfer(contract, 3000)),
                         0.01.waves,
                         assetId = Some(assetSponsoredByRecipient))
-    sender.sponsorAsset(contract, assetSponsoredByDApp, 1)
-    sender.sponsorAsset(recipient, assetSponsoredByRecipient, 5)
+    sender.sponsorAsset(contract, assetSponsoredByDApp, 1, fee = sponsorReducedFee + smartFee)
+    sender.sponsorAsset(recipient, assetSponsoredByRecipient, 5, fee = sponsorReducedFee + smartFee)
 
     val script = ScriptCompiler.compile("""
         |{-# STDLIB_VERSION 3 #-}
