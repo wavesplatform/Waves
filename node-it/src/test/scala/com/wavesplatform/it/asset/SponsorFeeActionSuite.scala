@@ -17,7 +17,7 @@ class SponsorFeeActionSuite extends BaseSuite {
 
   "State changes" - {
     val minSponsoredAssetFee = 100
-    val dApp = createDapp(
+    val dApp = createDApp(
       s"""
          |  {-# STDLIB_VERSION 4 #-}
          |  {-# CONTENT_TYPE DAPP #-}
@@ -100,7 +100,7 @@ class SponsorFeeActionSuite extends BaseSuite {
     }
 
     "Cancel sponsorship" in {
-      val dApp = createDapp(
+      val dApp = createDApp(
         s"""
           |
           |{-# STDLIB_VERSION 4 #-}
@@ -170,7 +170,7 @@ class SponsorFeeActionSuite extends BaseSuite {
     "SponsorFee actions count limit" in {
       val minSponsoredAssetFee = 1001
 
-      val dApp = createDapp(
+      val dApp = createDApp(
         s"""
           |{-# STDLIB_VERSION 4 #-}
           |{-# CONTENT_TYPE DAPP #-}
@@ -266,11 +266,33 @@ class SponsorFeeActionSuite extends BaseSuite {
       val failedTx = miner.invokeScript(miner.address, dApp, Some("sponsor11assets"), waitForTx = true, fee = smartMinFee)
       sender.debugStateChanges(failedTx._1.id).stateChanges.get.errorMessage.get.text should include("Too many script actions: max: 10, actual: 11")
     }
+
+    "SponsorFee available only for assets issuing from current dApp" in {
+      val dApp = miner.createAddress()
+      miner.transfer(sender.address, dApp, initialWavesBalance, minFee, waitForTx = true)
+
+      val assetId = miner.issue(dApp, waitForTx = true).id
+
+      createDApp(
+       s"""
+          |{-# STDLIB_VERSION 4 #-}
+          |{-# CONTENT_TYPE DAPP #-}
+          |{-# SCRIPT_TYPE ACCOUNT #-}
+          |
+          |@Callable(i)
+          |func sponsorAsset() = [
+          |    SponsorFee(base58'$assetId', 1000)
+          |]
+        """.stripMargin,
+        dApp
+      )
+      val failedTx = miner.invokeScript(miner.address, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee)
+      val error = sender.debugStateChanges(failedTx._1.id).stateChanges.get.errorMessage.get.text
+      error should include(s"SponsorFee assetId=$assetId was not issued from current dApp")
+    }
   }
 
-  private def createDapp(scriptParts: String*): String = {
-    val script  = scriptParts.mkString(" ")
-    val address = miner.createAddress()
+  private def createDApp(script: String, address: String = miner.createAddress()): String = {
     val compiledScript = ScriptCompiler
       .compile(
         script,

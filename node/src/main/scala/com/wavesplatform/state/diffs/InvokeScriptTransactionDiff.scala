@@ -470,11 +470,25 @@ object InvokeScriptTransactionDiff {
           }
 
           def applySponsorFee(sponsorFee: SponsorFee, pk: PublicKey): TracedResult[ValidationError, Diff] = {
-            val sponsorDiff =
-              SponsorFeeTxValidator.checkMinSponsoredAssetFee(sponsorFee.minSponsoredAssetFee)
-                .flatMap(_ => DiffsCommon.processSponsor(blockchain, dAppAddress, fee = 0, sponsorFee))
-            val pseudoTx = SponsorFeePseudoTx(sponsorFee, actionSender, pk, tx.id(), tx.timestamp)
-            validateActionAsPseudoTx(sponsorDiff, sponsorFee.assetId, pseudoTx)
+            val isIssuedFromCurrentDApp =
+              for {
+                assetInfo <- blockchain.assetDescription(IssuedAsset(sponsorFee.assetId))
+                sourceTx  <- blockchain.transactionInfo(assetInfo.source)
+              } yield sourceTx._2.typeId == InvokeScriptTransaction.typeId && assetInfo.issuer == pk
+
+            for {
+              _ <- TracedResult(
+                Either.cond(
+                  isIssuedFromCurrentDApp.getOrElse(false),
+                  (),
+                  ScriptExecutionError.dApp(s"SponsorFee assetId=${sponsorFee.assetId} was not issued from current dApp")
+                )
+              )
+              _ <- TracedResult(SponsorFeeTxValidator.checkMinSponsoredAssetFee(sponsorFee.minSponsoredAssetFee))
+              sponsorDiff = DiffsCommon.processSponsor(blockchain, dAppAddress, fee = 0, sponsorFee)
+              pseudoTx    = SponsorFeePseudoTx(sponsorFee, actionSender, pk, tx.id(), tx.timestamp)
+              r <- validateActionAsPseudoTx(sponsorDiff, sponsorFee.assetId, pseudoTx)
+            } yield r
           }
 
           def validateActionAsPseudoTx(
