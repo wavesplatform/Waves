@@ -218,6 +218,52 @@ class SponsorFeeActionSuite extends BaseSuite {
       dAppBalance.minSponsoredAssetFee shouldBe Some(lastMinSponsoredAssetFee)
       dAppBalance.sponsorBalance shouldBe Some(miner.balance(dApp).balance)
     }
+
+    "Sponsor and cancel sponsorship is available for same asset" in {
+      val dApp = createDApp(
+        s"""
+           | {-# STDLIB_VERSION 4 #-}
+           | {-# CONTENT_TYPE DAPP #-}
+           | {-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           | let issue = Issue("SponsoredAsset0", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
+           | let assetId = calculateAssetId(issue)
+           |
+           | @Callable(i)
+           | func sponsorAndCancel() = [
+           |     issue,
+           |     SponsorFee(assetId, 100),
+           |     SponsorFee(assetId, unit)
+           | ]
+        """.stripMargin
+      )
+
+      val invokeTx = miner.invokeScript(miner.address, dApp, Some("sponsorAndCancel"), waitForTx = true, fee = smartMinFee + issueFee)
+      val txStateChanges = miner.debugStateChanges(invokeTx._1.id).stateChanges.toSeq
+      val assetId = txStateChanges.flatMap(_.issues).head.assetId
+
+      val matchDebugResult = matchPattern {
+        case Seq(
+          StateChangesDetails(
+          Nil,
+          Nil,
+          Seq(IssueInfoResponse(`assetId`, _, _, _, _, _, _, _)),
+          Nil,
+          Nil,
+          Seq(SponsorFeeResponse(`assetId`, None)),
+          None
+          )
+        ) =>
+      }
+      txStateChanges should matchDebugResult
+      miner.debugStateChangesByAddress(dApp, limit = 100).flatMap(_.stateChanges) should matchDebugResult
+
+      miner.assetsDetails(assetId).minSponsoredAssetFee shouldBe None
+
+      val dAppBalance = miner.assetsBalance(dApp).balances.head
+      dAppBalance.minSponsoredAssetFee shouldBe None
+      dAppBalance.sponsorBalance shouldBe None
+    }
   }
 
   "Restrictions" - {
