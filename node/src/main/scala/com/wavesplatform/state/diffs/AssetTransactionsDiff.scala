@@ -99,7 +99,10 @@ object AssetTransactionsDiff extends ScorexLogging {
 
   def sponsor(blockchain: Blockchain, blockTime: Long)(tx: SponsorFeeTransaction): Either[ValidationError, Diff] =
     DiffsCommon.processSponsor(blockchain, tx.sender.toAddress, tx.fee, SponsorFee(tx.asset.id, tx.minSponsoredAssetFee))
-      .map(Diff(tx = tx, scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)) |+| _)
+      .map(sponsorDiff =>
+        Diff(tx = tx, portfolios = sponsorDiff.portfolios) |+|
+        sponsorDiff.copy(portfolios = Map(), scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx))
+      )
 
   def updateInfo(blockchain: Blockchain)(tx: UpdateAssetInfoTransaction): Either[ValidationError, Diff] =
     DiffsCommon.validateAsset(blockchain, tx.assetId, tx.sender.toAddress, issuerOnly = true) >> {
