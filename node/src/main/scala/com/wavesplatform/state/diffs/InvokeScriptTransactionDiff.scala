@@ -167,12 +167,17 @@ object InvokeScriptTransactionDiff {
                 case ScriptResultV4(actions)              => actions
               }
 
-              actionsByType  = actions.groupBy(_.getClass).withDefaultValue(Nil)
-              transferList   = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
-              issueList      = actionsByType(classOf[Issue]).asInstanceOf[List[Issue]]
-              reissueList    = actionsByType(classOf[Reissue]).asInstanceOf[List[Reissue]]
-              burnList       = actionsByType(classOf[Burn]).asInstanceOf[List[Burn]]
-              sponsorFeeList = actionsByType(classOf[SponsorFee]).asInstanceOf[List[SponsorFee]]
+              actionsByType = actions.groupBy(_.getClass).withDefaultValue(Nil)
+              transferList  = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
+              issueList     = actionsByType(classOf[Issue]).asInstanceOf[List[Issue]]
+              reissueList   = actionsByType(classOf[Reissue]).asInstanceOf[List[Reissue]]
+              burnList      = actionsByType(classOf[Burn]).asInstanceOf[List[Burn]]
+              sponsorFeeList = actionsByType(classOf[SponsorFee])
+                .asInstanceOf[List[SponsorFee]]
+                .groupBy(_.assetId)
+                .mapValues(_.last)
+                .values
+                .toList
 
               dataItems = actionsByType
                 .filterKeys(classOf[DataItem[_]].isAssignableFrom)

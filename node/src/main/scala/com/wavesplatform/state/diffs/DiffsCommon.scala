@@ -128,7 +128,7 @@ object DiffsCommon {
       Either.cond(
         !blockchain.hasAssetScript(asset),
         Diff.stateOps(
-          portfolios = Map(sender -> Portfolio(balance = -fee, lease = LeaseBalance.empty, assets = Map.empty)),
+          portfolios = Map(sender -> Portfolio(balance = -fee)),
           sponsorship = Map(asset -> SponsorshipValue(sponsorFee.minSponsoredAssetFee.getOrElse(0))),
         ),
         GenericError("Sponsorship smart assets is disabled.")
