@@ -579,7 +579,7 @@ object DataResponse {
       val value = `type` match {
         case "binary"  => fields("value").asInstanceOf[JsString].value
         case "string"  => fields("value").asInstanceOf[JsString].value
-        case "integer" => fields("value").asInstanceOf[JsNumber].value.toIntExact
+        case "integer" => fields("value").asInstanceOf[JsNumber].value.toLongExact
         case "boolean" => fields("value").asInstanceOf[JsBoolean].value
         case _         => JsError()
       }
