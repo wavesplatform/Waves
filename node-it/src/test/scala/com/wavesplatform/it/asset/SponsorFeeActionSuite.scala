@@ -164,6 +164,60 @@ class SponsorFeeActionSuite extends BaseSuite {
       dAppBalance(cancelledAssetId).minSponsoredAssetFee shouldBe None
       dAppBalance(cancelledAssetId).sponsorBalance shouldBe None
     }
+
+    "Multiple SponsorFee is available for same asset" in {
+      val lastMinSponsoredAssetFee = 10000000000L
+      val dApp = createDApp(
+        s"""
+           | {-# STDLIB_VERSION 4 #-}
+           | {-# CONTENT_TYPE DAPP #-}
+           | {-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           | let issue = Issue("SponsoredAsset0", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
+           | let assetId = calculateAssetId(issue)
+           |
+           | @Callable(i)
+           | func issueAndMultipleSponsor() = [
+           |     issue,
+           |     SponsorFee(assetId, 100),
+           |     SponsorFee(assetId, 1000),
+           |     SponsorFee(assetId, 10000),
+           |     SponsorFee(assetId, 100000),
+           |     SponsorFee(assetId, 1000000),
+           |     SponsorFee(assetId, 10000000),
+           |     SponsorFee(assetId, 100000000),
+           |     SponsorFee(assetId, 1000000000),
+           |     SponsorFee(assetId, $lastMinSponsoredAssetFee)
+           | ]
+        """.stripMargin
+      )
+
+      val invokeTx = miner.invokeScript(miner.address, dApp, Some("issueAndMultipleSponsor"), waitForTx = true, fee = smartMinFee + issueFee)
+      val txStateChanges = miner.debugStateChanges(invokeTx._1.id).stateChanges.toSeq
+      val assetId = txStateChanges.flatMap(_.issues).head.assetId
+
+      val matchDebugResult = matchPattern {
+        case Seq(
+          StateChangesDetails(
+          Nil,
+          Nil,
+          Seq(IssueInfoResponse(`assetId`, _, _, _, _, _, _, _)),
+          Nil,
+          Nil,
+          Seq(SponsorFeeResponse(`assetId`, Some(`lastMinSponsoredAssetFee`))),
+          None
+          )
+        ) =>
+      }
+      txStateChanges should matchDebugResult
+      miner.debugStateChangesByAddress(dApp, limit = 100).flatMap(_.stateChanges) should matchDebugResult
+
+      miner.assetsDetails(assetId).minSponsoredAssetFee shouldBe Some(lastMinSponsoredAssetFee)
+
+      val dAppBalance = miner.assetsBalance(dApp).balances.head
+      dAppBalance.minSponsoredAssetFee shouldBe Some(lastMinSponsoredAssetFee)
+      dAppBalance.sponsorBalance shouldBe Some(miner.balance(dApp).balance)
+    }
   }
 
   "Restrictions" - {
@@ -267,7 +321,7 @@ class SponsorFeeActionSuite extends BaseSuite {
       sender.debugStateChanges(failedTx._1.id).stateChanges.get.errorMessage.get.text should include("Too many script actions: max: 10, actual: 11")
     }
 
-    "SponsorFee available only for assets issuing from current dApp" in {
+    "SponsorFee is available only for assets issuing from current dApp" in {
       val dApp = miner.createAddress()
       miner.transfer(sender.address, dApp, initialWavesBalance, minFee, waitForTx = true)
 
