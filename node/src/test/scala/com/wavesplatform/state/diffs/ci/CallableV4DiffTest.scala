@@ -11,7 +11,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
+import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, _}
 import com.wavesplatform.state.{EmptyDataEntry, SponsorshipValue}
@@ -224,23 +224,21 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       } yield (List(genesis, genesis2), setDApp, ci, issue, master, reissueAmount, burnAmount)
     }.explicitGet()
 
-  private def sponsorFeePreconditions
-      : Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction, KeyPair, Option[Long])] =
+  private def sponsorFeePreconditions: Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, Option[Long])] =
     for {
       master               <- accountGen
       invoker              <- accountGen
       ts                   <- timestampGen
-      fee                  <- ciFee(1)
-      issue                <- issueV2TransactionGen(senderGen = Gen.const(master), _scriptGen = Gen.const(None))
-      minSponsoredAssetFee <- Gen.oneOf(Gen.chooseNum(1, issue.quantity).map(Some(_)), Gen.const(Some(1L)))
+      fee                  <- ciFee(1).map(_ + FeeUnit * FeeConstants(IssueTransaction.typeId))
+      minSponsoredAssetFee <- Gen.oneOf(None, Some(1000L))
     } yield {
-      val dApp = Some(sponsorFeeDApp(issue.id.value, minSponsoredAssetFee))
+      val dApp = Some(sponsorFeeDApp(minSponsoredAssetFee))
       for {
         genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
         genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
         setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, dApp, fee, ts + 2)
         ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3)
-      } yield (List(genesis, genesis2), setDApp, ci, issue, master, minSponsoredAssetFee)
+      } yield (List(genesis, genesis2), setDApp, ci, minSponsoredAssetFee)
     }.explicitGet()
 
   private def multiActionDApp(
@@ -375,11 +373,13 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
        """.stripMargin
     )
 
-  private def sponsorFeeDApp(assetId: ByteStr, minSponsoredAssetFee: Option[Long]): Script =
+  private def sponsorFeeDApp(minSponsoredAssetFee: Option[Long]): Script =
     dApp(
       s"""
+         | let i0 = Issue("SponsoredAsset0", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
          | [
-         |   SponsorFee(base58'$assetId', ${minSponsoredAssetFee.getOrElse("unit")})
+         |   i0,
+         |   SponsorFee(calculateAssetId(i0), ${minSponsoredAssetFee.getOrElse("unit")})
          | ]
        """.stripMargin
     )
@@ -392,8 +392,9 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
          | {-# SCRIPT_TYPE    ACCOUNT #-}
          |
          | @Callable(i)
-         | func default() = $body
-         |
+         | func default() = {
+         |   $body
+         | }
        """.stripMargin
 
     val expr     = Parser.parseContract(script).get.value
@@ -472,14 +473,14 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
 
   property("sponsor fee action results state") {
     forAll(sponsorFeePreconditions) {
-      case (genesis, setScript, invoke, issue, _, minSponsoredAssetFee) =>
+      case (genesis, setScript, invoke, minSponsoredAssetFee) =>
         assertDiffAndState(
-          Seq(TestBlock.create(genesis :+ setScript :+ issue)),
+          Seq(TestBlock.create(genesis :+ setScript)),
           TestBlock.create(Seq(invoke)),
           features
         ) {
           case (diff, blockchain) =>
-            val asset            = IssuedAsset(issue.id.value)
+            val asset = diff.issuedAssets.head._1
             val sponsorshipValue = minSponsoredAssetFee.getOrElse(0L)
             diff.sponsorship shouldBe Map(asset -> SponsorshipValue(sponsorshipValue))
             blockchain.assetDescription(asset).map(_.sponsorship) shouldBe Some(sponsorshipValue)

@@ -167,17 +167,12 @@ object InvokeScriptTransactionDiff {
                 case ScriptResultV4(actions)              => actions
               }
 
-              actionsByType = actions.groupBy(_.getClass).withDefaultValue(Nil)
-              transferList  = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
-              issueList     = actionsByType(classOf[Issue]).asInstanceOf[List[Issue]]
-              reissueList   = actionsByType(classOf[Reissue]).asInstanceOf[List[Reissue]]
-              burnList      = actionsByType(classOf[Burn]).asInstanceOf[List[Burn]]
-              sponsorFeeList = actionsByType(classOf[SponsorFee])
-                .asInstanceOf[List[SponsorFee]]
-                .groupBy(_.assetId)
-                .mapValues(_.last)
-                .values
-                .toList
+              actionsByType  = actions.groupBy(_.getClass).withDefaultValue(Nil)
+              transferList   = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
+              issueList      = actionsByType(classOf[Issue]).asInstanceOf[List[Issue]]
+              reissueList    = actionsByType(classOf[Reissue]).asInstanceOf[List[Reissue]]
+              burnList       = actionsByType(classOf[Burn]).asInstanceOf[List[Burn]]
+              sponsorFeeList = actionsByType(classOf[SponsorFee]).asInstanceOf[List[SponsorFee]]
 
               dataItems = actionsByType
                 .filterKeys(classOf[DataItem[_]].isAssignableFrom)
@@ -236,6 +231,11 @@ object InvokeScriptTransactionDiff {
               val currentTxDiffWithKeys = currentTxDiff.copy(_2 = currentTxDiff._2 ++ transfers.keys ++ compositeDiff.accountData.keys)
               val updatedTxDiff         = compositeDiff.transactions.updated(tx.id(), currentTxDiffWithKeys)
 
+              val resultSponsorFeeList =
+                compositeDiff.sponsorship
+                  .map { case (asset, SponsorshipValue(minFee)) => SponsorFee(asset.id, Some(minFee).filter(_ > 0)) }
+                  .toList
+
               val isr = InvokeScriptResult(
                 dataEntries,
                 transferList.map { tr =>
@@ -248,7 +248,7 @@ object InvokeScriptTransactionDiff {
                 issueList,
                 reissueList,
                 burnList,
-                sponsorFeeList
+                resultSponsorFeeList
               )
 
               compositeDiff.copy(
@@ -524,7 +524,10 @@ object InvokeScriptTransactionDiff {
                 PublicKey(new Array[Byte](32))
               })
             case d: DataItem[_] => applyDataItem(d)
-            case i: Issue       => applyIssue(tx, pk, i)
+            case i: Issue =>
+              val r = applyIssue(tx, pk, i)
+              println(r)
+              r
             case r: Reissue     => applyReissue(r, pk)
             case b: Burn        => applyBurn(b, pk)
             case sf: SponsorFee => applySponsorFee(sf, pk)
