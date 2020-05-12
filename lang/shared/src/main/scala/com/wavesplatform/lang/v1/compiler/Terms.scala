@@ -38,7 +38,7 @@ object Terms {
     override def deepCopy: Eval[LET] =
       value.deepCopy.map(LET(name, _))
   }
-  case class FUNC(name: String, args: List[String], var body: EXPR) extends DECLARATION {
+  case class FUNC(name: String, args: List[String], body: EXPR) extends DECLARATION {
     def toStr: Coeval[String] =
       for {
         e <- body.toStr
