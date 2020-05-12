@@ -231,10 +231,17 @@ object InvokeScriptTransactionDiff {
               val currentTxDiffWithKeys = currentTxDiff.copy(_2 = currentTxDiff._2 ++ transfers.keys ++ compositeDiff.accountData.keys)
               val updatedTxDiff         = compositeDiff.transactions.updated(tx.id(), currentTxDiffWithKeys)
 
-              val resultSponsorFeeList =
-                compositeDiff.sponsorship
-                  .map { case (asset, SponsorshipValue(minFee)) => SponsorFee(asset.id, Some(minFee).filter(_ > 0)) }
-                  .toList
+              val resultSponsorFeeList = {
+                val sponsorFeeDiff =
+                  compositeDiff.sponsorship
+                    .map {
+                      case (asset, SponsorshipValue(minFee)) => SponsorFee(asset.id, Some(minFee).filter(_ > 0))
+                      case (asset, SponsorshipNoInfo)        => SponsorFee(asset.id, None)
+                    }
+                    .toSet
+
+                sponsorFeeList.filter(sponsorFeeDiff.contains)
+              }
 
               val isr = InvokeScriptResult(
                 dataEntries,
