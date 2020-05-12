@@ -70,27 +70,16 @@ object InvokeScriptTransactionDiff {
             else
               invocationComplexity / stepLimit + 1
 
-          // just for reliability
-          _ <- TracedResult {
-            if (stepsNumber > 1 && !blockchain.settings.useEvaluatorV2)
-              Left(GenericError("EvaluatorV2 should be enabled for continuations"))
-            else if (stepsNumber > 1 && !blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction))
-              Left(GenericError(s"${BlockchainFeatures.ContinuationTransaction} should be activated for continuations"))
-            else
-              Right(())
-          }
-
           _ <- TracedResult {
             val minFee    = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber
             val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
             val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
-            val stepsInfo = if (stepsNumber > 1) s" with $stepsNumber invocation steps" else ""
             Either.cond(
               feeInfo._1 >= minFee,
               (),
               GenericError(
                 s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
-                  s"$stepsInfo does not exceed minimal value of $minFee WAVES."
+                  s" does not exceed minimal value of $minFee WAVES."
               )
             )
           }
@@ -159,10 +148,7 @@ object InvokeScriptTransactionDiff {
               resultDiff <- scriptResult._1 match {
                 case ScriptResultV3(dataItems, transfers) => doProcessActions(dataItems ::: transfers)
                 case ScriptResultV4(actions)              => doProcessActions(actions)
-                case ir: IncompleteResult =>
-                  TracedResult.wrapValue[Diff, ValidationError](
-                    Diff(tx = tx, continuationStates = Map(tx.id.value -> ContinuationState.InProgress(ir.expr)))
-                  )
+                case ir: IncompleteResult                 => TracedResult(Left(GenericError("Unexpected IncompleteResult")))
               }
             } yield resultDiff
           } else TracedResult.wrapValue(InvokeDiffsCommon.paymentsPart(tx, dAppAddress, feeInfo._2))
