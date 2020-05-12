@@ -239,7 +239,7 @@ object BlockchainSettings {
         val rewardsSettings        = config.as[RewardsSettings](s"custom.rewards")
         (addressSchemeCharacter, functionalitySettings, genesisSettings, rewardsSettings)
     }
-    val useEvaluatorV2 = config.getAs[Boolean]("use-evaluator-v2").getOrElse(false)
+    val useEvaluatorV2 = false
 
     BlockchainSettings(
       addressSchemeCharacter = addressSchemeCharacter,
