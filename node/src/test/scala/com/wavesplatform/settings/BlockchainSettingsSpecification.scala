@@ -77,7 +77,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.genesisSettings.transactions should be(
       Seq(GenesisTransactionSettings("BASE58ADDRESS1", 50000000000001L), GenesisTransactionSettings("BASE58ADDRESS2", 49999999999999L))
     )
-    settings.useEvaluatorV2 shouldBe true
+    settings.useEvaluatorV2 shouldBe false
   }
 
   it should "read testnet settings" in {
