@@ -17,7 +17,7 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
 
   def assertTxs(f: Transaction, second: ReissueTransaction): Unit = f match {
     case first: ReissueTransaction =>
-      first.sender.stringRepr shouldEqual second.sender.stringRepr
+      first.sender shouldEqual second.sender
       first.timestamp shouldEqual second.timestamp
       first.fee shouldEqual second.fee
       first.version shouldEqual second.version

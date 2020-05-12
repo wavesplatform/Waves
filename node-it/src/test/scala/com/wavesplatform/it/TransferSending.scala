@@ -67,7 +67,7 @@ trait TransferSending extends ScorexLogging {
 
     val sourceAndDest = (1 to n).map { _ =>
       val Seq((srcConfig, _), (_, destPrivateKey)) = Random.shuffle(srcDest).take(2)
-      (srcConfig, destPrivateKey.stringRepr)
+      (srcConfig, destPrivateKey.toAddress.toString)
     }
 
     val requests = sourceAndDest.foldLeft(List.empty[Req]) {
@@ -156,7 +156,7 @@ trait TransferSending extends ScorexLogging {
     TransferRequest(
       Some(2.toByte),
       None,
-      Some(Base58.encode(tx.sender)),
+      Some(tx.sender.toString),
       recipient.stringRepr,
       Some(assetId),
       amount,

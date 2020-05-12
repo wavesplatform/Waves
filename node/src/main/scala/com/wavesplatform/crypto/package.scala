@@ -34,17 +34,17 @@ package object crypto {
   def secureHash(s: String): Array[Byte]      = secureHash(s.utf8Bytes)
 
   // Signatures
-  def sign(account: PrivateKey, message: ByteStr): ByteStr =
-    Curve25519.sign(SPrivateKey(account.arr), message)
+  def sign(account: PrivateKey, message: Array[Byte]): ByteStr =
+    ByteStr(Curve25519.sign(SPrivateKey(account.arr), message))
 
-  def signVRF(account: PrivateKey, message: ByteStr): ByteStr =
-    ByteStr(provider.calculateVrfSignature(provider.getRandom(DigestLength), account.arr, message.arr))
+  def signVRF(account: PrivateKey, message: Array[Byte]): ByteStr =
+    ByteStr(provider.calculateVrfSignature(provider.getRandom(DigestLength), account.arr, message))
 
-  def verify(signature: ByteStr, message: ByteStr, publicKey: PublicKey): Boolean =
+  def verify(signature: ByteStr, message: Array[Byte], publicKey: PublicKey): Boolean =
     Curve25519.verify(Signature(signature.arr), message, SPublicKey(publicKey.arr))
 
-  def verifyVRF(signature: ByteStr, message: ByteStr, publicKey: PublicKey): Either[ValidationError, ByteStr] =
-    Try(ByteStr(provider.verifyVrfSignature(publicKey.arr, message.arr, signature.arr))).toEither.left
+  def verifyVRF(signature: ByteStr, message: Array[Byte], publicKey: PublicKey): Either[ValidationError, ByteStr] =
+    Try(ByteStr(provider.verifyVrfSignature(publicKey.arr, message, signature.arr))).toEither.left
       .map(_ => GenericError("Could not verify VRF proof"))
 
   def createKeyPair(seed: Array[Byte]): (Array[Byte], Array[Byte]) = Curve25519.createKeyPair(seed)

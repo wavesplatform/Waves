@@ -55,7 +55,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     tsOrderFrom,
     tsOrderTo,
     1,
-    proofs = Proofs(Base58.tryDecodeWithLimit("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get)
+    proofs = Proofs(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get)
   )
 
   private val sell = Order(
@@ -69,7 +69,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     tsOrderFrom,
     tsOrderTo,
     2,
-    proofs = Proofs(Base58.tryDecodeWithLimit("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
+    proofs = Proofs(ByteStr.decodeBase58("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
   )
 
   private val exV1 = ExchangeTransaction
@@ -353,7 +353,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
   )
 
   private val invokeScript = InvokeScriptTransaction
-    .create(1.toByte, PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").right.get, PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").right.get, Some(
+    .create(1.toByte, PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").right.get, PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").right.get.toAddress, Some(
         Terms.FUNCTION_CALL(
           function = FunctionHeader.User("testfunc"),
           args = List(TRUE)

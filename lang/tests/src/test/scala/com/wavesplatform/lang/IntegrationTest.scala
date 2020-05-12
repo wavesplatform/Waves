@@ -599,7 +599,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     for (i <- 65528 to 65535) array(i) = 1
     val src =
       s""" arr.toInt(65528) """
-    val arrVal = ContextfulVal.pure[NoContext](CONST_BYTESTR(array).explicitGet())
+    val arrVal = ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(array)).explicitGet())
     eval[EVALUATED](
       src,
       ctxt = CTX[NoContext](
@@ -1513,10 +1513,12 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(script(base16String8Kb + "aa"), version = V4) shouldBe Left("Base16 encode input length=8193 should not exceed 8192")
   }
 
+  private def bytes(base16String: String) = ByteStr(BaseEncoding.base16().decode(base16String.toUpperCase))
+
   property("fromBase16String limit 32768 digits from V4") {
     val string32Kb = "fedcba9876543210" * (32 * 1024 / 16)
     def script(base16String: String) = s"""fromBase16String("$base16String")"""
-    def bytes(base16String: String) = BaseEncoding.base16().decode(base16String.toUpperCase)
+
 
     eval(script(string32Kb), version = V3) shouldBe CONST_BYTESTR(bytes(string32Kb))
     eval(script(string32Kb), version = V4) shouldBe CONST_BYTESTR(bytes(string32Kb))
@@ -1529,6 +1531,6 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val value = "fedcba9876543210FEDCBA9876543210"
     val script = s"""fromBase16String("$value")"""
 
-    eval(script) shouldBe CONST_BYTESTR(BaseEncoding.base16().decode(value.toUpperCase))
+    eval(script) shouldBe CONST_BYTESTR(bytes(value.toUpperCase))
   }
 }

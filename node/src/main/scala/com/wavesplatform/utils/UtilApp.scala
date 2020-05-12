@@ -6,6 +6,7 @@ import java.nio.file.{Files, Paths}
 
 import com.google.common.io.ByteStreams
 import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, FastBase58}
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang.script.{Script, ScriptReader}
@@ -34,7 +35,7 @@ object UtilApp {
 
   case class CompileOptions(assetScript: Boolean = false)
   case class SignOptions(privateKey: PrivateKey = null)
-  case class VerifyOptions(publicKey: PublicKey = null, signature: Array[Byte] = Array.emptyByteArray)
+  case class VerifyOptions(publicKey: PublicKey = null, signature: ByteStr = ByteStr.empty)
   case class HashOptions(mode: String = "fast")
   case class SignTxOptions(signerAddress: String = "")
 
@@ -163,7 +164,7 @@ object UtilApp {
             opt[String]('s', "signature")
               .text("Signature to verify")
               .required()
-              .action((s, c) => c.copy(verifyOptions = c.verifyOptions.copy(signature = Base58.decode(s))))
+              .action((s, c) => c.copy(verifyOptions = c.verifyOptions.copy(signature = ByteStr.decodeBase58(s).get)))
           )
           .text("Sign bytes with provided private key")
           .action((_, c) => c.copy(mode = Command.SignBytes)),
@@ -206,7 +207,7 @@ object UtilApp {
     //noinspection ScalaDeprecation
     def doCompile(settings: WavesSettings)(c: Command, str: Array[Byte]): ActionResult = {
       ScriptCompiler(new String(str), c.compileOptions.assetScript, settings.estimator)
-        .map(_._1.bytes())
+        .map(_._1.bytes().arr)
     }
 
     def doDecompile(c: Command, data: Array[Byte]): ActionResult = {
@@ -220,7 +221,7 @@ object UtilApp {
     }
 
     def doSign(c: Command, data: Array[Byte]): ActionResult =
-      Right(com.wavesplatform.crypto.sign(c.signOptions.privateKey, data))
+      Right(com.wavesplatform.crypto.sign(c.signOptions.privateKey, data).arr)
 
     def doVerify(c: Command, data: Array[Byte]): ActionResult =
       Either.cond(com.wavesplatform.crypto.verify(c.verifyOptions.signature, data, c.verifyOptions.publicKey), data, "Invalid signature")

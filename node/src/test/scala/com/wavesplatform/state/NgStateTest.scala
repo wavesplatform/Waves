@@ -17,8 +17,8 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
       master    <- accountGen
       recipient <- accountGen
       ts        <- positiveIntGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      payments: Seq[TransferTransaction] <- Gen.listOfN(amt, wavesTransferGeneratorP(master, recipient))
+      genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+      payments: Seq[TransferTransaction] <- Gen.listOfN(amt, wavesTransferGeneratorP(master, recipient.toAddress))
     } yield (genesis, payments)
 
   property("can forge correctly signed blocks") {

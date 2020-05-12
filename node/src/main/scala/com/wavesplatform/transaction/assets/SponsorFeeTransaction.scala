@@ -84,5 +84,5 @@ object SponsorFeeTransaction extends TransactionParser {
       fee: TxAmount,
       timestamp: TxTimestamp
   ): Either[ValidationError, SponsorFeeTransaction] =
-    signed(version, sender, asset, minSponsoredAssetFee, fee, timestamp, sender)
+    signed(version, sender.publicKey, asset, minSponsoredAssetFee, fee, timestamp, sender.privateKey)
 }

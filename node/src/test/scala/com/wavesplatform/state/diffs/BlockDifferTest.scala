@@ -50,12 +50,12 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       "height < enableMicroblocksAfterHeight - a miner should receive 100% of the current block's fee" in {
         assertDiff(testChain.init, 1000) {
           case (_, s) =>
-            s.balance(signerA) shouldBe 40
+            s.balance(signerA.toAddress) shouldBe 40
         }
 
         assertDiff(testChain, 1000) {
           case (_, s) =>
-            s.balance(signerB) shouldBe 50
+            s.balance(signerB.toAddress) shouldBe 50
         }
       }
 
@@ -77,7 +77,7 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       "height = enableMicroblocksAfterHeight - a miner should receive 40% of the current block's fee only" in {
         assertDiff(testChain, 9) {
           case (_, s) =>
-            s.balance(signerB) shouldBe 44
+            s.balance(signerB.toAddress) shouldBe 44
         }
       }
 
@@ -99,12 +99,12 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       "height > enableMicroblocksAfterHeight - a miner should receive 60% of previous block's fee and 40% of the current one" in {
         assertDiff(testChain.init, 4) {
           case (_, s) =>
-            s.balance(signerA) shouldBe 34
+            s.balance(signerA.toAddress) shouldBe 34
         }
 
         assertDiff(testChain, 4) {
           case (_, s) =>
-            s.balance(signerB) shouldBe 50
+            s.balance(signerB.toAddress) shouldBe 50
         }
       }
     }
@@ -122,13 +122,13 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
 
   private def getTwoMinersBlockChain(from: KeyPair, to: KeyPair, numPayments: Int): Seq[Block] = {
     val ts                   = System.currentTimeMillis() - 100000
-    val genesisTx            = GenesisTransaction.create(from, Long.MaxValue - 1, ts).explicitGet()
+    val genesisTx            = GenesisTransaction.create(from.toAddress, Long.MaxValue - 1, ts).explicitGet()
     val features: Seq[Short] = Seq[Short](2)
 
     val paymentTxs = (1 to numPayments).map { i =>
       createWavesTransfer(
         from,
-        to,
+        to.toAddress,
         amount = 10000,
         TransactionFee,
         timestamp = ts + i * 1000

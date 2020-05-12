@@ -27,9 +27,9 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
     assetId = IssuedAsset(ByteStr(assetBytes))
     sender                    <- accountGen
     recipient                 <- accountGen
-    paymentTransaction        <- wavesTransferGeneratorP(time, sender, recipient)
-    transferTrancation        <- transferGeneratorP(1 + time, sender, recipient, assetId, Waves)
-    anotherPaymentTransaction <- wavesTransferGeneratorP(2 + time, sender, recipient)
+    paymentTransaction        <- wavesTransferGeneratorP(time, sender, recipient.toAddress)
+    transferTrancation        <- transferGeneratorP(1 + time, sender, recipient.toAddress, assetId, Waves)
+    anotherPaymentTransaction <- wavesTransferGeneratorP(2 + time, sender, recipient.toAddress)
     transactionData = Seq(paymentTransaction, transferTrancation, anotherPaymentTransaction)
   } yield (baseTarget, reference, ByteStr(generationSignature), recipient, transactionData)
 
@@ -42,7 +42,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
       assetId = Some(ByteStr(assetBytes))
       sender                                  <- accountGen
       recipient                               <- accountGen
-      paymentTransaction: TransferTransaction <- wavesTransferGeneratorP(time, sender, recipient)
+      paymentTransaction: TransferTransaction <- wavesTransferGeneratorP(time, sender, recipient.toAddress)
     } yield Block
       .buildAndSign(
         3.toByte,
@@ -181,7 +181,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
           )
         val (bytes, t1) = Instrumented.withTimeMillis(block.bytes().dropRight(crypto.SignatureLength))
         val (hash, t2)  = Instrumented.withTimeMillis(crypto.fastHash(bytes))
-        val (sig, t3)   = Instrumented.withTimeMillis(crypto.sign(acc, hash))
+        val (sig, t3)   = Instrumented.withTimeMillis(crypto.sign(acc.privateKey, hash))
     }
   }
 

@@ -30,7 +30,7 @@ class LegacyFrameCodecSpec extends FreeSpec with Matchers with MockFactory with 
     val decodedBytes = ch.readInbound[RawBytes]()
 
     decodedBytes.code shouldBe TransactionSpec.messageCode
-    decodedBytes.data.arr shouldEqual origTx.bytes()
+    decodedBytes.data shouldEqual origTx.bytes()
   }
 
   "should handle multiple messages" in forAll(Gen.nonEmptyListOf(issueGen)) { origTxs =>

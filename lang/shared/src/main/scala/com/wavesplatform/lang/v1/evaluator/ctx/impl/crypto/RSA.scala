@@ -3,7 +3,6 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto
 import java.security.spec.X509EncodedKeySpec
 import java.security.{KeyFactory, Signature}
 
-import com.wavesplatform.common.state.ByteStr
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 
 object RSA {
@@ -39,7 +38,7 @@ object RSA {
     }
   }
 
-  def verify(digestAlgorithm: DigestAlgorithm, message: ByteStr, signature: Array[Byte], publicKey: Array[Byte]): Boolean = {
+  def verify(digestAlgorithm: DigestAlgorithm, message: Array[Byte], signature: Array[Byte], publicKey: Array[Byte]): Boolean = {
     val algorithm = {
       val digestPrefix = digestAlgorithmPrefix(digestAlgorithm)
       s"${digestPrefix}withRSA"
@@ -51,7 +50,7 @@ object RSA {
     val jPublicKey     = KeyFactory.getInstance("RSA").generatePublic(jPublicKeySpec)
 
     publicSignature.initVerify(jPublicKey)
-    publicSignature.update(message.arr)
+    publicSignature.update(message)
 
     publicSignature.verify(signature)
   }

@@ -13,6 +13,7 @@ import com.wavesplatform.api.http.requests.DataRequest._
 import com.wavesplatform.api.http.requests.SponsorFeeRequest._
 import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.http.{ApiMarshallers, PlayJsonException}
 import com.wavesplatform.lang.contract.meta.RecKeyValueFolder
@@ -96,7 +97,7 @@ package object http extends ApiMarshallers with ScorexLogging {
 
   private def base58Segment(requiredLength: Option[Int], error: String => ApiError): PathMatcher1[ByteStr] = Segment.map { str =>
     ByteStr.decodeBase58(str) match {
-      case Success(value) if requiredLength.forall(_ == value.length) => value
+      case Success(value) if requiredLength.forall(_ == value.arr.length) => value
       case _                                                          => throw ApiException(error(str))
     }
   }
@@ -105,7 +106,7 @@ package object http extends ApiMarshallers with ScorexLogging {
     ByteStr.decodeBase58(str) match {
       case Success(value) =>
         if (value.arr.length == crypto.DigestLength || value.arr.length == crypto.SignatureLength) value
-        else throw ApiException(error(s"$str has invalid length ${value.length}. Length can either be ${crypto.DigestLength} or ${crypto.SignatureLength}"))
+        else throw ApiException(error(s"$str has invalid length ${value.arr.length}. Length can either be ${crypto.DigestLength} or ${crypto.SignatureLength}"))
       case Failure(exception) =>
         throw ApiException(error(exception.getMessage))
     }
@@ -120,7 +121,7 @@ package object http extends ApiMarshallers with ScorexLogging {
 
   val AddrSegment: PathMatcher1[Address] = Segment.map { str =>
     (for {
-      bytes <- ByteStr.decodeBase58(str).toEither.left.map(t => GenericError(t))
+      bytes <- Try(Base58.decode(str)).fold(e => Left(GenericError(e)), Right(_))
       addr  <- Address.fromBytes(bytes)
     } yield addr).fold(ae => throw ApiException(ApiError.fromValidationError(ae)), identity)
   }

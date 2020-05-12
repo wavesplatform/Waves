@@ -845,8 +845,6 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       ))
 
     val Right(dApp) = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4)
-    println(ctx.compilerContext.functionDefs.mapValues(_.fSigList.map(_.header).filter(_.isInstanceOf[Native]).map(_.asInstanceOf[Native].name)).toList.flatMap { case (name, codes) => codes.map((_, name)) })
-    println(decompilerContextV4.opCodes)
     val res         = Decompiler(dApp, ctx.decompilerContext)
     res shouldEq script
   }
@@ -885,8 +883,6 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       ))
 
     val Right(dApp) = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4)
-    println(ctx.compilerContext.functionDefs.mapValues(_.fSigList.map(_.header).filter(_.isInstanceOf[Native]).map(_.asInstanceOf[Native].name)).toList.flatMap { case (name, codes) => codes.map((_, name)) })
-    println(decompilerContextV4.opCodes)
     val res         = Decompiler(dApp, ctx.decompilerContext)
     res shouldEq script("")
   }

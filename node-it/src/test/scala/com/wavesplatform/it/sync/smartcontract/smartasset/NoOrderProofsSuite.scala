@@ -78,8 +78,8 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
 
     val incorrectTrTx = TransferTransaction(
       2.toByte,
-      pkByAddress(firstAddress),
-      pkByAddress(thirdAddress),
+      pkByAddress(firstAddress).publicKey,
+      pkByAddress(thirdAddress).toAddress,
       IssuedAsset(ByteStr.decodeBase58(assetWProofs).get),
       1,
       Waves,
@@ -98,7 +98,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
     val incorrectBrTx = BurnTransaction
       .create(
         2.toByte,
-        pkByAddress(firstAddress),
+        pkByAddress(firstAddress).publicKey,
         IssuedAsset(ByteStr.decodeBase58(assetWProofs).get),
         1,
         smartMinFee,

@@ -46,7 +46,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     forAll(invokeScriptGen(paymentListGen), accountGen) { (tx, caller) =>
       val unsigned = transaction.PBTransaction(
         tx.chainId,
-        ByteString.copyFrom(caller.publicKey),
+        ByteString.copyFrom(caller.publicKey.arr),
         Some(Amount.of(PBAmounts.toPBAssetId(tx.feeAssetId), tx.fee)),
         tx.timestamp,
         tx.version,
@@ -58,8 +58,8 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
           )
         )
       )
-      val proof        = crypto.sign(caller, PBTransactions.vanilla(PBSignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
-      val signed       = PBSignedTransaction(Some(unsigned), Seq(ByteString.copyFrom(proof)))
+      val proof        = crypto.sign(caller.privateKey, PBTransactions.vanilla(PBSignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
+      val signed       = PBSignedTransaction(Some(unsigned), Seq(ByteString.copyFrom(proof.arr)))
       val convTx       = PBTransactions.vanilla(signed).explicitGet()
       val unsafeConvTx = PBTransactions.vanillaUnsafe(signed)
       val modTx        = tx.copy(sender = caller.publicKey, proofs = Proofs(List(proof)))
@@ -143,7 +143,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       .selfSigned(
         1.toByte,
         KeyPair("test3".getBytes("UTF-8")),
-        KeyPair("test4".getBytes("UTF-8")),
+        KeyPair("test4".getBytes("UTF-8")).toAddress,
         Some(
           Terms.FUNCTION_CALL(
             FunctionHeader.User("foo"),
@@ -188,7 +188,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       .selfSigned(
         1.toByte,
         KeyPair("test3".getBytes("UTF-8")),
-        KeyPair("test4".getBytes("UTF-8")),
+        KeyPair("test4".getBytes("UTF-8")).toAddress,
         None,
         Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
         100000,
