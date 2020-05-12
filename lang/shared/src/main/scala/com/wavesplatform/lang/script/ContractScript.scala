@@ -59,16 +59,12 @@ object ContractScript {
       contract: DApp,
       estimator: ScriptEstimator,
       useContractVerifierLimit: Boolean = true,
-      checkLimit: Boolean = true,
-      allowContinuation: Boolean = false
+      checkLimit: Boolean = true
   ): Either[String, (Long, Map[String, Long])] =
     for {
       cbf <- estimateComplexityByFunction(version, contract, estimator, useContractVerifierLimit)
       max = cbf.maximumOption(_._2 compareTo _._2)
-      limit = if (allowContinuation)
-        MaxComplexityByVersion(version) * MaxContinuationSteps
-      else
-        MaxComplexityByVersion(version)
+      limit = MaxComplexityByVersion(version)
       _ <- max.fold(().asRight[String])(
         m => {
           Either.cond(

@@ -3,9 +3,7 @@ package com.wavesplatform.state.diffs.invoke
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.EstimatorProvider._
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.FunctionCallPolicyProvider._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.contract.DApp
