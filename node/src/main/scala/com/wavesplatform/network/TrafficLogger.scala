@@ -35,7 +35,7 @@ class TrafficLogger(settings: TrafficLogger.Settings) extends ChannelDuplexHandl
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = {
     codeOf(msg).filterNot(settings.ignoreRxMessages).foreach { code =>
-      log.trace(s"${id(ctx)} --> received($code): $msg")
+      log.trace(s"${id(ctx)} --> received($code): ${stringify(msg)}")
     }
 
     super.channelRead(ctx, msg)
@@ -43,7 +43,7 @@ class TrafficLogger(settings: TrafficLogger.Settings) extends ChannelDuplexHandl
 
   private def stringify(msg: Any) = msg match {
     case tx: Transaction => tx.json().toString()
-    case b: Block        => b.uniqueId.toString
+    case b: Block        => b.headerJson().toString()
     case other           => other.toString
   }
 }
