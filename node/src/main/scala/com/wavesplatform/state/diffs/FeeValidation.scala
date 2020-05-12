@@ -20,10 +20,10 @@ object FeeValidation {
 
   case class FeeDetails(asset: Asset, requirements: Chain[String], minFeeInAsset: Long, minFeeInWaves: Long)
 
-  val ScriptExtraFee   = 400000L
-  val FeeUnit          = 100000
-  val NFTMultiplier    = 0.001
-  val DAppV4Multiplier = 0.001
+  val ScriptExtraFee    = 400000L
+  val FeeUnit           = 100000
+  val NFTMultiplier     = 0.001
+  val BlockV5Multiplier = 0.001
 
   val FeeConstants: Map[Byte, Long] = Map(
     GenesisTransaction.typeId         -> 0,
@@ -92,7 +92,10 @@ object FeeValidation {
 
             (baseFee * multiplier).toLong
           case _: ReissueTransaction =>
-            val multiplier = if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) DAppV4Multiplier else 1
+            val multiplier = if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) BlockV5Multiplier else 1
+            (baseFee * multiplier).toLong
+          case _: SponsorFeeTransaction =>
+            val multiplier = if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) BlockV5Multiplier else 1
             (baseFee * multiplier).toLong
           case _ => baseFee
         }

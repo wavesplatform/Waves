@@ -9,7 +9,7 @@ object Dependencies {
 
   private def akkaHttpModule(module: String)               = "com.typesafe.akka"             %% module            % "10.1.8"
   private def nettyModule(module: String)                  = "io.netty"                      % s"netty-$module"   % "4.1.33.Final"
-  private def kamonModule(module: String, v: String)       = "io.kamon"                      %% s"kamon-$module"  % v
+  private def kamonModule(module: String)                  = "io.kamon"                      %% s"kamon-$module"  % "2.1.0"
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.9.8"
   private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
 
@@ -22,7 +22,7 @@ object Dependencies {
   val akkaHttp                   = akkaHttpModule("akka-http")
   private val jacksonModuleScala = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
   private val googleGuava        = "com.google.guava" % "guava" % "27.0.1-jre"
-  private val kamonCore          = kamonModule("core", "1.1.6")
+  private val kamonCore          = kamonModule("core")
   private val machinist          = "org.typelevel" %% "machinist" % "0.6.6"
   val logback                    = "ch.qos.logback" % "logback-classic" % "1.2.3"
   val janino                     = "org.codehaus.janino" % "janino" % "3.0.12"
@@ -99,7 +99,7 @@ object Dependencies {
       ("org.typelevel" %% "cats-mtl-core" % "0.4.0").exclude("org.scalacheck", "scalacheck_2.12"),
       "ch.obermuhlner" % "big-math" % "2.1.0",
       ("org.scorexfoundation" %% "scrypto" % "2.0.4").exclude("org.whispersystems", "curve25519-java"),
-      "com.wavesplatform" % "curve25519-java" % "0.6.1",
+      "com.wavesplatform" % "curve25519-java" % "0.6.3",
       ("org.bykn" %% "fastparse-cats-core" % "0.1.0")
         .exclude("org.scalatest", "scalatest_2.12")
         .exclude("org.scalacheck", "scalacheck_2.12")
@@ -152,8 +152,8 @@ object Dependencies {
       "com.iheart"           %% "ficus"                   % "1.4.2",
       "net.logstash.logback" % "logstash-logback-encoder" % "4.11" % Runtime,
       kamonCore,
-      kamonModule("system-metrics", "1.0.1"),
-      kamonModule("influxdb", "1.0.3"),
+      kamonModule("system-metrics"),
+      kamonModule("influxdb"),
       "org.influxdb" % "influxdb-java" % "2.14",
       googleGuava,
       "com.google.code.findbugs" % "jsr305"         % "3.0.2" % Compile, // javax.annotation stubs

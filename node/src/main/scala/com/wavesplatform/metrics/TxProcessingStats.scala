@@ -3,7 +3,7 @@ package com.wavesplatform.metrics
 import com.google.common.base.CaseFormat
 import com.wavesplatform.settings.Constants
 import kamon.Kamon
-import kamon.metric.TimerMetric
+import kamon.metric.Metric
 import supertagged._
 
 object TxProcessingStats {
@@ -16,13 +16,13 @@ object TxProcessingStats {
     Constants.TransactionNames.mapValues(timerName)
   }
 
-  object TxTimer extends TaggedType[TimerMetric]
+  object TxTimer extends TaggedType[Metric.Timer]
 
   type TxTimer = TxTimer.Type
 
   implicit class TxTimerExt(val t: TxTimer) extends AnyVal {
     def measureForType[A](typeId: Byte)(f: => A): A = {
-      val start  = t.refine("transaction-type" -> typeToName(typeId)).start()
+      val start  = t.withTag("transaction-type", typeToName(typeId)).start()
       val result = f
       start.stop()
       result
