@@ -392,6 +392,73 @@ class SponsorFeeActionSuite extends BaseSuite {
     }
   }
 
+  "Rollback" - {
+    val minSponsoredAssetFee = 1000
+    val script =
+      s"""
+        | {-# STDLIB_VERSION 4 #-}
+        | {-# CONTENT_TYPE DAPP #-}
+        | {-# SCRIPT_TYPE ACCOUNT #-}
+        |
+        | @Callable(i)
+        | func issueAsset() = {
+        |     let issue = Issue("SponsoredAsset0", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
+        |     let assetId = calculateAssetId(issue)
+        |     [
+        |         issue,
+        |         BinaryEntry("sponsoredAssetId", assetId)
+        |     ]
+        | }
+        |
+        | @Callable(i)
+        | func sponsorAsset() = [
+        |     SponsorFee(this.getBinary("sponsoredAssetId").value(), $minSponsoredAssetFee)
+        | ]
+      """.stripMargin
+
+    "without returning to utx" in {
+      val dApp = createDApp(script)
+
+      val invokeTx1 = miner.invokeScript(miner.address, dApp, Some("issueAsset"), waitForTx = true, fee = smartMinFee + issueFee)
+      val assetId = miner.debugStateChanges(invokeTx1._1.id).stateChanges.get.issues.head.assetId
+      val firstTxHeight = miner.height
+      nodes.waitForHeight(firstTxHeight + 1)
+
+      val invokeTx2 = miner.invokeScript(miner.address, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee + issueFee)
+      miner.debugStateChanges(invokeTx2._1.id).stateChanges.get.sponsorFees.head.assetId shouldBe assetId
+
+      nodes.rollback(firstTxHeight, returnToUTX = false)
+      nodes.waitForHeight(miner.height + 1)
+
+      miner.assetsDetails(assetId).minSponsoredAssetFee shouldBe None
+      val dAppBalance = miner.assetsBalance(dApp).balances.head
+      dAppBalance.assetId shouldBe assetId
+      dAppBalance.minSponsoredAssetFee shouldBe None
+      dAppBalance.sponsorBalance shouldBe None
+    }
+
+    "with returning to utx" in {
+      val dApp = createDApp(script)
+
+      val invokeTx1 = miner.invokeScript(miner.address, dApp, Some("issueAsset"), waitForTx = true, fee = smartMinFee + issueFee)
+      val assetId = miner.debugStateChanges(invokeTx1._1.id).stateChanges.get.issues.head.assetId
+      val firstTxHeight = miner.height
+      nodes.waitForHeight(firstTxHeight + 1)
+
+      val invokeTx2 = miner.invokeScript(miner.address, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee + issueFee)
+      miner.debugStateChanges(invokeTx2._1.id).stateChanges.get.sponsorFees.head.assetId shouldBe assetId
+
+      nodes.rollback(firstTxHeight, returnToUTX = true)
+      nodes.waitForTransaction(invokeTx2._1.id)
+
+      miner.assetsDetails(assetId).minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
+      val dAppBalance = miner.assetsBalance(dApp).balances.head
+      dAppBalance.assetId shouldBe assetId
+      dAppBalance.minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
+      dAppBalance.sponsorBalance shouldBe Some(miner.balance(dApp).balance)
+    }
+  }
+
   private def createDApp(script: String, address: String = miner.createAddress()): String = {
     val compiledScript = ScriptCompiler
       .compile(
