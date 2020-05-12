@@ -5,7 +5,7 @@ import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
-import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult, ScriptResultV3, ScriptResultV4}
+import com.wavesplatform.lang.v1.evaluator.{IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, Burn, DataItem, Issue, Reissue}
 import com.wavesplatform.transaction.TxValidationError.{ScriptExecutionError, TransactionNotAllowedByScript}
 import play.api.libs.json.Json.JsValueWrapper
@@ -86,6 +86,8 @@ case class InvokeScriptTrace(
             case item: DataItem[_]       => dataItemJson(item)     + ("type" -> JsString("dataItem"))
           }
         )
+      case i: IncompleteResult =>
+        throw new RuntimeException(s"Unexpected $i")
     }
 
   private def transferJson(transfer: AssetTransfer) =
