@@ -2,7 +2,6 @@ package com.wavesplatform.it.asset
 
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.it.BaseSuite
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{IssueInfoResponse, SponsorFeeResponse, StateChangesDetails}
 import com.wavesplatform.it.sync._

@@ -233,12 +233,10 @@ object InvokeScriptTransactionDiff {
 
               val resultSponsorFeeList = {
                 val sponsorFeeDiff =
-                  compositeDiff.sponsorship
-                    .map {
-                      case (asset, SponsorshipValue(minFee)) => SponsorFee(asset.id, Some(minFee).filter(_ > 0))
-                      case (asset, SponsorshipNoInfo)        => SponsorFee(asset.id, None)
-                    }
-                    .toSet
+                  compositeDiff.sponsorship.map {
+                    case (asset, SponsorshipValue(minFee)) => SponsorFee(asset.id, Some(minFee).filter(_ > 0))
+                    case (asset, SponsorshipNoInfo)        => SponsorFee(asset.id, None)
+                  }.toSet
 
                 sponsorFeeList.filter(sponsorFeeDiff.contains)
               }
@@ -531,10 +529,7 @@ object InvokeScriptTransactionDiff {
                 PublicKey(new Array[Byte](32))
               })
             case d: DataItem[_] => applyDataItem(d)
-            case i: Issue =>
-              val r = applyIssue(tx, pk, i)
-              println(r)
-              r
+            case i: Issue       => applyIssue(tx, pk, i)
             case r: Reissue     => applyReissue(r, pk)
             case b: Burn        => applyBurn(b, pk)
             case sf: SponsorFee => applySponsorFee(sf, pk)
