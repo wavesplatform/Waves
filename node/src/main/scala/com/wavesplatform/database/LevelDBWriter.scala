@@ -669,6 +669,15 @@ abstract class LevelDBWriter private[database] (
 
                 case _: InvokeScriptTransaction =>
                   val k = Keys.invokeScriptResult(h, num)
+                  rw.db.get(k).foreach { r =>
+                    assetDetailsToInvalidate ++= r.issues.map { issue =>
+                      val asset = IssuedAsset(issue.id)
+                      rw.delete(Keys.assetStaticInfo(asset))
+                      rollbackAssetInfo(rw, asset, currentHeight)
+                    }
+                    assetDetailsToInvalidate ++= r.reissues.map(i => rollbackAssetInfo(rw, IssuedAsset(i.assetId), currentHeight))
+                    assetDetailsToInvalidate ++= r.burns.map(i => rollbackAssetInfo(rw, IssuedAsset(i.assetId), currentHeight))
+                  }
                   rw.delete(k)
 
                 case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))

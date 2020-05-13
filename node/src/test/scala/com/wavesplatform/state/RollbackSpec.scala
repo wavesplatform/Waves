@@ -1,27 +1,41 @@
 package com.wavesplatform.state
 
+import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.features._
+import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values.{Account, V4}
+import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.{NoShrink, TestTime, TransactionGen, history}
-import org.scalacheck.Gen
+import org.scalacheck.Gen.alphaLowerChar
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{Assertions, FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -29,10 +43,13 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
   private val time   = new TestTime
   private def nextTs = time.getTimestamp()
 
-  private def genesisBlock(genesisTs: Long, address: Address, initialBalance: Long) = TestBlock.create(
+  private def genesisBlock(genesisTs: Long, address: Address, initialBalance: Long): Block =
+    genesisBlock(genesisTs, Map(address -> initialBalance))
+
+  private def genesisBlock(genesisTs: Long, initialBalances: Map[Address, Long]): Block = TestBlock.create(
     genesisTs,
     ByteStr(Array.fill[Byte](SignatureLength)(0)),
-    Seq(GenesisTransaction.create(address, initialBalance, genesisTs).explicitGet())
+    initialBalances.map { case (address, initialBalance) => GenesisTransaction.create(address, initialBalance, genesisTs).explicitGet() }.toSeq
   )
 
   private def transfer(sender: KeyPair, recipient: Address, amount: Long) =
@@ -347,6 +364,196 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
         }
     }
 
+    "invoke script transaction actions" - {
+      val issueFunctionCallGen: Gen[(Long, Terms.FUNCTION_CALL)] =
+        for {
+          nameLen        <- Gen.choose(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
+          descriptionLen <- Gen.choose(0, IssueTransaction.MaxAssetDescriptionLength)
+          name           <- Gen.listOfN(nameLen, alphaLowerChar).map(_.mkString)
+          description    <- Gen.listOfN(descriptionLen, alphaLowerChar).map(_.mkString)
+          quantity       <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
+          decimals       <- Gen.choose(0: Byte, 8: Byte)
+        } yield (
+          quantity,
+          Terms.FUNCTION_CALL(
+            FunctionHeader.User("issue"),
+            List(
+              Terms.CONST_STRING(name).explicitGet(),
+              Terms.CONST_STRING((description)).explicitGet(),
+              Terms.CONST_LONG(quantity),
+              Terms.CONST_LONG(decimals),
+              Terms.CONST_BOOLEAN(true)
+            )
+          )
+        )
+
+      def reissueFunctionCallGen(assetId: ByteStr): Gen[(Long, Terms.FUNCTION_CALL)] =
+        for {
+          reissuable <- Arbitrary.arbBool.arbitrary
+          quantity   <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
+        } yield (
+          quantity,
+          Terms.FUNCTION_CALL(
+            FunctionHeader.User("reissue"),
+            List(
+              Terms.CONST_BYTESTR(assetId).explicitGet(),
+              Terms.CONST_BOOLEAN(reissuable),
+              Terms.CONST_LONG(quantity)
+            )
+          )
+        )
+
+      def burnFunctionCallGen(assetId: ByteStr, quantity: Long): Gen[(Long, Terms.FUNCTION_CALL)] =
+        for {
+          burnt <- Gen.choose(1, quantity)
+        } yield (
+          burnt,
+          Terms.FUNCTION_CALL(
+            FunctionHeader.User("burn"),
+            List(
+              Terms.CONST_BYTESTR(assetId).explicitGet(),
+              Terms.CONST_LONG(burnt)
+            )
+          )
+        )
+
+      val scenario =
+        for {
+          dApp                 <- accountGen
+          initialDAppBalance   <- positiveLongGen
+          sender               <- accountGen
+          initialSenderBalance <- positiveLongGen
+          fee                  <- smallFeeGen
+          _                    <- issueParamGen
+          genesis     = genesisBlock(nextTs, Map(dApp.toAddress -> initialDAppBalance, sender.toAddress -> initialSenderBalance))
+          setScriptTx = SetScriptTransaction.selfSigned(1.toByte, dApp, Some(RollbackSpec.issueReissueBurnScript), fee, nextTs).explicitGet()
+        } yield (dApp, sender, genesis, setScriptTx)
+
+      def appendBlock(d: Domain, invoker: KeyPair, dApp: KeyPair)(parentBlockId: ByteStr, fc: Terms.FUNCTION_CALL): ByteStr = {
+        val fee = Gen.choose(MinIssueFee, 2 * MinIssueFee).sample.get
+        val issue =
+          InvokeScriptTransaction
+            .selfSigned(2.toByte, invoker, dApp.toAddress, Some(fc), Seq.empty, fee, Waves, nextTs)
+            .explicitGet()
+
+        d.appendBlock(
+          TestBlock.create(
+            nextTs,
+            parentBlockId,
+            Seq(issue)
+          )
+        )
+        issue.id()
+      }
+
+      "issue" in forAll(scenario) {
+        case (dApp, invoker, genesis, setScript) =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0)) { d =>
+            val append = appendBlock(d, invoker, dApp) _
+
+            d.appendBlock(genesis)
+            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript)))
+
+            val startBlockId = d.lastBlockId
+
+            val (quantity, issueFc) = issueFunctionCallGen.sample.get
+
+            /// liquid block rollback
+            val liquidIssueTxId = append(startBlockId, issueFc)
+            val liquidAsset = IssuedAsset(d.blockchainUpdater.bestLiquidDiff.get.scriptResults(liquidIssueTxId).issues.head.id)
+            d.balance(dApp.toAddress, liquidAsset) shouldBe quantity
+            d.blockchainUpdater.removeAfter(startBlockId).explicitGet()
+            d.balance(dApp.toAddress, liquidAsset) shouldBe 0L
+            d.blockchainUpdater.assetDescription(liquidAsset) shouldBe None
+
+            // hardened block rollback
+            val issueTxId = append(startBlockId, issueFc)
+            val asset = IssuedAsset(d.blockchainUpdater.bestLiquidDiff.get.scriptResults(issueTxId).issues.head.id)
+            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
+            d.balance(dApp.toAddress, asset) shouldBe quantity
+            d.blockchainUpdater.removeAfter(startBlockId).explicitGet()
+            d.balance(dApp.toAddress, asset) shouldBe 0L
+            d.blockchainUpdater.assetDescription(asset) shouldBe None
+          }
+      }
+
+      "reissue" in forAll(scenario) {
+        case (dApp, invoker, genesis, setScript) =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0)) { d =>
+            val append = appendBlock(d, invoker, dApp) _
+
+            d.appendBlock(genesis)
+            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript)))
+
+            val startBlockId = d.lastBlockId
+
+            val (quantity, issueFc) = issueFunctionCallGen.sample.get
+
+            val issueTxId = append(startBlockId, issueFc)
+            val asset = IssuedAsset(d.blockchainUpdater.bestLiquidDiff.get.scriptResults(issueTxId).issues.head.id)
+            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
+
+            val issueBlockId     = d.lastBlockId
+            val issueDescription = d.blockchainUpdater.assetDescription(asset)
+
+            val (reissued, reissueFc) = reissueFunctionCallGen(asset.id).sample.get
+
+            // liquid block rollback
+            append(issueBlockId, reissueFc)
+            d.balance(dApp.toAddress, asset) shouldBe reissued + quantity
+            d.blockchainUpdater.removeAfter(issueBlockId).explicitGet()
+            d.balance(dApp.toAddress, asset) shouldBe quantity
+            d.blockchainUpdater.assetDescription(asset) shouldBe issueDescription
+
+            // hardened block rollback
+            append(issueBlockId, reissueFc)
+            d.balance(dApp.toAddress, asset) shouldBe reissued + quantity
+            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
+            d.blockchainUpdater.removeAfter(issueBlockId).explicitGet()
+            d.balance(dApp.toAddress, asset) shouldBe quantity
+            d.blockchainUpdater.assetDescription(asset) shouldBe issueDescription
+          }
+      }
+
+      "burn" in forAll(scenario) {
+        case (dApp, invoker, genesis, setScript) =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0)) { d =>
+            val append = appendBlock(d, invoker, dApp) _
+
+            d.appendBlock(genesis)
+            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript)))
+
+            val startBlockId = d.lastBlockId
+
+            val (quantity, issueFc) = issueFunctionCallGen.sample.get
+
+            val issueTxId = append(startBlockId, issueFc)
+            val asset = IssuedAsset(d.blockchainUpdater.bestLiquidDiff.get.scriptResults(issueTxId).issues.head.id)
+            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
+
+            val issueBlockId     = d.lastBlockId
+            val issueDescription = d.blockchainUpdater.assetDescription(asset)
+
+            val (burnt, burntFc) = burnFunctionCallGen(asset.id, quantity).sample.get
+
+            // liquid block rollback
+            append(issueBlockId, burntFc)
+            d.balance(dApp.toAddress, asset) shouldBe quantity - burnt
+            d.blockchainUpdater.removeAfter(issueBlockId).explicitGet()
+            d.balance(dApp.toAddress, asset) shouldBe quantity
+            d.blockchainUpdater.assetDescription(asset) shouldBe issueDescription
+
+            // hardened block rollback
+            append(issueBlockId, burntFc)
+            d.balance(dApp.toAddress, asset) shouldBe quantity - burnt
+            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
+            d.blockchainUpdater.removeAfter(issueBlockId).explicitGet()
+            d.balance(dApp.toAddress, asset) shouldBe quantity
+            d.blockchainUpdater.assetDescription(asset) shouldBe issueDescription
+          }
+      }
+    }
+
     "address script" in forAll(accountGen, positiveLongGen) {
       case (sender, initialBalance) =>
         withDomain(createSettings(SmartAccounts -> 0)) { d =>
@@ -548,5 +755,48 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           }
         }
     }
+  }
+}
+
+object RollbackSpec {
+  private val issueReissueBurnScript = {
+    import com.wavesplatform.lang.directives.values.{DApp => DAppType}
+
+    val stdLibVersion = V4
+
+    val expr = {
+      val script =
+        s"""
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-#SCRIPT_TYPE ACCOUNT#-}
+           |
+           |@Callable(i)
+           |func issue(name: String, description: String, quantity: Int, decimals: Int, isReissuable: Boolean) =
+           |  [Issue(name, description, quantity, decimals, isReissuable, unit, 0)]
+           |
+           |@Callable (i)
+           |func reissue(assetId: ByteVector, isReissuable: Boolean, quantity: Int) =
+           |  [Reissue(assetId, isReissuable, quantity)]
+           |
+           |@Callable (i) func burn(assetId: ByteVector, quantity: Int) =
+           |  [Burn(assetId, quantity)]
+           |""".stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    val ctx = {
+      Monoid
+        .combineAll(
+          Seq(
+            PureContext.build(Global, stdLibVersion).withEnvironment[Environment],
+            CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment],
+            WavesContext.build(
+              DirectiveSet(stdLibVersion, Account, DAppType).explicitGet()
+            )
+          )
+        )
+    }
+    ContractScript(V4, compiler.ContractCompiler(ctx.compilerContext, expr, stdLibVersion).right.get).right.get
   }
 }
