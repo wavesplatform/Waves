@@ -112,7 +112,7 @@ class RideBlockInfoSuite extends BaseTransactionSuite {
     checkCommonFields(sender.blockAt(height))
   }
 
-  test("liquid blocks affect vrf field") {
+  ignore("liquid blocks affect vrf field") {
     val height = miner.height + 1
     nodes.waitForHeight(height)
 
