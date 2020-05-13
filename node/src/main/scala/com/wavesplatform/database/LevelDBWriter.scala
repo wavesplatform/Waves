@@ -13,11 +13,11 @@ import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.database
-import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings, WavesSettings}
+import com.wavesplatform.state.patch.PatchLoader
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -543,8 +543,10 @@ abstract class LevelDBWriter private[database] (
 
       expiredKeys.foreach(rw.delete(_, "expired-keys"))
 
-      if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(height)) {
-        disabledAliases = DisableHijackedAliases(rw)
+      PatchLoader.patches.find(p => p.name == "DisableHijackedAliases" && p.height == height).foreach { patch =>
+        val aliases = PatchLoader.read[Set[String]](patch).map(Alias.create(_).explicitGet())
+        rw.put(Keys.disabledAliases, aliases)
+        disabledAliases = aliases
       }
 
       rw.put(Keys.hitSource(height), Some(hitSource))
@@ -689,8 +691,8 @@ abstract class LevelDBWriter private[database] (
           rw.delete(Keys.blockReward(currentHeight))
           rw.delete(Keys.wavesAmount(currentHeight))
 
-          if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(currentHeight)) {
-            DisableHijackedAliases.revert(rw)
+          PatchLoader.patches.find(p => p.name == "DisableHijackedAliases" && p.height == currentHeight) foreach { _ =>
+            rw.put(Keys.disabledAliases, Set.empty[Alias])
             disabledAliases = Set.empty
           }
 
@@ -741,7 +743,7 @@ abstract class LevelDBWriter private[database] (
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
     for {
       (height, num) <- db.get(Keys.transactionHNById(TransactionId @@ id))
-      tx  <- db.get(Keys.transferTransactionAt(height, num))
+      tx            <- db.get(Keys.transferTransactionAt(height, num))
     } yield (height, tx)
   }
 
