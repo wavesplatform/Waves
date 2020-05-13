@@ -67,7 +67,7 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
   ): Future[Either[String, Environment.BalanceDetails]] =
     for {
      address <- extractAddress(recipient)
-     entity  <- client.get[Either[String, ?], Environment.BalanceDetails](s"/addresses/balance/detail/$address")
+     entity  <- client.get[Either[String, ?], Environment.BalanceDetails](s"/addresses/balance/details/$address")
     } yield entity
 
   private def extractAddress(addressOrAlias: Recipient): Future[String] =
