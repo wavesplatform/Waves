@@ -1,5 +1,6 @@
 package com.wavesplatform.it.api
 
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -643,6 +644,7 @@ case class Block(
     height: Int,
     timestamp: Long,
     generator: String,
+    generatorPublicKey: PublicKey,
     transactionCount: Int,
     generationSignature: Option[String],
     transactionsRoot: Option[String],
@@ -658,6 +660,8 @@ case class Block(
     version: Option[Byte] = None
 )
 object Block {
+  import PublicKey._
+
   implicit val blockFormat: Format[Block] = Format(
     Reads( jsv =>
       for {
@@ -667,6 +671,7 @@ object Block {
         height <- (jsv \ "height").validate[Int]
         timestamp <- (jsv \ "timestamp").validate[Long]
         generator <- (jsv \ "generator").validate[String]
+        generatorPublicKey <- (jsv \ "generatorPublicKey").validate[PublicKey]
         transactionCount <- (jsv \ "transactionCount").validate[Int]
         blocksize <- (jsv \ "blocksize").validate[Int]
         features <- (jsv \ "features").validateOpt[Set[Short]]
@@ -687,6 +692,7 @@ object Block {
         height,
         timestamp,
         generator,
+        generatorPublicKey,
         transactionCount,
         generationSignature,
         transactionsRoot,
