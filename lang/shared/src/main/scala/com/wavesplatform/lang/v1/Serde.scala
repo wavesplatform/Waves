@@ -30,7 +30,7 @@ object Serde {
 
   val E_BLOCK_V2 = 10
   val E_ARR      = 11
-  val E_CASE_OBJ = 13
+  val E_CASE_OBJ = 12
 
   val DEC_LET  = 0
   val DEC_FUNC = 1
