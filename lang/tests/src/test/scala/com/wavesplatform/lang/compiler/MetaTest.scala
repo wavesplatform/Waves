@@ -19,7 +19,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scala.collection.immutable.{ListMap, Map}
 
 class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink with Inside {
-  property("meta with union type parameters") {
+  property("meta v1 with union type parameters") {
     val ctx = Monoid.combine(
       compilerContext,
       WavesContext
@@ -88,6 +88,47 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
     )
   }
 
+  property("meta v1 with empty-param function") {
+    val ctx = Monoid.combine(
+      compilerContext,
+      WavesContext
+        .build(
+          DirectiveSet(V3, Account, DAppType).explicitGet()
+        )
+        .compilerContext
+    )
+    val expr = {
+      val script =
+        """
+          |
+          | {-# STDLIB_VERSION 3 #-}
+          | {-# CONTENT_TYPE DAPP #-}
+          | {-# SCRIPT_TYPE ACCOUNT #-}
+          |
+          | @Callable(i)
+          | func default() = WriteSet([])
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    val expectedMeta = DAppMeta(
+      version = 1,
+      List(
+        CallableFuncSignature(ByteString.EMPTY),
+      )
+    )
+
+    val dApp = compiler.ContractCompiler(ctx, expr, V3).explicitGet()
+    dApp.meta shouldBe expectedMeta
+
+    MetaMapper.dicFromProto(dApp) shouldBe Right(
+      Dic(Map(
+        "version" -> Single("1"),
+        "callableFuncTypes" -> Chain(List(Dic(Map())))
+      ))
+    )
+  }
+
   property("meta v2 supporting list parameters") {
     val ctx = Monoid.combine(
       compilerContext,
@@ -134,6 +175,47 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
             "a" -> Single("List[ByteVector]")
           ))
         ))
+      ))
+    )
+  }
+
+  property("meta v2 with empty-param function") {
+    val ctx = Monoid.combine(
+      compilerContext,
+      WavesContext
+        .build(
+          DirectiveSet(V4, Account, DAppType).explicitGet()
+        )
+        .compilerContext
+    )
+    val expr = {
+      val script =
+        """
+          |
+          | {-# STDLIB_VERSION 4 #-}
+          | {-# CONTENT_TYPE DAPP #-}
+          | {-# SCRIPT_TYPE ACCOUNT #-}
+          |
+          | @Callable(i)
+          | func default() = []
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    val expectedMeta = DAppMeta(
+      version = 2,
+      List(
+        CallableFuncSignature(ByteString.EMPTY),
+      )
+    )
+
+    val dApp = compiler.ContractCompiler(ctx, expr, V4).explicitGet()
+    dApp.meta shouldBe expectedMeta
+
+    MetaMapper.dicFromProto(dApp) shouldBe Right(
+      Dic(Map(
+        "version" -> Single("2"),
+        "callableFuncTypes" -> Chain(List(Dic(Map())))
       ))
     )
   }
