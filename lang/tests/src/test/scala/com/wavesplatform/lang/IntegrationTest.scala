@@ -1480,8 +1480,6 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     }
   }
 
-
-
   property("calculateAssetId") {
     val decimals = 100
     val description = "description"
@@ -1500,6 +1498,19 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
     genericEval[Environment, EVALUATED](script, ctxt = ctx, version = V4, env = utils.environment) shouldBe
       CONST_BYTESTR(issue.id)
+  }
+
+  property("different Issue action constructors") {
+    val script =
+     """
+       | Issue("name", "description", 1234567, 100, true) ==
+       | Issue("name", "description", 1234567, 100, true, unit, 0)
+     """.stripMargin
+
+    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+
+    genericEval[Environment, EVALUATED](script, ctxt = ctx, version = V4, env = utils.environment) shouldBe
+      Right(CONST_BOOLEAN(true))
   }
 
   property("toBase16String limit 8Kb from V4") {
