@@ -1,6 +1,7 @@
 package com.wavesplatform.it.asset
 
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, TransactionDoesNotExist}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.BaseSuite
@@ -283,8 +284,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
 
     "rollback works" in {
       val acc         = createDapp(script(simpleReissuableAsset))
-      val asset       = issueValidated(acc, simpleReissuableAsset)
-      val simpleAsset = issue(acc, TransactionMethod, simpleReissuableAsset, 1.1.waves).id
+      val assetA      = issueValidated(acc, simpleReissuableAsset)
 
       sender.debugStateChangesByAddress(acc, 100).flatMap(_.stateChanges) should matchPattern {
         case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, None)) if issue.name == simpleReissuableAsset.name =>
@@ -292,20 +292,34 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
 
       val height = nodes.waitForHeightArise()
       nodes.waitForHeightArise()
-      invokeScript(acc, "reissueIssueAndNft", assetId = asset, fee = invocationCost(1))
-      burn(acc, CallableMethod, simpleAsset, 5000)
-      burn(acc, TransactionMethod, asset, 10000)
+      val txId = invokeScript(acc, "reissueIssueAndNft", assetId = assetA, fee = invocationCost(1)).id
+
+      val (assetNft, assetB) = sender.debugStateChanges(txId).stateChanges.map { scd =>
+        val nft = scd.issues.find(_.name == nftAsset.name).get.assetId
+        val asset = scd.issues.find(_.name == simpleReissuableAsset.name).get.assetId
+        (nft, asset)
+      }.get
+
       nodes.waitForHeightArise()
 
       nodes.rollback(height, returnToUTX = false)
-      assertQuantity(asset)(simpleReissuableAsset.quantity)
-      sender.assertAssetBalance(acc, asset, simpleReissuableAsset.quantity)
-      sender.assertAssetBalance(acc, simpleAsset, simpleReissuableAsset.quantity)
-      sender.assetsBalance(acc).balances.map(_.assetId).toSet shouldBe Set(asset, simpleAsset)
-      sender.nftList(acc, 10) shouldBe empty
+
       sender.debugStateChangesByAddress(acc, 100).flatMap(_.stateChanges) should matchPattern {
         case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, None)) if issue.name == simpleReissuableAsset.name =>
       }
+      assertApiError(sender.debugStateChanges(txId), TransactionDoesNotExist)
+
+      assertAssetDetails(assetA) { ai =>
+        ai.quantity shouldBe simpleReissuableAsset.quantity
+        ai.reissuable shouldBe true
+      }
+      assertApiError(sender.assetsDetails(assetB), CustomValidationError("Failed to get description of the asset"))
+      assertApiError(sender.assetsDetails(assetNft), CustomValidationError("Failed to get description of the asset"))
+
+      sender.assertAssetBalance(acc, assetA, simpleReissuableAsset.quantity)
+      sender.assetBalance(acc, assetB).balance shouldBe 0L
+      sender.assetsBalance(acc).balances.map(_.assetId).toSet shouldBe Set(assetA)
+      sender.nftList(acc, 10) shouldBe empty
     }
 
     "liquid block works" in {
@@ -318,8 +332,8 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
           sd.burns should have size 1
           sd.reissues should have size 1
         }
-        assertQuantity(asset)(simpleReissuableAsset.quantity)
-        sender.assertAssetBalance(acc, asset, simpleReissuableAsset.quantity)
+        assertQuantity(asset)(simpleReissuableAsset.quantity + 50)
+        sender.assertAssetBalance(acc, asset, simpleReissuableAsset.quantity + 50)
         sender.assetsBalance(acc).balances should have size 2
         sender.nftList(acc, 10) should have size 1
       }
@@ -624,7 +638,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
        |  [
        |    Issue($issueParams, ${asset.nonce + 1}),
        |    Reissue(a, true, 100),
-       |    Burn(a, 100),
+       |    Burn(a, 50),
        |    Issue(${createIssueParams(nftAsset)}, 1)
        |  ]
        |}
