@@ -56,12 +56,12 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
     sender.setScript(dApp, Some(script), setScriptFee, waitForTx = true)
   }
 
-  test("check list for all data types exept union. Write first element of list of each type to acc data") {
+  test("check list for all data types except union. Write first element of list of each type to acc data") {
     val rndString = Random.nextString(10)
-    val intList   = ARR(IndexedSeq(CONST_LONG(Long.MaxValue)))
-    val strList   = ARR(IndexedSeq(CONST_STRING(rndString).explicitGet()))
-    val byteList  = ARR(IndexedSeq(CONST_BYTESTR(rndString.getBytes()).explicitGet()))
-    val boolList  = ARR(IndexedSeq(CONST_BOOLEAN(true)))
+    val intList   = ARR(IndexedSeq(CONST_LONG(Long.MaxValue)), limited = false).explicitGet()
+    val strList   = ARR(IndexedSeq(CONST_STRING(rndString).explicitGet()), limited = false).explicitGet()
+    val byteList  = ARR(IndexedSeq(CONST_BYTESTR(ByteStr(rndString.getBytes())).explicitGet()), limited = false).explicitGet()
+    val boolList  = ARR(IndexedSeq(CONST_BOOLEAN(true)), limited = false).explicitGet()
 
     sender
       .invokeScript(
@@ -82,7 +82,7 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
     val rndString = Random.nextString(10)
     val intEl   = CONST_LONG(Long.MaxValue)
     val strEl   = CONST_STRING(rndString).explicitGet()
-    val byteEl  = CONST_BYTESTR(rndString.getBytes()).explicitGet()
+    val byteEl  = CONST_BYTESTR(ByteStr(rndString.getBytes())).explicitGet()
     val boolEl  = CONST_BOOLEAN(true)
 
     sender
@@ -90,7 +90,7 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
         caller,
         dApp,
         Some("checksize"),
-        args = List(ARR(IndexedSeq(intEl, strEl, boolEl, byteEl))),
+        args = List(ARR(IndexedSeq(intEl, strEl, boolEl, byteEl), limited = false).explicitGet()),
         waitForTx = true
       )
 
@@ -104,10 +104,10 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
 
   test("can set different data types from first list el") {
     val rndString = Random.nextString(10)
-    val intList   = ARR(IndexedSeq(CONST_LONG(Long.MaxValue)))
-    val strList   = ARR(IndexedSeq(CONST_STRING(rndString).explicitGet()))
-    val byteList  = ARR(IndexedSeq(CONST_BYTESTR(rndString.getBytes()).explicitGet()))
-    val boolList  = ARR(IndexedSeq(CONST_BOOLEAN(true)))
+    val intList   = ARR(IndexedSeq(CONST_LONG(Long.MaxValue)), limited = false).explicitGet()
+    val strList   = ARR(IndexedSeq(CONST_STRING(rndString).explicitGet()), limited = false).explicitGet()
+    val byteList  = ARR(IndexedSeq(CONST_BYTESTR(ByteStr(rndString.getBytes())).explicitGet()), limited = false).explicitGet()
+    val boolList  = ARR(IndexedSeq(CONST_BOOLEAN(true)), limited = false).explicitGet()
 
     sender
       .invokeScript(
@@ -125,7 +125,7 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
   }
 
   test("error if list size more than 1000") {
-    val strList = ARR(genArrOfBoolean(1001))
+    val strList = ARR(genArrOfBoolean(1001), limited = false).explicitGet()
     assertApiError(
       sender
         .invokeScript(
@@ -141,7 +141,7 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
   }
 
   test("try to get non-existing element by index") {
-    val strList = ARR(genArrOfBoolean(1000))
+    val strList = ARR(genArrOfBoolean(1000), limited = false).explicitGet()
     assertApiError(
       sender
         .invokeScript(
@@ -158,7 +158,7 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
   }
 
   test("try to get element by negative index") {
-    val strList = ARR(genArrOfBoolean(5))
+    val strList = ARR(genArrOfBoolean(5), limited = false).explicitGet()
     assertApiError(
       sender
         .invokeScript(
