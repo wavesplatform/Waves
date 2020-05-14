@@ -3,9 +3,9 @@ package com.wavesplatform.it.sync.transactions
 import com.wavesplatform.account.{AddressScheme, Alias}
 import com.wavesplatform.api.http.requests.{MassTransferRequest, SignedMassTransferRequest}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.it.api.MassTransferTransactionInfo
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.{MassTransferTransactionInfo, TransactionInfo}
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -15,7 +15,6 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransf
 import com.wavesplatform.transaction.transfer.TransferTransaction.MaxAttachmentSize
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Proofs, TxVersion}
-import org.scalatest.CancelAfterFailure
 import play.api.libs.json._
 
 import scala.concurrent.duration._
@@ -138,7 +137,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite /*with CancelAft
           parsedTransfers <- MassTransferTransaction.parseTransfersList(transfers)
           tx <- MassTransferTransaction.selfSigned(
             1.toByte,
-            sender.privateKey,
+            sender.keyPair,
             Waves,
             parsedTransfers,
             fee,
@@ -151,7 +150,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite /*with CancelAft
 
         val req = SignedMassTransferRequest(
           Some(TxVersion.V1),
-          Base58.encode(sender.publicKey),
+          sender.publicKey.toString,
           None,
           transfers,
           fee,
@@ -408,8 +407,8 @@ class MassTransferTransactionSuite extends BaseTransactionSuite /*with CancelAft
         )
       )
     ) { error =>
-      error.id shouldBe 10
-      error.message shouldBe "Too big sequences requested"
+      error.id shouldBe 199
+      error.message shouldBe "Typed attachment not allowed"
     }
   }
 }

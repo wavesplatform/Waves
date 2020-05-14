@@ -4,10 +4,11 @@ import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp.AnnotatedFunction
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, StdLibVersion, DApp => DAppType}
 import com.wavesplatform.lang.utils._
-import com.wavesplatform.lang.v1.ContractLimits.{MaxComplexityByVersion, MaxContractSizeInBytes}
+import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
@@ -53,30 +54,15 @@ object ContractScript {
     }
   }
 
-  def estimateComplexityByFunction(
-      version: StdLibVersion,
-      contract: DApp,
-      estimator: ScriptEstimator
-  ): Either[String, List[(String, Long)]] =
-    (contract.callableFuncs.map(func => (func.annotation.invocationArgName, func.u)) ++
-      contract.verifierFuncOpt.map(func => (func.annotation.invocationArgName, func.u)))
-      .traverse {
-        case (annotationArgName, funcExpr) =>
-          estimator(
-            varNames(version, DAppType),
-            functionCosts(DirectiveSet(version, Account, DAppType).explicitGet()),
-            constructExprFromFuncAndContext(contract.decs, annotationArgName, funcExpr)
-          ).map((funcExpr.name, _))
-      }
-
   def estimateComplexity(
       version: StdLibVersion,
       contract: DApp,
       estimator: ScriptEstimator,
-    checkLimit: Boolean = true
+      useContractVerifierLimit: Boolean = true,
+      checkLimit: Boolean = true
   ): Either[String, (Long, Map[String, Long])] =
     for {
-      cbf <- estimateComplexityByFunction(version, contract, estimator)
+      cbf <- estimateComplexityByFunction(version, contract, estimator, useContractVerifierLimit)
       max = cbf.maximumOption(_._2 compareTo _._2)
       _ <- max.fold(().asRight[String])(
         m =>
@@ -87,6 +73,50 @@ object ContractScript {
           )
       )
     } yield (max.map(_._2).getOrElse(0L), cbf.toMap)
+
+  private def estimateComplexityByFunction(
+      version: StdLibVersion,
+      dApp: DApp,
+      estimator: ScriptEstimator,
+      useContractVerifierLimit: Boolean
+  ): Either[String, List[(String, Long)]] =
+    for {
+      callableComplexities <- dApp.callableFuncs.traverse(estimateAnnotatedFunction(version, dApp, estimator, _))
+      verifierComplexity   <- estimateVerifier(version, dApp, estimator, useContractVerifierLimit)
+    } yield callableComplexities ++ verifierComplexity
+
+  private def estimateVerifier(
+      version: StdLibVersion,
+      dApp: DApp,
+      estimator: ScriptEstimator,
+      useContractVerifierLimit: Boolean
+  ): Either[String, Option[(String, Long)]] =
+    dApp.verifierFuncOpt
+      .traverse(
+        func => {
+          val limit =
+            if (useContractVerifierLimit) MaxAccountVerifierComplexityByVersion(version)
+            else MaxComplexityByVersion(version)
+          estimateAnnotatedFunction(version, dApp, estimator, func)
+            .ensureOr(
+              complexity => s"Contract verifier is too complex: ${complexity._2} > $limit"
+            )(
+              _._2 <= limit
+            )
+        }
+      )
+
+  private def estimateAnnotatedFunction(
+      version: StdLibVersion,
+      dApp: DApp,
+      estimator: ScriptEstimator,
+      func: AnnotatedFunction
+  ): Either[String, (String, Long)] =
+    estimator(
+      varNames(version, DAppType),
+      functionCosts(DirectiveSet(version, Account, DAppType).explicitGet()),
+      constructExprFromFuncAndContext(dApp.decs, func.annotation.invocationArgName, func.u)
+    ).map((func.u.name, _))
 
   private def constructExprFromFuncAndContext(dec: List[DECLARATION], annotationArgName: String, funcExpr: FUNC): EXPR = {
     val funcWithAnnotationContext =

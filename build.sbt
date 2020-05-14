@@ -14,7 +14,6 @@ import sbtcrossproject.CrossPlugin.autoImport.{CrossType, crossProject}
 val langPublishSettings = Seq(
   coverageExcludedPackages := "",
   publishMavenStyle := true,
-  credentials += Credentials(Path.userHome / ".sbt" / ".credentials"),
   publishTo := Some("Sonatype Nexus" at "https://oss.sonatype.org/service/local/staging/deploy/maven2"),
   homepage := Some(url("https://docs.wavesplatform.com/en/technical-details/waves-contracts-language-description/maven-compiler-package.html")),
   developers := List(
@@ -35,7 +34,9 @@ lazy val lang =
           sourceGenerators += Tasks.docSource,
           PB.targets += scalapb.gen(flatPackage = true) -> (sourceManaged in Compile).value,
           PB.protoSources := Seq(baseDirectory.value.getParentFile / "shared" / "src" / "main" / "protobuf"),
-          PB.deleteTargetDirectory := false
+          PB.deleteTargetDirectory := false,
+          sources in (Compile, doc) := Seq.empty,
+          publishArtifact in (Compile, packageDoc) := false
         )
       )
     )
@@ -107,7 +108,7 @@ inScope(Global)(
     scalaVersion := "2.12.9",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
-    V.fallback := (1, 2, 2),
+    V.fallback := (1, 2, 4),
     organizationHomepage := Some(url("https://wavesplatform.com")),
     scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/Waves"), "git@github.com:wavesplatform/Waves.git", None)),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
@@ -184,14 +185,14 @@ checkPRRaw := {
   } finally {
     test.all(ScopeFilter(inProjects(langTests, node), inConfigurations(Test))).value
     (langJS / Compile / fastOptJS).value
-    compile.all(ScopeFilter(inProjects(`node-generator`, benchmark, `node-it`), inConfigurations(Test))).value
+    compile.all(ScopeFilter(inProjects(`node-generator`, benchmark, `node-it`, `blockchain-updates`), inConfigurations(Test))).value
   }
 }
 
 def checkPR: Command = Command.command("checkPR") { state =>
   val updatedState = Project
     .extract(state)
-    .appendWithoutSession(Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings", "-Ywarn-unused:-imports")), state)
+    .appendWithoutSession(Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings")), state)
   Project.extract(updatedState).runTask(root / checkPRRaw, updatedState)
   state
 }

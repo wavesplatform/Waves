@@ -15,6 +15,8 @@ import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.eval.Coeval
 import shapeless._
@@ -40,6 +42,7 @@ class WavesEnvironment(
   override def transactionById(id: Array[Byte]): Option[Tx] =
     blockchain
       .transactionInfo(ByteStr(id))
+      .filter(_._3)
       .map(_._2)
       .map(tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, Some(ByteStr.empty))).explicitGet())
 
@@ -48,7 +51,7 @@ class WavesEnvironment(
 
   override def transferTransactionById(id: Array[Byte]): Option[Tx] =
     blockchain
-      .transferById(id)
+      .transferById(ByteStr(id))
       .map(t => RealTransactionWrapper.mapTransferTx(t._2, ds.stdLibVersion))
 
   override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any] = {
@@ -82,7 +85,7 @@ class WavesEnvironment(
       .left
       .map(_.toString)
       .right
-      .map(a => Recipient.Address(ByteStr(a.bytes.arr)))
+      .map(a => Recipient.Address(ByteStr(a.bytes)))
 
   override def chainId: Byte = nByte
 
@@ -98,17 +101,17 @@ class WavesEnvironment(
   }
 
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
-    blockchain.transactionHeight(ByteStr(id)).map(_.toLong)
+    blockchain.transactionInfo(ByteStr(id)).filter(_._3).map(_._1.toLong)
 
   override def tthis: Address = Recipient.Address(address())
 
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
-    blockchain.assetDescription(IssuedAsset(id)).map { assetDesc =>
+    blockchain.assetDescription(IssuedAsset(ByteStr(id))).map { assetDesc =>
       ScriptAssetInfo(
-        id = id,
+        id = ByteStr(id),
         quantity = assetDesc.totalVolume.toLong,
         decimals = assetDesc.decimals,
-        issuer = Address(assetDesc.issuer.toAddress.bytes),
+        issuer = Address(ByteStr(assetDesc.issuer.toAddress.bytes)),
         issuerPk = assetDesc.issuer,
         reissuable = assetDesc.reissuable,
         scripted = assetDesc.script.nonEmpty,
@@ -118,13 +121,13 @@ class WavesEnvironment(
   }
 
   override def lastBlockOpt(): Option[BlockInfo] =
-    blockchain.lastBlock
-      .map(block => toBlockInfo(block.header, height.toInt, blockchain.hitSourceAtHeight(height.toInt)))
+    blockchain.lastBlockHeader
+      .map(block => toBlockInfo(block.header, height.toInt, blockchain.vrf(height.toInt)))
 
   override def blockInfoByHeight(blockHeight: Int): Option[BlockInfo] =
-    blockchain.blockInfo(blockHeight)
+    blockchain.blockHeader(blockHeight)
       .map(blockHAndSize =>
-        toBlockInfo(blockHAndSize.header, blockHeight, blockchain.hitSourceAtHeight(blockHeight)))
+        toBlockInfo(blockHAndSize.header, blockHeight, blockchain.vrf(blockHeight)))
 
   private def toBlockInfo(blockH: BlockHeader, bHeight: Int, vrf: Option[ByteStr]) = {
     BlockInfo(
@@ -132,9 +135,17 @@ class WavesEnvironment(
       height = bHeight,
       baseTarget = blockH.baseTarget,
       generationSignature = blockH.generationSignature,
-      generator = blockH.generator.toAddress.bytes,
-      generatorPublicKey = ByteStr(blockH.generator),
+      generator = ByteStr(blockH.generator.toAddress.bytes),
+      generatorPublicKey = blockH.generator,
       if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None
     )
   }
+
+  override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer] =
+    PBTransactionSerializer.parseBytes(b)
+      .toOption
+      .flatMap {
+        case tx: TransferTransaction => Some(RealTransactionWrapper.mapTransferTx(tx, ds.stdLibVersion))
+        case _                       => None
+      }
 }

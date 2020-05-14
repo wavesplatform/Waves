@@ -15,7 +15,7 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
   import FairPoSCalculatorTest._
   import PoSCalculator._
 
-  val pos: PoSCalculator = FairPoSCalculator
+  val pos: PoSCalculator = FairPoSCalculator.V1
 
   case class Block(height: Int, baseTarget: Long, miner: KeyPair, timestamp: Long, delay: Long)
 
@@ -32,7 +32,7 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
   property("Correct consensus parameters distribution of blocks generated with FairPoS") {
 
     val miners = mkMiners
-    val first  = Block(0, defaultBaseTarget, KeyPair(genSig), System.currentTimeMillis(), 0)
+    val first  = Block(0, defaultBaseTarget, KeyPair(ByteStr(genSig)), System.currentTimeMillis(), 0)
 
     val chain = (1 to 100000 foldLeft NonEmptyList.of(first))((acc, _) => {
       val gg     = acc.tail.lift(1)
@@ -56,8 +56,8 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
   property("Correct consensus parameters accordingly sample data") {
     def getHit(account: (PrivateKey, PublicKey), prevHitSource: ByteStr): BigInt = {
       val (privateKey, publicKey) = account
-      val vrfProof                = crypto.signVRF(privateKey, prevHitSource)
-      val vrf                     = crypto.verifyVRF(vrfProof, prevHitSource, publicKey).map(_.arr).right.get
+      val vrfProof                = crypto.signVRF(privateKey, prevHitSource.arr)
+      val vrf                     = crypto.verifyVRF(vrfProof, prevHitSource.arr, publicKey).map(_.arr).right.get
       PoSCalculator.hit(vrf)
     }
 
@@ -78,7 +78,7 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
 
   def mineBlock(prev: Block, grand: Option[Block], minerWithBalance: (KeyPair, Long)): Block = {
     val (miner, balance) = minerWithBalance
-    val gs               = generationSignature(genSig, miner)
+    val gs               = generationSignature(ByteStr(genSig), miner.publicKey)
     val h                = hit(gs)
     val delay            = pos.calculateDelay(h, prev.baseTarget, balance)
     val bt = pos.calculateBaseTarget(
@@ -118,12 +118,12 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
 
   def mkMiners: Map[KeyPair, Long] =
     List(
-      KeyPair(genSig) -> 200000000000000L,
-      KeyPair(genSig) -> 500000000000000L,
-      KeyPair(genSig) -> 1000000000000000L,
-      KeyPair(genSig) -> 1500000000000000L,
-      KeyPair(genSig) -> 2000000000000000L,
-      KeyPair(genSig) -> 2500000000000000L
+      KeyPair(ByteStr(genSig)) -> 200000000000000L,
+      KeyPair(ByteStr(genSig)) -> 500000000000000L,
+      KeyPair(ByteStr(genSig)) -> 1000000000000000L,
+      KeyPair(ByteStr(genSig)) -> 1500000000000000L,
+      KeyPair(ByteStr(genSig)) -> 2000000000000000L,
+      KeyPair(ByteStr(genSig)) -> 2500000000000000L
     ).toMap
 }
 

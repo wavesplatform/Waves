@@ -16,8 +16,8 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
 class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterFailure {
-  private val dApp   = pkByAddress(firstAddress).stringRepr
-  private val caller = pkByAddress(secondAddress).stringRepr
+  private val dApp   = firstAddress
+  private val caller = secondAddress
 
   private var asset1: IssuedAsset = _
   private var asset2: IssuedAsset = _
@@ -81,38 +81,29 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
   test("script should sheck if alias not exists") {
     val alias = "unknown"
 
-    assertApiError(
-      sender
-        .invokeScript(
-          caller,
-          dApp,
-          Some("f"),
-          payment = Seq(Payment(1.waves, Waves)),
-          args = List(CONST_STRING(alias).explicitGet()),
-          waitForTx = true
-        )
-    ) { error =>
-      error.message should include(s"Error while executing account-script: Alias 'alias:I:$alias")
-      error.id shouldBe ScriptExecutionError.Id
-      error.statusCode shouldBe 400
-    }
+    val tx1 = sender
+      .invokeScript(
+        caller,
+        dApp,
+        Some("f"),
+        payment = Seq(Payment(1.waves, Waves)),
+        args = List(CONST_STRING(alias).explicitGet()),
+        waitForTx = true
+      )._1.id
 
-    assertApiError(
-      sender
-        .invokeScript(
-          caller,
-          dApp,
-          Some("f"),
-          payment = Seq(Payment(1.waves, Waves)),
-          args = List(CONST_STRING(s"alias:I:$alias").explicitGet()),
-          waitForTx = true
-        )
-    ) { error =>
-      error.message should include("Alias should contain only following characters")
-      error.id shouldBe CustomValidationError.Id
-      error.statusCode shouldBe 400
-    }
+    sender.debugStateChanges(tx1).stateChanges.get.errorMessage.get.text should include(s"Alias 'alias:I:$alias")
 
+    val tx2 = sender
+      .invokeScript(
+        caller,
+        dApp,
+        Some("f"),
+        payment = Seq(Payment(1.waves, Waves)),
+        args = List(CONST_STRING(s"alias:I:$alias").explicitGet()),
+        waitForTx = true
+      )._1.id
+
+    sender.debugStateChanges(tx2).stateChanges.get.errorMessage.get.text should include("Alias should contain only following characters")
   }
 
   test("can invoke with no payments") {
@@ -169,7 +160,6 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
         payment = Seq(Payment(3, Waves), Payment(6, Waves), Payment(7, Waves))
       )
     ) { error =>
-      println(error)
       error.message should include("Script payment amount=3 should not exceed 2")
       error.id shouldBe StateCheckFailed.Id
       error.statusCode shouldBe 400

@@ -231,7 +231,7 @@ object Types {
     )
 
   val genericAttachmentType: UNION =
-    UNION(BYTESTR, LONG, BOOLEAN, BYTESTR, UNIT)
+    UNION(BYTESTR, LONG, BOOLEAN, STRING, UNIT)
 
   private def buildAttachmentType(version: StdLibVersion) =
     "attachment" -> (if (version >= V4) genericAttachmentType else BYTESTR)
@@ -241,13 +241,13 @@ object Types {
     else commonFields
   }
 
-  def buildIssueTransactionType(proofsEnabled: Boolean) = CASETYPEREF(
+  def buildIssueTransactionType(proofsEnabled: Boolean, version: StdLibVersion) = CASETYPEREF(
     "IssueTransaction",
     addProofsIfNeeded(
       List(
         "quantity"    -> LONG,
-        "name"        -> BYTESTR,
-        "description" -> BYTESTR,
+        "name"        -> (if (version >= V4) STRING else BYTESTR),
+        "description" -> (if (version >= V4) STRING else BYTESTR),
         "reissuable"  -> BOOLEAN,
         "decimals"    -> LONG,
         "script"      -> optionByteVector
@@ -463,7 +463,7 @@ object Types {
   def buildActiveTransactionTypes(proofsEnabled: Boolean, v: StdLibVersion): List[CASETYPEREF] = {
     buildAssetSupportedTransactions(proofsEnabled, v) ++
       List(
-        buildIssueTransactionType(proofsEnabled),
+        buildIssueTransactionType(proofsEnabled, v),
         buildLeaseTransactionType(proofsEnabled),
         buildLeaseCancelTransactionType(proofsEnabled),
         buildCreateAliasTransactionType(proofsEnabled),

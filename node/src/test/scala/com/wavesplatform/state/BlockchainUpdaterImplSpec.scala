@@ -40,7 +40,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
     val (fs, settings) =
       if (enableNg) (enableNG(functionalitySettings), enableNG(wavesSettings)) else (functionalitySettings, wavesSettings)
 
-    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs, dbSettings)
+    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs)
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, triggers)
     try {
       val (account, blocks) = gen(ntpTime).sample.get
@@ -68,11 +68,11 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
       master    <- accountGen
       recipient <- accountGen
       genesisBlock = TestBlock
-        .create(ts, Seq(GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()))
+        .create(ts, Seq(GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()))
       b1 = TestBlock
         .create(
           ts + 10,
-          genesisBlock.uniqueId,
+          genesisBlock.id(),
           Seq(
             createTransfer(master, recipient.toAddress, ts + 1),
             createTransfer(master, recipient.toAddress, ts + 2),
@@ -83,7 +83,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
         )
       b2 = TestBlock.create(
         ts + 20,
-        b1.uniqueId,
+        b1.id(),
         Seq(
           createTransfer(master, recipient.toAddress, ts + 11),
           createTransfer(recipient, master.toAddress, ts + 12),
@@ -94,71 +94,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
     } yield (master, List(genesisBlock, b1, b2))
   }
 
-  "addressTransactions" - {
-    "correctly applies transaction type filter" in {
-      baseTest(time => commonPreconditions(time.correctedTime())) { (writer, account) =>
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(GenesisTransaction.typeId), 10, None)
-          .explicitGet()
-
-        txs.length shouldBe 1
-      }
-    }
-
-    "return Left if fromId argument is a non-existent transaction" in {
-      baseTest(time => commonPreconditions(time.correctedTime())) { (updater, account) =>
-        val nonExistentTxId = GenesisTransaction.create(account, ENOUGH_AMT, 1).explicitGet().id()
-
-        val txs = updater
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 3, Some(nonExistentTxId))
-
-        txs shouldBe Left(s"Transaction $nonExistentTxId does not exist")
-      }
-    }
-
-    "without pagination" in {
-      baseTest(time => commonPreconditions(time.correctedTime())) { (updater, account) =>
-        val txs = updater
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 10, None)
-          .explicitGet()
-
-        val ordering = Ordering
-          .by[(Int, Transaction), (Int, Long)]({ case (h, t) => (-h, -t.timestamp) })
-
-        txs.length shouldBe 9
-        txs.sorted(ordering) shouldEqual txs
-      }
-    }
-
-    "with pagination" - {
-      val LIMIT = 8
-      def paginationTest(firstPageLength: Int): Unit = {
-        baseTest(time => commonPreconditions(time.correctedTime())) { (updater, account) =>
-          // using pagination
-          val firstPage = updater
-            .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), firstPageLength, None)
-            .explicitGet()
-
-          val rest = updater
-            .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), LIMIT - firstPageLength, Some(firstPage.last._2.id()))
-            .explicitGet()
-
-          // without pagination
-          val txs = updater
-            .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), LIMIT, None)
-            .explicitGet()
-
-          (firstPage ++ rest) shouldBe txs
-        }
-      }
-
-      "after txs is in the middle of ngState" in paginationTest(3)
-      "after txs is the last of ngState" in paginationTest(4)
-      "after txs is in levelDb" in paginationTest(6)
-    }
-  }
-
-  "blockchain update events sending" - {
+  "blochain update events sending" - {
     "without NG" - {
       "genesis block and two transfers blocks" in {
         val triggersMock = mock[BlockchainUpdateTriggers]
@@ -244,7 +180,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
           for {
             master    <- accountGen
             recipient <- accountGen
-            genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+            genesis = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
             transfers = Seq(
               createTransfer(master, recipient.toAddress, ts + 1),
               createTransfer(master, recipient.toAddress, ts + 2),
@@ -257,7 +193,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
         val triggersMock = mock[BlockchainUpdateTriggers]
 
         val defaultWriter =
-          TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, enableNG(functionalitySettings), dbSettings)
+          TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, enableNG(functionalitySettings))
         val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, enableNG(wavesSettings), ntpTime, triggersMock)
 
         try {
@@ -278,9 +214,8 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
               .once()
 
             // microblock 1
-            (triggersMock.onProcessMicroBlock _)
-              .expects(where {
-                case (microBlock, diff, bc) =>
+            (triggersMock.onProcessMicroBlock _).expects(where {
+                case (microBlock, diff, bc, _  ) =>
                   bc.height == 1 &&
                     microBlock.transactionData.length == 2 &&
                     // miner reward, no NG — all txs fees
@@ -290,9 +225,8 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
               .once()
 
             // microblock 2
-            (triggersMock.onProcessMicroBlock _)
-              .expects(where {
-                case (microBlock, diff, bc) =>
+            (triggersMock.onProcessMicroBlock _).expects(where {
+                case (microBlock, diff, bc, _) =>
                   bc.height == 1 &&
                     microBlock.transactionData.length == 1 &&
                     // miner reward, no NG — all txs fees
@@ -320,8 +254,8 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
             // microblock 3
             (triggersMock.onProcessMicroBlock _)
               .expects(where {
-                case (microBlock, diff, bc) =>
-                  bc.height == 2 && microBlock.prevResBlockSig == block2.signature
+                case (microBlock, _, bc, _) =>
+                  bc.height == 2 && microBlock.reference == block2.signature
               })
               .once()
           }

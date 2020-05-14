@@ -1,10 +1,9 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme}
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.{Block, Transaction, TransferTransactionInfo}
+import com.wavesplatform.it.api.TransferTransactionInfo
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -12,8 +11,7 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.transfer.Attachment.Bin
 import com.wavesplatform.transaction.transfer._
-import org.scalatest.{Assertion, Assertions, CancelAfterFailure}
-import play.api.libs.json.{JsArray, JsBoolean, JsNull, JsNumber, JsObject, JsString, Json}
+import org.scalatest.CancelAfterFailure
 
 import scala.concurrent.duration._
 
@@ -62,7 +60,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
   test("invalid signed waves transfer should not be in UTX or blockchain") {
     def invalidTx(timestamp: Long = System.currentTimeMillis, fee: Long = 100000): TransferTransaction =
       TransferTransaction
-        .selfSigned(1.toByte, sender.privateKey, AddressOrAlias.fromString(sender.address).explicitGet(), Waves, 1, Waves, fee, None, timestamp)
+        .selfSigned(1.toByte, sender.keyPair, AddressOrAlias.fromString(sender.address).explicitGet(), Waves, 1, Waves, fee, None, timestamp)
         .right
         .get
 
@@ -196,9 +194,44 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
           typedAttachment = Some(Attachment.Num(123))
         )
       ) { error =>
-        error.id shouldBe 10
-        error.message shouldBe "Too big sequences requested"
+        error.id shouldBe 199
+        error.message shouldBe "Typed attachment not allowed"
       }
     }
+  }
+
+  test("able to pass multiple typed attachments to transfer transaction V3") {
+    val txWithStringAtt =
+      sender.transfer(
+        firstAddress,
+        secondAddress,
+        transferAmount,
+        minFee,
+        version = TxVersion.V3,
+        typedAttachment = Some(Attachment.Str("somestring"))
+      )
+
+    val txWithBoolAtt =
+      sender.transfer(
+        firstAddress,
+        secondAddress,
+        transferAmount,
+        minFee,
+        version = TxVersion.V3,
+        typedAttachment = Some(Attachment.Bool(false))
+      )
+
+    val t1 = sender.waitForTransaction(txWithStringAtt.id)
+    val t2 = sender.waitForTransaction(txWithBoolAtt.id)
+
+    def checkBlock(h: Int): Unit = {
+      val block = sender.blockAt(h)
+      assert(Set(t1.id, t2.id).subsetOf(block.transactions.map(_.id).toSet))
+    }
+
+    val height = sender.height
+    checkBlock(height)
+    nodes.waitForHeightArise()
+    checkBlock(height)
   }
 }

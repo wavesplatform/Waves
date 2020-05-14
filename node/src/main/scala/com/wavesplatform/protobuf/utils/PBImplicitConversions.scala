@@ -12,22 +12,27 @@ object PBImplicitConversions {
   import com.google.protobuf.{ByteString => PBByteString}
   import com.wavesplatform.account.{AddressOrAlias, Address => VAddress, Alias => VAlias}
 
-  implicit def byteStringToByteStr(bs: PBByteString): ByteStr = bs.toByteArray
-  implicit def byteStrToByteString(bs: ByteStr): PBByteString = PBByteString.copyFrom(bs)
-
   implicit def fromAddressOrAlias(addressOrAlias: AddressOrAlias): Recipient = PBRecipients.create(addressOrAlias)
   implicit def fromAddress(address: VAddress): PBByteString                  = PBByteString.copyFrom(address.bytes)
 
   implicit class PBRecipientImplicitConversionOps(recipient: Recipient) {
-    def toAddress: Either[ValidationError, VAddress]              = PBRecipients.toAddress(recipient)
-    def toAlias: Either[ValidationError, VAlias]                  = PBRecipients.toAlias(recipient)
-    def toAddressOrAlias: Either[ValidationError, AddressOrAlias] = PBRecipients.toAddressOrAlias(recipient)
+    def toAddress(chainId: Byte): Either[ValidationError, VAddress]              = PBRecipients.toAddress(recipient, chainId)
+    def toAlias(chainId: Byte): Either[ValidationError, VAlias]                  = PBRecipients.toAlias(recipient, chainId)
+    def toAddressOrAlias(chainId: Byte): Either[ValidationError, AddressOrAlias] = PBRecipients.toAddressOrAlias(recipient, chainId)
+  }
+
+  implicit class ByteStrExt(val bs: ByteStr) extends AnyVal {
+    def toByteString: PBByteString = ByteString.copyFrom(bs.arr)
+  }
+
+  implicit class ByteStringExt(val bs: ByteString) extends AnyVal {
+    def toByteStr: ByteStr = ByteStr(bs.toByteArray)
   }
 
   implicit def fromAssetIdAndAmount(v: (VanillaAssetId, Long)): Amount = v match {
     case (IssuedAsset(assetId), amount) =>
       Amount()
-        .withAssetId(assetId)
+        .withAssetId(assetId.toByteString)
         .withAmount(amount)
 
     case (Waves, amount) =>

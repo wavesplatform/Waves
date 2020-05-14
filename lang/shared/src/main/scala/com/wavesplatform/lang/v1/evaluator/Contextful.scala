@@ -13,7 +13,7 @@ abstract class ContextfulNativeFunction[C[_[_]]](name: String, resultType: TYPE,
      ev(input)
     } catch {
        case _: SecurityException =>
-         Either.left[ExecutionError, EVALUATED](s"""An access to <$name(${args /*.toSeq.map(a => s"${a._1}: ${a._2}").mkString(", ") */ }): $resultType> is denied""").pure[F]
+         Either.left[ExecutionError, EVALUATED](s"""An access to <$name(${args.toSeq.map(a => s"${a._1}: ${a._2}").mkString(", ")}): $resultType> is denied""").pure[F]
        case e: Throwable =>
          Either.left[ExecutionError, EVALUATED](s"""An error during run <$name(${args.toSeq.map(a => s"${a._1}: ${a._2}").mkString(", ")}): $resultType>: ${e.getClass()} ${
            e.getMessage() match {

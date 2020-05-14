@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.smart.scenarios
 import cats.Id
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -26,10 +27,10 @@ import com.wavesplatform.utils.{EmptyBlockchain, _}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import monix.eval.Coeval
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
   val preconditions: Gen[(Seq[GenesisTransaction], IssueTransaction, DataTransaction, TransferTransaction, DataTransaction, DataTransaction, TransferTransaction)] =
     for {
       company  <- accountGen
@@ -38,18 +39,18 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
       accountA <- accountGen
       accountB <- accountGen
       ts       <- timestampGen
-      genesis1 = GenesisTransaction.create(company, ENOUGH_AMT, ts).explicitGet()
-      genesis2 = GenesisTransaction.create(king, ENOUGH_AMT, ts).explicitGet()
-      genesis3 = GenesisTransaction.create(notary, ENOUGH_AMT, ts).explicitGet()
-      genesis4 = GenesisTransaction.create(accountA, ENOUGH_AMT, ts).explicitGet()
-      genesis5 = GenesisTransaction.create(accountB, ENOUGH_AMT, ts).explicitGet()
+      genesis1 = GenesisTransaction.create(company.toAddress, ENOUGH_AMT, ts).explicitGet()
+      genesis2 = GenesisTransaction.create(king.toAddress, ENOUGH_AMT, ts).explicitGet()
+      genesis3 = GenesisTransaction.create(notary.toAddress, ENOUGH_AMT, ts).explicitGet()
+      genesis4 = GenesisTransaction.create(accountA.toAddress, ENOUGH_AMT, ts).explicitGet()
+      genesis5 = GenesisTransaction.create(accountB.toAddress, ENOUGH_AMT, ts).explicitGet()
 
       assetScript = s"""
                     |
                     | match tx {
                     |   case ttx: TransferTransaction =>
-                    |      let king = Address(base58'${king.stringRepr}')
-                    |      let company = Address(base58'${company.stringRepr}')
+                    |      let king = Address(base58'${king.toAddress}')
+                    |      let company = Address(base58'${company.toAddress}')
                     |      let notary1 = addressFromPublicKey(extract(getBinary(king, "notary1PK")))
                     |      let txIdBase58String = toBase58String(ttx.id)
                     |      let isNotary1Agreed = match getBoolean(notary1,txIdBase58String) {
@@ -87,15 +88,15 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
       assetId = IssuedAsset(issueTransaction.id())
 
       kingDataTransaction = DataTransaction
-        .selfSigned(1.toByte, king, List(BinaryDataEntry("notary1PK", ByteStr(notary.publicKey))), 1000, ts + 1)
+        .selfSigned(1.toByte, king, List(BinaryDataEntry("notary1PK", notary.publicKey)), 1000, ts + 1)
         .explicitGet()
 
       transferFromCompanyToA = TransferTransaction
-        .selfSigned(1.toByte, company, accountA, assetId, 1, Waves, 1000, None, ts + 20)
+        .selfSigned(1.toByte, company, accountA.toAddress, assetId, 1, Waves, 1000, None, ts + 20)
         .explicitGet()
 
       transferFromAToB = TransferTransaction
-        .selfSigned(1.toByte, accountA, accountB, assetId, 1, Waves, 1000, None, ts + 30)
+        .selfSigned(1.toByte, accountA, accountB.toAddress, assetId, 1, Waves, 1000, None, ts + 30)
         .explicitGet()
 
       notaryDataTransaction = DataTransaction

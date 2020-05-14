@@ -12,7 +12,7 @@ import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.api.AsyncNetworkApi.NodeAsyncNetworkApi
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{Docker, NodeConfigs, WaitForHeight2}
+import com.wavesplatform.it.{NodeConfigs, WaitForHeight2}
 import com.wavesplatform.network.RawBytes
 import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
 import play.api.libs.json.{JsSuccess, Json, Reads}
@@ -49,7 +49,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
   test("BlockV4: Accept correct block") {
     val height = nodes.head.height
 
-    val block  = forgeBlock(height, signerPK)()
+    val block = forgeBlock(height, signerPK)()
 
     waitForBlockTime(block)
 
@@ -60,7 +60,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig sameElements block.uniqueId.arr
+    newBlockSig sameElements block.id().arr
   }
 
   test("BlockV4: Reject block with invalid delay") {
@@ -74,7 +74,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig should not be block.uniqueId.arr
+    newBlockSig should not be block.id().arr
   }
 
   test("BlockV4: Reject block with invalid BT") {
@@ -89,7 +89,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig should not be block.uniqueId.arr
+    newBlockSig should not be block.id().arr
   }
 
   test("BlockV4: Reject block with invalid generation signature") {
@@ -111,7 +111,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig should not be block.uniqueId.arr
+    newBlockSig should not be block.id().arr
   }
 
   test("BlockV4: Reject block with invalid signature") {
@@ -120,7 +120,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
     val height = nodes.head.height
     val block  = forgeBlock(height, signerPK)(updateBaseTarget = _ + 2)
 
-    val signature = ByteStr(crypto.sign(otherNodePK, block.bytes()))
+    val signature = crypto.sign(otherNodePK.privateKey, block.bytes())
     val resignedBlock =
       block
         .copy(signature = signature)
@@ -133,7 +133,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig should not be resignedBlock.uniqueId.arr
+    newBlockSig should not be resignedBlock.id().arr
   }
 
   test("BlockV5: Node mines several blocks, integration test checks that block timestamps equal to time of appearence (+-1100ms)") {
@@ -167,7 +167,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig sameElements block.uniqueId.arr
+    newBlockSig sameElements block.id().arr
   }
 
   test("BlockV5: Reject block with invalid delay") {
@@ -181,7 +181,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig should not be block.uniqueId.arr
+    newBlockSig should not be block.id().arr
   }
 
   test("BlockV5: Reject block with invalid BT") {
@@ -196,7 +196,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig should not be block.uniqueId.arr
+    newBlockSig should not be block.id().arr
   }
 
   test("BlockV5: Reject block with invalid generation signature") {
@@ -218,7 +218,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig should not be block.uniqueId.arr
+    newBlockSig should not be block.id().arr
   }
 
   test("BlockV5: Reject block with invalid signature") {
@@ -227,7 +227,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
     val height = nodes.head.height
     val block  = forgeBlock(height, signerPK)(updateBaseTarget = _ + 2)
 
-    val signature = ByteStr(crypto.sign(otherNodePK, block.bytes()))
+    val signature = crypto.sign(otherNodePK.privateKey, block.bytes())
     val resignedBlock =
       block
         .copy(signature = signature)
@@ -240,7 +240,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig should not be resignedBlock.uniqueId.arr
+    newBlockSig should not be resignedBlock.id().arr
   }
 
   def waitForBlockTime(block: Block): Unit = {
@@ -336,27 +336,30 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
     val (lastBlockId, lastBlockTS, lastBlockCData, lastBlockVRF) = blockInfo(height)
     val genSig: ByteStr =
       if (height + 1 < vrfActivationHeight)
-        ByteStr(generatorSignature(lastBlockCData.generationSignature.arr, signerPK))
+        ByteStr(generatorSignature(lastBlockCData.generationSignature.arr, signerPK.publicKey))
       else
-        crypto.signVRF(signerPK, lastBlockVRF.getOrElse(lastBlockCData.generationSignature))
+        crypto.signVRF(signerPK.privateKey, lastBlockVRF.getOrElse(lastBlockCData.generationSignature).arr)
 
     val hitSource =
       if (height + 1 < vrfActivationHeight)
         genSig
       else
-        crypto.verifyVRF(genSig, lastBlockVRF.getOrElse(lastBlockCData.generationSignature), signerPK.publicKey).explicitGet()
+        crypto.verifyVRF(genSig, lastBlockVRF.getOrElse(lastBlockCData.generationSignature).arr, signerPK.publicKey).explicitGet()
+
+    val posCalculator = if (height + 1 < vrfActivationHeight) FairPoSCalculator.V1 else FairPoSCalculator.V2
+    val version       = if (height + 1 < vrfActivationHeight) 3.toByte else 5.toByte
 
     val validBlockDelay: Long = updateDelay(
-      FairPoSCalculator
+      posCalculator
         .calculateDelay(
           hit(hitSource.arr),
           lastBlockCData.baseTarget,
-          nodes.head.accountBalances(signerPK.stringRepr)._2
+          nodes.head.accountBalances(signerPK.toAddress.toString)._2
         )
     )
 
     val baseTarget: Long = updateBaseTarget(
-      FairPoSCalculator
+      posCalculator
         .calculateBaseTarget(
           10,
           height,
@@ -366,7 +369,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
           lastBlockTS + validBlockDelay
         )
     )
-    val version = if (height + 1 < vrfActivationHeight) 3.toByte else 5.toByte
+
     Block
       .buildAndSign(
         version = version,

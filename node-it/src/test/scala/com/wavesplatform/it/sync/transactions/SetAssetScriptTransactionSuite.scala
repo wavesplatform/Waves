@@ -9,7 +9,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{script, someAssetAmount, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
@@ -22,19 +22,18 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
-  val estimator = ScriptEstimatorV2
+  val estimator = ScriptEstimatorV1
 
   var assetWOScript    = ""
   var assetWScript     = ""
   var assetWScript2     = ""
   private val accountB = pkByAddress(secondAddress)
   private val unchangeableScript = ScriptCompiler(
-    s"""
-       |match tx {
+    s"""match tx {
        |  case s : SetAssetScriptTransaction => false
        |  case _ => true
        |}
-       """.stripMargin,
+       |""".stripMargin,
     isAssetScript = true,
     estimator
   ).explicitGet()._1
@@ -123,9 +122,10 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         script = Some(
           ScriptCompiler(
             s"""match tx {
-               |case s : SetAssetScriptTransaction => s.sender == addressFromPublicKey(base58'${ByteStr(pkByAddress(secondAddress).publicKey).toString}')
+               |case s : SetAssetScriptTransaction => s.sender == addressFromPublicKey(base58'${pkByAddress(secondAddress).publicKey}')
                |case _ => false
-               |}""".stripMargin,
+               |}
+               |""".stripMargin,
             isAssetScript = true,
             estimator
           ).explicitGet()._1.bytes.value.base64
@@ -182,7 +182,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       nodes.waitForHeightAriseAndTxPresent(txId)
       miner.assertBalances(firstAddress, balance - setAssetScriptFee, eff - setAssetScriptFee)
       val details2 = miner.assetsDetails(assetWScript, true).scriptDetails.getOrElse(fail("Expecting to get asset details"))
-      assert(details2.scriptComplexity == 18)
+      assert(details2.scriptComplexity == 6)
       assert(details2.script == script2)
     }
   }
@@ -220,7 +220,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
           assetId: IssuedAsset = IssuedAsset(ByteStr.decodeBase58(assetWScript).get)
       ): SetAssetScriptTransaction =
         SetAssetScriptTransaction
-          .signed(version = v, sender.privateKey, assetId, Some(script), fee, timestamp, sender.privateKey)
+          .signed(version = v, sender.keyPair.publicKey, assetId, Some(script), fee, timestamp, sender.keyPair.privateKey)
           .right
           .get
 
@@ -345,7 +345,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
           accountA,
           Some(
             ScriptCompiler(
-              s"""|let pkB = base58'${ByteStr(accountB.publicKey)}'
+              s"""|let pkB = base58'${accountB.publicKey}'
                   |match tx {
                   |  case s : SetAssetScriptTransaction => sigVerify(s.bodyBytes,s.proofs[0],pkB)
                   |  case _ => true
@@ -369,15 +369,16 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
       val nonIssuerUnsignedTx = SetAssetScriptTransaction(
         version = v,
-        accountA,
+        accountA.publicKey,
         IssuedAsset(ByteStr.decodeBase58(assetWithScript).get),
         Some(unchangeableScript),
         setAssetScriptFee + smartFee,
         System.currentTimeMillis,
-        Proofs.empty
+        Proofs.empty,
+        accountA.toAddress.chainId
       )
 
-      val sigTxB = ByteStr(crypto.sign(accountB, nonIssuerUnsignedTx.bodyBytes()))
+      val sigTxB = crypto.sign(accountB.privateKey, nonIssuerUnsignedTx.bodyBytes())
 
       val signedTxByB =
         nonIssuerUnsignedTx.copy(proofs = Proofs(Seq(sigTxB)))
@@ -390,15 +391,16 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       //try to change unchangeable script
       val nonIssuerUnsignedTx2 = SetAssetScriptTransaction(
         version = v,
-        accountA,
+        accountA.publicKey,
         IssuedAsset(ByteStr.decodeBase58(assetWithScript).get),
         Some(script),
         setAssetScriptFee + smartFee,
         System.currentTimeMillis,
-        Proofs.empty
+        Proofs.empty,
+        accountA.toAddress.chainId
       )
 
-      val sigTxB2 = ByteStr(crypto.sign(accountB, nonIssuerUnsignedTx2.bodyBytes()))
+      val sigTxB2 = crypto.sign(accountB.privateKey, nonIssuerUnsignedTx2.bodyBytes())
 
       val signedTxByB2 =
         nonIssuerUnsignedTx2.copy(proofs = Proofs(Seq(sigTxB2)))

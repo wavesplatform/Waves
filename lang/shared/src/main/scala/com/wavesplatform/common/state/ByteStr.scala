@@ -1,6 +1,7 @@
 package com.wavesplatform.common.state
 
 import com.wavesplatform.common.utils.{Base58, Base64}
+import com.wavesplatform.common._
 
 import scala.util.Try
 
@@ -19,10 +20,12 @@ case class ByteStr(arr: Array[Byte]) {
     base64
   }
 
-  def isEmpty: Boolean =
-    arr.length == 0
+  def isEmpty: Boolean = arr.length == 0
 
   def size: Int = arr.length
+
+  // java replaces invalid chars
+  def toUTF8String: String = new String(arr, "UTF-8")
 
   def ++(other: ByteStr): ByteStr =
     if (this.isEmpty) other else ByteStr(this.arr ++ other.arr)
@@ -52,27 +55,19 @@ case class ByteStr(arr: Array[Byte]) {
     case _              => false
   }
 
-  override lazy val hashCode: Int = java.util.Arrays.hashCode(arr)
+  private lazy val hc = java.util.Arrays.hashCode(arr)
+
+  override def hashCode(): Int = hc
 }
 
 object ByteStr {
   val empty: ByteStr = ByteStr(Array.emptyByteArray)
 
-  implicit def fromByteArray(arr: Array[Byte]): ByteStr = {
-    new ByteStr(arr)
-  }
-
-  implicit def toByteArray(bs: ByteStr): Array[Byte] = {
-    bs.arr
-  }
-
-  def fromBytes(bytes: Byte*): ByteStr = {
-    ByteStr(bytes.toArray)
-  }
+  def fromBytes(bytes: Byte*): ByteStr = ByteStr(bytes.toArray)
 
   def fromLong(longValue: Long): ByteStr = {
     val buf = new Array[Byte](8)
-    var b   = longValue
+    var b = longValue
 
     for (i <- (buf.length - 1) to 0 by -1) {
       buf(i) = b.toByte
@@ -92,24 +87,5 @@ object ByteStr {
     ByteStr(bs)
   }
 
-  implicit val byteStrOrdering: Ordering[ByteStr] = (x, y) => compare(x.arr, y.arr)
-
-  // scorex.utils.ByteArray.compare
-  private[this] def compare(buffer1: Array[Byte], buffer2: Array[Byte]): Int =
-    if (buffer1 sameElements buffer2) {
-      0
-    } else {
-      val end1: Int = if (buffer1.length < buffer2.length) buffer1.length else buffer2.length
-      var i: Int    = 0
-      while (i < end1) {
-        val a: Int = buffer1(i) & 0xff
-        val b: Int = buffer2(i) & 0xff
-        if (a != b) {
-          return a - b
-        }
-        i = i + 1
-      }
-      buffer1.length - buffer2.length
-    }
-
+  implicit val byteStrOrdering: Ordering[ByteStr] = (x, y) => ByteStrComparator.compare(x, y)
 }

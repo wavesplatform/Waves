@@ -1,8 +1,11 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.db.WithState
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
@@ -16,12 +19,15 @@ import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 
-class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks with WithState with TransactionGen {
   val One = 100000000L
   val NgAndSponsorshipSettings: FunctionalitySettings = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(NG.id -> 0, FeeSponsorship.id -> 0, SmartAccounts.id -> 0),
     blocksForFeatureActivation = 1,
     featureCheckBlocksPeriod = 1
+  )
+  val BlockV5Settings: FunctionalitySettings = NgAndSponsorshipSettings.copy(
+    preActivatedFeatures = NgAndSponsorshipSettings.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
   )
 
   property("SponsorFee serialization roundtrip") {
@@ -177,11 +183,11 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
   property("miner receives one satoshi less than sponsor pays") {
     val setup = for {
       (acc, name, desc, quantity, decimals, reissuable, fee, ts) <- issueParamGen
-      genesis = GenesisTransaction.create(acc, ENOUGH_AMT, ts).explicitGet()
+      genesis = GenesisTransaction.create(acc.toAddress, ENOUGH_AMT, ts).explicitGet()
       issue   = IssueTransaction(TxVersion.V1, acc.publicKey, name, desc, quantity, decimals, reissuable, script = None, fee, ts).signWith(acc.privateKey)
       minFee <- Gen.choose(1, issue.quantity)
       sponsor  = SponsorFeeTransaction.selfSigned(1.toByte, acc, IssuedAsset(issue.id()), Some(minFee), One, ts).explicitGet()
-      transfer = TransferTransaction.selfSigned(1.toByte, acc, acc, Waves, 1, feeAsset = IssuedAsset(issue.id()), minFee, None, ts).explicitGet()
+      transfer = TransferTransaction.selfSigned(1.toByte, acc, acc.toAddress, Waves, 1, feeAsset = IssuedAsset(issue.id()), minFee, None, ts).explicitGet()
     } yield (acc, genesis, issue, sponsor, transfer)
 
     forAll(setup) {
@@ -192,7 +198,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
 
         assertNgDiffState(Seq(b0, b1), b2, NgAndSponsorshipSettings) {
           case (_, state) =>
-            state.balance(acc, Waves) - ENOUGH_AMT shouldBe 0
+            state.balance(acc.toAddress, Waves) - ENOUGH_AMT shouldBe 0
         }
     }
   }
@@ -200,15 +206,15 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
   property("miner receives one satoshi more than sponsor pays") {
     val setup = for {
       (acc, name, desc, quantity, decimals, reissuable, fee, ts) <- issueParamGen
-      genesis = GenesisTransaction.create(acc, ENOUGH_AMT, ts).explicitGet()
+      genesis = GenesisTransaction.create(acc.toAddress, ENOUGH_AMT, ts).explicitGet()
       issue   = IssueTransaction(TxVersion.V1, acc.publicKey, name, desc, quantity, decimals, reissuable, script = None, fee, ts).signWith(acc.privateKey)
       minFee <- Gen.choose(1000000, issue.quantity)
       sponsor = SponsorFeeTransaction.selfSigned(1.toByte, acc, IssuedAsset(issue.id()), Some(minFee), One, ts).explicitGet()
       transfer1 = TransferTransaction
-        .selfSigned(1.toByte, acc, acc, Waves, 1, feeAsset = IssuedAsset(issue.id()), minFee + 7, None, ts)
+        .selfSigned(1.toByte, acc, acc.toAddress, Waves, 1, feeAsset = IssuedAsset(issue.id()), minFee + 7, None, ts)
         .explicitGet()
       transfer2 = TransferTransaction
-        .selfSigned(1.toByte, acc, acc, Waves, 1, feeAsset = IssuedAsset(issue.id()), minFee + 9, None, ts)
+        .selfSigned(1.toByte, acc, acc.toAddress, Waves, 1, feeAsset = IssuedAsset(issue.id()), minFee + 9, None, ts)
         .explicitGet()
     } yield (acc, genesis, issue, sponsor, transfer1, transfer2)
 
@@ -220,7 +226,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
 
         assertNgDiffState(Seq(b0, b1), b2, NgAndSponsorshipSettings) {
           case (_, state) =>
-            state.balance(acc, Waves) - ENOUGH_AMT shouldBe 0
+            state.balance(acc.toAddress, Waves) - ENOUGH_AMT shouldBe 0
         }
     }
   }
@@ -228,14 +234,14 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
   property("sponsorship changes in the middle of a block") {
     val setup = for {
       (acc, name, desc, quantity, decimals, reissuable, fee, ts) <- issueParamGen
-      genesis = GenesisTransaction.create(acc, ENOUGH_AMT, ts).explicitGet()
+      genesis = GenesisTransaction.create(acc.toAddress, ENOUGH_AMT, ts).explicitGet()
       issue   = IssueTransaction(TxVersion.V1, acc.publicKey, name, desc, quantity, decimals, reissuable, script = None, fee, ts).signWith(acc.privateKey)
       minFee <- Gen.choose(1, issue.quantity / 11)
 
       sponsor1  = SponsorFeeTransaction.selfSigned(1.toByte, acc, IssuedAsset(issue.id()), Some(minFee), One, ts).explicitGet()
-      transfer1 = TransferTransaction.selfSigned(1.toByte, acc, acc, Waves, 1, IssuedAsset(issue.id()), fee = minFee, None, ts).explicitGet()
+      transfer1 = TransferTransaction.selfSigned(1.toByte, acc, acc.toAddress, Waves, 1, IssuedAsset(issue.id()), fee = minFee, None, ts).explicitGet()
       sponsor2  = SponsorFeeTransaction.selfSigned(1.toByte, acc, IssuedAsset(issue.id()), Some(minFee * 10), One, ts).explicitGet()
-      transfer2 = TransferTransaction.selfSigned(1.toByte, acc, acc, Waves, 1, IssuedAsset(issue.id()), fee = minFee * 10, None, ts).explicitGet()
+      transfer2 = TransferTransaction.selfSigned(1.toByte, acc, acc.toAddress, Waves, 1, IssuedAsset(issue.id()), fee = minFee * 10, None, ts).explicitGet()
     } yield (acc, genesis, issue, sponsor1, transfer1, sponsor2, transfer2)
 
     forAll(setup) {
@@ -246,7 +252,34 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
 
         assertNgDiffState(Seq(b0, b1), b2, NgAndSponsorshipSettings) {
           case (_, state) =>
-            state.balance(acc, Waves) - ENOUGH_AMT shouldBe 0
+            state.balance(acc.toAddress, Waves) - ENOUGH_AMT shouldBe 0
+        }
+    }
+  }
+
+  property(s"min fee changed after ${BlockchainFeatures.BlockV5} activation") {
+    val setup = for {
+      (acc, name, desc, quantity, decimals, reissuable, fee, ts) <- issueParamGen
+      genesis = GenesisTransaction.create(acc.toAddress, ENOUGH_AMT, ts).explicitGet()
+      issue = IssueTransaction(TxVersion.V1, acc.publicKey, name, desc, quantity, decimals, reissuable, script = None, fee, ts)
+        .signWith(acc.privateKey)
+      minSponsoredAssetFee <- Gen.choose(1, issue.quantity / 11)
+      minFee               <- Gen.choose(One / 1000, One - 1)
+      sponsor = SponsorFeeTransaction.selfSigned(1.toByte, acc, IssuedAsset(issue.id()), Some(minSponsoredAssetFee), minFee, ts).explicitGet()
+    } yield (genesis, issue, sponsor, minFee)
+
+    forAll(setup) {
+      case (genesis, issue, sponsor, actualFee) =>
+        val b0 = block(Seq(genesis, issue))
+        val b1 = block(Seq(sponsor))
+        val b2 = block(Seq(sponsor), Block.ProtoBlockVersion)
+
+        assertDiffEi(Seq(b0), b1, NgAndSponsorshipSettings) { ei =>
+          ei should produce(s"Fee for SponsorFeeTransaction ($actualFee in WAVES) does not exceed minimal value of $One WAVES.")
+        }
+
+        assertDiffEi(Seq(b0), b2, BlockV5Settings) { ei =>
+          ei shouldBe 'right
         }
     }
   }

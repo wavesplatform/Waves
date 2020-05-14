@@ -21,7 +21,8 @@ case class SetAssetScriptTransaction(
     script: Option[Script],
     fee: TxAmount,
     timestamp: TxTimestamp,
-    proofs: Proofs
+    proofs: Proofs,
+    chainId: Byte
 ) extends VersionedTransaction
     with ProvenTransaction
     with TxWithFee.InWaves
@@ -39,8 +40,9 @@ case class SetAssetScriptTransaction(
 }
 
 object SetAssetScriptTransaction extends TransactionParser {
-  val typeId: TxType = 15
+  type TransactionT = SetAssetScriptTransaction
 
+  override val typeId: TxType                    = 15: Byte
   override val supportedVersions: Set[TxVersion] = Set(1, 2)
 
   implicit val validator: TxValidator[SetAssetScriptTransaction] = SetAssetScriptTxValidator
@@ -60,9 +62,10 @@ object SetAssetScriptTransaction extends TransactionParser {
       script: Option[Script],
       fee: TxAmount,
       timestamp: TxTimestamp,
-      proofs: Proofs
+      proofs: Proofs,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SetAssetScriptTransaction] =
-    SetAssetScriptTransaction(version, sender, assetId, script, fee, timestamp, proofs).validatedEither
+    SetAssetScriptTransaction(version, sender, assetId, script, fee, timestamp, proofs, chainId).validatedEither
 
   def signed(
       version: TxVersion,
@@ -83,5 +86,5 @@ object SetAssetScriptTransaction extends TransactionParser {
       fee: TxAmount,
       timestamp: TxTimestamp
   ): Either[ValidationError, SetAssetScriptTransaction] =
-    signed(version, sender, asset, script, fee, timestamp, sender)
+    signed(version, sender.publicKey, asset, script, fee, timestamp, sender.privateKey)
 }

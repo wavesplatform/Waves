@@ -21,13 +21,13 @@ object IssueTxSerializer {
       "decimals"    -> decimals,
       "description" -> description.toStringUtf8
     ) ++ (if (version >= TxVersion.V2) Json.obj("script" -> script.map(_.bytes().base64)) else JsObject.empty) ++
-      (if (version == TxVersion.V2) Json.obj("chainId"   -> chainByte) else JsObject.empty)
+      (if (version == TxVersion.V2) Json.obj("chainId"   -> chainId) else JsObject.empty)
   }
 
   def bodyBytes(tx: IssueTransaction): Array[Byte] = {
     import tx._
     lazy val baseBytes = Bytes.concat(
-      sender,
+      sender.arr,
       Deser.serializeArrayWithLength(name.toByteArray),
       Deser.serializeArrayWithLength(description.toByteArray),
       Longs.toByteArray(quantity),
@@ -40,14 +40,14 @@ object IssueTxSerializer {
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
       case TxVersion.V2 =>
-        Bytes.concat(Array(builder.typeId, version, chainByte), baseBytes, Deser.serializeOptionOfArrayWithLength(script)(_.bytes()))
+        Bytes.concat(Array(builder.typeId, version, chainId), baseBytes, Deser.serializeOptionOfArrayWithLength(script)(_.bytes().arr))
       case _ => PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
   def toBytes(tx: IssueTransaction): Array[Byte] =
     tx.version match {
-      case TxVersion.V1 => Bytes.concat(Array(tx.typeId), tx.proofs.toSignature, this.bodyBytes(tx)) // Signature before body, typeId appears twice
+      case TxVersion.V1 => Bytes.concat(Array(tx.typeId), tx.proofs.toSignature.arr, this.bodyBytes(tx)) // Signature before body, typeId appears twice
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
       case _            => PBTransactionSerializer.bytes(tx)
     }

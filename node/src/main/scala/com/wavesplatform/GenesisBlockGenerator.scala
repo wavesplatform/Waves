@@ -91,7 +91,7 @@ object GenesisBlockGenerator extends App {
 
   val genesisTxs: Seq[GenesisTransaction] = shares.map {
     case (_, addrInfo, part) =>
-      GenesisTransaction(addrInfo.accountAddress, part, timestamp, ByteStr.empty)
+      GenesisTransaction(addrInfo.accountAddress, part, timestamp, ByteStr.empty, settings.chainId)
   }
 
   val genesisBlock: Block = {
@@ -147,14 +147,14 @@ object GenesisBlockGenerator extends App {
     }
 
     val confBody = s"""genesis {
-         |  average-block-delay: ${settings.averageBlockDelay.toMillis}ms
-         |  initial-base-target: ${settings.initialBaseTarget}
-         |  timestamp: ${settings.timestamp}
-         |  block-timestamp: ${settings.blockTimestamp}
-         |  signature: "${settings.signature.get}"
-         |  initial-balance: ${settings.initialBalance}
+         |  average-block-delay = ${settings.averageBlockDelay.toMillis}ms
+         |  initial-base-target = ${settings.initialBaseTarget}
+         |  timestamp = ${settings.timestamp}
+         |  block-timestamp = ${settings.blockTimestamp}
+         |  signature = "${settings.signature.get}"
+         |  initial-balance = ${settings.initialBalance}
          |  transactions = [
-         |    ${settings.transactions.map(x => s"""{recipient: "${x.recipient}", amount: ${x.amount}}""").mkString(",\n    ")}
+         |    ${settings.transactions.map(x => s"""{recipient = "${x.recipient}", amount = ${x.amount}}""").mkString(",\n    ")}
          |  ]
          |}
          |""".stripMargin

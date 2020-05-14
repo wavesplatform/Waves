@@ -1,13 +1,13 @@
 package com.wavesplatform.state.diffs
 
 import cats._
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.{BlockchainFeatures, EstimatorProvider}
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.directives.values.{Expression, V1}
+import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, V1, V4}
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
@@ -38,7 +38,7 @@ class AssetTransactionsDiffTest
     for {
       master <- accountGen
       ts     <- timestampGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       ia                     <- positiveLongGen
       ra                     <- positiveLongGen
       ba                     <- positiveLongGen.suchThat(x => x < ia + ra)
@@ -57,7 +57,7 @@ class AssetTransactionsDiffTest
             totalPortfolioDiff.assets shouldBe Map(reissue.asset -> (reissue.quantity - burn.quantity))
 
             val totalAssetVolume = issue.quantity + reissue.quantity - burn.quantity
-            newState.portfolio(issue.sender).assets shouldBe Map(reissue.asset -> totalAssetVolume)
+            newState.balance(issue.sender.toAddress, reissue.asset) shouldEqual totalAssetVolume
         }
     }
   }
@@ -66,7 +66,7 @@ class AssetTransactionsDiffTest
     val setup: Gen[(GenesisTransaction, ReissueTransaction, BurnTransaction)] = for {
       master <- accountGen
       ts     <- timestampGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       reissue <- reissueGen
       burn    <- burnGen
     } yield (genesis, reissue, burn)
@@ -110,10 +110,10 @@ class AssetTransactionsDiffTest
       issuer    <- accountGen
       burner    <- accountGen.suchThat(_ != issuer)
       timestamp <- timestampGen
-      genesis: GenesisTransaction = GenesisTransaction.create(issuer, ENOUGH_AMT, timestamp).explicitGet()
+      genesis: GenesisTransaction = GenesisTransaction.create(issuer.toAddress, ENOUGH_AMT, timestamp).explicitGet()
       (issue, _, _) <- issueReissueBurnGeneratorP(ENOUGH_AMT, issuer)
-      assetTransfer <- transferGeneratorP(issuer, burner, IssuedAsset(issue.assetId), Waves)
-      wavesTransfer <- wavesTransferGeneratorP(issuer, burner)
+      assetTransfer <- transferGeneratorP(issuer, burner.toAddress, IssuedAsset(issue.assetId), Waves)
+      wavesTransfer <- wavesTransferGeneratorP(issuer, burner.toAddress)
       burn = BurnTransaction
         .selfSigned(1.toByte, burner, IssuedAsset(issue.assetId), assetTransfer.amount, wavesTransfer.amount, timestamp)
         .explicitGet()
@@ -129,7 +129,7 @@ class AssetTransactionsDiffTest
       case (genesis, issue, assetTransfer, wavesTransfer, burn) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, issue, assetTransfer, wavesTransfer))), TestBlock.create(Seq(burn)), fs) {
           case (_, newState) =>
-            newState.portfolio(burn.sender).assets shouldBe Map(burn.asset -> 0)
+            newState.balance(burn.sender.toAddress, burn.asset) shouldEqual 0
         }
     }
   }
@@ -138,7 +138,7 @@ class AssetTransactionsDiffTest
     val setup = for {
       issuer    <- accountGen
       timestamp <- timestampGen
-      genesis: GenesisTransaction = GenesisTransaction.create(issuer, ENOUGH_AMT, timestamp).explicitGet()
+      genesis: GenesisTransaction = GenesisTransaction.create(issuer.toAddress, ENOUGH_AMT, timestamp).explicitGet()
       assetName   <- genBoundedBytes(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
       description <- genBoundedBytes(0, IssueTransaction.MaxAssetDescriptionLength)
       quantity    <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
@@ -167,7 +167,7 @@ class AssetTransactionsDiffTest
     val setup = for {
       issuer    <- accountGen
       timestamp <- timestampGen
-      genesis: GenesisTransaction = GenesisTransaction.create(issuer, ENOUGH_AMT, timestamp).explicitGet()
+      genesis: GenesisTransaction = GenesisTransaction.create(issuer.toAddress, ENOUGH_AMT, timestamp).explicitGet()
       assetName   <- genBoundedBytes(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
       description <- genBoundedBytes(0, IssueTransaction.MaxAssetDescriptionLength)
       quantity    <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
@@ -194,7 +194,7 @@ class AssetTransactionsDiffTest
       issuer    <- accountGen
       holder    <- accountGen.suchThat(_ != issuer)
       timestamp <- timestampGen
-      genesis: GenesisTransaction = GenesisTransaction.create(issuer, ENOUGH_AMT, timestamp).explicitGet()
+      genesis: GenesisTransaction = GenesisTransaction.create(issuer.toAddress, ENOUGH_AMT, timestamp).explicitGet()
       assetName   <- genBoundedBytes(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
       description <- genBoundedBytes(0, IssueTransaction.MaxAssetDescriptionLength)
       quantity    <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
@@ -204,7 +204,7 @@ class AssetTransactionsDiffTest
       assetId = IssuedAsset(issue.assetId)
       attachment <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
       transfer = TransferTransaction
-        .selfSigned(1.toByte, issuer, holder, assetId, quantity - 1, Waves, fee, Some(Attachment.Bin(attachment)), timestamp)
+        .selfSigned(1.toByte, issuer, holder.toAddress, assetId, quantity - 1, Waves, fee, Some(Attachment.Bin(attachment)), timestamp)
         .explicitGet()
       reissue = ReissueTransaction
         .selfSigned(1.toByte, issuer, assetId, (Long.MaxValue - quantity) + 1, reissuable = true, 1, timestamp)
@@ -234,45 +234,49 @@ class AssetTransactionsDiffTest
     }
   }
 
-  private def createScript(code: String) = {
+  private def createScript(code: String, version: StdLibVersion) = {
     val Parsed.Success(expr, _) = Parser.parseExpr(code).get
-    ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), expr).explicitGet()._1).explicitGet()
+    ExprScript(version, ExpressionCompiler(compilerContext(version, Expression, isAssetScript = false), expr).explicitGet()._1).explicitGet()
   }
 
-  def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransaction, TransferTransaction, ReissueTransaction)] =
+  def genesisIssueTransferReissue(
+      code: String,
+      version: StdLibVersion = V1
+  ): Gen[(Seq[GenesisTransaction], IssueTransaction, TransferTransaction, ReissueTransaction, ReissueTransaction)] =
     for {
       timestamp          <- timestampGen
       initialWavesAmount <- Gen.choose(Long.MaxValue / 1000, Long.MaxValue / 100)
       accountA           <- accountGen
       accountB           <- accountGen
       smallFee           <- Gen.choose(1L, 10L)
-      genesisTx1 = GenesisTransaction.create(accountA, initialWavesAmount, timestamp).explicitGet()
-      genesisTx2 = GenesisTransaction.create(accountB, initialWavesAmount, timestamp).explicitGet()
+      genesisTx1 = GenesisTransaction.create(accountA.toAddress, initialWavesAmount, timestamp).explicitGet()
+      genesisTx2 = GenesisTransaction.create(accountB.toAddress, initialWavesAmount, timestamp).explicitGet()
       reissuable = true
       (_, assetName, description, quantity, decimals, _, _, _) <- issueParamGen
       issue = IssueTransaction(
         TxVersion.V2,
-        accountA,
+        accountA.publicKey,
         assetName,
         description,
         quantity,
         decimals,
         reissuable,
-        Some(createScript(code)),
+        Some(createScript(code, version)),
         smallFee,
         timestamp + 1
-      ).signWith(accountA)
+      ).signWith(accountA.privateKey)
       assetId = IssuedAsset(issue.id())
       transfer = TransferTransaction
-        .selfSigned(TxVersion.V1, accountA, accountB, assetId, issue.quantity, Waves, smallFee, None, timestamp + 2)
+        .selfSigned(TxVersion.V1, accountA, accountB.toAddress, assetId, issue.quantity, Waves, smallFee, None, timestamp + 2)
         .explicitGet()
-      reissue = ReissueTransaction.selfSigned(TxVersion.V1, accountB, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
-    } yield (Seq(genesisTx1, genesisTx2), issue, transfer, reissue)
+      reissue        = ReissueTransaction.selfSigned(TxVersion.V1, accountA, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
+      illegalReissue = ReissueTransaction.selfSigned(TxVersion.V1, accountB, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
+    } yield (Seq(genesisTx1, genesisTx2), issue, transfer, reissue, illegalReissue)
 
   property("Can issue smart asset with script") {
     forAll(for {
       acc        <- accountGen
-      genesis    <- genesisGeneratorP(acc)
+      genesis    <- genesisGeneratorP(acc.toAddress)
       smartIssue <- issueV2TransactionGen(acc)
     } yield (genesis, smartIssue)) {
       case (gen, issue) =>
@@ -288,7 +292,12 @@ class AssetTransactionsDiffTest
                 issue.reissuable,
                 BigInt(issue.quantity),
                 Height @@ 2,
-                issue.script,
+                issue.script.map(
+                  s =>
+                    s -> Script
+                      .estimate(s, EstimatorProvider.EstimatorBlockchainExt(newState).estimator, useContractVerifierLimit = false)
+                      .explicitGet()
+                ),
                 0L,
                 issue.decimals == 0 && issue.quantity == 1 && !issue.reissuable
               )
@@ -302,7 +311,7 @@ class AssetTransactionsDiffTest
 
   property("Can transfer when script evaluates to TRUE") {
     forAll(genesisIssueTransferReissue("true")) {
-      case (gen, issue, transfer, _) =>
+      case (gen, issue, transfer, _, _) =>
         assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, transfer)), smartEnabledFS) {
           case (blockDiff, newState) =>
             val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
@@ -314,7 +323,7 @@ class AssetTransactionsDiffTest
 
   property("Cannot transfer when script evaluates to FALSE") {
     forAll(genesisIssueTransferReissue("false")) {
-      case (gen, issue, transfer, _) =>
+      case (gen, issue, transfer, _, _) =>
         assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, transfer)), smartEnabledFS)(
           ei => ei should produce("TransactionNotAllowedByScript")
         )
@@ -323,7 +332,7 @@ class AssetTransactionsDiffTest
 
   property("Cannot reissue when script evaluates to FALSE") {
     forAll(genesisIssueTransferReissue("false")) {
-      case (gen, issue, _, reissue) =>
+      case (gen, issue, _, reissue, _) =>
         assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, reissue)), smartEnabledFS)(
           ei => ei should produce("TransactionNotAllowedByScript")
         )
@@ -332,8 +341,8 @@ class AssetTransactionsDiffTest
 
   property("Only issuer can reissue") {
     forAll(genesisIssueTransferReissue("true")) {
-      case (gen, issue, _, reissue) =>
-        assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, reissue)), smartEnabledFS) { ei =>
+      case (gen, issue, _, _, illegalReissue) =>
+        assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, illegalReissue)), smartEnabledFS) { ei =>
           ei should produce("Asset was issued by other address")
         }
     }
@@ -349,7 +358,7 @@ class AssetTransactionsDiffTest
     forAll(genesisIssueUpdate) {
       case (gen, issue, update) =>
         assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, update))) { ei =>
-          ei should produce("VRF and Protobuf feature has not been activated yet")
+          ei should produce("Ride V4, VRF, Protobuf, Failed transactions feature has not been activated yet")
         }
     }
   }
@@ -362,8 +371,8 @@ class AssetTransactionsDiffTest
         assertDiffEi(TestBlock.create(gen :+ issue) +: blocks, TestBlock.create(Seq(update), Block.ProtoBlockVersion), assetInfoUpdateEnabled) { ei =>
           ei should produce(
             s"Can't update info of asset with id=${issue.id.value} " +
-            s"before ${assetInfoUpdateEnabled.minAssetInfoUpdateInterval + 1} block, " +
-            s"current height=${blocks.size + 2}, minUpdateInfoInterval=${assetInfoUpdateEnabled.minAssetInfoUpdateInterval}"
+              s"before ${assetInfoUpdateEnabled.minAssetInfoUpdateInterval + 1} block, " +
+              s"current height=${blocks.size + 2}, minUpdateInfoInterval=${assetInfoUpdateEnabled.minAssetInfoUpdateInterval}"
           )
         }
     }
@@ -373,7 +382,9 @@ class AssetTransactionsDiffTest
     forAll(genesisIssueUpdate) {
       case (gen, issue, update) =>
         val blocks =
-          TestBlock.create(gen :+ issue) +: Seq.fill(assetInfoUpdateEnabled.minAssetInfoUpdateInterval)(TestBlock.create(Seq.empty, Block.ProtoBlockVersion))
+          TestBlock.create(gen :+ issue) +: Seq.fill(assetInfoUpdateEnabled.minAssetInfoUpdateInterval)(
+            TestBlock.create(Seq.empty, Block.ProtoBlockVersion)
+          )
 
         assertDiffEi(blocks, TestBlock.create(Seq(update), Block.ProtoBlockVersion), assetInfoUpdateEnabled) { ei =>
           ei shouldBe 'right
@@ -399,9 +410,16 @@ class AssetTransactionsDiffTest
           d.appendBlock(genesisBlock)
 
           val (keyBlock, Seq(microBlock)) =
-            UnsafeBlocks.unsafeChainBaseAndMicro(genesisBlock.uniqueId, Nil, Seq(Seq(update1)), signer, Block.ProtoBlockVersion, genesisBlock.header.timestamp + 100)
+            UnsafeBlocks.unsafeChainBaseAndMicro(
+              genesisBlock.id(),
+              Nil,
+              Seq(Seq(update1)),
+              signer,
+              Block.ProtoBlockVersion,
+              genesisBlock.header.timestamp + 100
+            )
           d.appendBlock(keyBlock)
-          d.appendMicroBlock(microBlock)
+          val microBlockId = d.appendMicroBlock(microBlock)
 
           { // Check liquid block
             val desc = blockchain.assetDescription(IssuedAsset(issue.assetId)).get
@@ -417,7 +435,7 @@ class AssetTransactionsDiffTest
           }
 
           val (keyBlock1, Nil) =
-            UnsafeBlocks.unsafeChainBaseAndMicro(microBlock.totalResBlockSig, Nil, Nil, signer, Block.ProtoBlockVersion, keyBlock.header.timestamp + 100)
+            UnsafeBlocks.unsafeChainBaseAndMicro(microBlockId, Nil, Nil, signer, Block.ProtoBlockVersion, keyBlock.header.timestamp + 100)
           d.appendBlock(keyBlock1)
 
           { // Check after new key block
@@ -436,6 +454,50 @@ class AssetTransactionsDiffTest
     }
   }
 
+  property("Asset V4 complexity limit is 4000") {
+    val exprV4WithComplexityBetween3000And4000 =
+      """
+        | {-#STDLIB_VERSION 4 #-}
+        | {-#SCRIPT_TYPE ASSET #-}
+        | {-#CONTENT_TYPE EXPRESSION #-}
+        |
+        | groth16Verify_15inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')
+      """.stripMargin
+
+    val exprV4WithComplexityAbove4000 =
+      """
+        | {-#STDLIB_VERSION 4 #-}
+        | {-#SCRIPT_TYPE ASSET #-}
+        | {-#CONTENT_TYPE EXPRESSION #-}
+        |
+        | groth16Verify_15inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK') &&
+        | groth16Verify_15inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')
+      """.stripMargin
+
+    val rideV4Activated = TestFunctionalitySettings.Enabled.copy(
+      preActivatedFeatures = Map(
+        BlockchainFeatures.Ride4DApps.id -> 0,
+        BlockchainFeatures.BlockV5.id    -> 0
+      )
+    )
+
+    forAll(genesisIssueTransferReissue(exprV4WithComplexityBetween3000And4000, V4)) {
+      case (gen, issue, _, _, _) =>
+        assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue)), rideV4Activated) {
+          case (blockDiff, newState) =>
+            val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
+            totalPortfolioDiff.assets(IssuedAsset(issue.id())) shouldEqual issue.quantity
+        }
+    }
+
+    forAll(genesisIssueTransferReissue(exprV4WithComplexityAbove4000, V4)) {
+      case (gen, issue, _, _, _) =>
+        assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue)), rideV4Activated) {
+          _ should produce("Script is too complex: 5207 > 4000")
+        }
+    }
+  }
+
   private val genesisIssueUpdate =
     for {
       timestamp          <- timestampGen
@@ -443,18 +505,17 @@ class AssetTransactionsDiffTest
       accountA           <- accountGen
       accountB           <- accountGen
       smallFee           <- Gen.choose(1L, 10L)
-      genesisTx1 = GenesisTransaction.create(accountA, initialWavesAmount, timestamp).explicitGet()
-      genesisTx2 = GenesisTransaction.create(accountB, initialWavesAmount, timestamp).explicitGet()
+      genesisTx1 = GenesisTransaction.create(accountA.toAddress, initialWavesAmount, timestamp).explicitGet()
+      genesisTx2 = GenesisTransaction.create(accountB.toAddress, initialWavesAmount, timestamp).explicitGet()
       (_, assetName, description, quantity, decimals, _, _, _) <- issueParamGen
       updName                                                  <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
       updDescription                                           <- genBoundedString(0, IssueTransaction.MaxAssetDescriptionLength)
-      issue = IssueTransaction(TxVersion.V2, accountA, assetName, description, quantity, decimals, false, None, smallFee, timestamp + 1)
-        .signWith(accountA)
+      issue = IssueTransaction(TxVersion.V2, accountA.publicKey, assetName, description, quantity, decimals, false, None, smallFee, timestamp + 1)
+        .signWith(accountA.privateKey)
       assetId = IssuedAsset(issue.id())
       update = UpdateAssetInfoTransaction
         .selfSigned(
           TxVersion.V1,
-          AddressScheme.current.chainId,
           accountA,
           assetId.id,
           updName,
@@ -470,7 +531,7 @@ class AssetTransactionsDiffTest
   private val genesisIssueUpdateWithSecondAsset = for {
     (gen, issue, _) <- genesisIssueUpdate
     accountС        <- accountGen
-    genesisTx3 = GenesisTransaction.create(accountС, Long.MaxValue / 100, gen.head.timestamp).explicitGet()
+    genesisTx3 = GenesisTransaction.create(accountС.toAddress, Long.MaxValue / 100, gen.head.timestamp).explicitGet()
     issue1 = IssueTransaction
       .selfSigned(
         TxVersion.V2,
@@ -488,7 +549,6 @@ class AssetTransactionsDiffTest
     update1 = UpdateAssetInfoTransaction
       .selfSigned(
         TxVersion.V1,
-        AddressScheme.current.chainId,
         accountС,
         issue1.assetId,
         "Invalid",

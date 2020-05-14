@@ -4,6 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.crypto
 import com.wavesplatform.it.{NodeConfigs, ReportingTestName}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
@@ -29,63 +30,69 @@ class BlockV5TestSuite
       .withSpecial(1, _.nonMiner)
       .buildNonConflicting()
 
+  var currentHeight = 0
+
   "block v5 appears and blockchain grows" - {
-    "when feature activation happened" in {
+    "check block v5 at current height" in {
       nodes.head.waitForHeight(nodes.head.height + 2, 2.minute)
-      val currentHeight = nodes.head.height
+      currentHeight = nodes.head.height
 
-      val lastBlockAfterActivationHeight = nodes.head.lastBlock()
-      val lastBlockHeadersAfterActivationHeight = nodes.head.lastBlockHeaders()
-      val blockAtActivationHeight = nodes.head.blockAt(currentHeight)
-      val blockHeadersAfterActivationHeight = nodes.head.blockHeadersAt(currentHeight)
-      val blockBySignatureAfterActivation = nodes.head.blockBySignature(blockAtActivationHeight.signature)
-      val generationSignatureInConsensusApi = ByteStr.decodeBase58(nodes.head.blockGenerationSignature(blockAtActivationHeight.signature).generationSignature).get
-      val generationSignatureInBlockJson = ByteStr.decodeBase58(blockAtActivationHeight.generationSignature.get).get
+      val lastBlockCurrentHeight = nodes.head.lastBlock()
+      val lastBlockHeadersCurrentHeight = nodes.head.lastBlockHeader()
+      val blockAtCurrentHeight = nodes.head.blockAt(currentHeight)
+      val blockHeadersCurrentHeight = nodes.head.blockHeadersAt(currentHeight)
+      val blockBySignatureCurrentHeight = nodes.head.blockById(blockAtCurrentHeight.id)
+      val generationSignatureInConsensusApi = ByteStr.decodeBase58(nodes.head.blockGenerationSignature(blockAtCurrentHeight.id).generationSignature).get
+      val generationSignatureInBlockJson = ByteStr.decodeBase58(blockAtCurrentHeight.generationSignature.get).get
 
-      blockAtActivationHeight.version.value shouldBe Block.ProtoBlockVersion
-      blockHeadersAfterActivationHeight.version.value shouldBe Block.ProtoBlockVersion
-      ByteStr.decodeBase58(blockAtActivationHeight.vrf.value).get.length shouldBe Block.HitSourceLength
-      ByteStr.decodeBase58(blockHeadersAfterActivationHeight.vrf.value).get.length shouldBe Block.HitSourceLength
-      blockAtActivationHeight.transactionsRoot.value shouldBe Base58.encode(Blake2b256.hash(Array(0.toByte)))
-      blockHeadersAfterActivationHeight.transactionsRoot.value shouldBe Base58.encode(Blake2b256.hash(Array(0.toByte)))
+      blockAtCurrentHeight.version.value shouldBe Block.ProtoBlockVersion
+      Base58.decode(blockAtCurrentHeight.id).length shouldBe crypto.DigestLength
+      blockHeadersCurrentHeight.version.value shouldBe Block.ProtoBlockVersion
+      Base58.decode(blockAtCurrentHeight.vrf.value).length shouldBe Block.HitSourceLength
+      Base58.decode(blockHeadersCurrentHeight.vrf.value).length shouldBe Block.HitSourceLength
+      blockAtCurrentHeight.transactionsRoot.value shouldBe Base58.encode(Blake2b256.hash(Array(0.toByte)))
+      blockHeadersCurrentHeight.transactionsRoot.value shouldBe Base58.encode(Blake2b256.hash(Array(0.toByte)))
       generationSignatureInBlockJson shouldBe generationSignatureInConsensusApi
-      generationSignatureInBlockJson.length shouldBe Block.GenerationVRFSignatureLength
+      generationSignatureInBlockJson.arr.length shouldBe Block.GenerationVRFSignatureLength
 
-      blockAtActivationHeight shouldBe blockBySignatureAfterActivation
-      blockAtActivationHeight shouldBe lastBlockAfterActivationHeight
-      blockHeadersAfterActivationHeight shouldBe lastBlockHeadersAfterActivationHeight
-      blockAtActivationHeight.signature shouldBe blockHeadersAfterActivationHeight.signature
-      blockAtActivationHeight.baseTarget shouldBe blockHeadersAfterActivationHeight.baseTarget
-      blockAtActivationHeight.generationSignature shouldBe blockHeadersAfterActivationHeight.generationSignature
+      blockAtCurrentHeight shouldBe blockBySignatureCurrentHeight
+      blockAtCurrentHeight shouldBe lastBlockCurrentHeight
+      blockHeadersCurrentHeight shouldBe lastBlockHeadersCurrentHeight
+      blockAtCurrentHeight.signature shouldBe blockHeadersCurrentHeight.signature
+      blockAtCurrentHeight.baseTarget shouldBe blockHeadersCurrentHeight.baseTarget
+      blockAtCurrentHeight.generationSignature shouldBe blockHeadersCurrentHeight.generationSignature
+    }
 
+    "check block v5 at next height" in {
       //Activation height + 1
       nodes.head.waitForHeight(currentHeight + 1)
 
       val blockAfterVRFUsing = nodes.head.blockAt(currentHeight + 1)
       blockAfterVRFUsing.version.value shouldBe Block.ProtoBlockVersion
-      ByteStr.decodeBase58(blockAfterVRFUsing.generationSignature.get).get.length shouldBe Block.GenerationVRFSignatureLength
+      blockAfterVRFUsing.reference shouldBe nodes.head.blockAt(currentHeight).id
+      Base58.decode(blockAfterVRFUsing.generationSignature.get).length shouldBe Block.GenerationVRFSignatureLength
 
       val blockSeq = nodes.head.blockSeq(currentHeight - 1, currentHeight + 1)
       for (block <- blockSeq) {
         block.version.value shouldBe Block.ProtoBlockVersion
-        ByteStr.decodeBase58(block.generationSignature.get).get.length shouldBe Block.GenerationVRFSignatureLength
-        ByteStr.decodeBase58(block.vrf.value).get.length shouldBe Block.HitSourceLength
+        Base58.decode(block.generationSignature.get).length shouldBe Block.GenerationVRFSignatureLength
+        Base58.decode(block.vrf.value).length shouldBe Block.HitSourceLength
         block.transactionsRoot.value shouldBe Base58.encode(Blake2b256.hash(Array(0.toByte)))
       }
 
       val blockHeadersSeq = nodes.head.blockHeadersSeq(currentHeight - 1, currentHeight + 1)
       for (block <- blockHeadersSeq) {
         block.version.value shouldBe Block.ProtoBlockVersion
-        ByteStr.decodeBase58(block.generationSignature.get).get.length shouldBe Block.GenerationVRFSignatureLength
-        ByteStr.decodeBase58(block.vrf.value).get.length shouldBe Block.HitSourceLength
+        Base58.decode(block.generationSignature.get).length shouldBe Block.GenerationVRFSignatureLength
+        Base58.decode(block.vrf.value).length shouldBe Block.HitSourceLength
         block.transactionsRoot.value shouldBe Base58.encode(Blake2b256.hash(Array(0.toByte)))
       }
 
       val blockSeqByAddress = nodes.head.blockSeqByAddress(nodes.head.address, currentHeight - 1, currentHeight + 1)
       for (block <- blockSeqByAddress) {
         block.version.value shouldBe Block.ProtoBlockVersion
-        ByteStr.decodeBase58(block.generationSignature.get).get.length shouldBe Block.GenerationVRFSignatureLength
-        ByteStr.decodeBase58(block.vrf.value).get.length shouldBe Block.HitSourceLength
+        Base58.decode(block.generationSignature.get).length shouldBe Block.GenerationVRFSignatureLength
+        Base58.decode(block.vrf.value).length shouldBe Block.HitSourceLength
         block.transactionsRoot.value shouldBe Base58.encode(Blake2b256.hash(Array(0.toByte)))
       }
 

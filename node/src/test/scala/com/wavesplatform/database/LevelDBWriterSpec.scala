@@ -6,6 +6,7 @@ import com.google.common.primitives.{Ints, Shorts}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
@@ -14,15 +15,15 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.utils.{BlockchainAddressTransactionsList, _}
+import com.wavesplatform.state.utils._
 import com.wavesplatform.state.{BlockchainUpdaterImpl, Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.utils.Time
-import com.wavesplatform.{RequestGen, TransactionGen, WithDB}
-import org.scalacheck.Gen
+import com.wavesplatform.{RequestGen, TransactionGen, WithDB, database}
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
@@ -47,26 +48,23 @@ class LevelDBWriterSpec
     }
   }
   "Merge" - {
-    import TestFunctionalitySettings.Enabled
     "correctly joins height ranges" in {
-      val fs     = Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccountTrading.id -> 0))
-      val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs, dbSettings)
-      writer.merge(Seq(15, 12, 3), Seq(12, 5)) shouldEqual Seq((15, 12), (12, 12), (3, 5))
-      writer.merge(Seq(12, 5), Seq(15, 12, 3)) shouldEqual Seq((12, 15), (12, 12), (5, 3))
-      writer.merge(Seq(8, 4), Seq(8, 4)) shouldEqual Seq((8, 8), (4, 4))
+      LevelDBWriter.merge(Seq(15, 12, 3), Seq(12, 5)) shouldEqual Seq((15, 12), (12, 12), (3, 5))
+      LevelDBWriter.merge(Seq(12, 5), Seq(15, 12, 3)) shouldEqual Seq((12, 15), (12, 12), (5, 3))
+      LevelDBWriter.merge(Seq(8, 4), Seq(8, 4)) shouldEqual Seq((8, 8), (4, 4))
     }
   }
   "hasScript" - {
     "returns false if a script was not set" in {
-      val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
-      writer.hasScript(accountGen.sample.get.toAddress) shouldBe false
+      val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
+      writer.hasAccountScript(accountGen.sample.get.toAddress) shouldBe false
     }
 
     "returns false if a script was set and then unset" in {
       assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
       resetTest { (_, account) =>
-        val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
-        writer.hasScript(account) shouldBe false
+        val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
+        writer.hasAccountScript(account.toAddress) shouldBe false
       }
     }
 
@@ -74,22 +72,22 @@ class LevelDBWriterSpec
       "if there is a script in db" in {
         assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
         test { (_, account) =>
-          val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
-          writer.hasScript(account) shouldBe true
+          val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
+          writer.hasAccountScript(account.toAddress) shouldBe true
         }
       }
 
       "if there is a script in cache" in {
         assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
         test { (defaultWriter, account) =>
-          defaultWriter.hasScript(account) shouldBe true
+          defaultWriter.hasAccountScript(account.toAddress) shouldBe true
         }
       }
     }
 
     def gen(ts: Long): Gen[(KeyPair, Seq[Block])] = baseGen(ts).map {
       case (master, blocks) =>
-        val nextBlock = TestBlock.create(ts + 1, blocks.last.uniqueId, Seq())
+        val nextBlock = TestBlock.create(ts + 1, blocks.last.id(), Seq())
         (master, blocks :+ nextBlock)
     }
 
@@ -99,13 +97,13 @@ class LevelDBWriterSpec
           .selfSigned(1.toByte, master, None, 5000000, ts + 1)
           .explicitGet()
 
-        val block1 = TestBlock.create(ts + 1, blocks.last.uniqueId, Seq(unsetScriptTx))
-        val block2 = TestBlock.create(ts + 2, block1.uniqueId, Seq())
+        val block1 = TestBlock.create(ts + 1, blocks.last.id(), Seq(unsetScriptTx))
+        val block2 = TestBlock.create(ts + 2, block1.id(), Seq())
         (master, blocks ++ List(block1, block2))
     }
 
     def baseGen(ts: Long): Gen[(KeyPair, Seq[Block])] = accountGen.map { master =>
-      val genesisTx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      val genesisTx = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       val setScriptTx = SetScriptTransaction
         .selfSigned(1.toByte, master, Some(ExprScript(Terms.TRUE).explicitGet()), 5000000, ts)
         .explicitGet()
@@ -121,7 +119,7 @@ class LevelDBWriterSpec
   }
 
   def baseTest(gen: Time => Gen[(KeyPair, Seq[Block])])(f: (LevelDBWriter, KeyPair) => Unit): Unit = {
-    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
+    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers)
@@ -141,7 +139,7 @@ class LevelDBWriterSpec
   }
 
   def testWithBlocks(gen: Time => Gen[(KeyPair, Seq[Block])])(f: (LevelDBWriter, Seq[Block], KeyPair) => Unit): Unit = {
-    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
+    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers)
@@ -171,17 +169,17 @@ class LevelDBWriterSpec
       master    <- accountGen
       recipient <- accountGen
       genesisBlock = TestBlock
-        .create(ts, Seq(GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()))
+        .create(ts, Seq(GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()))
       block1 = TestBlock
         .create(
           ts + 3,
-          genesisBlock.uniqueId,
+          genesisBlock.id(),
           Seq(
             createTransfer(master, recipient.toAddress, ts + 1),
             createTransfer(master, recipient.toAddress, ts + 2)
           )
         )
-      emptyBlock = TestBlock.create(ts + 5, block1.uniqueId, Seq())
+      emptyBlock = TestBlock.create(ts + 5, block1.id(), Seq())
     } yield (master, List(genesisBlock, block1, emptyBlock))
   }
 
@@ -189,34 +187,33 @@ class LevelDBWriterSpec
     val rw = TestLevelDB.withFunctionalitySettings(
       db,
       ignoreSpendableBalanceChanged,
-      TestFunctionalitySettings.Stub.copy(preActivatedFeatures = Map(15.toShort -> 5)),
-      dbSettings
+      TestFunctionalitySettings.Stub.copy(preActivatedFeatures = Map(15.toShort -> 5))
     )
     val settings0 = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu       = new BlockchainUpdaterImpl(rw, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers)
     try {
-      val master    = KeyPair("master".getBytes())
-      val recipient = KeyPair("recipient".getBytes())
+      val master    = KeyPair(ByteStr("master".getBytes()))
+      val recipient = KeyPair(ByteStr("recipient".getBytes()))
 
       val ts = System.currentTimeMillis()
 
       val genesisBlock = TestBlock
-        .create(ts, Seq(GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()))
+        .create(ts, Seq(GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()))
       val block1 = TestBlock
         .create(
           ts + 3,
-          genesisBlock.uniqueId,
+          genesisBlock.id(),
           Seq(
             createTransfer(master, recipient.toAddress, ts + 1),
             createTransfer(master, recipient.toAddress, ts + 2)
           )
         )
-      val block2 = TestBlock.create(ts + 5, block1.uniqueId, Seq())
+      val block2 = TestBlock.create(ts + 5, block1.id(), Seq())
       val block3 = TestBlock
         .create(
           ts + 10,
-          block2.uniqueId,
+          block2.id(),
           Seq(
             createTransfer(master, recipient.toAddress, ts + 6),
             createTransfer(master, recipient.toAddress, ts + 7)
@@ -226,7 +223,7 @@ class LevelDBWriterSpec
       val block4 = TestBlock
         .create(
           ts + 17,
-          block3.uniqueId,
+          block3.id(),
           Seq(
             createTransfer(master, recipient.toAddress, ts + 13),
             createTransfer(master, recipient.toAddress, ts + 14)
@@ -237,7 +234,7 @@ class LevelDBWriterSpec
       val block5 = TestBlock
         .create(
           ts + 24,
-          block4.uniqueId,
+          block4.id(),
           Seq(
             createTransfer(master, recipient.toAddress, ts + 20),
             createTransfer(master, recipient.toAddress, ts + 21)
@@ -252,23 +249,22 @@ class LevelDBWriterSpec
       bcu.processBlock(block4, block4.header.generationSignature) shouldBe 'right
       bcu.processBlock(block5, block5.header.generationSignature) shouldBe 'right
 
-      bcu.blockAt(1).get shouldBe genesisBlock
-      bcu.blockAt(2).get shouldBe block1
-      bcu.blockAt(3).get shouldBe block2
-      bcu.blockAt(4).get shouldBe block3
-      bcu.blockAt(5).get shouldBe block4
-      bcu.blockAt(6).get shouldBe block5
+      def blockAt(height: Int): Option[Block] =
+        bcu.liquidBlockMeta
+          .filter(_ => bcu.height == height)
+          .flatMap(m => bcu.liquidBlock(m.id))
+          .orElse(db.readOnly(ro => database.loadBlock(Height(height), ro)))
+
+      blockAt(1).get shouldBe genesisBlock
+      blockAt(2).get shouldBe block1
+      blockAt(3).get shouldBe block2
+      blockAt(4).get shouldBe block3
+      blockAt(5).get shouldBe block4
+      blockAt(6).get shouldBe block5
 
       for (i <- 1 to db.get(Keys.height)) {
-        db.get(Keys.blockInfoAt(Height(i))).isDefined shouldBe true
+        db.get(Keys.blockMetaAt(Height(i))).isDefined shouldBe true
       }
-
-      bcu.blockBytes(1).get shouldBe genesisBlock.bytes()
-      bcu.blockBytes(2).get shouldBe block1.bytes()
-      bcu.blockBytes(3).get shouldBe block2.bytes()
-      bcu.blockBytes(4).get shouldBe block3.bytes()
-      bcu.blockBytes(5).get shouldBe block4.bytes()
-      bcu.blockBytes(6).get shouldBe block5.bytes()
 
     } finally {
       bcu.shutdown()
@@ -278,91 +274,45 @@ class LevelDBWriterSpec
 
   "addressTransactions" - {
 
-    "return txs in correct ordering without fromId" in {
-      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 3, None)
-          .explicitGet()
-
-        val ordering = Ordering
-          .by[(Int, Transaction), (Int, Long)]({ case (h, t) => (-h, -t.timestamp) })
-
-        txs.length shouldBe 2
-
-        txs.sorted(ordering) shouldBe txs
-      }
-    }
-
-    "correctly applies transaction type filter" in {
-      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(GenesisTransaction.typeId), 10, None)
-          .explicitGet()
-
-        txs.length shouldBe 1
-      }
-    }
-
-    "return Left if fromId argument is a non-existent transaction" in {
-      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-        val nonExistentTxId = GenesisTransaction.create(account, ENOUGH_AMT, 1).explicitGet().id()
-
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 3, Some(nonExistentTxId))
-
-        txs shouldBe Left(s"Transaction $nonExistentTxId does not exist")
-      }
-    }
-
-    "return txs in correct ordering starting from a given id" in {
-      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-        // using pagination
-        val firstTx = writer
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 1, None)
-          .explicitGet()
-          .head
-
-        val secondTx = writer
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 1, Some(firstTx._2.id()))
-          .explicitGet()
-          .head
-
-        // without pagination
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 2, None)
-          .explicitGet()
-
-        txs shouldBe Seq(firstTx, secondTx)
-      }
-    }
-
-    "return an empty Seq when paginating from the last transaction" in {
-      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 2, None)
-          .explicitGet()
-
-        val txsFromLast = writer
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 2, Some(txs.last._2.id()))
-          .explicitGet()
-
-        txs.length shouldBe 2
-        txsFromLast shouldBe Seq.empty
-      }
-    }
-
     "don't parse irrelevant transactions in transferById" ignore {
-      val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
+      val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
 
       forAll(randomTransactionGen) { tx =>
         val transactionId = tx.id()
         db.put(Keys.transactionHNById(TransactionId @@ transactionId).keyBytes, Ints.toByteArray(1) ++ Shorts.toByteArray(0))
-        db.put(Keys.transactionBytesAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](1, 2, 3, 4, 5, 6))
+        db.put(Keys.transferTransactionAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](1, 2, 3, 4, 5, 6))
 
         writer.transferById(transactionId) shouldBe None
 
-        db.put(Keys.transactionBytesAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))
+        db.put(Keys.transferTransactionAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))
         intercept[BufferUnderflowException](writer.transferById(transactionId))
+      }
+    }
+  }
+
+  "readTransactionBytes" - {
+    "reads correct failed transactions" in {
+      val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
+
+      val scenario =
+        for {
+          oldBytesTx <- randomTransactionGen.map(tx => (tx, true))
+          newBytesTx <- Gen
+            .oneOf(
+              exchangeTransactionGen.map(tx => tx.copy(version = TxVersion.V3)),
+              invokeScriptGen(paymentListGen).map(tx => tx.copy(version = TxVersion.V3))
+            )
+            .flatMap(tx => Arbitrary.arbBool.arbitrary.map(s => (tx, s)))
+          (tx, status) <- Gen.oneOf(oldBytesTx, newBytesTx)
+        } yield (tx, status)
+
+      forAll(scenario) {
+        case (tx, s) =>
+          val transactionId = tx.id()
+          db.put(Keys.transactionHNById(TransactionId(transactionId)).keyBytes, database.writeTransactionHN((Height(1), TxNum(0.toShort))))
+          db.put(Keys.transactionAt(Height(1), TxNum(0.toShort)).keyBytes, database.writeTransaction((tx, s)))
+
+          writer.transactionInfo(transactionId) shouldBe Some((1, tx, s))
       }
     }
   }

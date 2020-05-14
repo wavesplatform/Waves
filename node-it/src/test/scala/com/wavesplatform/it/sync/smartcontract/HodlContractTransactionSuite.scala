@@ -16,14 +16,14 @@ import org.scalatest.CancelAfterFailure
 
 class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  private val contract = pkByAddress(firstAddress)
-  private val caller   = pkByAddress(secondAddress)
+  private val contract = firstAddress
+  private val caller   = secondAddress
 
   test("setup contract account with waves") {
     sender
       .transfer(
         sender.address,
-        recipient = contract.stringRepr,
+        recipient = contract,
         assetId = None,
         amount = 5.waves,
         fee = minFee,
@@ -36,7 +36,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
     sender
       .transfer(
         sender.address,
-        recipient = caller.stringRepr,
+        recipient = caller,
         assetId = None,
         amount = 10.waves,
         fee = minFee,
@@ -87,9 +87,9 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         """.stripMargin
 
     val script      = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
-    val setScriptId = sender.setScript(contract.stringRepr, Some(script), setScriptFee, waitForTx = true).id
+    val setScriptId = sender.setScript(contract, Some(script), setScriptFee, waitForTx = true).id
 
-    val acc0ScriptInfo = sender.addressScriptInfo(contract.stringRepr)
+    val acc0ScriptInfo = sender.addressScriptInfo(contract)
 
     acc0ScriptInfo.script.isEmpty shouldBe false
     acc0ScriptInfo.scriptText.isEmpty shouldBe false
@@ -99,11 +99,11 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
   }
 
   test("caller deposits waves") {
-    val balanceBefore = sender.accountBalances(contract.stringRepr)._1
+    val balanceBefore = sender.accountBalances(contract)._1
     val invokeScriptId = sender
       .invokeScript(
-        caller.stringRepr,
-        dappAddress = contract.stringRepr,
+        caller,
+        dappAddress = contract,
         func = Some("deposit"),
         args = List.empty,
         payment = Seq(InvokeScriptTransaction.Payment(1.5.waves, Waves)),
@@ -114,32 +114,32 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     sender.waitForTransaction(invokeScriptId)
 
-    sender.getDataByKey(contract.stringRepr, caller.stringRepr) shouldBe IntegerDataEntry(caller.stringRepr, 1.5.waves)
-    val balanceAfter = sender.accountBalances(contract.stringRepr)._1
+    sender.getDataByKey(contract, caller) shouldBe IntegerDataEntry(caller, 1.5.waves)
+    val balanceAfter = sender.accountBalances(contract)._1
 
     (balanceAfter - balanceBefore) shouldBe 1.5.waves
   }
 
   test("caller can't withdraw more than owns") {
-    assertBadRequestAndMessage(
-      sender.invokeScript(
-        caller.stringRepr,
-        contract.stringRepr,
-        func = Some("withdraw"),
-        args = List(CONST_LONG(1.51.waves)),
-        payment = Seq(),
-        fee = 1.waves
-      ),
-      "Not enough balance"
-    )
+    val tx = sender.invokeScript(
+      caller,
+      contract,
+      func = Some("withdraw"),
+      args = List(CONST_LONG(1.51.waves)),
+      payment = Seq(),
+      fee = 1.waves,
+      waitForTx = true
+    )._1.id
+
+    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("Not enough balance")
   }
 
   test("caller can withdraw less than he owns") {
-    val balanceBefore = sender.accountBalances(contract.stringRepr)._1
+    val balanceBefore = sender.accountBalances(contract)._1
     val invokeScriptId = sender
       .invokeScript(
-        caller.stringRepr,
-        dappAddress = contract.stringRepr,
+        caller,
+        dappAddress = contract,
         func = Some("withdraw"),
         args = List(CONST_LONG(1.49.waves)),
         payment = Seq(),
@@ -148,9 +148,9 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
       )
       ._1.id
 
-    val balanceAfter = sender.accountBalances(contract.stringRepr)._1
+    val balanceAfter = sender.accountBalances(contract)._1
 
-    sender.getDataByKey(contract.stringRepr, caller.stringRepr) shouldBe IntegerDataEntry(caller.stringRepr, 0.01.waves)
+    sender.getDataByKey(contract, caller) shouldBe IntegerDataEntry(caller, 0.01.waves)
     (balanceAfter - balanceBefore) shouldBe -1.49.waves
 
     val stateChangesInfo = sender.debugStateChanges(invokeScriptId).stateChanges
@@ -162,7 +162,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     val stateChangesTransfers = stateChangesInfo.get.transfers.head
     stateChangesInfo.get.transfers.length shouldBe 1
-    stateChangesTransfers.address shouldBe caller.stringRepr
+    stateChangesTransfers.address shouldBe caller
     stateChangesTransfers.amount shouldBe 1.49.waves
     stateChangesTransfers.asset shouldBe None
   }

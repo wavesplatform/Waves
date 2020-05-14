@@ -52,9 +52,9 @@ object InvokeScriptTxSerializer {
     version match {
       case TxVersion.V1 =>
         Bytes.concat(
-          Array(builder.typeId, version, chainByte),
-          sender,
-          dAppAddressOrAlias.bytes.arr,
+          Array(builder.typeId, version, chainId),
+          sender.arr,
+          dAppAddressOrAlias.bytes,
           Deser.serializeOption(funcCallOpt)(Serde.serialize(_)),
           Deser.serializeArrays(payments.map(pmt => Longs.toByteArray(pmt.amount) ++ pmt.assetId.byteRepr)),
           Longs.toByteArray(fee),
@@ -81,7 +81,8 @@ object InvokeScriptTxSerializer {
 
     val buf = ByteBuffer.wrap(bytes)
     require(buf.getByte == 0 && buf.getByte == InvokeScriptTransaction.typeId && buf.getByte == 1, "transaction type mismatch")
-    require(buf.getByte == AddressScheme.current.chainId, "chainId mismatch")
+    val chainId = buf.getByte
+    require(chainId == AddressScheme.current.chainId, "chainId mismatch")
 
     val sender       = buf.getPublicKey
     val dApp         = buf.getAddressOrAlias
@@ -90,6 +91,6 @@ object InvokeScriptTxSerializer {
     val fee          = buf.getLong
     val feeAssetId   = buf.getAsset
     val timestamp    = buf.getLong
-    InvokeScriptTransaction(TxVersion.V1, sender, dApp, functionCall, payments, fee, feeAssetId, timestamp, buf.getProofs)
+    InvokeScriptTransaction(TxVersion.V1, sender, dApp, functionCall, payments, fee, feeAssetId, timestamp, buf.getProofs, chainId)
   }
 }

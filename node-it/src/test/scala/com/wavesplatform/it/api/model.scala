@@ -6,7 +6,6 @@ import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.transfer.Attachment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import io.grpc.{Metadata, Status => GrpcStatus}
-import org.scalatest.Assertions
 import play.api.libs.json._
 
 import scala.util.{Failure, Success}
@@ -51,6 +50,11 @@ object AssetBalance {
 case class CompiledScript(script: String, complexity: Long, extraFee: Long)
 object CompiledScript {
   implicit val compiledScriptFormat: Format[CompiledScript] = Json.format
+}
+
+case class EstimatedScript(script: String, scriptText: String, complexity: Long, extraFee: Long)
+object EstimatedScript {
+  implicit val estimatedScriptFormat: Format[EstimatedScript] = Json.format
 }
 
 case class DecompiledScript(script: String)
@@ -99,7 +103,9 @@ case class AssetInfo(
     originTransactionId: String,
     minSponsoredAssetFee: Option[Long],
     scriptDetails: Option[ScriptAssetInfo]
-)
+) {
+  def isNFT: Boolean = decimals == 0 && quantity == 1 && !reissuable
+}
 object AssetInfo {
   implicit val AssetInfoFormat: Format[AssetInfo] = Json.format
 }
@@ -285,7 +291,8 @@ case class TransactionStatus(
     id: String,
     status: String,
     confirmations: Option[Int],
-    height: Option[Int]
+    height: Option[Int],
+    applicationStatus: Option[String]
 )
 object TransactionStatus {
   implicit val format: Format[TransactionStatus] = Json.format
@@ -321,7 +328,8 @@ case class StateChangesDetails(
     transfers: Seq[TransfersInfoResponse],
     issues: Seq[IssueInfoResponse],
     reissues: Seq[ReissueInfoResponse],
-    burns: Seq[BurnInfoResponse]
+    burns: Seq[BurnInfoResponse],
+    errorMessage: Option[ErrorMessageInfoResponse]
 )
 object StateChangesDetails {
   implicit val stateChangeResponseFormat: Format[StateChangesDetails] = Json.format[StateChangesDetails]
@@ -586,7 +594,7 @@ case class IssueInfoResponse(
     decimals: Int,
     isReissuable: Boolean,
     compiledScript: Option[String],
-    nonce: Int
+    nonce: Long
 )
 object IssueInfoResponse {
   implicit val IssueInfoFormat: Format[IssueInfoResponse] = Json.format
@@ -600,6 +608,11 @@ object ReissueInfoResponse {
 case class BurnInfoResponse(assetId: String, quantity: Long)
 object BurnInfoResponse {
   implicit val burnInfoFormat: Format[BurnInfoResponse] = Json.format
+}
+
+case class ErrorMessageInfoResponse(code: Int, text: String)
+object ErrorMessageInfoResponse {
+  implicit val errorMessageInfoFormat: Format[ErrorMessageInfoResponse] = Json.format
 }
 
 case class ExchangeTransaction(
@@ -624,7 +637,9 @@ object ExchangeTransaction {
 }
 
 case class Block(
+    id: String,
     signature: String,
+    reference: String,
     height: Int,
     timestamp: Long,
     generator: String,
@@ -646,7 +661,9 @@ object Block {
   implicit val blockFormat: Format[Block] = Format(
     Reads( jsv =>
       for {
+        id <- (jsv \ "id").validate[String]
         signature <- (jsv \ "signature").validate[String]
+        reference <- (jsv \ "reference").validate[String]
         height <- (jsv \ "height").validate[Int]
         timestamp <- (jsv \ "timestamp").validate[Long]
         generator <- (jsv \ "generator").validate[String]
@@ -664,7 +681,9 @@ object Block {
         transactionsRoot <- (jsv \ "transactionsRoot").validateOpt[String]
         vrf <- (jsv \ "VRF").validateOpt[String]
       } yield Block(
+        id,
         signature,
+        reference,
         height,
         timestamp,
         generator,
@@ -687,7 +706,8 @@ object Block {
   )
 }
 
-case class BlockHeaders(
+case class BlockHeader(
+    id: String,
     signature: String,
     height: Int,
     timestamp: Long,
@@ -704,10 +724,11 @@ case class BlockHeaders(
     vrf: Option[String],
     version: Option[Byte] = None
 )
-object BlockHeaders {
-  implicit val blockHeadersFormat: Format[BlockHeaders] = Format(
+object BlockHeader {
+  implicit val blockHeadersFormat: Format[BlockHeader] = Format(
     Reads( jsv =>
       for {
+        id <- (jsv \ "id").validate[String]
         signature <- (jsv \ "signature").validate[String]
         height <- (jsv \ "height").validate[Int]
         timestamp <- (jsv \ "timestamp").validate[Long]
@@ -723,7 +744,8 @@ object BlockHeaders {
         baseTarget <- (jsv \ "nxt-consensus" \ "base-target").validateOpt[Int]
         transactionsRoot <- (jsv \ "transactionsRoot").validateOpt[String]
         vrf <- (jsv \ "VRF").validateOpt[String]
-      } yield BlockHeaders(
+      } yield BlockHeader(
+        id,
         signature,
         height,
         timestamp,
@@ -741,7 +763,7 @@ object BlockHeaders {
         version
       )
     ),
-    Json.writes[BlockHeaders]
+    Json.writes[BlockHeader]
   )
 }
 

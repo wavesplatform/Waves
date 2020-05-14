@@ -2,7 +2,7 @@ package com.wavesplatform.it
 
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
 import com.wavesplatform.api.http.requests.IssueRequest
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi.AssertiveApiError
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.Script
@@ -20,7 +20,9 @@ package object sync {
   val reissueFee: Long                 = 1.waves
   val reissueReducedFee: Long          = 0.001.waves
   val burnFee: Long                    = 0.001.waves
+  val invokeFee: Long                  = 0.009.waves
   val sponsorFee: Long                 = 1.waves
+  val sponsorReducedFee: Long          = 0.001.waves
   val setAssetScriptFee: Long          = 1.waves
   val setScriptFee: Long               = 0.01.waves
   val transferAmount: Long             = 10.waves
@@ -40,7 +42,7 @@ package object sync {
         minFee * (dataSize / 1024 + 1)
       } else minFee
     } else {
-      val payload = DataTransactionData(data.map(dataEntry => PBTransactions.toPBDataEntry(dataEntry))).toByteArray
+      val payload   = DataTransactionData(data.map(dataEntry => PBTransactions.toPBDataEntry(dataEntry))).toByteArray
       val feeInUnit = 1 + (payload.length - 1) / 1024
       feeInUnit * 100000
     }
@@ -50,20 +52,20 @@ package object sync {
     minFee + massTransferFeePerTransfer * (numberOfRecipients + 1)
   }
 
-  val supportedVersions: List[Byte] = List(1, 2, 3)
-  val burnTxSupportedVersions: List[Byte] = List(1, 2, 3)
-  val leaseTxSupportedVersions: List[Byte] = List(1, 2, 3)
-  val dataTxSupportedVersions: List[Byte] = List(1, 2)
+  val supportedVersions: List[Byte]               = List(1, 2, 3)
+  val burnTxSupportedVersions: List[Byte]         = List(1, 2, 3)
+  val leaseTxSupportedVersions: List[Byte]        = List(1, 2, 3)
+  val dataTxSupportedVersions: List[Byte]         = List(1, 2)
   val massTransferTxSupportedVersions: List[Byte] = List(1, 2)
-  val sponsorshipTxSupportedVersions: List[Byte] = List(1, 2)
-  val setAssetScrTxSupportedVersions: List[Byte] = List(1, 2)
-  val issueTxSupportedVersions: List[Byte] = List(1, 2, 3)
-  val transferTxSupportedVersions: List[Byte] = List(1, 2, 3)
-  val aliasTxSupportedVersions: List[Byte] = List(1, 2, 3)
-  val reissueTxSupportedVersions: List[Byte] = List(1, 2, 3)
+  val sponsorshipTxSupportedVersions: List[Byte]  = List(1, 2)
+  val setAssetScrTxSupportedVersions: List[Byte]  = List(1, 2)
+  val issueTxSupportedVersions: List[Byte]        = List(1, 2, 3)
+  val transferTxSupportedVersions: List[Byte]     = List(1, 2, 3)
+  val aliasTxSupportedVersions: List[Byte]        = List(1, 2, 3)
+  val reissueTxSupportedVersions: List[Byte]      = List(1, 2, 3)
 
-  val script: Script       = ScriptCompiler(s"""true""".stripMargin, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
-  val scriptBase64: String = script.bytes.value.base64
+  val script: Script          = ScriptCompiler(s"""true""".stripMargin, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
+  val scriptBase64: String    = script.bytes.value.base64
   val scriptBase64Raw: String = script.bytes.value.base64Raw
 
   val errNotAllowedByToken = "Transaction is not allowed by token-script"
@@ -79,7 +81,7 @@ package object sync {
     IssueRequest(
       Some(tx.version),
       None,
-      Some(Base58.encode(tx.sender)),
+      Some(tx.sender.toString),
       tx.name.toStringUtf8,
       tx.description.toStringUtf8,
       quantity,

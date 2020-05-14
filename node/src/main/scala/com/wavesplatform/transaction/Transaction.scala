@@ -1,9 +1,8 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -14,9 +13,10 @@ trait Transaction {
   def builder: TransactionParser
   def assetFee: (Asset, Long)
   def timestamp: Long
-  def chainByte: Byte = AddressScheme.current.chainId
+  def chainId: Byte
 
-  def bytesSize: Int = bytes().length
+  def bytesSize: Int         = bytes().length
+  val protoSize: Coeval[Int] = Coeval(PBTransactions.protobuf(this).serializedSize)
   val bytes: Coeval[Array[Byte]]
   val json: Coeval[JsObject]
 
@@ -38,12 +38,4 @@ object Transaction {
 
   val V1: TxVersion = TxVersion.V1
   val V2: TxVersion = TxVersion.V2
-
-  implicit class TransactionExt(tx: Transaction) {
-    def feeDiff(): Portfolio = tx.assetFee match {
-      case (asset @ IssuedAsset(_), fee) =>
-        Portfolio(balance = 0, lease = LeaseBalance.empty, assets = Map(asset -> fee))
-      case (Waves, fee) => Portfolio(balance = fee, lease = LeaseBalance.empty, assets = Map.empty)
-    }
-  }
 }

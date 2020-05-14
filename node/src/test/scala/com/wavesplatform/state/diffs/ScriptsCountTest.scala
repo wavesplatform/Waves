@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats.kernel.Monoid
 import com.wavesplatform.common.utils._
+import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.Script
@@ -19,8 +20,8 @@ import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
-import org.scalatest.{Inside, Matchers, PropSpec}
+import com.wavesplatform.{NoShrink, TransactionGen}
+import org.scalatest.{Inside, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 object ScriptsCountTest {
@@ -33,7 +34,7 @@ object ScriptsCountTest {
     import com.wavesplatform.transaction.{Authorized, Transaction}
 
     val smartAccountRun = tx match {
-      case x: Transaction with Authorized if blockchain.hasScript(x.sender) => 1
+      case x: Transaction with Authorized if blockchain.hasAccountScript(x.sender.toAddress) => 1
       case _                                                                => 0
     }
 
@@ -62,7 +63,7 @@ object ScriptsCountTest {
 }
 
 //noinspection NameBooleanParameters
-class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB with Inside {
+class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink with Inside {
 
   private val fs = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
@@ -97,14 +98,14 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
       master <- accountGen
       acc    <- accountGen
       ts     <- timestampGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       fee                         = 1000000000L
       setContract                 = SetScriptTransaction.selfSigned(1.toByte, master, Some(allAllowed), fee, ts).explicitGet()
       resetContract               = SetScriptTransaction.selfSigned(1.toByte, master, Some(allAllowed), fee, ts + 1).explicitGet()
       (_, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
       issueSp = IssueTransaction(
           TxVersion.V2,
-          master,
+          master.publicKey,
           assetName,
           description,
           quantity + 1000000000L,
@@ -113,7 +114,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
           None,
           iFee,
           timestamp
-        ).signWith(master)
+        ).signWith(master.privateKey)
       sponsorTx = SponsorFeeTransaction.selfSigned(1.toByte, master, IssuedAsset(issueSp.id()), Some(1), fee, timestamp).explicitGet()
       burnSp    = BurnTransaction.selfSigned(2.toByte, master, IssuedAsset(issueSp.id()), 1, fee, timestamp).explicitGet()
       reissueSp = ReissueTransaction
@@ -121,7 +122,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
         .explicitGet()
       issueScr = IssueTransaction(
           TxVersion.V2,
-          master,
+          master.publicKey,
           assetName,
           description,
           quantity + 1000000000L,
@@ -130,45 +131,45 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
           Some(allAllowed),
           iFee,
           timestamp
-        ).signWith(master)
+        ).signWith(master.privateKey)
       burnScr = BurnTransaction.selfSigned(2.toByte, master, IssuedAsset(issueScr.id()), 1, fee, timestamp).explicitGet()
       reissueScr = ReissueTransaction
         .selfSigned(2.toByte, master, IssuedAsset(issueScr.id()), 1, true, fee, timestamp)
         .explicitGet()
       assetScript = SetAssetScriptTransaction
-        .create(1.toByte, master, IssuedAsset(issueScr.id()), Some(allAllowed), fee, timestamp, Proofs.empty)
+        .create(1.toByte, master.publicKey, IssuedAsset(issueScr.id()), Some(allAllowed), fee, timestamp, Proofs.empty)
         .explicitGet()
       data = DataTransaction.selfSigned(1.toByte, master, List(BooleanDataEntry("q", true)), 15000000, timestamp).explicitGet()
       tr1 = TransferTransaction
-        .selfSigned(2.toByte, master, acc, Waves, 10000000000L, Waves, fee, None, timestamp)
+        .selfSigned(2.toByte, master, acc.toAddress, Waves, 10000000000L, Waves, fee, None, timestamp)
         .explicitGet()
       tr2 = TransferTransaction
-        .selfSigned(2.toByte, master, acc, IssuedAsset(issueScr.id()), 1000000000L, Waves, fee, None, timestamp)
+        .selfSigned(2.toByte, master, acc.toAddress, IssuedAsset(issueScr.id()), 1000000000L, Waves, fee, None, timestamp)
         .explicitGet()
-      mt1 = MassTransferTransaction.selfSigned(1.toByte, master, Waves, List(ParsedTransfer(acc, 1)), fee, timestamp, None).explicitGet()
+      mt1 = MassTransferTransaction.selfSigned(1.toByte, master, Waves, List(ParsedTransfer(acc.toAddress, 1)), fee, timestamp, None).explicitGet()
       mt2 = MassTransferTransaction
-        .selfSigned(1.toByte, master, IssuedAsset(issueScr.id()), List(ParsedTransfer(acc, 1)), fee, timestamp, None)
+        .selfSigned(1.toByte, master, IssuedAsset(issueScr.id()), List(ParsedTransfer(acc.toAddress, 1)), fee, timestamp, None)
         .explicitGet()
-      l  = LeaseTransaction.selfSigned(2.toByte, master, acc, 1, fee, timestamp).explicitGet()
+      l  = LeaseTransaction.selfSigned(2.toByte, master, acc.toAddress, 1, fee, timestamp).explicitGet()
       lc = LeaseCancelTransaction.signed(2.toByte, master.publicKey, l.id(), fee, timestamp + 1, master.privateKey).explicitGet()
 
       assetPair = AssetPair(IssuedAsset(issueScr.id()), IssuedAsset(issueSp.id()))
-      o1        = Order.buy(2: Byte, master, master, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
-      o2        = Order.sell(2: Byte, acc, master, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
+      o1        = Order.buy(2: Byte, master, master.publicKey, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
+      o2        = Order.sell(2: Byte, acc, master.publicKey, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
       exchange = ExchangeTransaction
-        .signed(TxVersion.V2, master, o1, o2, 100000000L, 100000000L, 1, 1, (1 + 1) / 2, 10000L - 100)
+        .signed(TxVersion.V2, master.privateKey, o1, o2, 100000000L, 100000000L, 1, 1, (1 + 1) / 2, 10000L - 100)
         .explicitGet()
 
-      o1a = Order.buy(2: Byte, master, acc, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
-      o2a = Order.sell(2: Byte, acc, acc, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
+      o1a = Order.buy(2: Byte, master, acc.publicKey, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
+      o2a = Order.sell(2: Byte, acc, acc.publicKey, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
       exchangea = ExchangeTransaction
-        .signed(TxVersion.V2, acc, o1a, o2a, 100000000L, 100000000L, 1, 1, (1 + 1) / 2, 10000L - 100)
+        .signed(TxVersion.V2, acc.privateKey, o1a, o2a, 100000000L, 100000000L, 1, 1, (1 + 1) / 2, 10000L - 100)
         .explicitGet()
 
       setContractB = SetScriptTransaction.selfSigned(1.toByte, acc, Some(allAllowed), fee, ts).explicitGet()
       issueScrB = IssueTransaction(
           TxVersion.V2,
-          acc,
+          acc.publicKey,
           assetName,
           description,
           quantity + 1000000000L,
@@ -177,12 +178,12 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
           Some(allAllowed),
           iFee,
           timestamp
-        ).signWith(acc)
+        ).signWith(acc.privateKey)
       assetPairB = AssetPair(IssuedAsset(issueScrB.id()), IssuedAsset(issueScr.id()))
-      o1b        = Order.buy(2: Byte, master, master, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1)
-      o2b        = Order.sell(2: Byte, acc, master, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1)
+      o1b        = Order.buy(2: Byte, master, master.publicKey, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1)
+      o2b        = Order.sell(2: Byte, acc, master.publicKey, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1)
       exchangeB = ExchangeTransaction
-        .signed(TxVersion.V2, master, o1b, o2b, 100000001L, 100000001L, 1, 1, (1 + 1) / 2, 10000L - 100)
+        .signed(TxVersion.V2, master.privateKey, o1b, o2b, 100000001L, 100000001L, 1, 1, (1 + 1) / 2, 10000L - 100)
         .explicitGet()
     } yield {
       val txs = Seq[Transaction](
@@ -235,7 +236,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
       master <- accountGen
       acc    <- accountGen
       ts     <- timestampGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       fee                         = 1000000000L
       setContract                 = SetScriptTransaction.selfSigned(1.toByte, master, Some(allAllowed), fee, ts).explicitGet()
       resetContract               = SetScriptTransaction.selfSigned(1.toByte, master, Some(allAllowed), fee, ts + 1).explicitGet()
@@ -260,7 +261,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
         .explicitGet()
       issueScr = IssueTransaction(
           TxVersion.V2,
-          master,
+          master.publicKey,
           assetName,
           description,
           quantity + 1000000000L,
@@ -269,46 +270,46 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
           Some(allAllowed),
           iFee,
           timestamp
-        ).signWith(master)
+        ).signWith(master.privateKey)
 
       burnScr = BurnTransaction.selfSigned(2.toByte, master, IssuedAsset(issueScr.id()), 1, fee, timestamp).explicitGet()
       reissueScr = ReissueTransaction
         .selfSigned(2.toByte, master, IssuedAsset(issueScr.id()), 1, true, fee, timestamp)
         .explicitGet()
       assetScript = SetAssetScriptTransaction
-        .create(1.toByte, master, IssuedAsset(issueScr.id()), Some(allAllowed), fee, timestamp, Proofs.empty)
+        .create(1.toByte, master.publicKey, IssuedAsset(issueScr.id()), Some(allAllowed), fee, timestamp, Proofs.empty)
         .explicitGet()
       data = DataTransaction.selfSigned(1.toByte, master, List(BooleanDataEntry("q", true)), 15000000, timestamp).explicitGet()
       tr1 = TransferTransaction
-        .selfSigned(2.toByte, master, acc, Waves, 10000000000L, Waves, fee, None, timestamp)
+        .selfSigned(2.toByte, master, acc.toAddress, Waves, 10000000000L, Waves, fee, None, timestamp)
         .explicitGet()
       tr2 = TransferTransaction
-        .selfSigned(2.toByte, master, acc, IssuedAsset(issueScr.id()), 1000000000L, Waves, fee, None, timestamp)
+        .selfSigned(2.toByte, master, acc.toAddress, IssuedAsset(issueScr.id()), 1000000000L, Waves, fee, None, timestamp)
         .explicitGet()
-      mt1 = MassTransferTransaction.selfSigned(1.toByte, master, Waves, List(ParsedTransfer(acc, 1)), fee, timestamp, None).explicitGet()
+      mt1 = MassTransferTransaction.selfSigned(1.toByte, master, Waves, List(ParsedTransfer(acc.toAddress, 1)), fee, timestamp, None).explicitGet()
       mt2 = MassTransferTransaction
-        .selfSigned(1.toByte, master, IssuedAsset(issueScr.id()), List(ParsedTransfer(acc, 1)), fee, timestamp, None)
+        .selfSigned(1.toByte, master, IssuedAsset(issueScr.id()), List(ParsedTransfer(acc.toAddress, 1)), fee, timestamp, None)
         .explicitGet()
-      l  = LeaseTransaction.selfSigned(2.toByte, master, acc, 1, fee, timestamp).explicitGet()
+      l  = LeaseTransaction.selfSigned(2.toByte, master, acc.toAddress, 1, fee, timestamp).explicitGet()
       lc = LeaseCancelTransaction.signed(2.toByte, master.publicKey, l.id(), fee, timestamp + 1, master.privateKey).explicitGet()
 
       assetPair = AssetPair(IssuedAsset(issueScr.id()), IssuedAsset(issueSp.id()))
-      o1        = Order.buy(2: Byte, master, master, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
-      o2        = Order.sell(2: Byte, acc, master, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
+      o1        = Order.buy(2: Byte, master, master.publicKey, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
+      o2        = Order.sell(2: Byte, acc, master.publicKey, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
       exchange = ExchangeTransaction
-        .signed(TxVersion.V2, master, o1, o2, 100000000L, 100000000L, 1, 1, (1 + 1) / 2, 10000L - 100)
+        .signed(TxVersion.V2, master.privateKey, o1, o2, 100000000L, 100000000L, 1, 1, (1 + 1) / 2, 10000L - 100)
         .explicitGet()
 
-      o1a = Order.buy(2: Byte, master, acc, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
-      o2a = Order.sell(2: Byte, acc, acc, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
+      o1a = Order.buy(2: Byte, master, acc.publicKey, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
+      o2a = Order.sell(2: Byte, acc, acc.publicKey, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
       exchangea = ExchangeTransaction
-        .signed(TxVersion.V2, acc, o1a, o2a, 100000000L, 100000000L, 1, 1, (1 + 1) / 2, 10000L - 100)
+        .signed(TxVersion.V2, acc.privateKey, o1a, o2a, 100000000L, 100000000L, 1, 1, (1 + 1) / 2, 10000L - 100)
         .explicitGet()
 
       setContractB = SetScriptTransaction.selfSigned(1.toByte, acc, Some(allAllowed), fee, ts).explicitGet()
       issueScrB = IssueTransaction(
           TxVersion.V2,
-          acc,
+          acc.publicKey,
           assetName,
           description,
           quantity + 1000000000L,
@@ -317,12 +318,12 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
           Some(allAllowed),
           iFee,
           timestamp
-        ).signWith(acc)
+        ).signWith(acc.privateKey)
       assetPairB = AssetPair(IssuedAsset(issueScrB.id()), IssuedAsset(issueScr.id()))
-      o1b        = Order.buy(2: Byte, master, master, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1)
-      o2b        = Order.sell(2: Byte, acc, master, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1)
+      o1b        = Order.buy(2: Byte, master, master.publicKey, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1)
+      o2b        = Order.sell(2: Byte, acc, master.publicKey, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1)
       exchangeB = ExchangeTransaction
-        .signed(TxVersion.V2, master, o1b, o2b, 100000001L, 100000001L, 1, 1, (1 + 1) / 2, 10000L - 100)
+        .signed(TxVersion.V2, master.privateKey, o1b, o2b, 100000001L, 100000001L, 1, 1, (1 + 1) / 2, 10000L - 100)
         .explicitGet()
     } yield {
       assertDiffAndState(
@@ -357,7 +358,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
       ) {
         case (blockDiff, _) =>
           blockDiff.scriptsRun shouldBe 31
-          blockDiff.scriptsComplexity shouldBe (Script.estimate(allAllowed, ScriptEstimatorV2).explicitGet() * 31)
+          blockDiff.scriptsComplexity shouldBe (Script.estimate(allAllowed, ScriptEstimatorV2, useContractVerifierLimit = false).explicitGet() * 31)
       }
     }) { x =>
       x

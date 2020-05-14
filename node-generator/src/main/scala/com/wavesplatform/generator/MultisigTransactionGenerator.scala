@@ -1,7 +1,7 @@
 package com.wavesplatform.generator
+
 import cats.Show
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.generator.utils.Gen
@@ -38,17 +38,18 @@ class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settin
     val res = Range(0, settings.transactions).map { i =>
       val tx = TransferTransaction(
         2.toByte,
-        bank,
-        owners(1),
+        bank.publicKey,
+        owners(1).toAddress,
         Waves,
         totalAmountOnNewAccount - 2 * enoughFee - i,
         Waves,
         enoughFee,
         None,
         now + i,
-        Proofs.empty
+        Proofs.empty,
+        owners(1).toAddress.chainId
       )
-      val signatures = owners.map(crypto.sign(_, tx.bodyBytes())).map(ByteStr(_))
+      val signatures = owners.map(o => crypto.sign(o.privateKey, tx.bodyBytes()))
       tx.copy(proofs = Proofs(signatures))
     }
 

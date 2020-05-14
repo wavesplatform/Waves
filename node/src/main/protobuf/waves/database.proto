@@ -3,6 +3,7 @@ package waves.api;
 option java_package = "com.wavesplatform.database.protobuf";
 
 import "waves/block.proto";
+import "waves/transaction.proto";
 
 message AssetDetails {
     bytes name = 1;
@@ -12,21 +13,50 @@ message AssetDetails {
     bytes total_volume = 5;
 }
 
-message BlockInfo {
-    message Custom {
-        bytes prefix = 1;
-        bytes suffix = 2;
+message BlockMeta {
+    Block.Header header = 1;
+    bytes signature = 2;
+    bytes header_hash = 3;
+    int32 height = 4;
+    int32 size = 5;
+    int32 transaction_count = 6;
+    int64 total_fee_in_waves = 7;
+    int64 reward = 8;
+    bytes vrf = 9;
+}
+
+message TransactionData {
+    oneof transaction {
+        bytes legacy_bytes = 1;
+        SignedTransaction new_transaction = 2;
+    }
+    bool failed = 3;
+}
+
+message AccountScriptInfo {
+    message ComplexityByVersion {
+        int32 version = 1;
+        map<string, int64> callable_complexity = 2;
     }
 
-    message Proto {
-        Block.Header header = 1;
-        bytes signature = 2;
-    }
+    bytes public_key = 1;
+    bytes script_bytes = 2;
+    int64 max_complexity = 3;
+    repeated ComplexityByVersion callable_complexity = 4;
+}
 
-    int32 size = 1;
-    int32 transaction_count = 2;
-    oneof info {
-        Custom custom = 3;
-        Proto proto = 4;
+message StaticAssetInfo {
+    bytes source_id = 1;
+    bytes issuer_public_key = 2;
+    int32 decimals = 3;
+    bool is_nft = 4;
+}
+
+message DataEntry {
+    oneof value {
+        int64 int_value = 1;
+        bool bool_value = 2;
+        bytes binary_value = 3;
+        string string_value = 4;
     }
 }

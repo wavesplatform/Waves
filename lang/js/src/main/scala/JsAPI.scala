@@ -85,15 +85,17 @@ object JsAPI {
 
   @JSExportTopLevel("contractLimits")
   def contractLimits(): js.Dynamic = {
+    import ContractLimits._
     js.Dynamic.literal(
-      "MaxComplexityByVersion"     -> ((ver: Int) => ContractLimits.MaxComplexityByVersion(DirectiveDictionary[StdLibVersion].idMap(ver))),
-      "MaxExprSizeInBytes"         -> ContractLimits.MaxExprSizeInBytes,
-      "MaxContractSizeInBytes"     -> ContractLimits.MaxContractSizeInBytes,
-      "MaxInvokeScriptArgs"        -> ContractLimits.MaxInvokeScriptArgs,
-      "MaxInvokeScriptSizeInBytes" -> ContractLimits.MaxInvokeScriptSizeInBytes,
-      "MaxWriteSetSizeInBytes"     -> ContractLimits.MaxWriteSetSizeInBytes,
-      "MaxPaymentAmount"           -> ContractLimits.MaxCallableActionsAmount,
-      "MaxAttachedPaymentAmount"   -> ContractLimits.MaxAttachedPaymentAmount
+      "MaxComplexityByVersion"                -> ((ver: Int) => MaxComplexityByVersion(DirectiveDictionary[StdLibVersion].idMap(ver))),
+      "MaxAccountVerifierComplexityByVersion" -> ((ver: Int) => MaxAccountVerifierComplexityByVersion(DirectiveDictionary[StdLibVersion].idMap(ver))),
+      "MaxExprSizeInBytes"                    -> MaxExprSizeInBytes,
+      "MaxContractSizeInBytes"                -> MaxContractSizeInBytes,
+      "MaxInvokeScriptArgs"                   -> MaxInvokeScriptArgs,
+      "MaxInvokeScriptSizeInBytes"            -> MaxInvokeScriptSizeInBytes,
+      "MaxWriteSetSizeInBytes"                -> MaxWriteSetSizeInBytes,
+      "MaxPaymentAmount"                      -> MaxCallableActionsAmount,
+      "MaxAttachedPaymentAmount"              -> MaxAttachedPaymentAmount
     )
   }
 
@@ -135,9 +137,10 @@ object JsAPI {
 
   private def parseAndCompileScript(ds: DirectiveSet, input: String) = {
     val stdLibVer = ds.stdLibVersion
+    val isAsset = ds.scriptType == Asset
     ds.contentType match {
       case Expression =>
-        val ctx = buildScriptContext(stdLibVer, ds.scriptType == Asset, ds.contentType == DAppType)
+        val ctx = buildScriptContext(stdLibVer, isAsset, ds.contentType == DAppType)
         Global
           .parseAndCompileExpression(input, ctx.compilerContext, letBLockVersions.contains(stdLibVer), stdLibVer, estimator)
           .map {
@@ -150,9 +153,9 @@ object JsAPI {
               )
           }
       case Library =>
-        val ctx = buildScriptContext(stdLibVer, ds.scriptType == Asset, ds.contentType == DAppType)
+        val ctx = buildScriptContext(stdLibVer, isAsset, ds.contentType == DAppType)
         Global
-          .compileDecls(input, ctx.compilerContext, letBLockVersions.contains(stdLibVer), stdLibVer, estimator)
+          .compileDecls(input, ctx.compilerContext, letBLockVersions.contains(stdLibVer), stdLibVer, isAsset, estimator)
           .map {
             case (bytes, ast, complexity) =>
               js.Dynamic.literal(
@@ -198,11 +201,12 @@ object JsAPI {
 
   private def compileScript(ds: DirectiveSet, input: String) = {
     val ver = ds.stdLibVersion
+    val isAsset = ds.scriptType == Asset
     ds.contentType match {
       case Expression =>
-        val ctx = buildScriptContext(ver, ds.scriptType == Asset, ds.contentType == DAppType)
+        val ctx = buildScriptContext(ver, isAsset, ds.contentType == DAppType)
         Global
-          .compileExpression(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, estimator)
+          .compileExpression(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, isAsset, estimator)
           .map {
             case (bytes, ast, complexity) =>
               js.Dynamic.literal(
@@ -212,9 +216,9 @@ object JsAPI {
               )
           }
       case Library =>
-        val ctx = buildScriptContext(ver, ds.scriptType == Asset, ds.contentType == DAppType)
+        val ctx = buildScriptContext(ver, isAsset, ds.contentType == DAppType)
         Global
-          .compileDecls(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, estimator)
+          .compileDecls(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, isAsset, estimator)
           .map {
             case (bytes, ast, complexity) =>
               js.Dynamic.literal(

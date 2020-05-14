@@ -117,7 +117,7 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2 with Matcher
     } yield {
       val blocks = blockGroups.flatten.toList
       val blocksInfo = blocks.zipWithIndex
-        .map { case (x, i) => s"$i: id=${x.signature.trim}, txsSize=${x.transactions.size}, txs=${x.transactions.map(_.id.trim).mkString(", ")}" }
+        .map { case (x, i) => s"$i: id=${x.id.trim}, txsSize=${x.transactions.size}, txs=${x.transactions.map(_.id.trim).mkString(", ")}" }
 
       s"""Dump of ${node.name}:
          |UTX size: $utxSize

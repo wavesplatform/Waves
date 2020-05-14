@@ -2,8 +2,8 @@ package com.wavesplatform.http
 
 import java.io.IOException
 
-import akka.http.scaladsl.model.MediaTypes.`application/json`
 import akka.http.scaladsl.model.{MediaRange, MediaType}
+import akka.http.scaladsl.model.MediaTypes.`application/json`
 import com.fasterxml.jackson.core.io.SegmentedStringWriter
 import com.fasterxml.jackson.core.util.BufferRecyclers
 import com.fasterxml.jackson.core.{JsonGenerator, JsonProcessingException}

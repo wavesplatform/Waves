@@ -1,15 +1,14 @@
 package com.wavesplatform.api.grpc
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, PrivateKey, PublicKey}
+import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks, VanillaBlock}
 import com.wavesplatform.protobuf.transaction._
-import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.{crypto, block => vb}
+import com.wavesplatform.{block => vb}
 
 //noinspection ScalaStyle
 trait PBImplicitConversions {
@@ -50,13 +49,15 @@ trait PBImplicitConversions {
       header.featureVotes.map(shortToInt),
       header.timestamp,
       header.version,
-      ByteString.copyFrom(header.generator)
+      header.generator,
+      header.rewardVote,
+      ByteString.copyFrom(header.transactionsRoot.arr)
     )
   }
 
   implicit class PBRecipientConversions(r: Recipient) {
-    def toAddress        = PBRecipients.toAddress(r).explicitGet()
-    def toAddressOrAlias = PBRecipients.toAddressOrAlias(r).explicitGet()
+    def toAddress        = PBRecipients.toAddress(r, AddressScheme.current.chainId).explicitGet()
+    def toAddressOrAlias = PBRecipients.toAddressOrAlias(r, AddressScheme.current.chainId).explicitGet()
   }
 
   implicit class VanillaByteStrConversions(bytes: ByteStr) {
@@ -64,9 +65,10 @@ trait PBImplicitConversions {
   }
 
   implicit class PBByteStringConversions(bytes: ByteString) {
-    def toByteStr          = ByteStr(bytes.toByteArray)
-    def toPublicKey        = PublicKey(bytes.toByteArray)
-    def toAddress: Address = PBRecipients.toAddress(this.toByteStr).fold(ve => throw new IllegalArgumentException(ve.toString), identity)
+    def toByteStr   = ByteStr(bytes.toByteArray)
+    def toPublicKey = PublicKey(bytes.toByteArray)
+    def toAddress: Address =
+      PBRecipients.toAddress(bytes.toByteArray, AddressScheme.current.chainId).fold(ve => throw new IllegalArgumentException(ve.toString), identity)
   }
 
   implicit def vanillaByteStrToPBByteString(bs: ByteStr): ByteString = bs.toPBByteString

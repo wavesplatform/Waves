@@ -62,7 +62,7 @@ trait GrpcIntegrationSuiteWithThreeAddress
     def makeTransfers(accounts: Seq[ByteString]): Seq[String] = accounts.map { acc =>
       PBTransactions
         .vanilla(
-          sender.broadcastTransfer(sender.privateKey, Recipient().withPublicKeyHash(acc), defaultBalance, sender.fee(TransferTransaction.typeId))
+          sender.broadcastTransfer(sender.keyPair, Recipient().withPublicKeyHash(acc), defaultBalance, sender.fee(TransferTransaction.typeId))
         )
         .explicitGet()
         .id()

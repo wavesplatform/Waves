@@ -6,8 +6,6 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransac
 import com.wavesplatform.utils.Time
 import play.api.libs.json.JsObject
 
-import scala.util.Random
-
 package object smartcontract {
   val invokeScrTxSupportedVersions: List[Byte] = List(1, 2)
   val setScrTxSupportedVersions: List[Byte] = List(1, 2)
@@ -88,7 +86,7 @@ package object smartcontract {
        |         let dataByIndex = toBytes(d0) == base64'abcdef' || toBytes(d1) == base64'ghijkl' ||
        |                       isDefined(d2) || toBytes(extract(d3)) == base64'mnopqr'
        |
-       |         let add = Address(base58'${dtx.sender.bytes.toString}')
+       |         let add = Address(base58'${dtx.sender.toAddress}')
        |         let long = extract(getInteger(add,"${dtx.data(0).key}")) == ${dtx.data(0).value}
        |         let bool1 = extract(getBoolean(add,"${dtx.data(1).key}")) == ${dtx.data(1).value}
        |         let bin = extract(getBinary(add,"${dtx.data(2).key}")) ==  base58'${dtx.data(2).value}'
@@ -99,7 +97,7 @@ package object smartcontract {
        |     }
        |
        |     let aFromPK = addressFromPublicKey(ext.senderPublicKey) == ext.sender
-       |     let aFromStr = addressFromString("${dtx.sender.stringRepr}") == Address(base58'${dtx.sender.bytes.toString}')
+       |     let aFromStr = addressFromString("${dtx.sender.toAddress}") == Address(base58'${dtx.sender.toAddress}')
        |
        |     #case t1: TransferTransaction => addressFromRecipient(t1.recipient) == Address(base58'')
        |
@@ -124,14 +122,12 @@ package object smartcontract {
     val buyMatcherFee  = (BigInt(orderFee) * amount / buy.amount).toLong
     val sellMatcherFee = (BigInt(orderFee) * amount / sell.amount).toLong
 
-    val (order1, order2) = if (Random.nextBoolean()) (buy, sell) else (sell, buy)
-
     val tx = ExchangeTransaction
       .signed(
         2.toByte,
-        matcher = matcher,
-        order1 = order1,
-        order2 = order2,
+        matcher = matcher.privateKey,
+        order1 = buy,
+        order2 = sell,
         amount = amount,
         price = sellPrice,
         buyMatcherFee = buyMatcherFee,
@@ -157,8 +153,8 @@ package object smartcontract {
     val buyAmount           = 2
     val sellAmount          = 3
 
-    val buy  = Order.buy(ord1Ver, buyer, matcher, pair, buyAmount, buyPrice, ts, expirationTimestamp, fee)
-    val sell = Order.sell(ord2Ver, seller, matcher, pair, sellAmount, sellPrice, ts, expirationTimestamp, fee)
+    val buy  = Order.buy(ord1Ver, buyer, matcher.publicKey, pair, buyAmount, buyPrice, ts, expirationTimestamp, fee)
+    val sell = Order.sell(ord2Ver, seller, matcher.publicKey, pair, sellAmount, sellPrice, ts, expirationTimestamp, fee)
 
     (buy, sell)
   }

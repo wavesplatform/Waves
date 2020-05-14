@@ -26,13 +26,13 @@ object TransferTxSerializer {
     import tx._
     lazy val baseBytes =
       Bytes.concat(
-        sender,
+        sender.arr,
         assetId.byteRepr,
         feeAssetId.byteRepr,
         Longs.toByteArray(timestamp),
         Longs.toByteArray(amount),
         Longs.toByteArray(fee),
-        recipient.bytes.arr,
+        recipient.bytes,
         Deser.serializeArrayWithLength(attachment.toBytesStrict)
       )
 
@@ -44,7 +44,7 @@ object TransferTxSerializer {
   }
 
   def toBytes(tx: TransferTransaction): Array[Byte] = tx.version match {
-    case TxVersion.V1 => Bytes.concat(Array(tx.typeId), tx.proofs.toSignature, this.bodyBytes(tx))
+    case TxVersion.V1 => Bytes.concat(Array(tx.typeId), tx.proofs.toSignature.arr, this.bodyBytes(tx))
     case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
     case _            => PBTransactionSerializer.bytes(tx)
   }
@@ -60,7 +60,7 @@ object TransferTxSerializer {
       val recipient  = buf.getAddressOrAlias
       val attachment = buf.getByteArrayWithLength
 
-      TransferTransaction(version, sender, recipient, assetId, amount, feeAssetId, fee, Some(Attachment.Bin(attachment)), ts, Proofs.empty)
+      TransferTransaction(version, sender, recipient, assetId, amount, feeAssetId, fee, Some(Attachment.Bin(attachment)), ts, Proofs.empty, recipient.chainId)
     }
 
     require(bytes.length > 2, "buffer underflow while parsing transaction")

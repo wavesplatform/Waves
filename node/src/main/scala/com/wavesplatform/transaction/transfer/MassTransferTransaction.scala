@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.transfer
 
 import cats.implicits._
-import com.wavesplatform.account.{AddressOrAlias, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -24,7 +24,8 @@ case class MassTransferTransaction(
     fee: TxAmount,
     timestamp: TxTimestamp,
     attachment: Option[Attachment],
-    proofs: Proofs
+    proofs: Proofs,
+    chainId: Byte
 ) extends ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InWaves
@@ -48,9 +49,11 @@ case class MassTransferTransaction(
 }
 
 object MassTransferTransaction extends TransactionParser {
+  type TransactionT = MassTransferTransaction
+
   val MaxTransferCount = 100
 
-  override val typeId: TxType                    = 11
+  override val typeId: TxType                    = 11: Byte
   override val supportedVersions: Set[TxVersion] = Set(1, 2)
 
   implicit val validator: TxValidator[MassTransferTransaction] = MassTransferTxValidator
@@ -83,9 +86,10 @@ object MassTransferTransaction extends TransactionParser {
       fee: TxAmount,
       timestamp: TxTimestamp,
       attachment: Option[Attachment],
-      proofs: Proofs
+      proofs: Proofs,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, MassTransferTransaction] =
-    MassTransferTransaction(version, sender, assetId, transfers, fee, timestamp, attachment, proofs).validatedEither
+    MassTransferTransaction(version, sender, assetId, transfers, fee, timestamp, attachment, proofs, chainId).validatedEither
 
   def signed(
       version: TxVersion,
@@ -108,7 +112,7 @@ object MassTransferTransaction extends TransactionParser {
       timestamp: TxTimestamp,
       attachment: Option[Attachment]
   ): Either[ValidationError, MassTransferTransaction] =
-    signed(version, sender, assetId, transfers, fee, timestamp, attachment, sender)
+    signed(version, sender.publicKey, assetId, transfers, fee, timestamp, attachment, sender.privateKey)
 
   def parseTransfersList(transfers: List[Transfer]): Validation[List[ParsedTransfer]] = {
     transfers.traverse {
