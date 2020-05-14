@@ -9,7 +9,7 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.state._
-import com.wavesplatform.state.patch.PatchLoader
+import com.wavesplatform.state.patch._
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{ActivationError, _}
@@ -189,15 +189,15 @@ object BlockDiffer extends ScorexLogging {
           }
       }
       .map { result =>
-        val patches = PatchLoader.patches.filter(p => p.height == currentBlockHeight && PatchLoader.isDiffPatch(p.name))
-
-        val (diffWithPatches, patchDiff) = patches.foldLeft((result.diff, result.detailedDiff.parentDiff)) {
-          case ((previousDiff, previousPatchDiff), patch) =>
-            log.info(s"Applying patch: $patch")
-            val patchDiff = PatchLoader.read[Diff](patch)
-            (Monoid.combine(previousDiff, patchDiff), Monoid.combine(previousPatchDiff, patchDiff))
+        def applyAll(patches: DiffPatchFactory*) = patches.foldLeft((result.diff, result.detailedDiff.parentDiff)) {
+          case (prevResult @ (previousDiff, previousPatchDiff), p) =>
+            if (currentBlockHeight == p.height) {
+              val patchDiff = p()
+              (Monoid.combine(previousDiff, patchDiff), Monoid.combine(previousPatchDiff, patchDiff))
+            } else prevResult
         }
 
+        val (diffWithPatches, patchDiff) = applyAll(CancelAllLeases, CancelLeaseOverflow, CancelInvalidLeaseIn)
         result.copy(diff = diffWithPatches, detailedDiff = result.detailedDiff.copy(parentDiff = patchDiff))
       }
   }

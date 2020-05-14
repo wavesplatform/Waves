@@ -161,8 +161,6 @@ case class Diff(
 )
 
 object Diff {
-  implicit val jsonFormat: OFormat[Diff] = DiffJsonFormats.diffFormat
-
   def stateOps(
       portfolios: Map[Address, Portfolio] = Map.empty,
       issuedAssets: Map[IssuedAsset, NewAssetInfo] = Map.empty,
