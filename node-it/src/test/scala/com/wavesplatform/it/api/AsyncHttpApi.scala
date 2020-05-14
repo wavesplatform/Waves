@@ -1033,6 +1033,24 @@ object AsyncHttpApi extends Assertions {
   implicit class NodesAsyncHttpApi(nodes: Seq[Node]) extends Matchers {
     def height: Future[Seq[Int]] = traverse(nodes)(_.height)
 
+    def findTransactionInfo(txId: String): Future[Seq[Option[TransactionInfo]]] = traverse(nodes)(_.transactionInfo[TransactionInfo](txId).transform {
+      case Success(tx)                                          => Success(Some(tx))
+      case Failure(UnexpectedStatusCodeException(_, _, 404, _)) => Success(None)
+      case Failure(ex)                                          => Failure(ex)
+    })
+
+    def ensureTxDoesntExist(txId: String): Future[Seq[Unit]] =
+      traverse(nodes)(_.utx()
+        .zip(findTransactionInfo(txId))
+        .flatMap({
+          case (utx, _) if utx.map(_.id).contains(txId) =>
+            Future.failed(new IllegalStateException(s"Tx $txId is in UTX"))
+          case (_, txOpt) if txOpt.map(_.isDefined) =>
+            Future.failed(new IllegalStateException(s"Tx $txId is in blockchain"))
+          case _ =>
+            Future.successful(())
+        }))
+
     def waitForHeightAriseAndTxPresent(transactionId: String)(implicit p: Position): Future[Unit] =
       for {
         allHeights   <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))

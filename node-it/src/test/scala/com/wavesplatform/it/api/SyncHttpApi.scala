@@ -771,6 +771,9 @@ object SyncHttpApi extends Assertions {
     def height(implicit pos: Position): Seq[Int] =
       sync(async(nodes).height, TxInBlockchainAwaitTime)
 
+    def ensureTxDoesntExist(txId: String): Unit =
+      sync(async(nodes).ensureTxDoesntExist(txId))
+
     def waitForHeightAriseAndTxPresent(transactionId: String)(implicit pos: Position): Unit =
       withTxIdMessage(transactionId)(sync(async(nodes).waitForHeightAriseAndTxPresent(transactionId), TxInBlockchainAwaitTime))
 
