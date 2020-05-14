@@ -1,0 +1,128 @@
+{
+  "transactions" : { },
+  "portfolios" : {
+    "3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8" : {
+      "balance" : 0,
+      "lease" : {
+        "in" : 1000000000000,
+        "out" : -10000000000000
+      },
+      "assets" : { }
+    },
+    "3MtHNCZA7EdzsLjH8V9FWUmPbV42RGXvNk3" : {
+      "balance" : 0,
+      "lease" : {
+        "in" : 0,
+        "out" : -100000000
+      },
+      "assets" : { }
+    },
+    "3MsiHfvFVUULdn8bpVoDQ7JLKKjtPXUrCLT" : {
+      "balance" : 0,
+      "lease" : {
+        "in" : -100000000,
+        "out" : 0
+      },
+      "assets" : { }
+    },
+    "3N65xeNsETsQT6NncwpufwVAkTpiabRRpUm" : {
+      "balance" : 0,
+      "lease" : {
+        "in" : 0,
+        "out" : -800000000
+      },
+      "assets" : { }
+    },
+    "3NBYqPnTDdGeXCBkegBQzzAVEjPxS478JVj" : {
+      "balance" : 0,
+      "lease" : {
+        "in" : -3163,
+        "out" : 0
+      },
+      "assets" : { }
+    },
+    "3MvhHXWL5TCskTpL3XS2euywQaoFyzLWHCu" : {
+      "balance" : 0,
+      "lease" : {
+        "in" : 0,
+        "out" : -5884000003163
+      },
+      "assets" : { }
+    },
+    "3MqCsTH9y6nFJEFL81DubDrpKnvreR9M52p" : {
+      "balance" : 0,
+      "lease" : {
+        "in" : -100000000,
+        "out" : 0
+      },
+      "assets" : { }
+    },
+    "3N5sUvKLnEUBwk7WFCSjJs8VoiLiuqTs29v" : {
+      "balance" : 0,
+      "lease" : {
+        "in" : -10000000000000,
+        "out" : 1000000000000
+      },
+      "assets" : { }
+    },
+    "3MtMoVbAHSitzohEvd6dJGR3kmJZHSePUkS" : {
+      "balance" : 0,
+      "lease" : {
+        "in" : -500000000,
+        "out" : 200000000
+      },
+      "assets" : { }
+    },
+    "3N38yU3szhRyJfVaDRQL9m9BtGiYHf4pJvV" : {
+      "balance" : 0,
+      "lease" : {
+        "in" : -100000000,
+        "out" : 0
+      },
+      "assets" : { }
+    },
+    "3NBEheVJmcexzJ9itP9KiiC2K6qnGQwpqMg" : {
+      "balance" : 0,
+      "lease" : {
+        "in" : -5883900000000,
+        "out" : -1000
+      },
+      "assets" : { }
+    },
+    "3N9JoRvFqR5orj6v3s6NwPSmtPeM57yPRdh" : {
+      "balance" : 0,
+      "lease" : {
+        "in" : -1000,
+        "out" : 0
+      },
+      "assets" : { }
+    }
+  },
+  "issuedAssets" : { },
+  "updatedAssets" : { },
+  "aliases" : { },
+  "orderFills" : { },
+  "leaseState" : {
+    "D4cYU5bgtsA1wNFSFose2zFEqKgdJX647byADFYnmkyr" : false,
+    "GW7dUbzDqbH9fkgXMa5kgJNTW2oCcRco5cAwWvCpfHKS" : false,
+    "HFCeYLJ5LZ6GhwvmzNrBfejBos6xXG7Y37Hwop31y6jF" : false,
+    "4Hbi5w3kgh8nysJ31DavCrnnKecgV363MQ7TCDoqtgGV" : false,
+    "9J3CRH94aoar5XrRi1m73SwZbTWx5xtSnR3Kcv8WBZUZ" : false,
+    "yZnLyB9WUJAmYQw1poA5L3LK1kEtX8mAyTM8N9X7zTp" : false,
+    "D6YJmBUnLNvcEJ4ckdYduKprN78hCJLArkXKnd39Mofi" : false,
+    "CAKWkcjwPD3df4QZr63cD2EjibsyqTf4pnKRQsjiSMam" : false,
+    "HhBunv6ncKgranbXVSV34fytKedw3bbw33PyJiAc98Nn" : false,
+    "H4dGT2ShWFzFZCD6q2KngjrTL8seUWhHJDkBwzfmQs25" : false,
+    "24GZaS72WsfkBewp21jwSQqEMBEzvwbHgkmKum4M64Wg" : false,
+    "Dv19bBn7Mhc6B8DtepmhfFLTcoj6okYNThk7GSmoTZgv" : false,
+    "CgBBk1LaYncvdmZYr1TLdT4KyLLjLaCXW391xtCHsZXA" : false,
+    "7517y2CZZZD6HUVy6bAV3R4EV4Zrd7ZtEW2WVawHiAgL" : false
+  },
+  "scripts" : { },
+  "assetScripts" : { },
+  "accountData" : { },
+  "sponsorship" : { },
+  "scriptsRun" : 0,
+  "scriptsComplexity" : 0,
+  "scriptResults" : { }
+}
