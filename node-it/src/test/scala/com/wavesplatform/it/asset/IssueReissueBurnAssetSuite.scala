@@ -1,5 +1,6 @@
 package com.wavesplatform.it.asset
 
+import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, TransactionDoesNotExist}
 import com.wavesplatform.common.state.ByteStr
@@ -18,7 +19,7 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import scala.concurrent.duration._
 
 class IssueReissueBurnAssetSuite extends BaseSuite {
-  override def nodeConfigs =
+  override val nodeConfigs: Seq[Config] =
     com.wavesplatform.it.NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
       .withDefault(1)
