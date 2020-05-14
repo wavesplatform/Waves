@@ -44,7 +44,6 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
  
     @Callable(i)
     func isAssetInfoCorrect(id: String, name: String, description: String, quantity: Int, decimals: Int, issuer: String, issuerPublicKey: ByteVector, reissuable: Boolean, scripted: Boolean) = {
-      # ScriptTransfer(this, 1000, fromBase58String(id))
       let isCorrect = match assetInfo(fromBase58String(id)) {
         case a:Asset => a.name == name &&
           a.description == description &&
@@ -318,7 +317,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
           |case _ => false
           |}""".stripMargin
     val script1 = ScriptCompiler(scriptText1, isAssetScript = true, ScriptEstimatorV2).explicitGet()._1.bytes().base64
-    sender.setAssetScript(smartAssetId1, issuer.toAddress.toString, setAssetScriptFee, Some(script1))
+    sender.setAssetScript(smartAssetId1, issuer.toAddress.toString, setAssetScriptFee, Some(script1),  waitForTx = true)
 
     sender.burn(issuer.toAddress.toString, smartAssetId1, 1, minFee + 2 * smartFee, waitForTx = true)
   }
