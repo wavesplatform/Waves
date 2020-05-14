@@ -12,9 +12,9 @@ object Types {
   lazy val addressOrAliasType = UNION(addressType, aliasType)
 
   def assetType(version: StdLibVersion) = {
-    val sponsoredFields =
-      if (version >= V4) "minSponsoredFee" -> optionLong
-      else "sponsored" -> BOOLEAN
+    val versionDepFields =
+      if (version >= V4) List("minSponsoredFee" -> optionLong, "name" -> STRING, "description" -> STRING)
+      else List("sponsored" -> BOOLEAN)
 
     CASETYPEREF(
       "Asset",
@@ -26,7 +26,7 @@ object Types {
         "issuerPublicKey" -> BYTESTR,
         "reissuable"      -> BOOLEAN,
         "scripted"        -> BOOLEAN
-      ) :+ sponsoredFields
+      ) ++ versionDepFields
     )
   }
 
