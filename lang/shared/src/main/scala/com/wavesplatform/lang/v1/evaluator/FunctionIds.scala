@@ -84,6 +84,8 @@ object FunctionIds {
   val GETASSETINFOBYID: Short        = 1004
   val BLOCKINFOBYHEIGHT: Short       = 1005
   val TRANSFERTRANSACTIONBYID: Short = 1006
+  val ACCOUNTWAVESBALANCE: Short     = 1007
+  val ACCOUNTASSETONLYBALANCE: Short = 1008
 
   val DATA_LONG_FROM_ARRAY: Short    = 1040
   val DATA_BOOLEAN_FROM_ARRAY: Short = 1041
