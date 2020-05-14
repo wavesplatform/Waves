@@ -59,6 +59,7 @@ object SyncGrpcApi extends Assertions {
     import com.wavesplatform.it.api.AsyncGrpcApi.{NodeAsyncGrpcApi => async}
 
     private[this] lazy val accounts     = AccountsApiGrpc.blockingStub(n.grpcChannel)
+    private[this] lazy val assets       = AssetsApiGrpc.blockingStub(n.grpcChannel)
     private[this] lazy val transactions = TransactionsApiGrpc.blockingStub(n.grpcChannel)
     private[this] lazy val blocks       = BlocksApiGrpc.blockingStub(n.grpcChannel)
 
@@ -176,6 +177,10 @@ object SyncGrpcApi extends Assertions {
       val pbAssetIds = assetIds.map(a => ByteString.copyFrom(Base58.decode(a)))
       val balances   = accounts.getBalances(BalancesRequest.of(address, pbAssetIds))
       balances.map(b => Base58.encode(b.getAsset.assetId.toByteArray) -> b.getAsset.amount).toMap
+    }
+
+    def nftList(address: ByteString, limit: Int, after: ByteString = ByteString.EMPTY): Seq[NFTResponse] = {
+      assets.getNFTList(NFTRequest.of(address, limit, after)).toList
     }
 
     def assertAssetBalance(acc: ByteString, assetIdString: String, balance: Long): Unit = {
