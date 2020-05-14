@@ -273,77 +273,77 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
 
       val dApp = createDApp(
         s"""
-          |{-# STDLIB_VERSION 4 #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |
-          |@Callable(i)
-          |func issue10assets() = {
-          |    let i0 = Issue("SponsoredAsset0", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
-          |    let i1 = Issue("SponsoredAsset1", "SponsoredAsset description", 1000000000000000, 2, true, unit, 1)
-          |    let i2 = Issue("SponsoredAsset2", "SponsoredAsset description", 1000000000000000, 2, true, unit, 2)
-          |    let i3 = Issue("SponsoredAsset3", "SponsoredAsset description", 1000000000000000, 2, true, unit, 3)
-          |    let i4 = Issue("SponsoredAsset4", "SponsoredAsset description", 1000000000000000, 2, true, unit, 4)
-          |    let i5 = Issue("SponsoredAsset5", "SponsoredAsset description", 1000000000000000, 2, true, unit, 5)
-          |    let i6 = Issue("SponsoredAsset6", "SponsoredAsset description", 1000000000000000, 2, true, unit, 6)
-          |    let i7 = Issue("SponsoredAsset7", "SponsoredAsset description", 1000000000000000, 2, true, unit, 7)
-          |    let i8 = Issue("SponsoredAsset8", "SponsoredAsset description", 1000000000000000, 2, true, unit, 8)
-          |    let i9 = Issue("SponsoredAsset9", "SponsoredAsset description", 1000000000000000, 2, true, unit, 9)
-          |
-          |    let issueId0 = calculateAssetId(i0)
-          |    let issueId1 = calculateAssetId(i1)
-          |    let issueId2 = calculateAssetId(i2)
-          |    let issueId3 = calculateAssetId(i3)
-          |    let issueId4 = calculateAssetId(i4)
-          |    let issueId5 = calculateAssetId(i5)
-          |    let issueId6 = calculateAssetId(i6)
-          |    let issueId7 = calculateAssetId(i7)
-          |    let issueId8 = calculateAssetId(i8)
-          |    let issueId9 = calculateAssetId(i9)
-          |
-          |    [
-          |        BinaryEntry("sponsoredAssetId0", issueId0),
-          |        BinaryEntry("sponsoredAssetId1", issueId1),
-          |        BinaryEntry("sponsoredAssetId2", issueId2),
-          |        BinaryEntry("sponsoredAssetId3", issueId3),
-          |        BinaryEntry("sponsoredAssetId4", issueId4),
-          |        BinaryEntry("sponsoredAssetId5", issueId5),
-          |        BinaryEntry("sponsoredAssetId6", issueId6),
-          |        BinaryEntry("sponsoredAssetId7", issueId7),
-          |        BinaryEntry("sponsoredAssetId8", issueId8),
-          |        BinaryEntry("sponsoredAssetId9", issueId9),
-          |        i0,i1,i2,i3,i4,i5,i6,i7,i8,i9
-          |    ]
-          |}
-          |
-          |@Callable(i)
-          |func sponsor10assets() = [
-          |    SponsorFee(this.getBinary("sponsoredAssetId0").value(), ${minSponsoredAssetFee.toString}),
-          |    SponsorFee(this.getBinary("sponsoredAssetId1").value(), ${minSponsoredAssetFee.toString}),
-          |    SponsorFee(this.getBinary("sponsoredAssetId2").value(), ${minSponsoredAssetFee.toString}),
-          |    SponsorFee(this.getBinary("sponsoredAssetId3").value(), ${minSponsoredAssetFee.toString}),
-          |    SponsorFee(this.getBinary("sponsoredAssetId4").value(), ${minSponsoredAssetFee.toString}),
-          |    SponsorFee(this.getBinary("sponsoredAssetId5").value(), ${minSponsoredAssetFee.toString}),
-          |    SponsorFee(this.getBinary("sponsoredAssetId6").value(), ${minSponsoredAssetFee.toString}),
-          |    SponsorFee(this.getBinary("sponsoredAssetId7").value(), ${minSponsoredAssetFee.toString}),
-          |    SponsorFee(this.getBinary("sponsoredAssetId8").value(), ${minSponsoredAssetFee.toString}),
-          |    SponsorFee(this.getBinary("sponsoredAssetId9").value(), ${minSponsoredAssetFee.toString})
-          |]
-          |
-          |@Callable(i)
-          |func sponsor11assets() = [
-          |    SponsorFee(this.getBinary("sponsoredAssetId0").value(), ${minSponsoredAssetFee.toString}),
-          |    SponsorFee(this.getBinary("sponsoredAssetId1").value(), ${minSponsoredAssetFee.toString}),
-          |    SponsorFee(this.getBinary("sponsoredAssetId2").value(), ${minSponsoredAssetFee.toString}),
-          |    SponsorFee(this.getBinary("sponsoredAssetId3").value(), ${minSponsoredAssetFee.toString}),
-          |    SponsorFee(this.getBinary("sponsoredAssetId4").value(), ${minSponsoredAssetFee.toString}),
-          |    SponsorFee(this.getBinary("sponsoredAssetId5").value(), ${minSponsoredAssetFee.toString}),
-          |    SponsorFee(this.getBinary("sponsoredAssetId6").value(), ${minSponsoredAssetFee.toString}),
-          |    SponsorFee(this.getBinary("sponsoredAssetId7").value(), ${minSponsoredAssetFee.toString}),
-          |    SponsorFee(this.getBinary("sponsoredAssetId8").value(), ${minSponsoredAssetFee.toString}),
-          |    SponsorFee(this.getBinary("sponsoredAssetId9").value(), ${minSponsoredAssetFee.toString}),
-          |    SponsorFee(this.getBinary("sponsoredAssetId9").value(), ${minSponsoredAssetFee.toString})
-          |]
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           |@Callable(i)
+           |func issue10assets() = {
+           |    let i0 = Issue("SponsoredAsset0", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
+           |    let i1 = Issue("SponsoredAsset1", "SponsoredAsset description", 1000000000000000, 2, true, unit, 1)
+           |    let i2 = Issue("SponsoredAsset2", "SponsoredAsset description", 1000000000000000, 2, true, unit, 2)
+           |    let i3 = Issue("SponsoredAsset3", "SponsoredAsset description", 1000000000000000, 2, true, unit, 3)
+           |    let i4 = Issue("SponsoredAsset4", "SponsoredAsset description", 1000000000000000, 2, true, unit, 4)
+           |    let i5 = Issue("SponsoredAsset5", "SponsoredAsset description", 1000000000000000, 2, true, unit, 5)
+           |    let i6 = Issue("SponsoredAsset6", "SponsoredAsset description", 1000000000000000, 2, true, unit, 6)
+           |    let i7 = Issue("SponsoredAsset7", "SponsoredAsset description", 1000000000000000, 2, true, unit, 7)
+           |    let i8 = Issue("SponsoredAsset8", "SponsoredAsset description", 1000000000000000, 2, true, unit, 8)
+           |    let i9 = Issue("SponsoredAsset9", "SponsoredAsset description", 1000000000000000, 2, true, unit, 9)
+           |
+           |    let issueId0 = calculateAssetId(i0)
+           |    let issueId1 = calculateAssetId(i1)
+           |    let issueId2 = calculateAssetId(i2)
+           |    let issueId3 = calculateAssetId(i3)
+           |    let issueId4 = calculateAssetId(i4)
+           |    let issueId5 = calculateAssetId(i5)
+           |    let issueId6 = calculateAssetId(i6)
+           |    let issueId7 = calculateAssetId(i7)
+           |    let issueId8 = calculateAssetId(i8)
+           |    let issueId9 = calculateAssetId(i9)
+           |
+           |    [
+           |        BinaryEntry("sponsoredAssetId0", issueId0),
+           |        BinaryEntry("sponsoredAssetId1", issueId1),
+           |        BinaryEntry("sponsoredAssetId2", issueId2),
+           |        BinaryEntry("sponsoredAssetId3", issueId3),
+           |        BinaryEntry("sponsoredAssetId4", issueId4),
+           |        BinaryEntry("sponsoredAssetId5", issueId5),
+           |        BinaryEntry("sponsoredAssetId6", issueId6),
+           |        BinaryEntry("sponsoredAssetId7", issueId7),
+           |        BinaryEntry("sponsoredAssetId8", issueId8),
+           |        BinaryEntry("sponsoredAssetId9", issueId9),
+           |        i0,i1,i2,i3,i4,i5,i6,i7,i8,i9
+           |    ]
+           |}
+           |
+           |@Callable(i)
+           |func sponsor10assets() = [
+           |    SponsorFee(this.getBinary("sponsoredAssetId0").value(), ${minSponsoredAssetFee.toString}),
+           |    SponsorFee(this.getBinary("sponsoredAssetId1").value(), ${minSponsoredAssetFee.toString}),
+           |    SponsorFee(this.getBinary("sponsoredAssetId2").value(), ${minSponsoredAssetFee.toString}),
+           |    SponsorFee(this.getBinary("sponsoredAssetId3").value(), ${minSponsoredAssetFee.toString}),
+           |    SponsorFee(this.getBinary("sponsoredAssetId4").value(), ${minSponsoredAssetFee.toString}),
+           |    SponsorFee(this.getBinary("sponsoredAssetId5").value(), ${minSponsoredAssetFee.toString}),
+           |    SponsorFee(this.getBinary("sponsoredAssetId6").value(), ${minSponsoredAssetFee.toString}),
+           |    SponsorFee(this.getBinary("sponsoredAssetId7").value(), ${minSponsoredAssetFee.toString}),
+           |    SponsorFee(this.getBinary("sponsoredAssetId8").value(), ${minSponsoredAssetFee.toString}),
+           |    SponsorFee(this.getBinary("sponsoredAssetId9").value(), ${minSponsoredAssetFee.toString})
+           |]
+           |
+           |@Callable(i)
+           |func sponsor11assets() = [
+           |    SponsorFee(this.getBinary("sponsoredAssetId0").value(), ${minSponsoredAssetFee.toString}),
+           |    SponsorFee(this.getBinary("sponsoredAssetId1").value(), ${minSponsoredAssetFee.toString}),
+           |    SponsorFee(this.getBinary("sponsoredAssetId2").value(), ${minSponsoredAssetFee.toString}),
+           |    SponsorFee(this.getBinary("sponsoredAssetId3").value(), ${minSponsoredAssetFee.toString}),
+           |    SponsorFee(this.getBinary("sponsoredAssetId4").value(), ${minSponsoredAssetFee.toString}),
+           |    SponsorFee(this.getBinary("sponsoredAssetId5").value(), ${minSponsoredAssetFee.toString}),
+           |    SponsorFee(this.getBinary("sponsoredAssetId6").value(), ${minSponsoredAssetFee.toString}),
+           |    SponsorFee(this.getBinary("sponsoredAssetId7").value(), ${minSponsoredAssetFee.toString}),
+           |    SponsorFee(this.getBinary("sponsoredAssetId8").value(), ${minSponsoredAssetFee.toString}),
+           |    SponsorFee(this.getBinary("sponsoredAssetId9").value(), ${minSponsoredAssetFee.toString}),
+           |    SponsorFee(this.getBinary("sponsoredAssetId9").value(), ${minSponsoredAssetFee.toString})
+           |]
         """.stripMargin
       )
       val invokeTx1 = miner.invokeScript(miner.address, dApp, Some("issue10assets"), waitForTx = true, fee = smartMinFee + issueFee * 10)
@@ -368,28 +368,99 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
       sender.debugStateChanges(failedTx._1.id).stateChanges.get.errorMessage.get.text should include("Too many script actions: max: 10, actual: 11")
     }
 
-    "SponsorFee is available only for assets issuing from current dApp" in {
+    "SponsorFee is available for assets issued via transaction" in {
       val dApp = miner.createAddress()
       miner.transfer(sender.address, dApp, initialWavesBalance, minFee, waitForTx = true)
-
       val assetId = miner.issue(dApp, waitForTx = true).id
 
       createDApp(
-       s"""
-          |{-# STDLIB_VERSION 4 #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |
-          |@Callable(i)
-          |func sponsorAsset() = [
-          |    SponsorFee(base58'$assetId', 1000)
-          |]
+        s"""
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           |@Callable(i)
+           |func sponsorAsset() = [
+           |    SponsorFee(base58'$assetId', 1000)
+           |]
         """.stripMargin,
         dApp
       )
+
+      val tx = miner.invokeScript(miner.address, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee)
+      sender.debugStateChanges(tx._1.id).stateChanges.get.sponsorFees.head shouldBe SponsorFeeResponse(assetId, Some(1000))
+    }
+
+    "Negative fee is not available" in {
+      val dApp = miner.createAddress()
+      miner.transfer(sender.address, dApp, initialWavesBalance, minFee, waitForTx = true)
+      val assetId = miner.issue(dApp, waitForTx = true).id
+
+      createDApp(
+        s"""
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           |@Callable(i)
+           |func sponsorAsset() = [
+           |    SponsorFee(base58'$assetId', -1)
+           |]
+        """.stripMargin,
+        dApp
+      )
+
       val failedTx = miner.invokeScript(miner.address, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee)
       val error = sender.debugStateChanges(failedTx._1.id).stateChanges.get.errorMessage.get.text
-      error should include(s"SponsorFee assetId=$assetId was not issued from current dApp")
+      error should include("NegativeMinFee")
+    }
+
+    "SponsorFee is available only for assets issuing from current address" in {
+      val issuer = miner.createAddress()
+      miner.transfer(sender.address, issuer, initialWavesBalance, minFee, waitForTx = true)
+      val assetId = miner.issue(issuer, waitForTx = true).id
+
+      val dApp = createDApp(
+        s"""
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           |@Callable(i)
+           |func sponsorAsset() = [
+           |    SponsorFee(base58'$assetId', 1000)
+           |]
+        """.stripMargin
+      )
+
+      val failedTx = miner.invokeScript(miner.address, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee)
+      val error = sender.debugStateChanges(failedTx._1.id).stateChanges.get.errorMessage.get.text
+      error should include(s"SponsorFee assetId=$assetId was not issued from address of current dApp")
+    }
+
+    "SponsorFee is not available for scripted assets" in {
+      val dApp = miner.createAddress()
+      miner.transfer(sender.address, dApp, initialWavesBalance, minFee, waitForTx = true)
+
+      val script = ScriptCompiler.compile("true", ScriptEstimatorV2).explicitGet()._1.bytes.value.base64
+      val assetId = miner.issue(dApp, script = Some(script), waitForTx = true).id
+
+      createDApp(
+        s"""
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           |@Callable(i)
+           |func sponsorAsset() = [
+           |    SponsorFee(base58'$assetId', 1000)
+           |]
+        """.stripMargin,
+        dApp
+      )
+      val failedTx = miner.invokeScript(miner.address, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee + smartFee)
+      val error = sender.debugStateChanges(failedTx._1.id).stateChanges.get.errorMessage.get.text
+      error should include(s"Sponsorship smart assets is disabled.")
     }
   }
 
