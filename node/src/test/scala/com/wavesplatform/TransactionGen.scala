@@ -481,7 +481,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     (issue, reissue1, reissue2)
   }
 
-  def issueGen(sender: KeyPair, fixedQuantity: Option[Long] = None): Gen[IssueTransaction] =
+  def issueGen(sender: KeyPair, fixedQuantity: Option[Long] = None, fixedDecimals: Option[Byte] = None): Gen[IssueTransaction] =
     for {
       (_, assetName, description, quantity, decimals, _, _, timestamp) <- issueParamGen
     } yield {
@@ -491,7 +491,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
         assetName,
         description,
         fixedQuantity.getOrElse(quantity),
-        decimals,
+        fixedDecimals.getOrElse(decimals),
         reissuable = false,
         script = None,
         1 * Constants.UnitsInWave,

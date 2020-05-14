@@ -145,6 +145,9 @@ object AsyncHttpApi extends Assertions {
     def blacklist(address: InetSocketAddress): Future[Unit] =
       post("/debug/blacklist", s"${address.getHostString}:${address.getPort}").map(_ => ())
 
+    def clearBlacklist(): Future[Unit] =
+      post("/peers/clearblacklist", s"").map(_ => ())
+
     def printDebugMessage(db: DebugMessage): Future[Response] = postJsonWithApiKey("/debug/print", db)
 
     def connectedPeers: Future[Seq[Peer]] = get("/peers/connected").map { r =>

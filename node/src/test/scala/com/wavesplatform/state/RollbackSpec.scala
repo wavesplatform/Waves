@@ -417,6 +417,12 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           )
         )
 
+      def getAsset(d: Domain, txId: ByteStr): IssuedAsset = {
+        val sr = d.blockchainUpdater.bestLiquidDiff.get.scriptResults(txId)
+        sr.errorMessage shouldBe 'empty
+        IssuedAsset(sr.issues.head.id)
+      }
+
       val scenario =
         for {
           dApp                 <- accountGen
@@ -460,7 +466,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
             /// liquid block rollback
             val liquidIssueTxId = append(startBlockId, issueFc)
-            val liquidAsset = IssuedAsset(d.blockchainUpdater.bestLiquidDiff.get.scriptResults(liquidIssueTxId).issues.head.id)
+            val liquidAsset = getAsset(d, liquidIssueTxId)
             d.balance(dApp.toAddress, liquidAsset) shouldBe quantity
             d.blockchainUpdater.removeAfter(startBlockId).explicitGet()
             d.balance(dApp.toAddress, liquidAsset) shouldBe 0L
@@ -468,7 +474,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
             // hardened block rollback
             val issueTxId = append(startBlockId, issueFc)
-            val asset = IssuedAsset(d.blockchainUpdater.bestLiquidDiff.get.scriptResults(issueTxId).issues.head.id)
+            val asset = getAsset(d, issueTxId)
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
             d.balance(dApp.toAddress, asset) shouldBe quantity
             d.blockchainUpdater.removeAfter(startBlockId).explicitGet()
@@ -490,7 +496,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             val (quantity, issueFc) = issueFunctionCallGen.sample.get
 
             val issueTxId = append(startBlockId, issueFc)
-            val asset = IssuedAsset(d.blockchainUpdater.bestLiquidDiff.get.scriptResults(issueTxId).issues.head.id)
+            val asset = getAsset(d, issueTxId)
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
 
             val issueBlockId     = d.lastBlockId
@@ -528,7 +534,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             val (quantity, issueFc) = issueFunctionCallGen.sample.get
 
             val issueTxId = append(startBlockId, issueFc)
-            val asset = IssuedAsset(d.blockchainUpdater.bestLiquidDiff.get.scriptResults(issueTxId).issues.head.id)
+            val asset = getAsset(d, issueTxId)
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
 
             val issueBlockId     = d.lastBlockId
