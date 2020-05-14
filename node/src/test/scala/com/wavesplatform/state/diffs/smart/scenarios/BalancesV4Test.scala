@@ -27,6 +27,7 @@ import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.account.Alias
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
 import org.scalatest.PropSpec
@@ -62,12 +63,13 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
     ts     <- positiveIntGen
     genesis = Seq(
       GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet(),
-      GenesisTransaction.create(acc1.toAddress, 25 * Constants.UnitsInWave + 2 * MinFee, ts).explicitGet(),
+      GenesisTransaction.create(acc1.toAddress, 25 * Constants.UnitsInWave + 3 * MinFee, ts).explicitGet(),
       GenesisTransaction
         .create(dapp.toAddress, 10 * Constants.UnitsInWave + SetScriptFee + 2 * InvokeScriptTxFee + 1 * Constants.UnitsInWave, ts)
-        .explicitGet()
+        .explicitGet(),
+      CreateAliasTransaction.selfSigned(TxVersion.V2, acc1, Alias.create("alias").explicitGet(), MinFee, ts).explicitGet()
     )
-    setScript = SetScriptTransaction.selfSigned(1.toByte, dapp, Some(script(ByteStr(acc1.toAddress.bytes))), SetScriptFee, ts).explicitGet()
+    setScript = SetScriptTransaction.selfSigned(1.toByte, dapp, Some(script("alias")), SetScriptFee, ts).explicitGet()
     ci        = InvokeScriptTransaction.selfSigned(1.toByte, master, dapp.toAddress, functionCall, Nil, InvokeScriptTxFee, Waves, ts + 3).explicitGet()
     lease1    = LeaseTransaction.selfSigned(2.toByte, acc1, dapp.toAddress, 10 * Constants.UnitsInWave, MinFee, ts + 2).explicitGet()
     lease2    = LeaseTransaction.selfSigned(2.toByte, acc1, dapp.toAddress, 10 * Constants.UnitsInWave, MinFee, ts + 3).explicitGet()
@@ -80,7 +82,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
     (genesis ++ Seq(setScript, lease1, lease2), Seq(cancel1, leaseD, t), acc1, dapp, ci)
   }
 
-  def script(a: ByteStr): Script = {
+  def script(a: String): Script = {
     val ctx = {
       val directives = DirectiveSet(V4, Account, DAppType).explicitGet()
       PureContext.build(Global, V4).withEnvironment[Environment] |+|
@@ -96,7 +98,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
          |
          | @Callable(i)
          | func bar() = {
-         |  let balance = wavesBalance(Address(base58'$a'))
+         |  let balance = wavesBalance(Alias("$a"))
          |   [
          |     IntegerEntry("available", balance.available),
          |     IntegerEntry("regular", balance.regular),
@@ -152,7 +154,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
           | {-# CONTENT_TYPE EXPRESSION #-}
           | {-# SCRIPT_TYPE ASSET #-}
           |
-          | assetBalance(Address(base58'$acc'), this.id) == $a
+          | assetBalance(Address(base58'$acc'), this.id) == $a && assetBalance(Alias("alias"), this.id) == $a
         """.stripMargin
       val parsedScript = Parser.parseExpr(script).get.value
       ExprScript(V4, ExpressionCompiler(ctx.compilerContext, parsedScript).explicitGet()._1)
@@ -199,6 +201,8 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
     forAll(for { a <- accountGen; b <- accountGen } yield (a, b)) {
       case (acc1, acc2) =>
         val g1 = GenesisTransaction.create(acc1.toAddress, ENOUGH_AMT, nextTs).explicitGet()
+        val g2 = GenesisTransaction.create(acc2.toAddress, ENOUGH_AMT, nextTs).explicitGet()
+        val alias = CreateAliasTransaction.selfSigned(TxVersion.V2, acc2, Alias.create("alias").explicitGet(), MinFee, nextTs).explicitGet()
         val issue = IssueTransaction(
           TxVersion.V1,
           acc1.publicKey,
@@ -216,7 +220,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
           .explicitGet()
         val ci = InvokeScriptTransaction.selfSigned(1.toByte, acc1, acc1.toAddress, functionCall, Nil, InvokeScriptTxFee, Waves, nextTs).explicitGet()
 
-        assertDiffAndState(Seq(TestBlock.create(Seq(g1, issue, setScript))), TestBlock.create(Seq(ci)), rideV4Activated) {
+        assertDiffAndState(Seq(TestBlock.create(Seq(g1, g2, alias, issue, setScript))), TestBlock.create(Seq(ci)), rideV4Activated) {
           case (d, s) =>
             d.scriptResults(ci.id()).errorMessage shouldBe Some(InvokeScriptResult.ErrorMessage(3, "Transaction is not allowed by token-script"))
             s.balance(acc1.toAddress, IssuedAsset(issue.id())) shouldBe a
