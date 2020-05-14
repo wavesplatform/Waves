@@ -8,7 +8,7 @@ import com.wavesplatform.utils.ScorexLogging
 import play.api.libs.json.{Json, Reads}
 
 object PatchLoader extends ScorexLogging {
-  final case class Patch(name: String, chainId: Byte, height: Int) {
+  final case class Patch(name: String, chainId: Char, height: Int) {
     private[PatchLoader] def fileName: String = s"$name-${chainId.toChar}-patch.json"
   }
 
@@ -18,6 +18,7 @@ object PatchLoader extends ScorexLogging {
     name != "DisableHijackedAliases"
 
   def read[T: Reads](patch: Patch): T = {
+    assert(patch.chainId == AddressScheme.current.chainId)
     val path  = getResourcePath(s"patches/${patch.fileName}")
     val bytes = Files.readAllBytes(Paths.get(path))
     Json.parse(bytes).as[T]
@@ -33,9 +34,9 @@ object PatchLoader extends ScorexLogging {
     getResourceFolderFiles("patches")
       .collect {
         case regex(name, chainId, height) =>
-          Patch(name, chainId.head.toByte, height.toInt)
+          Patch(name, chainId.head, height.toInt)
       }
-      .filter(_.chainId == AddressScheme.current.chainId)
+      .filter(_.chainId.toByte == AddressScheme.current.chainId)
   }
 
   private[this] def getResourcePath(path: String) = {

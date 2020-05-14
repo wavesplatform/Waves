@@ -1,0 +1,49 @@
+{
+  "transactions": {},
+  "portfolios": {
+    "3PFrn8EHRhjJGEQxYwWKdJcwcsW1XFRJbmz": {
+      "balance": 0,
+      "lease": {
+        "in": -11900000000,
+        "out": 0
+      },
+      "assets": {}
+    },
+    "3PGd1eQR8EhLkSogpmu9Ne7hSH1rQ5ALihd": {
+      "balance": 0,
+      "lease": {
+        "in": -4712672332,
+        "out": 0
+      },
+      "assets": {}
+    },
+    "3PHkrdL58z8pYq4w8Vd9rbxWxTQVaq2SJMi": {
+      "balance": 0,
+      "lease": {
+        "in": -31000000000,
+        "out": 0
+      },
+      "assets": {}
+    },
+    "3PBPtQceb2Qu7bSWsgQH8Xj3irSdh6BNAku": {
+      "balance": 0,
+      "lease": {
+        "in": 4712672332,
+        "out": 0
+      },
+      "assets": {}
+    }
+  },
+  "issuedAssets": {},
+  "updatedAssets": {},
+  "aliases": {},
+  "orderFills": {},
+  "leaseState": {},
+  "scripts": {},
+  "assetScripts": {},
+  "accountData": {},
+  "sponsorship": {},
+  "scriptsRun": 0,
+  "scriptsComplexity": 0,
+  "scriptResults": {}
+}

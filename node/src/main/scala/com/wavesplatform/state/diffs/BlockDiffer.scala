@@ -193,6 +193,7 @@ object BlockDiffer extends ScorexLogging {
 
         val (diffWithPatches, patchDiff) = patches.foldLeft((result.diff, result.detailedDiff.parentDiff)) {
           case ((previousDiff, previousPatchDiff), patch) =>
+            log.info(s"Applying patch: $patch")
             val patchDiff = PatchLoader.read[Diff](patch)
             (Monoid.combine(previousDiff, patchDiff), Monoid.combine(previousPatchDiff, patchDiff))
         }

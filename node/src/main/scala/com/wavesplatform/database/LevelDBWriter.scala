@@ -547,6 +547,7 @@ abstract class LevelDBWriter private[database] (
         val aliases = PatchLoader.read[Set[String]](patch).map(Alias.create(_).explicitGet())
         rw.put(Keys.disabledAliases, aliases)
         disabledAliases = aliases
+        log.info(s"Disabled Hijacked aliases: ${aliases.size} aliases")
       }
 
       rw.put(Keys.hitSource(height), Some(hitSource))
