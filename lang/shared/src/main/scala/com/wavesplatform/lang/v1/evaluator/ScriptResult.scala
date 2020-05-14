@@ -208,9 +208,9 @@ object ScriptResult {
     (fields.get(FieldNames.SponsorFeeAssetId), fields.get(FieldNames.SponsorFeeMinFee)) match {
       case (Some(CONST_BYTESTR(assetId)), Some(minFeeOpt)) =>
         val minFeeValueOpt = minFeeOpt match {
-          case CONST_LONG(minFee)         => Right(Some(minFee))
-          case CaseObj(_, m) if m.isEmpty => Right(None)
-          case other                      => err(s"can't reconstruct ${FieldNames.SponsorFeeMinFee} from $other", V4)
+          case CONST_LONG(minFee) => Right(Some(minFee))
+          case `unit`             => Right(None)
+          case other              => err(s"can't reconstruct ${FieldNames.SponsorFeeMinFee} from $other", V4)
         }
         minFeeValueOpt.map(v => SponsorFee(assetId, v))
       case other =>
