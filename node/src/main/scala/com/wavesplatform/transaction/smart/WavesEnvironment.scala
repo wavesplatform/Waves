@@ -106,9 +106,13 @@ class WavesEnvironment(
   override def tthis: Address = Recipient.Address(address())
 
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
-    blockchain.assetDescription(IssuedAsset(ByteStr(id))).map { assetDesc =>
+    for {
+      assetDesc <- blockchain.assetDescription(IssuedAsset(ByteStr(id)))
+    } yield {
       ScriptAssetInfo(
         id = ByteStr(id),
+        name = assetDesc.name.toStringUtf8(),
+        description = assetDesc.description.toStringUtf8(),
         quantity = assetDesc.totalVolume.toLong,
         decimals = assetDesc.decimals,
         issuer = Address(ByteStr(assetDesc.issuer.toAddress.bytes)),

@@ -5,6 +5,8 @@ import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 
 case class ScriptAssetInfo(
   id:            ByteStr,
+  name:          String,
+  description:   String,
   quantity:      Long,
   decimals:      Int,
   issuer:        Address,
