@@ -136,7 +136,7 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
         )
     ) { error =>
       error.statusCode shouldBe 400
-    //TODO check error message after fix SC-571
+      error.message shouldBe "List size should not exceed 1000"
     }
   }
 

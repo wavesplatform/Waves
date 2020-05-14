@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction
 
+import cats.implicits._
 import com.wavesplatform.account._
 import com.wavesplatform.api.http.requests.DataRequest._
 import com.wavesplatform.api.http.requests.SponsorFeeRequest._
@@ -270,12 +271,13 @@ object  TransactionFactory {
       sender   <- wallet.findPrivateKey(request.sender)
       signer   <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       contract <- AddressOrAlias.fromString(request.dApp)
+      call     <- request.call.traverse(InvokeScriptRequest.buildFunctionCall)
 
       tx <- InvokeScriptTransaction.signed(
         request.version.getOrElse(1.toByte),
         sender.publicKey,
         contract,
-        request.call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart)),
+        call,
         request.payment,
         request.fee,
         Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
@@ -287,7 +289,7 @@ object  TransactionFactory {
   def invokeScript(request: InvokeScriptRequest, sender: PublicKey): Either[ValidationError, InvokeScriptTransaction] =
     for {
       addressOrAlias <- AddressOrAlias.fromString(request.dApp)
-      fcOpt = request.call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart))
+      fcOpt <- request.call.traverse(InvokeScriptRequest.buildFunctionCall)
       tx <- InvokeScriptTransaction.create(
         request.version.getOrElse(1.toByte),
         sender,

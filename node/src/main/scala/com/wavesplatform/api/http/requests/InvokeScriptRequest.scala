@@ -6,7 +6,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import play.api.libs.json._
 
@@ -25,12 +27,12 @@ object InvokeScriptRequest {
         case JsDefined(JsString("boolean")) =>
           jv \ "value" match {
             case JsDefined(JsBoolean(n)) => JsSuccess(CONST_BOOLEAN(n))
-            case _ => JsError("value is missing or not an boolean")
+            case _ => JsError("value is missing or not a boolean")
           }
         case JsDefined(JsString("string")) =>
           jv \ "value" match {
             case JsDefined(JsString(n)) => CONST_STRING(n).fold(JsError(_), JsSuccess(_))
-            case _ => JsError("value is missing or not an string")
+            case _ => JsError("value is missing or not a string")
           }
         case JsDefined(JsString("binary")) =>
           jv \ "value" match {
@@ -41,15 +43,16 @@ object InvokeScriptRequest {
                 .leftMap(_.getMessage)
                 .flatMap(CONST_BYTESTR(_))
                 .fold(JsError(_), JsSuccess(_))
-            case _ => JsError("value is missing or not an base64 encoded string")
+            case _ => JsError("value is missing or not a base64 encoded string")
           }
         case JsDefined(JsString("list")) =>
           jv \ "value" match {
             case JsDefined(JsArray(args)) =>
               for {
                 parsedArgs <- args.toStream.traverse(read)
-                arr        <- ARR(parsedArgs.toIndexedSeq, limited = true).fold(JsError(_), JsSuccess(_))
+                arr        <- ARR(parsedArgs.toIndexedSeq, limited = false).fold(JsError(_), JsSuccess(_))
               } yield arr
+            case _ => JsError("value is missing or not a list")
           }
         case _ => JsError("type is missing")
       }
@@ -77,8 +80,12 @@ object InvokeScriptRequest {
   implicit val unsignedInvokeScriptRequestReads: Reads[InvokeScriptRequest]     = Json.reads[InvokeScriptRequest]
   implicit val signedInvokeScriptRequestReads: Reads[SignedInvokeScriptRequest] = Json.reads[SignedInvokeScriptRequest]
 
-  def buildFunctionCall(fc: FunctionCallPart): FUNCTION_CALL =
-    FUNCTION_CALL(FunctionHeader.User(fc.function), fc.args)
+  def buildFunctionCall(fc: FunctionCallPart): Either[ValidationError, FUNCTION_CALL] =
+    Either.cond(
+      fc.args.collect { case arr: ARR if arr.xs.size > MaxListLengthV4 => arr }.isEmpty,
+      FUNCTION_CALL(FunctionHeader.User(fc.function), fc.args),
+      GenericError(s"List size should not exceed $MaxListLengthV4")
+    )
 }
 
 case class InvokeScriptRequest(
@@ -108,11 +115,12 @@ case class SignedInvokeScriptRequest(
       _sender      <- PublicKey.fromBase58String(senderPublicKey)
       _dappAddress <- AddressOrAlias.fromString(dApp)
       _feeAssetId  <- parseBase58ToAsset(feeAssetId.filter(_.length > 0), "invalid.feeAssetId")
+      checkedCall  <- call.traverse(InvokeScriptRequest.buildFunctionCall)
       t <- InvokeScriptTransaction.create(
         version.getOrElse(2.toByte),
         _sender,
         _dappAddress,
-        call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart)),
+        checkedCall,
         payment.getOrElse(Seq()),
         fee,
         _feeAssetId,
