@@ -367,11 +367,82 @@ class SponsorFeeActionSuite extends BaseSuite {
       sender.debugStateChanges(failedTx._1.id).stateChanges.get.errorMessage.get.text should include("Too many script actions: max: 10, actual: 11")
     }
 
-    "SponsorFee is available only for assets issuing from current dApp" in {
+    "SponsorFee is available for assets issued via transaction" in {
+      val dApp = miner.createAddress()
+      miner.transfer(sender.address, dApp, initialWavesBalance, minFee, waitForTx = true)
+      val assetId = miner.issue(dApp, waitForTx = true).id
+
+      createDApp(
+        s"""
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           |@Callable(i)
+           |func sponsorAsset() = [
+           |    SponsorFee(base58'$assetId', 1000)
+           |]
+        """.stripMargin,
+        dApp
+      )
+
+      val tx = miner.invokeScript(miner.address, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee)
+      sender.debugStateChanges(tx._1.id).stateChanges.get.sponsorFees.head shouldBe SponsorFeeResponse(assetId, Some(1000))
+    }
+
+    "Negative fee is not available" in {
+      val dApp = miner.createAddress()
+      miner.transfer(sender.address, dApp, initialWavesBalance, minFee, waitForTx = true)
+      val assetId = miner.issue(dApp, waitForTx = true).id
+
+      createDApp(
+        s"""
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           |@Callable(i)
+           |func sponsorAsset() = [
+           |    SponsorFee(base58'$assetId', -1)
+           |]
+        """.stripMargin,
+        dApp
+      )
+
+      val failedTx = miner.invokeScript(miner.address, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee)
+      val error = sender.debugStateChanges(failedTx._1.id).stateChanges.get.errorMessage.get.text
+      error should include("NegativeMinFee")
+    }
+
+    "SponsorFee is available only for assets issuing from current address" in {
+      val issuer = miner.createAddress()
+      miner.transfer(sender.address, issuer, initialWavesBalance, minFee, waitForTx = true)
+      val assetId = miner.issue(issuer, waitForTx = true).id
+
+      val dApp = createDApp(
+       s"""
+          |{-# STDLIB_VERSION 4 #-}
+          |{-# CONTENT_TYPE DAPP #-}
+          |{-# SCRIPT_TYPE ACCOUNT #-}
+          |
+          |@Callable(i)
+          |func sponsorAsset() = [
+          |    SponsorFee(base58'$assetId', 1000)
+          |]
+        """.stripMargin
+      )
+
+      val failedTx = miner.invokeScript(miner.address, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee)
+      val error = sender.debugStateChanges(failedTx._1.id).stateChanges.get.errorMessage.get.text
+      error should include(s"SponsorFee assetId=$assetId was not issued from address of current dApp")
+    }
+
+    "SponsorFee is not available for scripted assets" in {
       val dApp = miner.createAddress()
       miner.transfer(sender.address, dApp, initialWavesBalance, minFee, waitForTx = true)
 
-      val assetId = miner.issue(dApp, waitForTx = true).id
+      val script = ScriptCompiler.compile("true", ScriptEstimatorV2).explicitGet()._1.bytes.value.base64
+      val assetId = miner.issue(dApp, script = Some(script), waitForTx = true).id
 
       createDApp(
        s"""
@@ -386,9 +457,9 @@ class SponsorFeeActionSuite extends BaseSuite {
         """.stripMargin,
         dApp
       )
-      val failedTx = miner.invokeScript(miner.address, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee)
+      val failedTx = miner.invokeScript(miner.address, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee + smartFee)
       val error = sender.debugStateChanges(failedTx._1.id).stateChanges.get.errorMessage.get.text
-      error should include(s"SponsorFee assetId=$assetId was not issued from current dApp")
+      error should include(s"Sponsorship smart assets is disabled.")
     }
   }
 
