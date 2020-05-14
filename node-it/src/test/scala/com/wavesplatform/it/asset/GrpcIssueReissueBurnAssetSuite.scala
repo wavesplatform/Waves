@@ -268,14 +268,13 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
       sender.assertAssetBalance(acc, asset2Id, 15)
     }
 
-    // TODO NODE-1968
-    "NFT burning removes it from list" ignore {
+    "NFT burning removes it from list" in {
       val acc     = createDapp(script(nftAsset))
       val txIssue = issue(acc, CallableMethod, nftAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, nftAsset, method = CallableMethod)
-      // sender.nftList(acc, 2).map(_.assetId) shouldBe Seq(assetId)
+      sender.nftList(acc, 2).map(r => Base58.encode(r.assetId.toByteArray)) shouldBe Seq(assetId)
       burn(acc, CallableMethod, assetId, 1)
-      // sender.nftList(acc, 1) shouldBe empty
+      sender.nftList(acc, 1) shouldBe empty
     }
 
     "liquid block works" in {
@@ -290,7 +289,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
         }
         assertQuantity(asset)(simpleReissuableAsset.quantity)
         sender.assertAssetBalance(acc, asset, simpleReissuableAsset.quantity)
-        // sender.nftList(acc, 10) should have size 1
+        sender.nftList(acc, 10) should have size 1
       }
       checks()
       miner.waitForHeightArise()

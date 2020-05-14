@@ -930,4 +930,54 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe 'right
   }
+
+  property("Asset has no name") {
+    val ctx = Monoid
+      .combineAll(
+        Seq(
+          PureContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
+          CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
+          WavesContext.build(
+            DirectiveSet(V3, Account, DAppType).explicitGet()
+          )
+        ))
+      .compilerContext
+    val expr = {
+      val script =
+        """
+          |
+          |@Verifier(tx)
+          |func verify() = assetInfo(base58'').value().name == "qqqq"
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr, V3) should produce("Undefined field `name` of variable of type `Asset`")
+  }
+
+  property("Asset has some name") {
+    val ctx = Monoid
+      .combineAll(
+        Seq(
+          PureContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
+          CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
+          WavesContext.build(
+            DirectiveSet(V4, Account, DAppType).explicitGet()
+          )
+        ))
+      .compilerContext
+    val expr = {
+      val script =
+        """
+          |
+          |@Verifier(tx)
+          |func verify() = assetInfo(base58'').value().name == "qqqq"
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr, V4) shouldBe 'right
+  }
+
+
 }
