@@ -796,7 +796,7 @@ object SyncHttpApi extends Assertions {
         ConditionAwaitTime
       )
 
-    def rollback(height: Int, returnToUTX: Boolean = true): Unit = {
+    def rollbackWithoutBlacklisting(height: Int, returnToUTX: Boolean = true): Unit = {
       sync(
         Future.traverse(nodes) { node =>
           com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi(node).rollback(height, returnToUTX)
@@ -805,7 +805,7 @@ object SyncHttpApi extends Assertions {
       )
     }
 
-    def gracefulRollback(height: Int, returnToUTX: Boolean = true): Unit = {
+    def rollback(height: Int, returnToUTX: Boolean = true): Unit = {
       val combinations = nodes.combinations(2).toSeq
       nodes.combinations(2).foreach {
         case Seq(n1, n2) =>
@@ -813,7 +813,7 @@ object SyncHttpApi extends Assertions {
           n2.blacklist(n1.networkAddress)
       }
 
-      nodes.rollback(height, returnToUTX)
+      nodes.rollbackWithoutBlacklisting(height, returnToUTX)
       nodes.foreach(_.clearBlacklist())
 
       combinations.foreach {
