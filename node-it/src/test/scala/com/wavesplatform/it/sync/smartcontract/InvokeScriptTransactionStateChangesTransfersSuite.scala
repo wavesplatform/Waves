@@ -89,7 +89,7 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
     firstTransferAssetAmountOpt shouldBe Some(transferAmount)
   }
 
-  test("payment value higher than transfer") {
+  test("payment value lower than transfer") {
     val pamentAmount   = 1
     val transferAmount = 4
 
