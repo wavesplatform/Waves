@@ -436,7 +436,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
         } yield (dApp, sender, genesis, setScriptTx)
 
       def appendBlock(d: Domain, invoker: KeyPair, dApp: KeyPair)(parentBlockId: ByteStr, fc: Terms.FUNCTION_CALL): ByteStr = {
-        val fee = Gen.choose(MinIssueFee, 2 * MinIssueFee).sample.get
+        val fee = 150000000L
         val issue =
           InvokeScriptTransaction
             .selfSigned(2.toByte, invoker, dApp.toAddress, Some(fc), Seq.empty, fee, Waves, nextTs)
