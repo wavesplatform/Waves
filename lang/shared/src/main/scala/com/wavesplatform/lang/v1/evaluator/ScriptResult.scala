@@ -146,7 +146,7 @@ object ScriptResult {
       fields.get(FieldNames.IssueDecimals),
       fields.get(FieldNames.IssueName),
       fields.get(FieldNames.IssueDescription),
-      fields.get(FieldNames.IssueScript),
+      fields.get(FieldNames.IssueScriptField),
       fields.get(FieldNames.IssueIsReissuable),
       fields.get(FieldNames.IssueNonce)
     ) match {
