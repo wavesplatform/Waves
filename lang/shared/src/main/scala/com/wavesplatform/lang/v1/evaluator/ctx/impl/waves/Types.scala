@@ -12,9 +12,9 @@ object Types {
   lazy val addressOrAliasType = UNION(addressType, aliasType)
 
   def assetType(version: StdLibVersion) = {
-    val sponsoredFields =
-      if (version >= V4) "minSponsoredFee" -> optionLong
-      else "sponsored" -> BOOLEAN
+    val versionDepFields =
+      if (version >= V4) List("minSponsoredFee" -> optionLong, "name" -> STRING, "description" -> STRING)
+      else List("sponsored" -> BOOLEAN)
 
     CASETYPEREF(
       "Asset",
@@ -26,7 +26,7 @@ object Types {
         "issuerPublicKey" -> BYTESTR,
         "reissuable"      -> BOOLEAN,
         "scripted"        -> BOOLEAN
-      ) :+ sponsoredFields
+      ) ++ versionDepFields
     )
   }
 
@@ -473,6 +473,16 @@ object Types {
       )
   }
 
+  val balanceDetailsType = CASETYPEREF(
+    "BalanceDetails",
+    List(
+      "available" -> LONG,
+      "regular" -> LONG,
+      "generating" -> LONG,
+      "effective" -> LONG
+      )
+  )
+
   def buildWavesTypes(proofsEnabled: Boolean, v: StdLibVersion): Seq[FINAL] = {
     val activeTxTypes                       = buildActiveTransactionTypes(proofsEnabled, v)
     val obsoleteTxTypes                     = buildObsoleteTransactionTypes(proofsEnabled)
@@ -488,6 +498,6 @@ object Types {
       transactionsCommonType
     ) ++
       transactionTypes ++
-      (if (v >= V4) deleteDataEntry :: typedDataEntries else Seq(genericDataEntry))
+      (if (v >= V4) balanceDetailsType :: deleteDataEntry :: typedDataEntries else Seq(genericDataEntry))
   }
 }

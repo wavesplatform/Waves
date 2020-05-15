@@ -36,7 +36,7 @@ class MicroblocksSponsoredFeeTestSuite extends FreeSpec with Matchers with Cance
     val transferTxToSecondAddress = sponsor.transfer(sponsor.address, secondAddress, sponsorAssetTotal / 2, minFee, Some(sponsorAssetId), None).id
     nodes.waitForHeightAriseAndTxPresent(transferTxToSecondAddress)
 
-    val sponsorId = sponsor.sponsorAsset(sponsor.address, sponsorAssetId, baseFee = Token, fee = sponsorFee).id
+    val sponsorId = sponsor.sponsorAsset(sponsor.address, sponsorAssetId, baseFee = Token, fee = sponsorReducedFee).id
     nodes.waitForHeightAriseAndTxPresent(sponsorId)
 
     "check fee distribution" in {

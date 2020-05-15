@@ -521,7 +521,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   val reissueGen: Gen[ReissueTransaction] = issueReissueBurnGen.map(_._2)
   val burnGen: Gen[BurnTransaction]       = issueReissueBurnGen.map(_._3)
 
-  def sponsorFeeCancelSponsorFeeGen(sender: KeyPair): Gen[(IssueTransaction, SponsorFeeTransaction, SponsorFeeTransaction, SponsorFeeTransaction)] =
+  def sponsorFeeCancelSponsorFeeGen(sender: KeyPair, reducedFee: Boolean = true): Gen[(IssueTransaction, SponsorFeeTransaction, SponsorFeeTransaction, SponsorFeeTransaction)] =
     for {
       (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
       issue = IssueTransaction(
@@ -539,11 +539,12 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       minFee  <- smallFeeGen
       minFee1 <- smallFeeGen
       assetId = IssuedAsset(issue.assetId)
+      fee = (if (reducedFee) 0.001 * Constants.UnitsInWave else 1 * Constants.UnitsInWave).toLong
     } yield (
       issue,
-      SponsorFeeTransaction.selfSigned(1.toByte, sender, assetId, Some(minFee), 1 * Constants.UnitsInWave, timestamp).explicitGet(),
-      SponsorFeeTransaction.selfSigned(1.toByte, sender, assetId, Some(minFee1), 1 * Constants.UnitsInWave, timestamp).explicitGet(),
-      SponsorFeeTransaction.selfSigned(1.toByte, sender, assetId, None, 1 * Constants.UnitsInWave, timestamp).explicitGet()
+      SponsorFeeTransaction.selfSigned(1.toByte, sender, assetId, Some(minFee), fee, timestamp).explicitGet(),
+      SponsorFeeTransaction.selfSigned(1.toByte, sender, assetId, Some(minFee1), fee, timestamp).explicitGet(),
+      SponsorFeeTransaction.selfSigned(1.toByte, sender, assetId, None, fee, timestamp).explicitGet()
     )
 
   val sponsorFeeGen: Gen[SponsorFeeTransaction] = for {
