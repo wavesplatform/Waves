@@ -475,7 +475,7 @@ class BlockV5Test
     val utxPool           = new UtxPoolImpl(time, blockchain, Observer.stopped, settings.utxSettings, enablePriorityPool = false)
     val minerScheduler    = Scheduler.singleThread("miner")
     val appenderScheduler = Scheduler.singleThread("appender")
-    val miner             = new MinerImpl(allChannels, blockchain, settings, time, utxPool, wallet, pos, minerScheduler, minerScheduler, appenderScheduler)
+    val miner             = new MinerImpl(allChannels, blockchain, settings, time, utxPool, wallet, pos, minerScheduler, appenderScheduler)
     val blockAppender     = BlockAppender(blockchain, time, utxPool, pos, appenderScheduler) _
     f(miner, blockAppender, appenderScheduler)
   }

@@ -301,7 +301,8 @@ object FailedTransactionSuiteLike {
   }
 
   val configForMinMicroblockAge: Config = ConfigFactory.parseString(s"""
-     |waves.miner.min-micro-block-age = 30
+     |waves.miner.min-micro-block-age = 7
+     |waves.miner.max-transactions-in-micro-block = 1
      |""".stripMargin)
 
   val Configs: Seq[Config] =

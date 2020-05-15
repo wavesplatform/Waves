@@ -55,30 +55,29 @@ class MinerImpl(
     wallet: Wallet,
     pos: PoSSelector,
     val minerScheduler: SchedulerService,
-    val microMinerScheduler: SchedulerService,
     val appenderScheduler: SchedulerService
 ) extends Miner
     with MinerDebugInfo
     with ScorexLogging {
 
-  private implicit val s: SchedulerService = minerScheduler
+  private[this] implicit val implicitScheduler: SchedulerService = minerScheduler
 
-  private lazy val minerSettings              = settings.minerSettings
-  private lazy val minMicroBlockDurationMills = minerSettings.minMicroBlockAge.toMillis
-  private lazy val blockchainSettings         = settings.blockchainSettings
+  private[this] lazy val minerSettings              = settings.minerSettings
+  private[this] lazy val minMicroBlockDurationMills = minerSettings.minMicroBlockAge.toMillis
+  private[this] lazy val blockchainSettings         = settings.blockchainSettings
 
-  private val scheduledAttempts = SerialCancelable()
-  private val microBlockAttempt = SerialCancelable()
+  private[this] val scheduledAttempts = SerialCancelable()
+  private[this] val microBlockAttempt = SerialCancelable()
 
-  private val debugStateRef: Ref[Task, MinerDebugInfo.State] = Ref.unsafe[Task, MinerDebugInfo.State](MinerDebugInfo.Disabled)
+  private[this] val debugStateRef: Ref[Task, MinerDebugInfo.State] = Ref.unsafe[Task, MinerDebugInfo.State](MinerDebugInfo.Disabled)
 
-  private val microBlockMiner: MicroBlockMiner = MicroBlockMiner(
+  private[this] val microBlockMiner: MicroBlockMiner = MicroBlockMiner(
     debugStateRef,
     allChannels,
     blockchainUpdater,
     utx,
     settings.minerSettings,
-    microMinerScheduler,
+    minerScheduler,
     appenderScheduler
   )
 
@@ -312,7 +311,7 @@ class MinerImpl(
 
   override def state: MinerDebugInfo.State = debugStateRef.get.runSyncUnsafe(1.second)(minerScheduler, CanBlock.permit)
 
-  //noinspection TypeAnnotation
+  //noinspection TypeAnnotation,ScalaStyle
   private[this] object metrics {
     val blockBuildTimeStats      = Kamon.timer("miner.pack-and-forge-block-time")
     val microBlockBuildTimeStats = Kamon.timer("miner.forge-microblock-time")
