@@ -152,11 +152,20 @@ object Types {
       )
     )
 
+  val sponsorFeeActionType =
+    CASETYPEREF(
+      FieldNames.SponsorFee,
+      List(
+        FieldNames.SponsorFeeAssetId -> BYTESTR,
+        FieldNames.SponsorFeeMinFee -> optionLong
+      )
+    )
+
   private val callableV3Results =
     List(writeSetType, scriptTransferSetType, scriptResultType)
 
   private val callableV4Actions =
-    List(issueActionType, reissueActionType, burnActionType)
+    List(issueActionType, reissueActionType, burnActionType, sponsorFeeActionType)
 
   private def callableTypes(version: StdLibVersion) =
     if (version == V3) callableV3Results

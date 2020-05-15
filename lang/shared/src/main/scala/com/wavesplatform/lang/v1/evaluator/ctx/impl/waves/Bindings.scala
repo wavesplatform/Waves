@@ -170,6 +170,21 @@ object Bindings {
       version
     )
 
+  def mapSponsorFeePseudoTx(s: SponsorFeePseudoTx, version: StdLibVersion): CaseObj =
+    sponsorshipTransactionObject(
+      proofsEnabled = false,
+      Proven(
+        h = Header(id = s.txId, fee = 0, timestamp = s.timestamp, version = 0),
+        sender = s.sender,
+        bodyBytes = ByteStr.empty,
+        senderPk = s.senderPk,
+        proofs = IndexedSeq.empty
+      ),
+      s.sponsorFee.assetId,
+      s.sponsorFee.minSponsoredAssetFee,
+      version
+    )
+
   def transactionObject(tx: Tx, proofsEnabled: Boolean, version: StdLibVersion = V3): CaseObj =
     tx match {
       case Tx.Genesis(h, amount, recipient) =>
@@ -254,10 +269,7 @@ object Bindings {
           combine(Map("script" -> fromOptionBV(scriptOpt), "assetId" -> assetId), provenTxPart(p, proofsEnabled, version))
         )
       case Sponsorship(p, assetId, minSponsoredAssetFee) =>
-        CaseObj(
-          buildSponsorFeeTransactionType(proofsEnabled),
-          combine(Map("assetId" -> assetId, "minSponsoredAssetFee" -> minSponsoredAssetFee), provenTxPart(p, proofsEnabled, version))
-        )
+        sponsorshipTransactionObject(proofsEnabled, p, assetId, minSponsoredAssetFee, version)
       case Data(p, data) =>
         def mapValue(e: Any): (EVALUATED, CASETYPEREF) =
           e match {
@@ -353,6 +365,18 @@ object Bindings {
         ),
         provenTxPart(p, proofsEnabled, version)
       )
+    )
+
+  private def sponsorshipTransactionObject(
+    proofsEnabled: Boolean,
+    p: Proven,
+    assetId: ByteStr,
+    minSponsoredAssetFee: Option[Long],
+    version: StdLibVersion
+  ) =
+    CaseObj(
+      buildSponsorFeeTransactionType(proofsEnabled),
+      combine(Map("assetId" -> assetId, "minSponsoredAssetFee" -> minSponsoredAssetFee), provenTxPart(p, proofsEnabled, version))
     )
 
   def transferTransactionObject(tx: Tx.Transfer, proofsEnabled: Boolean, version: StdLibVersion): CaseObj =
