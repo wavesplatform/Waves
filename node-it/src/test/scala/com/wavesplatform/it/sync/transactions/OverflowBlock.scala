@@ -16,7 +16,7 @@ trait OverflowBlock { self: IntegrationSuiteWithThreeAddresses =>
     val addr    = sender.createAddress()
     val fee     = calcDataFee(entries, 1)
     nodes.waitForHeightArise()
-    sender.transfer(sender.privateKey.stringRepr, addr, fee * 10, waitForTx = true)
+    sender.transfer(sender.address, addr, fee * 10, waitForTx = true)
     for (_ <- 1 to 7) sender.putData(addr, entries, fee)
     sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
   }

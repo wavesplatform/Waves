@@ -511,7 +511,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
     val entries = List.tabulate(4)(n => PBTransactions.toPBDataEntry(BinaryDataEntry("test" + n, ByteStr(Array.fill(32767)(n.toByte)))))
     val fee = calcDataFee(entries)
     waitForHeightArise()
-    for (_ <- 1 to 8) sender.putData(sender.privateKey, entries, fee)
+    for (_ <- 1 to 8) sender.putData(sender.keyPair, entries, fee)
     waitForEmptyUtx()
   }
 

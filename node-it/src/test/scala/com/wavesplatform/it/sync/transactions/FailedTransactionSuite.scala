@@ -557,11 +557,11 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     sender.transfer(sender.address, caller, 100.waves, minFee, waitForTx = true)
 
     val txs = collection.mutable.ListBuffer[String]()
-    sender.waitFor("wait for even height")(n => n.height, (h: Int) => h % 2 == 0, 100.millis)
+    sender.waitFor("wait for even height")(n => n.height, (h: Int) => h % 2 == 0, 500.millis)
     sender.waitFor("send until odd height")({ n =>
       Try(n.invokeScript(caller, contract, Some("blockIsEven"), fee = invokeFee)._1.id).foreach(txs += _)
       n.height
-    }, (h: Int) => h % 2 != 0, 10 second)
+    }, (h: Int) => h % 2 != 0, 5 second)
 
     miner.waitFor("empty utx")(_.utxSize, (_: Int) == 0, 1 second)
     assertFailedTxs(txs)

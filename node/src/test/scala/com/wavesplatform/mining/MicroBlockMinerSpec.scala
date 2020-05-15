@@ -26,7 +26,7 @@ class MicroBlockMinerSpec extends FlatSpec with Matchers with PrivateMethodTeste
   "Micro block miner" should "generate microblocks in flat interval" in {
     val scheduler = Schedulers.singleThread("test")
     val acc       = TestValues.keyPair
-    val genesis   = GenesisTransaction.create(acc, TestValues.bigMoney, TestValues.timestamp).explicitGet()
+    val genesis   = GenesisTransaction.create(acc.toAddress, TestValues.bigMoney, TestValues.timestamp).explicitGet()
     val settings  = domainSettingsWithFS(TestFunctionalitySettings.withFeatures(BlockchainFeatures.NG))
     withDomain(settings) { d =>
       d.appendBlock(TestBlock.create(Seq(genesis)))
