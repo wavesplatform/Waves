@@ -7,7 +7,7 @@ import com.wavesplatform.lang.v1.repl.global
 import com.wavesplatform.lang.v1.repl.node.http.response.model._
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven, Transfer}
-import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, ByteStrValue, ScriptAssetInfo}
+import com.wavesplatform.lang.v1.traits.domain._
 
 private[node] class ChainDependentMapper(chainId: Byte) {
   def toRideModel(tx: TransferTransaction): Transfer =
@@ -17,14 +17,20 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       tx.assetId.map(_.byteStr),
       tx.amount,
       Address(tx.recipient.byteStr),
-      ByteStrValue(tx.attachment.byteStr)
+      (tx.attachment match {
+        case ANothing => EmptyAttachment
+        case AStr(v) => StringValue(v)
+        case ABoolean(v) => BooleanValue(v)
+        case ABytes(v) => ByteStrValue(v.byteStr)
+        case AInt(v) => IntValue(v)
+      })
     )
 
   private def proven(tx: TransferTransaction): Proven =
     Proven(
       Header(tx.id.byteStr, tx.fee, tx.timestamp, tx.version),
       Address(pkToAddress(tx.senderPublicKey)),
-      ByteStr(bodyBytes(tx)),
+      tx.bodyBytes.byteStr,
       tx.senderPublicKey.byteStr,
       tx.proofs.map(_.byteStr).toIndexedSeq
     )
@@ -37,7 +43,7 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       a.quantity,
       a.decimals,
       Address(a.issuer.byteStr),
-      pkToAddress(a.issuer),
+      a.issuerPublicKey.byteStr,
       a.reissuable,
       a.scripted,
       a.minSponsoredAssetFee
@@ -79,36 +85,4 @@ private[node] class ChainDependentMapper(chainId: Byte) {
 
     ByteStr(bytes)
   }
-
-  private val typeId: Byte = 4
-
-  private def bodyBytes(tx: TransferTransaction): Array[Byte] =
-    tx match {
-      case _: TransferTransactionV1 => typeId +: bytesBase(tx)
-      case _: TransferTransactionV2 => Array(typeId, tx.version) ++ bytesBase(tx)
-    }
-
-  private def bytesBase(tx: TransferTransaction): Array[Byte] =
-    Seq(
-      tx.senderPublicKey.bytes,
-      bytes(tx.assetId),
-      bytes(tx.feeAssetId),
-      bytes(tx.timestamp),
-      bytes(tx.amount),
-      bytes(tx.fee),
-      tx.recipient.bytes,
-      serializeArray(tx.attachment.bytes)
-    ).reduce(_ ++ _)
-
-  private def bytes(id: Option[ByteString]): Array[Byte] =
-    id.map(_.bytes).getOrElse(Array[Byte](0))
-
-  private def bytes(l: Long): Array[Byte] =
-    ByteBuffer.allocate(8).putLong(l).array()
-
-  private def bytes(s: Short): Array[Byte] =
-    ByteBuffer.allocate(2).putShort(s).array()
-
-  private def serializeArray(b: Array[Byte]): Array[Byte] =
-    bytes(b.length.toShort) ++ b
 }

@@ -7,6 +7,7 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.v1.repl.node.http.NodeClient._
 import com.wavesplatform.lang.v1.repl.node.http.response.ImplicitMappings
 import com.wavesplatform.lang.v1.repl.node.http.response.model._
+import com.wavesplatform.lang.v1.repl.node.http.response.model.Transaction._
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
@@ -29,7 +30,7 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
     getEntity[Id, HeightResponse, Long]("/blocks/height")
 
   override def transferTransactionById(id: Array[Byte]): Future[Option[Tx]] =
-    getEntity[Option, TransferTransaction, Tx](s"/transactions/info/${Base58.encode(id)}")
+    getEntity[Option, TransferTransaction, Tx](s"/transactions/info/${Base58.encode(id)}?bodyBytes=true")
 
   override def transactionHeightById(id: Array[Byte]): Future[Option[Long]] =
     getEntity[Option, HeightResponse, Long](s"/transactions/info/${Base58.encode(id)}")
@@ -59,7 +60,10 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
   ): Future[Either[String, Long]] =
     for {
      address <- extractAddress(recipient)
-     entity  <- getEntity[Either[String, ?], BalanceResponse, Long](s"/addresses/balance/$address")
+     entity  <- getEntity[Either[String, ?], BalanceResponse, Long]((assetId match {
+       case Some(assetId) => s"/assets/balance/${address}/${Base58.encode(assetId)}"
+       case None => s"/address/balance/${address}"
+     }))
     } yield entity
 
   override def accountWavesBalanceOf(
