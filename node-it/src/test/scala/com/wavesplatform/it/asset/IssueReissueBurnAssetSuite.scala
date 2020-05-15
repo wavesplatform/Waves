@@ -18,6 +18,11 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import scala.concurrent.duration._
 
 class IssueReissueBurnAssetSuite extends BaseSuite {
+  override def nodeConfigs =
+    com.wavesplatform.it.NodeConfigs.newBuilder
+      .overrideBase(_.quorum(0))
+      .withDefault(1)
+      .buildNonConflicting()
   private val initialWavesBalance = 100.waves
   private val setScriptPrice      = 0.01.waves
 
@@ -287,7 +292,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val assetA      = issueValidated(acc, simpleReissuableAsset)
 
       sender.debugStateChangesByAddress(acc, 100).flatMap(_.stateChanges) should matchPattern {
-        case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, None)) if issue.name == simpleReissuableAsset.name =>
+        case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, Nil, None)) if issue.name == simpleReissuableAsset.name =>
       }
 
       val height = nodes.waitForHeightArise()
@@ -305,7 +310,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       nodes.rollback(height, returnToUTX = false)
 
       sender.debugStateChangesByAddress(acc, 100).flatMap(_.stateChanges) should matchPattern {
-        case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, None)) if issue.name == simpleReissuableAsset.name =>
+        case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, Nil, None)) if issue.name == simpleReissuableAsset.name =>
       }
       assertApiError(sender.debugStateChanges(txId), TransactionDoesNotExist)
 

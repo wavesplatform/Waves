@@ -164,6 +164,20 @@ object Bindings {
       b.burn.assetId
     )
 
+  def mapSponsorFeePseudoTx(s: SponsorFeePseudoTx): CaseObj =
+    sponsorshipTransactionObject(
+      proofsEnabled = false,
+      Proven(
+        h = Header(id = s.txId, fee = 0, timestamp = s.timestamp, version = 0),
+        sender = s.sender,
+        bodyBytes = ByteStr.empty,
+        senderPk = s.senderPk,
+        proofs = IndexedSeq.empty
+      ),
+      s.sponsorFee.assetId,
+      s.sponsorFee.minSponsoredAssetFee
+    )
+
   def transactionObject(tx: Tx, proofsEnabled: Boolean, version: StdLibVersion = V3): CaseObj =
     tx match {
       case Tx.Genesis(h, amount, recipient) =>
@@ -248,10 +262,7 @@ object Bindings {
           combine(Map("script" -> fromOptionBV(scriptOpt), "assetId" -> assetId), provenTxPart(p, proofsEnabled))
         )
       case Sponsorship(p, assetId, minSponsoredAssetFee) =>
-        CaseObj(
-          buildSponsorFeeTransactionType(proofsEnabled),
-          combine(Map("assetId" -> assetId, "minSponsoredAssetFee" -> minSponsoredAssetFee), provenTxPart(p, proofsEnabled))
-        )
+        sponsorshipTransactionObject(proofsEnabled, p, assetId, minSponsoredAssetFee)
       case Data(p, data) =>
         def mapValue(e: Any): (EVALUATED, CASETYPEREF) =
           e match {
@@ -347,6 +358,17 @@ object Bindings {
       )
     )
 
+  private def sponsorshipTransactionObject(
+    proofsEnabled: Boolean,
+    p: Proven,
+    assetId: ByteStr,
+    minSponsoredAssetFee: Option[Long]
+  ) =
+    CaseObj(
+      buildSponsorFeeTransactionType(proofsEnabled),
+      combine(Map("assetId" -> assetId, "minSponsoredAssetFee" -> minSponsoredAssetFee), provenTxPart(p, proofsEnabled))
+    )
+
   def transferTransactionObject(tx: Tx.Transfer, proofsEnabled: Boolean, version: StdLibVersion): CaseObj =
     CaseObj(
       buildTransferTransactionType(proofsEnabled, version),
@@ -373,15 +395,15 @@ object Bindings {
         "scripted"        -> sAInfo.scripted
       )
 
-    val sponsoredField: (String, EVALUATED) =
+    val versionDepField: Map[String, EVALUATED] =
       if (version >= V4)
-        "minSponsoredFee" -> sAInfo.minSponsoredFee
+        Map("minSponsoredFee" -> sAInfo.minSponsoredFee, "name" -> sAInfo.name, "description" -> sAInfo.description)
       else
-        "sponsored" -> sAInfo.minSponsoredFee.isDefined
+        Map("sponsored" -> sAInfo.minSponsoredFee.isDefined)
 
     CaseObj(
       assetType(version),
-      commonFields + sponsoredField
+      commonFields ++ versionDepField
     )
   }
 

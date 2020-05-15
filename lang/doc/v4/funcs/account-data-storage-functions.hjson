@@ -2,7 +2,7 @@
   funcs: [
     {
       name: "assetBalance"
-      params: [ "Address|Alias", "ByteVector|Unit" ]
+      params: [ "Address|Alias", "ByteVector" ]
       doc: "Gets account balance by token ID."
       paramsDoc: [ "[Address](/blockchain/address.md) or [alias](/blockchain/alias.md) of the account.", "Token ID." ]
     }
@@ -57,7 +57,7 @@
     {
       name: "wavesBalance"
       params: [ "Address|Alias" ]
-      doc: "Gets account balance in [WAVES](/blockchain/token/waves.md)."
+      doc: "Gets account waves balance details."
       paramsDoc: [ "[Address](/blockchain/address.md) or [alias](/blockchain/alias.md) of the account." ]
     }
   ]

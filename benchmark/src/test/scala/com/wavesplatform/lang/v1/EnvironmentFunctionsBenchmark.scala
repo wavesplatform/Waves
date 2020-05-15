@@ -95,6 +95,7 @@ object EnvironmentFunctionsBenchmark {
     override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
     override def blockInfoByHeight(height: Int): Option[BlockInfo]                                               = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
+    override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails]    = ???
     override def tthis: Recipient.Address                                                                        = ???
     override def multiPaymentAllowed: Boolean                                                                    = ???
     override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
