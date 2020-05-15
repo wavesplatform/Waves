@@ -130,7 +130,8 @@ object Types {
         FieldNames.IssueIsReissuable -> BOOLEAN,
         FieldNames.IssueScriptField -> UNION(issueScriptType, UNIT),
         FieldNames.IssueNonce -> LONG,
-      )
+      ),
+      hideConstructor = true
     )
 
   val reissueActionType =
