@@ -33,7 +33,15 @@ class DataTransactionBodyBytesByteVectorSuite extends BaseTransactionSuite {
          |{-# STDLIB_VERSION 3 #-}
          |{-# CONTENT_TYPE EXPRESSION #-}
          |
-         | tx.bodyBytes.size() == $maxDataTxV1bodyBytesSize
+         | match tx {
+         |    case dtx: DataTransaction =>
+         |      dtx.bodyBytes.size() == $maxDataTxV1bodyBytesSize &&
+         |      dtx.data.size() == 5
+         |
+         |   case _ =>
+         |      throw("unexpected")
+         | }
+         |
        """.stripMargin
     )
 
@@ -43,8 +51,16 @@ class DataTransactionBodyBytesByteVectorSuite extends BaseTransactionSuite {
          |{-# STDLIB_VERSION 4 #-}
          |{-# CONTENT_TYPE EXPRESSION #-}
          |
-         | tx.bodyBytes.size() == ${Terms.DataTxMaxProtoBytes}        &&
-         | sigVerify(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)
+         | match tx {
+         |   case dtx: DataTransaction =>
+         |     dtx.bodyBytes.size() == ${Terms.DataTxMaxProtoBytes}         &&
+         |     dtx.data.size() == 6                                         &&
+         |     sigVerify(dtx.bodyBytes, dtx.proofs[0], dtx.senderPublicKey)
+         |
+         |  case _ =>
+         |     throw("unexpected")
+         | }
+         |
        """.stripMargin
     )
 
