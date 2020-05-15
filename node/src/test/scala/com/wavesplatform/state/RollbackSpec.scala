@@ -269,7 +269,6 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
         }
     }
 
-
     "asset quantity and reissuability" in forAll(accountGen, positiveLongGen, nonEmptyStringGen(4, 16), nonEmptyStringGen(0, 1000)) {
       case (sender, initialBalance, name, description) =>
         withDomain() { d =>
@@ -417,6 +416,20 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           )
         )
 
+      def sponsorFunctionCallGen(assetId: ByteStr): Gen[(Long, Terms.FUNCTION_CALL)] =
+        for {
+          minSponsoredAssetFee <- Gen.choose(1L, 100000L)
+        } yield (
+          minSponsoredAssetFee,
+          Terms.FUNCTION_CALL(
+            FunctionHeader.User("sponsor"),
+            List(
+              Terms.CONST_BYTESTR(assetId).explicitGet(),
+              Terms.CONST_LONG(minSponsoredAssetFee)
+            )
+          )
+        )
+
       def getAsset(d: Domain, txId: ByteStr): IssuedAsset = {
         val sr = d.blockchainUpdater.bestLiquidDiff.get.scriptResults(txId)
         sr.errorMessage shouldBe 'empty
@@ -466,7 +479,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
             /// liquid block rollback
             val liquidIssueTxId = append(startBlockId, issueFc)
-            val liquidAsset = getAsset(d, liquidIssueTxId)
+            val liquidAsset     = getAsset(d, liquidIssueTxId)
             d.balance(dApp.toAddress, liquidAsset) shouldBe quantity
             d.blockchainUpdater.removeAfter(startBlockId).explicitGet()
             d.balance(dApp.toAddress, liquidAsset) shouldBe 0L
@@ -474,7 +487,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
             // hardened block rollback
             val issueTxId = append(startBlockId, issueFc)
-            val asset = getAsset(d, issueTxId)
+            val asset     = getAsset(d, issueTxId)
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
             d.balance(dApp.toAddress, asset) shouldBe quantity
             d.blockchainUpdater.removeAfter(startBlockId).explicitGet()
@@ -496,7 +509,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             val (quantity, issueFc) = issueFunctionCallGen.sample.get
 
             val issueTxId = append(startBlockId, issueFc)
-            val asset = getAsset(d, issueTxId)
+            val asset     = getAsset(d, issueTxId)
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
 
             val issueBlockId     = d.lastBlockId
@@ -534,7 +547,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             val (quantity, issueFc) = issueFunctionCallGen.sample.get
 
             val issueTxId = append(startBlockId, issueFc)
-            val asset = getAsset(d, issueTxId)
+            val asset     = getAsset(d, issueTxId)
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
 
             val issueBlockId     = d.lastBlockId
@@ -555,6 +568,43 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
             d.blockchainUpdater.removeAfter(issueBlockId).explicitGet()
             d.balance(dApp.toAddress, asset) shouldBe quantity
+            d.blockchainUpdater.assetDescription(asset) shouldBe issueDescription
+          }
+      }
+
+      "sponsorFee" in forAll(scenario) {
+        case (dApp, invoker, genesis, setScript) =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0)) { d =>
+            val append = appendBlock(d, invoker, dApp) _
+
+            d.appendBlock(genesis)
+            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript)))
+
+            val startBlockId = d.lastBlockId
+
+            val (_, issueFc) = issueFunctionCallGen.sample.get
+
+            val issueTxId = append(startBlockId, issueFc)
+            val asset = getAsset(d, issueTxId)
+            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
+
+            val issueBlockId = d.lastBlockId
+            val issueDescription = d.blockchainUpdater.assetDescription(asset)
+
+            val (sponsorship, sponsorFc) = sponsorFunctionCallGen(asset.id).sample.get
+
+            // liquid block rollback
+            append(issueBlockId, sponsorFc)
+            d.blockchainUpdater.assetDescription(asset).get.sponsorship shouldBe sponsorship
+            d.blockchainUpdater.removeAfter(issueBlockId).explicitGet()
+            d.blockchainUpdater.assetDescription(asset).get.sponsorship shouldBe 0L
+
+            // hardened block rollback
+            append(issueBlockId, sponsorFc)
+            d.blockchainUpdater.assetDescription(asset).get.sponsorship shouldBe sponsorship
+            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
+            d.blockchainUpdater.removeAfter(issueBlockId).explicitGet()
+            d.blockchainUpdater.assetDescription(asset).get.sponsorship shouldBe 0L
             d.blockchainUpdater.assetDescription(asset) shouldBe issueDescription
           }
       }
@@ -781,13 +831,19 @@ object RollbackSpec {
            |func issue(name: String, description: String, quantity: Int, decimals: Int, isReissuable: Boolean) =
            |  [Issue(name, description, quantity, decimals, isReissuable, unit, 0)]
            |
-           |@Callable (i)
+           |@Callable(i)
            |func reissue(assetId: ByteVector, isReissuable: Boolean, quantity: Int) =
            |  [Reissue(assetId, isReissuable, quantity)]
            |
-           |@Callable (i) func burn(assetId: ByteVector, quantity: Int) =
+           |@Callable(i)
+           |func burn(assetId: ByteVector, quantity: Int) =
            |  [Burn(assetId, quantity)]
+           |  
+           |@Callable(i)
+           |func sponsor(assetId: ByteVector, minSponsoredAssetFee: Int) =
+           |  [SponsorFee(assetId, minSponsoredAssetFee)]
            |""".stripMargin
+
       Parser.parseContract(script).get.value
     }
 
