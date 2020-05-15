@@ -40,7 +40,7 @@ object Vals {
                   {
                     case b: BurnPseudoTx        => Bindings.mapBurnPseudoTx(b, version).asRight[ExecutionError]
                     case r: ReissuePseudoTx     => Bindings.mapReissuePseudoTx(r, version).asRight[ExecutionError]
-                    case sf: SponsorFeePseudoTx => Bindings.mapSponsorFeePseudoTx(sf).asRight[ExecutionError]
+                    case sf: SponsorFeePseudoTx => Bindings.mapSponsorFeePseudoTx(sf, version).asRight[ExecutionError]
                     case st: ScriptTransfer     => Bindings.scriptTransfer(st, version).asRight[ExecutionError]
                   },
                   _ => "Expected Transaction or Order".asLeft[EVALUATED]
