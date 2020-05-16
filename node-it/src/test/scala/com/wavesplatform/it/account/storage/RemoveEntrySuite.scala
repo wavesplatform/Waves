@@ -1,7 +1,5 @@
 package com.wavesplatform.it.account.storage
 
-import java.nio.charset.StandardCharsets
-
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
