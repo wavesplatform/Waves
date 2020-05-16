@@ -80,8 +80,8 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
         """.stripMargin
       Parser.parseExpr(script).get.value
     }
-    ExpressionCompiler(compilerContext, funcExpr) should produce("exceeds 255")
-    ExpressionCompiler(compilerContext, letExpr)  should produce("exceeds 255")
+    ExpressionCompiler(compilerContext, funcExpr) should produce(s"Function '$tooLongName' size = 256 bytes exceeds 255")
+    ExpressionCompiler(compilerContext, letExpr)  should produce(s"Let '$tooLongName' size = 256 bytes exceeds 255")
 
   }
 

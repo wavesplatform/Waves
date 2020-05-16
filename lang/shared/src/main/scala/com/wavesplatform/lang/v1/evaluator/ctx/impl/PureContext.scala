@@ -50,7 +50,7 @@ object PureContext {
         if (a.length + b.length <= Terms.DataEntryValueMax) {
           CONST_STRING(a + b)
         } else {
-          Left("String is too large")
+          Left(s"String length = ${a.length + b.length} exceeds ${Terms.DataEntryValueMax}")
         }
       case _ => ???
     }
@@ -60,7 +60,7 @@ object PureContext {
         if (a.arr.length + b.arr.length <= Terms.DataEntryValueMax) {
           CONST_BYTESTR(a ++ b)
         } else {
-          Left("ByteVector is too large")
+          Left(s"ByteVector size = ${a.arr.length + b.arr.length} bytes exceeds ${Terms.DataEntryValueMax}")
         }
       case _ => ???
     }

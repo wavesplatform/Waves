@@ -1578,8 +1578,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(constructingMaxStringAndBytes, version = V3) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
     eval(constructingMaxStringAndBytes, version = V4) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
 
-    eval(constructingTooBigString, version = V3) should produce("String is too large")
-    eval(constructingTooBigString, version = V4) should produce("String is too large")
+    eval(constructingTooBigString, version = V3) should produce("String length = 32768 exceeds 32767")
+    eval(constructingTooBigString, version = V4) should produce("String length = 32768 exceeds 32767")
   }
 
   property("bytes limit") {
@@ -1601,7 +1601,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       case Right(CONST_BYTESTR(bytes)) => bytes.size shouldBe Terms.DataEntryValueMax
     }
 
-    eval(constructingTooBigBytes, version = V3) should produce("ByteVector is too large")
-    eval(constructingTooBigBytes, version = V4) should produce("ByteVector is too large")
+    eval(constructingTooBigBytes, version = V3) should produce("ByteVector size = 32768 bytes exceeds 32767")
+    eval(constructingTooBigBytes, version = V4) should produce("ByteVector size = 32768 bytes exceeds 32767")
   }
 }

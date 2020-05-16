@@ -1,9 +1,7 @@
 package com.wavesplatform.state.diffs
 
-import cats.instances.map._
+import cats.implicits._
 import cats.kernel.Monoid
-import cats.syntax.either._
-import cats.syntax.semigroup._
 import com.google.common.base.Throwables
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
@@ -339,11 +337,9 @@ object InvokeScriptTransactionDiff {
       )
 
       maxKeySize = ContractLimits.MaxKeySizeInBytesByVersion(stdLibVersion)
-      _ <- Either.cond(
-        dataEntries.forall(_.key.utf8Bytes.length <= maxKeySize),
-        (),
-        s"Key size must be less than $maxKeySize"
-      )
+      _ <- dataEntries.find(_.key.utf8Bytes.length > maxKeySize)
+          .toLeft(())
+          .leftMap(d => s"Key size = ${d.key.utf8Bytes.length} bytes must be less than $maxKeySize")
 
       totalDataBytes = dataEntries.map(_.toBytes.length).sum
       _ <- Either.cond(

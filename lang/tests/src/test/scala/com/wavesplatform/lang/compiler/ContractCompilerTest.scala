@@ -808,7 +808,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) should produce("exceeds 255")
+    compiler.ContractCompiler(ctx, expr, V3) should produce(s"Function '$longName' size = 256 bytes exceeds 255")
   }
 
   property("contract compiles if function name length is equal to 255 bytes") {

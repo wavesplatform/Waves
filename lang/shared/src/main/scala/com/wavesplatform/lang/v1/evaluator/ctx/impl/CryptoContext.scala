@@ -103,7 +103,7 @@ object CryptoContext {
         (n => (s"${name}_${n._1}Kb", (internalName + n._2).toShort)),
         costs,
         (n => {
-          case CONST_BYTESTR(msg: ByteStr) :: _ => Either.cond(msg.size <= n * 1024, (), s"Invalid message size, must be not greater than $n Kb")
+          case CONST_BYTESTR(msg: ByteStr) :: _ => Either.cond(msg.size <= n * 1024, (), s"Invalid message size = ${msg.size} bytes, must be not greater than $n KB")
           case xs                               => notImplemented[Id, Unit](s"${name}_${n}Kb(bytes: ByteVector)", xs)
         }),
         BYTESTR,
@@ -142,7 +142,7 @@ object CryptoContext {
         case 128 => 150
       }),
       (n => {
-        case CONST_BYTESTR(msg: ByteStr) :: _ => Either.cond(msg.size <= n * 1024, (), s"Invalid message size, must be not greater than $n Kb")
+        case CONST_BYTESTR(msg: ByteStr) :: _ => Either.cond(msg.size <= n * 1024, (), s"Invalid message size = ${msg.size} bytes, must be not greater than $n KB")
         case xs                               => notImplemented[Id, Unit](s"sigVerify_${n}Kb(message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
       }),
       BOOLEAN,
@@ -168,7 +168,7 @@ object CryptoContext {
                                    }), SIGVERIFY, BOOLEAN, ("message", BYTESTR), ("sig", BYTESTR), ("pub", BYTESTR)) {
         case CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil
             if (contextVer != V1 && contextVer != V2 && msg.size > lim) =>
-          Left(s"Invalid message size, must be not greater than ${lim / 1024} KB")
+          Left(s"Invalid message size = ${msg.size} bytes, must be not greater than ${lim / 1024} KB")
         case CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
           Right(CONST_BOOLEAN(global.curve25519verify(msg.arr, sig.arr, pub.arr)))
         case xs => notImplemented[Id, EVALUATED](s"sigVerify(message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
@@ -197,7 +197,7 @@ object CryptoContext {
       ) {
         case (digestAlg: CaseObj) :: CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil
             if (msg.size > lim) =>
-          Left(s"Invalid message size, must be not greater than ${lim / 1024} KB")
+          Left(s"Invalid message size = ${msg.size} bytes, must be not greater than ${lim / 1024} KB")
         case (digestAlg: CaseObj) :: CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
           algFromCO(digestAlg) flatMap { alg =>
             Try(global.rsaVerify(alg, msg.arr, sig.arr, pub.arr)).toEither
@@ -217,7 +217,7 @@ object CryptoContext {
         case 128 => 750
       }),
       (n => {
-        case _ :: CONST_BYTESTR(msg: ByteStr) :: _ => Either.cond(msg.size <= n * 1024, (), s"Invalid message size, must be not greater than $n Kb")
+        case _ :: CONST_BYTESTR(msg: ByteStr) :: _ => Either.cond(msg.size <= n * 1024, (), s"Invalid message size = ${msg.size} bytes, must be not greater than $n KB")
         case xs =>
           notImplemented[Id, Unit](s"rsaVerify_${n}Kb(digest: DigestAlgorithmType, message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
       }),

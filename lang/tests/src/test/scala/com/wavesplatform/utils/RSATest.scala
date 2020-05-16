@@ -167,7 +167,7 @@ class RSATest extends PropSpec with PropertyChecks with Matchers with BeforeAndA
            )
           val ctx: CTX[NoContext] = PureContext.build(Global, V4) |+| CryptoContext.build(Global, V4) |+| CTX[NoContext](Seq(), vars, Array.empty[BaseFunction[NoContext]])
 
-          eval(limScriptSrc(lim, alg, signature, xpub.getEncoded), ctx) shouldBe Left(s"Invalid message size, must be not greater than ${lim} Kb")
+          eval(limScriptSrc(lim, alg, signature, xpub.getEncoded), ctx) shouldBe Left(s"Invalid message size = ${lim * 1024 + 1} bytes, must be not greater than ${lim} KB")
         }
       }
     }
@@ -240,7 +240,7 @@ class RSATest extends PropSpec with PropertyChecks with Matchers with BeforeAndA
          )
         val ctx: CTX[NoContext] = PureContext.build(Global, V3) |+| CryptoContext.build(Global, V3) |+| CTX[NoContext](Seq(), vars, Array.empty[BaseFunction[NoContext]])
 
-        eval(maxScriptSrc(alg, signature, xpub.getEncoded), ctx) shouldBe Left("Invalid message size, must be not greater than 32 KB")
+        eval(maxScriptSrc(alg, signature, xpub.getEncoded), ctx) shouldBe Left(s"Invalid message size = ${32 * 1024 + 1} bytes, must be not greater than 32 KB")
       }
     }
   }

@@ -305,29 +305,32 @@ class InvokeScriptTransactionDiffTest
     compileContractFromExpr(expr)
   }
 
-  def writeSetWithKeyLength(funcName: String, length: Int = 1): DApp = {
+  def writeSetWithKeyLength(funcName: String, length: Int = 1, version: StdLibVersion = V3): DApp = {
     val keyName = Array.fill(length)("a").mkString
 
     val expr = {
+      val body =
+        if (version == V3)
+          s""" WriteSet([DataEntry("$keyName", 0)]) """
+        else
+          s""" [IntegerEntry("$keyName", 0)] """
+
       val script =
         s"""
            |
-           | {-#STDLIB_VERSION 3 #-}
+           | {-#STDLIB_VERSION $version #-}
            | {-#CONTENT_TYPE DAPP#-}
            | {-#SCRIPT_TYPE ACCOUNT#-}
            |
            | @Callable(i)
-           | func $funcName(b: ByteVector) = {
-           |    WriteSet([
-           |      DataEntry("$keyName", 0)
-           |        ])
-           |}
+           | func $funcName(b: ByteVector) =
+           |    $body
            |
         """.stripMargin
       Parser.parseContract(script).get.value
     }
 
-    compileContractFromExpr(expr)
+    compileContractFromExpr(expr, version)
   }
 
   def compileContractFromExpr(expr: Expressions.DAPP, stdLibVersion: StdLibVersion = V3): DApp = {
@@ -1346,7 +1349,7 @@ class InvokeScriptTransactionDiffTest
   property("can't write entry with key size greater than limit") {
     forAll(for {
       version <- Gen.oneOf(V3, V4)
-      r <- preconditionsAndSetContract(s => writeSetWithKeyLength(s, ContractLimits.MaxKeySizeInBytesByVersion(version) + 1))
+      r <- preconditionsAndSetContract(s => writeSetWithKeyLength(s, ContractLimits.MaxKeySizeInBytesByVersion(version) + 1, version), version = version)
     } yield (r._1, r._2, r._3, version)) {
       case (genesis, setScript, ci, version) =>
 
@@ -1355,7 +1358,10 @@ class InvokeScriptTransactionDiffTest
           else fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
 
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), settings) {
-          _ should produce("Key size must be less than")
+          _ should produce(
+            s"Key size = ${ContractLimits.MaxKeySizeInBytesByVersion(version) + 1} bytes " +
+            s"must be less than ${ContractLimits.MaxKeySizeInBytesByVersion(version)}"
+          )
         }
     }
   }
@@ -1363,7 +1369,7 @@ class InvokeScriptTransactionDiffTest
   property("can write entry with key size equals limit") {
     forAll(for {
       version <- Gen.oneOf(V3, V4)
-      r <- preconditionsAndSetContract(s => writeSetWithKeyLength(s, ContractLimits.MaxKeySizeInBytesByVersion(version)))
+      r <- preconditionsAndSetContract(s => writeSetWithKeyLength(s, ContractLimits.MaxKeySizeInBytesByVersion(version), version), version = version)
     } yield (r._1, r._2, r._3, version)) {
       case (genesis, setScript, ci, version) =>
 

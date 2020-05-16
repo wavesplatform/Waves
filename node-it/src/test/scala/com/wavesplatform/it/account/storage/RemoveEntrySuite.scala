@@ -1,5 +1,7 @@
 package com.wavesplatform.it.account.storage
 
+import java.nio.charset.StandardCharsets
+
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -122,12 +124,12 @@ class RemoveEntrySuite extends BaseSuite {
 
     "Trying of writing key longer than 400 bytes and removing it should produce an error" in {
       val address    = createDapp(script)
-      val tooLongKey = new scala.util.Random().nextString(401)
+      val tooLongKey = new scala.util.Random().nextPrintableChar().toString * 401
 
       val tx = miner.waitForTransaction(invokeScript(address, s"write", tooLongKey, "value")).id
 
       miner.transactionStatus(Seq(tx)).head.applicationStatus shouldBe Some("scriptExecutionFailed")
-      miner.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include ("Key size must be less than 400")
+      miner.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include ("Key size = 401 bytes must be less than 400")
     }
   }
 

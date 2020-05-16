@@ -65,7 +65,7 @@ object CompilationError {
     private val name = decl.name.asInstanceOf[PART.VALID[String]].v
     private val size = name.getBytes(StandardCharsets.UTF_8).length
 
-    val message = s"$declType '$name' size=$size exceeds ${ContractLimits.MaxDeclarationNameInBytes}"
+    val message = s"$declType '$name' size = $size bytes exceeds ${ContractLimits.MaxDeclarationNameInBytes}"
   }
 
   final case class FunctionNotFound(start: Int, end: Int, name: String, argTypes: List[String]) extends CompilationError {
