@@ -36,7 +36,7 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
     val callableNameSize =
       funcCallOpt match {
         case Some(FUNCTION_CALL(FunctionHeader.User(internalName, _), _)) => internalName.utf8Bytes.length
-        case None => 0
+        case _ => 0
       }
 
     V.seq(tx)(
