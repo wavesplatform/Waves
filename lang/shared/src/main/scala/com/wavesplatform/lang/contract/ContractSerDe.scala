@@ -2,6 +2,7 @@ package com.wavesplatform.lang.contract
 
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 
 import cats.implicits._
 import com.wavesplatform.lang.contract.DApp._
@@ -105,10 +106,11 @@ object ContractSerDe {
     for {
       ca <- deserializeCallableAnnotation(bb)
       cf <- deserializeDeclaration(bb).map(_.asInstanceOf[FUNC])
+      nameSize = cf.name.getBytes(StandardCharsets.UTF_8).length
       _ <- Either.cond(
-        cf.name.getBytes("UTF-8").size <= ContractLimits.MaxDeclarationNameInBytes,
+        nameSize <= ContractLimits.MaxDeclarationNameInBytes,
         (),
-        s"Callable function name (${cf.name}) longer than limit ${ContractLimits.MaxDeclarationNameInBytes}"
+        s"Callable function name (${cf.name}) size = $nameSize bytes exceeds ${ContractLimits.MaxDeclarationNameInBytes}"
       )
     } yield CallableFunction(ca, cf)
   }
