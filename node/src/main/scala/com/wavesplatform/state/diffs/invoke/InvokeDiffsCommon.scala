@@ -18,7 +18,7 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer}
+import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
@@ -33,6 +33,7 @@ import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
+import com.wavesplatform.transaction.validation.impl.SponsorFeeTxValidator
 import com.wavesplatform.utils._
 import shapeless.Coproduct
 
@@ -98,6 +99,8 @@ object InvokeDiffsCommon {
     val issueList     = actionsByType(classOf[Issue]).asInstanceOf[List[Issue]]
     val reissueList   = actionsByType(classOf[Reissue]).asInstanceOf[List[Reissue]]
     val burnList      = actionsByType(classOf[Burn]).asInstanceOf[List[Burn]]
+    val sponsorFeeList = actionsByType(classOf[SponsorFee]).asInstanceOf[List[SponsorFee]]
+
 
     val dataEntries = actionsByType
       .filterKeys(classOf[DataItem[_]].isAssignableFrom)
@@ -138,7 +141,8 @@ object InvokeDiffsCommon {
           tx.checkedAssets ++
             transferList.flatMap(_.assetId).map(IssuedAsset) ++
             reissueList.map(r => IssuedAsset(r.assetId)) ++
-            burnList.map(b => IssuedAsset(b.assetId))
+            burnList.map(b => IssuedAsset(b.assetId)) ++
+            sponsorFeeList.map(sf => IssuedAsset(sf.assetId))
         val totalScriptsInvoked = smartAssetInvocations.count(blockchain.hasAssetScript) + (if (blockchain.hasAccountScript(tx.sender.toAddress)) 1 else 0)
         val minIssueFee         = issueList.count(i => !blockchain.isNFT(i)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
         val dAppInvocationFee   = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber
@@ -165,6 +169,16 @@ object InvokeDiffsCommon {
       currentTxDiffWithKeys = currentTxDiff.copy(_2 = currentTxDiff._2 ++ transfers.keys ++ compositeDiff.accountData.keys)
       updatedTxDiff         = compositeDiff.transactions.updated(tx.id(), currentTxDiffWithKeys)
 
+      resultSponsorFeeList = {
+        val sponsorFeeDiff =
+          compositeDiff.sponsorship.map {
+            case (asset, SponsorshipValue(minFee)) => SponsorFee(asset.id, Some(minFee).filter(_ > 0))
+            case (asset, SponsorshipNoInfo)        => SponsorFee(asset.id, None)
+          }.toSet
+
+        sponsorFeeList.filter(sponsorFeeDiff.contains)
+      }
+
       isr = InvokeScriptResult(
         dataEntries,
         transferList.map { tr =>
@@ -176,7 +190,8 @@ object InvokeDiffsCommon {
         },
         issueList,
         reissueList,
-        burnList
+        burnList,
+        resultSponsorFeeList
       )
 
       resultDiff = compositeDiff.copy(
@@ -378,6 +393,21 @@ object InvokeDiffsCommon {
             validateActionAsPseudoTx(burnDiff, burn.assetId, pseudoTx)
           }
 
+          def applySponsorFee(sponsorFee: SponsorFee, pk: PublicKey): TracedResult[ValidationError, Diff] =
+            for {
+              _ <- TracedResult(
+                Either.cond(
+                  blockchain.assetDescription(IssuedAsset(sponsorFee.assetId)).exists(_.issuer == pk),
+                  (),
+                  ScriptExecutionError.dApp(s"SponsorFee assetId=${sponsorFee.assetId} was not issued from address of current dApp")
+                )
+              )
+              _ <- TracedResult(SponsorFeeTxValidator.checkMinSponsoredAssetFee(sponsorFee.minSponsoredAssetFee))
+              sponsorDiff = DiffsCommon.processSponsor(blockchain, dAppAddress, fee = 0, sponsorFee)
+              pseudoTx    = SponsorFeePseudoTx(sponsorFee, actionSender, pk, tx.id(), tx.timestamp)
+              r <- validateActionAsPseudoTx(sponsorDiff, sponsorFee.assetId, pseudoTx)
+            } yield r
+
           def validateActionAsPseudoTx(
               actionDiff: Either[ValidationError, Diff],
               assetId: ByteStr,
@@ -409,6 +439,7 @@ object InvokeDiffsCommon {
             case i: Issue       => applyIssue(tx, pk, i)
             case r: Reissue     => applyReissue(r, pk)
             case b: Burn        => applyBurn(b, pk)
+            case sf: SponsorFee => applySponsorFee(sf, pk)
           }
           diffAcc |+| diff
 

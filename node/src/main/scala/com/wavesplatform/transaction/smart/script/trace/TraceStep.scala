@@ -6,7 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.evaluator.{IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
-import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, Burn, DataItem, Issue, Reissue}
+import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.transaction.TxValidationError.{ScriptExecutionError, TransactionNotAllowedByScript}
 import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
@@ -22,7 +22,7 @@ case class AccountVerifierTrace(
 ) extends TraceStep {
 
   override lazy val json: JsObject = Json.obj(
-    "address" -> address.stringRepr,
+    "address" -> address.stringRepr
   ) ++ (errorO match {
     case Some(e) => Json.obj("error"  -> TraceStep.errorJson(e))
     case None    => Json.obj("result" -> "ok")
@@ -34,7 +34,7 @@ case class AssetVerifierTrace(
     errorO: Option[ValidationError]
 ) extends TraceStep {
   override lazy val json: JsObject = Json.obj(
-    "assetId" -> id.toString,
+    "assetId" -> id.toString
   ) ++ (errorO match {
     case Some(e) => Json.obj("error"  -> TraceStep.errorJson(e))
     case None    => Json.obj("result" -> "ok")
@@ -58,13 +58,16 @@ case class InvokeScriptTrace(
       "function" -> functionCall.function.funcName,
       "args"     -> functionCall.args.map(_.toString),
       resultE match {
-        case Right(value) => "result" ->
-           ({v: JsObject => if(logged) {
-              v ++ Json.obj(TraceStep.logJson(log))
-           } else {
-              v
-           }})(toJson(value))
-        case Left(e)      => "error"  -> TraceStep.errorJson(e)
+        case Right(value) =>
+          "result" ->
+            ({ v: JsObject =>
+              if (logged) {
+                v ++ Json.obj(TraceStep.logJson(log))
+              } else {
+                v
+              }
+            })(toJson(value))
+        case Left(e) => "error" -> TraceStep.errorJson(e)
       }
     )
   }
@@ -79,11 +82,12 @@ case class InvokeScriptTrace(
       case ScriptResultV4(actions) =>
         Json.obj(
           "actions" -> actions.map {
-            case transfer: AssetTransfer => transferJson(transfer) + ("type" -> JsString("transfer"))
-            case issue: Issue            => issueJson(issue)       + ("type" -> JsString("issue"))
-            case reissue: Reissue        => reissueJson(reissue)   + ("type" -> JsString("reissue"))
-            case burn: Burn              => burnJson(burn)         + ("type" -> JsString("burn"))
-            case item: DataItem[_]       => dataItemJson(item)     + ("type" -> JsString("dataItem"))
+            case transfer: AssetTransfer => transferJson(transfer) + ("type"     -> JsString("transfer"))
+            case issue: Issue            => issueJson(issue) + ("type"           -> JsString("issue"))
+            case reissue: Reissue        => reissueJson(reissue) + ("type"       -> JsString("reissue"))
+            case burn: Burn              => burnJson(burn) + ("type"             -> JsString("burn"))
+            case sponsorFee: SponsorFee  => sponsorFeeJson(sponsorFee) + ("type" -> JsString("sponsorFee"))
+            case item: DataItem[_]       => dataItemJson(item) + ("type"         -> JsString("dataItem"))
           }
         )
       case i: IncompleteResult =>
@@ -130,6 +134,12 @@ case class InvokeScriptTrace(
     Json.obj(
       "assetId"  -> burn.assetId.toString,
       "quantity" -> burn.quantity
+    )
+
+  private def sponsorFeeJson(sponsorFee: SponsorFee) =
+    Json.obj(
+      "assetId"              -> sponsorFee.assetId.toString,
+      "minSponsoredAssetFee" -> sponsorFee.minSponsoredAssetFee
     )
 }
 
