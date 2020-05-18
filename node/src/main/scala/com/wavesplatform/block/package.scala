@@ -30,7 +30,7 @@ package object block {
 
   // Sign
   private[block] implicit class BlockSignOps(block: Block) {
-    def sign(signer: PrivateKey): Block = block.copy(signature = crypto.sign(signer, block.bytesWithoutSignature()))
+    def sign(signer: PrivateKey): Block = block.copy(signature = crypto.sign(signer, block.bodyBytes()))
   }
 
   private[block] implicit class MicroBlockSignOps(microBlock: MicroBlock) {

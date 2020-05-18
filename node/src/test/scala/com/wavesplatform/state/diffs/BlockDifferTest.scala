@@ -9,6 +9,7 @@ import com.wavesplatform.crypto._
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.{Blockchain, Diff}
@@ -113,19 +114,25 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
       }
     }
 
-    "counts exchange fee asset complexity" in {
-      val issue1 = TxHelpers.issue(script = Some(TestValues.assetScript))
-      val issue2 = TxHelpers.issue(script = Some(TestValues.assetScript))
-      val order1 = TxHelpers.orderV3(OrderType.BUY, IssuedAsset(issue1.assetId), IssuedAsset(issue2.assetId))
-      val order2 = TxHelpers.orderV3(OrderType.SELL, IssuedAsset(issue1.assetId), IssuedAsset(issue2.assetId))
-      val exchange = TxHelpers.exchange(order1, order2)
+    "counts exchange fee asset complexity" - {
+      def test(assetScript: Option[Script], feeAssetScript: Option[Script]): Unit = {
+        val tradeableAssetIssue = TxHelpers.issue(script = assetScript)
+        val feeAssetIssue = TxHelpers.issue(script = feeAssetScript)
+        val order1 = TxHelpers.orderV3(OrderType.BUY, IssuedAsset(tradeableAssetIssue.assetId), IssuedAsset(feeAssetIssue.assetId))
+        val order2 = TxHelpers.orderV3(OrderType.SELL, IssuedAsset(tradeableAssetIssue.assetId), IssuedAsset(feeAssetIssue.assetId))
+        val exchange = TxHelpers.exchange(order1, order2)
 
-      withDomain(domainSettingsWithFS(TestFunctionalitySettings.withFeatures(BlockchainFeatures.SmartAssets, BlockchainFeatures.SmartAccountTrading, BlockchainFeatures.OrderV3))) { d =>
-        d.appendBlock(issue1, issue2)
-        val newBlock = d.createBlock(2.toByte, Seq(exchange))
-        val diff = BlockDiffer.fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited).explicitGet()
-        diff.diff.scriptsComplexity shouldBe (TestValues.assetScriptComplexity * 2)
+        withDomain(domainSettingsWithFS(TestFunctionalitySettings.withFeatures(BlockchainFeatures.SmartAssets, BlockchainFeatures.SmartAccountTrading, BlockchainFeatures.OrderV3))) { d =>
+          d.appendBlock(tradeableAssetIssue, feeAssetIssue)
+          val newBlock = d.createBlock(2.toByte, Seq(exchange))
+          val diff = BlockDiffer.fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited).explicitGet()
+          diff.diff.scriptsComplexity shouldBe (assetScript.toSeq ++ feeAssetScript).length
+        }
       }
+
+      "fee and asset" in test(Some(TestValues.assetScript), Some(TestValues.assetScript))
+      "only asset" in test(Some(TestValues.assetScript), None)
+      "only fee" in test(None, Some(TestValues.assetScript))
     }
   }
 
