@@ -653,10 +653,6 @@ object SyncHttpApi extends Assertions {
     def blockHeadersSeq(fromHeight: Int, toHeight: Int, amountsAsStrings: Boolean = false): Seq[BlockHeader] =
       sync(async(n).blockHeadersSeq(fromHeight, toHeight, amountsAsStrings))
 
-    def blockGenerationSignature(signature: String): GenerationSignatureResponse = sync(async(n).blockGenerationSignature(signature))
-
-    def lastBlockGenerationSignature: String = sync(async(n).lastBlockGenerationSignature)
-
     def generatingBalance(address: String, amountsAsStrings: Boolean = false): GeneratingBalance =
       sync(async(n).generatingBalance(address, amountsAsStrings))
 
