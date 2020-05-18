@@ -211,7 +211,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       sender.assetsBalance(contract).balances.map(_.assetId) should contain theSameElementsAs prevAssets
 
       failed.foreach { s =>
-        checkStateChange(sender.debugStateChanges(s.id), 3, "Transaction is not allowed by token-script")
+        checkStateChange(sender.debugStateChanges(s.id), 3, "Transaction is not allowed by script of the asset")
       }
 
       failed
@@ -273,7 +273,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       sender.assetBalance(caller, paymentAsset) shouldBe prevPaymentAssetBalance.copy(balance = prevPaymentAssetBalance.balance + paymentDelta)
 
       failed.foreach { s =>
-        checkStateChange(sender.debugStateChanges(s.id), 4, "Transaction is not allowed by token-script")
+        checkStateChange(sender.debugStateChanges(s.id), 4, "Transaction is not allowed by script of the asset")
       }
 
       failed
@@ -347,12 +347,12 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
           sender.getDataByKey(contract, key) shouldBe lastSuccessWrites.getOrElse(key, initial)
       }
 
-      failed.foreach(s => checkStateChange(sender.debugStateChanges(s.id), 3, "Transaction is not allowed by token-script"))
+      failed.foreach(s => checkStateChange(sender.debugStateChanges(s.id), 3, "Transaction is not allowed by script of the asset"))
 
       val failedIds             = failed.map(_.id).toSet
       val stateChangesByAddress = sender.debugStateChangesByAddress(contract, 10).takeWhile(sc => failedIds.contains(sc.id))
       stateChangesByAddress.size should be > 0
-      stateChangesByAddress.foreach(info => checkStateChange(info, 3, "Transaction is not allowed by token-script"))
+      stateChangesByAddress.foreach(info => checkStateChange(info, 3, "Transaction is not allowed by script of the asset"))
 
       failed
     }

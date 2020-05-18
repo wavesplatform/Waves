@@ -13,7 +13,7 @@ import play.api.libs.json._
 
 sealed abstract class TraceStep {
   def json: JsObject
-  def loggedJson = json
+  def loggedJson: JsObject = json
 }
 
 case class AccountVerifierTrace(
@@ -22,7 +22,7 @@ case class AccountVerifierTrace(
 ) extends TraceStep {
 
   override lazy val json: JsObject = Json.obj(
-    "address" -> address.stringRepr,
+    "address" -> address.stringRepr
   ) ++ (errorO match {
     case Some(e) => Json.obj("error"  -> TraceStep.errorJson(e))
     case None    => Json.obj("result" -> "ok")
@@ -34,7 +34,7 @@ case class AssetVerifierTrace(
     errorO: Option[ValidationError]
 ) extends TraceStep {
   override lazy val json: JsObject = Json.obj(
-    "assetId" -> id.toString,
+    "assetId" -> id.toString
   ) ++ (errorO match {
     case Some(e) => Json.obj("error"  -> TraceStep.errorJson(e))
     case None    => Json.obj("result" -> "ok")
@@ -58,13 +58,16 @@ case class InvokeScriptTrace(
       "function" -> functionCall.function.funcName,
       "args"     -> functionCall.args.map(_.toString),
       resultE match {
-        case Right(value) => "result" ->
-           ({v: JsObject => if(logged) {
-              v ++ Json.obj(TraceStep.logJson(log))
-           } else {
-              v
-           }})(toJson(value))
-        case Left(e)      => "error"  -> TraceStep.errorJson(e)
+        case Right(value) =>
+          "result" ->
+            ({ v: JsObject =>
+              if (logged) {
+                v ++ Json.obj(TraceStep.logJson(log))
+              } else {
+                v
+              }
+            })(toJson(value))
+        case Left(e) => "error" -> TraceStep.errorJson(e)
       }
     )
   }
@@ -80,10 +83,10 @@ case class InvokeScriptTrace(
         Json.obj(
           "actions" -> actions.map {
             case transfer: AssetTransfer => transferJson(transfer) + ("type" -> JsString("transfer"))
-            case issue: Issue            => issueJson(issue)       + ("type" -> JsString("issue"))
-            case reissue: Reissue        => reissueJson(reissue)   + ("type" -> JsString("reissue"))
-            case burn: Burn              => burnJson(burn)         + ("type" -> JsString("burn"))
-            case item: DataItem[_]       => dataItemJson(item)     + ("type" -> JsString("dataItem"))
+            case issue: Issue            => issueJson(issue) + ("type"       -> JsString("issue"))
+            case reissue: Reissue        => reissueJson(reissue) + ("type"   -> JsString("reissue"))
+            case burn: Burn              => burnJson(burn) + ("type"         -> JsString("burn"))
+            case item: DataItem[_]       => dataItemJson(item) + ("type"     -> JsString("dataItem"))
           }
         )
     }
@@ -133,9 +136,9 @@ case class InvokeScriptTrace(
 
 object TraceStep {
   def errorJson(e: ValidationError): JsValue = e match {
-    case ScriptExecutionError(error, log, isAssetScript)   => Json.obj(logType(isAssetScript), logJson(log), "reason" -> error)
-    case TransactionNotAllowedByScript(log, isAssetScript) => Json.obj(logType(isAssetScript), logJson(log))
-    case a                                                 => JsString(a.toString)
+    case see: ScriptExecutionError          => Json.obj(logType(see.isAssetScript), logJson(see.log), "reason" -> see.error)
+    case tne: TransactionNotAllowedByScript => Json.obj(logType(tne.isAssetScript), logJson(tne.log))
+    case a                                  => JsString(a.toString)
   }
 
   private def logType(isAssetScript: Boolean): (String, JsValueWrapper) =

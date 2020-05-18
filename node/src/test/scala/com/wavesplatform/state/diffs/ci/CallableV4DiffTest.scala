@@ -61,7 +61,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           Seq(TestBlock.create(genesis :+ setScript :+ issue)),
           TestBlock.create(Seq(invoke)),
           features
-        )(_ should produce("Transaction is not allowed by token-script", requireFailed = true))
+        )(_ should produce("Transaction is not allowed by script of the asset", requireFailed = true))
     }
   }
 
@@ -82,7 +82,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           Seq(TestBlock.create(genesis :+ setScript :+ issue)),
           TestBlock.create(Seq(invoke)),
           features
-        )(_ should produce("Transaction is not allowed by token-script", requireFailed = true))
+        )(_ should produce("Transaction is not allowed by script of the asset", requireFailed = true))
     }
   }
 

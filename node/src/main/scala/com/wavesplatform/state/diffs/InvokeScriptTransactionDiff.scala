@@ -152,7 +152,7 @@ object InvokeScriptTransactionDiff {
                     }
                   } yield (evaluator, invocationComplexity)
 
-                  result.leftMap { case (error, log) => ScriptExecutionError.dApp(error, log) }
+                  result.leftMap { case (error, log) => ScriptExecutionError.ByDAppScript(error, log) }
                 })
                 TracedResult(
                   scriptResultE,
@@ -181,17 +181,19 @@ object InvokeScriptTransactionDiff {
 
               dataEntries = dataItems.map(dataItemToEntry)
 
-              _ <- TracedResult(checkDataEntries(tx, dataEntries)).leftMap(ScriptExecutionError.dApp)
+              _ <- TracedResult(checkDataEntries(tx, dataEntries)).leftMap(e => ScriptExecutionError.ByDAppScript(e))
               _ <- TracedResult(
                 Either.cond(
                   actions.length - dataEntries.length <= ContractLimits.MaxCallableActionsAmount,
                   (),
-                  ScriptExecutionError.dApp(s"Too many script actions: max: ${ContractLimits.MaxCallableActionsAmount}, actual: ${actions.length}")
+                  ScriptExecutionError.ByDAppScript(
+                    s"Too many script actions: max: ${ContractLimits.MaxCallableActionsAmount}, actual: ${actions.length}"
+                  )
                 )
               )
 
               _ <- TracedResult(checkSelfPayments(dAppAddress, blockchain, tx, version, transferList))
-              _ <- TracedResult(Either.cond(transferList.map(_.amount).forall(_ >= 0), (), ScriptExecutionError.dApp("Negative amount")))
+              _ <- TracedResult(Either.cond(transferList.map(_.amount).forall(_ >= 0), (), ScriptExecutionError.ByDAppScript("Negative amount")))
               _ <- TracedResult(checkOverflow(transferList.map(_.amount)))
 
               verifierComplexity = blockchain.accountScript(tx.sender.toAddress).map(_.verifierComplexity)
@@ -296,9 +298,9 @@ object InvokeScriptTransactionDiff {
   ): Either[ScriptExecutionError, Unit] =
     if (blockchain.disallowSelfPayment && version >= V4)
       if (tx.payments.nonEmpty && tx.sender.toAddress == dAppAddress)
-        ScriptExecutionError.dApp("DApp self-payment is forbidden since V4").asLeft[Unit]
+        ScriptExecutionError.ByDAppScript("DApp self-payment is forbidden since V4").asLeft[Unit]
       else if (transfers.exists(_.recipient.bytes == ByteStr(dAppAddress.bytes)))
-        ScriptExecutionError.dApp("DApp self-transfer is forbidden since V4").asLeft[Unit]
+        ScriptExecutionError.ByDAppScript("DApp self-transfer is forbidden since V4").asLeft[Unit]
       else
         ().asRight[ScriptExecutionError]
     else
@@ -307,7 +309,7 @@ object InvokeScriptTransactionDiff {
   def checkOverflow(dataList: Traversable[Long]): Either[ScriptExecutionError, Unit] = {
     Try(dataList.foldLeft(0L)(Math.addExact))
       .fold(
-        _ => ScriptExecutionError.dApp("Attempt to transfer unavailable funds in contract payment").asLeft[Unit],
+        _ => ScriptExecutionError.ByDAppScript("Attempt to transfer unavailable funds in contract payment").asLeft[Unit],
         _ => ().asRight[ScriptExecutionError]
       )
   }
@@ -431,7 +433,7 @@ object InvokeScriptTransactionDiff {
             } else if (issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
               TracedResult(Left(TooBigArray), List())
             } else if (blockchain.assetDescription(IssuedAsset(issue.id)).isDefined) {
-              TracedResult(Left(ScriptExecutionError(s"Asset ${issue.id} is already issued", List(), isAssetScript = false)), List())
+              TracedResult(Left(ScriptExecutionError.ByDAppScript(s"Asset ${issue.id} is already issued")))
             } else {
               val staticInfo = AssetStaticInfo(TransactionId @@ itx.id(), pk, issue.decimals, blockchain.isNFT(issue))
               val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
@@ -516,25 +518,21 @@ object InvokeScriptTransactionDiff {
         isAssetScript = true,
         scriptContainerAddress = if (blockchain.passCorrectAssetId) assetId else ByteStr(tx.dAppAddressOrAlias.bytes)
       ) match {
-        case (log, Left(error))  => Left(ScriptExecutionError.asset(error, log, FailedScriptError.Reason.AssetInAction))
-        case (log, Right(FALSE)) => Left(TransactionNotAllowedByScript.asset(log, FailedScriptError.Reason.AssetInAction))
+        case (log, Left(error))  => Left(ScriptExecutionError.ByAssetScriptInAction(error, log, assetId))
+        case (log, Right(FALSE)) => Left(TransactionNotAllowedByScript.ByAssetScriptInAction(log, assetId))
         case (_, Right(TRUE))    => Right(nextDiff)
-        case (log, Right(x)) =>
-          Left(ScriptExecutionError.asset(s"Script returned not a boolean result, but $x", log, FailedScriptError.Reason.AssetInAction))
+        case (log, Right(x))     => Left(ScriptExecutionError.ByAssetScriptInAction(s"Script returned not a boolean result, but $x", log, assetId))
       }
     } match {
       case Failure(e) =>
-        Left(
-          ScriptExecutionError
-            .asset(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, FailedScriptError.Reason.AssetInAction)
-        )
+        Left(ScriptExecutionError.ByAssetScriptInAction(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, assetId))
       case Success(s) => s
     }
 
-  private def asFailedScriptError(ve: ValidationError): FailedScriptError =
+  private def asFailedScriptError(ve: ValidationError): FailedTransactionError =
     ve match {
-      case e: FailedScriptError => e
-      case e: GenericError      => ScriptExecutionError.dApp(e.err)
-      case e                    => ScriptExecutionError.dApp(e.toString)
+      case e: FailedTransactionError => e
+      case e: GenericError           => ScriptExecutionError.ByDAppScript(e.err)
+      case e                         => ScriptExecutionError.ByDAppScript(e.toString)
     }
 }
