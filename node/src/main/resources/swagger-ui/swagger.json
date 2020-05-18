@@ -3987,53 +3987,6 @@
         ]
       }
     },
-    "/debug/historyInfo": {
-      "get": {
-        "tags": [
-          "debug"
-        ],
-        "summary": "State",
-        "description": "All history info you need to debug",
-        "operationId": "historyInfo_1",
-        "parameters": [
-        ],
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "schema": {
-              "type": "object",
-              "required": [
-                "lastBlockIds",
-                "microBlockIds"
-              ],
-              "properties": {
-                "lastBlockIds": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "microBlockIds": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "$ref": "#/responses/ApiKeyNotValid"
-          }
-        },
-        "security": [
-          {
-            "API Key": [
-            ]
-          }
-        ]
-      }
-    },
     "/debug/configInfo": {
       "get": {
         "tags": [
