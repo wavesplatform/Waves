@@ -2697,7 +2697,7 @@
         }
       }
     },
-    "/assets/details/{assetId}": {
+    "/assets/details": {
       "get": {
         "tags": [
           "assets"
@@ -2707,11 +2707,15 @@
         "operationId": "details_1",
         "parameters": [
           {
-            "name": "assetId",
-            "in": "path",
+            "name": "id",
+            "in": "query",
             "description": "ID of the asset",
             "required": true,
-            "type": "string"
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
           },
           {
             "name": "full",
