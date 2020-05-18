@@ -41,7 +41,8 @@ private[node] case class TransferTransaction(
   version: Byte,
   senderPublicKey: ByteString,
   proofs: List[ByteString],
-  bodyBytes: ByteString
+  bodyBytes: ByteString,
+  succeed: Boolean
 )
 
 object Transaction {
@@ -49,9 +50,8 @@ object Transaction {
    for {
      applicationStatus <- c.downField("applicationStatus").as[Option[String]]
      succeed = applicationStatus.fold(true)(_ == "succeed")
-     _ <- Either.cond(succeed, (), DecodingFailure.apply("Failed transaction", List()))
      version <- c.downField("version").as[Int]
-     height <- c.downField("height").as[Int]
+     height <- c.downField("height").as[Option[Int]]
      typeId <- c.downField("type").as[Int]
      bodyBytes <- c.downField("bodyBytes").as[ByteString]
      proofs <- version match {
@@ -60,12 +60,16 @@ object Transaction {
      }
      id <- c.downField("id").as[ByteString]
      recipient <- c.downField("recipient").as[ByteString]
-     attachment <- c.downField("attachment").as[Option[Attachment]]
+     af = c.downField("attachment")
+     attachment <- version match {
+       case 1 | 2 => af.as[ByteString].map(v => Some(ABytes.apply(v)))
+       case _ => af.as[Option[Attachment]]
+     }
      senderPublicKey <- c.downField("senderPublicKey").as[ByteString]
      amount <- c.downField("amount").as[Long]
      fee <- c.downField("fee").as[Long]
      timestamp <- c.downField("timestamp").as[Long]
      assetId <- c.downField("assetId").as[Option[ByteString]]
      feeAssetId <- c.downField("feeAssetId").as[Option[ByteString]]
-   } yield TransferTransaction(id, recipient, amount, assetId, feeAssetId, attachment.getOrElse(ANothing), fee, timestamp, height, typeId.toByte, version.toByte, senderPublicKey, proofs, bodyBytes)
+   } yield TransferTransaction(id, recipient, amount, assetId, feeAssetId, attachment.getOrElse(ANothing), fee, timestamp, height.getOrElse(-1), typeId.toByte, version.toByte, senderPublicKey, proofs, bodyBytes, succeed)
 }

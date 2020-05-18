@@ -34,13 +34,15 @@ class ReplTest extends BaseSuite {
     val trans = miner.transfer(miner.address, issuer, 100.waves, 1.waves, version = TxVersion.V3, waitForTx = true)
     miner.transfer(miner.address, sample, 100.waves, 1.waves, waitForTx = true)
     miner.createAlias(miner.address, "aaaa", waitForTx = true)
-    val assetScript = ScriptCompiler.compile(
+
+    val failDApp = ScriptCompiler.compile(
             """
-               |{-# STDLIB_VERSION 2 #-}
-               |{-# CONTENT_TYPE EXPRESSION #-}
+               |{-# STDLIB_VERSION 4 #-}
+               |{-# CONTENT_TYPE DAPP #-}
                |{-# SCRIPT_TYPE ACCOUNT #-}
                |
-               |false
+               |@Callable(i)
+               |func default() = throw("")
                |""".stripMargin,
             ScriptEstimatorV3
           )
@@ -49,17 +51,46 @@ class ReplTest extends BaseSuite {
           .bytes()
           .base64
 
+    val assetScript = ScriptCompiler.compile(
+            """
+               |{-# STDLIB_VERSION 2 #-}
+               |{-# CONTENT_TYPE EXPRESSION #-}
+               |{-# SCRIPT_TYPE ASSET #-}
+               |
+               | false
+               |""".stripMargin,
+            ScriptEstimatorV3
+          )
+          .explicitGet()
+          ._1
+          .bytes()
+          .base64
+
+
     val assetId =
       miner.broadcastIssue(ikey, "asset", "description", 1000, decimals = 1, reissuable = true, script = Some(assetScript), waitForTx = true, fee = 1.waves).id
     val height = miner.height
-
-//    val transFailed = miner.transfer(issuer, miner.address, 1, assetId = Some(assetId), fee = 1.waves, waitForTx = true)
 
     miner.putData(issuer, List[DataEntry[_]](
       IntegerDataEntry("int", 100500L),
       StringDataEntry("str", "text"),
       BinaryDataEntry("bin", ByteStr(Base58.decode("r1Mw3j9J"))),
       BooleanDataEntry("bool", true)), 1.waves, waitForTx = true)
+
+    miner.setScript(issuer, Some(failDApp), 1.waves, waitForTx = true)
+
+    val transFailed = miner.invokeScript(
+        issuer,
+        issuer,
+        func = None,
+        payment = Seq(),
+        fee = 1.waves,
+        waitForTx = true
+      )
+ 
+    val idFailed = transFailed._1.id
+
+    (miner.rawTransactionInfo(idFailed) \ "applicationStatus").as[String] shouldBe "scriptExecutionFailed"
 
     val settings = NodeConnectionSettings(miner.nodeApiEndpoint.toString, 'I'.toByte, issuer)
     val repl = Repl(Some(settings))
@@ -149,5 +180,29 @@ class ReplTest extends BaseSuite {
 
     await(repl.execute(s""" wavesBalance(Address(base58'${sample}')).regular """)) shouldBe Right(s"res12: Int = ${100.waves}")
     await(repl.execute(""" this.wavesBalance() """)).explicitGet() should fullyMatch regex "res13: BalanceDetails = BalanceDetails\\(\\s+available = \\d+\\s+regular = \\d+\\s+generating = \\d+\\s+effective = \\d+\\s+\\)".r
+
+    await(repl.execute(s""" transferTransactionFromProto(base58'3nec5yth17jNrNgA7dfbbmzJTKysfVyrbkAH5A8w8ncBtWYGgfxEn5hGMnNKQyacgGxuoT9DQdbufGBybzPEpR4SFSbM2o1rxgLUtocDdzLWdbSAUKKHM7f2fsCDqEExkGF2f7Se6Tfi44y3yuNMTYAKrfShEBrKGzCgbEaJtLoZo4bPdnX5V6K2eWCBFnmFjUjA947TckxnNGboh7CL6') """)) shouldBe Right(
+      s"""|res14: TransferTransaction|Unit = TransferTransaction(
+          |	recipient = Address(
+          |		bytes = base58'3HdNRU6DwZBy3ZYAmNEkncQFJFCN5DCY1FQ'
+          |	)
+          |	timestamp = 15872737
+          |	bodyBytes = base58'VgZFeoUbnDNf9w4VBwyTUPxNvhPXJwZGnqinAeszLjngHW3MGWU1y2PemPTfVvtvzvGmGieCjNqpCkVspycSPdbpVLX9CkxzdZ6HR1MxoMNWamXHESqhmy'
+          |	assetId = Unit
+          |	feeAssetId = Unit
+          |	amount = 27603095
+          |	version = 1
+          |	id = base58'EmfqfvR3CcaSitJ5AoZdrKs6AAEcWeivNi3aUT9YZaXG'
+          |	senderPublicKey = base58'CgQJiVQ73HQRgVZErv1Uri5n6ZGKSbvrXaRgsMhj8LN6'
+          |	attachment = base58''
+          |	sender = Address(
+          |		bytes = base58'3HiHQ7gWXJZuLCtBStKjjgB8J8ZkixPuGuN'
+          |	)
+          |	proofs = [base58'5op9X8DV9c5tBmDnwZo7baGqTo2dqdH5oxvS5WL4EBJKPJKLsCA2c3mvMHjmSFwf3Yf1VLoCiT2TbicV5vr5kBft', base58'', base58'', base58'', base58'', base58'', base58'', base58'']
+          |	fee = 87195628
+          |)""".stripMargin)
+
+    await(repl.execute(s""" transactionHeightById(base58'$idFailed') """)) shouldBe
+      Right("res15: Int|Unit = Unit")
   }
 }

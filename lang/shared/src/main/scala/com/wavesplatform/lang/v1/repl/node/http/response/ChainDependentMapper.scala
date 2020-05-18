@@ -26,6 +26,13 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       })
     )
 
+  def toRideModelO(tx: TransferTransaction): Option[Transfer] =
+    if(tx.succeed) {
+      Some(toRideModel(tx))
+    } else {
+      None
+    }
+
   private def proven(tx: TransferTransaction): Proven =
     Proven(
       Header(tx.id.byteStr, tx.fee, tx.timestamp, tx.version),
