@@ -2736,7 +2736,7 @@
         "tags": [
           "assets"
         ],
-        "summary": "Information about a multiple assets",
+        "summary": "Information about the multiple assets",
         "description": "Provides detailed information about the given assets",
         "operationId": "asset_details_array",
         "parameters": [
