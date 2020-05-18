@@ -304,13 +304,14 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
       issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
       maybeAsset1              <- Gen.option(issue1.id()).map(Asset.fromCompatId)
       maybeAsset2              <- (Gen.option(issue2.id()) suchThat (x => x != maybeAsset1.compatId)).map(Asset.fromCompatId)
+      matcherFeeAssetId        <- assetIdGen retryUntil (_.nonEmpty) map (s => IssuedAsset(s.get))
       exchange <- exchangeV2GeneratorP(
         buyer = buyer,
         seller = seller,
         amountAssetId = maybeAsset2,
         priceAssetId = maybeAsset1,
-        buyMatcherFeeAssetId = Waves,
-        sellMatcherFeeAssetId = Waves,
+        buyMatcherFeeAssetId = matcherFeeAssetId,
+        sellMatcherFeeAssetId = matcherFeeAssetId,
         fixedMatcher = Some(matcher),
         orderVersions = Set(3)
       )
@@ -1080,7 +1081,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
                 order1 = tx.buyOrder.copy(amount = sellAmount).signWith(buyer.privateKey),
                 order2 = tx.sellOrder.copy(amount = buyAmount).signWith(seller.privateKey),
                 buyMatcherFee = (BigInt(tx.fee) * amount / buyAmount).toLong,
-                sellMatcherFee = (BigInt(tx.fee) * amount / sellAmount).toLong
+                sellMatcherFee = (BigInt(tx.fee) * amount / sellAmount).toLong,
               )
               .signWith(MATCHER.privateKey)
           }
