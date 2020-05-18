@@ -6,7 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult, ScriptResultV3, ScriptResultV4}
-import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, Burn, DataItem, Issue, Reissue}
+import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.transaction.TxValidationError.{ScriptExecutionError, TransactionNotAllowedByScript}
 import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
@@ -86,6 +86,7 @@ case class InvokeScriptTrace(
             case issue: Issue            => issueJson(issue) + ("type"       -> JsString("issue"))
             case reissue: Reissue        => reissueJson(reissue) + ("type"   -> JsString("reissue"))
             case burn: Burn              => burnJson(burn) + ("type"         -> JsString("burn"))
+            case sponsorFee: SponsorFee  => sponsorFeeJson(sponsorFee) + ("type" -> JsString("sponsorFee"))
             case item: DataItem[_]       => dataItemJson(item) + ("type"     -> JsString("dataItem"))
           }
         )
@@ -131,6 +132,12 @@ case class InvokeScriptTrace(
     Json.obj(
       "assetId"  -> burn.assetId.toString,
       "quantity" -> burn.quantity
+    )
+
+  private def sponsorFeeJson(sponsorFee: SponsorFee) =
+    Json.obj(
+      "assetId"              -> sponsorFee.assetId.toString,
+      "minSponsoredAssetFee" -> sponsorFee.minSponsoredAssetFee
     )
 }
 

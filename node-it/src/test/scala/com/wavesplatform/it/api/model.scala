@@ -423,10 +423,11 @@ case class StateChangesDetails(
     issues: Seq[IssueInfoResponse],
     reissues: Seq[ReissueInfoResponse],
     burns: Seq[BurnInfoResponse],
+    sponsorFees: Seq[SponsorFeeResponse],
     errorMessage: Option[ErrorMessageInfoResponse]
 )
 object StateChangesDetails {
-  implicit val stateChangeResponseFormat: Format[StateChangesDetails] = Json.format[StateChangesDetails]
+  implicit val stateChangeResponseFormat: Reads[StateChangesDetails] = Json.reads[StateChangesDetails]
 }
 
 case class DebugStateChanges(
@@ -442,7 +443,7 @@ case class DebugStateChanges(
     stateChanges: Option[StateChangesDetails]
 ) extends TxInfo
 object DebugStateChanges {
-  implicit val debugStateChanges: Format[DebugStateChanges] = Format(
+  implicit val debugStateChanges: Reads[DebugStateChanges] =
     Reads(jsv =>
       for {
         _type <- (jsv \ "type").validate[Int]
@@ -467,9 +468,8 @@ object DebugStateChanges {
           recipient,
           script,
           stateChanges
-        )),
-    Json.writes[DebugStateChanges]
-  )
+        )
+    )
 }
 
 case class IssueTransactionInfo(`type`: Int,
@@ -664,9 +664,22 @@ object BurnTransactionInfo {
   )
 }
 
-case class DataResponse(`type`: String, value: Long, key: String)
+case class DataResponse(`type`: String, value: Any, key: String)
 object DataResponse {
-  implicit val dataResponseFormat: Format[DataResponse] = Json.format
+  implicit val dataResponseFormat: Reads[DataResponse] = Reads {
+    case JsObject(fields) =>
+      val key = fields("key").asInstanceOf[JsString].value
+      val `type` = fields("type").asInstanceOf[JsString].value
+      val value = `type` match {
+        case "binary"  => fields("value").asInstanceOf[JsString].value
+        case "string"  => fields("value").asInstanceOf[JsString].value
+        case "integer" => fields("value").asInstanceOf[JsNumber].value.toLongExact
+        case "boolean" => fields("value").asInstanceOf[JsBoolean].value
+        case _         => JsError()
+      }
+      JsSuccess(DataResponse(`type`, value, key))
+    case _ => JsError()
+  }
 }
 
 case class TransfersInfoResponse(address: String, asset: Option[String], amount: Long)
@@ -702,6 +715,11 @@ object ReissueInfoResponse {
 case class BurnInfoResponse(assetId: String, quantity: Long)
 object BurnInfoResponse {
   implicit val burnInfoFormat: Format[BurnInfoResponse] = Json.format
+}
+
+case class SponsorFeeResponse(assetId: String, minSponsoredAssetFee: Option[Long])
+object SponsorFeeResponse {
+  implicit val sponsorFeeFormat: Format[SponsorFeeResponse] = Json.format
 }
 
 case class ErrorMessageInfoResponse(code: Int, text: String)
