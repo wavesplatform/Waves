@@ -522,6 +522,10 @@ abstract class LevelDBWriter private[database] (
         expiredKeys ++= updateHistory(rw, Keys.sponsorshipHistory(asset), threshold, Keys.sponsorship(asset))
       }
 
+      rw.put(Keys.issuedAssets(height), issuedAssets.keySet.toSeq)
+      rw.put(Keys.updatedAssets(height), updatedAssets.keySet.toSeq)
+      rw.put(Keys.sponsorshipAssets(height), sponsorship.keySet.toSeq)
+
       rw.put(Keys.carryFee(height), carry)
       expiredKeys += Keys.carryFee(threshold - 1).keyBytes
 
@@ -560,7 +564,6 @@ abstract class LevelDBWriter private[database] (
 
       val discardedBlocks: Seq[(Block, ByteStr)] = for (currentHeight <- height until targetHeight by -1) yield {
         val balancesToInvalidate     = Seq.newBuilder[(Address, Asset)]
-        val assetDetailsToInvalidate = Seq.newBuilder[IssuedAsset]
         val ordersToInvalidate       = Seq.newBuilder[ByteStr]
         val scriptsToDiscard         = Seq.newBuilder[Address]
         val assetScriptsToDiscard    = Seq.newBuilder[IssuedAsset]
@@ -625,6 +628,8 @@ abstract class LevelDBWriter private[database] (
             }
           }
 
+          rollbackAssetsInfo(rw, currentHeight)
+
           val transactions = transactionsAtHeight(h)
 
           transactions.foreach {
@@ -635,17 +640,9 @@ abstract class LevelDBWriter private[database] (
                 case _: PaymentTransaction | _: TransferTransaction | _: MassTransferTransaction =>
                 // balances already restored
 
-                case tx: IssueTransaction =>
-                  rw.delete(Keys.assetStaticInfo(IssuedAsset(tx.id())))
-                  assetDetailsToInvalidate += rollbackAssetInfo(rw, IssuedAsset(tx.id()), currentHeight)
-                case tx: UpdateAssetInfoTransaction =>
-                  assetDetailsToInvalidate += rollbackAssetInfo(rw, tx.assetId, currentHeight)
-                case tx: ReissueTransaction =>
-                  assetDetailsToInvalidate += rollbackAssetInfo(rw, tx.asset, currentHeight)
-                case tx: BurnTransaction =>
-                  assetDetailsToInvalidate += rollbackAssetInfo(rw, tx.asset, currentHeight)
-                case tx: SponsorFeeTransaction =>
-                  assetDetailsToInvalidate += rollbackSponsorship(rw, tx.asset, currentHeight)
+                case _: IssueTransaction | _: UpdateAssetInfoTransaction | _: ReissueTransaction | _: BurnTransaction | _: SponsorFeeTransaction =>
+                // asset info already restored
+
                 case tx: LeaseTransaction =>
                   rollbackLeaseStatus(rw, tx.id(), currentHeight)
                 case tx: LeaseCancelTransaction =>
@@ -702,7 +699,6 @@ abstract class LevelDBWriter private[database] (
         }
 
         balancesToInvalidate.result().foreach(discardBalance)
-        assetDetailsToInvalidate.result().foreach(discardAssetDescription)
         ordersToInvalidate.result().foreach(discardVolumeAndFee)
         scriptsToDiscard.result().foreach(discardScript)
         assetScriptsToDiscard.result().foreach(discardAssetScript)
@@ -716,10 +712,34 @@ abstract class LevelDBWriter private[database] (
     }
   }
 
-  private def rollbackAssetInfo(rw: RW, asset: IssuedAsset, currentHeight: Int): IssuedAsset = {
-    rw.delete(Keys.assetDetails(asset)(currentHeight))
-    rw.filterHistory(Keys.assetDetailsHistory(asset), currentHeight)
-    asset
+  private def rollbackAssetsInfo(rw: RW, currentHeight: Int): Unit = {
+    val issuedKey = Keys.issuedAssets(currentHeight)
+    val updatedKey = Keys.updatedAssets(currentHeight)
+    val sponsorshipKey = Keys.sponsorshipAssets(currentHeight)
+
+    val issued = rw.get(issuedKey)
+    val updated = rw.get(updatedKey)
+    val sponsorship = rw.get(sponsorshipKey)
+
+    rw.delete(issuedKey)
+    rw.delete(updatedKey)
+    rw.delete(sponsorshipKey)
+
+    issued.foreach { asset =>
+      rw.delete(Keys.assetStaticInfo(asset))
+    }
+
+    (issued ++ updated).foreach { asset =>
+      rw.delete(Keys.assetDetails(asset)(currentHeight))
+      rw.filterHistory(Keys.assetDetailsHistory(asset), currentHeight)
+      discardAssetDescription(asset)
+    }
+
+    sponsorship.foreach { asset =>
+      rw.delete(Keys.sponsorship(asset)(currentHeight))
+      rw.filterHistory(Keys.sponsorshipHistory(asset), currentHeight)
+      discardAssetDescription(asset)
+    }
   }
 
   private def rollbackOrderFill(rw: RW, orderId: ByteStr, currentHeight: Int): ByteStr = {
@@ -731,12 +751,6 @@ abstract class LevelDBWriter private[database] (
   private def rollbackLeaseStatus(rw: RW, leaseId: ByteStr, currentHeight: Int): Unit = {
     rw.delete(Keys.leaseStatus(leaseId)(currentHeight))
     rw.filterHistory(Keys.leaseStatusHistory(leaseId), currentHeight)
-  }
-
-  private def rollbackSponsorship(rw: RW, asset: IssuedAsset, currentHeight: Int): IssuedAsset = {
-    rw.delete(Keys.sponsorship(asset)(currentHeight))
-    rw.filterHistory(Keys.sponsorshipHistory(asset), currentHeight)
-    asset
   }
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>

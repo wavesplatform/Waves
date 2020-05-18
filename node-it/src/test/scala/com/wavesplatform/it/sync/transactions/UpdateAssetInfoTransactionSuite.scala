@@ -3,12 +3,15 @@ package com.wavesplatform.it.sync.transactions
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ApiError.{InvalidName, StateCheckFailed, TooBigArrayAllocation}
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.NodeConfigs.{Miners, NotMiner}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{Transaction, TransactionInfo}
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
@@ -28,10 +31,35 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
 
   val issuer       = pkByAddress(firstAddress)
   val nonIssuer    = pkByAddress(secondAddress)
+  val dApp         = pkByAddress(thirdAddress)
   var assetId      = ""
   var otherAssetId = ""
   var smartAssetId = ""
   var nftId        = ""
+
+  val testDapp = """
+    {-# STDLIB_VERSION 4 #-}
+    {-# CONTENT_TYPE DAPP #-}
+    {-# SCRIPT_TYPE ACCOUNT #-}
+ 
+    @Callable(i)
+    func isAssetInfoCorrect(id: String, name: String, description: String, quantity: Int, decimals: Int, issuer: String, issuerPublicKey: ByteVector, reissuable: Boolean, scripted: Boolean) = {
+      let isCorrect = match assetInfo(fromBase58String(id)) {
+        case a:Asset => a.name == name &&
+          a.description == description &&
+          a.quantity == quantity &&
+          a.id == fromBase58String(id) &&
+          a.decimals == decimals &&
+          a.issuer == Address(fromBase58String(issuer)) &&
+          a.issuerPublicKey == issuerPublicKey &&
+          a.reissuable == reissuable &&
+          a.scripted == scripted &&
+          a.minSponsoredFee == unit
+      case _ => throw("Can't find asset with specified id")
+      }
+      [BooleanEntry("isAssetInfoCorrect", isCorrect)]
+    }
+  """
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -53,6 +81,30 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
       )
       .id
     nftId = sender.broadcastIssue(issuer, "asset", "description", quantity = 1, decimals = 0, reissuable = false, script = None, waitForTx = true).id
+    val script = ScriptCompiler.compile(testDapp, ScriptEstimatorV3).explicitGet()._1.bytes().base64
+    sender.setScript(dApp.toAddress.toString, Some(script), waitForTx = true)
+  }
+
+  test("DApp can read asset info") {
+    sender.invokeScript(
+      issuer.toAddress.toString,
+      dApp.toAddress.toString,
+      func = Some("isAssetInfoCorrect"),
+      args = List(
+        Terms.CONST_STRING(assetId).explicitGet(),
+        Terms.CONST_STRING("asset").explicitGet(),
+        Terms.CONST_STRING("description").explicitGet(),
+        Terms.CONST_LONG(someAssetAmount),
+        Terms.CONST_LONG(8),
+        Terms.CONST_STRING(issuer.toAddress.toString).explicitGet(),
+        Terms.CONST_BYTESTR(ByteStr(issuer.publicKey.arr)).explicitGet(),
+        Terms.CONST_BOOLEAN(true),
+        Terms.CONST_BOOLEAN(false)
+        ),
+      waitForTx = true
+    )
+    val res = sender.getDataByKey(dApp.toAddress.toString, "isAssetInfoCorrect")
+    res.value shouldBe true
   }
 
   test("able to update name/description of issued asset") {
@@ -85,6 +137,28 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
 
     sender.balanceDetails(issuer.publicKey.toAddress.toString).available shouldBe issuerBalance.available - minFee
     nodes.waitForHeightArise()
+  }
+
+  test("DApp can read updated asset info") {
+    sender.invokeScript(
+      issuer.toAddress.toString,
+      dApp.toAddress.toString,
+      func = Some("isAssetInfoCorrect"),
+      args = List(
+        Terms.CONST_STRING(assetId).explicitGet(),
+        Terms.CONST_STRING("updatedName").explicitGet(),
+        Terms.CONST_STRING("updatedDescription").explicitGet(),
+        Terms.CONST_LONG(someAssetAmount),
+        Terms.CONST_LONG(8),
+        Terms.CONST_STRING(issuer.toAddress.toString).explicitGet(),
+        Terms.CONST_BYTESTR(ByteStr(issuer.publicKey.arr)).explicitGet(),
+        Terms.CONST_BOOLEAN(true),
+        Terms.CONST_BOOLEAN(false)
+        ),
+      waitForTx = true
+    )
+    val res = sender.getDataByKey(dApp.toAddress.toString, "isAssetInfoCorrect")
+    res.value shouldBe true
   }
 
   test("not able to update name/description more than once within interval") {
@@ -209,6 +283,45 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     }
   }
 
+  test("asset script can read asset info") {
+    val scriptTextT = s"""true""".stripMargin
+    val scriptT     = ScriptCompiler(scriptTextT, isAssetScript = true, ScriptEstimatorV2).explicitGet()._1.bytes().base64
+
+    val smartAssetId1 =
+      sender.broadcastIssue(issuer, "smartAsset", "description", someAssetAmount, 8, reissuable = true, script = Some(scriptT), waitForTx = true).id
+    val scriptText1 = s"""
+          |{-# STDLIB_VERSION 4 #-}
+          |{-# CONTENT_TYPE EXPRESSION #-}
+          |{-# SCRIPT_TYPE ASSET #-}
+ 
+          |match assetInfo(fromBase58String("${smartAssetId1}")) {
+          |case a:Asset =>
+          | a.name == "smartAsset" &&
+          | this.name == "smartAsset" &&
+          | a.description == "description" &&
+          | this.description == "description" &&
+          | a.quantity == ${someAssetAmount} &&
+          | a.quantity == ${someAssetAmount} &&
+          | this.id == fromBase58String("${smartAssetId1}") &&
+          | a.decimals == 8 &&
+          | this.decimals == 8 &&
+          | a.issuer == Address(fromBase58String("${issuer.toAddress.toString}")) &&
+          | this.issuer == Address(fromBase58String("${issuer.toAddress.toString}")) &&
+          | a.issuerPublicKey == this.issuerPublicKey &&
+          | a.reissuable == true &&
+          | this.reissuable == true &&
+          | a.scripted == true &&
+          | this.scripted == true &&
+          | a.minSponsoredFee == unit &&
+          | this.minSponsoredFee == unit
+          |case _ => false
+          |}""".stripMargin
+    val script1 = ScriptCompiler(scriptText1, isAssetScript = true, ScriptEstimatorV2).explicitGet()._1.bytes().base64
+    sender.setAssetScript(smartAssetId1, issuer.toAddress.toString, setAssetScriptFee, Some(script1),  waitForTx = true)
+
+    sender.burn(issuer.toAddress.toString, smartAssetId1, 1, minFee + 2 * smartFee, waitForTx = true)
+  }
+
   test("check increased fee for smart sender/asset") {
     val scriptText = s"""true""".stripMargin
     val script     = ScriptCompiler(scriptText, isAssetScript = true, ScriptEstimatorV2).explicitGet()._1.bytes().base64
@@ -231,6 +344,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     sender.updateAssetInfo(issuer, smartAssetId, "updatedName", "updatedDescription", minFee + 2 * smartFee, waitForTx = true)
     nodes.waitForHeightArise()
   }
+
 
   test("able to update name/description of nft") {
     val updateAssetInfoTxId = sender.updateAssetInfo(issuer, nftId, "updatedName", "updatedDescription", minFee + smartFee)._1.id

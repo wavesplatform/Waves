@@ -106,6 +106,19 @@ package object database extends ScorexLogging {
   def writeAddressIds(values: Seq[AddressId]): Array[Byte] =
     values.foldLeft(ByteBuffer.allocate(values.length * java.lang.Long.BYTES)) { case (buf, aid) => buf.putLong(aid.toLong) }.array()
 
+  def readAssetIds(data: Array[Byte]): Seq[ByteStr] = Option(data).fold(Seq.empty[ByteStr]) { d =>
+    require(d.length % transaction.AssetIdLength == 0, s"Invalid data length: ${d.length}")
+    val buffer = ByteBuffer.wrap(d)
+    Seq.fill(d.length / transaction.AssetIdLength) {
+      val idBytes = new Array[Byte](transaction.AssetIdLength)
+      buffer.get(idBytes)
+      ByteStr(idBytes)
+    }
+  }
+
+  def writeAssetIds(values: Seq[ByteStr]): Array[Byte] =
+    values.foldLeft(ByteBuffer.allocate(values.length * transaction.AssetIdLength)) { case (buf, ai) => buf.put(ai.arr) }.array()
+
   def readTxIds(data: Array[Byte]): List[ByteStr] = Option(data).fold(List.empty[ByteStr]) { d =>
     val b   = ByteBuffer.wrap(d)
     val ids = List.newBuilder[ByteStr]

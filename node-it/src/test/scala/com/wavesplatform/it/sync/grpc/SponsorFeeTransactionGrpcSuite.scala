@@ -27,11 +27,11 @@ class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val minerBalanceHeight = sender.height
 
       val sponsoredAssetId = PBTransactions.vanilla(
-        sender.broadcastIssue(sponsor, "SponsoredAsset", sponsorAssetTotal, 2, reissuable = false, sponsorFee, waitForTx = true)
+        sender.broadcastIssue(sponsor, "SponsoredAsset", sponsorAssetTotal, 2, reissuable = false, issueFee, waitForTx = true)
       ).explicitGet().id().toString
 
       val sponsoredAssetMinFee = Some(Amount.of(ByteString.copyFrom(Base58.decode(sponsoredAssetId)), token))
-      sender.broadcastSponsorFee(sponsor, sponsoredAssetMinFee, fee = sponsorFee, version = v, waitForTx = true)
+      sender.broadcastSponsorFee(sponsor, sponsoredAssetMinFee, fee = sponsorReducedFee, version = v, waitForTx = true)
 
       sender.broadcastTransfer(sponsor, Recipient().withPublicKeyHash(aliceAddress), sponsorAssetTotal / 2, minFee, assetId = sponsoredAssetId, waitForTx = true)
 
@@ -54,19 +54,19 @@ class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
       val reward = (sender.height - minerBalanceHeight) * 600000000L
       sender.wavesBalance(ByteString.copyFrom(Base58.decode(miner.address))).available shouldBe
-        minerWavesBalance.available + reward + sponsorFee + issueFee + minFee + FeeValidation.FeeUnit * smallFee / minSponsorFee
+        minerWavesBalance.available + reward + sponsorReducedFee + issueFee + minFee + FeeValidation.FeeUnit * smallFee / minSponsorFee
     }
   }
 
   test("only issuer is able to sponsor asset") {
     for (v <- sponsorFeeTxSupportedVersions) {
       val sponsoredAssetId = PBTransactions.vanilla(
-        sender.broadcastIssue(sponsor, "SponsoredAsset", sponsorAssetTotal, 2, reissuable = false, sponsorFee, waitForTx = true)
+        sender.broadcastIssue(sponsor, "SponsoredAsset", sponsorAssetTotal, 2, reissuable = false, issueFee, waitForTx = true)
       ).explicitGet().id().toString
 
       val sponsoredAssetMinFee = Some(Amount.of(ByteString.copyFrom(Base58.decode(sponsoredAssetId)), token))
       assertGrpcError(
-        sender.broadcastSponsorFee(alice, sponsoredAssetMinFee, fee = sponsorFee, version = v),
+        sender.broadcastSponsorFee(alice, sponsoredAssetMinFee, fee = sponsorReducedFee, version = v),
         "Asset was issued by other address",
         Code.INVALID_ARGUMENT
       )
@@ -76,11 +76,11 @@ class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   test("sponsor is able to cancel sponsorship") {
     for (v <- sponsorFeeTxSupportedVersions) {
       val sponsoredAssetId = PBTransactions.vanilla(
-        sender.broadcastIssue(alice, "SponsoredAsset", sponsorAssetTotal, 2, reissuable = false, sponsorFee, waitForTx = true)
+        sender.broadcastIssue(alice, "SponsoredAsset", sponsorAssetTotal, 2, reissuable = false, issueFee, waitForTx = true)
       ).explicitGet().id().toString
 
       val sponsoredAssetMinFee = Some(Amount.of(ByteString.copyFrom(Base58.decode(sponsoredAssetId)), token))
-      sender.broadcastSponsorFee(alice, sponsoredAssetMinFee, fee = sponsorFee, version = v, waitForTx = true)
+      sender.broadcastSponsorFee(alice, sponsoredAssetMinFee, fee = sponsorReducedFee, version = v, waitForTx = true)
 
       /**
         * Cancel sponsorship by sponsor None amount of sponsored asset.
@@ -89,7 +89,7 @@ class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         * that kind of Amount will cancel sponsorship.
         **/
       val sponsoredAssetNullMinFee = Some(Amount(ByteString.copyFrom(Base58.decode(sponsoredAssetId))))
-      sender.broadcastSponsorFee(alice, sponsoredAssetNullMinFee, fee = sponsorFee, version = v, waitForTx = true)
+      sender.broadcastSponsorFee(alice, sponsoredAssetNullMinFee, fee = sponsorReducedFee, version = v, waitForTx = true)
 
       assertGrpcError(
         sender.broadcastTransfer(alice, Recipient().withPublicKeyHash(bobAddress), 10 * token, smallFee, assetId = sponsoredAssetId, feeAssetId = sponsoredAssetId, waitForTx = true),
@@ -102,16 +102,16 @@ class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   test("sponsor is able to update amount of sponsored fee") {
     for (v <- sponsorFeeTxSupportedVersions) {
       val sponsoredAssetId = PBTransactions.vanilla(
-        sender.broadcastIssue(sponsor, "SponsoredAsset", sponsorAssetTotal, 2, reissuable = false, sponsorFee, waitForTx = true)
+        sender.broadcastIssue(sponsor, "SponsoredAsset", sponsorAssetTotal, 2, reissuable = false, issueFee, waitForTx = true)
       ).explicitGet().id().toString
 
       sender.broadcastTransfer(sponsor, Recipient().withPublicKeyHash(aliceAddress), sponsorAssetTotal / 2, minFee, assetId = sponsoredAssetId, waitForTx = true)
 
       val sponsoredAssetMinFee = Some(Amount.of(ByteString.copyFrom(Base58.decode(sponsoredAssetId)), token))
-      sender.broadcastSponsorFee(sponsor, sponsoredAssetMinFee, fee = sponsorFee, version = v, waitForTx = true)
+      sender.broadcastSponsorFee(sponsor, sponsoredAssetMinFee, fee = sponsorReducedFee, version = v, waitForTx = true)
 
       val sponsoredAssetUpdatedMinFee = Some(Amount(ByteString.copyFrom(Base58.decode(sponsoredAssetId)), largeFee))
-      sender.broadcastSponsorFee(sponsor, sponsoredAssetUpdatedMinFee, fee = sponsorFee, version = v, waitForTx = true)
+      sender.broadcastSponsorFee(sponsor, sponsoredAssetUpdatedMinFee, fee = sponsorReducedFee, version = v, waitForTx = true)
 
       assertGrpcError(
         sender.broadcastTransfer(alice, Recipient().withPublicKeyHash(bobAddress), 10 * token, smallFee, assetId = sponsoredAssetId, feeAssetId = sponsoredAssetId, waitForTx = true),
