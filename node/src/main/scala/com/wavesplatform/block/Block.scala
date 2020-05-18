@@ -67,8 +67,8 @@ case class Block(
   }
 
   override def toString: String =
-    s"Block(${id()} -> ${header.reference.trim}, " +
-      s"txs=${transactionData.size}, features=${header.featureVotes}${if (header.rewardVote >= 0) s", rewardVote=${header.rewardVote}" else ""})"
+    s"Block(${id()},${header.reference},${header.generator.toAddress}," +
+      s"${header.timestamp},${header.featureVotes.mkString("[",",","]")}${if (header.rewardVote >= 0) s",${header.rewardVote}" else ""})"
 }
 
 object Block extends ScorexLogging {

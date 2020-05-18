@@ -668,6 +668,9 @@ abstract class LevelDBWriter private[database] (
 
                 case _: InvokeScriptTransaction =>
                   val k = Keys.invokeScriptResult(h, num)
+                  rw.db.get(k).foreach(
+                    _.sponsorFees.map(sf => rollbackSponsorship(rw, IssuedAsset(sf.assetId), currentHeight))
+                  )
                   rw.delete(k)
 
                 case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))
