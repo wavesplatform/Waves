@@ -2,25 +2,19 @@ package com.wavesplatform.state.diffs
 
 import java.util.concurrent.ThreadLocalRandom
 
+import com.wavesplatform.BlockGen
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
-import com.wavesplatform.db.WithDomain
-import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.script.Script
-import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Blockchain, Diff}
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.exchange.OrderType
-import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers}
-import com.wavesplatform.{BlockGen, TestValues}
+import com.wavesplatform.transaction.GenesisTransaction
 import org.scalatest.{FreeSpecLike, Matchers}
 
-class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with WithDomain {
-
+class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with WithState {
   private val TransactionFee = 10
 
   def randomKeyPair(): KeyPair = {
@@ -112,27 +106,6 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
             s.balance(signerB.toAddress) shouldBe 50
         }
       }
-    }
-
-    "counts exchange fee asset complexity" - {
-      def test(assetScript: Option[Script], feeAssetScript: Option[Script]): Unit = {
-        val tradeableAssetIssue = TxHelpers.issue(script = assetScript)
-        val feeAssetIssue = TxHelpers.issue(script = feeAssetScript)
-        val order1 = TxHelpers.orderV3(OrderType.BUY, IssuedAsset(tradeableAssetIssue.assetId), IssuedAsset(feeAssetIssue.assetId))
-        val order2 = TxHelpers.orderV3(OrderType.SELL, IssuedAsset(tradeableAssetIssue.assetId), IssuedAsset(feeAssetIssue.assetId))
-        val exchange = TxHelpers.exchange(order1, order2)
-
-        withDomain(domainSettingsWithFS(TestFunctionalitySettings.withFeatures(BlockchainFeatures.SmartAssets, BlockchainFeatures.SmartAccountTrading, BlockchainFeatures.OrderV3))) { d =>
-          d.appendBlock(tradeableAssetIssue, feeAssetIssue)
-          val newBlock = d.createBlock(2.toByte, Seq(exchange))
-          val diff = BlockDiffer.fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited).explicitGet()
-          diff.diff.scriptsComplexity shouldBe (assetScript.toSeq ++ feeAssetScript).length
-        }
-      }
-
-      "fee and asset" in test(Some(TestValues.assetScript), Some(TestValues.assetScript))
-      "only asset" in test(Some(TestValues.assetScript), None)
-      "only fee" in test(None, Some(TestValues.assetScript))
     }
   }
 
