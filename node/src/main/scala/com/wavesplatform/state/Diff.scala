@@ -243,4 +243,9 @@ object Diff {
         scriptsComplexity = older.scriptsComplexity + newer.scriptsComplexity
       )
   }
+
+  implicit class DiffExt(private val d: Diff) extends AnyVal {
+    def errorMessage(txId: ByteStr): Option[InvokeScriptResult.ErrorMessage] =
+      d.scriptResults.get(txId).flatMap(_.errorMessage)
+  }
 }

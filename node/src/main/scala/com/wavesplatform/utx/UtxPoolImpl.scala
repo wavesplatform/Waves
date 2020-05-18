@@ -14,6 +14,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.UtxSettings
+import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.reader.CompositeBlockchain
@@ -324,11 +325,14 @@ class UtxPoolImpl(
                           validatedTransactions = r.validatedTransactions + tx.id()
                         )
                       } else {
-                        log.trace(s"Packing transaction ${tx.id()}")
-                        if (!newDiff.transactions(tx.id())._3) {
-                          val errorMessage = newDiff.scriptResults(tx.id()).errorMessage.get.text
-                          log.debug(s"Transaction ${tx.id()} packed as failed due to $errorMessage")
+                        newDiff.errorMessage(tx.id()) match {
+                          case Some(ErrorMessage(code, text)) =>
+                            log.trace(s"Packing transaction ${tx.id()} as failed due to $code: $text")
+
+                          case None =>
+                            log.trace(s"Packing transaction ${tx.id()}")
                         }
+
                         PackResult(
                           Some(r.transactions.fold(Seq(tx))(tx +: _)),
                           r.totalDiff.combine(newDiff),
@@ -469,8 +473,9 @@ class UtxPoolImpl(
     private[this] val sizeStats  = Kamon.rangeSampler("utx.pool-size", MeasurementUnit.none, SampleInterval).withoutTags()
     private[this] val bytesStats = Kamon.rangeSampler("utx.pool-bytes", MeasurementUnit.information.bytes, SampleInterval).withoutTags()
 
-    private[this] val prioritySizeStats  = Kamon.rangeSampler("utx.priority-pool-size", MeasurementUnit.none, SampleInterval).withoutTags()
-    private[this] val priorityBytesStats = Kamon.rangeSampler("utx.priority-pool-bytes", MeasurementUnit.information.bytes, SampleInterval).withoutTags()
+    private[this] val prioritySizeStats = Kamon.rangeSampler("utx.priority-pool-size", MeasurementUnit.none, SampleInterval).withoutTags()
+    private[this] val priorityBytesStats =
+      Kamon.rangeSampler("utx.priority-pool-bytes", MeasurementUnit.information.bytes, SampleInterval).withoutTags()
 
     val putTimeStats    = Kamon.timer("utx.put-if-new")
     val putRequestStats = Kamon.counter("utx.put-if-new.requests").withoutTags()
