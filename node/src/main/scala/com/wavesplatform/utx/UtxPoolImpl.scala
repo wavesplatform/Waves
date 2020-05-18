@@ -325,6 +325,10 @@ class UtxPoolImpl(
                         )
                       } else {
                         log.trace(s"Packing transaction ${tx.id()}")
+                        if (!newDiff.transactions(tx.id())._3) {
+                          val errorMessage = newDiff.scriptResults(tx.id()).errorMessage.get.text
+                          log.debug(s"Transaction ${tx.id()} packed as failed due to $errorMessage")
+                        }
                         PackResult(
                           Some(r.transactions.fold(Seq(tx))(tx +: _)),
                           r.totalDiff.combine(newDiff),

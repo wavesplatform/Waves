@@ -21,7 +21,6 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
 import scala.concurrent.duration._
-import scala.util.Try
 
 class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailure with FailedTransactionSuiteLike[String] with OverflowBlock {
   import FailedTransactionSuite._
@@ -556,22 +555,25 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     val caller = sender.createAddress()
     sender.transfer(sender.address, caller, 100.waves, minFee, waitForTx = true)
 
-    val txs = collection.mutable.ListBuffer[String]()
-    sender.waitFor("wait for even height")(n => n.height, (h: Int) => h % 2 == 0, 500.millis)
-    sender.waitFor("send until odd height")({ n =>
-      Try(n.invokeScript(caller, contract, Some("blockIsEven"), fee = invokeFee)._1.id).foreach(txs += _)
-      n.height
-    }, (h: Int) => h % 2 != 0, 1 second)
+    sender.waitFor("even height")(n => n.height, (h: Int) => h % 2 == 0, 500.millis)
 
-    miner.waitFor("empty utx")(_.utxSize, (_: Int) == 0, 1 second)
-    assertFailedTxs(txs)
+    var ids = Set.empty[String]
+    while (miner.height % 2 == 0) {
+      val tx = sender.invokeScript(caller, contract, Some("blockIsEven"), fee = invokeFee, waitForTx = true)._1
+      ids += tx.id
+    }
+
+    val height = sender.waitFor("odd height")(n => n.height, (h: Int) => h % 2 != 0, 500.millis)
+    nodes.waitForHeightArise()
+    val blockTxs = sender.blockAt(height).transactions.map(_.id).filter(ids)
+    assertFailedTxs(blockTxs)
   }
 
   def updateTikTok(result: String, fee: Long): String =
     sender.broadcastData(pkByAddress(contract), List(StringDataEntry("tikTok", result)), fee = fee, waitForTx = true).id
 
   private def waitForTxs(txs: Seq[String]): Unit =
-    nodes.waitFor("preconditions", 100.millis)(_.transactionStatus(txs).forall(_.status == "confirmed"))(
+    nodes.waitFor("preconditions", 500.millis)(_.transactionStatus(txs).forall(_.status == "confirmed"))(
       statuses => statuses.forall(identity)
     )
 
