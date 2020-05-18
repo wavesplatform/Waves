@@ -514,6 +514,21 @@ object PureContext {
       )
   }
 
+  lazy val makeString: BaseFunction[NoContext] =
+    NativeFunction("makeString", 30, MAKESTRING, listString, ("list", LIST(STRING)), ("separator", STRING)) {
+      case ARR(list) :: CONST_STRING(separator) :: Nil =>
+        val expectedStringSize =
+          list.toStream
+            .map(_.asInstanceOf[CONST_STRING].s.getBytes(StandardCharsets.UTF_8).length)
+            .sum
+        if (expectedStringSize <= DATA_TX_BYTES_MAX)
+          CONST_STRING(list.mkString(separator))
+        else
+          Left(s"Constructing string size = $expectedStringSize bytes will exceed $DATA_TX_BYTES_MAX")
+      case xs =>
+        notImplemented[Id, EVALUATED]("makeString(list: List[String], separator: String)", xs)
+    }
+
   lazy val contains: BaseFunction[NoContext] =
     UserFunction("contains", 20, BOOLEAN, ("@source", STRING), ("@substr", STRING)) {
       FUNCTION_CALL(
@@ -809,7 +824,7 @@ object PureContext {
     val v4Functions =
       ctx.functions ++
         fromV3Funcs ++
-        Array(contains, valueOrElse, listAppend, listConcat, listConstructor(checkSize = true), getListMedian)
+        Array(contains, valueOrElse, listAppend, listConcat, listConstructor(checkSize = true), getListMedian, makeString)
 
     version match {
       case V1 | V2 => ctx
