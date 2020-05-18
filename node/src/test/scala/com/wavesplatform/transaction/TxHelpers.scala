@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction
 
 import com.google.common.primitives.Ints
+import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.script.Script
@@ -10,22 +11,24 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransac
 import com.wavesplatform.transaction.transfer.TransferTransaction
 
 object TxHelpers {
-  val oneWaves      = 1e8.toLong
-  val defaultAmount = oneWaves * 1000
-  val defaultFee    = 1e6.toLong
-
   def signer(i: Int): KeyPair = KeyPair(Ints.toByteArray(i))
   val defaultSigner: KeyPair  = signer(0)
 
-  def genesis(address: Address, amount: Long = defaultAmount): GenesisTransaction =
-    GenesisTransaction.create(address, amount, System.currentTimeMillis()).explicitGet()
+  private[this] var lastTimestamp = System.currentTimeMillis()
+  def timestamp: Long = {
+    lastTimestamp += 1
+    lastTimestamp
+  }
 
-  def transfer(from: KeyPair, to: AddressOrAlias, amount: Long = oneWaves, asset: Asset = Waves): TransferTransaction =
-    TransferTransaction.selfSigned(TxVersion.V1, from, to, asset, amount, Waves, defaultFee, None, System.currentTimeMillis()).explicitGet()
+  def genesis(address: Address, amount: Long = TestValues.OneWaves * 1000): GenesisTransaction =
+    GenesisTransaction.create(address, amount, timestamp).explicitGet()
 
-  def issue(amount: Long = defaultAmount, script: Option[Script] = None): IssueTransaction =
+  def transfer(from: KeyPair, to: AddressOrAlias, amount: Long = TestValues.OneWaves, asset: Asset = Waves): TransferTransaction =
+    TransferTransaction.selfSigned(TxVersion.V1, from, to, asset, amount, Waves, TestValues.fee, None, timestamp).explicitGet()
+
+  def issue(amount: Long = TestValues.ThousandWaves, script: Option[Script] = None): IssueTransaction =
     IssueTransaction
-      .selfSigned(TxVersion.V2, defaultSigner, "test", "", amount, 0, reissuable = false, script, oneWaves, System.currentTimeMillis())
+      .selfSigned(TxVersion.V2, defaultSigner, "test", "", amount, 0, reissuable = false, script, TestValues.OneWaves, timestamp)
       .explicitGet()
 
   def orderV3(orderType: OrderType, asset: Asset, feeAsset: Asset): Order = {
@@ -37,8 +40,8 @@ object TxHelpers {
       orderType,
       1,
       1,
-      System.currentTimeMillis(),
-      System.currentTimeMillis() + 100000,
+      timestamp,
+      timestamp + 100000,
       1,
       feeAsset
     )
@@ -55,8 +58,8 @@ object TxHelpers {
         order1.price,
         order1.matcherFee,
         order2.matcherFee,
-        defaultFee,
-        System.currentTimeMillis()
+        TestValues.fee,
+        timestamp
       )
       .explicitGet()
   }

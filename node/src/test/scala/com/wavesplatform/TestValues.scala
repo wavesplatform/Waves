@@ -8,10 +8,13 @@ import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 object TestValues {
+  val OneWaves      = 1e8.toLong
+  val ThousandWaves = OneWaves * 1000
+
   val keyPair: KeyPair   = TxHelpers.defaultSigner
   val address: Address   = keyPair.toAddress
   val asset: IssuedAsset = IssuedAsset(ByteStr(("A" * 32).getBytes("ASCII")))
-  val fee                = 1000000
+  val fee                = 1e6.toLong
 
   val Right((script, scriptComplexity)) = ScriptCompiler.compile(
     """

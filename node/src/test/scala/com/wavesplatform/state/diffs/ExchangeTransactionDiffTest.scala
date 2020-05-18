@@ -321,7 +321,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
       case (gen1, gen2, gen3, issue1, issue2, exchange) =>
         assertDiffEi(Seq(TestBlock.create(Seq(gen1, gen2, gen3, issue1, issue2))), TestBlock.create(Seq(exchange)), fsWithOrderFeature) {
           blockDiffEi =>
-            blockDiffEi should produce("negative asset balance")
+            blockDiffEi should produce("Assets should be issued")
         }
     }
   }
