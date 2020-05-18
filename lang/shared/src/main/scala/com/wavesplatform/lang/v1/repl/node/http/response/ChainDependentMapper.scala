@@ -32,6 +32,8 @@ private[node] class ChainDependentMapper(chainId: Byte) {
   def toRideModel(a: AssetInfoResponse): ScriptAssetInfo =
     ScriptAssetInfo(
       a.assetId.byteStr,
+      a.name,
+      a.description,
       a.quantity,
       a.decimals,
       Address(a.issuer.byteStr),

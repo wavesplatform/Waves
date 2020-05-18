@@ -983,10 +983,6 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
   }
 
   property("ExchangeTransaction V3 can have SELL order as order1 after BlockV5 activation") {
-    def normalizePrice(pad: Byte, aad: Byte)(orderVersion: Byte, price: Long): Long = {
-      if (orderVersion < Order.V4) (price * math.pow(10, 8 + pad - aad)).toLong
-      else (price * math.pow(10, 8)).toLong
-    }
     val scenario =
       for {
         buyer  <- accountGen
@@ -995,8 +991,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
         gtx2 = GenesisTransaction.create(seller.toAddress, ENOUGH_AMT, ntpTime.getTimestamp()).explicitGet()
         gtx3 = GenesisTransaction.create(MATCHER.toAddress, ENOUGH_AMT, ntpTime.getTimestamp()).explicitGet()
         fee  = 100000000L
-        itx1 <- issueGen(MATCHER, Some(ENOUGH_AMT))
-        itx2 <- issueGen(MATCHER, Some(ENOUGH_AMT))
+        itx1 <- issueGen(MATCHER, Some(ENOUGH_AMT), fixedDecimals = Some(8.toByte))
+        itx2 <- issueGen(MATCHER, Some(ENOUGH_AMT), fixedDecimals = Some(8.toByte))
         ttx1 = TransferTransaction
           .selfSigned(TxVersion.V3, MATCHER, seller.toAddress, IssuedAsset(itx1.assetId), ENOUGH_AMT / 2, Waves, fee, None, itx1.timestamp + 1)
           .explicitGet()
@@ -1013,20 +1009,15 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
         assetsDecimal = Map(IssuedAsset(itx1.assetId) -> itx1.decimals, IssuedAsset(itx2.assetId) -> itx2.decimals, Waves -> 8.toByte)
         amountAsset <- Gen.oneOf(assets)
         priceAsset  <- Gen.oneOf(assets).filter(_ != amountAsset)
-        np = normalizePrice(assetsDecimal(priceAsset), assetsDecimal(amountAsset)) _
-        amount <- Gen.choose(1, 1000)
-        price  <- Gen.choose(1, 1000)
         tx     <- exchangeGeneratorP(buyer, seller, amountAsset, priceAsset, fixedMatcher = Some(MATCHER))
         fixed = tx
           .copy(
             version = TxVersion.V3,
-            amount = amount,
-            price = np(Order.V4, price),
             buyMatcherFee = fee,
             sellMatcherFee = fee,
             fee = fee,
-            order1 = tx.order1.copy(amount = amount, price = np(tx.order1.version, price), matcherFee = fee).signWith(buyer.privateKey),
-            order2 = tx.order2.copy(amount = amount, price = np(tx.order2.version, price), matcherFee = fee).signWith(seller.privateKey)
+            order1 = tx.order1.copy(version = Order.V4, matcherFee = fee).signWith(buyer.privateKey),
+            order2 = tx.order2.copy(version = Order.V4, matcherFee = fee).signWith(seller.privateKey)
           )
           .signWith(MATCHER.privateKey)
         reversed = fixed

@@ -4,7 +4,8 @@ import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils._
-import com.wavesplatform.lang.v1.traits.domain.{Burn, Issue, Reissue}
+import com.wavesplatform.lang.v1.traits.domain.{Burn, Issue, Reissue, SponsorFee}
+import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
 import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 import com.wavesplatform.protobuf.utils.PBUtils
@@ -20,6 +21,7 @@ final case class InvokeScriptResult(
     issues: Seq[Issue] = Nil,
     reissues: Seq[Reissue] = Nil,
     burns: Seq[Burn] = Nil,
+    sponsorFees: Seq[SponsorFee] = Nil,
     errorMessage: Option[ErrorMessage] = None
 )
 
@@ -52,6 +54,7 @@ object InvokeScriptResult {
   }
   implicit val reissueFormat      = Json.writes[Reissue]
   implicit val burnFormat         = Json.writes[Burn]
+  implicit val sponsorFeeFormat   = Json.writes[SponsorFee]
   implicit val errorMessageFormat = Json.writes[ErrorMessage]
   implicit val jsonFormat         = Json.writes[InvokeScriptResult]
 
@@ -86,7 +89,8 @@ object InvokeScriptResult {
       isr.issues.map(toPbIssue),
       isr.reissues.map(toPbReissue),
       isr.burns.map(toPbBurn),
-      isr.errorMessage.map(toPbErrorMessage)
+      isr.errorMessage.map(toPbErrorMessage),
+      isr.sponsorFees.map(toPbSponsorFee)
     )
   }
 
@@ -110,6 +114,9 @@ object InvokeScriptResult {
   private def toPbBurn(b: Burn) =
     PBInvokeScriptResult.Burn(ByteString.copyFrom(b.assetId.arr), b.quantity)
 
+  private def toPbSponsorFee(sf: SponsorFee) =
+    PBInvokeScriptResult.SponsorFee(Some(Amount(sf.assetId.toByteString, sf.minSponsoredAssetFee.getOrElse(0))))
+
   private def toPbErrorMessage(em: ErrorMessage) =
     PBInvokeScriptResult.ErrorMessage(em.code, em.text)
 
@@ -124,6 +131,11 @@ object InvokeScriptResult {
   private def toVanillaBurn(b: PBInvokeScriptResult.Burn) =
     Burn(b.assetId.toByteStr, b.amount)
 
+  private def toVanillaSponsorFee(sf: PBInvokeScriptResult.SponsorFee) = {
+    val amount = sf.minFee.get
+    SponsorFee(amount.assetId.toByteStr, Some(amount.amount).filter(_ > 0))
+  }
+
   private def toVanillaErrorMessage(b: PBInvokeScriptResult.ErrorMessage) =
     ErrorMessage(b.code, b.text)
 
@@ -137,6 +149,7 @@ object InvokeScriptResult {
       pbValue.issues.map(toVanillaIssue),
       pbValue.reissues.map(toVanillaReissue),
       pbValue.burns.map(toVanillaBurn),
+      pbValue.sponsorFees.map(toVanillaSponsorFee),
       pbValue.errorMessage.map(toVanillaErrorMessage)
     )
   }
