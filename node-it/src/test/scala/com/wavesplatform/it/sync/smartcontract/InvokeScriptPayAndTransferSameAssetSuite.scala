@@ -106,7 +106,7 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
     val fee           = smartMinFee + smartFee * 2
 
     val tx = invoke("resendPayment", paymentAmount, issued(rejAssetId), fee)
-    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include regex "token-script"
+    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include regex "token-script"
 
   }
 

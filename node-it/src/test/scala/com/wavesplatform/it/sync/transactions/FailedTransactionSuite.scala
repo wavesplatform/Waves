@@ -580,9 +580,9 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     info.stateChanges.get.issues.size shouldBe 0
     info.stateChanges.get.reissues.size shouldBe 0
     info.stateChanges.get.burns.size shouldBe 0
-    info.stateChanges.get.errorMessage shouldBe 'defined
-    info.stateChanges.get.errorMessage.get.code shouldBe code
-    info.stateChanges.get.errorMessage.get.text should include(text)
+    info.stateChanges.get.error shouldBe 'defined
+    info.stateChanges.get.error.get.code shouldBe code
+    info.stateChanges.get.error.get.text should include(text)
   }
 
   private def checkTransactionHeightById(failedTxs: Seq[TransactionStatus]): Unit = {

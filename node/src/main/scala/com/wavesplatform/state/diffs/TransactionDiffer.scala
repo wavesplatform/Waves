@@ -226,7 +226,7 @@ object TransactionDiffer {
       Diff.empty.copy(
         transactions = mutable.LinkedHashMap((tx.id(), (tx, (portfolios.keys ++ maybeDApp.toList).toSet, false))),
         portfolios = portfolios,
-        scriptResults = Map(tx.id() -> InvokeScriptResult(errorMessage = error))
+        scriptResults = Map(tx.id() -> InvokeScriptResult(error = error))
       )
     }
   }

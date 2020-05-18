@@ -222,7 +222,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
 
         assertDiffAndState(Seq(TestBlock.create(Seq(g1, g2, alias, issue, setScript))), TestBlock.create(Seq(ci)), rideV4Activated) {
           case (d, s) =>
-            val error = d.scriptResults(ci.id()).errorMessage
+            val error = d.scriptResults(ci.id()).error
             error.get.code shouldBe 3
             error.get.text should include("Transaction is not allowed by script of the asset")
             s.balance(acc1.toAddress, IssuedAsset(issue.id())) shouldBe a
@@ -314,7 +314,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
 
         assertDiffAndState(Seq(TestBlock.create(Seq(g1, g2, issue, setScript))), TestBlock.create(Seq(ci)), rideV4Activated) {
           case (d, s) =>
-            val error = d.scriptResults(ci.id()).errorMessage
+            val error = d.scriptResults(ci.id()).error
             error.get.code shouldBe 3
             error.get.text should include("Transaction is not allowed by script of the asset")
             s.wavesPortfolio(acc1.toAddress).balance shouldBe w

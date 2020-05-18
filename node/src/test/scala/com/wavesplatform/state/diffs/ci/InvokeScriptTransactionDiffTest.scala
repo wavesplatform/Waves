@@ -1830,7 +1830,7 @@ class InvokeScriptTransactionDiffTest
           )
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
             inside(ei) {
-              case Right(diff) => diff.scriptResults(invoke.id()).errorMessage.get.text should include("is already issued")
+              case Right(diff) => diff.scriptResults(invoke.id()).error.get.text should include("is already issued")
             }
           }
         }

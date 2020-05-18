@@ -643,7 +643,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
     method match {
       case CallableMethod =>
         val id = f
-        sender.debugStateChanges(id).stateChanges.get.errorMessage.get.text should include(msg)
+        sender.debugStateChanges(id).stateChanges.get.error.get.text should include(msg)
       case TransactionMethod =>
         assertApiError(f) { e =>
           e.message should include(msg)

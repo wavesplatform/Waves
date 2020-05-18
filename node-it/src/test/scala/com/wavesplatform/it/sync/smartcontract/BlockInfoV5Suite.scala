@@ -48,11 +48,11 @@ class BlockInfoV5Suite extends BaseTransactionSuite {
 
   test("not able to retrieve vrf from block V4") {
     val tx = sender.invokeScript(caller, dApp, func = Some("blockInfo"), args = List(Terms.CONST_LONG(activationHeight - 1)), waitForTx = true)._1.id
-    sender.debugStateChanges(tx).stateChanges.get.errorMessage shouldBe 'defined
+    sender.debugStateChanges(tx).stateChanges.get.error shouldBe 'defined
   }
 
   test("not able to retrieve vrf from block V3") {
     val tx = sender.invokeScript(caller, dApp, func = Some("blockInfo"), args = List(Terms.CONST_LONG(activationHeight - 2)), waitForTx = true)._1.id
-    sender.debugStateChanges(tx).stateChanges.get.errorMessage shouldBe 'defined
+    sender.debugStateChanges(tx).stateChanges.get.error shouldBe 'defined
   }
 }

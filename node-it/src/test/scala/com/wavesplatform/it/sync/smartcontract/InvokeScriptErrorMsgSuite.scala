@@ -88,7 +88,7 @@ class InvokeScriptErrorMsgSuite extends BaseTransactionSuite with CancelAfterFai
       )
       ._1
       .id
-    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include(
+    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include(
       "Fee in WAVES for InvokeScriptTransaction (1300000 in WAVES) with 12 total scripts invoked does not exceed minimal value of 5300000 WAVES."
     )
   }

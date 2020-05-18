@@ -487,7 +487,7 @@ object InvokeScriptTransactionDiff {
                 Either.cond(
                   blockchain.assetDescription(IssuedAsset(sponsorFee.assetId)).exists(_.issuer == pk),
                   (),
-                  ScriptExecutionError.dApp(s"SponsorFee assetId=${sponsorFee.assetId} was not issued from address of current dApp")
+                  ScriptExecutionError.ByDAppScript(s"SponsorFee assetId=${sponsorFee.assetId} was not issued from address of current dApp")
                 )
               )
               _ <- TracedResult(SponsorFeeTxValidator.checkMinSponsoredAssetFee(sponsorFee.minSponsoredAssetFee))

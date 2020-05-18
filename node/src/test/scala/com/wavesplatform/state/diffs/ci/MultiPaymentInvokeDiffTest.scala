@@ -265,7 +265,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
           features
         ) {
           case Right(diff: Diff) =>
-            val errMsg = diff.scriptResults(diff.transactions.keys.head).errorMessage.get.text
+            val errMsg = diff.scriptResults(diff.transactions.keys.head).error.get.text
             ((message(oldVersion.id, maybeFailedAssetId)).r.findFirstIn(errMsg)) should not be empty
 
           case l @ Left(_) =>
