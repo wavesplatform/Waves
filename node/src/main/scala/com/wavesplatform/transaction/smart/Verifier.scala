@@ -56,12 +56,7 @@ object Verifier extends ScorexLogging {
   }
 
   def assets(blockchain: Blockchain)(tx: Transaction): TracedResult[ValidationError, Transaction] = {
-    val additionalAssets = tx match {
-      case etx: ExchangeTransaction => Seq(etx.buyOrder.matcherFeeAssetId, etx.sellOrder.matcherFeeAssetId)
-      case _                        => Seq.empty
-    }
-
-    (tx.checkedAssets ++ additionalAssets)
+    tx.checkedAssets
       .flatMap {
         case asset: IssuedAsset => blockchain.assetDescription(asset).flatMap(_.script).map(script => (script, asset))
         case _                  => None

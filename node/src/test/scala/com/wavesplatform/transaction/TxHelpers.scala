@@ -1,0 +1,63 @@
+package com.wavesplatform.transaction
+
+import com.google.common.primitives.Ints
+import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
+import com.wavesplatform.common.utils._
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
+import com.wavesplatform.transaction.transfer.TransferTransaction
+
+object TxHelpers {
+  val oneWaves      = 1e8.toLong
+  val defaultAmount = oneWaves * 1000
+  val defaultFee    = 1e6.toLong
+
+  def signer(i: Int): KeyPair = KeyPair(Ints.toByteArray(i))
+  val defaultSigner: KeyPair  = signer(0)
+
+  def genesis(address: Address, amount: Long = defaultAmount): GenesisTransaction =
+    GenesisTransaction.create(address, amount, System.currentTimeMillis()).explicitGet()
+
+  def transfer(from: KeyPair, to: AddressOrAlias, amount: Long = oneWaves, asset: Asset = Waves): TransferTransaction =
+    TransferTransaction.selfSigned(TxVersion.V1, from, to, asset, amount, Waves, defaultFee, None, System.currentTimeMillis()).explicitGet()
+
+  def issue(amount: Long = defaultAmount, script: Option[Script] = None): IssueTransaction =
+    IssueTransaction
+      .selfSigned(TxVersion.V2, defaultSigner, "test", "", amount, 0, reissuable = false, script, oneWaves, System.currentTimeMillis())
+      .explicitGet()
+
+  def orderV3(orderType: OrderType, asset: Asset, feeAsset: Asset): Order = {
+    Order.selfSigned(
+      TxVersion.V3,
+      defaultSigner,
+      defaultSigner.publicKey,
+      AssetPair(asset, Waves),
+      orderType,
+      1,
+      1,
+      System.currentTimeMillis(),
+      System.currentTimeMillis() + 100000,
+      1,
+      feeAsset
+    )
+  }
+
+  def exchange(order1: Order, order2: Order): ExchangeTransaction = {
+    ExchangeTransaction
+      .signed(
+        TxVersion.V2,
+        defaultSigner.privateKey,
+        order1,
+        order2,
+        order1.amount,
+        order1.price,
+        order1.matcherFee,
+        order2.matcherFee,
+        defaultFee,
+        System.currentTimeMillis()
+      )
+      .explicitGet()
+  }
+}

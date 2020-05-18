@@ -22,7 +22,6 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
-import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.mining._
 import com.wavesplatform.network.{InvalidBlockStorage, PeerDatabase}
 import com.wavesplatform.settings._
@@ -33,7 +32,6 @@ import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.{GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
@@ -691,15 +689,7 @@ class UtxPoolSpecification
     }
 
     "priority pool" - {
-      val Right((testScript, testScriptComplexity)) = ScriptCompiler.compile(
-        """
-          |{-# STDLIB_VERSION 2 #-}
-          |{-# CONTENT_TYPE EXPRESSION #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |true
-          |""".stripMargin,
-        ScriptEstimatorV1
-      )
+      import TestValues.{script => testScript, scriptComplexity => testScriptComplexity}
 
       def assertPortfolios(utx: UtxPool, transactions: Seq[TransferTransaction]): Unit = {
         val portfolios = transactions.groupBy(_.sender.toAddress).map {

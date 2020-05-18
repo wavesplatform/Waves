@@ -16,6 +16,14 @@ import org.iq80.leveldb.DB
 
 case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter) {
   import Domain._
+
+  def lastBlock: Block = {
+    blockchainUpdater
+      .liquidBlock(blockchainUpdater.lastBlockId.get)
+      .orElse(levelDBWriter.lastBlock)
+      .get
+  }
+
   def effBalance(a: Address): Long = blockchainUpdater.effectiveBalance(a, 1000)
 
   def appendBlock(b: Block): Option[DiscardedTransactions] = blockchainUpdater.processBlock(b).explicitGet()
