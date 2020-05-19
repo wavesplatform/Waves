@@ -113,4 +113,29 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
     firstTransferAddrOpt shouldBe Some(callerAndRecipient)
     firstTransferAssetAmountOpt shouldBe Some(transferAmount)
   }
+
+  test("zero transfer amount") {
+    val paymentAmount  = 1
+    val transferAmount = 0
+
+    val invokeScriptTx = sender.invokeScript(
+      callerAndRecipient,
+      dApp,
+      func = Some("sendToCaller"),
+      args = List(CONST_LONG(transferAmount)),
+      payment = Seq(Payment(paymentAmount, Waves)),
+      fee = 1.waves,
+      waitForTx = true
+    )
+    nodes.waitForHeightAriseAndTxPresent(invokeScriptTx._1.id)
+    val txStateChanges = sender.debugStateChanges(invokeScriptTx._1.id)
+
+    val transferCountOpt            = txStateChanges.stateChanges.map(_.transfers.size)
+    val firstTransferAddrOpt        = txStateChanges.stateChanges.map(_.transfers.head.address)
+    val firstTransferAssetAmountOpt = txStateChanges.stateChanges.map(_.transfers.head.amount)
+
+    transferCountOpt shouldBe Some(1)
+    firstTransferAddrOpt shouldBe Some(callerAndRecipient)
+    firstTransferAssetAmountOpt shouldBe Some(transferAmount)
+  }
 }
