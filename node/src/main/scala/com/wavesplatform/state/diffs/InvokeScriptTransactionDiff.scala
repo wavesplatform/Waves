@@ -27,7 +27,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer}
+import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.metrics._
 import com.wavesplatform.settings.Constants
@@ -41,6 +41,7 @@ import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
+import com.wavesplatform.transaction.validation.impl.SponsorFeeTxValidator
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils._
 import monix.eval.Coeval
@@ -166,11 +167,12 @@ object InvokeScriptTransactionDiff {
                 case ScriptResultV4(actions)              => actions
               }
 
-              actionsByType = actions.groupBy(_.getClass).withDefaultValue(Nil)
-              transferList  = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
-              issueList     = actionsByType(classOf[Issue]).asInstanceOf[List[Issue]]
-              reissueList   = actionsByType(classOf[Reissue]).asInstanceOf[List[Reissue]]
-              burnList      = actionsByType(classOf[Burn]).asInstanceOf[List[Burn]]
+              actionsByType  = actions.groupBy(_.getClass).withDefaultValue(Nil)
+              transferList   = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
+              issueList      = actionsByType(classOf[Issue]).asInstanceOf[List[Issue]]
+              reissueList    = actionsByType(classOf[Reissue]).asInstanceOf[List[Reissue]]
+              burnList       = actionsByType(classOf[Burn]).asInstanceOf[List[Burn]]
+              sponsorFeeList = actionsByType(classOf[SponsorFee]).asInstanceOf[List[SponsorFee]]
 
               dataItems = actionsByType
                 .filterKeys(classOf[DataItem[_]].isAssignableFrom)
@@ -204,7 +206,8 @@ object InvokeScriptTransactionDiff {
                   tx.checkedAssets ++
                     transferList.flatMap(_.assetId).map(IssuedAsset) ++
                     reissueList.map(r => IssuedAsset(r.assetId)) ++
-                    burnList.map(b => IssuedAsset(b.assetId))
+                    burnList.map(b => IssuedAsset(b.assetId)) ++
+                    sponsorFeeList.map(sf => IssuedAsset(sf.assetId))
                 val totalScriptsInvoked =
                   smartAssetInvocations.count(blockchain.hasAssetScript) + (if (blockchain.hasAccountScript(tx.sender.toAddress)) 1 else 0)
                 val minIssueFee = issueList.count(i => !blockchain.isNFT(i)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
@@ -228,6 +231,16 @@ object InvokeScriptTransactionDiff {
               val currentTxDiffWithKeys = currentTxDiff.copy(_2 = currentTxDiff._2 ++ transfers.keys ++ compositeDiff.accountData.keys)
               val updatedTxDiff         = compositeDiff.transactions.updated(tx.id(), currentTxDiffWithKeys)
 
+              val resultSponsorFeeList = {
+                val sponsorFeeDiff =
+                  compositeDiff.sponsorship.map {
+                    case (asset, SponsorshipValue(minFee)) => SponsorFee(asset.id, Some(minFee).filter(_ > 0))
+                    case (asset, SponsorshipNoInfo)        => SponsorFee(asset.id, None)
+                  }.toSet
+
+                sponsorFeeList.filter(sponsorFeeDiff.contains)
+              }
+
               val isr = InvokeScriptResult(
                 dataEntries,
                 transferList.map { tr =>
@@ -239,7 +252,8 @@ object InvokeScriptTransactionDiff {
                 },
                 issueList,
                 reissueList,
-                burnList
+                burnList,
+                resultSponsorFeeList
               )
 
               compositeDiff.copy(
@@ -465,6 +479,21 @@ object InvokeScriptTransactionDiff {
             validateActionAsPseudoTx(burnDiff, burn.assetId, pseudoTx)
           }
 
+          def applySponsorFee(sponsorFee: SponsorFee, pk: PublicKey): TracedResult[ValidationError, Diff] =
+            for {
+              _ <- TracedResult(
+                Either.cond(
+                  blockchain.assetDescription(IssuedAsset(sponsorFee.assetId)).exists(_.issuer == pk),
+                  (),
+                  ScriptExecutionError.dApp(s"SponsorFee assetId=${sponsorFee.assetId} was not issued from address of current dApp")
+                )
+              )
+              _ <- TracedResult(SponsorFeeTxValidator.checkMinSponsoredAssetFee(sponsorFee.minSponsoredAssetFee))
+              sponsorDiff = DiffsCommon.processSponsor(blockchain, dAppAddress, fee = 0, sponsorFee)
+              pseudoTx    = SponsorFeePseudoTx(sponsorFee, actionSender, pk, tx.id(), tx.timestamp)
+              r <- validateActionAsPseudoTx(sponsorDiff, sponsorFee.assetId, pseudoTx)
+            } yield r
+
           def validateActionAsPseudoTx(
               actionDiff: Either[ValidationError, Diff],
               assetId: ByteStr,
@@ -496,6 +525,7 @@ object InvokeScriptTransactionDiff {
             case i: Issue       => applyIssue(tx, pk, i)
             case r: Reissue     => applyReissue(r, pk)
             case b: Burn        => applyBurn(b, pk)
+            case sf: SponsorFee => applySponsorFee(sf, pk)
           }
           diffAcc |+| diff
         case _ => diffAcc

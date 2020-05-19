@@ -22,6 +22,7 @@ object ErrorMessageEnvironment extends Environment[Future] {
   override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Future[Option[Any]]                   = unavailable
   override def resolveAlias(name: String): Future[Either[String, Recipient.Address]]                                   = unavailable
   override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Future[Either[String, Long]] = unavailable
+  override def accountWavesBalanceOf(addressOrAlias: Recipient): Future[Either[String, Environment.BalanceDetails]]    = unavailable
   override def multiPaymentAllowed: Boolean                                                                            = unavailable
   override def txId: ByteStr                                                                                           = unavailable
   override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                                       = unavailable

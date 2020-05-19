@@ -778,7 +778,8 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |     ScriptTransfer(i.caller, 1, base58''),
         |     Issue("name", "description", 1000, 4, true, unit, 0),
         |     Reissue(base58'', false, 1),
-        |     Burn(base58'', 1)
+        |     Burn(base58'', 1),
+        |     SponsorFee(base58'', unit)
         |   ]
         """.stripMargin
 
