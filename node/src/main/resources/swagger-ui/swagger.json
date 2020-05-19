@@ -62,7 +62,7 @@
           "addresses"
         ],
         "summary": "Addresses",
-        "description": "Get wallet accounts addresses",
+        "description": "Get the wallet accounts addresses",
         "operationId": "root_1",
         "parameters": [],
         "responses": {
@@ -169,7 +169,7 @@
           "addresses"
         ],
         "summary": "Seq",
-        "description": "Get wallet accounts addresses. Max range {from}-{to} is 1,000 blocks",
+        "description": "Get the wallet accounts addresses. Max range {from}-{to} is 1,000 blocks",
         "operationId": "seq_2",
         "parameters": [
           {
@@ -248,8 +248,8 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Address from Public Key",
-        "description": "Generate an address from public key. Public key Base58-encoded",
+        "summary": "Address from a public key",
+        "description": "Generate an address from a public key. Public key should be Base58-encoded",
         "operationId": "publicKey_1",
         "parameters": [
           {
@@ -573,8 +573,8 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Script info asccount",
-        "description": "Account script and its parameters",
+        "summary": "Account script info",
+        "description": "Account script with an additional information",
         "operationId": "scriptInfo_1",
         "parameters": [
           {
@@ -819,7 +819,7 @@
           "addresses"
         ],
         "summary": "Confirmed regular balance",
-        "description": "Get regular balance at the address of {confirmations} blocks from the current height. {confirmations} supports return of balance not more than 2000 blocks back",
+        "description": "Get the regular balance of the address within {confirmations} blocks back from the current height. Maximum {confirmations} value is 2,000.",
         "operationId": "balanceWithConfirmations_1",
         "parameters": [
           {
@@ -1807,7 +1807,7 @@
           "transactions"
         ],
         "summary": "Unconfirmed transactions",
-        "description": "Get list of unconfirmed transactions",
+        "description": "Get a list of an unconfirmed transactions",
         "operationId": "unconfirmed_1",
         "parameters": [],
         "responses": {
@@ -2006,7 +2006,7 @@
           "transactions"
         ],
         "summary": "Broadcast transaction",
-        "description": "Broadcast a signed transaction. Need to use the JSON format transaction with a proof",
+        "description": "Broadcast a signed transaction. You should use the JSON transaction format with a proofs",
         "operationId": "signedBroadcast_1",
         "parameters": [
           {
@@ -3045,7 +3045,7 @@
           "consensus"
         ],
         "summary": "Generating balance",
-        "description": "Account generating balance(the same as balance atm)",
+        "description": "Account generating balance",
         "operationId": "generatingBalance_1",
         "parameters": [
           {
@@ -3215,7 +3215,7 @@
           "activation"
         ],
         "summary": "Activation status",
-        "description": "Activation status",
+        "description": "Activation status of the blockchain features",
         "operationId": "status",
         "parameters": [],
         "responses": {
@@ -3699,7 +3699,7 @@
           "debug"
         ],
         "summary": "Validate Transaction",
-        "description": "Validates a transaction and measures time spent in milliseconds. Need to use JSON format transaction with proof",
+        "description": "Validates a transaction and measures time spent in milliseconds. You should use the JSON transaction format with a proofs",
         "operationId": "validate",
         "parameters": [
           {
@@ -3844,7 +3844,7 @@
           "debug"
         ],
         "summary": "Rollback to height",
-        "description": "Removes all blocks after given height. Max for 2,000 blocks",
+        "description": "Removes all blocks after the given height. Max for 2,000 blocks",
         "operationId": "rollback_1",
         "parameters": [
           {
