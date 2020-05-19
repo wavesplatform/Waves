@@ -16,6 +16,7 @@ import com.wavesplatform.lang.v1.traits.domain._
 sealed trait ScriptResult
 case class ScriptResultV3(ds: List[DataItem[_]], ts: List[AssetTransfer]) extends ScriptResult
 case class ScriptResultV4(actions: List[CallableAction])                  extends ScriptResult
+case class IncompleteResult(expr: EXPR, unusedComplexity: Int)            extends ScriptResult
 
 object ScriptResult {
   type E[A] = Either[String, A]
