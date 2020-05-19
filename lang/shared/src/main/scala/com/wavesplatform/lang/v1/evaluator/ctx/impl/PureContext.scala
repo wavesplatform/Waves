@@ -517,10 +517,7 @@ object PureContext {
   lazy val makeString: BaseFunction[NoContext] =
     NativeFunction("makeString", 30, MAKESTRING, listString, ("list", LIST(STRING)), ("separator", STRING)) {
       case ARR(list) :: CONST_STRING(separator) :: Nil =>
-        val expectedStringSize =
-          list.toStream
-            .map(_.asInstanceOf[CONST_STRING].s.getBytes(StandardCharsets.UTF_8).length)
-            .sum
+        val expectedStringSize = list.map(_.asInstanceOf[CONST_STRING].weight).sum
         if (expectedStringSize <= DATA_TX_BYTES_MAX)
           CONST_STRING(list.mkString(separator))
         else
