@@ -33,7 +33,7 @@ import scopt.OParser
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import scala.util.Success
+import scala.util.{Failure, Success, Try}
 
 object Importer extends ScorexLogging {
   import monix.execution.Scheduler.Implicits.global
@@ -125,14 +125,21 @@ object Importer extends ScorexLogging {
       }
 
       val extensions = wavesSettings.extensions.map { extensionClassName =>
+        println(extensionClassName)
         val extensionClass = Class.forName(extensionClassName).asInstanceOf[Class[Extension]]
         val ctor           = extensionClass.getConstructor(classOf[Context])
         log.info(s"Enable extension: $extensionClassName")
         ctor.newInstance(extensionContext)
       }
-      extensions.foreach(_.start())
-
-      extensions
+      extensions.flatMap { ext =>
+        Try(ext.start()) match {
+          case Success(_) =>
+            Some(ext)
+          case Failure(e) =>
+            log.warn(s"Can't initialize extension $ext", e)
+            None
+        }
+      }
     }
 
   @volatile private var quit = false
