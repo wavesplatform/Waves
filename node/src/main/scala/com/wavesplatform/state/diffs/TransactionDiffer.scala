@@ -142,7 +142,7 @@ object TransactionDiffer {
       case dtx: DataTransaction              => DataTransactionDiff(blockchain)(dtx)
       case sstx: SetScriptTransaction        => SetScriptTransactionDiff(blockchain)(sstx)
       case sstx: SetAssetScriptTransaction   => AssetTransactionsDiff.setAssetScript(blockchain, currentBlockTs)(sstx)
-      case stx: SponsorFeeTransaction        => AssetTransactionsDiff.sponsor(blockchain, currentBlockTs)(stx)
+      case stx: SponsorFeeTransaction        => AssetTransactionsDiff.sponsor(blockchain)(stx)
       case _                                 => UnsupportedTransactionType.asLeft
     }
     val complexityDiff = Diff.empty.copy(scriptsComplexity = DiffsCommon.getScriptsComplexity(blockchain, tx)).asRight[ValidationError]
