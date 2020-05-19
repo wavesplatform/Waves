@@ -3,8 +3,8 @@ package com.wavesplatform.lang
 import java.nio.ByteBuffer
 
 import cats.Id
-import cats.implicits._
 import cats.data.EitherT
+import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
@@ -16,14 +16,14 @@ import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, EnvironmentFunctions, PureContext, _}
-import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1, Log}
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
+import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1, EvaluatorV2, Log, LogItem}
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
@@ -33,7 +33,10 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
-class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
+import scala.collection.mutable.ListBuffer
+import scala.util.Try
+
+class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   implicit val version : StdLibVersion = V4
 
@@ -57,24 +60,55 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   private def pureEvalContext(implicit version : StdLibVersion): EvaluationContext[NoContext, Id] =
     PureContext.build(Global, version).evaluationContext
 
-  private val noContextEvaluator = new EvaluatorV1[Id, NoContext]()
   private val defaultEvaluator = new EvaluatorV1[Id, Environment]()
 
-  private def ev[T <: EVALUATED](context: EvaluationContext[NoContext, Id] = pureEvalContext, expr: EXPR): Either[ExecutionError, T] =
-    noContextEvaluator.apply[T](context, expr)
+  private def evalV1[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] =
+    defaultEvaluator[T](context, expr)
+
+  private def evalV2[T <: EVALUATED](context: LoggedEvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] = {
+    val evaluatorV2 = new EvaluatorV2(context, implicitly[StdLibVersion])
+    Try(evaluatorV2(expr, Int.MaxValue))
+      .toEither
+      .bimap(_.getMessage, _._1.asInstanceOf[T])
+  }
+
+  private def evalV2[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] =
+    evalV2[T](LoggedEvaluationContext[Environment, Id](_ => _ => (), context), expr)
+
+  private def eval[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] = {
+    val evaluatorV1Result = evalV1[T](context, expr)
+    val evaluatorV2Result = evalV2[T](context, expr)
+    
+    evaluatorV1Result shouldBe evaluatorV2Result
+    evaluatorV1Result
+  }
+
+  private def evalPure[T <: EVALUATED](context: EvaluationContext[NoContext, Id] = pureEvalContext, expr: EXPR): Either[ExecutionError, T] =
+    eval[T](context.asInstanceOf[EvaluationContext[Environment, Id]], expr)
+
+  private def evalWithLogging(context: EvaluationContext[Environment, Id], expr: EXPR): (Log[Id], Either[ExecutionError, EVALUATED]) = {
+    val evaluatorV1Result = defaultEvaluator.applyWithLogging[EVALUATED](context, expr)
+
+    val evaluatorV2Log = ListBuffer[LogItem[Id]]()
+    val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => evaluatorV2Log.append((name, value)), context)
+    val evaluatorV2Result = evalV2[EVALUATED](loggedCtx, expr)
+
+    (evaluatorV2Log.toList, evaluatorV2Result) shouldBe evaluatorV1Result
+    evaluatorV1Result
+  }
 
   private def simpleDeclarationAndUsage(i: Int, blockBuilder: (LET, EXPR) => EXPR) = blockBuilder(LET("x", CONST_LONG(i)), REF("x"))
 
   property("successful on very deep expressions (stack overflow check)") {
     val term = (1 to 100000).foldLeft[EXPR](CONST_LONG(0))((acc, _) => FUNCTION_CALL(sumLong.header, List(acc, CONST_LONG(1))))
 
-    ev(expr = term) shouldBe evaluated(100000)
+    evalPure(expr = term) shouldBe evaluated(100000)
   }
 
   property("return error and log of failed evaluation") {
     forAll(blockBuilder) { block =>
-      val (log, Left(err)) = noContextEvaluator.applyWithLogging[EVALUATED](
-        pureEvalContext,
+      val (log, Left(err)) = evalWithLogging(
+        pureEvalContext.asInstanceOf[EvaluationContext[Environment, Id]],
         expr = block(
           LET("x", CONST_LONG(3)),
           block(
@@ -93,7 +127,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on unused let") {
     forAll(blockBuilder) { block =>
-      ev[EVALUATED](
+      evalPure[EVALUATED](
         expr = block(
           LET("x", CONST_LONG(3)),
           CONST_LONG(3)
@@ -103,7 +137,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on x = y") {
     forAll(blockBuilder) { block =>
-      ev[EVALUATED](
+      evalPure[EVALUATED](
         expr = block(LET("x", CONST_LONG(3)),
                      block(
                        LET("y", REF("x")),
@@ -114,13 +148,13 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on simple get") {
     forAll(blockBuilder) { block =>
-      ev[EVALUATED](expr = simpleDeclarationAndUsage(3, block)) shouldBe evaluated(3)
+      evalPure[EVALUATED](expr = simpleDeclarationAndUsage(3, block)) shouldBe evaluated(3)
     }
   }
 
   property("successful on get used further in expr") {
     forAll(blockBuilder) { block =>
-      ev[EVALUATED](
+      evalPure[EVALUATED](
         expr = block(
           LET("x", CONST_LONG(3)),
           FUNCTION_CALL(PureContext.eq.header, List(REF("x"), CONST_LONG(2)))
@@ -130,7 +164,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on multiple lets") {
     forAll(blockBuilder) { block =>
-      ev[EVALUATED](
+      evalPure[EVALUATED](
         expr = block(
           LET("x", CONST_LONG(3)),
           block(LET("y", CONST_LONG(3)), FUNCTION_CALL(PureContext.eq.header, List(REF("x"), REF("y"))))
@@ -140,7 +174,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on multiple lets with expression") {
     forAll(blockBuilder) { block =>
-      ev[EVALUATED](
+      evalPure[EVALUATED](
         expr = block(
           LET("x", CONST_LONG(3)),
           block(
@@ -153,7 +187,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("successful on deep type resolution") {
     forAll(blockBuilder) { block =>
-      ev[EVALUATED](expr = IF(FUNCTION_CALL(PureContext.eq.header, List(CONST_LONG(1), CONST_LONG(2))),
+      evalPure[EVALUATED](expr = IF(FUNCTION_CALL(PureContext.eq.header, List(CONST_LONG(1), CONST_LONG(2))),
                               simpleDeclarationAndUsage(3, block),
                               CONST_LONG(4))) shouldBe evaluated(4)
     }
@@ -165,18 +199,18 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         IF(FUNCTION_CALL(PureContext.eq.header, List(CONST_LONG(1), CONST_LONG(2))),
            simpleDeclarationAndUsage(3, block),
            simpleDeclarationAndUsage(4, block))
-      ev[EVALUATED](expr = expr) shouldBe evaluated(4)
+      evalPure[EVALUATED](expr = expr) shouldBe evaluated(4)
     }
   }
 
   property("fails if definition not found") {
-    ev[EVALUATED](expr = FUNCTION_CALL(sumLong.header, List(REF("x"), CONST_LONG(2)))) should produce("A definition of 'x' not found")
+    evalPure[EVALUATED](expr = FUNCTION_CALL(sumLong.header, List(REF("x"), CONST_LONG(2)))) should produce("A definition of 'x' not found")
   }
 
   property("custom type field access") {
     val pointType     = CASETYPEREF("Point", List("X" -> LONG, "Y" -> LONG))
     val pointInstance = CaseObj(pointType, Map("X"    -> 3L, "Y"   -> 4L))
-    ev[EVALUATED](
+    evalPure[EVALUATED](
       context = Monoid.combine(pureEvalContext,
                                EvaluationContext[NoContext, Id](
                                  Contextful.empty[Id],
@@ -189,11 +223,11 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("ne works") {
-    ev[EVALUATED](
+    evalPure[EVALUATED](
       expr = FUNCTION_CALL(FunctionHeader.User(PureContext.ne.name), List(CONST_LONG(1), CONST_LONG(2)))
     ) shouldBe evaluated(true)
 
-    ev[EVALUATED](
+    evalPure[EVALUATED](
       expr = FUNCTION_CALL(FunctionHeader.User(PureContext.ne.name), List(CONST_LONG(1), CONST_LONG(1)))
     ) shouldBe evaluated(false)
   }
@@ -214,7 +248,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       )
     )
     forAll(blockBuilder) { block =>
-      ev[EVALUATED](
+      evalPure[EVALUATED](
         context = context,
         expr = block(LET("Z", REF("badVal")), FUNCTION_CALL(sumLong.header, List(GETTER(REF("p"), "X"), CONST_LONG(2))))
       ) shouldBe evaluated(5)
@@ -237,14 +271,15 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
                                      typeDefs = Map.empty,
                                      letDefs = Map.empty,
                                      functions = Map(f.header -> f)
-                                   ))
+                                   )).asInstanceOf[EvaluationContext[Environment, Id]]
 
-      ev[EVALUATED](
-        context = context,
-        expr = block(LET("X", FUNCTION_CALL(f.header, List(CONST_LONG(1000)))), FUNCTION_CALL(sumLong.header, List(REF("X"), REF("X"))))
-      ) shouldBe evaluated(2L)
+      val expr = block(LET("X", FUNCTION_CALL(f.header, List(CONST_LONG(1000)))), FUNCTION_CALL(sumLong.header, List(REF("X"), REF("X"))))
 
+      evalV1[EVALUATED](context, expr) shouldBe evaluated(2L)
       functionEvaluated shouldBe 1
+
+      evalV2[EVALUATED](context, expr) shouldBe evaluated(2L)
+      functionEvaluated shouldBe 2
     }
   }
 
@@ -261,7 +296,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val expr = GETTER(REF("fooInstance"), "bar")
 
-    ev[EVALUATED](context, expr) shouldBe evaluated("bAr")
+    evalPure[EVALUATED](context, expr) shouldBe evaluated("bAr")
   }
 
   property("successful on function call getter evaluation") {
@@ -279,7 +314,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val expr = GETTER(FUNCTION_CALL(fooCtor.header, List.empty), "bar")
 
-    ev[EVALUATED](context, expr) shouldBe evaluated("bAr")
+    evalPure[EVALUATED](context, expr) shouldBe evaluated("bAr")
   }
 
   property("successful on block getter evaluation") {
@@ -315,12 +350,12 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         ),
         "bar"
       )
-      ev[EVALUATED](context, expr) shouldBe evaluated("TRANSFORMED_BAR")
+      evalPure[EVALUATED](context, expr) shouldBe evaluated("TRANSFORMED_BAR")
     }
   }
 
   property("successful on simple function evaluation") {
-    ev[EVALUATED](
+    evalPure[EVALUATED](
       context = EvaluationContext.build(
         typeDefs = Map.empty,
         letDefs = Map.empty,
@@ -411,7 +446,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(genBytesAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(PureContext.dropBytes.header, List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
-        val actual = ev[EVALUATED](pureEvalContext, expr)
+        val actual = evalPure[EVALUATED](pureEvalContext, expr)
         actual shouldBe evaluated(xs.drop(number))
     }
   }
@@ -420,7 +455,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(genBytesAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(FunctionHeader.Native(TAKE_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
-        val actual = ev[EVALUATED](pureEvalContext, expr)
+        val actual = evalPure[EVALUATED](pureEvalContext, expr)
         actual shouldBe evaluated(xs.take(number))
     }
   }
@@ -429,7 +464,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(genBytesAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(PureContext.dropRightBytes.header, List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
-        val actual = ev[EVALUATED](pureEvalContext, expr)
+        val actual = evalPure[EVALUATED](pureEvalContext, expr)
         actual shouldBe evaluated(xs.dropRight(number))
     }
   }
@@ -438,7 +473,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(genBytesAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(PureContext.takeRightBytes.header, List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
-        val actual = ev[EVALUATED](pureEvalContext, expr)
+        val actual = evalPure[EVALUATED](pureEvalContext, expr)
         actual shouldBe evaluated(xs.takeRight(number))
     }
   }
@@ -452,7 +487,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(genStringAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(FunctionHeader.Native(DROP_STRING), List(CONST_STRING(xs).explicitGet(), CONST_LONG(number)))
-        val actual = ev[EVALUATED](pureEvalContext, expr)
+        val actual = evalPure[EVALUATED](pureEvalContext, expr)
         actual shouldBe evaluated(xs.drop(number))
     }
   }
@@ -461,7 +496,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(genStringAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(FunctionHeader.Native(TAKE_STRING), List(CONST_STRING(xs).explicitGet(), CONST_LONG(number)))
-        val actual = ev[EVALUATED](pureEvalContext, expr)
+        val actual = evalPure[EVALUATED](pureEvalContext, expr)
         actual shouldBe evaluated(xs.take(number))
     }
   }
@@ -470,7 +505,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(genStringAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(PureContext.dropRightString.header, List(CONST_STRING(xs).explicitGet(), CONST_LONG(number)))
-        val actual = ev[EVALUATED](pureEvalContext, expr)
+        val actual = evalPure[EVALUATED](pureEvalContext, expr)
         actual shouldBe evaluated(xs.dropRight(number))
     }
   }
@@ -479,7 +514,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     forAll(genStringAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(PureContext.takeRightString.header, List(CONST_STRING(xs).explicitGet(), CONST_LONG(number)))
-        val actual = ev[EVALUATED](pureEvalContext, expr)
+        val actual = evalPure[EVALUATED](pureEvalContext, expr)
         actual shouldBe evaluated(xs.takeRight(number))
     }
   }
@@ -487,7 +522,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("size(String) works as the native one") {
     forAll(Arbitrary.arbString.arbitrary) { xs =>
       val expr   = FUNCTION_CALL(FunctionHeader.Native(SIZE_STRING), List(CONST_STRING(xs).explicitGet()))
-      val actual = ev[EVALUATED](pureEvalContext, expr)
+      val actual = evalPure[EVALUATED](pureEvalContext, expr)
       actual shouldBe evaluated(xs.length)
     }
   }
@@ -500,7 +535,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(gen) { xs =>
       val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(CONST_STRING(xs).explicitGet()))
-      val actual = ev[EVALUATED](defaultCryptoContext.evaluationContext, expr)
+      val actual = evalPure[EVALUATED](defaultCryptoContext.evaluationContext, expr)
       actual shouldBe evaluated(ByteStr(Base58.tryDecodeWithLimit(xs).get))
     }
   }
@@ -514,7 +549,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(gen) { xs =>
       val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(CONST_STRING(xs).explicitGet()))
-      val actual = ev[EVALUATED](defaultCryptoContext.evaluationContext, expr)
+      val actual = evalPure[EVALUATED](defaultCryptoContext.evaluationContext, expr)
       actual shouldBe Left("base58Decode input exceeds 100")
     }
   }
@@ -527,7 +562,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(gen) { xs =>
       val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE64), List(CONST_STRING(xs).explicitGet()))
-      val actual = ev[EVALUATED](defaultCryptoContext.evaluationContext, expr)
+      val actual = evalPure[EVALUATED](defaultCryptoContext.evaluationContext, expr)
       actual shouldBe evaluated(ByteStr(Base64.tryDecode(xs).get))
     }
   }
@@ -540,7 +575,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(gen) { xs =>
       val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE64), List(CONST_STRING(xs).explicitGet()))
-      val actual = ev[EVALUATED](defaultCryptoContext.evaluationContext, expr)
+      val actual = evalPure[EVALUATED](defaultCryptoContext.evaluationContext, expr)
       actual shouldBe evaluated(ByteStr(Base64.tryDecode(xs).get))
     }
   }
@@ -558,7 +593,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
           FUNCTION_CALL(FunctionHeader.Native(TOBASE16), List(CONST_BYTESTR(ByteStr(xs)).explicitGet()))
         )
       )
-      val actual = ev[EVALUATED](defaultCryptoContext.evaluationContext, expr)
+      val actual = evalPure[EVALUATED](defaultCryptoContext.evaluationContext, expr)
       actual shouldBe evaluated(ByteStr(xs))
     }
   }
@@ -578,7 +613,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         List(CONST_BYTESTR(ByteStr(pkBytes)).explicitGet())
       )
 
-      val actual = defaultEvaluator.apply[CaseObj](ctx.evaluationContext(environment), expr).map(_.fields("bytes"))
+      val actual = eval[CaseObj](ctx.evaluationContext(environment), expr).map(_.fields("bytes"))
       actual shouldBe evaluated(ByteStr(addressFromPublicKey(environment.chainId, pkBytes)))
     }
   }
@@ -594,7 +629,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(gen) { addrStr =>
       val expr                                   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr).explicitGet()))
-      val actual                                 = defaultEvaluator.apply[CaseObj](ctx.evaluationContext(environment), expr)
+      val actual                                 = eval[CaseObj](ctx.evaluationContext(environment), expr)
       val a: Either[ExecutionError, EVALUATED]   = actual.map(_.fields("bytes"))
       val e: Either[String, Option[Array[Byte]]] = addressFromString(environment.chainId, addrStr)
       a shouldBe CONST_BYTESTR(ByteStr(e.explicitGet().get))
@@ -612,7 +647,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr).explicitGet()))
-      val actual = defaultEvaluator.apply[CaseObj](ctx.evaluationContext(environment), expr)
+      val actual = eval[CaseObj](ctx.evaluationContext(environment), expr)
       val e      = addressFromString(environment.chainId, addrStr).explicitGet().get
       actual.map(_.fields("bytes")) shouldBe CONST_BYTESTR(ByteStr(e))
     }
@@ -629,7 +664,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr).explicitGet()))
-      val actual = defaultEvaluator.apply[EVALUATED](ctx.evaluationContext(environment), expr)
+      val actual = eval[EVALUATED](ctx.evaluationContext(environment), expr)
       actual shouldBe evaluated(unit)
     }
   }
@@ -649,7 +684,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr).explicitGet()))
-      val actual = defaultEvaluator.apply[EVALUATED](ctx.evaluationContext(environment), expr)
+      val actual = eval[EVALUATED](ctx.evaluationContext(environment), expr)
       actual shouldBe evaluated(unit)
     }
   }
@@ -669,7 +704,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr).explicitGet()))
-      val actual = defaultEvaluator.apply[EVALUATED](ctx.evaluationContext(environment), expr)
+      val actual = eval[EVALUATED](ctx.evaluationContext(environment), expr)
       actual shouldBe evaluated(unit)
     }
   }
@@ -691,7 +726,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     forAll(gen) { addrStr =>
       val expr   = FUNCTION_CALL(FunctionHeader.User("addressFromString"), List(CONST_STRING(addrStr).explicitGet()))
-      val actual = defaultEvaluator.apply[EVALUATED](ctx.evaluationContext(environment), expr)
+      val actual = eval[EVALUATED](ctx.evaluationContext(environment), expr)
       actual shouldBe evaluated(unit)
     }
   }
@@ -714,7 +749,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         .compileUntyped(script, context.compilerContext)
         .explicitGet()
 
-    ev[EVALUATED](
+    evalPure[EVALUATED](
       context = context.evaluationContext[Id],
       expr = expr
     ).map {
@@ -784,7 +819,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
         )
       ))
 
-    ev[EVALUATED](
+    evalPure[EVALUATED](
       context = context,
       expr = FUNCTION_CALL(
         function = FunctionHeader.Native(lim_n.fold(SIGVERIFY)(n => (SIGVERIFY_LIM + n).toShort)),
@@ -800,7 +835,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     }
   }
 
-  private def recArrWeight(script: String): (Log[Id], Either[ExecutionError, EVALUATED]) = {
+  private def recArrWeight(script: String): Either[ExecutionError, EVALUATED] = {
     val context: CTX[NoContext] = Monoid.combineAll(
       Seq(
         pureContext,
@@ -810,30 +845,30 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     com.wavesplatform.lang.v1.parser.Parser.parseExpr(script) match {
       case fastparse.core.Parsed.Success(xs, _) =>
-        noContextEvaluator.applyWithLogging[EVALUATED](
+        evalPure[EVALUATED](
           context.evaluationContext[Id],
           ExpressionCompiler
             .apply(context.compilerContext, xs)
             .explicitGet()
             ._1
         )
-      case fastparse.core.Parsed.Failure(_,index,_) => (List(), Left(s"Parse error at $index"))
+      case fastparse.core.Parsed.Failure(_,index,_) => Left(s"Parse error at $index")
     }
   }
 
   private def recCmp(cnt: Int)(f: ((String => String) => String) = (gen =>  gen("x") ++ gen("y") ++ s"x${cnt+1} == y${cnt+1}")): (Log[Id], Either[ExecutionError, Boolean]) = {
-    val context: CTX[NoContext] = Monoid.combineAll(
+    val context = Monoid.combineAll(
       Seq(
         pureContext,
         defaultCryptoContext,
         CTX[NoContext](Seq(), Map(), Array.empty[BaseFunction[NoContext]])
-      ))
+      )).withEnvironment[Environment]
 
     def gen(a: String) = (0 to cnt).foldLeft(s"""let ${a}0="qqqq";""") { (c, n) => c ++ s"""let $a${n+1}=[$a$n,$a$n,$a$n];""" }
     val script = f(gen)
 
-    val r = noContextEvaluator.applyWithLogging[EVALUATED](
-      context.evaluationContext[Id],
+    val r = evalWithLogging(
+      context.evaluationContext(Common.emptyBlockchainEnvironment()),
       ExpressionCompiler
         .compile(script, context.compilerContext)
         .explicitGet()
@@ -855,28 +890,26 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   property("recCmp fail by cmp") {
-    val (log, result) = recCmp(5)()
+    val (_, result) = recCmp(5)()
 
     result shouldBe 'Left
   }
 
   property("recData fail by ARR") {
     val cnt = 8
-    val (log, result) = recCmp(cnt)(gen => gen("x") ++ s"x${cnt+1}.size() == 3")
+    val (_, result) = recCmp(cnt)(gen => gen("x") ++ s"x${cnt+1}.size() == 3")
 
     result shouldBe 'Left
   }
 
   property("recData use uncomparable data") {
     val cnt = 7
-    val (log, result) = recCmp(cnt)(gen => gen("x") ++ s"x${cnt+1}[1].size() == 3")
-
+    val (_, result) = recCmp(cnt)(gen => gen("x") ++ s"x${cnt+1}[1].size() == 3")
     result shouldBe Right(true)
   }
 
   property("List weight correct") {
-   val (log, Right(ARR(Seq(a,b)))) = recArrWeight("[[0] ++ [1], 0::1::nil]")
-
+   val Right(ARR(Seq(a,b))) = recArrWeight("[[0] ++ [1], 0::1::nil]")
    a.weight shouldBe b.weight
   }
 
@@ -892,21 +925,21 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val environment = emptyBlockchainEnvironment()
     val term = genRCO(3)
 
-    defaultEvaluator.apply[CONST_BOOLEAN](defaultFullContext.evaluationContext(environment), FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, term))) shouldBe evaluated(true)
+    eval[CONST_BOOLEAN](defaultFullContext.evaluationContext(environment), FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, term))) shouldBe evaluated(true)
   }
 
   property("recursive caseobject fail by compare") {
     val environment = emptyBlockchainEnvironment()
     val term = genRCO(4)
 
-    defaultEvaluator.apply[CONST_BOOLEAN](defaultFullContext.evaluationContext(environment), FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, term))) shouldBe 'Left
+    eval[CONST_BOOLEAN](defaultFullContext.evaluationContext(environment), FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, term))) shouldBe 'Left
   }
 
   property("recursive caseobject compare with unit") {
     val environment = emptyBlockchainEnvironment()
     val term = genRCO(4)
 
-    defaultEvaluator.apply[CONST_BOOLEAN](defaultFullContext.evaluationContext(environment), FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, REF("unit")))) shouldBe evaluated(false)
+    eval[CONST_BOOLEAN](defaultFullContext.evaluationContext(environment), FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, REF("unit")))) shouldBe evaluated(false)
   }
 
   private def multiSig(bodyBytes: Array[Byte],
@@ -941,12 +974,13 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       ("bobPubKey", (BYTESTR, ContextfulVal.pure[NoContext](ByteStr(bobPK))))
     )
 
-    val context: CTX[NoContext] = Monoid.combineAll(
+    val context = Monoid.combineAll(
       Seq(
         pureContext,
         defaultCryptoContext,
         CTX[NoContext](Seq(txType), vars, Array.empty[BaseFunction[NoContext]])
-      ))
+      )
+    ).withEnvironment[Environment]
 
     val script =
       s"""
@@ -956,8 +990,8 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
          |aliceSigned && bobSigned
    """.stripMargin
 
-    val r = noContextEvaluator.applyWithLogging[EVALUATED](
-      context.evaluationContext[Id],
+    val r = evalWithLogging(
+      context.evaluationContext[Id](Common.emptyBlockchainEnvironment()),
       ExpressionCompiler
         .compile(script, context.compilerContext)
         .explicitGet()
@@ -979,7 +1013,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   private def hashFuncTest(bodyBytes: Array[Byte], funcName: Short): Either[ExecutionError, ByteStr] = {
     val context = Monoid.combineAll(Seq(pureEvalContext, defaultCryptoContext.evaluationContext[Id]))
 
-    ev[CONST_BYTESTR](
+    evalPure[CONST_BYTESTR](
       context = context,
       expr = FUNCTION_CALL(
         function = FunctionHeader.Native(funcName),
@@ -997,13 +1031,13 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val frac2 = FUNCTION_CALL(fraction.header, List(CONST_LONG(Long.MaxValue), CONST_LONG(3), CONST_LONG(2)))
     val frac3 = FUNCTION_CALL(fraction.header, List(CONST_LONG(-Long.MaxValue), CONST_LONG(3), CONST_LONG(2)))
 
-    ev[EVALUATED](expr = sum) shouldBe evaluated(10)
-    ev[EVALUATED](expr = mul) shouldBe evaluated(25)
-    ev[EVALUATED](expr = div) shouldBe evaluated(3)
-    ev[EVALUATED](expr = mod) shouldBe evaluated(1)
-    ev[EVALUATED](expr = frac) shouldBe evaluated(Long.MaxValue / 2)
-    ev[EVALUATED](expr = frac2) shouldBe Left(s"Long overflow: value `${BigInt(Long.MaxValue) * 3 / 2}` greater than 2^63-1")
-    ev[EVALUATED](expr = frac3) shouldBe Left(s"Long overflow: value `${-BigInt(Long.MaxValue) * 3 / 2}` less than -2^63-1")
+    evalPure[EVALUATED](expr = sum) shouldBe evaluated(10)
+    evalPure[EVALUATED](expr = mul) shouldBe evaluated(25)
+    evalPure[EVALUATED](expr = div) shouldBe evaluated(3)
+    evalPure[EVALUATED](expr = mod) shouldBe evaluated(1)
+    evalPure[EVALUATED](expr = frac) shouldBe evaluated(Long.MaxValue / 2)
+    evalPure[EVALUATED](expr = frac2) shouldBe Left(s"Long overflow: value `${BigInt(Long.MaxValue) * 3 / 2}` greater than 2^63-1")
+    evalPure[EVALUATED](expr = frac3) shouldBe Left(s"Long overflow: value `${-BigInt(Long.MaxValue) * 3 / 2}` less than -2^63-1")
   }
 
   property("data constructors") {
@@ -1011,7 +1045,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val pointType = CASETYPEREF(point, List("X" -> LONG, "Y" -> LONG))
     val pointCtor = FunctionHeader.User(point)
 
-    ev[EVALUATED](
+    evalPure[EVALUATED](
       context = EvaluationContext.build(typeDefs = Map(point -> pointType), letDefs = Map.empty, functions = Seq()),
       FUNCTION_CALL(pointCtor, List(CONST_LONG(1), CONST_LONG(2)))
     ) shouldBe evaluated(CaseObj(pointType, Map("X" -> CONST_LONG(1), "Y" -> CONST_LONG(2))))
@@ -1019,7 +1053,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("toString") {
     import PureContext.{toStringBoolean, toStringLong}
-    def evalToString(f: FunctionHeader, arg: EXPR) = ev[EVALUATED](expr = FUNCTION_CALL(f, List(arg)))
+    def evalToString(f: FunctionHeader, arg: EXPR) = evalPure[EVALUATED](expr = FUNCTION_CALL(f, List(arg)))
 
     evalToString(toStringBoolean, TRUE) shouldBe evaluated("true")
     evalToString(toStringBoolean, FALSE) shouldBe evaluated("false")
@@ -1033,7 +1067,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
   property("toBytes") {
     import PureContext.{toBytesBoolean, toBytesLong, toBytesString}
-    def evalToBytes(f: FunctionHeader, arg: EXPR) = ev[EVALUATED](expr = FUNCTION_CALL(f, List(arg)))
+    def evalToBytes(f: FunctionHeader, arg: EXPR) = evalPure[EVALUATED](expr = FUNCTION_CALL(f, List(arg)))
 
     evalToBytes(toBytesBoolean, TRUE) shouldBe evaluated(ByteStr.fromBytes(1))
     evalToBytes(toBytesBoolean, FALSE) shouldBe evaluated(ByteStr.fromBytes(0))
@@ -1063,23 +1097,27 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
                                    typeDefs = Map.empty,
                                    letDefs = Map.empty,
                                    functions = Seq(f, doubleFst)
-                                 ))
+                                 )).asInstanceOf[EvaluationContext[Environment, Id]]
 
     // g(...(g(f(1000)))))
     val expr = (1 to 6).foldLeft(FUNCTION_CALL(f.header, List(CONST_LONG(1000)))) {
       case (r, _) => FUNCTION_CALL(doubleFst.header, List(r))
     }
 
-    ev[EVALUATED](context, expr) shouldBe evaluated(64L)
-
+    evalV1[EVALUATED](context, expr) shouldBe evaluated(64L)
     functionEvaluated shouldBe 1
+
+    evalV2[EVALUATED](context, expr) shouldBe evaluated(64L)
+    functionEvaluated shouldBe 2
   }
 
   property("function parameters (REF) in body should be taken from the arguments, not from the outer context") {
+    // func doubleFn(x: Int) = x + x
     val doubleFn = UserFunction[NoContext]("doubleFn", 0, LONG, ("x", LONG)) {
       FUNCTION_CALL(sumLong.header, List(REF("x"), REF("x")))
     }
 
+    // func mulFn(y: Int, x: Int) = y - x
     val subFn = UserFunction[NoContext]("mulFn", 0, LONG, ("y", LONG), ("x", LONG)) {
       FUNCTION_CALL(subLong.header, List(REF("y"), REF("x")))
     }
@@ -1096,14 +1134,14 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
           ),
           functions = Seq(doubleFn, subFn)
         )
-    )
+    ).asInstanceOf[EvaluationContext[Environment, Id]]
 
-    // sub(dub(x), 7)
+    // mulFn(doubleFn(x), 7) = (x + x) - 7 = 6 - 7 = -1
     val expr1 = FUNCTION_CALL(subFn.header, List(FUNCTION_CALL(doubleFn.header, List(REF("x"))), CONST_LONG(7)))
-    ev[EVALUATED](context, expr1) shouldBe evaluated(-1)
+    evalV2[EVALUATED](context, expr1) shouldBe evaluated(-1)
 
-    // sub(7, dub(x))
+    // mulFn(7, doubleFn(x)) = 7 - (x + x) = 7 - 6 = 1
     val expr2 = FUNCTION_CALL(subFn.header, List(CONST_LONG(7), FUNCTION_CALL(doubleFn.header, List(REF("x")))))
-    ev[EVALUATED](context, expr2) shouldBe evaluated(1)
+    evalV2[EVALUATED](context, expr2) shouldBe evaluated(1)
   }
 }
