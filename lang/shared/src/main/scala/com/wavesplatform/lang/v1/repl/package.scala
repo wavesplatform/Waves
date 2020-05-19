@@ -19,9 +19,9 @@ package object repl {
   val version = V4
 
   val initialCtx: CTX[Environment] =
-    CryptoContext.build(global, V4).withEnvironment[Environment] |+|
-    PureContext.build(global, V4).withEnvironment[Environment]   |+|
-    WavesContext.build(DirectiveSet(V4, Account, DApp, Imports(Nil)).right.get)
+    CryptoContext.build(global, version).withEnvironment[Environment] |+|
+    PureContext.build(global, version).withEnvironment[Environment]   |+|
+    WavesContext.build(DirectiveSet(version, Account, DApp, Imports(Nil)).right.get)
 
   def buildEnvironment(settings: Option[NodeConnectionSettings]): Environment[Future] =
     settings.fold(ErrorMessageEnvironment: Environment[Future])(WebEnvironment)
