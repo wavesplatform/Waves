@@ -9,7 +9,7 @@ import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.v1.CTX
+import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, FINAL, LONG, STRING}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
@@ -1564,6 +1564,24 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(""" [true, false].lastIndexOf(0) """, version = V4) should produce("Can't find a function overload")
     eval(""" [true, false].lastIndexOf() """, version = V4) should produce("Can't find a function overload")
     eval(""" ["a","b","c","d"].lastIndexOf("a") """, version = V3) should produce("Can't find a function overload 'lastIndexOf'")
+  }
+
+  property("list indexOf compare Limits") {
+    val maxCmpWeightElement          = "a" * ContractLimits.MaxCmpWeight.toInt
+    val maxSizeElementToFound        = "a" * 150 * 1024
+    val listWithMaxCmpWeightElements = List.fill(20)("b" * ContractLimits.MaxCmpWeight.toInt).map(s => s""""$s"""").mkString("[", ",", "]")
+    val listWithMaxSizeElements      = List.fill(2)("b" * 150 * 1000).map(s => s""""$s"""").mkString("[", ",", "]")
+
+    val tooHeavyCmpElement         = maxCmpWeightElement + "a"
+    val listWithTooHeavyCmpElement = s""" ("$tooHeavyCmpElement" :: $listWithMaxCmpWeightElements) """
+
+    for (func <- Seq("indexOf", "lastIndexOf")) {
+      eval(s""" $listWithMaxSizeElements.$func("$maxCmpWeightElement") """, version = V4) shouldBe Right(unit)
+      eval(s""" $listWithMaxCmpWeightElements.$func("$maxSizeElementToFound") """, version = V4) shouldBe Right(unit)
+
+      eval(s""" $listWithMaxSizeElements.$func("$tooHeavyCmpElement") """, version = V4) should produce("are too heavy to compare")
+      eval(s""" $listWithTooHeavyCmpElement.$func("$maxSizeElementToFound") """, version = V4) should produce("are too heavy to compare")
+    }
   }
 
   property("list contains") {
