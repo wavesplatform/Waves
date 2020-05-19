@@ -1536,6 +1536,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   property("list indexOf") {
     eval(""" ["a","b","c","d"].indexOf("a") """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" ["a","b","c","d","a"].indexOf("a") """, version = V4) shouldBe Right(CONST_LONG(0))
     eval(""" ["a","b","c","d"].indexOf("d") """, version = V4) shouldBe Right(CONST_LONG(3))
     eval(""" [-1,2,3,4].indexOf(-1) """, version = V4) shouldBe Right(CONST_LONG(0))
     eval(""" [-1,2,3,4].indexOf(4) """, version = V4) shouldBe Right(CONST_LONG(3))
