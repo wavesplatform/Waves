@@ -626,6 +626,9 @@ object SyncHttpApi extends Assertions {
     def blacklist(address: InetSocketAddress): Unit =
       sync(async(n).blacklist(address))
 
+    def clearBlacklist(): Unit =
+      sync(async(n).clearBlacklist())
+
     def debugMinerInfo(): Seq[State] =
       sync(async(n).debugMinerInfo())
 
@@ -793,13 +796,30 @@ object SyncHttpApi extends Assertions {
         ConditionAwaitTime
       )
 
-    def rollback(height: Int, returnToUTX: Boolean = true): Unit = {
+    def rollbackWithoutBlacklisting(height: Int, returnToUTX: Boolean = true): Unit = {
       sync(
         Future.traverse(nodes) { node =>
           com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi(node).rollback(height, returnToUTX)
         },
         ConditionAwaitTime
       )
+    }
+
+    def rollback(height: Int, returnToUTX: Boolean = true): Unit = {
+      val combinations = nodes.combinations(2).toSeq
+      nodes.combinations(2).foreach {
+        case Seq(n1, n2) =>
+          n1.blacklist(n2.networkAddress)
+          n2.blacklist(n1.networkAddress)
+      }
+
+      nodes.rollbackWithoutBlacklisting(height, returnToUTX)
+      nodes.foreach(_.clearBlacklist())
+
+      combinations.foreach {
+        case Seq(n1, n2) =>
+          n1.connect(n2.networkAddress)
+      }
     }
 
     def rollbackToBlockId(id: String): Unit = {
