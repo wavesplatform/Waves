@@ -95,7 +95,7 @@ case class UtilsApiRoute(
 
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String])) { code =>
-      val stdLib: StdLibVersion = if(blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) { V4 } else { StdLibVersion.VersionDic.default }
+      def stdLib: StdLibVersion = if(blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) { V4 } else { StdLibVersion.VersionDic.default }
       executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator, defaultStdLib = stdLib)) { result =>
         complete(
           result

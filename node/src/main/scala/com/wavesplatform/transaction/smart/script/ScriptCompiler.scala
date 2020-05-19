@@ -32,7 +32,7 @@ object ScriptCompiler extends ScorexLogging {
       scriptText: String,
       estimator: ScriptEstimator,
       libraries: Map[String, String] = Map(),
-      defaultStdLib: StdLibVersion = StdLibVersion.VersionDic.default
+      defaultStdLib: => StdLibVersion = StdLibVersion.VersionDic.default
   ): Either[String, (Script, Script.ComplexityInfo)] =
     compileAndEstimate(scriptText, estimator, libraries, Script.complexityInfo, defaultStdLib)
 
@@ -41,7 +41,7 @@ object ScriptCompiler extends ScorexLogging {
       estimator: ScriptEstimator,
       libraries: Map[String, String] = Map(),
       estimate: (Script, ScriptEstimator, Boolean) => Either[String, C],
-      defaultStdLib: StdLibVersion = StdLibVersion.VersionDic.default
+      defaultStdLib: => StdLibVersion = StdLibVersion.VersionDic.default
   ): Either[String, (Script, C)] =
     for {
       directives  <- DirectiveParser(scriptText)

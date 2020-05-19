@@ -451,7 +451,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     }
 
   routePath("/script/compile") in {
-    Post(routePath("/script/compile"), "(1 == 2)") ~> route ~> check {
+    Post(routePath("/script/compile"), "{-# STDLIB_VERSION 2 #-}\n(1 == 2)") ~> route ~> check {
       val json           = responseAs[JsValue]
       val expectedScript = ExprScript(V2, script).explicitGet()
 
@@ -468,7 +468,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   }
 
   routePath("/script/compileCode") in {
-    Post(routePath("/script/compileCode"), "(1 == 2)") ~> route ~> check {
+    Post(routePath("/script/compileCode"), "{-# STDLIB_VERSION 2 #-}\n(1 == 2)") ~> route ~> check {
       val json           = responseAs[JsValue]
       val expectedScript = ExprScript(V2, script).explicitGet()
 
@@ -518,7 +518,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   }
 
   routePath("/script/compileWithImports") in {
-    Post(routePath("/script/compileWithImports"), ScriptWithImportsRequest("(1 == 2)")) ~> route ~> check {
+    Post(routePath("/script/compileWithImports"), ScriptWithImportsRequest("{-# STDLIB_VERSION 2 #-}\n(1 == 2)")) ~> route ~> check {
       val json           = responseAs[JsValue]
       val expectedScript = ExprScript(V2, script).explicitGet()
 
