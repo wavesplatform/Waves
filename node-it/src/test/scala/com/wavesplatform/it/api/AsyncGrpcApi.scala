@@ -246,7 +246,7 @@ object AsyncGrpcApi {
 
     def setScript(
         sender: KeyPair,
-        script: Either[Array[Byte], Option[Script]],
+        script: Either[Array[Byte], Option[Scr]],
         fee: Long,
         timestamp: Long = System.currentTimeMillis(),
         version: Int = 1
