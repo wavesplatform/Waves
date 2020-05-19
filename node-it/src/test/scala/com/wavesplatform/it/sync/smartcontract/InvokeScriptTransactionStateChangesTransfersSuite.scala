@@ -90,7 +90,7 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
   }
 
   test("payment value lower than transfer") {
-    val pamentAmount   = 1
+    val paymentAmount   = 1
     val transferAmount = 4
 
     val invokeScriptTx = sender.invokeScript(
@@ -98,7 +98,7 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
       dApp,
       func = Some("sendToCaller"),
       args = List(CONST_LONG(transferAmount)),
-      payment = Seq(Payment(pamentAmount, Waves)),
+      payment = Seq(Payment(paymentAmount, Waves)),
       fee = 1.waves,
       waitForTx = true
     )
