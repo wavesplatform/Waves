@@ -1533,4 +1533,52 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
     eval(script) shouldBe CONST_BYTESTR(bytes(value.toUpperCase))
   }
+
+  property("list indexOf") {
+    eval(""" ["a","b","c","d"].indexOf("a") """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" ["a","b","c","d"].indexOf("d") """, version = V4) shouldBe Right(CONST_LONG(3))
+    eval(""" [-1,2,3,4].indexOf(-1) """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" [-1,2,3,4].indexOf(4) """, version = V4) shouldBe Right(CONST_LONG(3))
+    eval(""" [true, false].indexOf(true) """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" [true, false].indexOf(false) """, version = V4) shouldBe Right(CONST_LONG(1))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].indexOf(base58'a') """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].indexOf(base58'd') """, version = V4) shouldBe Right(CONST_LONG(3))
+    eval(""" ["a","b","c","d"].indexOf("e") """, version = V4) shouldBe Right(unit)
+    
+    eval(""" [true, false].indexOf(0) """, version = V4) should produce("Can't find a function overload")
+    eval(""" [true, false].indexOf() """, version = V4) should produce("Can't find a function overload")
+    eval(""" ["a","b","c","d"].indexOf("a") """, version = V3) should produce("Can't find a function overload 'indexOf'")
+  }
+
+  property("list lastIndexOf") {
+    eval(""" ["a","b","a","c","d"].lastIndexOf("a") """, version = V4) shouldBe Right(CONST_LONG(2))
+    eval(""" ["d","a","b","c","d"].lastIndexOf("d") """, version = V4) shouldBe Right(CONST_LONG(4))
+    eval(""" [-1,2,3,4,-1].lastIndexOf(-1) """, version = V4) shouldBe Right(CONST_LONG(4))
+    eval(""" [4,-1,2,3].lastIndexOf(4) """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" [true, false].lastIndexOf(true) """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" [true, false].lastIndexOf(false) """, version = V4) shouldBe Right(CONST_LONG(1))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].lastIndexOf(base58'a') """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].lastIndexOf(base58'd') """, version = V4) shouldBe Right(CONST_LONG(3))
+    eval(""" ["a","b","c","d"].lastIndexOf("e") """, version = V4) shouldBe Right(unit)
+    
+    eval(""" [true, false].lastIndexOf(0) """, version = V4) should produce("Can't find a function overload")
+    eval(""" [true, false].lastIndexOf() """, version = V4) should produce("Can't find a function overload")
+    eval(""" ["a","b","c","d"].lastIndexOf("a") """, version = V3) should produce("Can't find a function overload 'lastIndexOf'")
+  }
+
+  property("list contains") {
+    eval(""" ["a","b","c","d"].containsElement("a") """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" ["a","b","c","d"].containsElement("d") """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" [-1,2,3,4].containsElement(-1) """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" [-1,2,3,4].containsElement(4) """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" [true, false].containsElement(true) """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" [true, false].containsElement(false) """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].containsElement(base58'a') """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].containsElement(base58'd') """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" ["a","b","c","d"].containsElement("e") """, version = V4) shouldBe Right(CONST_BOOLEAN(false))
+
+    eval(""" [true, false].containsElement(0) """, version = V4) should produce("Can't match inferred types")
+    eval(""" [true, false].containsElement() """, version = V4) should produce("Function 'containsElement' requires 2 arguments")
+    eval(""" ["a","b","c","d"].containsElement("a") """, version = V3) should produce("Can't find a function 'containsElement'")
+  }
 }

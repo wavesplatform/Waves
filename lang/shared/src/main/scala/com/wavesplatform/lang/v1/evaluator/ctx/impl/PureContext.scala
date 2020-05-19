@@ -7,6 +7,7 @@ import java.nio.{BufferUnderflowException, ByteBuffer}
 import cats.Id
 import cats.implicits._
 import cats.kernel.Monoid
+import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
@@ -630,6 +631,75 @@ object PureContext {
       case xs => notImplemented[Id, EVALUATED](s"median(arr: List[Int])", xs)
     }
 
+  lazy val listIndexOf: BaseFunction[NoContext] =
+    NativeFunction(
+      "indexOf",
+      5,
+      INDEX_OF_LIST,
+      optionLong,
+      ("list", PARAMETERIZEDLIST(TYPEPARAM('T'))),
+      ("element", TYPEPARAM('T'))
+    ) {
+      case ARR(list) :: element :: Nil =>
+        genericListIndexOf(element, list.indexOf, list.indexWhere)
+      case xs =>
+        notImplemented[Id, EVALUATED]("indexOf(list: List[T], element: T)", xs)
+    }
+
+  lazy val listLastIndexOf: BaseFunction[NoContext] =
+    NativeFunction(
+      "lastIndexOf",
+      5,
+      LAST_INDEX_OF_LIST,
+      optionLong,
+      ("list", PARAMETERIZEDLIST(TYPEPARAM('T'))),
+      ("element", TYPEPARAM('T'))
+    ) {
+      case ARR(list) :: element :: Nil =>
+        genericListIndexOf(element, list.lastIndexOf, list.lastIndexWhere)
+      case xs =>
+        notImplemented[Id, EVALUATED]("lastIndexOf(list: List[T], element: T)", xs)
+    }
+
+  @VisibleForTesting
+  private[v1] def genericListIndexOf(
+     element: EVALUATED,
+     indexOf: EVALUATED => Int,
+     indexWhere: (EVALUATED => Boolean) => Int
+  ): Either[String, EVALUATED] =
+    if (element.weight <= MaxCmpWeight)
+      Right {
+        val i = indexOf(element)
+        if (i != -1) CONST_LONG(i.toLong) else unit
+      }
+    else Try {
+      indexWhere { listElement =>
+        if (listElement.weight > MaxCmpWeight)
+          throw new RuntimeException(
+            s"Both element to search for `$element` " +
+            s"and list element `$listElement` " +
+            s"are too heavy to compare"
+          )
+        listElement == element
+      }
+    }.toEither
+      .bimap(
+        _.getMessage,
+        index => if (index != -1) CONST_LONG(index.toLong) else unit
+      )
+
+  lazy val listContains: BaseFunction[NoContext] =
+    UserFunction(
+      "containsElement",
+      5,
+      BOOLEAN,
+      ("@list", PARAMETERIZEDLIST(TYPEPARAM('T'))),
+      ("@element", TYPEPARAM('T'))
+    ) {
+      val index = FUNCTION_CALL(Native(INDEX_OF_LIST), List(REF("@list"), REF("@element")))
+      FUNCTION_CALL(User("!="), List(index, unit))
+    }
+
   lazy val uMinus: BaseFunction[NoContext] =
     UserFunction("-", Map[StdLibVersion, Long](V1 -> 9, V2 -> 9, V3 -> 1, V4 -> 1), LONG, ("@n", LONG)) {
       FUNCTION_CALL(subLong, List(CONST_LONG(0), REF("@n")))
@@ -801,7 +871,7 @@ object PureContext {
       ctx,
       CTX[NoContext](
         Seq.empty,
-        Map(("nil", (LIST(NOTHING), ContextfulVal.pure[NoContext](ARR(IndexedSeq.empty[EVALUATED], EMPTYARR_WEIGHT, false).explicitGet)))),
+        Map(("nil", (LIST(NOTHING), ContextfulVal.pure[NoContext](ARR(IndexedSeq.empty[EVALUATED], EMPTYARR_WEIGHT, limited = false).explicitGet())))),
         fromV3Funcs :+ listConstructor(checkSize = false)
       )
     )
@@ -809,7 +879,17 @@ object PureContext {
     val v4Functions =
       ctx.functions ++
         fromV3Funcs ++
-        Array(contains, valueOrElse, listAppend, listConcat, listConstructor(checkSize = true), getListMedian)
+        Array(
+          contains,
+          valueOrElse,
+          listAppend,
+          listConcat,
+          listConstructor(checkSize = true),
+          getListMedian,
+          listIndexOf,
+          listLastIndexOf,
+          listContains
+        )
 
     version match {
       case V1 | V2 => ctx
