@@ -187,7 +187,7 @@ object Terms {
         Either.cond(
           mweight <= MaxWeight,
           (new ARR(xs) { override val weight: Long = mweight }),
-          s"the list is too heavy. Actual weight: ${mweight}, limit: ${MaxWeight}"
+          s"The list is too heavy. Actual weight: ${mweight}, limit: ${MaxWeight}"
         )
       }
 

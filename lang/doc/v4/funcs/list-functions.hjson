@@ -24,5 +24,35 @@
       doc: "Returns the median of the list."
       paramsDoc: [ "The list of integers." ]
     }
+	{
+      name: "min"
+      params: [ "List[Int]" ]
+      doc: "Returns the minimum of the list."
+      paramsDoc: [ "The list of integers." ]
+    }
+	{
+      name: "max"
+      params: [ "List[Int]" ]
+      doc: "Returns the maximum of the list."
+      paramsDoc: [ "The list of integers." ]
+    }
+    {
+      name: "indexOf"
+      params: [ "List[T]", "T" ]
+      doc: "Returns the index of the first occurrence of given value"
+      paramsDoc: [ "The list.", "The element." ]
+    }
+    {
+      name: "lastIndexOf"
+      params: [ "List[T]", "T" ]
+      doc: "Returns the index of the last occurrence of given value"
+      paramsDoc: [ "The list.", "The element." ]
+    }
+    {
+      name: "containsElement"
+      params: [ "List[T]", "T" ]
+      doc: "Tests whether the list contains a given value as an element"
+      paramsDoc: [ "The list.", "The element." ]
+    }
   ]
 }
