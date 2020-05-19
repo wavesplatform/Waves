@@ -196,4 +196,7 @@ object Terms {
       ARR(xs, weight, limited)
     }
   }
+
+  implicit val orderingConstLong: Ordering[CONST_LONG] =
+    (a, b) => a.t compare b.t
 }

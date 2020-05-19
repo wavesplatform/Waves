@@ -1581,4 +1581,26 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(""" [true, false].containsElement() """, version = V4) should produce("Function 'containsElement' requires 2 arguments")
     eval(""" ["a","b","c","d"].containsElement("a") """, version = V3) should produce("Can't find a function 'containsElement'")
   }
+
+  property("list min") {
+    eval(""" [1, 2, 3, 4].min() """, version = V4) shouldBe Right(CONST_LONG(1))
+    eval(""" [-1, 2, 3, 4].min() """, version = V4) shouldBe Right(CONST_LONG(-1))
+    eval(""" [-1, -2, -3, -4].min() """, version = V4) shouldBe Right(CONST_LONG(-4))
+    eval(""" [1, 1, 2, 2].min() """, version = V4) shouldBe Right(CONST_LONG(1))
+    eval(""" [2].min() """, version = V4) shouldBe Right(CONST_LONG(2))
+
+    eval(""" [].min() """, version = V4) should produce("Can't find min for empty list")
+    eval(""" [1, 2].min() """, version = V3) should produce("Can't find a function 'min'")
+  }
+
+  property("list max") {
+    eval(""" [1, 2, 3, 4].max() """, version = V4) shouldBe Right(CONST_LONG(4))
+    eval(""" [-1, 2, 3, 4].max() """, version = V4) shouldBe Right(CONST_LONG(4))
+    eval(""" [-1, -2, -3, -4].max() """, version = V4) shouldBe Right(CONST_LONG(-1))
+    eval(""" [1, 1, 2, 2].max() """, version = V4) shouldBe Right(CONST_LONG(2))
+    eval(""" [2].max() """, version = V4) shouldBe Right(CONST_LONG(2))
+
+    eval(""" [].max() """, version = V4) should produce("Can't find max for empty list")
+    eval(""" [1, 2].max() """, version = V3) should produce("Can't find a function 'max'")
+  }
 }

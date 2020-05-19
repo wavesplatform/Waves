@@ -631,6 +631,30 @@ object PureContext {
       case xs => notImplemented[Id, EVALUATED](s"median(arr: List[Int])", xs)
     }
 
+  lazy val listMax: BaseFunction[NoContext] =
+    NativeFunction("max", 3, MAX_LIST, LONG, ("list", PARAMETERIZEDLIST(LONG))) {
+      case ARR(list) :: Nil =>
+        Either.cond(
+          list.nonEmpty,
+          list.asInstanceOf[IndexedSeq[CONST_LONG]].max,
+          "Can't find max for empty list"
+        )
+      case xs =>
+        notImplemented[Id, EVALUATED]("max(list: List[Int])", xs)
+    }
+
+  lazy val listMin: BaseFunction[NoContext] =
+    NativeFunction("min", 3, MIN_LIST, LONG, ("list", PARAMETERIZEDLIST(LONG))) {
+      case ARR(list) :: Nil =>
+        Either.cond(
+          list.nonEmpty,
+          list.asInstanceOf[IndexedSeq[CONST_LONG]].min,
+          "Can't find min for empty list"
+        )
+      case xs =>
+        notImplemented[Id, EVALUATED]("min(list: List[Int])", xs)
+    }
+
   lazy val listIndexOf: BaseFunction[NoContext] =
     NativeFunction(
       "indexOf",
@@ -888,7 +912,9 @@ object PureContext {
           getListMedian,
           listIndexOf,
           listLastIndexOf,
-          listContains
+          listContains,
+          listMin,
+          listMax
         )
 
     version match {
