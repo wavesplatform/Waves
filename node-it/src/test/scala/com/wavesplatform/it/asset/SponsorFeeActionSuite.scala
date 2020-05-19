@@ -96,7 +96,7 @@ class SponsorFeeActionSuite extends BaseSuite {
 
       miner.assetBalance(dApp, sponsoredAssetId).balance shouldBe startDAppSponsorAssetBalance - assetTransferAmount
       miner.balance(dApp).balance shouldBe startDAppBalance - dAppWavesOutgo
-      miner.balance(miner.address).balance shouldBe startMinerBalance + dAppWavesOutgo + blockReward * 2
+      miner.balance(miner.address).balance shouldBe startMinerBalance + dAppWavesOutgo + blockReward
     }
 
     "Cancel sponsorship" in {
@@ -192,22 +192,22 @@ class SponsorFeeActionSuite extends BaseSuite {
         """.stripMargin
       )
 
-      val invokeTx = miner.invokeScript(miner.address, dApp, Some("issueAndMultipleSponsor"), waitForTx = true, fee = smartMinFee + issueFee)
+      val invokeTx       = miner.invokeScript(miner.address, dApp, Some("issueAndMultipleSponsor"), waitForTx = true, fee = smartMinFee + issueFee)
       val txStateChanges = miner.debugStateChanges(invokeTx._1.id).stateChanges.toSeq
-      val assetId = txStateChanges.flatMap(_.issues).head.assetId
+      val assetId        = txStateChanges.flatMap(_.issues).head.assetId
 
       val matchDebugResult = matchPattern {
         case Seq(
-          StateChangesDetails(
-          Nil,
-          Nil,
-          Seq(IssueInfoResponse(`assetId`, _, _, _, _, _, _, _)),
-          Nil,
-          Nil,
-          Seq(SponsorFeeResponse(`assetId`, Some(`lastMinSponsoredAssetFee`))),
-          None
-          )
-        ) =>
+            StateChangesDetails(
+              Nil,
+              Nil,
+              Seq(IssueInfoResponse(`assetId`, _, _, _, _, _, _, _)),
+              Nil,
+              Nil,
+              Seq(SponsorFeeResponse(`assetId`, Some(`lastMinSponsoredAssetFee`))),
+              None
+            )
+            ) =>
       }
       txStateChanges should matchDebugResult
       miner.debugStateChangesByAddress(dApp, limit = 100).flatMap(_.stateChanges) should matchDebugResult
@@ -238,22 +238,22 @@ class SponsorFeeActionSuite extends BaseSuite {
         """.stripMargin
       )
 
-      val invokeTx = miner.invokeScript(miner.address, dApp, Some("sponsorAndCancel"), waitForTx = true, fee = smartMinFee + issueFee)
+      val invokeTx       = miner.invokeScript(miner.address, dApp, Some("sponsorAndCancel"), waitForTx = true, fee = smartMinFee + issueFee)
       val txStateChanges = miner.debugStateChanges(invokeTx._1.id).stateChanges.toSeq
-      val assetId = txStateChanges.flatMap(_.issues).head.assetId
+      val assetId        = txStateChanges.flatMap(_.issues).head.assetId
 
       val matchDebugResult = matchPattern {
         case Seq(
-          StateChangesDetails(
-          Nil,
-          Nil,
-          Seq(IssueInfoResponse(`assetId`, _, _, _, _, _, _, _)),
-          Nil,
-          Nil,
-          Seq(SponsorFeeResponse(`assetId`, None)),
-          None
-          )
-        ) =>
+            StateChangesDetails(
+              Nil,
+              Nil,
+              Seq(IssueInfoResponse(`assetId`, _, _, _, _, _, _, _)),
+              Nil,
+              Nil,
+              Seq(SponsorFeeResponse(`assetId`, None)),
+              None
+            )
+            ) =>
       }
       txStateChanges should matchDebugResult
       miner.debugStateChangesByAddress(dApp, limit = 100).flatMap(_.stateChanges) should matchDebugResult
@@ -410,7 +410,7 @@ class SponsorFeeActionSuite extends BaseSuite {
       )
 
       val failedTx = miner.invokeScript(miner.address, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee)
-      val error = sender.debugStateChanges(failedTx._1.id).stateChanges.get.errorMessage.get.text
+      val error    = sender.debugStateChanges(failedTx._1.id).stateChanges.get.errorMessage.get.text
       error should include("NegativeMinFee")
     }
 
@@ -420,7 +420,7 @@ class SponsorFeeActionSuite extends BaseSuite {
       val assetId = miner.issue(issuer, waitForTx = true).id
 
       val dApp = createDApp(
-       s"""
+        s"""
           |{-# STDLIB_VERSION 4 #-}
           |{-# CONTENT_TYPE DAPP #-}
           |{-# SCRIPT_TYPE ACCOUNT #-}
@@ -433,7 +433,7 @@ class SponsorFeeActionSuite extends BaseSuite {
       )
 
       val failedTx = miner.invokeScript(miner.address, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee)
-      val error = sender.debugStateChanges(failedTx._1.id).stateChanges.get.errorMessage.get.text
+      val error    = sender.debugStateChanges(failedTx._1.id).stateChanges.get.errorMessage.get.text
       error should include(s"SponsorFee assetId=$assetId was not issued from address of current dApp")
     }
 
@@ -441,11 +441,11 @@ class SponsorFeeActionSuite extends BaseSuite {
       val dApp = miner.createAddress()
       miner.transfer(sender.address, dApp, initialWavesBalance, minFee, waitForTx = true)
 
-      val script = ScriptCompiler.compile("true", ScriptEstimatorV2).explicitGet()._1.bytes.value.base64
+      val script  = ScriptCompiler.compile("true", ScriptEstimatorV2).explicitGet()._1.bytes.value.base64
       val assetId = miner.issue(dApp, script = Some(script), waitForTx = true).id
 
       createDApp(
-       s"""
+        s"""
           |{-# STDLIB_VERSION 4 #-}
           |{-# CONTENT_TYPE DAPP #-}
           |{-# SCRIPT_TYPE ACCOUNT #-}
@@ -458,7 +458,7 @@ class SponsorFeeActionSuite extends BaseSuite {
         dApp
       )
       val failedTx = miner.invokeScript(miner.address, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee + smartFee)
-      val error = sender.debugStateChanges(failedTx._1.id).stateChanges.get.errorMessage.get.text
+      val error    = sender.debugStateChanges(failedTx._1.id).stateChanges.get.errorMessage.get.text
       error should include(s"Sponsorship smart assets is disabled.")
     }
   }
@@ -490,8 +490,8 @@ class SponsorFeeActionSuite extends BaseSuite {
     "without returning to utx" in {
       val dApp = createDApp(script)
 
-      val invokeTx1 = miner.invokeScript(miner.address, dApp, Some("issueAsset"), waitForTx = true, fee = smartMinFee + issueFee)
-      val assetId = miner.debugStateChanges(invokeTx1._1.id).stateChanges.get.issues.head.assetId
+      val invokeTx1     = miner.invokeScript(miner.address, dApp, Some("issueAsset"), waitForTx = true, fee = smartMinFee + issueFee)
+      val assetId       = miner.debugStateChanges(invokeTx1._1.id).stateChanges.get.issues.head.assetId
       val firstTxHeight = miner.height
       nodes.waitForHeight(firstTxHeight + 1)
 
@@ -511,8 +511,8 @@ class SponsorFeeActionSuite extends BaseSuite {
     "with returning to utx" in {
       val dApp = createDApp(script)
 
-      val invokeTx1 = miner.invokeScript(miner.address, dApp, Some("issueAsset"), waitForTx = true, fee = smartMinFee + issueFee)
-      val assetId = miner.debugStateChanges(invokeTx1._1.id).stateChanges.get.issues.head.assetId
+      val invokeTx1     = miner.invokeScript(miner.address, dApp, Some("issueAsset"), waitForTx = true, fee = smartMinFee + issueFee)
+      val assetId       = miner.debugStateChanges(invokeTx1._1.id).stateChanges.get.issues.head.assetId
       val firstTxHeight = miner.height
       nodes.waitForHeight(firstTxHeight + 1)
 
