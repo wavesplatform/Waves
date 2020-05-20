@@ -3,6 +3,7 @@ package com.wavesplatform.lang
 import java.nio.charset.StandardCharsets
 
 import cats.Id
+import cats.implicits._
 import cats.kernel.Monoid
 import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.state.ByteStr
@@ -16,20 +17,22 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, FINAL, LONG, STRING}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, _}
-import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1}
+import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV2}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Issue
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import org.web3j.crypto.Keys
+import scorex.crypto.encode.Base16
+import scorex.crypto.hash.Keccak256
 
-import scala.util.Random
+import scala.util.{Random, Try}
 
 class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
   private def eval[T <: EVALUATED](
@@ -89,7 +92,13 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       )
 
     val typed = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => new EvaluatorV1[Id, C]().apply(ctx.evaluationContext(env), v._1))
+    val loggedCtx = LoggedEvaluationContext[C, Id](_ => _ => (), ctx.evaluationContext(env))
+      .asInstanceOf[LoggedEvaluationContext[Environment, Id]]
+    typed.flatMap(v =>
+      Try(new EvaluatorV2(loggedCtx, version).apply(v._1, Int.MaxValue)._1.asInstanceOf[T])
+        .toEither
+        .leftMap(_.getMessage)
+    )
   }
 
   property("simple let") {
@@ -1549,6 +1558,19 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       CONST_BYTESTR(issue.id)
   }
 
+  property("different Issue action constructors") {
+    val script =
+     """
+       | Issue("name", "description", 1234567, 100, true) ==
+       | Issue("name", "description", 1234567, 100, true, unit, 0)
+     """.stripMargin
+
+    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+
+    genericEval[Environment, EVALUATED](script, ctxt = ctx, version = V4, env = utils.environment) shouldBe
+      Right(CONST_BOOLEAN(true))
+  }
+
   property("toBase16String limit 8Kb from V4") {
     val base16String8Kb              = "fedcba9876543210" * 1024
     def script(base16String: String) = s"toBase16String(base16'$base16String')"
@@ -1603,5 +1625,54 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
     eval(constructingTooBigBytes, version = V3) should produce("ByteVector size = 32768 bytes exceeds 32767")
     eval(constructingTooBigBytes, version = V4) should produce("ByteVector size = 32768 bytes exceeds 32767")
+  }
+
+  property("ecrecover positive cases") {
+    def hash(message: String): String = {
+      val prefix = "\u0019Ethereum Signed Message:\n" + message.length
+      Base16.encode(Keccak256.hash((prefix + message).getBytes))
+    }
+
+    def recoverPublicKey(message: String, signature: String): Array[Byte] = {
+      val script = s"ecrecover(base16'${hash(message)}', base16'$signature')"
+      eval[CONST_BYTESTR](script, version = V4).explicitGet().bs.arr
+    }
+
+    //source: https://etherscan.io/verifySig/2006
+    val signature1 =
+      "3b163bbd90556272b57c35d1185b46824f8e16ca229bdb3" +
+      "6f8dfd5eaaee9420723ef7bc3a6c0236568217aa990617c" +
+      "f292b1bef1e7d1d936fb2faef3d846c5751b"
+    val message1 = "what's up jim"
+    val expectedAddress1 = "85db9634489b76e238368e4a075cc6e5a56a714c"
+
+    Keys.getAddress(recoverPublicKey(message1, signature1)) shouldBe Base16.decode(expectedAddress1)
+
+    //source: https://etherscan.io/verifySig/2007
+    val signature2 =
+      "848ffb6a07e7ce335a2bfe373f1c17573eac320f658ea8" +
+      "cf07426544f2203e9d52dbba4584b0b6c0ed5333d84074" +
+      "002878082aa938fdf68c43367946b2f615d01b"
+    val message2 = "i am the owner"
+    val expectedAddress2 = "73f32c743e5928ff800ab8b05a52c73cd485f9c3"
+
+    Keys.getAddress(recoverPublicKey(message2, signature2)) shouldBe Base16.decode(expectedAddress2)
+  }
+
+  property("ecrecover negative cases") {
+    eval[CONST_BYTESTR](s"ecrecover(base16'aaaa', base16'bbbb')", version = V3) should
+      produce("Can't find a function 'ecrecover'")
+
+    eval[CONST_BYTESTR](s"ecrecover(base16'${"a" * 60}', base16'bbbb')", version = V4) should
+      produce("Invalid message hash size 30 bytes, must be equal to 32 bytes")
+
+    eval[CONST_BYTESTR](s"ecrecover(base16'${"a" * 64}', base16'')", version = V4) should
+      produce("Signature must not be empty")
+
+    eval[CONST_BYTESTR](s"ecrecover(base16'${"a" * 64}', base16'${"a" * 132}')", version = V4) should
+      produce("Invalid signature size 66 bytes, must not be greater than 65 bytes")
+
+    eval[CONST_BYTESTR](s"ecrecover(base16'${"a" * 64}', base16'${"a" * 130}')", version = V4) should
+      produce("Header byte out of range: 197")
   }
 }

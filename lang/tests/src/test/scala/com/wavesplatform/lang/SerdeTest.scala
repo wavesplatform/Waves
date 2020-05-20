@@ -9,6 +9,7 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.testing.ScriptGen
@@ -17,7 +18,19 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{Assertion, FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
+import scala.util.Try
+
 class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
+
+  private val caseObj = CaseObj(
+    CASETYPEREF("Object type", Nil),
+    Map(
+      "field1" -> CONST_BYTESTR(ByteStr.fromBytes(1, 2, 3)).explicitGet(),
+      "field2" -> CONST_STRING("str").explicitGet(),
+      "field3" -> CONST_LONG(5),
+      "field4" -> CONST_BOOLEAN(true)
+    )
+  )
 
   "roundtrip" - {
     "CONST_LONG" in roundTripTest(CONST_LONG(1))
@@ -74,6 +87,10 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
           args = List.empty
         )
       )
+    }
+
+    "CaseObj if allowed" - {
+      "simple" in roundTripTest(caseObj, allowObjects = true)
     }
 
     "general" in forAll(BOOLgen(10)) {
@@ -147,6 +164,13 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
     Serde.deserialize(expr2) should produce("ByteStr size=32768 exceeds 32767 bytes")
   }
 
+  "forbid CaseObj" in {
+    Try(Serde.serialize(caseObj)).toEither shouldBe 'left
+
+    val objectBytes = Serde.serialize(caseObj, allowObjects = true)
+    Serde.deserialize(objectBytes) shouldBe 'left
+  }
+
   def measureTime[A](f: => A): (A, Long) = {
     val start  = System.currentTimeMillis()
     val result = f
@@ -158,11 +182,11 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
     roundTripTest(typedExpr)
   }
 
-  private def roundTripTest(typedExpr: EXPR): Assertion = {
-    val encoded = Serde.serialize(typedExpr)
+  private def roundTripTest(typedExpr: EXPR, allowObjects: Boolean = false): Assertion = {
+    val encoded = Serde.serialize(typedExpr, allowObjects)
     encoded.nonEmpty shouldBe true
 
-    val decoded = Serde.deserialize(encoded).map(_._1).explicitGet()
+    val decoded = Serde.deserialize(encoded, all = true, allowObjects).map(_._1).explicitGet()
     withClue(s"encoded bytes: [${encoded.mkString(", ")}]") {
       decoded shouldEqual typedExpr
     }

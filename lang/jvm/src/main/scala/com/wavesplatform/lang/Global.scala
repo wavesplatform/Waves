@@ -12,6 +12,8 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 import com.wavesplatform.utils.Merkle
 import com.wavesplatform.zwaves.bls12.Groth16
+import org.web3j.crypto.Sign
+import org.web3j.crypto.Sign.SignatureData
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
@@ -92,4 +94,17 @@ object Global extends BaseGlobal {
 
   override def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
     Groth16.verify(verifyingKey, proof, inputs)
+
+  override def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte] = {
+    // https://github.com/web3j/web3j/blob/master/crypto/src/test/java/org/web3j/crypto/ECRecoverTest.java#L43
+    val signatureData = {
+      val vTemp = signature(64)
+      val v = if (vTemp < 27) (vTemp + 27).toByte else vTemp
+      val r = signature.slice(0, 32)
+      val s = signature.slice(32, 64)
+      new SignatureData(v, r, s)
+    }
+    val pk = Sign.signedMessageHashToKey(messageHash, signatureData)
+    base16Encoder.decode(pk.toString(16))
+  }
 }
