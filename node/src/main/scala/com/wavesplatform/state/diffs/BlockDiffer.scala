@@ -189,15 +189,15 @@ object BlockDiffer extends ScorexLogging {
           }
       }
       .map { result =>
-        def applyAll(patches: DiffPatchFactory*) = patches.foldLeft((result.diff, result.detailedDiff.parentDiff)) {
+        def applyAll(patches: DiffPatchFactory*): (Diff, Diff) = patches.foldLeft((result.diff, result.detailedDiff.parentDiff)) {
           case (prevResult @ (previousDiff, previousPatchDiff), p) =>
-            if (currentBlockHeight == p.height) {
+            if (p.isApplicable(blockchain)) {
               val patchDiff = p()
               (Monoid.combine(previousDiff, patchDiff), Monoid.combine(previousPatchDiff, patchDiff))
             } else prevResult
         }
 
-        val (diffWithPatches, patchDiff) = applyAll(CancelAllLeases, CancelLeaseOverflow, CancelInvalidLeaseIn)
+        val (diffWithPatches, patchDiff) = applyAll(CancelAllLeases, CancelLeaseOverflow, CancelInvalidLeaseIn, SwapHijackedLeases)
         result.copy(diff = diffWithPatches, detailedDiff = result.detailedDiff.copy(parentDiff = patchDiff))
       }
   }
