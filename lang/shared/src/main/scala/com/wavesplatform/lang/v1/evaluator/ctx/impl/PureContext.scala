@@ -515,6 +515,18 @@ object PureContext {
       )
   }
 
+  lazy val makeString: BaseFunction[NoContext] =
+    NativeFunction("makeString", 30, MAKESTRING, listString, ("list", LIST(STRING)), ("separator", STRING)) {
+      case (arr: ARR) :: CONST_STRING(separator) :: Nil =>
+        val expectedStringSize = arr.elementsWeightSum
+        if (expectedStringSize <= DATA_TX_BYTES_MAX)
+          CONST_STRING(arr.xs.mkString(separator))
+        else
+          Left(s"Constructing string size = $expectedStringSize bytes will exceed $DATA_TX_BYTES_MAX")
+      case xs =>
+        notImplemented[Id, EVALUATED]("makeString(list: List[String], separator: String)", xs)
+    }
+
   lazy val contains: BaseFunction[NoContext] =
     UserFunction("contains", 20, BOOLEAN, ("@source", STRING), ("@substr", STRING)) {
       FUNCTION_CALL(
@@ -914,7 +926,8 @@ object PureContext {
           listLastIndexOf,
           listContains,
           listMin,
-          listMax
+          listMax,
+          makeString
         )
 
     version match {

@@ -54,5 +54,11 @@
       doc: "Tests whether the list contains a given value as an element"
       paramsDoc: [ "The list.", "The element." ]
     }
+	{
+      name: "makeString"
+      params: [ "List[String]", "String" ]
+      doc: "Returns all the elements of the list in a string using the separator string."
+      paramsDoc: [ "The list of strings.", "The separator" ]
+    }
   ]
 }

@@ -54,6 +54,7 @@ object FunctionIds {
   val PARSEINT: Short     = 1206
   val LASTINDEXOF: Short  = 1207
   val LASTINDEXOFN: Short = 1208
+  val MAKESTRING: Short   = 1209
 
   // Crypto
   val SIGVERIFY: Short = 500

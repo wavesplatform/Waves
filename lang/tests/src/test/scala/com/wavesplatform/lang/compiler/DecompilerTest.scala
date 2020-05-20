@@ -837,6 +837,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |   let v27 = containsElement(["a", "b", "c"], "a")
         |   let v28 = min([1, 2, 3])
         |   let v29 = max([1, 2, 3])
+        |   let v30 = makeString(["a","b","c"],"|")
         |   let v31 = ecrecover(base58'aaaa', base58'bbbb')
         |   nil
         | }
