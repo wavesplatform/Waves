@@ -44,8 +44,8 @@ object ListIndexOfBenchmark {
   class ListIndexOfSt {
     val maxCmpWeightElementToFound   = CONST_STRING("a" * ContractLimits.MaxCmpWeight.toInt).explicitGet()
     val maxSizeElementToFound        = CONST_STRING("a" * 150 * 1024).explicitGet()
-    val listWithMaxCmpWeightElements = IndexedSeq.fill(1000)(CONST_STRING("b" * ContractLimits.MaxCmpWeight.toInt).explicitGet())
-    val listWithMaxSizeElements      = IndexedSeq.fill(1000)(CONST_STRING("b" * 150 * 1024).explicitGet())
+    val listWithMaxCmpWeightElements = IndexedSeq.fill(1000)(CONST_STRING("a" * (ContractLimits.MaxCmpWeight.toInt - 1) + "b").explicitGet())
+    val listWithMaxSizeElements      = IndexedSeq.fill(1000)(CONST_STRING(("a" * (150 * 1024 - 1)) + "b").explicitGet())
 
     def indexOf(list: Seq[EVALUATED], element: EVALUATED): Either[String, EVALUATED] =
       PureContext.genericListIndexOf(element, list.indexOf, list.indexWhere)
