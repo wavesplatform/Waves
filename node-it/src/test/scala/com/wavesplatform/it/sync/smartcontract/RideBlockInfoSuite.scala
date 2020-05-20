@@ -112,7 +112,7 @@ class RideBlockInfoSuite extends BaseTransactionSuite {
     checkCommonFields(sender.blockAt(height))
   }
 
-  ignore("liquid blocks affect vrf field") {
+  test("liquid blocks don't affect vrf field") {
     val height = miner.height + 1
     nodes.waitForHeight(height)
 
@@ -126,7 +126,7 @@ class RideBlockInfoSuite extends BaseTransactionSuite {
     val vrf2 = sender.getDataByKey(dApp, "vrf").value.asInstanceOf[ByteStr]
     vrf2 shouldBe ByteStr.decodeBase58(sender.blockAt(height).vrf.get).get
 
-    vrf1 should not be vrf2
+    vrf1 shouldBe vrf2
   }
 
   private def checkCommonFields(block: Block) = {
