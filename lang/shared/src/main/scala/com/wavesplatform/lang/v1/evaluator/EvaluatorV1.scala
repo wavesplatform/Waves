@@ -4,7 +4,7 @@ import cats.implicits._
 import cats.{Eval, Id, Monad, StackSafeMonad}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
+import com.wavesplatform.lang.v1.compiler.Types.{NOTHING, CASETYPEREF}
 import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext.Lenses
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.task.imports._
@@ -43,7 +43,7 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, ?]]) {
 
   private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[F, C, (EvaluationContext[C, F], EVALUATED)] = {
     val funcHeader = FunctionHeader.User(func.name)
-    val function = UserFunction(func.name, 0, null, func.args.map(n => (n, null)): _*)(func.body)
+    val function = UserFunction(func.name, 0, NOTHING, func.args.map(n => (n, NOTHING)): _*)(func.body)
         .asInstanceOf[UserFunction[C]]
     local {
       modify[F, LoggedEvaluationContext[C, F], ExecutionError](funcs.modify(_)(_.updated(funcHeader, function)))
@@ -105,7 +105,7 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, ?]]) {
           header match {
             case FunctionHeader.User(typeName, _) =>
               types.get(ctx).get(typeName).collect {
-                case t @ CASETYPEREF(_, fields) =>
+                case t @ CASETYPEREF(_, fields, hidden) =>
                   args
                     .traverse[EvalM[F, C, ?], EVALUATED](evalExpr)
                     .map(values => CaseObj(t, fields.map(_._1).zip(values).toMap): EVALUATED)
@@ -123,12 +123,14 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, ?]]) {
         dec match {
           case l: LET  => evalLetBlock(l, inner)
           case f: FUNC => evalFuncBlock(f, inner)
+          case _: FAILED_DEC => raiseError("Attempt to evaluate failed declaration.")
         }
       case REF(str)                    => evalRef(str)
       case c: EVALUATED                => get[F, LoggedEvaluationContext[C, F], ExecutionError].map(ctx => (ctx.ec, c))
       case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
       case GETTER(expr, field)         => evalGetter(expr, field)
       case FUNCTION_CALL(header, args) => evalFunctionCall(header, args)
+      case _: FAILED_EXPR => raiseError("Attempt to evaluate failed expression.")
     }
 
   def evalExpr(t: EXPR): EvalM[F, C, EVALUATED] =

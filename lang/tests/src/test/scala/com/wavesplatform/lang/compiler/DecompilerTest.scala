@@ -1,55 +1,58 @@
 package com.wavesplatform.lang.compiler
 
-import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.{Common, Global}
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
+import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.V3
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler._
-import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.parser.BinaryOperation.NE_OP
+import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
+import com.wavesplatform.lang.v1.{CTX, FunctionHeader, compiler}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
+  val sp = "\\s+".r
   implicit class StringCmp(s1: String) {
-    def shouldEq(s2: String) = s1.replace("\r\n", "\n") shouldEqual s2.replace("\r\n", "\n")
+    def shouldEq(s2: String) = sp.replaceAllIn(s1, "") shouldEqual sp.replaceAllIn(s2, "")
   }
 
-  val ctx: CTX[Environment] =
-    Monoid.combineAll(Seq(
-      testContext.withEnvironment[Environment],
-      CryptoContext.build(Global, V3).withEnvironment[Environment],
-      WavesContext.build(DirectiveSet.contractDirectiveSet)
-    ))
+  def getCtx(v: StdLibVersion): CTX[Environment] = {
+    Monoid.combineAll(
+      Seq(
+        getTestContext(v).withEnvironment[Environment],
+        CryptoContext.build(Global, v).withEnvironment[Environment],
+        WavesContext.build(DirectiveSet(v, Account, DAppType).explicitGet())
+      )
+    )
+  }
 
-  val decompilerContext = ctx.decompilerContext
+  val decompilerContextV3 = getCtx(V3).decompilerContext
+  val decompilerContextV4 = getCtx(V4).decompilerContext
 
   property("successful on very deep expressions (stack overflow check)") {
     val expr = (1 to 10000).foldLeft[EXPR](CONST_LONG(0)) { (acc, _) =>
       FUNCTION_CALL(function = FunctionHeader.Native(100), List(CONST_LONG(1), acc))
     }
-    Decompiler(expr, decompilerContext) should startWith("(1 + (1 + (1 + (1 + (1 + (1 + ")
+    Decompiler(expr, decompilerContextV3) should startWith("(1 + (1 + (1 + (1 + (1 + (1 + ")
   }
 
   property("simple let") {
     val expr = Terms.LET_BLOCK(LET("a", CONST_LONG(1)), Terms.LET_BLOCK(LET("b", CONST_LONG(2)), Terms.LET_BLOCK(LET("c", CONST_LONG(3)), TRUE)))
-    Decompiler(expr, decompilerContext) shouldEq
+    Decompiler(expr, decompilerContextV3) shouldEq
       """let a = 1
         |let b = 2
         |let c = 3
@@ -59,7 +62,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   property("let in let") {
     val expr =
       Terms.LET_BLOCK(LET("a", Terms.LET_BLOCK(LET("x", CONST_LONG(0)), TRUE)), Terms.LET_BLOCK(LET("c", CONST_LONG(3)), TRUE))
-    Decompiler(expr, decompilerContext) shouldEq
+    Decompiler(expr, decompilerContextV3) shouldEq
       """let a = {
         |    let x = 0
         |    true
@@ -72,7 +75,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       function = FunctionHeader.Native(500),
       args = List(TRUE)
     )
-    Decompiler(expr, decompilerContext) shouldEq "sigVerify(true)"
+    Decompiler(expr, decompilerContextV3) shouldEq "sigVerify(true)"
   }
 
   property("native function call with two arg (binary operations)") {
@@ -80,12 +83,12 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       function = FunctionHeader.Native(100),
       args = List(CONST_LONG(1), CONST_LONG(2))
     )
-    Decompiler(expr, decompilerContext) shouldEq "(1 + 2)"
+    Decompiler(expr, decompilerContextV3) shouldEq "(1 + 2)"
   }
 
   property("nested binary operations") {
     val expr = FUNCTION_CALL(Native(105), List(FUNCTION_CALL(Native(101), List(REF("height"), REF("startHeight"))), REF("interval")))
-    Decompiler(expr, decompilerContext) shouldEq "((height - startHeight) / interval)"
+    Decompiler(expr, decompilerContextV3) shouldEq "((height - startHeight) / interval)"
   }
 
   property("unknown native function call") {
@@ -93,7 +96,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       function = FunctionHeader.Native(254),
       args = List(CONST_LONG(1), CONST_LONG(2))
     )
-    Decompiler(expr, decompilerContext) shouldEq "Native<254>(1, 2)"
+    Decompiler(expr, decompilerContextV3) shouldEq "Native<254>(1, 2)"
   }
 
   property("user function call with one args") {
@@ -101,7 +104,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       function = FunctionHeader.User("foo"),
       args = List(TRUE)
     )
-    Decompiler(expr, decompilerContext) shouldEq "foo(true)"
+    Decompiler(expr, decompilerContextV3) shouldEq "foo(true)"
   }
 
   property("user function call with empty args") {
@@ -109,7 +112,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       function = FunctionHeader.User("foo"),
       args = List.empty
     )
-    Decompiler(expr, decompilerContext) shouldEq "foo()"
+    Decompiler(expr, decompilerContextV3) shouldEq "foo()"
   }
 
   property("v2 with LET in BLOCK") {
@@ -117,47 +120,53 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       LET("vari", REF("p")),
       TRUE
     )
-    val actual   = Decompiler(expr, decompilerContext)
+    val actual   = Decompiler(expr, decompilerContextV3)
     val expected = """|let vari = p
                       |true""".stripMargin
     actual shouldEq expected
   }
 
   property("let and function call in block") {
-    val expr = Terms.BLOCK(Terms.LET("v", CONST_LONG(1)),
-                           Terms.FUNCTION_CALL(
-                             function = FunctionHeader.Native(100),
-                             args = List(REF("v"), CONST_LONG(2))
-                           ))
-    Decompiler(expr, decompilerContext) shouldEq
+    val expr = Terms.BLOCK(
+      Terms.LET("v", CONST_LONG(1)),
+      Terms.FUNCTION_CALL(
+        function = FunctionHeader.Native(100),
+        args = List(REF("v"), CONST_LONG(2))
+      )
+    )
+    Decompiler(expr, decompilerContextV3) shouldEq
       """let v = 1
         |(v + 2)""".stripMargin
   }
 
-  ignore("neq binary op") {
+  property("neq binary op") {
     val expr =
       Terms.FUNCTION_CALL(
         function = FunctionHeader.User(NE_OP.func),
         args = List(CONST_LONG(4), CONST_LONG(2))
       )
-    Decompiler(expr, decompilerContext) shouldEq
-      """4 != 2""".stripMargin
+    Decompiler(expr, decompilerContextV3) shouldEq
+      """(4 != 2)""".stripMargin
   }
 
   property("function with complex args") {
     val expr = BLOCK(
       LET(
         "x",
-        BLOCK(LET("y",
-                  Terms.FUNCTION_CALL(
-                    function = FunctionHeader.User("foo"),
-                    args = List(BLOCK(LET("a", CONST_LONG(4)), REF("a")), CONST_LONG(2))
-                  )),
-              TRUE)
+        BLOCK(
+          LET(
+            "y",
+            Terms.FUNCTION_CALL(
+              function = FunctionHeader.User("foo"),
+              args = List(BLOCK(LET("a", CONST_LONG(4)), REF("a")), CONST_LONG(2))
+            )
+          ),
+          TRUE
+        )
       ),
       FALSE
     )
-    Decompiler(expr, decompilerContext) shouldEq
+    Decompiler(expr, decompilerContextV3) shouldEq
       """let x = {
         |    let y = foo({
         |        let a = 4
@@ -172,10 +181,11 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val expr = Terms.BLOCK(
       Terms.LET(
         "p",
-        Terms.BLOCK(Terms.LET("v", CONST_LONG(1)), Terms.FUNCTION_CALL(function = FunctionHeader.Native(100), args = List(REF("v"), CONST_LONG(2))))),
+        Terms.BLOCK(Terms.LET("v", CONST_LONG(1)), Terms.FUNCTION_CALL(function = FunctionHeader.Native(100), args = List(REF("v"), CONST_LONG(2))))
+      ),
       Terms.FUNCTION_CALL(function = FunctionHeader.Native(100), args = List(REF("p"), CONST_LONG(3)))
     )
-    Decompiler(expr, decompilerContext) shouldEq
+    Decompiler(expr, decompilerContextV3) shouldEq
       """let p = {
         |    let v = 1
         |    (v + 2)
@@ -196,7 +206,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         FALSE
       )
     )
-    Decompiler(expr, decompilerContext) shouldEq
+    Decompiler(expr, decompilerContextV3) shouldEq
       """let v = 1
         |if (if ((v + 2))
         |    then true
@@ -210,13 +220,13 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("ref getter idents") {
     val expr = GETTER(REF("a"), "foo")
-    Decompiler(expr, decompilerContext) shouldEq
+    Decompiler(expr, decompilerContextV3) shouldEq
       """a.foo""".stripMargin
   }
 
   property("block getter idents") {
     val expr = GETTER(BLOCK(LET("a", FALSE), REF("a")), "foo")
-    Decompiler(expr, decompilerContext) shouldEq
+    Decompiler(expr, decompilerContextV3) shouldEq
       """{
         |    let a = false
         |    a
@@ -239,31 +249,42 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
                 FUNCTION_CALL(User("foo"), List()),
                 FUNCTION_CALL(
                   User("WriteSet"),
-                  List(FUNCTION_CALL(
-                    Native(1100),
-                    List(
-                      FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("b").explicitGet(), CONST_LONG(1))),
-                      FUNCTION_CALL(Native(1100), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("x"))), REF("nil")))
+                  List(
+                    FUNCTION_CALL(
+                      Native(1100),
+                      List(
+                        FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("b").explicitGet(), CONST_LONG(1))),
+                        FUNCTION_CALL(
+                          Native(1100),
+                          List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("x"))), REF("nil"))
+                        )
+                      )
                     )
-                  ))
+                  )
                 ),
                 FUNCTION_CALL(
                   User("WriteSet"),
-                  List(FUNCTION_CALL(
-                    Native(1100),
-                    List(
-                      FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a").explicitGet(), REF("a"))),
-                      FUNCTION_CALL(Native(1100), List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("x"))), REF("nil")))
+                  List(
+                    FUNCTION_CALL(
+                      Native(1100),
+                      List(
+                        FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a").explicitGet(), REF("a"))),
+                        FUNCTION_CALL(
+                          Native(1100),
+                          List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("x"))), REF("nil"))
+                        )
+                      )
                     )
-                  ))
+                  )
                 )
               )
             )
           )
-        )),
+        )
+      ),
       Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
     )
-    Decompiler(contract: DApp, decompilerContext) shouldEq
+    Decompiler(contract: DApp, decompilerContextV3) shouldEq
       """|func foo () = false
          |
          |
@@ -301,10 +322,11 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
               TRUE
             )
           )
-        )),
+        )
+      ),
       None
     )
-    Decompiler(contract, decompilerContext) shouldEq
+    Decompiler(contract, decompilerContextV3) shouldEq
       """func foo (bar,buz) = true
         |
         |
@@ -333,10 +355,11 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
               TRUE
             )
           )
-        )),
+        )
+      ),
       None
     )
-    Decompiler(contract, decompilerContext) shouldEq
+    Decompiler(contract, decompilerContextV3) shouldEq
       """func foo (bar,buz) = true
         |
         |
@@ -354,24 +377,26 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val test = Base58.encode("abc".getBytes("UTF-8"))
     // ([REVIEW]: may be i`am make a mistake here)
     val expr = Terms.BLOCK(Terms.LET("param", CONST_BYTESTR(ByteStr(test.getBytes("UTF-8"))).explicitGet()), REF("param"))
-    Decompiler(expr, decompilerContext) shouldEq
+    Decompiler(expr, decompilerContextV3) shouldEq
       """let param = base58'3K3F4C'
         |param""".stripMargin
   }
 
   property("getter") {
-    val expr = Terms.GETTER(Terms.FUNCTION_CALL(
-                              function = FunctionHeader.User("testfunc"),
-                              args = List(TRUE)
-                            ),
-                            "testfield")
-    Decompiler(expr, decompilerContext) shouldEq
+    val expr = Terms.GETTER(
+      Terms.FUNCTION_CALL(
+        function = FunctionHeader.User("testfunc"),
+        args = List(TRUE)
+      ),
+      "testfield"
+    )
+    Decompiler(expr, decompilerContextV3) shouldEq
       """testfunc(true).testfield""".stripMargin
   }
 
   property("simple if") {
     val expr = IF(TRUE, CONST_LONG(1), CONST_STRING("XXX").explicitGet())
-    Decompiler(expr, decompilerContext) shouldEq
+    Decompiler(expr, decompilerContextV3) shouldEq
       """if (true)
         |    then 1
         |    else "XXX"""".stripMargin
@@ -379,7 +404,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("if with complicated else branch") {
     val expr = IF(TRUE, CONST_LONG(1), IF(TRUE, CONST_LONG(1), CONST_STRING("XXX").explicitGet()))
-    Decompiler(expr, decompilerContext) shouldEq
+    Decompiler(expr, decompilerContextV3) shouldEq
       """if (true)
         |    then 1
         |    else if (true)
@@ -389,12 +414,24 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   property("if with complicated then branch") {
     val expr = IF(TRUE, IF(TRUE, CONST_LONG(1), CONST_STRING("XXX").explicitGet()), CONST_LONG(1))
-    Decompiler(expr, decompilerContext) shouldEq
+    Decompiler(expr, decompilerContextV3) shouldEq
       """if (true)
         |    then if (true)
         |        then 1
         |        else "XXX"
         |    else 1""".stripMargin
+  }
+
+  property("if with != condition") {
+    val expr = IF(
+      FUNCTION_CALL(User("!="), List(REF("left"), REF("right"))),
+      REF("left"),
+      REF("right")
+    )
+    Decompiler(expr, decompilerContextV3) shouldEq
+      """if ((left != right))
+        |    then left
+        |    else right""".stripMargin
   }
 
   property("Surge smart accet") {
@@ -413,8 +450,10 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
                 BLOCK(
                   LET("e", REF("$match0")),
                   BLOCK(
-                    LET("days",
-                        FUNCTION_CALL(Native(105), List(FUNCTION_CALL(Native(101), List(REF("height"), REF("startHeight"))), REF("interval")))),
+                    LET(
+                      "days",
+                      FUNCTION_CALL(Native(105), List(FUNCTION_CALL(Native(101), List(REF("height"), REF("startHeight"))), REF("interval")))
+                    ),
                     IF(
                       IF(
                         IF(
@@ -422,32 +461,42 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
                             Native(103),
                             List(
                               GETTER(REF("e"), "price"),
-                              FUNCTION_CALL(Native(104),
-                                            List(REF("startPrice"),
-                                                 FUNCTION_CALL(Native(100),
-                                                               List(CONST_LONG(1), FUNCTION_CALL(Native(104), List(REF("days"), REF("days")))))))
+                              FUNCTION_CALL(
+                                Native(104),
+                                List(
+                                  REF("startPrice"),
+                                  FUNCTION_CALL(Native(100), List(CONST_LONG(1), FUNCTION_CALL(Native(104), List(REF("days"), REF("days")))))
+                                )
+                              )
                             )
                           ),
-                          FUNCTION_CALL(User("!"),
-                                        List(FUNCTION_CALL(User("isDefined"),
-                                                           List(GETTER(GETTER(GETTER(REF("e"), "sellOrder"), "assetPair"), "priceAsset"))))),
+                          FUNCTION_CALL(
+                            User("!"),
+                            List(FUNCTION_CALL(User("isDefined"), List(GETTER(GETTER(GETTER(REF("e"), "sellOrder"), "assetPair"), "priceAsset"))))
+                          ),
                           FALSE
                         ),
                         FUNCTION_CALL(
                           Native(103),
-                          List(REF("exp"),
-                               FUNCTION_CALL(Native(101),
-                                             List(GETTER(GETTER(REF("e"), "sellOrder"), "expiration"),
-                                                  GETTER(GETTER(REF("e"), "sellOrder"), "timestamp"))))
+                          List(
+                            REF("exp"),
+                            FUNCTION_CALL(
+                              Native(101),
+                              List(GETTER(GETTER(REF("e"), "sellOrder"), "expiration"), GETTER(GETTER(REF("e"), "sellOrder"), "timestamp"))
+                            )
+                          )
                         ),
                         FALSE
                       ),
                       FUNCTION_CALL(
                         Native(103),
-                        List(REF("exp"),
-                             FUNCTION_CALL(Native(101),
-                                           List(GETTER(GETTER(REF("e"), "buyOrder"), "expiration"),
-                                                GETTER(GETTER(REF("e"), "buyOrder"), "timestamp"))))
+                        List(
+                          REF("exp"),
+                          FUNCTION_CALL(
+                            Native(101),
+                            List(GETTER(GETTER(REF("e"), "buyOrder"), "expiration"), GETTER(GETTER(REF("e"), "buyOrder"), "timestamp"))
+                          )
+                        )
                       ),
                       FALSE
                     )
@@ -468,7 +517,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       )
     )
 
-    Decompiler(expr, decompilerContext) shouldEq
+    Decompiler(expr, decompilerContextV3) shouldEq
       """let startHeight = 1375557
         |let startPrice = 100000
         |let interval = (24 * 60)
@@ -490,9 +539,9 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |}""".stripMargin
   }
 
-  def compile(code: String): Either[String, (EXPR, TYPE)] = {
+  def compileExpr(code: String, v: StdLibVersion = V3): Either[String, (EXPR, TYPE)] = {
     val untyped = Parser.parseExpr(code).get.value
-    val typed = ExpressionCompiler(ctx.compilerContext, untyped)
+    val typed   = ExpressionCompiler(getCtx(v).compilerContext, untyped)
     typed
   }
 
@@ -503,9 +552,9 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         case x : PointC => 2
     }"""
 
-    val Right((expr, ty)) = compile(script)
- 
-    val rev = Decompiler(expr, decompilerContext)
+    val Right((expr, ty)) = compileExpr(script)
+
+    val rev = Decompiler(expr, decompilerContextV3)
 
     rev shouldEq """match tv {
     |    case x: PointB|PointA => 
@@ -524,9 +573,9 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         case x => 2
     }"""
 
-    val Right((expr, ty)) = compile(script)
- 
-    val rev = Decompiler(expr, decompilerContext)
+    val Right((expr, ty)) = compileExpr(script)
+
+    val rev = Decompiler(expr, decompilerContextV3)
 
     rev shouldEq """match tv {
     |    case x: PointB|PointA => 
@@ -543,9 +592,9 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         case x => 2
     }"""
 
-    val Right((expr, ty)) = compile(script)
- 
-    val rev = Decompiler(expr, decompilerContext)
+    val Right((expr, ty)) = compileExpr(script)
+
+    val rev = Decompiler(expr, decompilerContextV3)
 
     rev shouldEq """match tv {
     |    case _: PointB|PointA => 
@@ -556,50 +605,50 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("multiple value list") {
-    val script = """["a", "b", "c", "d"]"""
-    val Right((expr, _)) = compile(script)
-    Decompiler(expr, decompilerContext) shouldEq script
+    val script           = """["a", "b", "c", "d"]"""
+    val Right((expr, _)) = compileExpr(script)
+    Decompiler(expr, decompilerContextV3) shouldEq script
   }
 
   property("concat with nil is hidden") {
-    val expected = """["a", "b"]"""
-    val Right((expr1, _)) = compile(""""a"::"b"::nil""")
-    val Right((expr2, _)) = compile("""cons("a", cons("b", nil))""")
-    Decompiler(expr1, decompilerContext) shouldEq expected
-    Decompiler(expr2, decompilerContext) shouldEq expected
+    val expected          = """["a", "b"]"""
+    val Right((expr1, _)) = compileExpr(""""a"::"b"::nil""")
+    val Right((expr2, _)) = compileExpr("""cons("a", cons("b", nil))""")
+    Decompiler(expr1, decompilerContextV3) shouldEq expected
+    Decompiler(expr2, decompilerContextV3) shouldEq expected
   }
 
   property("single value list") {
-    val script = """["a"]"""
-    val Right((expr, _)) = compile(script)
-    Decompiler(expr, decompilerContext) shouldEq script
+    val script           = """["a"]"""
+    val Right((expr, _)) = compileExpr(script)
+    Decompiler(expr, decompilerContextV3) shouldEq script
   }
 
   property("existing list concat") {
     val script =
       """let list = ["b", "c", "d"]
         |"a" :: list""".stripMargin
-    val Right((expr, _)) = compile(script)
-    Decompiler(expr, decompilerContext) shouldEq script
+    val Right((expr, _)) = compileExpr(script)
+    Decompiler(expr, decompilerContextV3) shouldEq script
   }
 
   property("extracted functions") {
-    val script = """addressFromStringValue("abcd")"""
-    val Right((expr, _)) = compile(script)
-    Decompiler(expr, decompilerContext) shouldEq script
+    val script           = """addressFromStringValue("abcd")"""
+    val Right((expr, _)) = compileExpr(script)
+    Decompiler(expr, decompilerContextV3) shouldEq script
   }
 
   property("list element access") {
     val script =
       """let arr = [1, 2, 3]
         |arr[1]""".stripMargin
-    val Right((expr, _)) = compile(script)
-    val Right((expr2, _)) = compile(
+    val Right((expr, _)) = compileExpr(script)
+    val Right((expr2, _)) = compileExpr(
       """let arr = [1, 2, 3]
         |arr.getElement(1)""".stripMargin
     )
-    Decompiler(expr, decompilerContext) shouldEq script
-    Decompiler(expr2, decompilerContext) shouldEq script
+    Decompiler(expr, decompilerContextV3) shouldEq script
+    Decompiler(expr2, decompilerContextV3) shouldEq script
   }
 
   property("get state values") {
@@ -613,8 +662,8 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |let intV = getIntegerValue(this, "key")
         |let strV = getStringValue(this, "key")
         |boo""".stripMargin
-    val Right((expr, _)) = compile(script)
-    Decompiler(expr, decompilerContext) shouldEq script
+    val Right((expr, _)) = compileExpr(script)
+    Decompiler(expr, decompilerContextV3) shouldEq script
   }
 
   property("get DataEntry list values by key") {
@@ -629,8 +678,8 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |let intV = getIntegerValue(list, "k3")
         |let strV = getStringValue(list, "k4")
         |boo""".stripMargin
-    val Right((expr, _)) = compile(script)
-    Decompiler(expr, decompilerContext) shouldEq script
+    val Right((expr, _)) = compileExpr(script)
+    Decompiler(expr, decompilerContextV3) shouldEq script
   }
 
   property("get DataEntry list values by index") {
@@ -645,9 +694,17 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |let intV = getIntegerValue(list, 2)
         |let strV = getStringValue(list, 3)
         |boo""".stripMargin
-    val Right((expr, _)) = compile(script)
-    Decompiler(expr, decompilerContext) shouldEq script
+    val Right((expr, _)) = compileExpr(script)
+    Decompiler(expr, decompilerContextV3) shouldEq script
   }
+
+  property("V3 - checkMerkleProof") {
+    val script =
+      "checkMerkleProof(base58'',base58'',base58'')"
+    val Right((expr, _)) = compileExpr(script, v=V3)
+    Decompiler(expr, decompilerContextV3) shouldEq script
+  }
+
 
   property("list func params") {
     val script =
@@ -655,10 +712,180 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         | func f(a: List[String], b: String) = a[0] + b
         | f(["a", "b"], "c")
       """.stripMargin
-    val Right((expr, _)) = compile(script)
-    Decompiler(expr, decompilerContext) shouldEq
+    val Right((expr, _)) = compileExpr(script)
+    Decompiler(expr, decompilerContextV3) shouldEq
       """func f (a,b) = (a[0] + b)
         |
         |f(["a", "b"], "c")""".stripMargin
   }
+
+  property("V4 - contains") {
+    val script           = """"abc".contains("b")"""
+    val Right((expr, _)) = compileExpr(script, V4)
+    val res              = Decompiler(expr, decompilerContextV4)
+    res shouldEq """contains("abc", "b")"""
+  }
+
+  property("V4 - valueOrElse") {
+    val script           = """let a = 1
+                             |let b = 2
+                             |a.valueOrElse(b)""".stripMargin
+    val Right((expr, _)) = compileExpr(script, V4)
+    val res              = Decompiler(expr, decompilerContextV4)
+    res shouldEq """let a = 1
+                   |let b = 2
+                   |valueOrElse(a, b)""".stripMargin
+  }
+
+  property("V4 - listAppend (:+)") {
+    val script           = """[1, 2, 3] :+ 4"""
+    val Right((expr, _)) = compileExpr(script, V4)
+    val res              = Decompiler(expr, decompilerContextV4)
+    res shouldEq """([1, 2, 3] :+ 4)"""
+  }
+
+  property("V4 - listConcat (++)") {
+    val script           = """[1, 2, 3] ++ [4, 5, 42]"""
+    val Right((expr, _)) = compileExpr(script, V4)
+    val res              = Decompiler(expr, decompilerContextV4)
+    res shouldEq """([1, 2, 3] ++ [4, 5, 42])"""
+  }
+
+  property("V4 - median") {
+    val script           = """median([1, 2, 3]) + [1, 2, 3].median()"""
+    val Right((expr, _)) = compileExpr(script, V4)
+    val res              = Decompiler(expr, decompilerContextV4)
+    res shouldEq """(median([1, 2, 3]) + median([1, 2, 3]))"""
+  }
+
+  property("V4 - new contract result format") {
+    val prefix =
+      """
+        | {-# STDLIB_VERSION 4    #-}
+        | {-#CONTENT_TYPE    DAPP #-}
+        |""".stripMargin
+    val script =
+      """
+        | @Callable(i)
+        | func foo() =
+        |   [
+        |     IntegerEntry("key", 1),
+        |     BooleanEntry("key", true),
+        |     StringEntry("key", "str"),
+        |     BinaryEntry("key", base58''),
+        |     BinaryEntry("key", calculateAssetId(Issue("name", "description", 1000, 4, true, unit, 0))),
+        |     DeleteEntry("key"),
+        |     ScriptTransfer(i.caller, 1, base58''),
+        |     Issue("name", "description", 1000, 4, true, unit, 0),
+        |     Reissue(base58'', false, 1),
+        |     Burn(base58'', 1),
+        |     SponsorFee(base58'', unit)
+        |   ]
+        """.stripMargin
+
+    val parsedExpr = Parser.parseContract(prefix ++ script).get.value
+
+    val ctx =
+      Monoid.combine(
+        PureContext.build(Global, V4).withEnvironment[Environment],
+        WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
+      )
+
+    val Right(dApp) = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4)
+    val res         = Decompiler(dApp, decompilerContextV4)
+    res shouldEq script
+  }
+
+  property("V4 - new functions") {
+    val sizes = Seq(16, 32, 64, 128)
+    val hashes = Seq("blake2b", "keccak", "sha")
+    val prefix =
+      """
+        | {-# STDLIB_VERSION 4    #-}
+        | {-#CONTENT_TYPE    DAPP #-}
+        |""".stripMargin
+    val script =
+      s"""
+        | @Callable(i)
+        | func foo() = {
+        |   let v1 = transferTransactionFromProto(base58'')
+        |   let v2 = groth16Verify(base58'', base58'', base58'')
+        |   let v3 = createMerkleRoot(nil, base58'', 0)
+        |   let v4 = [${(for {s <- sizes; h <- hashes} yield h ++ "256_" ++ s.toString ++ "Kb(base58'')").mkString(", ")}]
+        |   let v5 = [${(for {s <- sizes} yield "sigVerify_" ++ s.toString ++ "Kb(base58'', base58'', base58'')").mkString(", ")}]
+        |   let v6 = [${(for {s <- sizes} yield "rsaVerify_" ++ s.toString ++ "Kb(SHA256, base58'', base58'', base58'')").mkString(", ")}]
+        |   let v7 = [${(for {s <- 1 to 15} yield "groth16Verify_" ++ s.toString ++ "inputs( base58'', base58'', base58'')").mkString(", ")}]
+        |   let v8 = value(1)
+        |   let v9 = valueOrErrorMessage(1,"")
+        |   let v10 = toUtf8String(base58'')
+        |   let v11 = toInt(base58'', toInt(base58''))
+        |   let v12 = indexOf("", "")
+        |   let v13 = lastIndexOf("", "")
+        |   let v14 = split("", "")
+        |   let v15 = parseInt("")
+        |   let v16 = parseIntValue("")
+        |   let v17 = pow(0,0,0,0,0,UP)
+        |   let v18 = log(0,0,0,0,0,UP)
+        |   let v19 = assetInfo(base58'')
+        |   let v20 = blockInfoByHeight(0)
+        |   let v21 = transferTransactionById(base58'')
+        |   let v22 = toString(Address(base58''))
+        |   let v23 = toBase16String(base58'')
+        |   let v24 = fromBase16String("")
+        |   nil
+        | }
+        """.stripMargin
+
+    val parsedExpr = Parser.parseContract(prefix ++ script).get.value
+
+    val ctx =
+      Monoid.combineAll( Seq(
+        PureContext.build(Global, V4).withEnvironment[Environment],
+        CryptoContext.build(Global, V4).withEnvironment[Environment],
+        WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
+      ))
+
+    val Right(dApp) = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4)
+    val res         = Decompiler(dApp, ctx.decompilerContext)
+    res shouldEq script
+  }
+
+  property("V4 - new case types") {
+    val prefix =
+      """
+        | {-# STDLIB_VERSION 4    #-}
+        | {-#CONTENT_TYPE    DAPP #-}
+        |""".stripMargin
+
+    val types = ": UpdateAssetInfoTransaction | InvokeScriptTransaction | DataTransaction | IssueTransaction | TransferTransaction | MassTransferTransaction | Asset | BlockInfo"
+
+    def script(t: String) = s"""
+        | func m (v$t) =
+        |   match v {
+        |    case a: UpdateAssetInfoTransaction => nil
+        |    case a: InvokeScriptTransaction => nil
+        |    case a: DataTransaction => nil
+        |    case a: IssueTransaction => nil
+        |    case a: TransferTransaction => nil
+        |    case a: MassTransferTransaction => nil
+        |    case a: Asset => nil
+        |    case a: BlockInfo => nil
+        |    case _ => nil
+        |   }
+        |""".stripMargin
+
+    val parsedExpr = Parser.parseContract(prefix ++ script(types)).get.value
+
+    val ctx =
+      Monoid.combineAll( Seq(
+        PureContext.build(Global, V4).withEnvironment[Environment],
+        CryptoContext.build(Global, V4).withEnvironment[Environment],
+        WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
+      ))
+
+    val Right(dApp) = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4)
+    val res         = Decompiler(dApp, ctx.decompilerContext)
+    res shouldEq script("")
+  }
+ 
 }

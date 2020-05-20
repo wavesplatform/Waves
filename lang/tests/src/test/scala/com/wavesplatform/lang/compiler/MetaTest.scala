@@ -3,13 +3,12 @@ package com.wavesplatform.lang.compiler
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper, Single}
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{Account, V3, DApp => DAppType}
+import com.wavesplatform.lang.directives.values.{Account, V3, V4, DApp => DAppType}
 import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.Terms.{FUNC, REF}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -68,7 +67,7 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
         CallableFuncSignature(ByteString.copyFrom(Array[Byte](5))),
       )
     )
-    compiler.ContractCompiler(ctx, expr).map(_.meta) shouldBe Right(meta)
+    compiler.ContractCompiler(ctx, expr, V3).map(_.meta) shouldBe Right(meta)
 
     val callables = List(
       CallableFunction(CallableAnnotation("invocation"), FUNC("foo", List("a", "b", "c", "d", "e", "f"), REF(""))),
@@ -80,15 +79,65 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
         "version" -> Single("1"),
         "callableFuncTypes" -> Chain(List(
           Dic(ListMap(
-            "a" -> Single("Boolean|Int|String"),
+            "a" -> Single("Boolean|ByteVector|Int|String"),
             "b" -> Single("Int"),
             "c" -> Single("Int|String"),
             "d" -> Single("Int|String"),
-            "e" -> Single("Boolean|String"),
+            "e" -> Single("Boolean|ByteVector|String"),
             "f" -> Single("ByteVector|Int")
           )),
           Dic(Map(
             "a" -> Single("Boolean|Int")
+          ))
+        ))
+      ))
+    )
+  }
+
+  property("meta v2 supporting list parameters") {
+    val ctx = Monoid.combine(
+      compilerContext,
+      WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
+        .compilerContext
+    )
+    val expr = {
+      val script =
+        """
+          |
+          | @Callable(i)
+          | func foo(a: List[Int], b: List[String], c: ByteVector, d: Int|String|Boolean) = []
+          |
+          | @Callable(i)
+          | func bar(a: List[ByteVector]) = []
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    val meta = DAppMeta(
+      version = 2,
+      List(
+        CallableFuncSignature(ByteString.copyFrom(Array[Byte](17, 24, 2, 13))),
+        CallableFuncSignature(ByteString.copyFrom(Array[Byte](18))),
+      )
+    )
+    compiler.ContractCompiler(ctx, expr, V4).map(_.meta) shouldBe Right(meta)
+    val callables = List(
+      CallableFunction(CallableAnnotation("invocation"), FUNC("foo", List("a", "b", "c", "d", "e", "f"), REF(""))),
+      CallableFunction(CallableAnnotation("invocation"), FUNC("bar", List("a"), REF("")))
+    )
+    val dApp = DApp(meta, Nil, callables, None)
+    MetaMapper.dicFromProto(dApp) shouldBe Right(
+      Dic(Map(
+        "version" -> Single("2"),
+        "callableFuncTypes" -> Chain(List(
+          Dic(ListMap(
+            "a" -> Single("List[Int]"),
+            "b" -> Single("List[String]"),
+            "c" -> Single("ByteVector"),
+            "d" -> Single("Boolean|Int|String"),
+          )),
+          Dic(Map(
+            "a" -> Single("List[ByteVector]")
           ))
         ))
       ))

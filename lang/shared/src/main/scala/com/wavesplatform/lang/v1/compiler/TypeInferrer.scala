@@ -75,6 +75,7 @@ object TypeInferrer {
 
   // match, e.g. many ifs
   def findCommonType(list: Seq[FINAL]): FINAL = list match {
+    case Nil => NOTHING
     case one :: Nil => one
     case head :: tail =>
       val t = findCommonType(tail)

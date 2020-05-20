@@ -8,7 +8,7 @@ import com.wavesplatform.lang.v1.repl.global
 import com.wavesplatform.lang.v1.repl.node.http.response.model._
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven, Transfer}
-import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, ScriptAssetInfo}
+import com.wavesplatform.lang.v1.traits.domain._
 
 private[node] class ChainDependentMapper(chainId: Byte) {
   def toRideModel(tx: TransferTransaction): Transfer =
@@ -18,14 +18,27 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       tx.assetId.map(_.byteStr),
       tx.amount,
       tx.recipient,
-      tx.attachment.byteStr
+      (tx.attachment match {
+        case ANothing => EmptyAttachment
+        case AStr(v) => StringValue(v)
+        case ABoolean(v) => BooleanValue(v)
+        case ABytes(v) => ByteStrValue(v.byteStr)
+        case AInt(v) => IntValue(v)
+      })
     )
+
+  def toRideModelO(tx: TransferTransaction): Option[Transfer] =
+    if(tx.succeed) {
+      Some(toRideModel(tx))
+    } else {
+      None
+    }
 
   private def proven(tx: TransferTransaction): Proven =
     Proven(
       Header(tx.id.byteStr, tx.fee, tx.timestamp, tx.version),
       Address(pkToAddress(tx.senderPublicKey)),
-      ByteStr(bodyBytes(tx)),
+      tx.bodyBytes.byteStr,
       tx.senderPublicKey.byteStr,
       tx.proofs.map(_.byteStr).toIndexedSeq
     )
@@ -33,13 +46,15 @@ private[node] class ChainDependentMapper(chainId: Byte) {
   def toRideModel(a: AssetInfoResponse): ScriptAssetInfo =
     ScriptAssetInfo(
       a.assetId.byteStr,
+      a.name,
+      a.description,
       a.quantity,
       a.decimals,
       Address(a.issuer.byteStr),
-      pkToAddress(a.issuer),
+      a.issuerPublicKey.byteStr,
       a.reissuable,
       a.scripted,
-      a.sponsored
+      a.minSponsoredAssetFee
     )
 
   def toRideModel(b: BlockInfoResponse): BlockInfo =
@@ -49,7 +64,8 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       b.`nxt-consensus`.`base-target`,
       b.`nxt-consensus`.`generation-signature`.byteStr,
       pkToAddress(b.generator),
-      b.generator.byteStr
+      b.generator.byteStr,
+      b.VRF.map(_.byteStr)
     )
 
 

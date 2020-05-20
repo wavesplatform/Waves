@@ -1,18 +1,28 @@
 package com.wavesplatform.lang.v1.evaluator
 
+import cats.Id
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.common.state.diffs.ProduceError._
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.NoShrink
+import com.wavesplatform.lang.directives.values.V3
+import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL}
-import com.wavesplatform.lang.v1.traits.domain.DataItem
-import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
+import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.FieldNames
+import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
+import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, DataItem}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ScriptResultTest extends PropSpec with PropertyChecks with Matchers with NoShrink {
+
+  val pureEvalContext : EvaluationContext[Environment, Id] =
+    PureContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment].evaluationContext(utils.environment)
+
 
   val el       = List.empty[(String, FINAL)]
   val address1 = ByteStr.fromBytes(19: Byte)
@@ -28,7 +38,7 @@ class ScriptResultTest extends PropSpec with PropertyChecks with Matchers with N
         "key"   -> CONST_STRING("xxx").explicitGet(),
         "value" -> CONST_LONG(42)
       )
-    ))))
+    ): EVALUATED), false).explicitGet)
   )
 
   val transferSetObj = CaseObj(
@@ -51,28 +61,28 @@ class ScriptResultTest extends PropSpec with PropertyChecks with Matchers with N
             "asset"     -> noAsset
           )
         )
-      )))
+      ), false).explicitGet)
   )
 
   val scriptResultObj = CaseObj(CASETYPEREF("ScriptResult", el), Map(FieldNames.ScriptWriteSet -> writeSetObj, FieldNames.ScriptTransferSet -> transferSetObj))
 
   val writeResult    = List(DataItem.Lng("xxx", 42))
-  val transferResult = List((Address(address1), 41L, Some(asset)), (Address(address2), 42L, None))
+  val transferResult = List(AssetTransfer(Address(address1), 41L, Some(asset)), AssetTransfer(Address(address2), 42L, None))
 
   property("ScriptResult from WriteSet") {
-    ScriptResult.fromObj(writeSetObj) shouldBe Right(ScriptResult(writeResult, List.empty))
+    ScriptResult.fromObj(pureEvalContext, asset, writeSetObj, V3) shouldBe Right(ScriptResultV3(writeResult, List.empty))
   }
 
   property("ScriptResult from TransferSet") {
-    ScriptResult.fromObj(transferSetObj) shouldBe Right(ScriptResult(List.empty, transferResult))
+    ScriptResult.fromObj(pureEvalContext, asset, transferSetObj, V3) shouldBe Right(ScriptResultV3(List.empty, transferResult))
   }
 
   property("ScriptResult from ScriptResult") {
-    ScriptResult.fromObj(scriptResultObj) shouldBe
-      Right(ScriptResult(writeResult, transferResult))
+    ScriptResult.fromObj(pureEvalContext, asset, scriptResultObj, V3) shouldBe
+      Right(ScriptResultV3(writeResult, transferResult))
   }
 
   property("ScriptResult from bad object") {
-    ScriptResult.fromObj(CaseObj(CASETYPEREF("Foo", el), Map.empty)) should produce("CallableFunction needs to return")
+    ScriptResult.fromObj(pureEvalContext, asset, CaseObj(CASETYPEREF("Foo", el), Map.empty), V3) should produce("CallableFunction needs to return")
   }
 }

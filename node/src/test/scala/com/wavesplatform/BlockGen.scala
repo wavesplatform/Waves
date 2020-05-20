@@ -2,9 +2,9 @@ package com.wavesplatform
 
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
+import com.wavesplatform.block.Block.{GenerationSignatureLength, GenerationVRFSignatureLength, ProtoBlockVersion}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.transaction.{ProvenTransaction, Transaction}
 import org.scalacheck.Gen
 import org.scalatest.Suite
@@ -24,22 +24,22 @@ trait BlockGen extends TransactionGen { _: Suite =>
 
   def versionedBlockGen(reference: ByteStr, txs: Seq[Transaction], signer: KeyPair, version: Byte): Gen[Block] =
     for {
-      baseTarget          <- Gen.posNum[Long]
-      generationSignature <- byteArrayGen(Block.GeneratorSignatureLength)
-      timestamp           <- timestampGen
-    } yield
-      Block
-        .buildAndSign(
-          version,
-          if (txs.isEmpty) timestamp else txs.map(_.timestamp).max,
-          reference,
-          NxtLikeConsensusBlockData(baseTarget, ByteStr(generationSignature)),
-          txs,
-          signer,
-          Set.empty,
-          -1L
-        )
-        .explicitGet()
+      baseTarget <- Gen.posNum[Long]
+      genSig     <- if (version < ProtoBlockVersion) byteArrayGen(GenerationSignatureLength) else byteArrayGen(GenerationVRFSignatureLength)
+      timestamp  <- timestampGen
+    } yield Block
+      .buildAndSign(
+        version,
+        if (txs.isEmpty) timestamp else txs.map(_.timestamp).max,
+        reference,
+        baseTarget,
+        ByteStr(genSig),
+        txs,
+        signer,
+        Seq.empty,
+        -1L
+      )
+      .explicitGet()
 
   def blockGen(txs: Seq[Transaction], signer: KeyPair): Gen[Block] = versionedBlockGen(txs, signer, 1)
 
@@ -73,7 +73,7 @@ trait BlockGen extends TransactionGen { _: Suite =>
 }
 
 object BlockGen {
-  val minTransactionsInBlockCount                   = 1
-  val maxTransactionsInBlockCount                   = 100
-  val predefinedSignerPrivateKey: KeyPair = KeyPair((1 to 10).map(_.toByte).toArray)
+  val minTransactionsInBlockCount         = 1
+  val maxTransactionsInBlockCount         = 100
+  val predefinedSignerPrivateKey: KeyPair = KeyPair(ByteStr(Array.tabulate(10)(_.toByte)))
 }

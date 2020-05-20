@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.api.http.assets
 
-import com.wavesplatform.api.http.assets._
+import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.script.Script
@@ -34,14 +34,14 @@ class SignedRequestsTest extends FunSuite with Matchers {
     req.reissuable shouldBe true
 
     val tx = req.toTx.explicitGet()
-    Base58.encode(tx.name) shouldBe "zVbyBrMk"
-    Base58.encode(tx.description) shouldBe "zVbyBrMk"
+    tx.name.toStringUtf8 shouldBe "string"
+    tx.description.toStringUtf8 shouldBe "string"
     tx.reissuable shouldBe true
     tx.decimals shouldBe 2
     tx.fee shouldBe 100000L
     tx.quantity shouldBe 100000L
     tx.timestamp shouldBe 1484064349669L
-    tx.signature.base58 shouldBe "d3JTwzxHj3j74yemdvw2xAdFeMo6hDJ9i2s3v3e4GMrz2Q25G89Pp3HyXfKk3mwNcKWjtyoTWvTt1eLk2KzetoL"
+    tx.signature.toString shouldBe "d3JTwzxHj3j74yemdvw2xAdFeMo6hDJ9i2s3v3e4GMrz2Q25G89Pp3HyXfKk3mwNcKWjtyoTWvTt1eLk2KzetoL"
   }
 
   test("AssetReissueRequest json parsing works") {
@@ -65,13 +65,13 @@ class SignedRequestsTest extends FunSuite with Matchers {
     req.reissuable shouldBe true
 
     val tx = req.toTx.explicitGet()
-    tx.asset.id.base58 shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
+    tx.asset.id.toString shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
     tx.reissuable shouldBe true
     tx.fee shouldBe 100000L
     tx.quantity shouldBe 100000L
     tx.timestamp shouldBe 1234L
     tx.reissuable shouldBe true
-    tx.signature.base58 shouldBe "4YWbtkDA7PHH1MCxEUaP12pkNRPNqpJh8X7aagZzLyDNbzgopXJb7NHNNV8rjXcy2WsAKX1wzti7Bishu8u6hwtF"
+    tx.signature.toString shouldBe "4YWbtkDA7PHH1MCxEUaP12pkNRPNqpJh8X7aagZzLyDNbzgopXJb7NHNNV8rjXcy2WsAKX1wzti7Bishu8u6hwtF"
   }
 
   test("AssetTransfer json parsing works") {
@@ -99,13 +99,13 @@ class SignedRequestsTest extends FunSuite with Matchers {
     req.attachment shouldBe Some("A")
 
     val tx = req.toTx.explicitGet()
-    Base58.encode(tx.sender) shouldBe "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5"
+    tx.sender.toString shouldBe "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5"
     tx.timestamp shouldBe 1479462208828L
-    tx.attachment shouldBe Base58.tryDecodeWithLimit("A").get
+    tx.attachment.toBytes shouldBe Base58.tryDecodeWithLimit("A").get
     tx.assetId.maybeBase58Repr.get shouldBe "GAXAj8T4pSjunDqpz6Q3bit4fJJN9PD4t8AK8JZVSa5u"
     tx.amount shouldBe 100000
     tx.fee shouldBe 100000
-    tx.signature.base58 shouldBe "4dPRTW6XyRQUTQwwpuZDCNy1UDHYG9WGsEQnn5v49Lj5uyh4XGDdwtEq3t6ZottweAXHieK32UokHwiTxGFtz9bQ"
+    tx.proofs.toSignature.toString shouldBe "4dPRTW6XyRQUTQwwpuZDCNy1UDHYG9WGsEQnn5v49Lj5uyh4XGDdwtEq3t6ZottweAXHieK32UokHwiTxGFtz9bQ"
   }
 
   test("AssetTransfer with a fee in an asset json parsing works") {
@@ -135,14 +135,14 @@ class SignedRequestsTest extends FunSuite with Matchers {
     req.attachment shouldBe Some("2Kk7Zsr1e9jsqSBM5hpF")
 
     val tx = req.toTx.explicitGet()
-    Base58.encode(tx.sender) shouldBe "FJuErRxhV9JaFUwcYLabFK5ENvDRfyJbRz8FeVfYpBLn"
+    tx.sender.toString shouldBe "FJuErRxhV9JaFUwcYLabFK5ENvDRfyJbRz8FeVfYpBLn"
     tx.timestamp shouldBe 1489054107569L
-    tx.attachment shouldBe Base58.tryDecodeWithLimit("2Kk7Zsr1e9jsqSBM5hpF").get
+    tx.attachment.toBytes shouldBe Base58.tryDecodeWithLimit("2Kk7Zsr1e9jsqSBM5hpF").get
     tx.assetId.maybeBase58Repr.get shouldBe "6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL"
     tx.feeAssetId.maybeBase58Repr.get shouldBe "6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL"
     tx.amount shouldBe 1000
     tx.fee shouldBe 100
-    tx.signature.base58 shouldBe "UAhYXYdkFAFBuwAuUFP3yw7E8aRTyx56ZL4UPbT4ufomBzVLMRpdW2dCtJmfpCuPPMhGTvdzhXwb7o4ER6HAUpJ"
+    tx.proofs.toSignature.toString shouldBe "UAhYXYdkFAFBuwAuUFP3yw7E8aRTyx56ZL4UPbT4ufomBzVLMRpdW2dCtJmfpCuPPMhGTvdzhXwb7o4ER6HAUpJ"
   }
 
   test("AssetBurnRequest json parsing works") {
@@ -164,7 +164,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
   }
 
   test("SponsorFeeRequest json parsing works") {
-    import com.wavesplatform.api.http.assets.SponsorFeeRequest._
+    import com.wavesplatform.api.http.requests.SponsorFeeRequest._
 
     val One = 100000000L
     val js1 = s"""{
@@ -225,7 +225,8 @@ class SignedRequestsTest extends FunSuite with Matchers {
 
     val req = Json.parse(js1).validate[SignedSponsorFeeRequest].get.toTx.right.get
     req.proofs shouldBe Proofs(
-      Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get))
+      Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get)
+    )
     req.fee shouldBe 100000000L
     req.minSponsoredAssetFee shouldBe Some(100000)
 
@@ -253,13 +254,13 @@ class SignedRequestsTest extends FunSuite with Matchers {
         |}
       """.stripMargin
     val req = Json.parse(json).validate[SignedSetAssetScriptRequest].get
-    req.assetId shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
-    req.proofs shouldBe Seq("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7")
+    req.assetId.id.toString shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
+    req.proofs shouldBe Proofs(Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get))
     req.fee shouldBe 100000L
     req.timestamp shouldBe 1520945679531L
 
     val tx = req.toTx.explicitGet()
-    tx.asset.id.base58 shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
+    tx.asset.id.toString shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
     tx.script shouldBe Some(Script.fromBase64String("base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").explicitGet())
     tx.fee shouldBe 100000L
     tx.timestamp shouldBe 1520945679531L

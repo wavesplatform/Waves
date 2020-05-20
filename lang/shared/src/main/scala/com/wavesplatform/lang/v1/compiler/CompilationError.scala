@@ -72,7 +72,7 @@ object CompilationError {
   final case class WrongArgumentsNumber(start: Int, end: Int, name: String, required: Int, found: Int) extends CompilationError {
     val message = s"Function '$name' requires $required arguments, but $found are provided"
   }
-  final case class WrongArgumentType(start: Int, end: Int, funcName: String, typeName: String, required: List[String]) extends CompilationError {
+  final case class WrongArgumentType(start: Int, end: Int, funcName: String, typeName: String, required: Iterable[String]) extends CompilationError {
     val message = s"Unexpected argument type in function '$funcName', required: (${required.mkString(", ")}), but $typeName type found"
   }
   final case class UnexpectedType(start: Int, end: Int, required: String, found: String) extends CompilationError {

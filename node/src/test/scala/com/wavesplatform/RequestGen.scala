@@ -1,9 +1,19 @@
 package com.wavesplatform
 
 import com.wavesplatform.account.Alias
-import com.wavesplatform.api.http.alias.SignedCreateAliasV1Request
-import com.wavesplatform.api.http.assets._
-import com.wavesplatform.api.http.leasing.{SignedLeaseCancelV1Request, SignedLeaseV1Request}
+import com.wavesplatform.api.http.requests.{
+  BurnV1Request,
+  IssueV1Request,
+  ReissueV1Request,
+  SignedBurnV1Request,
+  SignedCreateAliasV1Request,
+  SignedIssueV1Request,
+  SignedLeaseCancelV1Request,
+  SignedLeaseV1Request,
+  SignedReissueV1Request,
+  SignedTransferV1Request,
+  TransferV1Request
+}
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto._
 import com.wavesplatform.transaction.assets._
@@ -16,7 +26,7 @@ trait RequestGen extends TransactionGen { _: Suite =>
   val nonPositiveLong: G[Long] = choose(Long.MinValue, 0).label("non-positive value")
   val invalidDecimals: G[Byte] = oneOf(
     choose[Byte](Byte.MinValue, -1),
-    choose((IssueTransaction.MaxDecimals + 1).toByte, Byte.MaxValue)
+    choose((IssueTransaction.MaxAssetDecimals + 1).toByte, Byte.MaxValue)
   ).label("invalid decimals")
 
   val longAttachment: G[String] =
@@ -40,13 +50,13 @@ trait RequestGen extends TransactionGen { _: Suite =>
   ).map(_.mkString)
 
   val longDescription: G[String] =
-    genBoundedBytes(IssueTransaction.MaxDescriptionLength + 1, IssueTransaction.MaxDescriptionLength + 50)
+    genBoundedBytes(IssueTransaction.MaxAssetDescriptionLength + 1, IssueTransaction.MaxAssetDescriptionLength + 50)
       .map(Base58.encode)
 
   val addressGen: G[String] = listOfN(32, Arbitrary.arbByte.arbitrary).map(b => Base58.encode(b.toArray))
   val signatureGen: G[String] = listOfN(SignatureLength, Arbitrary.arbByte.arbitrary)
     .map(b => Base58.encode(b.toArray))
-  private val assetIdStringGen = assetIdGen.map(_.map(_.base58))
+  private val assetIdStringGen = assetIdGen.map(_.map(_.toString))
 
   private val commonFields = for {
     _account <- addressGen
@@ -56,9 +66,9 @@ trait RequestGen extends TransactionGen { _: Suite =>
   val issueReq: G[IssueV1Request] = for {
     (account, fee) <- commonFields
     name           <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
-    description    <- genBoundedString(0, IssueTransaction.MaxDescriptionLength)
+    description    <- genBoundedString(0, IssueTransaction.MaxAssetDescriptionLength)
     quantity       <- positiveLongGen
-    decimals       <- G.choose[Byte](0, IssueTransaction.MaxDecimals.toByte)
+    decimals       <- G.choose[Byte](0, IssueTransaction.MaxAssetDecimals.toByte)
     reissuable     <- G.oneOf(true, false)
   } yield IssueV1Request(account, new String(name), new String(description), quantity, decimals, reissuable, fee)
 
@@ -102,7 +112,7 @@ trait RequestGen extends TransactionGen { _: Suite =>
     amount         <- positiveLongGen
     assetId        <- assetIdStringGen
     feeAssetId     <- assetIdStringGen
-    attachment     <- genBoundedString(1, 20).map(b => Some(Base58.encode(b)))
+    attachment     <- genBoundedStringBytes(1, 20).map(b => Some(Base58.encode(b)))
   } yield TransferV1Request(assetId, feeAssetId, amount, fee, account, attachment, recipient)
 
   val broadcastTransferReq: G[SignedTransferV1Request] = for {
@@ -127,5 +137,5 @@ trait RequestGen extends TransactionGen { _: Suite =>
     _signature <- signatureGen
     _timestamp <- ntpTimestampGen
     _cancel    <- leaseCancelGen
-  } yield SignedLeaseCancelV1Request(_cancel.sender.toString, _cancel.leaseId.base58, _cancel.timestamp, _signature, _cancel.fee)
+  } yield SignedLeaseCancelV1Request(_cancel.sender.toString, _cancel.leaseId.toString, _timestamp, _signature, _cancel.fee)
 }

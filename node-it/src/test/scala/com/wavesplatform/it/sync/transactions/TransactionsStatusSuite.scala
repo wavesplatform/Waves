@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.api.http.ApiError.InvalidIds
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -9,9 +10,10 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.ProvenTransaction
-import com.wavesplatform.transaction.transfer.TransferTransactionV2
-
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import play.api.libs.json._
+
+import scala.util.Random
 
 class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
 
@@ -40,8 +42,7 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
 
     val checkData = CheckData(notMiner.height, confirmedTxsInfo, unconfirmedTxs.map(_.id().toString), notFoundTxs.map(_.id().toString))
 
-    val postJsonResult =
-      Json.parse(notMiner.postJson("/transactions/status", Json.obj("ids" -> txIds)).getResponseBody).as[List[TransactionStatus]]
+    val postJsonResult = notMiner.transactionStatus(txIds)
     val postFormResult =
       Json.parse(notMiner.postForm("/transactions/status", txIds.map(("id", _)): _*).getResponseBody).as[List[TransactionStatus]]
     val getResult =
@@ -50,9 +51,19 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
     check(checkData, postJsonResult)
     check(checkData, postFormResult)
     check(checkData, getResult)
+
+    val maxTxList = (1 to 1000).map(_ => txIds.head).toList
+    val result = notMiner.transactionStatus(maxTxList)
+    result.size shouldBe maxTxList.size
+    result.forall(_ == result.head)
+
+    assertBadRequestAndMessage(notMiner.transactionStatus(maxTxList :+ txIds.head), "Too big sequences requested")
+    assertBadRequestAndMessage(notMiner.transactionStatus(Seq()), "Empty request")
+
+    assertApiError(notMiner.transactionStatus(Random.shuffle(txIds :+ "illegal id")), InvalidIds(Seq("illegal id")))
   }
 
-  private def check(data: CheckData, result: List[TransactionStatus]): Unit = {
+  private def check(data: CheckData, result: Seq[TransactionStatus]): Unit = {
     result.size shouldBe data.size
 
     val confirmed   = result.filter(_.status == "confirmed")
@@ -66,16 +77,17 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
 
   private def mkTransactions: List[ProvenTransaction] =
     (1001 to 1020).map { amount =>
-      TransferTransactionV2
+      TransferTransaction
         .selfSigned(
-          Waves,
-          miner.privateKey,
+          2.toByte,
+          miner.keyPair,
           AddressOrAlias.fromString(secondAddress).explicitGet(),
+          Waves,
           amount,
-          ntpTime.correctedTime(),
           Waves,
           minFee,
-          Array.emptyByteArray
+          None,
+          ntpTime.correctedTime(),
         )
         .explicitGet()
     }.toList
@@ -96,9 +108,9 @@ object TransactionsStatusSuite {
   object CheckData {
     def apply(height: Int, confirmed: List[TransactionInfo], unconfirmed: List[String], notFound: List[String]): CheckData =
       new CheckData(
-        confirmed.map(info => TransactionStatus(info.id, "confirmed", Some(height - info.height), Some(info.height))),
-        unconfirmed.map(d => TransactionStatus(d, "unconfirmed", None, None)),
-        notFound.map(d => TransactionStatus(d, "not_found", None, None))
+        confirmed.map(info => TransactionStatus(info.id, "confirmed", Some(height - info.height), Some(info.height), Some("succeed"))),
+        unconfirmed.map(d => TransactionStatus(d, "unconfirmed", None, None, None)),
+        notFound.map(d => TransactionStatus(d, "not_found", None, None, None))
       )
   }
 }

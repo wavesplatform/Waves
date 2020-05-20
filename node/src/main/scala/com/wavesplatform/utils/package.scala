@@ -2,6 +2,8 @@ package com.wavesplatform
 
 import java.security.SecureRandom
 
+import com.google.common.base.Charsets
+import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.ByteStr._
 import org.joda.time.Duration
@@ -63,12 +65,17 @@ package object utils extends ScorexLogging {
     r
   }
 
-  implicit val byteStrWrites: Format[ByteStr] = new Format[ByteStr] {
-    override def writes(o: ByteStr): JsValue = JsString(o.base58)
+  implicit val byteStrFormat: Format[ByteStr] = new Format[ByteStr] {
+    override def writes(o: ByteStr): JsValue = JsString(o.toString)
 
     override def reads(json: JsValue): JsResult[ByteStr] = json match {
       case JsString(v) => decodeBase58(v).fold(e => JsError(s"Error parsing base58: ${e.getMessage}"), b => JsSuccess(b))
       case _           => JsError("Expected JsString")
     }
+  }
+
+  implicit class StringBytes(val s: String) extends AnyVal {
+    def utf8Bytes: Array[Byte] = s.getBytes(Charsets.UTF_8)
+    def toByteString: ByteString = ByteString.copyFromUtf8(s)
   }
 }

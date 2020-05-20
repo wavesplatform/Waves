@@ -2,9 +2,9 @@ package com.wavesplatform.lang.v1
 
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.v1.repl.Repl
-import com.wavesplatform.lang.v1.repl.node.BlockchainUnavailableException
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import com.wavesplatform.lang.v1.testing.ScriptGen
+import com.wavesplatform.lang.Common.produce
 import org.scalatest.{Matchers, PropSpec}
 
 import scala.concurrent.duration._
@@ -40,14 +40,14 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
 
   property("syntax errors") {
     val repl = Repl()
-    await(repl.execute(""" let a = {{1} """)) shouldBe Left("Compilation failed: expected a value's expression in 9-9")
-    await(repl.execute(""" 1 ++ 2 """))       shouldBe Left("Compilation failed: expected a second operator in 4-4")
+    await(repl.execute(""" let a = {{1} """)) shouldBe Left("Compilation failed: [expected a value's expression in 9-9]")
+    await(repl.execute(""" 1 %% 2 """))       shouldBe Left("Compilation failed: [expected a second operator in 4-4]")
   }
 
   property("logic errors") {
     val repl = Repl()
     await(repl.execute(""" let a = base64'12345' """)) shouldBe Left("Compilation failed: can't parse Base64 string in 17-21")
-    await(repl.execute(""" let b = "abc" + 1 """))     shouldBe Left("Compilation failed: Can't find a function overload '+'(String, Int) in 9-18")
+    await(repl.execute(""" let b = "abc" + 1 """))     shouldBe Left("Compilation failed: [Can't find a function overload '+'(String, Int) in 9-18]")
   }
 
   property("exceptions") {
@@ -59,8 +59,7 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
   property("waves context funcs absent") {
     val repl = Repl()
 
-    val err = the[BlockchainUnavailableException] thrownBy await(repl.execute(s""" transferTransactionById(base58'fdg') """))
-    err.toString shouldBe "Blockchain state is unavailable from REPL"
+    await(repl.execute(s""" transferTransactionById(base58'fdg') """)) should produce("Blockchain state is unavailable from REPL")
 
     await(repl.execute(s""" let a = 1 """))
     await(repl.execute(s""" a """))  shouldBe Right("res1: Int = 1")
@@ -72,8 +71,8 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     await(repl.execute("let b = a + 2")) shouldBe Right("defined let b: Int")
     await(repl.execute("b"))             shouldBe Right("res1: Int = 3")
     repl.clear()
-    await(repl.execute("a")) shouldBe Left("Compilation failed: A definition of 'a' is not found in 0-1")
-    await(repl.execute("b")) shouldBe Left("Compilation failed: A definition of 'b' is not found in 0-1")
+    await(repl.execute("a")) shouldBe Left("Compilation failed: [A definition of 'a' is not found in 0-1]")
+    await(repl.execute("b")) shouldBe Left("Compilation failed: [A definition of 'b' is not found in 0-1]")
   }
 
   property("keep state if input contain both expression and declarations") {
@@ -117,7 +116,7 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     ))
     await(repl.execute("f()")) shouldBe Right("res1: Int = 3")
     await(repl.execute("b"))   shouldBe Right("res2: Int = 3")
-    await(repl.execute("a"))   shouldBe Left("Compilation failed: A definition of 'a' is not found in 0-1")
+    await(repl.execute("a"))   shouldBe Left("Compilation failed: [A definition of 'a' is not found in 0-1]")
   }
 
   property("type info") {
@@ -130,8 +129,8 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     val repl = Repl()
     repl.info("getInteger").split("\n") shouldBe Array(
       "func getInteger(addressOrAlias: Address|Alias, key: String): Int|Unit",
-      "func getInteger(data: List[DataEntry], key: String): Int|Unit",
-      "func getInteger(data: List[DataEntry], index: Int): Int|Unit"
+      "func getInteger(data: List[BinaryEntry|BooleanEntry|IntegerEntry|StringEntry], key: String): Int|Unit",
+      "func getInteger(data: List[BinaryEntry|BooleanEntry|IntegerEntry|StringEntry], index: Int): Int|Unit"
     )
     await(repl.execute("func my(a: Int) = toString(a)"))
     repl.info("my") shouldBe "func my(a: Int): String"

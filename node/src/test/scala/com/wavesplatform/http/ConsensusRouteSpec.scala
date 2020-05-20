@@ -18,10 +18,11 @@ class ConsensusRouteSpec
     with HistoryTest
     with WithDomain {
 
-  def routeTest(f: (Blockchain, Route) => Any) = withDomain() { d =>
-    d.blockchainUpdater.processBlock(genesisBlock)
+  private def routeTest(f: (Blockchain, Route) => Any) = withDomain() { d =>
+    d.blockchainUpdater.processBlock(genesisBlock, genesisBlock.header.generationSignature)
     1 to 10 foreach { _ =>
-      d.blockchainUpdater.processBlock(getNextTestBlock(d.blockchainUpdater))
+      val block = getNextTestBlock(d.blockchainUpdater)
+      d.blockchainUpdater.processBlock(block, block.header.generationSignature)
     }
     f(d.blockchainUpdater, NxtConsensusApiRoute(restAPISettings, d.blockchainUpdater).route)
   }
@@ -29,32 +30,32 @@ class ConsensusRouteSpec
   routePath("/generationsignature") - {
     "for last block" in routeTest { (h, route) =>
       Get(routePath("/generationsignature")) ~> route ~> check {
-        (responseAs[JsObject] \ "generationSignature").as[String] shouldEqual h.lastBlock.get.consensusData.generationSignature.base58
+        (responseAs[JsObject] \ "generationSignature").as[String] shouldEqual h.lastBlockHeader.get.header.generationSignature.toString
       }
     }
 
     "for existing block" in routeTest { (h, route) =>
-      val block = h.blockAt(3).get
-      Get(routePath(s"/generationsignature/${block.uniqueId.base58}")) ~> route ~> check {
-        (responseAs[JsObject] \ "generationSignature").as[String] shouldEqual block.consensusData.generationSignature.base58
+      val sh = h.blockHeader(3).get
+      Get(routePath(s"/generationsignature/${sh.id()}")) ~> route ~> check {
+        (responseAs[JsObject] \ "generationSignature").as[String] shouldEqual sh.header.generationSignature.toString
       }
     }
 
-    "for non-existent block" in routeTest { (h, route) =>
-      Get(routePath(s"/generationsignature/brggwg4wg4g")) ~> route should produce(BlockDoesNotExist)
+    "for non-existent block" in routeTest { (_, route) =>
+      Get(routePath(s"/generationsignature/24aTK4mg6DMFKw4SuQCfSRG52MXg8DSjDWQopahs38Cm3tPMFM1m6fGqCoPY69kstM7TE4mpJAMYmG7LWTTjndCH")) ~> route should produce(BlockDoesNotExist)
     }
   }
 
   routePath("/basetarget") - {
     "for existing block" in routeTest { (h, route) =>
-      val block = h.blockAt(3).get
-      Get(routePath(s"/basetarget/${block.uniqueId.base58}")) ~> route ~> check {
-        (responseAs[JsObject] \ "baseTarget").as[Long] shouldEqual block.consensusData.baseTarget
+      val sh = h.blockHeader(3).get
+      Get(routePath(s"/basetarget/${sh.id()}")) ~> route ~> check {
+        (responseAs[JsObject] \ "baseTarget").as[Long] shouldEqual sh.header.baseTarget
       }
     }
 
     "for non-existent block" in routeTest { (h, route) =>
-      Get(routePath(s"/basetarget/brggwg4wg4g")) ~> route should produce(BlockDoesNotExist)
+      Get(routePath(s"/basetarget/24aTK4mg6DMFKw4SuQCfSRG52MXg8DSjDWQopahs38Cm3tPMFM1m6fGqCoPY69kstM7TE4mpJAMYmG7LWTTjndCH")) ~> route should produce(BlockDoesNotExist)
     }
   }
 }

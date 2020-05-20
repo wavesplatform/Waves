@@ -77,7 +77,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
             FUNC("default", List(), TRUE)
           )
         ),
-        None,
+        None
       )
     )
 

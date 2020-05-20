@@ -5,11 +5,11 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining._
 import com.wavesplatform.network._
-import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -36,8 +36,8 @@ package object appender extends ScorexLogging {
       miner: Miner,
       start: => String,
       success: => String,
-      errorPrefix: String)(f: => Task[Either[B, Option[BigInt]]]): Task[Either[B, Option[BigInt]]] = {
-
+      errorPrefix: String
+  )(f: => Task[Either[B, Option[BigInt]]]): Task[Either[B, Option[BigInt]]] = {
     log.debug(start)
     f map {
       case Right(maybeNewScore) =>
@@ -51,41 +51,49 @@ package object appender extends ScorexLogging {
     }
   }
 
-  private[appender] def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain,
-                                    utxStorage: UtxPoolImpl,
-                                    pos: PoSSelector,
-                                    time: Time,
-                                    verify: Boolean)(block: Block): Either[ValidationError, Option[Int]] = {
-    val append: Block => Either[ValidationError, Option[Int]] =
-      if (verify) validateAndAppendBlock(blockchainUpdater, utxStorage, pos, time)
-      else appendBlock(blockchainUpdater, utxStorage, verify = false)
-    append(block)
+  private[appender] def appendBlock(
+      blockchainUpdater: BlockchainUpdater with Blockchain,
+      utxStorage: UtxPoolImpl,
+      pos: PoSSelector,
+      time: Time,
+      verify: Boolean
+  )(block: Block): Either[ValidationError, Option[Int]] = {
+    if (verify)
+      validateAndAppendBlock(blockchainUpdater, utxStorage, pos, time)(block)
+    else
+      pos
+        .validateGenerationSignature(block)
+        .flatMap(hitSource => appendBlock(blockchainUpdater, utxStorage, verify = false)(block, hitSource))
   }
 
-  private[appender] def validateAndAppendBlock(blockchainUpdater: BlockchainUpdater with Blockchain,
-                                               utxStorage: UtxPoolImpl,
-                                               pos: PoSSelector,
-                                               time: Time)(block: Block): Either[ValidationError, Option[Int]] =
+  private[appender] def validateAndAppendBlock(
+      blockchainUpdater: BlockchainUpdater with Blockchain,
+      utxStorage: UtxPoolImpl,
+      pos: PoSSelector,
+      time: Time
+  )(block: Block): Either[ValidationError, Option[Int]] =
     for {
       _ <- Either.cond(
-        !blockchainUpdater.hasScript(block.sender),
+        !blockchainUpdater.hasAccountScript(block.sender.toAddress),
         (),
         BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block)
       )
-      _ <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime(), block) { (height, parent) =>
-        val balance = blockchainUpdater.generatingBalance(block.sender, Some(parent))
+      hitSource <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime(), block) { (height, parent) =>
+        val balance = blockchainUpdater.generatingBalance(block.sender.toAddress, Some(parent))
         Either.cond(
           blockchainUpdater.isEffectiveBalanceValid(height, block, balance),
           balance,
           s"generator's effective balance $balance is less that required for generation"
         )
       }
-      baseHeight <- appendBlock(blockchainUpdater, utxStorage, verify = true)(block)
+      baseHeight <- appendBlock(blockchainUpdater, utxStorage, verify = true)(block, hitSource)
     } yield baseHeight
 
   private def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPoolImpl, verify: Boolean)(
-      block: Block): Either[ValidationError, Option[Int]] =
-    metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, verify)).map { maybeDiscardedTxs =>
+      block: Block,
+      hitSource: ByteStr
+  ): Either[ValidationError, Option[Int]] =
+    metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify)).map { maybeDiscardedTxs =>
       metrics.utxRemoveAll.measure(utxStorage.removeAll(block.transactionData))
       maybeDiscardedTxs.map { discarded =>
         metrics.utxDiscardedPut.measure(utxStorage.addAndCleanup(discarded))
@@ -94,23 +102,26 @@ package object appender extends ScorexLogging {
     }
 
   private def blockConsensusValidation(blockchain: Blockchain, pos: PoSSelector, currentTs: Long, block: Block)(
-      genBalance: (Int, BlockId) => Either[String, Long]): Either[ValidationError, Unit] =
+      genBalance: (Int, BlockId) => Either[String, Long]
+  ): Either[ValidationError, ByteStr] =
     metrics.blockConsensusValidation
       .measureSuccessful {
 
-        val blockTime = block.timestamp
+        val blockTime = block.header.timestamp
 
         for {
-          height <- blockchain.heightOf(block.reference).toRight(GenericError(s"height: history does not contain parent ${block.reference}"))
-          parent <- blockchain.parentHeader(block).toRight(GenericError(s"parent: history does not contain parent ${block.reference}"))
+          height <- blockchain
+            .heightOf(block.header.reference)
+            .toRight(GenericError(s"height: history does not contain parent ${block.header.reference}"))
+          parent <- blockchain.parentHeader(block.header).toRight(GenericError(s"parent: history does not contain parent ${block.header.reference}"))
           grandParent = blockchain.parentHeader(parent, 2)
-          effectiveBalance <- genBalance(height, block.reference).left.map(GenericError(_))
-          _                <- validateBlockVersion(height, block, blockchain.settings.functionalitySettings)
+          effectiveBalance <- genBalance(height, block.header.reference).left.map(GenericError(_))
+          _                <- validateBlockVersion(height, block, blockchain)
           _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
           _                <- pos.validateBaseTarget(height, block, parent, grandParent)
-          _                <- pos.validateGeneratorSignature(height, block)
-          _                <- pos.validateBlockDelay(height, block, parent, effectiveBalance).orElse(checkExceptions(height, block))
-        } yield ()
+          hitSource        <- pos.validateGenerationSignature(block)
+          _                <- pos.validateBlockDelay(height, block.header, parent, effectiveBalance).orElse(checkExceptions(height, block))
+        } yield hitSource
       }
       .left
       .map {
@@ -121,20 +132,17 @@ package object appender extends ScorexLogging {
   private def checkExceptions(height: Int, block: Block): Either[ValidationError, Unit] = {
     Either
       .cond(
-        exceptions.contains((height, block.uniqueId)),
+        exceptions.contains((height, block.id())),
         (),
-        GenericError(s"Block time ${block.timestamp} less than expected")
+        GenericError(s"Block time ${block.header.timestamp} less than expected")
       )
   }
 
-  private def validateBlockVersion(height: Int, block: Block, fs: FunctionalitySettings): Either[ValidationError, Unit] = {
-    val version3Height = fs.blockVersion3AfterHeight
+  private def validateBlockVersion(parentHeight: Int, block: Block, blockchain: Blockchain): Either[ValidationError, Unit] = {
     Either.cond(
-      height > version3Height
-        || block.version == Block.GenesisBlockVersion
-        || block.version == Block.PlainBlockVersion,
+      blockchain.blockVersionAt(parentHeight + 1) == block.header.version,
       (),
-      GenericError(s"Block Version 3 can only appear at height greater than $version3Height")
+      GenericError(s"Block version should be equal to ${blockchain.blockVersionAt(parentHeight + 1)}")
     )
   }
 

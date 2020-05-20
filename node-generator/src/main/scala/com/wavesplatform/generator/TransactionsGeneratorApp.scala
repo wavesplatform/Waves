@@ -142,14 +142,12 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       )
   }
 
-  implicit val _: ValueReader[Worker.Settings] = Worker.settingsReader
-
   val defaultConfig =
     ConfigFactory
       .load()
       .as[GeneratorSettings]("generator")
 
-  val wavesSettings = WavesSettings.fromRootConfig(ConfigFactory.load())
+  val wavesSettings = WavesSettings.default()
 
   parser.parse(args, defaultConfig) match {
     case None => parser.failure("Failed to parse command line parameters")
@@ -169,15 +167,15 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
 
       val estimator = wavesSettings.estimator
 
-      val (universe, initialUniTransactions) = preconditions
-        .fold((UniverseHolder(), List.empty[Transaction]))(Preconditions.mk(_, time, estimator))
+      val (universe, initialUniTransactions, initialTailTransactions) = preconditions
+        .fold((UniverseHolder(), List.empty[Transaction], List.empty[Transaction]))(Preconditions.mk(_, time, estimator))
 
       Universe.Accounts = universe.accounts
       Universe.IssuedAssets = universe.issuedAssets
       Universe.Leases = universe.leases
 
       val generator: TransactionGenerator = finalConfig.mode match {
-        case Mode.NARROW   => new NarrowTransactionGenerator(finalConfig.narrow, finalConfig.privateKeyAccounts, estimator)
+        case Mode.NARROW   => NarrowTransactionGenerator(finalConfig.narrow, finalConfig.privateKeyAccounts, time, estimator)
         case Mode.WIDE     => new WideTransactionGenerator(finalConfig.wide, finalConfig.privateKeyAccounts)
         case Mode.DYN_WIDE => new DynamicWideTransactionGenerator(finalConfig.dynWide, finalConfig.privateKeyAccounts)
         case Mode.MULTISIG => new MultisigTransactionGenerator(finalConfig.multisig, finalConfig.privateKeyAccounts, estimator)
@@ -209,10 +207,13 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         }
       }
 
-      val initialGenTransactions = generator.initial
+      val initialGenTransactions     = generator.initial
+      val initialGenTailTransactions = generator.tailInitial
 
       log.info(s"Universe precondition transactions size: ${initialUniTransactions.size}")
       log.info(s"Generator precondition transactions size: ${initialGenTransactions.size}")
+      log.info(s"Universe precondition tail transactions size: ${initialTailTransactions.size}")
+      log.info(s"Generator precondition tail transactions size: ${initialGenTailTransactions.size}")
 
       val workers = finalConfig.sendTo.map {
         case NodeAddress(node, nodeRestUrl) =>
@@ -226,7 +227,8 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
             nodeRestUrl,
             () => canContinue,
             initialUniTransactions ++ initialGenTransactions,
-            finalConfig.privateKeyAccounts.map(_.toAddress.stringRepr)
+            finalConfig.privateKeyAccounts.map(_.toAddress.stringRepr),
+            initialTailTransactions ++ initialGenTailTransactions
           )
       }
 

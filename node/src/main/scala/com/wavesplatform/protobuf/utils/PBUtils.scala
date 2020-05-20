@@ -1,7 +1,9 @@
 package com.wavesplatform.protobuf.utils
+
+import cats.implicits._
 import com.google.protobuf.CodedOutputStream
 import com.wavesplatform.common.state.ByteStr
-import scalapb.GeneratedMessage
+import scalapb.{GeneratedMessage, GeneratedMessageCompanion}
 
 import scala.util.control.NonFatal
 
@@ -21,4 +23,12 @@ object PBUtils {
 
     outArray
   }
+
+  def decode[A <: GeneratedMessage with scalapb.Message[A]](msg: Array[Byte], cmp: GeneratedMessageCompanion[A]): Either[Throwable, A] =
+    cmp
+      .validate(msg)
+      .toEither
+      .adaptErr {
+        case err => new RuntimeException(s"Error deserializing PB message: $cmp (bytes = ${ByteStr(msg)})", err)
+      }
 }

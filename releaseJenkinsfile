@@ -53,13 +53,12 @@ if (currentBuild.result == Constants.PIPELINE_ABORTED){
     return
 }
 
-node('vostok'){
+node('wavesnode'){
     currentBuild.result = Constants.PIPELINE_SUCCESS
 
     timestamps {
         wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm']) {
             try {
-
                 currentBuild.displayName = "#${env.BUILD_NUMBER} - ${branch} - release ${tag}"
 
                 stage('Checkout') {
@@ -83,6 +82,7 @@ node('vostok'){
                             replacement="as builder\nCOPY ./.ivy2 /root/.ivy2\nCOPY ./.sbt /root/.sbt"
                             writeFile file: "Dockerfile", text: text.replace('as builder', replacement).replace('sbt "node/assembly"','true')
                         }
+
                         def dockerImageBuilder = imageIt(
                             dockerRegistryAddress: dockerRegistryAddress,
                             dockerRegistryCreds: dockerRegistryCreds,

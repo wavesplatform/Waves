@@ -7,6 +7,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -34,14 +35,14 @@ class BlockchainUpdaterLiquidBlockTest
 
       val prevBlock = unsafeBlock(
         reference = randomSig,
-        txs = Seq(GenesisTransaction.create(richAccount, ENOUGH_AMT, 0).explicitGet()),
+        txs = Seq(GenesisTransaction.create(richAccount.toAddress, ENOUGH_AMT, 0).explicitGet()),
         signer = TestBlock.defaultSigner,
         version = 3,
         timestamp = 0
       )
 
       val (keyBlock, microBlocks) = unsafeChainBaseAndMicro(
-        totalRefTo = prevBlock.signerData.signature,
+        totalRefTo = prevBlock.signature,
         base = keyBlockTxs,
         micros = microTxs.grouped(math.max(1, txNumberInMicros / 5)).toSeq,
         signer = TestBlock.defaultSigner,
@@ -63,7 +64,7 @@ class BlockchainUpdaterLiquidBlockTest
           } yield ()
 
           val r = microBlocks.foldLeft(blocksApplied) {
-            case (Right(_), curr) => d.blockchainUpdater.processMicroBlock(curr)
+            case (Right(_), curr) => d.blockchainUpdater.processMicroBlock(curr).map(_ => ())
             case (x, _)           => x
           }
 
@@ -73,9 +74,9 @@ class BlockchainUpdaterLiquidBlockTest
               case x =>
                 val txNumberByMicroBlock = microBlocks.map(_.transactionData.size)
                 fail(
-                  s"Unexpected result: $x. keyblock txs: ${keyBlock.transactionCount}, " +
+                  s"Unexpected result: $x. keyblock txs: ${keyBlock.transactionData.length}, " +
                     s"microblock txs: ${txNumberByMicroBlock.mkString(", ")} (total: ${txNumberByMicroBlock.sum}), " +
-                    s"total txs: ${keyBlock.transactionCount + txNumberByMicroBlock.sum}"
+                    s"total txs: ${keyBlock.transactionData.length + txNumberByMicroBlock.sum}"
                 )
             }
           }

@@ -30,6 +30,7 @@ object FunctionIds {
 
   val SIZE_LIST: Short         = 400
   val GET_LIST: Short          = 401
+  val MEDIAN_LIST: Short       = 405
   val LONG_TO_BYTES: Short     = 410
   val STRING_TO_BYTES: Short   = 411
   val BOOLEAN_TO_BYTES: Short  = 412
@@ -37,6 +38,8 @@ object FunctionIds {
   val BOOLEAN_TO_STRING: Short = 421
 
   val CREATE_LIST: Short = 1100
+  val APPEND_LIST: Short = 1101
+  val CONCAT_LIST: Short = 1102
 
   val UTF8STRING: Short   = 1200
   val BININT: Short       = 1201
@@ -63,6 +66,16 @@ object FunctionIds {
   val FROMBASE16: Short = 605
 
   val CHECK_MERKLE_PROOF: Short = 700
+  val CREATE_MERKLE_ROOT: Short = 701
+
+  val BLS12_GROTH16_VERIFY: Short = 800
+
+  val BLS12_GROTH16_VERIFY_LIM: Short = 2400 // Reserved n id for generated limited functions
+  val SIGVERIFY_LIM: Short = 2500 // Reserved n id for generated limited functions
+  val RSAVERIFY_LIM: Short = 2600 // Reserved n id for generated limited functions
+  val KECCAK256_LIM: Short = 2700 // Reserved n id for generated limited functions
+  val BLAKE256_LIM : Short = 2800 // Reserved n id for generated limited functions
+  val SHA256_LIM   : Short = 2900 // Reserved n id for generated limited functions
 
   // Waves
   val GETTRANSACTIONBYID: Short      = 1000
@@ -71,6 +84,8 @@ object FunctionIds {
   val GETASSETINFOBYID: Short        = 1004
   val BLOCKINFOBYHEIGHT: Short       = 1005
   val TRANSFERTRANSACTIONBYID: Short = 1006
+  val ACCOUNTWAVESBALANCE: Short     = 1007
+  val ACCOUNTASSETONLYBALANCE: Short = 1008
 
   val DATA_LONG_FROM_ARRAY: Short    = 1040
   val DATA_BOOLEAN_FROM_ARRAY: Short = 1041
@@ -85,4 +100,10 @@ object FunctionIds {
   val ADDRESSFROMRECIPIENT: Short = 1060
   val ADDRESSTOSTRING: Short      = 1061
 
+  val TRANSFER_TRANSACTION_FROM_PROTO: Short = 1070
+
+  val CALCULATE_ASSET_ID: Short = 1080
+
+  val SIMPLIFIED_ISSUE_ACTION_CONSTRUCTOR: Short = 1090
+  val DETAILED_ISSUE_ACTION_CONSTRUCTOR: Short   = 1091
 }

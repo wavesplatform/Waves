@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{Asset, Proofs}
+import com.wavesplatform.transaction.{Asset, Proofs, TxVersion}
 import play.api.libs.json._
 
 import scala.util.{Failure, Success}
@@ -42,18 +42,20 @@ object OrderJson {
     case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))
   }
 
-  def readOrderV1V2(sender: PublicKey,
-                    matcher: PublicKey,
-                    assetPair: AssetPair,
-                    orderType: OrderType,
-                    amount: Long,
-                    price: Long,
-                    timestamp: Long,
-                    expiration: Long,
-                    matcherFee: Long,
-                    signature: Option[Array[Byte]],
-                    proofs: Option[Array[Array[Byte]]],
-                    version: Option[Byte]): Order = {
+  def readOrderV1V2(
+      sender: PublicKey,
+      matcher: PublicKey,
+      assetPair: AssetPair,
+      orderType: OrderType,
+      amount: Long,
+      price: Long,
+      timestamp: Long,
+      expiration: Long,
+      matcherFee: Long,
+      signature: Option[Array[Byte]],
+      proofs: Option[Array[Array[Byte]]],
+      version: Option[Byte]
+  ): Order = {
 
     val eproofs =
       proofs
@@ -62,55 +64,32 @@ object OrderJson {
         .getOrElse(Proofs.empty)
 
     val vrsn: Byte = version.getOrElse(if (eproofs.proofs.size == 1 && eproofs.proofs.head.arr.length == SignatureLength) 1 else 2)
-    Order(
-      sender,
-      matcher,
-      assetPair,
-      orderType,
-      amount,
-      price,
-      timestamp,
-      expiration,
-      matcherFee,
-      eproofs,
-      vrsn
-    )
+    Order(vrsn, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs = eproofs)
   }
 
-  def readOrderV3(sender: PublicKey,
-                  matcher: PublicKey,
-                  assetPair: AssetPair,
-                  orderType: OrderType,
-                  amount: Long,
-                  price: Long,
-                  timestamp: Long,
-                  expiration: Long,
-                  matcherFee: Long,
-                  signature: Option[Array[Byte]],
-                  proofs: Option[Array[Array[Byte]]],
-                  version: Byte,
-                  matcherFeeAssetId: Asset): Order = {
+  def readOrderV3V4(
+      sender: PublicKey,
+      matcher: PublicKey,
+      assetPair: AssetPair,
+      orderType: OrderType,
+      amount: Long,
+      price: Long,
+      timestamp: Long,
+      expiration: Long,
+      matcherFee: Long,
+      signature: Option[Array[Byte]],
+      proofs: Option[Array[Array[Byte]]],
+      version: TxVersion,
+      matcherFeeAssetId: Asset
+  ): Order = {
 
     val eproofs =
       proofs
         .map(p => Proofs(p.map(ByteStr.apply)))
-        .orElse(signature.map(s => Proofs(Seq(ByteStr(s)))))
+        .orElse(signature.map(s => Proofs(ByteStr(s))))
         .getOrElse(Proofs.empty)
 
-    Order(
-      sender,
-      matcher,
-      assetPair,
-      orderType,
-      amount,
-      price,
-      timestamp,
-      expiration,
-      matcherFee,
-      eproofs,
-      version,
-      matcherFeeAssetId
-    )
+    Order(version, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, eproofs)
   }
 
   private val assetReads: Reads[Asset] = {
@@ -148,7 +127,7 @@ object OrderJson {
     r(readOrderV1V2 _)
   }
 
-  private val orderV3Reads: Reads[Order] = {
+  private val orderV3V4Reads: Reads[Order] = {
     val r = (JsPath \ "senderPublicKey").read[PublicKey](accountPublicKeyReads) and
       (JsPath \ "matcherPublicKey").read[PublicKey](accountPublicKeyReads) and
       (JsPath \ "assetPair").read[AssetPair] and
@@ -164,14 +143,14 @@ object OrderJson {
       (JsPath \ "matcherFeeAssetId")
         .readNullable[Array[Byte]]
         .map(arrOpt => Asset.fromCompatId(arrOpt.map(ByteStr(_))))
-    r(readOrderV3 _)
+    r(readOrderV3V4 _)
   }
 
   implicit val orderReads: Reads[Order] = {
     case jsOrder @ JsObject(map) =>
       map.getOrElse("version", JsNumber(1)) match {
-        case JsNumber(x) if x.byteValue() == 3 => orderV3Reads.reads(jsOrder)
-        case _                                 => orderV1V2Reads.reads(jsOrder)
+        case JsNumber(x) if x.byteValue() >= Order.V3 => orderV3V4Reads.reads(jsOrder)
+        case _                                        => orderV1V2Reads.reads(jsOrder)
       }
     case invalidOrder => JsError(s"Can't parse invalid order $invalidOrder")
   }

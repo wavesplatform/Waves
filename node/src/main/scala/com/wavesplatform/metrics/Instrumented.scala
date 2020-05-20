@@ -1,7 +1,7 @@
 package com.wavesplatform.metrics
 
 import com.wavesplatform.utils.LoggerFacade
-import kamon.metric.{Histogram, MeasurementUnit}
+import kamon.metric.{MeasurementUnit, Metric}
 
 object Instrumented {
   private[this] val NanosInMS = 1000000L
@@ -24,10 +24,10 @@ object Instrumented {
     result
   }
 
-  def withTime[R](h: Histogram, f: => R): (R, Long) = {
+  def withTime[R](h: Metric.Histogram, f: => R): (R, Long) = {
     import scala.concurrent.duration._
     val (result, nanoTime) = withTimeNanos(f)
-    h.unit match {
+    h.settings.unit match {
       case u if u == MeasurementUnit.time.nanoseconds =>
         (result, nanoTime)
 

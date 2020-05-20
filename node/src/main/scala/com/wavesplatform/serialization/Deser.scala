@@ -1,5 +1,7 @@
 package com.wavesplatform.serialization
 
+import java.nio.ByteBuffer
+
 import com.google.common.primitives.{Bytes, Shorts}
 import scorex.crypto.hash.Digest32
 
@@ -7,12 +9,20 @@ object Deser {
 
   def serializeBoolean(b: Boolean): Array[Byte] = if (b) Array(1: Byte) else Array(0: Byte)
 
-  def serializeArray(b: Array[Byte]): Array[Byte] = {
+  def serializeArrayWithLength(b: Array[Byte]): Array[Byte] = {
     val length = b.length
     if (length.isValidShort)
       Bytes.concat(Shorts.toByteArray(length.toShort), b)
     else
       throw new IllegalArgumentException(s"Attempting to serialize array with size, but the size($length) exceeds MaxShort(${Short.MaxValue})")
+  }
+
+  def parseArrayWithLength(bytes: ByteBuffer): Array[Byte] = {
+    val length = bytes.getShort
+    require(length >= 0, s"Array length should be non-negative, but $length found")
+    val array = new Array[Byte](length)
+    bytes.get(array)
+    array
   }
 
   def parseArrayWithLength(bytes: Array[Byte], position: Int): (Array[Byte], Int) = {
@@ -35,8 +45,12 @@ object Deser {
     } else (None, position + 1)
   }
 
+  def parseByteArrayOptionWithLength(bytes: ByteBuffer): Option[Array[Byte]] = {
+    if (bytes.get() == 1) Some(parseArrayWithLength(bytes)) else None
+  }
+
   def parseOption[T](bytes: Array[Byte], position: Int, length: Int = -1)(deser: Array[Byte] => T): (Option[T], Int) = {
-    if (bytes.slice(position, position + 1).head == (1: Byte)) {
+    if (bytes(position) == (1: Byte)) {
       val (arr, arrPosEnd) =
         if (length < 0) {
           parseArrayWithLength(bytes, position + 1)
@@ -45,6 +59,10 @@ object Deser {
         }
       (Some(deser(arr)), arrPosEnd)
     } else (None, position + 1)
+  }
+
+  def parseOption[T](buf: ByteBuffer)(deser: ByteBuffer => T): Option[T] = {
+    if (buf.get == 1) Some(deser(buf)) else None
   }
 
   def parseArrays(bytes: Array[Byte]): Seq[Array[Byte]] = {
@@ -62,16 +80,26 @@ object Deser {
     r._1
   }
 
+  def parseArrays(buf: ByteBuffer): Seq[Array[Byte]] = {
+    val arraysCount = buf.getShort
+    require(arraysCount >= 0, s"Arrays count should be non-negative, but $arraysCount found")
+    require(
+      arraysCount <= buf.remaining() / 2,
+      s"Bytes with length = ${buf.remaining()} can't contain $arraysCount array(s)"
+    )
+    Vector.fill(arraysCount)(parseArrayWithLength(buf))
+  }
+
   def serializeOption[T](b: Option[T])(ser: T => Array[Byte]): Array[Byte] =
     b.map(a => (1: Byte) +: ser(a)).getOrElse(Array(0: Byte))
 
-  def serializeOptionOfArray[T](b: Option[T])(ser: T => Array[Byte]): Array[Byte] =
-    b.map(a => (1: Byte) +: serializeArray(ser(a))).getOrElse(Array(0: Byte))
+  def serializeOptionOfArrayWithLength[T](b: Option[T])(ser: T => Array[Byte]): Array[Byte] =
+    b.map(a => (1: Byte) +: serializeArrayWithLength(ser(a))).getOrElse(Array(0: Byte))
 
   def serializeArrays(bs: Seq[Array[Byte]]): Array[Byte] = {
     require(bs.length.isValidShort, s"Attempting to serialize array with size, but the size(${bs.length}) exceeds MaxShort(${Short.MaxValue})")
     val countBytes = Shorts.toByteArray(bs.length.toShort)
-    Bytes.concat(Seq(countBytes) ++ bs.map(serializeArray): _*)
+    Bytes.concat(Seq(countBytes) ++ bs.map(serializeArrayWithLength): _*)
   }
 
   def serializeMerkleRootHash(d: Digest32): Array[Byte] = {

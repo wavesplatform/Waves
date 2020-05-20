@@ -1,19 +1,18 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.BinaryDataEntry
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
-import com.wavesplatform.common.utils._
-import com.wavesplatform.it.NodeConfigs
 
 import scala.concurrent.duration._
 
@@ -29,12 +28,12 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
       .overrideBase(_.raw(s"""
                               | waves.blockchain.custom.functionality {
                               |   estimator-pre-check-height =  $featureHeight
-                              |   pre-activated-features = {14 = 0}
+                              |   pre-activated-features = {14 = 0, 15 = 999999}
                               |}""".stripMargin))
       .buildNonConflicting()
 
-  private val smartAcc  = pkByAddress(firstAddress)
-  private val callerAcc = pkByAddress(secondAddress)
+  private val smartAcc  = firstAddress
+  private val callerAcc = secondAddress
 
   private val accScript = ScriptCompiler
     .compile(
@@ -113,7 +112,7 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
 
   test("send waves to accounts") {
 
-    Seq(smartAcc.stringRepr, callerAcc.stringRepr).foreach(
+    Seq(smartAcc, callerAcc).foreach(
       r =>
         sender
           .transfer(
@@ -134,24 +133,28 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
       ),
       BinaryDataEntry(
         "key",
-        Base64.decode(
-          "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA9TuTafHJ0vfVBzFmF0jpUgcYt9Evuqkrk5BYZQyMPK5mB6YCEKDpK+C57oEhKf4sWNhxhBy5pwOQVCXQFO+IWLyTreVDKg091gAosZNFES5uC1hHmMKJUUHoXirEa1Zk6dgc9ErtCe3tJmA5FwVeGG1zg+4PUR3DTBIbPojVFu0GneMU9/p2Yp42PmOwuCzBHSWJxLGqL6wFvQKevT12vesNRSpF+d4Dl6IxDONojJDuPhPdHYIRNaQiSiEWtZ2pwg5WCUTwyl9ZpUM8Cx5e3pwbaqq3vufsbImAAR0QtTbgfi/YaEXj5lrd3Y1T4QWJczEeQHsdKXNkY0ZaErzRVwIDAQAB"
-        )
+        ByteStr
+          .decodeBase64(
+            "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA9TuTafHJ0vfVBzFmF0jpUgcYt9Evuqkrk5BYZQyMPK5mB6YCEKDpK+C57oEhKf4sWNhxhBy5pwOQVCXQFO+IWLyTreVDKg091gAosZNFES5uC1hHmMKJUUHoXirEa1Zk6dgc9ErtCe3tJmA5FwVeGG1zg+4PUR3DTBIbPojVFu0GneMU9/p2Yp42PmOwuCzBHSWJxLGqL6wFvQKevT12vesNRSpF+d4Dl6IxDONojJDuPhPdHYIRNaQiSiEWtZ2pwg5WCUTwyl9ZpUM8Cx5e3pwbaqq3vufsbImAAR0QtTbgfi/YaEXj5lrd3Y1T4QWJczEeQHsdKXNkY0ZaErzRVwIDAQAB"
+          )
+          .get
       ),
       BinaryDataEntry(
         "s",
-        Base64.decode(
-          "E1CFy1u245yo1UNJXVXtW/4H8YSVt+98S7ackF4r1reeJHXL3z8V4rUyiq8B2qVg39GBfGiP82UJlmLbOP9BEztIPdMyLI+mQUBdEPQ35oziXxbJndqnqJozdoSaYUfq4UpEk334y7l6E4xOQmW7IsMhgG+T4+oK6AKXtNxLCB4Dpcaz7xM+kdsi/37usNvKcAfitx3bKdSL0ukFsaDLGuyingqIcofa7lj4s/xybWI1d4xcjhRUFbOzslnWeuoxePUZ/UJvg2wOhG/HtTVbfVc6z0nvS+yfju/AqAiPUdcsfu8dfu5xZsxf0HiXU6vweFWUHV5tY6SauZuopkcJEw=="
-        )
+        ByteStr
+          .decodeBase64(
+            "E1CFy1u245yo1UNJXVXtW/4H8YSVt+98S7ackF4r1reeJHXL3z8V4rUyiq8B2qVg39GBfGiP82UJlmLbOP9BEztIPdMyLI+mQUBdEPQ35oziXxbJndqnqJozdoSaYUfq4UpEk334y7l6E4xOQmW7IsMhgG+T4+oK6AKXtNxLCB4Dpcaz7xM+kdsi/37usNvKcAfitx3bKdSL0ukFsaDLGuyingqIcofa7lj4s/xybWI1d4xcjhRUFbOzslnWeuoxePUZ/UJvg2wOhG/HtTVbfVc6z0nvS+yfju/AqAiPUdcsfu8dfu5xZsxf0HiXU6vweFWUHV5tY6SauZuopkcJEw=="
+          )
+          .get
       )
     )
-    sender.putData(smartAcc.stringRepr, data, 0.3.waves, waitForTx = true)
+    sender.putData(smartAcc, data, 0.3.waves, waitForTx = true)
   }
 
   test("can issue scripted asset and set script fro asset before precheck activation") {
     issuedAssetId = sender
       .issue(
-        smartAcc.stringRepr,
+        smartAcc,
         "Test",
         "Test asset",
         1000,
@@ -165,7 +168,7 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
     sender
       .setAssetScript(
         issuedAssetId,
-        smartAcc.stringRepr,
+        smartAcc,
         issueFee,
         Some(assetScript),
         waitForTx = true
@@ -175,12 +178,12 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
   }
 
   test("can set contract and invoke script before precheck activation") {
-    sender.setScript(smartAcc.stringRepr, Some(accScript), setScriptFee + smartFee, waitForTx = true).id
+    sender.setScript(smartAcc, Some(accScript), setScriptFee + smartFee, waitForTx = true).id
 
     sender
       .invokeScript(
-        callerAcc.stringRepr,
-        smartAcc.stringRepr,
+        callerAcc,
+        smartAcc,
         Some("default"),
         List.empty,
         Seq.empty,
@@ -191,7 +194,7 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
       ._1
       .id
 
-    sender.setScript(smartAcc.stringRepr, Some(accScript), setScriptFee + smartFee, waitForTx = true).id
+    sender.setScript(smartAcc, Some(accScript), setScriptFee + smartFee, waitForTx = true).id
   }
 
   test(s"wait height from to $featureHeight for precheck activation") {
@@ -202,12 +205,12 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     assertBadRequestAndMessage(
       sender.issue(
-        smartAcc.stringRepr,
+        smartAcc,
         "Test",
         "Test asset",
         1000,
         8,
-        fee = issueFee+smartFee,
+        fee = issueFee + smartFee,
         script = Some(assetScript)
       ),
       "Script is too complex: 33280 > 4000"
@@ -218,8 +221,8 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
     assertBadRequestAndMessage(
       sender.setAssetScript(
         issuedAssetId,
-        smartAcc.stringRepr,
-        issueFee+smartFee,
+        smartAcc,
+        issueFee + smartFee,
         Some(assetScript)
       ),
       "Script is too complex: 33280 > 4000"
@@ -227,14 +230,17 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
   }
 
   test("can't set contract to account after estimator v1 precheck activation") {
-    assertBadRequestAndMessage(sender.setScript(smartAcc.stringRepr, Some(accScript), setScriptFee + smartFee), "Contract function (default) is too complex")
+    assertBadRequestAndMessage(
+      sender.setScript(smartAcc, Some(accScript), setScriptFee + smartFee),
+      "Contract function (default) is too complex"
+    )
   }
 
   test("can still invoke account and asset scripts after estimator v1 precheck activation") {
     sender
       .invokeScript(
-        callerAcc.stringRepr,
-        smartAcc.stringRepr,
+        callerAcc,
+        smartAcc,
         Some("default"),
         List.empty,
         Seq.empty,
@@ -245,7 +251,7 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
       ._1
       .id
 
-    sender.transfer(smartAcc.stringRepr, callerAcc.stringRepr, 1, minFee + 2 * smartFee, Some(issuedAssetId), None, waitForTx = true)
+    sender.transfer(smartAcc, callerAcc, 1, minFee + 2 * smartFee, Some(issuedAssetId), None, waitForTx = true)
   }
 
 }

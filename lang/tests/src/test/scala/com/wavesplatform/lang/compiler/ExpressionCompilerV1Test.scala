@@ -4,6 +4,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.Common._
+import com.wavesplatform.lang.v1.compiler.CompilerContext.VariableInfo
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
@@ -52,7 +53,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
 
   treeTypeTest("GETTER")(
     ctx =
-      CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> pointType), functionDefs = Map.empty),
+      CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> VariableInfo(AnyPos, pointType)), functionDefs = Map.empty),
     expr = Expressions.GETTER(
       AnyPos,
       ref = Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
@@ -65,7 +66,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
 
   treeTypeTest("REF(OBJECT)")(
     ctx =
-      CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> pointType), functionDefs = Map.empty),
+      CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> VariableInfo(AnyPos, pointType)), functionDefs = Map.empty),
     expr = Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
     expectedResult = {
         res: Either[String, (EXPR, TYPE)] => res shouldBe Right((REF("p"), pointType))
@@ -74,7 +75,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
 
   treeTypeTest("REF x = y")(
     ctx =
-      CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> pointType), functionDefs = Map.empty),
+      CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> VariableInfo(AnyPos, pointType)), functionDefs = Map.empty),
     expr = Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
     expectedResult = {
         res: Either[String, (EXPR, TYPE)] => res shouldBe Right((REF("p"), pointType))
@@ -275,7 +276,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       )
     ),
     expectedResult = {
-        res: Either[String, (EXPR, TYPE)] => res shouldBe Left("Compilation failed: Value 'foo' already defined in the scope in -1--1")
+        res: Either[String, (EXPR, TYPE)] => res should produce("Value 'foo' already defined in the scope in -1--1")
       }
   )
 
@@ -304,7 +305,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       )
     ),
     expectedResult = {
-        res: Either[String, (EXPR, TYPE)] => res shouldBe Left("Compilation failed: Value 'p' already defined in the scope in -1--1")
+        res: Either[String, (EXPR, TYPE)] => res should produce("Value 'p' already defined in the scope in -1--1")
       }
   )
 
@@ -334,7 +335,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     ),
     expectedResult = {
         res: Either[String, (EXPR, TYPE)] =>
-          res.left.get.startsWith("Compilation failed: Undefined type: `Point0`, expected: PointA, PointB") shouldBe true
+          res should produce("Undefined type: `Point0`, expected: PointA, PointB")
       }
   )
 
@@ -346,7 +347,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
     ),
     expectedResult = {
-        res: Either[String, (EXPR, TYPE)] => res shouldBe Left("Compilation failed: can't parse in 0-1")
+        res: Either[String, (EXPR, TYPE)] => res should produce("can't parse in 0-1")
       }
   )
 
@@ -355,7 +356,8 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     expr =
       Expressions.GETTER(AnyPos, Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x")), Expressions.PART.INVALID(Pos(2, 3), "can't parse")),
     expectedResult = {
-        res: Either[String, (EXPR, TYPE)] => res shouldBe Left("Compilation failed: can't parse in 2-3")
+        res: Either[String, (EXPR, TYPE)] =>
+          res should produce("can't parse in 2-3")
       }
   )
 
@@ -363,7 +365,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     ctx = compilerContext,
     expr = Expressions.CONST_BYTESTR(AnyPos, Expressions.PART.INVALID(AnyPos, "can't parse")),
     expectedResult = {
-        res: Either[String, (EXPR, TYPE)] => res shouldBe Left("Compilation failed: can't parse in -1--1")
+        res: Either[String, (EXPR, TYPE)] => res should produce("can't parse in -1--1")
       }
   )
 
@@ -371,7 +373,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     ctx = compilerContext,
     expr = Expressions.CONST_STRING(AnyPos, Expressions.PART.INVALID(AnyPos, "can't parse")),
     expectedResult = {
-        res: Either[String, (EXPR, TYPE)] => res shouldBe Left("Compilation failed: can't parse in -1--1")
+        res: Either[String, (EXPR, TYPE)] => res should produce("can't parse in -1--1")
       }
   )
 
@@ -379,7 +381,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     ctx = compilerContext,
     expr = Expressions.REF(AnyPos, Expressions.PART.INVALID(AnyPos, "can't parse")),
     expectedResult = {
-        res: Either[String, (EXPR, TYPE)] => res shouldBe Left("Compilation failed: can't parse in -1--1")
+        res: Either[String, (EXPR, TYPE)] => res should produce("can't parse in -1--1")
       }
   )
 
@@ -387,7 +389,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     ctx = compilerContext,
     expr = Expressions.FUNCTION_CALL(AnyPos, Expressions.PART.INVALID(AnyPos, "can't parse"), List.empty),
     expectedResult = {
-        res: Either[String, (EXPR, TYPE)] => res shouldBe Left("Compilation failed: can't parse in -1--1")
+        res: Either[String, (EXPR, TYPE)] => res should produce("can't parse in -1--1")
       }
   )
 
@@ -395,7 +397,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     ctx = compilerContext,
     expr = Expressions.INVALID(AnyPos, "###"),
     expectedResult = {
-        res: Either[String, (EXPR, TYPE)] => res shouldBe Left("Compilation failed: ### in -1--1")
+        res: Either[String, (EXPR, TYPE)] => res should produce("### in -1--1")
       }
   )
 
@@ -439,7 +441,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       List(Expressions.TRUE(AnyPos), Expressions.CONST_LONG(AnyPos, 1))
     ),
     expectedResult = {
-        res: Either[String, (EXPR, TYPE)] => res shouldBe Left("Compilation failed: Can't find a function overload 'dropRight'(Boolean, Int) in -1--1")
+        res: Either[String, (EXPR, TYPE)] => res should produce("Can't find a function overload 'dropRight'(Boolean, Int) in -1--1")
       }
   )
 
@@ -493,7 +495,8 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
 
   private def treeTypeTest(propertyName: String)(expr: Expressions.EXPR, expectedResult: Either[String, (EXPR, TYPE)] => org.scalatest.compatible.Assertion, ctx: CompilerContext): Unit =
     property(propertyName) {
-      expectedResult(compiler.ExpressionCompiler(ctx, expr))
+      val res = compiler.ExpressionCompiler(ctx, expr)
+      expectedResult(res)
     }
 
 }

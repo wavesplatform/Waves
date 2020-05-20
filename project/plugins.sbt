@@ -1,7 +1,5 @@
 resolvers ++= Seq(
-  "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
-  "Artima Maven Repository" at "http://repo.artima.com/releases",
-  "JBoss" at "https://repository.jboss.org",
+  Resolver.typesafeRepo("releases"),
   Resolver.sbtPluginRepo("releases")
 )
 

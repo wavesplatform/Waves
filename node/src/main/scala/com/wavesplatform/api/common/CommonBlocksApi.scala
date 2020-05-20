@@ -1,81 +1,78 @@
 package com.wavesplatform.api.common
 
-import com.wavesplatform.api.http.ApiError
-import com.wavesplatform.api.http.ApiError._
+import com.wavesplatform.account.Address
+import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.protobuf.block.VanillaBlock
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.transaction.Transaction
 import monix.reactive.Observable
 
-private[api] class CommonBlocksApi(blockchain: Blockchain) {
-  private[this] def fixHeight(h: Int) = if (h <= 0) blockchain.height + h else h
+trait CommonBlocksApi {
+  def blockDelay(blockId: BlockId, blockNum: Int): Option[Long]
 
-  def blocksRange(fromHeight: Int, toHeight: Int): Observable[(VanillaBlock, Int)] = {
-    Observable
-      .fromIterable(fixHeight(fromHeight) to fixHeight(toHeight))
-      .map(height => (blockchain.blockAt(height), height))
-      .collect { case (Some(block), height) => (block, height) }
-  }
+  def currentHeight: Int
 
-  def childBlock(blockId: BlockId): Option[(VanillaBlock, Int)] = {
-    for {
-      height     <- blockchain.heightOf(blockId)
-      childBlock <- blockchain.blockAt(height + 1)
-    } yield (childBlock, height + 1)
-  }
+  def block(blockId: BlockId): Option[(BlockMeta, Seq[Transaction])]
 
-  def calcBlocksDelay(blockId: BlockId, blockNum: Int): Either[ApiError, Long] = {
-    getBlockById(blockId).toRight(BlockDoesNotExist).flatMap { block =>
-      blockchain
-        .parentHeader(block, blockNum)
-        .map(parent => (block.timestamp - parent.timestamp) / blockNum)
-        .toRight(CustomValidationError(s"Cannot go $blockNum blocks back"))
-    }
-  }
+  def blockAtHeight(height: Int): Option[(BlockMeta, Seq[Transaction])]
 
-  def blockHeight(blockId: BlockId): Option[Int] = {
-    blockchain.heightOf(blockId)
-  }
+  def blocksRange(fromHeight: Int, toHeight: Int): Observable[(BlockMeta, Seq[Transaction])]
 
-  def currentHeight(): Int = {
-    blockchain.height
-  }
+  def blocksRange(fromHeight: Int, toHeight: Int, generatorAddress: Address): Observable[(BlockMeta, Seq[Transaction])]
 
-  def blockAtHeight(height: Int): Option[VanillaBlock] = {
-    blockchain.blockAt(height)
-  }
+  def meta(id: ByteStr): Option[BlockMeta]
 
-  def blockHeaderAtHeight(height: Int): Option[(BlockHeader, Int)] = {
-    blockchain.blockHeaderAndSize(height)
-  }
+  def metaAtHeight(height: Int): Option[BlockMeta]
 
-  def blockHeadersRange(fromHeight: Int, toHeight: Int): Observable[(BlockHeader, Int, Int)] = {
-    Observable
-      .fromIterable(fixHeight(fromHeight) to fixHeight(toHeight))
-      .map(height => (height, blockchain.blockHeaderAndSize(height)))
-      .collect { case (height, Some((header, size))) => (header, size, height) }
-  }
+  def metaRange(fromHeight: Int, toHeight: Int): Observable[BlockMeta]
+}
 
-  def lastBlock(): Option[VanillaBlock] = {
-    blockchain.lastBlock
-  }
+object CommonBlocksApi {
+  def apply(
+      blockchain: Blockchain,
+      metaAt: Int => Option[BlockMeta],
+      blockAt: Int => Option[(BlockMeta, Seq[Transaction])]
+  ): CommonBlocksApi = new CommonBlocksApi {
+    private def fixHeight(h: Int)                  = if (h <= 0) blockchain.height + h else h
+    private def heightOf(id: ByteStr): Option[Int] = blockchain.heightOf(id)
 
-  def lastBlockHeaderAndSize(): Option[(VanillaBlock, Int)] = {
-    blockchain.lastBlock.map(block => (block, block.bytes().length))
-  }
+    def blocksRange(fromHeight: Int, toHeight: Int): Observable[(BlockMeta, Seq[Transaction])] =
+      Observable.fromIterable((fixHeight(fromHeight) to fixHeight(toHeight)).flatMap(h => blockAt(h)))
 
-  def firstBlock(): VanillaBlock = {
-    blockchain.genesis
-  }
+    def blocksRange(fromHeight: Int, toHeight: Int, generatorAddress: Address): Observable[(BlockMeta, Seq[Transaction])] =
+      Observable.fromIterable(
+        (fixHeight(fromHeight) to fixHeight(toHeight))
+          .flatMap(h => metaAt(h))
+          .collect { case m if m.header.generator.toAddress == generatorAddress => m.height }
+          .flatMap(h => blockAt(h))
+      )
 
-  def blockBySignature(blockId: BlockId): Option[VanillaBlock] = {
-    getBlockById(blockId)
-  }
+    def blockDelay(blockId: BlockId, blockNum: Int): Option[Long] =
+      heightOf(blockId)
+        .map { maxHeight =>
+          val minHeight  = maxHeight - blockNum.max(1)
+          val allHeaders = (minHeight to maxHeight).flatMap(h => metaAt(h))
+          val totalPeriod = allHeaders
+            .sliding(2)
+            .map { pair =>
+              pair(1).header.timestamp - pair(0).header.timestamp
+            }
+            .sum
+          totalPeriod / allHeaders.size
+        }
 
-  private[this] def getBlockById(signature: ByteStr): Option[VanillaBlock] = {
-    blockchain
-      .blockById(signature)
+    def currentHeight: Int = blockchain.height
+
+    def blockAtHeight(height: Int): Option[(BlockMeta, Seq[Transaction])] = blockAt(height)
+
+    def metaAtHeight(height: Int): Option[BlockMeta] = metaAt(height)
+
+    def meta(id: ByteStr): Option[BlockMeta] = heightOf(id).flatMap(metaAt)
+
+    def metaRange(fromHeight: Int, toHeight: Int): Observable[BlockMeta] =
+      Observable.fromIterable((fixHeight(fromHeight) to fixHeight(toHeight)).flatMap(h => metaAt(h)))
+
+    def block(blockId: BlockId): Option[(BlockMeta, Seq[Transaction])] = heightOf(blockId).flatMap(h => blockAt(h))
   }
 }

@@ -71,7 +71,8 @@ case class FunctionalitySettings(
     maxTransactionTimeForwardOffset: FiniteDuration = 90.minutes,
     lastTimeBasedForkParameter: Long = 0L,
     leaseExpiration: Int = 1000000,
-    estimatorPreCheckHeight: Int = 0
+    estimatorPreCheckHeight: Int = 0,
+    minAssetInfoUpdateInterval: Int = 100000
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int        = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil                       = lastTimeBasedForkParameter
@@ -86,6 +87,7 @@ case class FunctionalitySettings(
     (blocksForFeatureActivation > 0) && (blocksForFeatureActivation <= featureCheckBlocksPeriod),
     s"blocksForFeatureActivation must be in range 1 to $featureCheckBlocksPeriod"
   )
+  require(minAssetInfoUpdateInterval >= 0, "minAssetInfoUpdateInterval must be greater than or equal to 0")
 
   def activationWindowSize(height: Int): Int =
     featureCheckBlocksPeriod * (if (height <= doubleFeaturesPeriodsAfterHeight) 1 else 2)
@@ -130,7 +132,8 @@ object FunctionalitySettings {
     featureCheckBlocksPeriod = 100,
     blocksForFeatureActivation = 40,
     doubleFeaturesPeriodsAfterHeight = 1000000000,
-    preActivatedFeatures = (1 to 13).map(_.toShort -> 0).toMap
+    preActivatedFeatures = (1 to 13).map(_.toShort -> 0).toMap,
+    minAssetInfoUpdateInterval = 10
   )
 
   val configPath = "waves.blockchain.custom.functionality"
@@ -202,7 +205,8 @@ case class BlockchainSettings(
     addressSchemeCharacter: Char,
     functionalitySettings: FunctionalitySettings,
     genesisSettings: GenesisSettings,
-    rewardsSettings: RewardsSettings
+    rewardsSettings: RewardsSettings,
+    useEvaluatorV2: Boolean
 )
 
 object BlockchainType extends Enumeration {
@@ -235,12 +239,12 @@ object BlockchainSettings {
         val rewardsSettings        = config.as[RewardsSettings](s"custom.rewards")
         (addressSchemeCharacter, functionalitySettings, genesisSettings, rewardsSettings)
     }
-
     BlockchainSettings(
       addressSchemeCharacter = addressSchemeCharacter,
       functionalitySettings = functionalitySettings,
       genesisSettings = genesisSettings,
-      rewardsSettings = rewardsSettings
+      rewardsSettings = rewardsSettings,
+      useEvaluatorV2 = false
     )
   }
 }

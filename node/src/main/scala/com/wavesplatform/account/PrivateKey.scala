@@ -1,12 +1,13 @@
 package com.wavesplatform.account
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.transaction.TxValidationError.GenericError
 import play.api.libs.json.{Format, Writes}
 import supertagged._
+import com.wavesplatform.crypto.KeyLength
 
 object PrivateKey extends TaggedType[ByteStr] {
   def apply(privateKey: ByteStr): PrivateKey = {
+    require(privateKey.arr.length == KeyLength, s"invalid public key length: ${privateKey.arr.length}")
     privateKey @@ PrivateKey
   }
 
@@ -16,16 +17,8 @@ object PrivateKey extends TaggedType[ByteStr] {
   def unapply(arg: Array[Byte]): Option[PrivateKey] =
     Some(apply(arg))
 
-  @deprecated("Use KeyPair.fromSeed", "0.17.0")
-  def fromSeed(seed: ByteStr): PrivateKey =
-    KeyPair(seed).privateKey
-
-  @deprecated("Use KeyPair.fromSeed", "0.17.0")
-  def fromSeed(base58: String): Either[GenericError, PrivateKey] =
-    KeyPair.fromSeed(base58).map(_.privateKey)
-
   implicit lazy val jsonFormat: Format[PrivateKey] = Format[PrivateKey](
-    com.wavesplatform.utils.byteStrWrites.map(this.apply),
-    Writes(pk => com.wavesplatform.utils.byteStrWrites.writes(pk))
+    com.wavesplatform.utils.byteStrFormat.map(this.apply),
+    Writes(pk => com.wavesplatform.utils.byteStrFormat.writes(pk))
   )
 }
