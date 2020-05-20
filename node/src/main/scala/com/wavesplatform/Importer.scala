@@ -6,6 +6,7 @@ import akka.actor.ActorSystem
 import com.google.common.primitives.Ints
 import com.wavesplatform.Exporter.Formats
 import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonBlocksApi, CommonTransactionsApi}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
@@ -20,6 +21,7 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.appender.BlockAppender
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, BlockchainUpdater, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils._
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
@@ -79,7 +81,7 @@ object Importer extends ScorexLogging {
           },
         opt[Unit]('n', "no-verify")
           .text("Disable signatures verification")
-          .action((n, c) => c.copy(verify = false)),
+          .action((_, c) => c.copy(verify = false)),
         help("help").hidden()
       )
     }
@@ -101,6 +103,7 @@ object Importer extends ScorexLogging {
   ): Seq[Extension] =
     if (wavesSettings.extensions.isEmpty) Seq.empty
     else {
+      def notImplementedDuringImport[A]: A = throw new NotImplementedError("Not implemented during import")
       val extensionContext: Context = {
         val t = time
         new Context {
@@ -109,23 +112,22 @@ object Importer extends ScorexLogging {
           override def rollbackTo(blockId: ByteStr): Task[Either[ValidationError, DiscardedBlocks]] =
             Task(blockchainUpdater.removeAfter(blockId)).executeOn(appenderScheduler)
           override def time: Time     = t
-          override def wallet: Wallet = ???
+          override def wallet: Wallet = notImplementedDuringImport
           override def utx: UtxPool   = utxPool
 
-          override def broadcastTransaction(tx: Transaction)                 = ???
-          override def spendableBalanceChanged: Observable[(Address, Asset)] = ???
-          override def actorSystem: ActorSystem                              = ???
-          override def blockchainUpdated: Observable[BlockchainUpdated]      = blockchainUpdatedObservable
-          override def utxEvents: Observable[UtxEvent]                       = Observable.empty
-          override def transactionsApi                                       = ???
-          override def blocksApi                                             = ???
-          override def accountsApi                                           = ???
-          override def assetsApi                                             = ???
+          override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] = notImplementedDuringImport
+          override def spendableBalanceChanged: Observable[(Address, Asset)]                         = notImplementedDuringImport
+          override def actorSystem: ActorSystem                                                      = notImplementedDuringImport
+          override def blockchainUpdated: Observable[BlockchainUpdated]                              = blockchainUpdatedObservable
+          override def utxEvents: Observable[UtxEvent]                                               = Observable.empty
+          override def transactionsApi: CommonTransactionsApi                                        = notImplementedDuringImport
+          override def blocksApi: CommonBlocksApi                                                    = notImplementedDuringImport
+          override def accountsApi: CommonAccountsApi                                                = notImplementedDuringImport
+          override def assetsApi: CommonAssetsApi                                                    = notImplementedDuringImport
         }
       }
 
       val extensions = wavesSettings.extensions.map { extensionClassName =>
-        println(extensionClassName)
         val extensionClass = Class.forName(extensionClassName).asInstanceOf[Class[Extension]]
         val ctor           = extensionClass.getConstructor(classOf[Context])
         log.info(s"Enable extension: $extensionClassName")
