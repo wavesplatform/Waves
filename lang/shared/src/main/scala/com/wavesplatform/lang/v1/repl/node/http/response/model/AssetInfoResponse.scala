@@ -7,6 +7,7 @@ private[node] case class AssetInfoResponse(
     quantity:             Long,
     decimals:             Int,
     issuer:               ByteString,
+    issuerPublicKey:      ByteString,
     reissuable:           Boolean,
     scripted:             Boolean,
     minSponsoredAssetFee: Option[Long]

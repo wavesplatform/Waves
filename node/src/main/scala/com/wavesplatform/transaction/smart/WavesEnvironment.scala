@@ -50,7 +50,7 @@ class WavesEnvironment(
   override def inputEntity: InputEntity =
     in.value
 
-  override def transferTransactionById(id: Array[Byte]): Option[Tx] =
+  override def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer] =
     blockchain
       .transferById(ByteStr(id))
       .map(t => RealTransactionWrapper.mapTransferTx(t._2, ds.stdLibVersion))
