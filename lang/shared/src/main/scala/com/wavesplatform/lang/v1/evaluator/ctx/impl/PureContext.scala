@@ -517,11 +517,14 @@ object PureContext {
   lazy val makeString: BaseFunction[NoContext] =
     NativeFunction("makeString", 30, MAKESTRING, listString, ("list", LIST(STRING)), ("separator", STRING)) {
       case (arr: ARR) :: CONST_STRING(separator) :: Nil =>
-        val expectedStringSize = arr.elementsWeightSum
-        if (expectedStringSize <= DATA_TX_BYTES_MAX)
+        val separatorStringSize =
+          if (arr.xs.length > 1) (arr.xs.length - 1) * separator.length
+          else 0
+        val expectedStringSize = arr.elementsWeightSum + separatorStringSize
+        if (expectedStringSize <= DataEntryValueMax)
           CONST_STRING(arr.xs.mkString(separator))
         else
-          Left(s"Constructing string size = $expectedStringSize bytes will exceed $DATA_TX_BYTES_MAX")
+          Left(s"Constructing string size = $expectedStringSize bytes will exceed $DataEntryValueMax")
       case xs =>
         notImplemented[Id, EVALUATED]("makeString(list: List[String], separator: String)", xs)
     }

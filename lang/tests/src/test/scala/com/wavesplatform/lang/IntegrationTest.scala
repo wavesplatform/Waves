@@ -1768,13 +1768,14 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("makeString") {
     eval(""" ["cat", "dog", "pig"].makeString(", ") """, version = V4) shouldBe CONST_STRING("cat, dog, pig")
     eval(""" [].makeString(", ") """, version = V4) shouldBe CONST_STRING("")
+    eval(""" ["abc"].makeString(", ") """, version = V4) shouldBe CONST_STRING("abc")
 
-    val script = s""" [${s""" "${"a" * 1024}", """ * 150} "a"].makeString(", ") """
-    eval(script, version = V4) should produce("Constructing string size = 153601 bytes will exceed 153600")
+    val script = s""" [${s""" "${"a" * 1000}", """ * 32} "${"a" * 704}"].makeString(", ") """
+    eval(script, version = V4) should produce("Constructing string size = 32768 bytes will exceed 32767")
+    // 1000 * 32 + 704 + 2 * 32 = 32768
 
-    val script2 = s""" [${s""" "${"a" * 1022}", """ * 149} "${"a" * 1024}"].makeString(", ") """
-    eval[CONST_STRING](script2, version = V4).explicitGet().s.length shouldBe 150 * 1024
-    // 1022 * 149 + 1024 + 2 * 149 = 150 * 1024
+    val script2 = s""" [${s""" "${"a" * 1000}", """ * 32} "${"a" * 703}"].makeString(", ") """
+    eval[CONST_STRING](script2, version = V4).explicitGet().s.length shouldBe 32767
 
     eval(""" [].makeString(", ") """, version = V3) should produce("Can't find a function 'makeString'")
   }
