@@ -159,4 +159,7 @@ object Global extends BaseGlobal {
 
   override def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
     ???
+
+  override def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte] =
+    ???
 }
