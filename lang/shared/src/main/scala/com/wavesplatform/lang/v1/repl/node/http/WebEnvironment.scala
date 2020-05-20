@@ -85,9 +85,7 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
   override def multiPaymentAllowed: Boolean                                   = ???
   override def txId: ByteStr                                                  = ???
 
-  override def transferTransactionFromProto(b: Array[Byte]): Future[Option[Tx.Transfer]] = {
-    getEntity[Option, TransferTransaction, Tx.Transfer](s"/transactions/byProtoBytes/${Base64.encode(b).replace("/", "%2f").replace("+", "%2b")}")
-  }
+  override def transferTransactionFromProto(b: Array[Byte]): Future[Option[Tx.Transfer]] = ???
 
 
   private def getEntity[F[_] : Functor : ResponseWrapper, A <% B : Decoder, B](url: String): Future[F[B]] =
