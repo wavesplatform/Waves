@@ -275,7 +275,11 @@ object Terms {
 
   abstract case class ARR private (xs: IndexedSeq[EVALUATED]) extends EVALUATED {
     override def toString: String = TermPrinter.string(this)
+
+    val elementsWeightSum: Long =
+      weight - EMPTYARR_WEIGHT - ELEM_WEIGHT * xs.size
   }
+
   object ARR {
     def apply(xs: IndexedSeq[EVALUATED], mweight: Long, limited: Boolean): Either[ExecutionError, ARR] =
       if (limited && xs.size > MaxListLengthV4) {
@@ -283,8 +287,8 @@ object Terms {
       } else {
         Either.cond(
           mweight <= MaxWeight,
-          (new ARR(xs) { override val weight: Long = mweight }),
-          s"the list is too heavy. Actual weight: ${mweight}, limit: ${MaxWeight}"
+          new { override val weight: Long = mweight } with ARR(xs),
+          s"The list is too heavy. Actual weight: ${mweight}, limit: ${MaxWeight}"
         )
       }
 
@@ -293,4 +297,7 @@ object Terms {
       ARR(xs, weight, limited)
     }
   }
+
+  implicit val orderingConstLong: Ordering[CONST_LONG] =
+    (a, b) => a.t compare b.t
 }
