@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs.invoke
 
 import cats.implicits._
-import cats.kernel.Monoid
 import com.google.common.base.Throwables
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, PublicKey}
