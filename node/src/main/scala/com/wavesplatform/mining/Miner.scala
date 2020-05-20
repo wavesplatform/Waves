@@ -256,7 +256,7 @@ class MinerImpl(
                   Task.raiseError(new RuntimeException(err.toString))
 
                 case Right(Some(score)) =>
-                  log.debug(s"Forged and applied $block by ${account.toAddress} with cumulative score $score")
+                  log.debug(s"Forged and applied $block with cumulative score $score")
                   BlockStats.mined(block, blockchainUpdater.height)
                   allChannels.broadcast(BlockForged(block))
                   scheduleMining()

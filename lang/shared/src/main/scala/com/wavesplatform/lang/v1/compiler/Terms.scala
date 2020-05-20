@@ -248,7 +248,7 @@ object Terms {
         Either.cond(
           mweight <= MaxWeight,
           new { override val weight: Long = mweight } with ARR(xs),
-          s"the list is too heavy. Actual weight: ${mweight}, limit: ${MaxWeight}"
+          s"The list is too heavy. Actual weight: ${mweight}, limit: ${MaxWeight}"
         )
       }
 
@@ -257,4 +257,7 @@ object Terms {
       ARR(xs, weight, limited)
     }
   }
+
+  implicit val orderingConstLong: Ordering[CONST_LONG] =
+    (a, b) => a.t compare b.t
 }

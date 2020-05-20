@@ -10,7 +10,7 @@ import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.v1.CTX
+import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, FINAL, LONG, STRING}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
@@ -1552,6 +1552,95 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val script = s"""fromBase16String("$value")"""
 
     eval(script) shouldBe CONST_BYTESTR(bytes(value.toUpperCase))
+  }
+
+  property("list indexOf") {
+    eval(""" ["a","b","c","d"].indexOf("a") """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" ["a","b","c","d","a"].indexOf("a") """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" ["a","b","c","d"].indexOf("d") """, version = V4) shouldBe Right(CONST_LONG(3))
+    eval(""" [-1,2,3,4].indexOf(-1) """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" [-1,2,3,4].indexOf(4) """, version = V4) shouldBe Right(CONST_LONG(3))
+    eval(""" [true, false].indexOf(true) """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" [true, false].indexOf(false) """, version = V4) shouldBe Right(CONST_LONG(1))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].indexOf(base58'a') """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].indexOf(base58'd') """, version = V4) shouldBe Right(CONST_LONG(3))
+    eval(""" ["a","b","c","d"].indexOf("e") """, version = V4) shouldBe Right(unit)
+
+    eval(""" [true, false].indexOf(0) """, version = V4) should produce("Can't find a function overload")
+    eval(""" [true, false].indexOf() """, version = V4) should produce("Can't find a function overload")
+    eval(""" ["a","b","c","d"].indexOf("a") """, version = V3) should produce("Can't find a function overload 'indexOf'")
+  }
+
+  property("list lastIndexOf") {
+    eval(""" ["a","b","a","c","d"].lastIndexOf("a") """, version = V4) shouldBe Right(CONST_LONG(2))
+    eval(""" ["d","a","b","c","d"].lastIndexOf("d") """, version = V4) shouldBe Right(CONST_LONG(4))
+    eval(""" [-1,2,3,4,-1].lastIndexOf(-1) """, version = V4) shouldBe Right(CONST_LONG(4))
+    eval(""" [4,-1,2,3].lastIndexOf(4) """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" [true, false].lastIndexOf(true) """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" [true, false].lastIndexOf(false) """, version = V4) shouldBe Right(CONST_LONG(1))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].lastIndexOf(base58'a') """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].lastIndexOf(base58'd') """, version = V4) shouldBe Right(CONST_LONG(3))
+    eval(""" ["a","b","c","d"].lastIndexOf("e") """, version = V4) shouldBe Right(unit)
+
+    eval(""" [true, false].lastIndexOf(0) """, version = V4) should produce("Can't find a function overload")
+    eval(""" [true, false].lastIndexOf() """, version = V4) should produce("Can't find a function overload")
+    eval(""" ["a","b","c","d"].lastIndexOf("a") """, version = V3) should produce("Can't find a function overload 'lastIndexOf'")
+  }
+
+  property("list indexOf compare Limits") {
+    val maxCmpWeightElement          = "a" * ContractLimits.MaxCmpWeight.toInt
+    val maxSizeElementToFound        = "a" * 150 * 1024
+    val listWithMaxCmpWeightElements = List.fill(20)("b" * ContractLimits.MaxCmpWeight.toInt).map(s => s""""$s"""").mkString("[", ",", "]")
+    val listWithMaxSizeElements      = List.fill(2)("b" * 150 * 1000).map(s => s""""$s"""").mkString("[", ",", "]")
+
+    val tooHeavyCmpElement         = maxCmpWeightElement + "a"
+    val listWithTooHeavyCmpElement = s""" ("$tooHeavyCmpElement" :: $listWithMaxCmpWeightElements) """
+
+    for (func <- Seq("indexOf", "lastIndexOf")) {
+      eval(s""" $listWithMaxSizeElements.$func("$maxCmpWeightElement") """, version = V4) shouldBe Right(unit)
+      eval(s""" $listWithMaxCmpWeightElements.$func("$maxSizeElementToFound") """, version = V4) shouldBe Right(unit)
+
+      eval(s""" $listWithMaxSizeElements.$func("$tooHeavyCmpElement") """, version = V4) should produce("are too heavy to compare")
+      eval(s""" $listWithTooHeavyCmpElement.$func("$maxSizeElementToFound") """, version = V4) should produce("are too heavy to compare")
+    }
+  }
+
+  property("list contains") {
+    eval(""" ["a","b","c","d"].containsElement("a") """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" ["a","b","c","d"].containsElement("d") """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" [-1,2,3,4].containsElement(-1) """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" [-1,2,3,4].containsElement(4) """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" [true, false].containsElement(true) """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" [true, false].containsElement(false) """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].containsElement(base58'a') """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].containsElement(base58'd') """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" ["a","b","c","d"].containsElement("e") """, version = V4) shouldBe Right(CONST_BOOLEAN(false))
+
+    eval(""" [true, false].containsElement(0) """, version = V4) should produce("Can't match inferred types")
+    eval(""" [true, false].containsElement() """, version = V4) should produce("Function 'containsElement' requires 2 arguments")
+    eval(""" ["a","b","c","d"].containsElement("a") """, version = V3) should produce("Can't find a function 'containsElement'")
+  }
+
+  property("list min") {
+    eval(""" [1, 2, 3, 4].min() """, version = V4) shouldBe Right(CONST_LONG(1))
+    eval(""" [-1, 2, 3, 4].min() """, version = V4) shouldBe Right(CONST_LONG(-1))
+    eval(""" [-1, -2, -3, -4].min() """, version = V4) shouldBe Right(CONST_LONG(-4))
+    eval(""" [1, 1, 2, 2].min() """, version = V4) shouldBe Right(CONST_LONG(1))
+    eval(""" [2].min() """, version = V4) shouldBe Right(CONST_LONG(2))
+
+    eval(""" [].min() """, version = V4) should produce("Can't find min for empty list")
+    eval(""" [1, 2].min() """, version = V3) should produce("Can't find a function 'min'")
+  }
+
+  property("list max") {
+    eval(""" [1, 2, 3, 4].max() """, version = V4) shouldBe Right(CONST_LONG(4))
+    eval(""" [-1, 2, 3, 4].max() """, version = V4) shouldBe Right(CONST_LONG(4))
+    eval(""" [-1, -2, -3, -4].max() """, version = V4) shouldBe Right(CONST_LONG(-1))
+    eval(""" [1, 1, 2, 2].max() """, version = V4) shouldBe Right(CONST_LONG(2))
+    eval(""" [2].max() """, version = V4) shouldBe Right(CONST_LONG(2))
+
+    eval(""" [].max() """, version = V4) should produce("Can't find max for empty list")
+    eval(""" [1, 2].max() """, version = V3) should produce("Can't find a function 'max'")
   }
 
   property("ecrecover positive cases") {
