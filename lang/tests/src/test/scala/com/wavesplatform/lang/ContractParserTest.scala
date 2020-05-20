@@ -60,7 +60,7 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
           Expressions.FUNC(
             AnyPos,
             PART.VALID(AnyPos, "bar"),
-            List((PART.VALID(AnyPos, "arg"), List((PART.VALID(AnyPos, "Baz"), None)))),
+            List((PART.VALID(AnyPos, "arg"), List(ArgSingleType(PART.VALID(AnyPos, "Baz"))))),
             CONST_LONG(AnyPos, 3)
           )
         )
@@ -103,7 +103,7 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
           Expressions.FUNC(
             AnyPos,
             PART.VALID(AnyPos, "bar"),
-            List((PART.VALID(AnyPos, "arg"), List((PART.VALID(AnyPos, "Baz"), None)))),
+            List((PART.VALID(AnyPos, "arg"), List(ArgSingleType(PART.VALID(AnyPos, "Baz"))))),
             CONST_LONG(AnyPos, 3)
           )
         )
@@ -144,7 +144,7 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
           Expressions.FUNC(
             AnyPos,
             PART.VALID(AnyPos, "bar"),
-            List((PART.VALID(AnyPos, "arg"), List((PART.VALID(AnyPos, "Baz"), None)))),
+            List((PART.VALID(AnyPos, "arg"), List(ArgSingleType(PART.VALID(AnyPos, "Baz"))))),
             CONST_LONG(AnyPos, 3)
           )
         )
@@ -193,7 +193,7 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
           Expressions.FUNC(
             AnyPos,
             PART.VALID(AnyPos, "bar"),
-            List((PART.VALID(AnyPos, "arg"), List((PART.VALID(AnyPos, "Baz"), None)))),
+            List((PART.VALID(AnyPos, "arg"), List(ArgSingleType(PART.VALID(AnyPos, "Baz"))))),
             CONST_LONG(AnyPos, 3)
           )
         )

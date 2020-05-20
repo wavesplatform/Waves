@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
-import com.wavesplatform.lang.v1.parser.Expressions.Pos
+import com.wavesplatform.lang.v1.parser.Expressions.{ArgSingleType, Pos}
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.testing.ScriptGen
@@ -452,7 +452,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       Expressions.FUNC(
         AnyPos,
         Expressions.PART.VALID(AnyPos, "id"),
-        Seq((Expressions.PART.VALID(AnyPos, "x"), Seq((Expressions.PART.VALID(AnyPos, "Int"), None)))),
+        Seq((Expressions.PART.VALID(AnyPos, "x"), Seq(ArgSingleType(Expressions.PART.VALID(AnyPos, "Int"))))),
         Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
       ),
       Expressions.FUNCTION_CALL(AnyPos, Expressions.PART.VALID(AnyPos, "id"), List(Expressions.CONST_LONG(AnyPos, 1L)))

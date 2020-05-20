@@ -14,7 +14,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
-import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, PART, Type}
+import com.wavesplatform.lang.v1.parser.Expressions.{ArgTypeTuple, FUNC, PART}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser, ParserV2}
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
@@ -230,9 +230,8 @@ object ContractCompiler {
       .traverse { func =>
         for {
           funcName <- handleValid(func.f.name)
-          funcArgs <- func.f.args.flatMap(_._2).toList.traverse(resolveGenericType)
-          () <- funcArgs
-            .map { case (argType, typeParam) => (argType.v, typeParam.map(_.v)) }
+          funcArgTypes <- func.f.args.flatMap(_._2).toList.traverse(handleGenericPart)
+          () <- funcArgTypes
             .find(!checkAnnotatedParamType(_))
             .map(argTypesError(func, funcName, _))
             .getOrElse(().pure[CompileM])
@@ -243,25 +242,25 @@ object ContractCompiler {
   private def argTypesError(
       func: Expressions.ANNOTATEDFUNC,
       funcName: PART.VALID[String],
-      t: (String, Option[String])
+      t: ArgTypeTuple
   ): CompileM[Unit] =
     raiseError[Id, CompilerContext, CompilationError, Unit](
-      WrongArgumentType(func.f.position.start, func.f.position.end, funcName.v, typeStr(t), allowedCallableTypesV4)
+      WrongArgumentType(func.f.position.start, func.f.position.end, funcName.v, typeStr(t.toTuple()), allowedCallableTypesV4)
     )
 
-  private def typeStr(t: (String, Option[String])) =
-    t._2.fold(t._1)(typeParam => s"${t._1}[$typeParam]")
+  private def typeStr(t: (String, List[ArgTypeTuple])) = {
+    if (t._2.nonEmpty)
+      s"${t._1}[${t._2.map(_.t).mkString("|")}]"
+    else
+      t._1
+  }
 
-  private def resolveGenericType(t: Type): CompileM[(PART.VALID[String], Option[PART.VALID[String]])] =
-    for {
-      argType   <- handleValid(t._1)
-      typeParam <- t._2.traverse(handleValid)
-    } yield (argType, typeParam)
-
-  private def checkAnnotatedParamType(t: (String, Option[String])): Boolean =
+  private def checkAnnotatedParamType(t: ArgTypeTuple): Boolean =
     t match {
-      case (singleType, None)             => primitiveCallableTypes.contains(singleType)
-      case (genericType, Some(typeParam)) => primitiveCallableTypes.contains(typeParam) && genericType == "List"
+      case ArgTypeTuple(singleType, Nil)             => primitiveCallableTypes.contains(singleType)
+      case ArgTypeTuple(genericType, typeParams) =>
+        typeParams.forall(typeParam => primitiveCallableTypes.contains(typeParam.t)) &&             // union of simple types (not generic)
+          genericType == "List"
     }
 
   val primitiveCallableTypes: Set[String] =

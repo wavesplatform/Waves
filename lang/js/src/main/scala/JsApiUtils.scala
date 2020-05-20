@@ -4,7 +4,7 @@ import com.wavesplatform.lang.v1.compiler.CompilationError
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL, LIST, NOTHING, TYPE, UNION}
 import com.wavesplatform.lang.v1.parser.Expressions
-import com.wavesplatform.lang.v1.parser.Expressions.{PART, Pos, Type}
+import com.wavesplatform.lang.v1.parser.Expressions.{ArgGenericType, ArgSingleType, ArgType, PART, Pos}
 
 import scala.scalajs.js
 import scala.scalajs.js.Any
@@ -199,16 +199,26 @@ package object JsApiUtils {
 
   def serDec(dec: Expressions.Declaration): js.Object = {
 
-    def serFuncArg(argName: PART[String], argTypeList: Seq[Type]): js.Object = {
+    def serFuncArg(argName: PART[String], argTypeList: Seq[ArgType]): js.Object = {
       jObj.applyDynamic("apply")(
         "argName" -> serPartStr(argName),
-        "typeList" -> argTypeList.map { t =>
-          jObj.applyDynamic("apply")(
-            "typeName"  -> serPartStr(t._1),
-            "typeParam" -> t._2.map(serPartStr).orUndefined
-          )
-        }.toJSArray
+        "typeList" -> serArgTypeList(argTypeList)
       )
+    }
+
+    def serArgTypeList(argTypeList: Seq[ArgType]): js.Object = {
+      argTypeList.map {
+        case ArgSingleType(t) =>
+          jObj.applyDynamic("apply")(
+            "typeName"  -> serPartStr(t),
+            "typeParam" -> scalajs.js.undefined
+          )
+        case ArgGenericType(t, gt) =>
+          jObj.applyDynamic("apply")(
+            "typeName"  -> serPartStr(t),
+            "typeParam" -> serArgTypeList(gt)
+          )
+      }.toJSArray
     }
 
     dec match {

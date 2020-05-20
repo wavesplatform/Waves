@@ -82,9 +82,27 @@ object Expressions {
   type Type      = (PART[String], TypeParam)
   type FuncArgs  = Seq[(PART[String], Seq[Type])]
 
+  case class ArgTypeTuple(t: String, gt: List[ArgTypeTuple]) {
+    def toTuple(): (String, List[ArgTypeTuple]) = (t, gt)
+    def execForAll(f: String => Boolean): Boolean = {
+      f(t) && gt.forall(_.execForAll(f))
+    }
+  }
+
+  trait ArgType {
+    def toTuple(): (PART[String], Seq[ArgType])
+  }
+  case class ArgSingleType(t: PART[String]) extends ArgType {
+    override def toTuple(): (PART[String], Seq[ArgType]) = (t, Seq.empty)
+  }
+  case class ArgGenericType(t: PART[String], gt: Seq[ArgType]) extends ArgType {
+    override def toTuple(): (PART[String], Seq[ArgType]) = (t, gt)
+  }
+  type FuncArgsWithType = Seq[(PART[String], Seq[ArgType])]                   //sequence of pairs (argName, argTypes); argType - Int..., List[Int|String], List[List[Int]]
+
   type CtxOpt = Option[Map[String, Pos]]
 
-  case class FUNC(position: Pos, name: PART[String], args: FuncArgs, expr: EXPR) extends Declaration {
+  case class FUNC(position: Pos, name: PART[String], args: FuncArgsWithType, expr: EXPR) extends Declaration {
     val allowShadowing = false
   }
 

@@ -174,7 +174,10 @@ class ParserV2ScriptTest extends PropSpec with PropertyChecks with Matchers with
       FUNC(
         AnyPos,
         PART.VALID(AnyPos, "q"),
-        Seq((PART.VALID(AnyPos, "x"), Seq((PART.VALID(AnyPos, "Int"), None))), (PART.VALID(AnyPos, "y"), Seq((PART.VALID(AnyPos, "Boolean"), None)))),
+        Seq(
+          (PART.VALID(AnyPos, "x"), Seq(ArgSingleType(PART.VALID(AnyPos, "Int")))),
+          (PART.VALID(AnyPos, "y"), Seq(ArgSingleType(PART.VALID(AnyPos, "Boolean"))))
+        ),
         CONST_LONG(AnyPos, 42)
       ),
       REF(AnyPos, PART.VALID(AnyPos, "c"))
@@ -190,7 +193,12 @@ class ParserV2ScriptTest extends PropSpec with PropertyChecks with Matchers with
       FUNC(
         AnyPos,
         PART.VALID(AnyPos, "q"),
-        Seq((PART.VALID(AnyPos, "x"), Seq((PART.VALID(AnyPos, "Int"), None), (PART.VALID(AnyPos, "String"), None)))),
+        Seq(
+          (
+            PART.VALID(AnyPos, "x"),
+            Seq(ArgSingleType(PART.VALID(AnyPos, "Int")), ArgSingleType(PART.VALID(AnyPos, "String")))
+          )
+        ),
         CONST_LONG(AnyPos, 42)
       ),
       REF(AnyPos, PART.VALID(AnyPos, "c"))

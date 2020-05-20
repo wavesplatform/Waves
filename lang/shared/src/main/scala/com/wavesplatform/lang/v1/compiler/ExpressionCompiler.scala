@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v1.compiler.Types.{FINAL, _}
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE, PART, Pos, TypeParam}
+import com.wavesplatform.lang.v1.parser.Expressions.{ArgType, ArgTypeTuple, BINARY_OP, MATCH_CASE, PART, Pos}
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser, ParserV2}
 import com.wavesplatform.lang.v1.task.TaskM
 import com.wavesplatform.lang.v1.task.imports._
@@ -224,20 +224,19 @@ object ExpressionCompiler {
   private def genericFlat(
       pos: Pos,
       typeDefs: Map[String, FINAL],
-      definedTypes: List[(String, Option[String])],
+      definedTypes: List[ArgTypeTuple],
       expectedTypes: List[String] = List(),
       varName: Option[String] = None
   ): Either[CompilationError, List[FINAL]] = {
     def f(t: String) = flatSingle(pos, typeDefs, definedTypes.map(_.toString), expectedTypes, varName, t)
     definedTypes.flatTraverse {
-      case (typeName, typeParamO) =>
-        typeParamO.fold(f(typeName))(
-          paramName =>
-            for {
-              typeConstr <- findGenericType(pos, typeName)
-              typeParam  <- f(paramName)
-            } yield List(typeConstr(UNION.reduce(UNION.create(typeParam))))
-        )
+      case ArgTypeTuple(typeName, Nil) => f(typeName)
+      case ArgTypeTuple(typeName, typeParams) => {
+        for {
+          typeConstr <- findGenericType(pos, typeName)
+          typeParam  <- genericFlat(pos, typeDefs, typeParams.toList)
+        } yield List(typeConstr(UNION.reduce(UNION.create(typeParam))))
+      }
     }
   }
 
@@ -394,9 +393,12 @@ object ExpressionCompiler {
               name <- handlePart(argName)
               typeDecls <- argType.toList
                 .traverse(handleGenericPart)
-                .ensure(NonExistingType(p.start, p.end, funcNameWithErr._1.getOrElse("NO_NAME"), ctx.predefTypes.keys.toList))(_.forall {
-                  case (t, param) => param.fold(ctx.predefTypes.contains(t))(ctx.predefTypes.contains)
-                })
+                .ensure(NonExistingType(p.start, p.end, funcNameWithErr._1.getOrElse("NO_NAME"), ctx.predefTypes.keys.toList))(
+                  argTypeTuples =>
+                    argTypeTuples.forall {
+                      argTypeTuple => argTypeTuple.execForAll(ctx.predefTypes.contains)
+                    }
+                )
               types <- liftEither[Id, CompilerContext, CompilationError, List[FINAL]](genericFlat(p, ctx.predefTypes, typeDecls))
               union = UNION.reduce(UNION.create(types))
             } yield (name, VariableInfo(argName.position, union))
@@ -697,13 +699,23 @@ object ExpressionCompiler {
       .fold(err)(t => Right((ctx, getter, t)))
   }
 
-  private def handleGenericPart(
+  /*private def handleGenericPart(
       decl: (PART[String], TypeParam)
   ): TaskM[CompilerContext, CompilationError, (String, Option[String])] =
     for {
       t1 <- handlePart(decl._1)
       t2 <- decl._2.traverse(handlePart)
-    } yield (t1, t2)
+    } yield (t1, t2)*/
+
+  def handleGenericPart(
+    t: ArgType
+  ): TaskM[CompilerContext, CompilationError, ArgTypeTuple] = {
+    val decl = t.toTuple()
+    for {
+      t1 <- handlePart(decl._1)
+      t2 <- decl._2.toList.traverse(handleGenericPart)
+    } yield ArgTypeTuple(t1, t2)
+  }
 
   def handlePart[T](part: PART[T]): CompileM[T] = part match {
     case PART.VALID(_, x)         => x.pure[CompileM]

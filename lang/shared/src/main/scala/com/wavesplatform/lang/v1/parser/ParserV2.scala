@@ -14,14 +14,14 @@ case class GetterAcc(position: Pos, name: PART[String])                  extends
 case class ListIndexAcc(position: Pos, index: EXPR)                      extends Accessor
 
 case class BinaryOpWithExpr(op: BinaryOperation, expr: EXPR)
-case class IdAndTypes(id: PART[String], types: Seq[(PART[String], Option[PART[String]])])
+case class IdAndTypes(id: PART[String], types: Seq[ArgType])
 
 class ParserV2(val input: ParserInput) extends Parser {
 
   private val Global = com.wavesplatform.lang.hacks.Global // Hack for IDEA
 
   def DAppRoot: Rule1[DAPP] = rule {
-    push(cursor) ~ WS ~ zeroOrMore(Directive ~ WS) ~ zeroOrMore(WS ~ Decl) ~ zeroOrMore(WS ~ AnnotatedFunc) ~ WS ~ push(cursor) ~ EOI ~> parseDAppRoot _
+    push(cursor) ~ WS ~ zeroOrMore(Directive ~ WS) ~ zeroOrMore(WS ~ Decl) ~ zeroOrMore(WS ~ AnnotatedFuncWithAnn) ~ WS ~ push(cursor) ~ EOI ~> parseDAppRoot _
   }
 
   def ScriptRoot: Rule1[SCRIPT] = rule {
@@ -30,19 +30,27 @@ class ParserV2(val input: ParserInput) extends Parser {
 
   def Directive: Rule0 = rule { "{-#" ~ WS ~ oneOrMore(noneOf("\n#")) ~ WS ~ "#-}" }
 
-  def Decl: Rule1[Declaration] = rule { Func | Let }
+  def Decl: Rule1[Declaration] = rule { UserFunc | Let }
 
-  def AnnotatedFunc: Rule1[ANNOTATEDFUNC] = rule { oneOrMore(Annotation).separatedBy(WS) ~ WS ~ Func ~ push(cursor) ~> parseAnnotatedFunc _ }
+  def AnnotatedFuncWithAnn: Rule1[ANNOTATEDFUNC] = rule { oneOrMore(Annotation).separatedBy(WS) ~ WS ~ AnnotatedFunc ~ push(cursor) ~> parseAnnotatedFunc _ }
   def Annotation: Rule1[ANNOTATION] = rule {
     push(cursor) ~ "@" ~ IdentifierAtom ~ WS ~ "(" ~ WS ~ zeroOrMore(IdentifierAtom)
       .separatedBy(WS ~ "," ~ WS) ~ WS ~ ")" ~ push(cursor) ~> parseAnnotation _
   }
 
-  def Func: Rule1[FUNC] = rule {
-    push(cursor) ~ "func" ~ WS ~ IdentifierAtom ~ WS ~ "(" ~ WS ~ zeroOrMore(FuncArg)
+  def AnnotatedFunc: Rule1[FUNC] = rule {
+    push(cursor) ~ "func" ~ WS ~ IdentifierAtom ~ WS ~ "(" ~ WS ~ zeroOrMore(AnnotatedFuncArg)
       .separatedBy(WS ~ "," ~ WS) ~ WS ~ ")" ~ WS ~ "=" ~ WS ~ Expr ~ push(cursor) ~> parseFunc _
   }
-  def FuncArg: Rule1[IdAndTypes] = rule { IdentifierAtom ~ WS ~ ":" ~ WS ~ GenericTypesAtom ~> IdAndTypes }
+  def AnnotatedFuncArg: Rule1[IdAndTypes] = rule { IdentifierAtom ~ WS ~ ":" ~ WS ~ AnnotatedFuncArgGenericTypesAtom ~> IdAndTypes }
+
+
+  def UserFunc: Rule1[FUNC] = rule {
+    push(cursor) ~ "func" ~ WS ~ IdentifierAtom ~ WS ~ "(" ~ WS ~ zeroOrMore(UserFuncArg)
+      .separatedBy(WS ~ "," ~ WS) ~ WS ~ ")" ~ WS ~ "=" ~ WS ~ Expr ~ push(cursor) ~> parseFunc _
+  }
+  def UserFuncArg: Rule1[IdAndTypes] = rule { IdentifierAtom ~ WS ~ ":" ~ WS ~ UserFuncArgGenericTypesAtom ~> IdAndTypes }
+
 
   def Let: Rule1[LET] = rule { push(cursor) ~ "let" ~ WS ~ IdentifierAtom ~ WS ~ "=" ~ WS ~ Expr ~ push(cursor) ~> parseLet _ }
 
@@ -152,12 +160,29 @@ class ParserV2(val input: ParserInput) extends Parser {
     push(cursor) ~ capture((!ReservedWords ~ Char ~ zeroOrMore(Char | Digit)) | (ReservedWords ~ (Char | Digit) ~ zeroOrMore(Char | Digit))) ~ push(cursor) ~> parseReferenceAtom _
   }
 
-  def GenericTypesAtom: Rule1[Seq[(PART[String], Option[PART[String]])]] = rule { oneOrMore(OneGenericTypeAtom).separatedBy(WS ~ "|" ~ WS) }
-  def TypesAtom: Rule1[Seq[PART[String]]]                                = rule { oneOrMore(OneTypeAtom).separatedBy(WS ~ "|" ~ WS) }
-  def OneGenericTypeAtom: Rule1[(PART[String], Option[PART[String]])] = rule {
-    push(cursor) ~ capture(Char ~ zeroOrMore(Char | Digit)) ~ optional(WS ~ "[" ~ WS ~ OneTypeAtom ~ WS ~ "]" ~ WS) ~ push(cursor) ~> parseGenericTypeAtom _
+
+  def AnnotatedFuncArgGenericTypesAtom: Rule1[Seq[ArgType]] = rule { oneOrMore(AnnotatedFuncArgTypeAtom).separatedBy(WS ~ "|" ~ WS) }
+  def AnnotatedFuncArgTypeAtom: Rule1[ArgType] = rule {
+    push(cursor) ~ capture(Char ~ zeroOrMore(Char | Digit)) ~ optional(WS ~ "[" ~ WS ~ oneOrMore(SimpleArgType).separatedBy(WS ~ "|" ~ WS) ~ WS ~ "]" ~ WS) ~ push(cursor) ~> parseFuncArgType _
   }
+
+  def UserFuncArgGenericTypesAtom: Rule1[Seq[ArgType]] = rule { oneOrMore(UserFuncArgTypeAtom).separatedBy(WS ~ "|" ~ WS) }
+  def UserFuncArgTypeAtom: Rule1[ArgType] = rule {
+    push(cursor) ~ capture(Char ~ zeroOrMore(Char | Digit)) ~ optional(WS ~ "[" ~ WS ~ oneOrMore(UserFuncArgTypeAtom).separatedBy(WS ~ "|" ~ WS) ~ WS ~ "]" ~ WS) ~ push(cursor) ~> parseFuncArgType _
+  }
+
+  def SimpleArgType: Rule1[ArgType] = rule { push(cursor) ~ capture(Char ~ zeroOrMore(Char | Digit)) ~ push(cursor) ~> parseSimpleArgType _ }
+
+
+  //def GenericTypesAtom: Rule1[Seq[(PART[String], Option[PART[String]])]] = rule { oneOrMore(OneGenericTypeAtom).separatedBy(WS ~ "|" ~ WS) }
+  /*def OneGenericTypeAtom: Rule1[(PART[String], Option[PART[String]])] = rule {
+    push(cursor) ~ capture(Char ~ zeroOrMore(Char | Digit)) ~ optional(WS ~ "[" ~ WS ~ OneTypeAtom ~ WS ~ "]" ~ WS) ~ push(cursor) ~> parseGenericTypeAtom _
+  }*/
+
+  def TypesAtom: Rule1[Seq[PART[String]]]                                = rule { oneOrMore(OneTypeAtom).separatedBy(WS ~ "|" ~ WS) }
   def OneTypeAtom: Rule1[PART[String]] = rule { push(cursor) ~ capture(Char ~ zeroOrMore(Char | Digit)) ~ push(cursor) ~> parseOneTypeAtom _ }
+
+
 
   def ByteVectorAtom: Rule1[EXPR] = rule {
     "base" ~ capture(("58" | "64" | "16")) ~ "'" ~ push(cursor) ~ capture(zeroOrMore(noneOf("\'"))) ~ push(cursor) ~> parseByteVectorAtom _ ~ "'"
@@ -219,7 +244,7 @@ class ParserV2(val input: ParserInput) extends Parser {
     FUNC(
       Pos(startPos, endPos),
       name,
-      argAndTypesList.map(el => (el.id, el.types)): FuncArgs,
+      argAndTypesList.map(el => (el.id, el.types)): FuncArgsWithType,
       expr
     )
   }
@@ -329,8 +354,21 @@ class ParserV2(val input: ParserInput) extends Parser {
     argTypeList
   }
 
+  def parseFuncArgType(startPos: Int, genericTypeName: String, typeNamesOpt: Option[Seq[ArgType]], endPos: Int): ArgType = {
+    val firstTypePart = PART.VALID(Pos(startPos, endPos), genericTypeName)
+    typeNamesOpt
+      .map {
+        argTypes =>
+          ArgGenericType(firstTypePart, argTypes)
+      }.getOrElse(ArgSingleType(firstTypePart))
+  }
+
   def parseGenericTypeAtom(startPos: Int, genericTypeName: String, typeName: Option[PART[String]], endPos: Int): (PART[String], Option[PART[String]]) = {
     (PART.VALID(Pos(startPos, endPos), genericTypeName), typeName)
+  }
+
+  def parseSimpleArgType(startPos: Int, typeName: String, endPos: Int): ArgType = {
+    ArgSingleType(PART.VALID(Pos(startPos, endPos), typeName))
   }
 
   def parseOneTypeAtom(startPos: Int, typeName: String, endPos: Int): PART[String] = {

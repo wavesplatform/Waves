@@ -195,15 +195,39 @@ object Parser {
   case class ListIndex(index: EXPR)                      extends Accessor
 
   val typesP: P[Seq[PART[String]]] = anyVarName.rep(min = 1, sep = comment ~ "|" ~ comment)
-  val genericTypesP: P[Seq[(PART[String], Option[PART[String]])]] =
-    (anyVarName ~~ ("[" ~~ anyVarName ~~ "]").?).rep(min = 1, sep = comment ~ "|" ~ comment)
 
-  val funcP: P[FUNC] = {
-    val funcname    = anyVarName
-    val argWithType = anyVarName ~ ":" ~ genericTypesP ~ comment
-    val args        = "(" ~ comment ~ argWithType.rep(sep = "," ~ comment) ~ ")" ~ comment
-    val funcHeader  = Index ~~ "func" ~ funcname ~ comment ~ args ~ "=" ~ P(singleBaseExpr | ("{" ~ baseExpr ~ "}")) ~~ Index
-    funcHeader.map {
+  val funcName = anyVarName
+
+  val userFuncArgGenericTypesP: P[Seq[ArgType]] = {      // support multilevel generic types - List[List[...]]
+    (anyVarName ~~ ("[" ~~ userFuncArgGenericTypesP ~~ "]").?).rep(min = 1, sep = comment ~ "|" ~ comment).map {
+      args =>
+        args.map {
+          case (typeName, Some(genericTypeNameList)) => ArgGenericType(typeName, genericTypeNameList)
+          case (typeName, None) => ArgSingleType(typeName)
+        }
+    }
+  }
+  val userFuncArgWithType = anyVarName ~ ":" ~ userFuncArgGenericTypesP ~ comment
+  val userFuncArgs        = "(" ~ comment ~ userFuncArgWithType.rep(sep = "," ~ comment) ~ ")" ~ comment
+  val userFuncHeader  = Index ~~ "func" ~ funcName ~ comment ~ userFuncArgs ~ "=" ~ P(singleBaseExpr | ("{" ~ baseExpr ~ "}")) ~~ Index
+  val userFuncP: P[FUNC] = {
+    userFuncHeader.map {
+      case (start, name, args, expr, end) => FUNC(Pos(start, end), name, args, expr)
+    }
+  }
+
+  val annotatedFuncArgGenericTypesP: P[Seq[ArgType]] =  // support one level generic types - List[Int|...]
+    (anyVarName ~~ ("[" ~~ anyVarName.rep(min = 1, sep = comment ~ "|" ~ comment) ~~ "]").?).rep(min = 1, sep = comment ~ "|" ~ comment).map {
+      _.map{
+        case (typeName, Some(genericTypeNameList)) => ArgGenericType(typeName, genericTypeNameList.map(argtypeName => ArgSingleType(argtypeName)))
+        case (typeName, None) => ArgSingleType(typeName)
+      }
+    }
+  val annotatedFuncArgWithType = anyVarName ~ ":" ~ annotatedFuncArgGenericTypesP ~ comment
+  val annotatedFuncArgs        = "(" ~ comment ~ annotatedFuncArgWithType.rep(sep = "," ~ comment) ~ ")" ~ comment
+  val annotatedFuncHeader  = Index ~~ "func" ~ funcName ~ comment ~ annotatedFuncArgs ~ "=" ~ P(singleBaseExpr | ("{" ~ baseExpr ~ "}")) ~~ Index
+  val annotatedFuncP: P[FUNC] = {
+    annotatedFuncHeader.map {
       case (start, name, args, expr, end) => FUNC(Pos(start, end), name, args, expr)
     }
   }
@@ -212,7 +236,7 @@ object Parser {
     case (start, name: PART[String], args: Seq[PART[String]], end) => ANNOTATION(Pos(start, end), name, args)
   }
 
-  val annotatedFunc: P[ANNOTATEDFUNC] = (Index ~~ annotationP.rep(min = 1) ~ comment ~ funcP ~~ Index).map {
+  val annotatedFunc: P[ANNOTATEDFUNC] = (Index ~~ annotationP.rep(min = 1) ~ comment ~ annotatedFuncP ~~ Index).map {
     case (start, as, f, end) => ANNOTATEDFUNC(Pos(start, end), as, f)
   }
 
@@ -308,7 +332,7 @@ object Parser {
   val block: P[EXPR] = blockOr(INVALID(_, "expected ';'"))
 
   private def blockOr(otherExpr: Pos => EXPR): P[EXPR] = {
-    val declaration = letP | funcP
+    val declaration = letP | userFuncP
 
     // Hack to force parse of "\n". Otherwise it is treated as a separator
     val newLineSep = {
@@ -357,7 +381,7 @@ object Parser {
 
   val singleBaseExpr = P(binaryOp(singleBaseAtom, opsByPriority))
 
-  val declaration = P(letP | funcP)
+  val declaration = P(letP | userFuncP)
 
   def revp[A, B](l: A, s: Seq[(B, A)], o: Seq[(A, B)] = Seq.empty): (Seq[(A, B)], A) = {
     s.foldLeft((o, l)) { (acc, op) =>
