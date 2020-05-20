@@ -832,6 +832,11 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |   let v22 = toString(Address(base58''))
         |   let v23 = toBase16String(base58'')
         |   let v24 = fromBase16String("")
+        |   let v25 = indexOf(["a", "b", "c"], "a")
+        |   let v26 = lastIndexOf(["a", "b", "c"], "a")
+        |   let v27 = containsElement(["a", "b", "c"], "a")
+        |   let v28 = min([1, 2, 3])
+        |   let v29 = max([1, 2, 3])
         |   let v31 = ecrecover(base58'aaaa', base58'bbbb')
         |   nil
         | }
