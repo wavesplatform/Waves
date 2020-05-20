@@ -9,7 +9,7 @@ import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, LIST, LONG, STRING, UNION, UNIT, optionLong}
+import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, LIST, LONG, STRING, UNION, UNIT, optionLong}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{scriptTransfer => _, _}
@@ -350,7 +350,7 @@ object Functions {
       balanceDetailsType,
       ("addressOrAlias", addressOrAliasType)
     ) {
-      new ContextfulNativeFunction[Environment]("assetBalance", LONG, Seq(("addressOrAlias", addressOrAliasType),("assetId", UNION(UNIT, BYTESTR)))) {
+      new ContextfulNativeFunction[Environment]("wavesBalance", LONG, Seq(("addressOrAlias", addressOrAliasType))) {
         override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
           input match {
             case (env, (c: CaseObj) :: Nil) =>
@@ -571,13 +571,42 @@ object Functions {
         override def ev[F[_] : Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
           input match {
             case (env, List(CONST_BYTESTR(bytes))) =>
-              (env.transferTransactionFromProto(bytes.arr)
-                  .map(transactionObject(_, proofsEnabled, version)): EVALUATED)
-                  .asRight[ExecutionError]
-                  .pure[F]
+              env.transferTransactionFromProto(bytes.arr).map(tx =>
+                (tx.map(transactionObject(_, proofsEnabled, version)): EVALUATED)
+                  .asRight[ExecutionError])
 
             case (_, xs) => notImplemented[F, EVALUATED](s"transferTransactionFromProto(bytes: ByteVector)", xs)
           }
       }
+    }
+
+  val simplifiedIssueActionConstructor: BaseFunction[Environment] =
+    NativeFunction(
+      "Issue", 1, SIMPLIFIED_ISSUE_ACTION_CONSTRUCTOR, issueActionType,
+      FieldNames.IssueName -> STRING,
+      FieldNames.IssueDescription -> STRING,
+      FieldNames.IssueQuantity -> LONG,
+      FieldNames.IssueDecimals -> LONG,
+      FieldNames.IssueIsReissuable -> BOOLEAN,
+    ) {
+      args =>
+        val typedArgs = (issueActionType.fields.map(_._1) zip (args ::: List(unit, CONST_LONG(0)))).toMap
+        Right(CaseObj(issueActionType, typedArgs))
+    }
+
+  val detailedIssueActionConstructor: BaseFunction[Environment] =
+    NativeFunction(
+      "Issue", 1, DETAILED_ISSUE_ACTION_CONSTRUCTOR, issueActionType,
+      FieldNames.IssueName -> STRING,
+      FieldNames.IssueDescription -> STRING,
+      FieldNames.IssueQuantity -> LONG,
+      FieldNames.IssueDecimals -> LONG,
+      FieldNames.IssueIsReissuable -> BOOLEAN,
+      FieldNames.IssueScriptField -> UNION(issueScriptType, UNIT),
+      FieldNames.IssueNonce -> LONG,
+    ) {
+      args =>
+        val typedArgs = (issueActionType.fields.map(_._1) zip args).toMap
+        Right(CaseObj(issueActionType, typedArgs))
     }
 }

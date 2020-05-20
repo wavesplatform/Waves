@@ -14,7 +14,7 @@ import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.http.BroadcastRoute
@@ -24,6 +24,8 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
+import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import monix.execution.Scheduler
@@ -49,7 +51,7 @@ case class TransactionsApiRoute(
 
   override lazy val route: Route =
     pathPrefix("transactions") {
-      unconfirmed ~ addressLimit ~ info ~ status ~ sign ~ calculateFee ~ signedBroadcast ~ merkleProof
+      unconfirmed ~ addressLimit ~ info ~ status ~ sign ~ calculateFee ~ byProto ~ signedBroadcast ~ merkleProof
     }
 
   def addressLimit: Route = {
@@ -66,10 +68,10 @@ case class TransactionsApiRoute(
   def info: Route = (pathPrefix("info") & get) {
     pathEndOrSingleSlash {
       complete(InvalidTransactionId("Transaction ID was not specified"))
-    } ~ path(TransactionId) { id =>
+    } ~ (path(TransactionId) & parameter('bodyBytes.as[Boolean] ? false)) { (id, bodyBytes) =>
       commonApi.transactionById(id) match {
         case Some((h, either, succeed)) =>
-          complete(txToExtendedJson(either.fold(identity, _._1)) ++ applicationStatus(h, succeed) + ("height" -> JsNumber(h)))
+          complete(txToExtendedJson(either.fold(identity, _._1), bodyBytes) ++ applicationStatus(h, succeed) + ("height" -> JsNumber(h)))
         case None => complete(ApiError.TransactionDoesNotExist)
       }
     }
@@ -109,7 +111,7 @@ case class TransactionsApiRoute(
 
   def unconfirmed: Route = (pathPrefix("unconfirmed") & get) {
     pathEndOrSingleSlash {
-      complete(JsArray(commonApi.unconfirmedTransactions.map(txToExtendedJson)))
+      complete(JsArray(commonApi.unconfirmedTransactions.map(txToExtendedJson(_, false))))
     } ~ utxSize ~ utxTransactionInfo
   }
 
@@ -147,6 +149,14 @@ case class TransactionsApiRoute(
       }
     })
 
+  def byProto: Route = (pathPrefix("byProtoBytes" / Segment) & get) { (bytes) =>
+    PBTransactionSerializer.parseBytes(Base64.decode(bytes)).toOption match {
+      case Some(tx: TransferTransaction) =>
+        complete(txToExtendedJson(tx, true) ++ Json.obj("applicationStatus" -> "succeed"))
+      case _ => complete(ApiError.TransactionDoesNotExist)
+    }
+  }
+
   def sign: Route = (pathPrefix("sign") & withAuth) {
     pathEndOrSingleSlash(jsonPost[JsObject] { jsv =>
       TransactionFactory.parseRequestAndSign(wallet, (jsv \ "sender").as[String], time, jsv)
@@ -180,9 +190,9 @@ case class TransactionsApiRoute(
       case _ => InvalidSignature
     }
 
-  private def txToExtendedJson(tx: Transaction): JsObject = {
+  private def txToExtendedJson(tx: Transaction, bodyBytes: Boolean = false): JsObject = {
     import com.wavesplatform.transaction.lease.LeaseTransaction
-    tx match {
+    (tx match {
       case lease: LeaseTransaction =>
         import com.wavesplatform.api.http.TransactionsApiRoute.LeaseStatus._
         lease.json() ++ Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) Active else Canceled))
@@ -191,7 +201,7 @@ case class TransactionsApiRoute(
         leaseCancel.json() ++ Json.obj("lease" -> blockchain.transactionInfo(leaseCancel.leaseId).map(_._2.json()).getOrElse[JsValue](JsNull))
 
       case t => t.json()
-    }
+    }) ++ (if(bodyBytes) { Json.obj("bodyBytes" -> ("base64:" ++ Base64.encode(tx.bodyBytes()))) } else { Json.obj() })
   }
 
   private def applicationStatus(height: Int, succeed: Boolean): JsObject = {
