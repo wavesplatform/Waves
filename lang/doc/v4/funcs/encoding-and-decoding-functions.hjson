@@ -142,5 +142,11 @@
         '''
       paramsDoc: [ "The string to decode." ]
     }
+    {
+      name: "ecrecover"
+      params: [ "ByteVector", "ByteVector" ]
+      doc: "Recovers the public key from hash of ECDSA-encoded message and signature."
+      paramsDoc: [ "The hash of encoded message.", "The signature." ]
+    }
   ]
 }
