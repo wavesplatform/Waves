@@ -70,6 +70,8 @@ object FunctionIds {
 
   val BLS12_GROTH16_VERIFY: Short = 800
 
+  val ECRECOVER: Short = 900
+
   val BLS12_GROTH16_VERIFY_LIM: Short = 2400 // Reserved n id for generated limited functions
   val SIGVERIFY_LIM: Short = 2500 // Reserved n id for generated limited functions
   val RSAVERIFY_LIM: Short = 2600 // Reserved n id for generated limited functions
@@ -103,4 +105,7 @@ object FunctionIds {
   val TRANSFER_TRANSACTION_FROM_PROTO: Short = 1070
 
   val CALCULATE_ASSET_ID: Short = 1080
+
+  val SIMPLIFIED_ISSUE_ACTION_CONSTRUCTOR: Short = 1090
+  val DETAILED_ISSUE_ACTION_CONSTRUCTOR: Short   = 1091
 }

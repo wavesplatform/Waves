@@ -832,6 +832,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |   let v22 = toString(Address(base58''))
         |   let v23 = toBase16String(base58'')
         |   let v24 = fromBase16String("")
+        |   let v31 = ecrecover(base58'aaaa', base58'bbbb')
         |   nil
         | }
         """.stripMargin

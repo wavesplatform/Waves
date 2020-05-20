@@ -2,9 +2,9 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import cats.implicits._
 import cats.{Id, Monad}
-import cats.implicits._
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.merkle.Merkle.createRoot
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, _}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -15,7 +15,6 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, EvaluationContext, NativeFunction}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
-import com.wavesplatform.lang.ExecutionError
 
 import scala.util.Try
 
@@ -317,6 +316,28 @@ object CryptoContext {
         case xs => notImplemented[Id, EVALUATED]("groth16Verify(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
       }
 
+    val ecrecover: BaseFunction[NoContext] =
+      NativeFunction(
+        "ecrecover",
+        70,
+        ECRECOVER,
+        BYTESTR,
+        ("message hash", BYTESTR),
+        ("signature", BYTESTR)
+      ) {
+        case CONST_BYTESTR(messageHash: ByteStr) :: CONST_BYTESTR(signature: ByteStr) :: Nil =>
+          if (messageHash.size != 32)
+            Left(s"Invalid message hash size ${messageHash.size} bytes, must be equal to 32 bytes")
+          else if (signature.size > 65)
+            Left(s"Invalid signature size ${signature.size} bytes, must not be greater than 65 bytes")
+          else if (signature.isEmpty)
+            Left(s"Signature must not be empty")
+          else
+            CONST_BYTESTR(ByteStr(global.ecrecover(messageHash.arr, signature.arr)))
+        case xs => notImplemented[Id, EVALUATED]("ecrecover(messageHash:ByteVector, signature:ByteVector)", xs)
+
+      }
+
     val v1Functions =
       Array(
         keccak256F,
@@ -369,9 +390,9 @@ object CryptoContext {
 
     val v4Functions =
       Array(
-        bls12Groth16VerifyF, createMerkleRootF,  // new in V4
+        bls12Groth16VerifyF, createMerkleRootF, ecrecover, // new in V4
         rsaVerifyF, toBase16StringF(checkLength = true), fromBase16StringF(checkLength = true) // from V3
-        ) ++ sigVerifyL ++ rsaVerifyL ++ keccak256F_lim ++ blake2b256F_lim ++ sha256F_lim ++ bls12Groth16VerifyL
+      ) ++ sigVerifyL ++ rsaVerifyL ++ keccak256F_lim ++ blake2b256F_lim ++ sha256F_lim ++ bls12Groth16VerifyL
 
     val fromV1Ctx = CTX[NoContext](Seq(), Map(), v1Functions)
     val fromV3Ctx = fromV1Ctx |+| CTX[NoContext](v3Types, v3Vars, v3Functions)

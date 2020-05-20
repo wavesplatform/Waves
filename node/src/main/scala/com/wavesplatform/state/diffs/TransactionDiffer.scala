@@ -12,6 +12,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
+import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
 import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, Portfolio, Sponsorship}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{FailedScriptError, GenericError, UnsupportedTransactionType}
@@ -142,7 +143,7 @@ object TransactionDiffer {
       case dtx: DataTransaction              => DataTransactionDiff(blockchain)(dtx)
       case sstx: SetScriptTransaction        => SetScriptTransactionDiff(blockchain)(sstx)
       case sstx: SetAssetScriptTransaction   => AssetTransactionsDiff.setAssetScript(blockchain, currentBlockTs)(sstx)
-      case stx: SponsorFeeTransaction        => AssetTransactionsDiff.sponsor(blockchain, currentBlockTs)(stx)
+      case stx: SponsorFeeTransaction        => AssetTransactionsDiff.sponsor(blockchain)(stx)
       case _                                 => UnsupportedTransactionType.asLeft
     }
     val complexityDiff = Diff.empty.copy(scriptsComplexity = DiffsCommon.getScriptsComplexity(blockchain, tx)).asRight[ValidationError]
