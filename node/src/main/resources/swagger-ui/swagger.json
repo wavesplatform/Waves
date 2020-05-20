@@ -169,7 +169,7 @@
           "addresses"
         ],
         "summary": "Seq",
-        "description": "Get the wallet accounts addresses. Max range {from}-{to} is 1,000 blocks",
+        "description": "Get the wallet accounts addresses. Max range {from}-{to} is 1,000 addresses",
         "operationId": "seq_2",
         "parameters": [
           {
