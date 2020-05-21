@@ -156,18 +156,14 @@ object CryptoContext {
     }
 
     def sigVerifyF(contextVer: StdLibVersion): BaseFunction[NoContext] = {
-      val lim = if (version < V4) {
-        global.MaxByteStrSizeForVerifyFuncs
-      } else {
-        global.MaxByteStrSizeForVerifyFuncs_V4
-      }
+      val lim = global.MaxByteStrSizeForVerifyFuncs
       NativeFunction("sigVerify", (if (version < V4) {
                                      100
                                    } else {
                                      200
                                    }), SIGVERIFY, BOOLEAN, ("message", BYTESTR), ("sig", BYTESTR), ("pub", BYTESTR)) {
         case CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil
-            if (contextVer != V1 && contextVer != V2 && msg.size > lim) =>
+            if (contextVer == V3 && msg.size > lim) =>
           Left(s"Invalid message size = ${msg.size} bytes, must be not greater than ${lim / 1024} KB")
         case CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
           Right(CONST_BOOLEAN(global.curve25519verify(msg.arr, sig.arr, pub.arr)))
@@ -176,11 +172,7 @@ object CryptoContext {
     }
 
     val rsaVerifyF: BaseFunction[NoContext] = {
-      val lim = if (version < V4) {
-        global.MaxByteStrSizeForVerifyFuncs
-      } else {
-        global.MaxByteStrSizeForVerifyFuncs_V4
-      }
+      val lim = global.MaxByteStrSizeForVerifyFuncs
       NativeFunction(
         "rsaVerify",
         (if (version < V4) {
@@ -196,7 +188,7 @@ object CryptoContext {
         ("pub", BYTESTR)
       ) {
         case (digestAlg: CaseObj) :: CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil
-            if (msg.size > lim) =>
+            if version < V4 && msg.size > lim =>
           Left(s"Invalid message size = ${msg.size} bytes, must be not greater than ${lim / 1024} KB")
         case (digestAlg: CaseObj) :: CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
           algFromCO(digestAlg) flatMap { alg =>

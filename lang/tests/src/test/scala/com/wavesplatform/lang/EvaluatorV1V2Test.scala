@@ -819,7 +819,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
     val txObj = CaseObj(
       txType,
       Map(
-        "bodyBytes" -> CONST_BYTESTR(ByteStr(bodyBytes), limit = CONST_BYTESTR.ProtoDataTxSize).explicitGet(),
+        "bodyBytes" -> CONST_BYTESTR(ByteStr(bodyBytes), limit = CONST_BYTESTR.NoLimit).explicitGet(),
         "senderPk"  -> ByteStr(publicKey),
         "proof0"    -> ByteStr(signature)
       )

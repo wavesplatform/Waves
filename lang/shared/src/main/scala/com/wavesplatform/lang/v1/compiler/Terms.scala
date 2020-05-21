@@ -183,7 +183,7 @@ object Terms {
     sealed abstract class Limit(val value: Int)
     case object DataEntrySize   extends Limit(DataEntryValueMax)
     case object DataTxSize      extends Limit(DataTxMaxBytes)
-    case object ProtoDataTxSize extends Limit(DataTxMaxProtoBytes)
+    case object NoLimit         extends Limit(Int.MaxValue)
 
     def apply(bs: ByteStr, limit: Limit = DataEntrySize): Either[ExecutionError, EVALUATED] =
       Either.cond(

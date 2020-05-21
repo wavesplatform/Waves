@@ -31,7 +31,7 @@ object Bindings {
 
   private def provenTxPart(tx: Proven, proofsEnabled: Boolean, version: StdLibVersion): Map[String, EVALUATED] = {
     val limit =
-      if (version >= V4) CONST_BYTESTR.ProtoDataTxSize
+      if (version >= V4) CONST_BYTESTR.NoLimit
       else CONST_BYTESTR.DataTxSize
 
     val commonPart = combine(Map(
