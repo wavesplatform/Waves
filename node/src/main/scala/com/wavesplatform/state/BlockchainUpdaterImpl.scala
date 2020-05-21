@@ -16,7 +16,7 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.metrics.{TxsInBlockchainStats, _}
-import com.wavesplatform.mining.{MiningConstraint, MiningConstraints}
+import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
@@ -35,7 +35,8 @@ class BlockchainUpdaterImpl(
     spendableBalanceChanged: Observer[(Address, Asset)],
     wavesSettings: WavesSettings,
     time: Time,
-    blockchainUpdateTriggers: BlockchainUpdateTriggers
+    blockchainUpdateTriggers: BlockchainUpdateTriggers,
+    miner: Miner = _ => ()
 ) extends Blockchain
     with BlockchainUpdater
     with NG
@@ -281,20 +282,24 @@ class BlockchainUpdaterImpl(
 
                         val liquidDiffWithCancelledLeases = ng.cancelExpiredLeases(referencedLiquidDiff)
 
-                        val diff = BlockDiffer
+                        val referencedBlockchain = CompositeBlockchain(leveldb, Some(liquidDiffWithCancelledLeases), Some(referencedForgedBlock), carry, reward)
+                        val maybeDiff = BlockDiffer
                           .fromBlock(
-                            CompositeBlockchain(leveldb, Some(liquidDiffWithCancelledLeases), Some(referencedForgedBlock), carry, reward),
+                            referencedBlockchain,
                             Some(referencedForgedBlock),
                             block,
                             constraint,
                             verify
                           )
 
-                        diff.map { hardenedDiff =>
+                        maybeDiff.map { differResult =>
+                          val tempBlockchain = CompositeBlockchain(referencedBlockchain, Some(differResult.diff), Some(block), differResult.carry, reward)
+                          miner.scheduleMining(Some(tempBlockchain))
+
                           leveldb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
                           BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
                           TxsInBlockchainStats.record(ng.transactions.size)
-                          Some((hardenedDiff, discarded.flatMap(_.transactionData), reward, hitSource))
+                          Some((differResult, discarded.flatMap(_.transactionData), reward, hitSource))
                         }
                       } else {
                         val errorText = s"Forged block has invalid signature. Base: ${ng.base}, requested reference: ${block.header.reference}"
@@ -388,6 +393,7 @@ class BlockchainUpdaterImpl(
 
     notifyChangedSpendable(prevNgState, ngState)
     publishLastBlockInfo()
+    miner.scheduleMining()
     result
   }
 

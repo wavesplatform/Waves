@@ -170,7 +170,27 @@ final case class CompositeBlockchain(
 }
 
 object CompositeBlockchain {
-  def assetDescription(
+  def apply(blockchain: Blockchain, ngState: NgState): CompositeBlockchain =
+    CompositeBlockchain(blockchain, Some(ngState.bestLiquidDiff), Some(ngState.bestLiquidBlock), ngState.carryFee, ngState.reward)
+
+  def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff])(
+      filter: LeaseTransaction => Boolean
+  ): Seq[LeaseTransaction] = {
+    val innerActiveLeases = inner.collectActiveLeases(filter)
+    maybeDiff match {
+      case Some(ng) =>
+        val cancelledInLiquidBlock = ng.leaseState.collect {
+          case (id, false) => id
+        }.toSet
+        val addedInLiquidBlock = ng.transactions.values.collect {
+          case (lt: LeaseTransaction, _, true) if !cancelledInLiquidBlock(lt.id()) => lt
+        }
+        innerActiveLeases.filterNot(lt => cancelledInLiquidBlock(lt.id())) ++ addedInLiquidBlock
+      case _ => innerActiveLeases
+    }
+  }
+
+  private def assetDescription(
       asset: IssuedAsset,
       diff: Diff,
       innerAssetDescription: => Option[AssetDescription],
@@ -244,23 +264,4 @@ object CompositeBlockchain {
     }
   }
 
-  def apply(blockchain: Blockchain, ngState: NgState): Blockchain =
-    CompositeBlockchain(blockchain, Some(ngState.bestLiquidDiff), Some(ngState.bestLiquidBlock), ngState.carryFee, ngState.reward)
-
-  def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff])(
-      filter: LeaseTransaction => Boolean
-  ): Seq[LeaseTransaction] = {
-    val innerActiveLeases = inner.collectActiveLeases(filter)
-    maybeDiff match {
-      case Some(ng) =>
-        val cancelledInLiquidBlock = ng.leaseState.collect {
-          case (id, false) => id
-        }.toSet
-        val addedInLiquidBlock = ng.transactions.values.collect {
-          case (lt: LeaseTransaction, _, true) if !cancelledInLiquidBlock(lt.id()) => lt
-        }
-        innerActiveLeases.filterNot(lt => cancelledInLiquidBlock(lt.id())) ++ addedInLiquidBlock
-      case _ => innerActiveLeases
-    }
-  }
 }

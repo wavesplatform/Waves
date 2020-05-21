@@ -42,7 +42,6 @@ package object appender extends ScorexLogging {
     f map {
       case Right(maybeNewScore) =>
         log.debug(success)
-        maybeNewScore.foreach(_ => miner.scheduleMining())
         Right(maybeNewScore)
       case Left(ve) =>
         log.warn(s"$errorPrefix: $ve")

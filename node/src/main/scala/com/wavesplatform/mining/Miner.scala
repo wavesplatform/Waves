@@ -30,7 +30,7 @@ import monix.execution.schedulers.{CanBlock, SchedulerService}
 import scala.concurrent.duration._
 
 trait Miner {
-  def scheduleMining(): Unit
+  def scheduleMining(blockchain: Option[Blockchain] = None): Unit
 }
 
 trait MinerDebugInfo {
@@ -82,7 +82,7 @@ class MinerImpl(
   )
 
   def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] =
-    this.nextBlockGenOffsetWithConditions(account)
+    this.nextBlockGenOffsetWithConditions(account, blockchainUpdater)
 
   private def checkAge(parentHeight: Int, parentTimestamp: Long): Either[String, Unit] =
     Either
@@ -107,11 +107,6 @@ class MinerImpl(
 
   private def ngEnabled: Boolean = blockchainUpdater.featureActivationHeight(BlockchainFeatures.NG.id).exists(blockchainUpdater.height > _ + 1)
 
-  private def generateOneBlockTask(account: KeyPair)(delay: FiniteDuration): Task[Either[String, (MiningConstraints, Block, MiningConstraint)]] = {
-    Task {
-      forgeBlock(account)
-    }.delayExecution(delay)
-  }
 
   private def consensusData(
       height: Int,
@@ -220,11 +215,11 @@ class MinerImpl(
     } else Left(s"Balance $balance of ${account.toAddress} is lower than required for generation")
   }
 
-  private def nextBlockGenOffsetWithConditions(account: KeyPair): Either[String, FiniteDuration] = {
-    val height    = blockchainUpdater.height
-    val lastBlock = blockchainUpdater.lastBlockHeader.get
+  private def nextBlockGenOffsetWithConditions(account: KeyPair, blockchain: Blockchain): Either[String, FiniteDuration] = {
+    val height    = blockchain.height
+    val lastBlock = blockchain.lastBlockHeader.get
     for {
-      _  <- checkAge(height, blockchainUpdater.lastBlockTimestamp.get) // lastBlock ?
+      _  <- checkAge(height, blockchain.lastBlockTimestamp.get) // lastBlock ?
       _  <- checkScript(account)
       ts <- nextBlockGenerationTime(blockchainSettings.functionalitySettings, height, lastBlock, account)
       calculatedOffset = ts - timeService.correctedTime()
@@ -233,19 +228,28 @@ class MinerImpl(
     } yield offset
   }
 
-  private def generateBlockTask(account: KeyPair): Task[Unit] = {
-    {
-      for {
-        offset <- nextBlockGenOffsetWithConditions(account)
-        quorumAvailable = checkQuorumAvailable().isRight
-      } yield {
-        if (quorumAvailable) offset
-        else offset.max(settings.minerSettings.noQuorumMiningDelay)
-      }
-    } match {
+  private def generateBlockTask(account: KeyPair, maybeBlockchain: Option[Blockchain] = None): Task[Unit] = {
+    (for {
+      offset <- nextBlockGenOffsetWithConditions(account, maybeBlockchain.getOrElse(blockchainUpdater))
+      quorumAvailable = checkQuorumAvailable().isRight
+    } yield {
+      if (quorumAvailable) offset
+      else offset.max(settings.minerSettings.noQuorumMiningDelay)
+    }) match {
       case Right(offset) =>
+        def waitUntilBlockAppended(block: BlockId): Task[Unit] =
+          if (blockchainUpdater.contains(block)) Task.unit
+          else Task.sleep(5 seconds).flatMap(_ => waitUntilBlockAppended(block))
+
         log.debug(f"Next attempt for acc=${account.toAddress} in ${offset.toUnit(SECONDS)}%.3f seconds")
-        generateOneBlockTask(account)(offset).flatMap {
+        val waitTask = maybeBlockchain match {
+          case Some(value) => waitUntilBlockAppended(value.lastBlockId.get)
+          case None => Task.unit
+        }
+        waitTask.timed.flatMap { case (elapsed, _) =>
+          val newOffset = (offset - elapsed).max(Duration.Zero)
+          Task(forgeBlock(account)).delayExecution(newOffset)
+        }.flatMap {
           case Right((estimators, block, totalConstraint)) =>
             BlockAppender(blockchainUpdater, timeService, utx, pos, appenderScheduler)(block)
               .asyncBoundary(minerScheduler)
@@ -260,7 +264,6 @@ class MinerImpl(
                   log.debug(s"Forged and applied $block by ${account.toAddress} with cumulative score $score")
                   BlockStats.mined(block, blockchainUpdater.height)
                   allChannels.broadcast(BlockForged(block))
-                  scheduleMining()
                   if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, estimators, totalConstraint)
                   Task.unit
 
@@ -279,12 +282,12 @@ class MinerImpl(
     }
   }
 
-  def scheduleMining(): Unit = {
+  def scheduleMining(tempBlockchain: Option[Blockchain]): Unit = {
     Miner.blockMiningStarted.increment()
 
-    val nonScriptedAccounts = wallet.privateKeyAccounts.filterNot(kp => blockchainUpdater.hasAccountScript(kp.toAddress))
+    val nonScriptedAccounts = wallet.privateKeyAccounts.filterNot(kp => tempBlockchain.getOrElse(blockchainUpdater).hasAccountScript(kp.toAddress))
     scheduledAttempts := CompositeCancelable.fromSet(nonScriptedAccounts.map { account =>
-      generateBlockTask(account)
+      generateBlockTask(account, tempBlockchain)
         .onErrorHandle(err => log.warn(s"Error mining Block: $err"))
         .runToFuture
     }.toSet)
@@ -325,7 +328,7 @@ object Miner {
   val MaxTransactionsPerMicroblock: Int = 500
 
   case object Disabled extends Miner with MinerDebugInfo {
-    override def scheduleMining(): Unit                                                         = ()
+    override def scheduleMining(blockchain: Option[Blockchain]): Unit                                   = ()
     override def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] = Left("Disabled")
     override val state: MinerDebugInfo.State                                                    = MinerDebugInfo.Disabled
   }
