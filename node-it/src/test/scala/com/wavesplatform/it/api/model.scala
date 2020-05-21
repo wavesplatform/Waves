@@ -425,7 +425,7 @@ case class StateChangesDetails(
     reissues: Seq[ReissueInfoResponse],
     burns: Seq[BurnInfoResponse],
     sponsorFees: Seq[SponsorFeeResponse],
-    errorMessage: Option[ErrorMessageInfoResponse]
+    error: Option[ErrorMessageInfoResponse]
 )
 object StateChangesDetails {
   implicit val stateChangeResponseFormat: Reads[StateChangesDetails] = Json.reads[StateChangesDetails]

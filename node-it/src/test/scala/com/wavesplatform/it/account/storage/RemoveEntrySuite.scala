@@ -115,7 +115,7 @@ class RemoveEntrySuite extends BaseSuite {
       val tx = miner.waitForTransaction(invokeScript(address, s"delete101Entries")).id
 
       miner.transactionStatus(Seq(tx)).head.applicationStatus shouldBe Some("scriptExecutionFailed")
-      miner.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include ("WriteSet can't contain more than 100 entries")
+      miner.debugStateChanges(tx).stateChanges.get.error.get.text should include ("WriteSet can't contain more than 100 entries")
 
       miner.getData(address) should have size 101
     }
@@ -127,7 +127,7 @@ class RemoveEntrySuite extends BaseSuite {
       val tx = miner.waitForTransaction(invokeScript(address, s"write", tooLongKey, "value")).id
 
       miner.transactionStatus(Seq(tx)).head.applicationStatus shouldBe Some("scriptExecutionFailed")
-      miner.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include ("Key size = 401 bytes must be less than 400")
+      miner.debugStateChanges(tx).stateChanges.get.error.get.text should include ("Key size = 401 bytes must be less than 400")
     }
   }
 

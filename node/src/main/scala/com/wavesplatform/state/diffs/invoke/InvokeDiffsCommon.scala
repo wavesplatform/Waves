@@ -92,13 +92,12 @@ object InvokeDiffsCommon {
       blockchain: Blockchain,
       blockTime: Long
   ): TracedResult[ValidationError, Diff] = {
-    val actionsByType = actions.groupBy(_.getClass).withDefaultValue(Nil)
-    val transferList  = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
-    val issueList     = actionsByType(classOf[Issue]).asInstanceOf[List[Issue]]
-    val reissueList   = actionsByType(classOf[Reissue]).asInstanceOf[List[Reissue]]
-    val burnList      = actionsByType(classOf[Burn]).asInstanceOf[List[Burn]]
+    val actionsByType  = actions.groupBy(_.getClass).withDefaultValue(Nil)
+    val transferList   = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
+    val issueList      = actionsByType(classOf[Issue]).asInstanceOf[List[Issue]]
+    val reissueList    = actionsByType(classOf[Reissue]).asInstanceOf[List[Reissue]]
+    val burnList       = actionsByType(classOf[Burn]).asInstanceOf[List[Burn]]
     val sponsorFeeList = actionsByType(classOf[SponsorFee]).asInstanceOf[List[SponsorFee]]
-
 
     val dataEntries = actionsByType
       .filterKeys(classOf[DataItem[_]].isAssignableFrom)
@@ -109,17 +108,17 @@ object InvokeDiffsCommon {
       .map(dataItemToEntry)
 
     for {
-      _ <- TracedResult(checkDataEntries(tx, dataEntries, version)).leftMap(ScriptExecutionError.dApp)
+      _ <- TracedResult(checkDataEntries(tx, dataEntries, version)).leftMap(e => ScriptExecutionError.ByDAppScript(e))
       _ <- TracedResult(
         Either.cond(
           actions.length - dataEntries.length <= ContractLimits.MaxCallableActionsAmount,
           (),
-          ScriptExecutionError.dApp(s"Too many script actions: max: ${ContractLimits.MaxCallableActionsAmount}, actual: ${actions.length}")
+          ScriptExecutionError.ByDAppScript(s"Too many script actions: max: ${ContractLimits.MaxCallableActionsAmount}, actual: ${actions.length}")
         )
       )
 
       _ <- TracedResult(checkSelfPayments(dAppAddress, blockchain, tx, version, transferList))
-      _ <- TracedResult(Either.cond(transferList.map(_.amount).forall(_ >= 0), (), ScriptExecutionError.dApp("Negative amount")))
+      _ <- TracedResult(Either.cond(transferList.map(_.amount).forall(_ >= 0), (), ScriptExecutionError.ByDAppScript("Negative amount")))
       _ <- TracedResult(checkOverflow(transferList.map(_.amount)))
 
       assetsComplexity = (tx.checkedAssets.map(_.id) ++ transferList.flatMap(_.assetId))
@@ -141,12 +140,13 @@ object InvokeDiffsCommon {
             reissueList.map(r => IssuedAsset(r.assetId)) ++
             burnList.map(b => IssuedAsset(b.assetId)) ++
             sponsorFeeList.map(sf => IssuedAsset(sf.assetId))
-        val totalScriptsInvoked = smartAssetInvocations.count(blockchain.hasAssetScript) + (if (blockchain.hasAccountScript(tx.sender.toAddress)) 1 else 0)
-        val minIssueFee         = issueList.count(i => !blockchain.isNFT(i)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
-        val dAppInvocationFee   = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber
-        val minWaves            = totalScriptsInvoked * ScriptExtraFee + dAppInvocationFee + minIssueFee
-        val txName              = Constants.TransactionNames(InvokeScriptTransaction.typeId)
-        val assetName           = tx.assetFee._1.fold("WAVES")(_.id.toString)
+        val totalScriptsInvoked = smartAssetInvocations.count(blockchain.hasAssetScript) + (if (blockchain.hasAccountScript(tx.sender.toAddress)) 1
+                                                                                            else 0)
+        val minIssueFee       = issueList.count(i => !blockchain.isNFT(i)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
+        val dAppInvocationFee = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber
+        val minWaves          = totalScriptsInvoked * ScriptExtraFee + dAppInvocationFee + minIssueFee
+        val txName            = Constants.TransactionNames(InvokeScriptTransaction.typeId)
+        val assetName         = tx.assetFee._1.fold("WAVES")(_.id.toString)
         Either.cond(
           minWaves <= feeInfo._1,
           totalScriptsInvoked,
@@ -202,9 +202,9 @@ object InvokeDiffsCommon {
   }
 
   def paymentsPart(
-    tx: InvokeScriptTransaction,
-    dAppAddress: Address,
-    feePart: Map[Address, Portfolio]
+      tx: InvokeScriptTransaction,
+      dAppAddress: Address,
+      feePart: Map[Address, Portfolio]
   ): Diff = {
     val payablePart = tx.payments
       .map {
@@ -241,9 +241,9 @@ object InvokeDiffsCommon {
   ): Either[ScriptExecutionError, Unit] =
     if (blockchain.disallowSelfPayment && version >= V4)
       if (tx.payments.nonEmpty && tx.sender.toAddress == dAppAddress)
-        ScriptExecutionError.dApp("DApp self-payment is forbidden since V4").asLeft[Unit]
+        ScriptExecutionError.ByDAppScript("DApp self-payment is forbidden since V4").asLeft[Unit]
       else if (transfers.exists(_.recipient.bytes == ByteStr(dAppAddress.bytes)))
-        ScriptExecutionError.dApp("DApp self-transfer is forbidden since V4").asLeft[Unit]
+        ScriptExecutionError.ByDAppScript("DApp self-transfer is forbidden since V4").asLeft[Unit]
       else
         ().asRight[ScriptExecutionError]
     else
@@ -252,7 +252,7 @@ object InvokeDiffsCommon {
   private def checkOverflow(dataList: Traversable[Long]): Either[ScriptExecutionError, Unit] = {
     Try(dataList.foldLeft(0L)(Math.addExact))
       .fold(
-        _ => ScriptExecutionError.dApp("Attempt to transfer unavailable funds in contract payment").asLeft[Unit],
+        _ => ScriptExecutionError.ByDAppScript("Attempt to transfer unavailable funds in contract payment").asLeft[Unit],
         _ => ().asRight[ScriptExecutionError]
       )
   }
@@ -358,7 +358,7 @@ object InvokeDiffsCommon {
             } else if (issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
               TracedResult(Left(TooBigArray), List())
             } else if (blockchain.assetDescription(IssuedAsset(issue.id)).isDefined) {
-              TracedResult(Left(ScriptExecutionError(s"Asset ${issue.id} is already issued", List(), isAssetScript = false)), List())
+              TracedResult(Left(ScriptExecutionError.ByDAppScript(s"Asset ${issue.id} is already issued")), List())
             } else {
               val staticInfo = AssetStaticInfo(TransactionId @@ itx.id(), pk, issue.decimals, blockchain.isNFT(issue))
               val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
@@ -398,7 +398,7 @@ object InvokeDiffsCommon {
                 Either.cond(
                   blockchain.assetDescription(IssuedAsset(sponsorFee.assetId)).exists(_.issuer == pk),
                   (),
-                  ScriptExecutionError.dApp(s"SponsorFee assetId=${sponsorFee.assetId} was not issued from address of current dApp")
+                  ScriptExecutionError.ByDAppScript(s"SponsorFee assetId=${sponsorFee.assetId} was not issued from address of current dApp")
                 )
               )
               _ <- TracedResult(SponsorFeeTxValidator.checkMinSponsoredAssetFee(sponsorFee.minSponsoredAssetFee))
@@ -460,24 +460,21 @@ object InvokeDiffsCommon {
         isAssetScript = true,
         scriptContainerAddress = if (blockchain.passCorrectAssetId) assetId else ByteStr(tx.dAppAddressOrAlias.bytes)
       ) match {
-        case (log, Left(error))  => Left(ScriptExecutionError.asset(error, log, FailedScriptError.Reason.AssetInAction))
-        case (log, Right(FALSE)) => Left(TransactionNotAllowedByScript.asset(log, FailedScriptError.Reason.AssetInAction))
+        case (log, Left(error))  => Left(ScriptExecutionError.ByAssetScriptInAction(error, log, assetId))
+        case (log, Right(FALSE)) => Left(TransactionNotAllowedByScript.ByAssetScriptInAction(log, assetId))
         case (_, Right(TRUE))    => Right(nextDiff)
-        case (log, Right(x)) =>
-          Left(ScriptExecutionError.asset(s"Script returned not a boolean result, but $x", log, FailedScriptError.Reason.AssetInAction))
+        case (log, Right(x))     => Left(ScriptExecutionError.ByAssetScriptInAction(s"Script returned not a boolean result, but $x", log, assetId))
       }
     } match {
       case Failure(e) =>
-        Left(
-          ScriptExecutionError.asset(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, FailedScriptError.Reason.AssetInAction)
-        )
+        Left(ScriptExecutionError.ByAssetScriptInAction(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, assetId))
       case Success(s) => s
     }
 
-  private def asFailedScriptError(ve: ValidationError): FailedScriptError =
+  private def asFailedScriptError(ve: ValidationError): FailedTransactionError =
     ve match {
-      case e: FailedScriptError => e
-      case e: GenericError      => ScriptExecutionError.dApp(e.err)
-      case e                    => ScriptExecutionError.dApp(e.toString)
+      case e: FailedTransactionError => e
+      case e: GenericError           => ScriptExecutionError.ByDAppScript(e.err)
+      case e                         => ScriptExecutionError.ByDAppScript(e.toString)
     }
 }

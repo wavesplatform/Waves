@@ -138,7 +138,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       sender.balance(caller).balance shouldBe prevBalance - txs.size * invokeFee
 
       failed.foreach { s =>
-        checkStateChange(sender.debugStateChanges(s.id), 1, "Crashed by dApp")
+        checkStateChange(sender.debugStateChanges(s.id), 1, "Crashed by dApp", strict = true)
       }
 
       failed
@@ -211,7 +211,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       sender.assetsBalance(contract).balances.map(_.assetId) should contain theSameElementsAs prevAssets
 
       failed.foreach { s =>
-        checkStateChange(sender.debugStateChanges(s.id), 3, "Transaction is not allowed by token-script")
+        checkStateChange(sender.debugStateChanges(s.id), 3, "Transaction is not allowed by script of the asset")
       }
 
       failed
@@ -273,7 +273,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       sender.assetBalance(caller, paymentAsset) shouldBe prevPaymentAssetBalance.copy(balance = prevPaymentAssetBalance.balance + paymentDelta)
 
       failed.foreach { s =>
-        checkStateChange(sender.debugStateChanges(s.id), 4, "Transaction is not allowed by token-script")
+        checkStateChange(sender.debugStateChanges(s.id), 4, "Transaction is not allowed by script of the asset")
       }
 
       failed
@@ -347,12 +347,12 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
           sender.getDataByKey(contract, key) shouldBe lastSuccessWrites.getOrElse(key, initial)
       }
 
-      failed.foreach(s => checkStateChange(sender.debugStateChanges(s.id), 3, "Transaction is not allowed by token-script"))
+      failed.foreach(s => checkStateChange(sender.debugStateChanges(s.id), 3, "Transaction is not allowed by script of the asset"))
 
       val failedIds             = failed.map(_.id).toSet
       val stateChangesByAddress = sender.debugStateChangesByAddress(contract, 10).takeWhile(sc => failedIds.contains(sc.id))
       stateChangesByAddress.size should be > 0
-      stateChangesByAddress.foreach(info => checkStateChange(info, 3, "Transaction is not allowed by token-script"))
+      stateChangesByAddress.foreach(info => checkStateChange(info, 3, "Transaction is not allowed by script of the asset"))
 
       failed
     }
@@ -575,14 +575,17 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       statuses => statuses.forall(identity)
     )
 
-  private def checkStateChange(info: DebugStateChanges, code: Int, text: String): Unit = {
+  private def checkStateChange(info: DebugStateChanges, code: Int, text: String, strict: Boolean = false): Unit = {
     info.stateChanges shouldBe 'defined
     info.stateChanges.get.issues.size shouldBe 0
     info.stateChanges.get.reissues.size shouldBe 0
     info.stateChanges.get.burns.size shouldBe 0
-    info.stateChanges.get.errorMessage shouldBe 'defined
-    info.stateChanges.get.errorMessage.get.code shouldBe code
-    info.stateChanges.get.errorMessage.get.text should include(text)
+    info.stateChanges.get.error shouldBe 'defined
+    info.stateChanges.get.error.get.code shouldBe code
+    if (strict)
+      info.stateChanges.get.error.get.text shouldBe text
+    else
+      info.stateChanges.get.error.get.text should include(text)
   }
 
   private def checkTransactionHeightById(failedTxs: Seq[TransactionStatus]): Unit = {

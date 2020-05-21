@@ -62,11 +62,10 @@ object InvokeScriptTransactionDiff {
           }
 
           stepLimit = ContractLimits.MaxComplexityByVersion(version)
-          stepsNumber =
-            if (invocationComplexity % stepLimit == 0)
-              invocationComplexity / stepLimit
-            else
-              invocationComplexity / stepLimit + 1
+          stepsNumber = if (invocationComplexity % stepLimit == 0)
+            invocationComplexity / stepLimit
+          else
+            invocationComplexity / stepLimit + 1
 
           _ <- TracedResult {
             val minFee    = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber
@@ -120,7 +119,7 @@ object InvokeScriptTransactionDiff {
 
                   Try(evaluate(version, contract, directives, invocation, environment))
                     .fold(e => Left((e.getMessage, Nil)), identity)
-                    .leftMap { case (error, log) => ScriptExecutionError.dApp(error, log) }
+                    .leftMap { case (error, log) => ScriptExecutionError.ByDAppScript(error, log) }
                 })
                 TracedResult(
                   scriptResultE,

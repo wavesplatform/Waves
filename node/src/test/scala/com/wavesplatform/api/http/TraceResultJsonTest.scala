@@ -165,7 +165,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
       InvokeScriptTrace(
         tx.dAppAddressOrAlias,
         tx.funcCall,
-        Left(TxValidationError.ScriptExecutionError(reason, vars, isAssetScript = false)),
+        Left(TxValidationError.ScriptExecutionError.ByAccountScript(reason, vars)),
         vars
       )
     )

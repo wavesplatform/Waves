@@ -152,7 +152,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
       ._1
       .id
 
-    sender.debugStateChanges(tx1).stateChanges.get.errorMessage.get.text should include("Empty keys aren't allowed in tx version >= 2")
+    sender.debugStateChanges(tx1).stateChanges.get.error.get.text should include("Empty keys aren't allowed in tx version >= 2")
 
     nodes.waitForHeightArise()
     sender.getData(secondContract).filter(_.key.isEmpty) shouldBe List.empty
@@ -170,7 +170,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
       ._1
       .id
 
-    sender.debugStateChanges(tx2).stateChanges.get.errorMessage.get.text should include("Empty keys aren't allowed in tx version >= 2")
+    sender.debugStateChanges(tx2).stateChanges.get.error.get.text should include("Empty keys aren't allowed in tx version >= 2")
 
     nodes.waitForHeightArise()
     sender.getData(thirdContract).filter(_.key.isEmpty) shouldBe List.empty

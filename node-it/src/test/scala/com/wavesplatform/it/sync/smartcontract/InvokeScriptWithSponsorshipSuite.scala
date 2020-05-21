@@ -167,7 +167,7 @@ class InvokeScriptWithSponsorshipSuite extends BaseTransactionSuite with CancelA
       )
       ._1
       .id
-    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("does not exceed minimal value of 5300000 WAVES")
+    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include("does not exceed minimal value of 5300000 WAVES")
 
     sender
       .invokeScript(
