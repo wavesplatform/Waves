@@ -21,9 +21,9 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
     ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Right((ExprScript(V1, expectedExpr).explicitGet(), 13))
   }
 
-  property("use version 2 if not specified") {
+  property("use version 3 if not specified") {
     val script = scriptWithVersion(none)
-    ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Right((ExprScript(V2, expectedExpr).explicitGet(), 13))
+    ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Right((ExprScript(V3, expectedExpr).explicitGet(), 13))
   }
 
   property("fails on unsupported version") {

@@ -27,6 +27,7 @@ import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.{Schedulers, Time}
 import io.netty.util.HashedWheelTimer
 import org.scalacheck.Gen
@@ -35,7 +36,8 @@ import play.api.libs.json.{JsObject, JsValue}
 
 import scala.concurrent.duration._
 
-class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks {
+import org.scalamock.scalatest.PathMockFactory
+class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks  with PathMockFactory {
   implicit val routeTestTimeout = RouteTestTimeout(10.seconds)
   implicit val timeout          = routeTestTimeout.duration
 
@@ -52,7 +54,8 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       5.seconds,
       1,
       "rest-time-limited"
-    )
+    ),
+    stub[Blockchain]("globalBlockchain")
   ).route
 
   val script = FUNCTION_CALL(
@@ -448,7 +451,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     }
 
   routePath("/script/compile") in {
-    Post(routePath("/script/compile"), "(1 == 2)") ~> route ~> check {
+    Post(routePath("/script/compile"), "{-# STDLIB_VERSION 2 #-}\n(1 == 2)") ~> route ~> check {
       val json           = responseAs[JsValue]
       val expectedScript = ExprScript(V2, script).explicitGet()
 
@@ -465,7 +468,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   }
 
   routePath("/script/compileCode") in {
-    Post(routePath("/script/compileCode"), "(1 == 2)") ~> route ~> check {
+    Post(routePath("/script/compileCode"), "{-# STDLIB_VERSION 2 #-}\n(1 == 2)") ~> route ~> check {
       val json           = responseAs[JsValue]
       val expectedScript = ExprScript(V2, script).explicitGet()
 
@@ -515,7 +518,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   }
 
   routePath("/script/compileWithImports") in {
-    Post(routePath("/script/compileWithImports"), ScriptWithImportsRequest("(1 == 2)")) ~> route ~> check {
+    Post(routePath("/script/compileWithImports"), ScriptWithImportsRequest("{-# STDLIB_VERSION 2 #-}\n(1 == 2)")) ~> route ~> check {
       val json           = responseAs[JsValue]
       val expectedScript = ExprScript(V2, script).explicitGet()
 
