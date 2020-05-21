@@ -169,7 +169,7 @@
           "addresses"
         ],
         "summary": "Seq",
-        "description": "Get the wallet accounts addresses. Max range {from}-{to} is 1,000 blocks",
+        "description": "Get the wallet accounts addresses. Max range {from}-{to} is 100 addresses",
         "operationId": "seq_2",
         "parameters": [
           {
@@ -819,7 +819,7 @@
           "addresses"
         ],
         "summary": "Confirmed regular balance",
-        "description": "Get the regular balance of the address within {confirmations} blocks back from the current height. Maximum {confirmations} value is 2,000.",
+        "description": "Get the regular balance of the address within {confirmations} blocks back from the current height. {confirmations} supports return of balance not more than 2,000 blocks back",
         "operationId": "balanceWithConfirmations_1",
         "parameters": [
           {
@@ -1807,7 +1807,7 @@
           "transactions"
         ],
         "summary": "Unconfirmed transactions",
-        "description": "Get a list of an unconfirmed transactions",
+        "description": "Get a list of unconfirmed transactions",
         "operationId": "unconfirmed_1",
         "parameters": [],
         "responses": {
@@ -2006,7 +2006,7 @@
           "transactions"
         ],
         "summary": "Broadcast transaction",
-        "description": "Broadcast a signed transaction. You should use the JSON transaction format with a proofs",
+        "description": "Broadcast a signed transaction. You should use the JSON transaction format with proofs",
         "operationId": "signedBroadcast_1",
         "parameters": [
           {
@@ -3699,7 +3699,7 @@
           "debug"
         ],
         "summary": "Validate Transaction",
-        "description": "Validates a transaction and measures time spent in milliseconds. You should use the JSON transaction format with a proofs",
+        "description": "Validates a transaction and measures time spent in milliseconds. You should use the JSON transaction format with proofs",
         "operationId": "validate",
         "parameters": [
           {
