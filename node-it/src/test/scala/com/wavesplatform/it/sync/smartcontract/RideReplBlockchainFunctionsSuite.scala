@@ -38,7 +38,6 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   private val repl     = Repl(Some(settings))
 
   private var dataTxId     = ""
-  private var aliasTxId    = ""
   private var assetId      = ""
   private var transferTxId = ""
 
@@ -66,7 +65,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
       )
       .id
 
-    aliasTxId = sender.createAlias(bob.toAddress.stringRepr, alias, minFee).id
+    sender.createAlias(bob.toAddress.stringRepr, alias, minFee).id
     assetId = sender.issue(alice.toAddress.stringRepr, "Asset", "descr", 1000, 2, waitForTx = true).id
     transferTxId = sender.transfer(alice.toAddress.stringRepr, s"alias:$chainId:$alias", transferAmount, minFee, Some(assetId)).id
     nodes.waitForHeightAriseAndTxPresent(transferTxId)
