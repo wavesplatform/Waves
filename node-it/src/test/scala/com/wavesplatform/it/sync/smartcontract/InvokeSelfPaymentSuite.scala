@@ -75,7 +75,7 @@ class InvokeSelfPaymentSuite extends BaseTransactionSuite with CancelAfterFailur
       Seq(Payment(1, Waves), Payment(1, asset1))
     )) {
       val tx = sender.invokeScript(dAppV4, dAppV4, payment = payment, fee = smartMinFee + smartFee, waitForTx = true)._1.id
-      sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("DApp self-payment is forbidden since V4")
+      sender.debugStateChanges(tx).stateChanges.get.error.get.text should include("DApp self-payment is forbidden since V4")
     }
   }
 
@@ -89,7 +89,7 @@ class InvokeSelfPaymentSuite extends BaseTransactionSuite with CancelAfterFailur
       List(CONST_STRING(asset1Id).explicitGet())
     )) {
       val tx = sender.invokeScript(caller, dAppV4, Some("paySelf"), args, waitForTx = true)._1.id
-      sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("DApp self-transfer is forbidden since V4")
+      sender.debugStateChanges(tx).stateChanges.get.error.get.text should include("DApp self-transfer is forbidden since V4")
     }
   }
 

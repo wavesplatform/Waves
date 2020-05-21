@@ -42,7 +42,6 @@ class BlockV5TestSuite
       val blockAtCurrentHeight = nodes.head.blockAt(currentHeight)
       val blockHeadersCurrentHeight = nodes.head.blockHeadersAt(currentHeight)
       val blockBySignatureCurrentHeight = nodes.head.blockById(blockAtCurrentHeight.id)
-      val generationSignatureInConsensusApi = ByteStr.decodeBase58(nodes.head.blockGenerationSignature(blockAtCurrentHeight.id).generationSignature).get
       val generationSignatureInBlockJson = ByteStr.decodeBase58(blockAtCurrentHeight.generationSignature.get).get
 
       blockAtCurrentHeight.version.value shouldBe Block.ProtoBlockVersion
@@ -52,7 +51,6 @@ class BlockV5TestSuite
       Base58.decode(blockHeadersCurrentHeight.vrf.value).length shouldBe Block.HitSourceLength
       blockAtCurrentHeight.transactionsRoot.value shouldBe Base58.encode(Blake2b256.hash(Array(0.toByte)))
       blockHeadersCurrentHeight.transactionsRoot.value shouldBe Base58.encode(Blake2b256.hash(Array(0.toByte)))
-      generationSignatureInBlockJson shouldBe generationSignatureInConsensusApi
       generationSignatureInBlockJson.arr.length shouldBe Block.GenerationVRFSignatureLength
 
       blockAtCurrentHeight shouldBe blockBySignatureCurrentHeight

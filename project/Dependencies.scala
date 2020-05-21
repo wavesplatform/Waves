@@ -109,7 +109,8 @@ object Dependencies {
       kindProjector,
       compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4"),
       "com.softwaremill.sttp" %%% "core" % "1.6.4",
-      "com.wavesplatform"     % "zwaves" % "0.1.0-SNAPSHOT"
+      "com.wavesplatform"     % "zwaves" % "0.1.0-SNAPSHOT",
+      "org.web3j" % "crypto" % "4.5.18"
     ) ++ scalapbRuntime.value ++ circe.value
   )
 
@@ -197,7 +198,7 @@ object Dependencies {
   )
 
   lazy val circe = Def.setting {
-    val circeVersion = "0.12.0-RC4"
+    val circeVersion = "0.12.3"
     Seq(
       "io.circe" %%% "circe-core",
       "io.circe" %%% "circe-generic",

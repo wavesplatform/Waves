@@ -2676,7 +2676,7 @@
         ],
         "summary": "Information about an asset",
         "description": "Provides detailed information about given asset",
-        "operationId": "details_1",
+        "operationId": "asset_details",
         "parameters": [
           {
             "name": "assetId",
@@ -2697,80 +2697,47 @@
           "200": {
             "description": "successful operation",
             "schema": {
-              "type": "object",
-              "required": [
-                "assetId",
-                "decimals",
-                "description",
-                "issueHeight",
-                "issueTimestamp",
-                "issuer",
-                "minSponsoredAssetFee",
-                "name",
-                "quantity",
-                "reissuable",
-                "scriptDetails",
-                "scripted"
-              ],
-              "properties": {
-                "assetId": {
-                  "type": "string"
-                },
-                "issueHeight": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "issueTimestamp": {
-                  "type": "integer",
-                  "format": "int64"
-                },
-                "issuer": {
-                  "type": "string"
-                },
-                "name": {
-                  "type": "string"
-                },
-                "description": {
-                  "type": "string"
-                },
-                "decimals": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "reissuable": {
-                  "type": "boolean"
-                },
-                "quantity": {
-                  "type": "integer",
-                  "format": "int64"
-                },
-                "scripted": {
-                  "type": "boolean"
-                },
-                "minSponsoredAssetFee": {
-                  "type": "integer",
-                  "format": "int64"
-                },
-                "scriptDetails": {
-                  "type": "object",
-                  "required": [
-                    "script",
-                    "scriptComplexity",
-                    "scriptText"
-                  ],
-                  "properties": {
-                    "scriptComplexity": {
-                      "type": "integer",
-                      "format": "int32"
-                    },
-                    "script": {
-                      "type": "string"
-                    },
-                    "scriptText": {
-                      "type": "string"
-                    }
-                  }
-                }
+              "$ref": "#/definitions/AssetDetails"
+            }
+          }
+        }
+      }
+    },
+    "/assets/details": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "Information about the multiple assets",
+        "description": "Provides detailed information about the given assets",
+        "operationId": "asset_details_array",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "ID of the asset",
+            "required": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          },
+          {
+            "name": "full",
+            "in": "query",
+            "description": "false",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/AssetDetails"
               }
             }
           }
@@ -3012,33 +2979,6 @@
         }
       }
     },
-    "/consensus/generationsignature": {
-      "get": {
-        "tags": [
-          "consensus"
-        ],
-        "summary": "Generation signature last",
-        "description": "Generation signature of a last block",
-        "operationId": "generationSignature_1",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "schema": {
-              "type": "object",
-              "required": [
-                "generationSignature"
-              ],
-              "properties": {
-                "generationSignature": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/consensus/generatingbalance/{address}": {
       "get": {
         "tags": [
@@ -3072,41 +3012,6 @@
                 "balance": {
                   "type": "integer",
                   "format": "int64"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/consensus/generationsignature/{blockId}": {
-      "get": {
-        "tags": [
-          "consensus"
-        ],
-        "summary": "Generation signature",
-        "description": "Generation signature of a block with specified id",
-        "operationId": "generationSignatureId_1",
-        "parameters": [
-          {
-            "name": "blockId",
-            "in": "path",
-            "description": "Block id",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "schema": {
-              "type": "object",
-              "required": [
-                "generationSignature"
-              ],
-              "properties": {
-                "generationSignature": {
-                  "type": "string"
                 }
               }
             }
@@ -3941,51 +3846,6 @@
         ]
       }
     },
-    "/debug/historyInfo": {
-      "get": {
-        "tags": [
-          "debug"
-        ],
-        "summary": "State",
-        "description": "All history info you need to debug",
-        "operationId": "historyInfo_1",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "schema": {
-              "type": "object",
-              "required": [
-                "lastBlockIds",
-                "microBlockIds"
-              ],
-              "properties": {
-                "lastBlockIds": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "microBlockIds": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "$ref": "#/responses/ApiKeyNotValid"
-          }
-        },
-        "security": [
-          {
-            "API Key": []
-          }
-        ]
-      }
-    },
     "/debug/configInfo": {
       "get": {
         "tags": [
@@ -4257,6 +4117,83 @@
           "example": {
             "assetId1": 0,
             "assetId2": 100
+          }
+        }
+      }
+    },
+    "AssetDetails": {
+      "type": "object",
+      "required": [
+        "assetId",
+        "decimals",
+        "description",
+        "issueHeight",
+        "issueTimestamp",
+        "issuer",
+        "minSponsoredAssetFee",
+        "name",
+        "quantity",
+        "reissuable",
+        "scriptDetails",
+        "scripted"
+      ],
+      "properties": {
+        "assetId": {
+          "type": "string"
+        },
+        "issueHeight": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "issueTimestamp": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "issuer": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "decimals": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "reissuable": {
+          "type": "boolean"
+        },
+        "quantity": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "scripted": {
+          "type": "boolean"
+        },
+        "minSponsoredAssetFee": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "scriptDetails": {
+          "type": "object",
+          "required": [
+            "script",
+            "scriptComplexity",
+            "scriptText"
+          ],
+          "properties": {
+            "scriptComplexity": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "script": {
+              "type": "string"
+            },
+            "scriptText": {
+              "type": "string"
+            }
           }
         }
       }

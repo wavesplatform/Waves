@@ -28,7 +28,7 @@ trait Environment[F[_]] {
   def tthis: Recipient.Address
   def height: F[Long]
   def transactionById(id: Array[Byte]): F[Option[Tx]]
-  def transferTransactionById(id: Array[Byte]): F[Option[Tx]]
+  def transferTransactionById(id: Array[Byte]): F[Option[Tx.Transfer]]
   def transactionHeightById(id: Array[Byte]): F[Option[Long]]
   def assetInfoById(id: Array[Byte]): F[Option[ScriptAssetInfo]]
   def lastBlockOpt(): F[Option[BlockInfo]]
@@ -39,5 +39,5 @@ trait Environment[F[_]] {
   def accountWavesBalanceOf(addressOrAlias: Recipient): F[Either[String, Environment.BalanceDetails]]
   def multiPaymentAllowed: Boolean
   def txId: ByteStr
-  def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]
+  def transferTransactionFromProto(b: Array[Byte]): F[Option[Tx.Transfer]]
 }

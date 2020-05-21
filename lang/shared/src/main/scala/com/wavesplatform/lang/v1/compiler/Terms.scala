@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.v1.compiler
 
+import cats.Eval
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
@@ -16,6 +17,7 @@ object Terms {
   sealed abstract class DECLARATION {
     def name: String
     def toStr: Coeval[String]
+    def deepCopy: Eval[DECLARATION]
     override def toString: String = toStr()
     def isItFailed: Boolean       = false
   }
@@ -23,22 +25,32 @@ object Terms {
     def name                         = "NO_NAME"
     def toStr: Coeval[String]        = Coeval.now("Error")
     override def isItFailed: Boolean = true
+
+    override def deepCopy: Eval[DECLARATION] =
+      Eval.now(this)
   }
-  case class LET(name: String, value: EXPR) extends DECLARATION {
+  case class LET(name: String, var value: EXPR) extends DECLARATION {
     def toStr: Coeval[String] =
       for {
         e <- value.toStr
       } yield "LET(" ++ name ++ "," ++ e ++ ")"
+
+    override def deepCopy: Eval[LET] =
+      value.deepCopy.map(LET(name, _))
   }
   case class FUNC(name: String, args: List[String], body: EXPR) extends DECLARATION {
     def toStr: Coeval[String] =
       for {
         e <- body.toStr
       } yield "FUNC(" ++ name ++ "," ++ args.toString ++ "," ++ e ++ ")"
+
+    def deepCopy: Eval[FUNC] =
+      body.deepCopy.map(FUNC(name, args, _))
   }
 
   sealed abstract class EXPR {
     def toStr: Coeval[String]
+    def deepCopy: Eval[EXPR]
     override def toString: String = toStr()
     def isItFailed: Boolean       = false
   }
@@ -46,52 +58,97 @@ object Terms {
   case class FAILED_EXPR() extends EXPR {
     def toStr: Coeval[String]        = Coeval.now("error")
     override def isItFailed: Boolean = true
+
+    override def deepCopy: Eval[EXPR] =
+      Eval.now(this)
   }
 
-  case class GETTER(expr: EXPR, field: String) extends EXPR {
+  case class GETTER(var expr: EXPR, field: String) extends EXPR {
     def toStr: Coeval[String] =
       for {
         e <- expr.toStr
       } yield "GETTER(" ++ e ++ "," ++ field ++ ")"
+
+    override def deepCopy: Eval[EXPR] =
+      expr.deepCopy.map(GETTER(_, field))
   }
+
+  sealed trait BLOCK_DEF {
+    val dec: DECLARATION
+    var body: EXPR
+  }
+
   @Deprecated
-  case class LET_BLOCK(let: LET, body: EXPR) extends EXPR {
+  case class LET_BLOCK(let: LET, var body: EXPR) extends EXPR with BLOCK_DEF {
     def toStr: Coeval[String] =
       for {
         e <- let.toStr
         b <- body.toStr
       } yield "LET_BLOCK(" ++ e ++ "," ++ b ++ ")"
+
+    override val dec: DECLARATION = let
+
+    override def deepCopy: Eval[EXPR] =
+      for {
+        l <- let.deepCopy
+        b <- body.deepCopy
+      } yield LET_BLOCK(l, b)
   }
-  case class BLOCK(dec: DECLARATION, body: EXPR) extends EXPR {
+
+  case class BLOCK(dec: DECLARATION, var body: EXPR) extends EXPR with BLOCK_DEF {
     def toStr: Coeval[String] =
       for {
         e <- dec.toStr
         b <- body.toStr
       } yield "BLOCK(" ++ e ++ "," ++ b ++ ")"
+
+    override def deepCopy: Eval[EXPR] =
+      for {
+        l <- dec.deepCopy
+        b <- body.deepCopy
+      } yield BLOCK(l, b)
   }
-  case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR) extends EXPR {
+
+  case class IF(var cond: EXPR, ifTrue: EXPR, ifFalse: EXPR) extends EXPR {
     def toStr: Coeval[String] =
       for {
         c <- cond.toStr
         t <- ifTrue.toStr
         f <- ifFalse.toStr
       } yield "IF(" ++ c ++ "," ++ t ++ "," ++ f ++ ")"
+
+    override def deepCopy: Eval[EXPR] =
+      for {
+        c <- cond.deepCopy
+        t <- ifTrue.deepCopy
+        f <- ifFalse.deepCopy
+      } yield IF(c, t, f)
   }
   case class REF(key: String) extends EXPR {
     override def toString: String = "REF(" ++ key ++ ")"
     def toStr: Coeval[String]     = Coeval.now(toString)
+
+    override def deepCopy: Eval[EXPR] =
+      Eval.now(this)
   }
-  case class FUNCTION_CALL(function: FunctionHeader, args: List[EXPR]) extends EXPR {
+  case class FUNCTION_CALL(function: FunctionHeader, var args: List[EXPR]) extends EXPR {
     def toStr: Coeval[String] =
       for {
         e <- args.map(_.toStr).sequence
       } yield "FUNCTION_CALL(" ++ function.toString ++ "," ++ e.toString ++ ")"
+
+    override def deepCopy: Eval[EXPR] =
+      Eval.defer(args.traverse(_.deepCopy)).map(FUNCTION_CALL(function, _))
   }
 
   sealed trait EVALUATED extends EXPR {
     def prettyString(level: Int): String = toString
     def toStr: Coeval[String]            = Coeval.now(toString)
     def weight: Long
+    var wasLogged: Boolean = false
+
+    override def deepCopy: Eval[EXPR] =
+      Eval.now(this)
   }
   case class CONST_LONG(t: Long) extends EVALUATED {
     override def toString: String = t.toString
@@ -178,7 +235,11 @@ object Terms {
 
   abstract case class ARR private (xs: IndexedSeq[EVALUATED]) extends EVALUATED {
     override def toString: String = TermPrinter.string(this)
+
+    val elementsWeightSum: Long =
+      weight - EMPTYARR_WEIGHT - ELEM_WEIGHT * xs.size
   }
+
   object ARR {
     def apply(xs: IndexedSeq[EVALUATED], mweight: Long, limited: Boolean): Either[ExecutionError, ARR] =
       if (limited && xs.size > MaxListLengthV4) {
@@ -186,8 +247,8 @@ object Terms {
       } else {
         Either.cond(
           mweight <= MaxWeight,
-          (new ARR(xs) { override val weight: Long = mweight }),
-          s"the list is too heavy. Actual weight: ${mweight}, limit: ${MaxWeight}"
+          new { override val weight: Long = mweight } with ARR(xs),
+          s"The list is too heavy. Actual weight: ${mweight}, limit: ${MaxWeight}"
         )
       }
 
@@ -196,4 +257,7 @@ object Terms {
       ARR(xs, weight, limited)
     }
   }
+
+  implicit val orderingConstLong: Ordering[CONST_LONG] =
+    (a, b) => a.t compare b.t
 }
