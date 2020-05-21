@@ -1,12 +1,11 @@
 package com.wavesplatform.lang.v1.repl.node.http.response
 
 import java.nio.ByteBuffer
-import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.repl.global
 import com.wavesplatform.lang.v1.repl.node.http.response.model._
-import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
+import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven, Transfer}
 import com.wavesplatform.lang.v1.traits.domain._
 
@@ -59,19 +58,17 @@ private[node] class ChainDependentMapper(chainId: Byte) {
 
   def toRideModel(b: BlockInfoResponse): BlockInfo =
     BlockInfo(
-      b.timestamp,
-      b.height,
-      b.`nxt-consensus`.`base-target`,
-      b.`nxt-consensus`.`generation-signature`.byteStr,
-      pkToAddress(b.generator),
-      b.generator.byteStr,
-      b.VRF.map(_.byteStr)
+      timestamp = b.timestamp,
+      height = b.height,
+      baseTarget = b.`nxt-consensus`.`base-target`,
+      generationSignature = b.`nxt-consensus`.`generation-signature`.byteStr,
+      generator = b.generator.byteStr,
+      generatorPublicKey = b.generatorPublicKey.byteStr,
+      vrf = b.VRF.map(_.byteStr)
     )
 
 
-  private val AddressVersion: Byte = 1
-  private val AliasVersion  : Byte = 2
-
+  private val AddressVersion = 1
   private val ChecksumLength = 4
   private val HashLength     = 20
   private val AddressLength  = 1 + 1 + HashLength + ChecksumLength
@@ -79,7 +76,7 @@ private[node] class ChainDependentMapper(chainId: Byte) {
   private def pkToAddress(publicKey: ByteString): ByteStr = {
     val withoutChecksum =
       ByteBuffer.allocate(1 + 1 + HashLength)
-        .put(AddressVersion)
+        .put(AddressVersion.toByte)
         .put(chainId)
         .put(global.secureHash(publicKey.bytes), 0, HashLength)
         .array()
@@ -95,39 +92,4 @@ private[node] class ChainDependentMapper(chainId: Byte) {
 
     ByteStr(bytes)
   }
-
-  private val typeId: Byte = 4
-
-  private def bodyBytes(tx: TransferTransaction): Array[Byte] =
-    tx match {
-      case _: TransferTransactionV1 => typeId +: bytesBase(tx)
-      case _: TransferTransactionV2 => Array(typeId, tx.version) ++ bytesBase(tx)
-    }
-
-  private def bytesBase(tx: TransferTransaction): Array[Byte] =
-    Seq(
-      tx.senderPublicKey.bytes,
-      bytes(tx.assetId),
-      bytes(tx.feeAssetId),
-      bytes(tx.timestamp),
-      bytes(tx.amount),
-      bytes(tx.fee),
-      tx.recipient match {
-        case Address(bytes) => bytes.arr
-        case Alias(name)    => AliasVersion +: chainId +: serializeArray(name.getBytes(StandardCharsets.UTF_8))
-      },
-      serializeArray(tx.attachment.bytes)
-    ).reduce(_ ++ _)
-
-  private def bytes(id: Option[ByteString]): Array[Byte] =
-    id.map(_.bytes).getOrElse(Array[Byte](0))
-
-  private def bytes(l: Long): Array[Byte] =
-    ByteBuffer.allocate(8).putLong(l).array()
-
-  private def bytes(s: Short): Array[Byte] =
-    ByteBuffer.allocate(2).putShort(s).array()
-
-  private def serializeArray(b: Array[Byte]): Array[Byte] =
-    bytes(b.length.toShort) ++ b
 }

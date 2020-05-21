@@ -505,6 +505,7 @@ case class TransferTransactionInfo(
                             version: Option[Byte],
                             typedAttachment: Option[Attachment],
                             attachment: Option[String],
+                            proofs: Option[Seq[String]]
                           )
 object TransferTransactionInfo {
   implicit val transactionFormat: Format[TransferTransactionInfo] = Format(
@@ -531,6 +532,7 @@ object TransferTransactionInfo {
           case Some(v) if v < 2 && _type == 11 => (jsv \ "attachment").validateOpt[String]
           case _ => JsSuccess(None)
         }
+        proofs <- (jsv \ "proofs").validateOpt[Seq[String]]
       }
         yield TransferTransactionInfo(
           _type,
@@ -544,7 +546,8 @@ object TransferTransactionInfo {
           recipient,
           version,
           typedAttachment,
-          attachment
+          attachment,
+          proofs
         )),
     Json.writes[TransferTransactionInfo]
   )
