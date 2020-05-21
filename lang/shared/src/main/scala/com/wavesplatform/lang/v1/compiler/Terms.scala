@@ -1,5 +1,7 @@
 package com.wavesplatform.lang.v1.compiler
 
+import java.nio.charset.StandardCharsets
+
 import cats.Eval
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
@@ -12,7 +14,9 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import monix.eval.Coeval
 
 object Terms {
-  val DATA_TX_BYTES_MAX: Int = 150 * 1024 // should be the same as DataTransaction.MAX_BYTES
+  val DataTxMaxBytes: Int       = 150 * 1024     // should be the same as DataTransaction.MaxBytes
+  val DataTxMaxProtoBytes: Int  = 165947         // depends from DataTransaction.MaxProtoBytes
+  val DataEntryValueMax: Int    = Short.MaxValue // should be the same as DataEntry.MaxValueSize
 
   sealed abstract class DECLARATION {
     def name: String
@@ -155,7 +159,7 @@ object Terms {
     override val weight: Long     = 8L
   }
 
-  case class CONST_BYTESTR private (bs: ByteStr) extends EVALUATED {
+  class CONST_BYTESTR private (val bs: ByteStr) extends EVALUATED {
     override def toString: String = bs.toString
     override def prettyString(level: Int): String = {
       if (bs.size > 1024) {
@@ -165,17 +169,66 @@ object Terms {
       }
     }
     override val weight: Long = bs.size
-  }
-  object CONST_BYTESTR {
-    def apply(bs: ByteStr): Either[ExecutionError, EVALUATED] =
-      Either.cond(
-        bs.size <= DATA_TX_BYTES_MAX,
-        new CONST_BYTESTR(bs),
-        s"ByteStr exceeds $DATA_TX_BYTES_MAX bytes"
-      )
+
+    override def equals(obj: Any): Boolean =
+      obj match {
+        case CONST_BYTESTR(`bs`) => true
+        case _                   => false
+      }
+
+    override def hashCode(): Int = bs.hashCode
   }
 
-  def escape(s: String): String = {
+  object CONST_BYTESTR {
+    sealed abstract class Limit(val value: Int)
+    case object DataEntrySize   extends Limit(DataEntryValueMax)
+    case object DataTxSize      extends Limit(DataTxMaxBytes)
+    case object NoLimit         extends Limit(Int.MaxValue)
+
+    def apply(bs: ByteStr, limit: Limit = DataEntrySize): Either[ExecutionError, EVALUATED] =
+      Either.cond(
+        bs.size <= limit.value,
+        new CONST_BYTESTR(bs),
+        s"ByteStr size=${bs.size} exceeds ${limit.value} bytes"
+      )
+
+    def unapply(arg: CONST_BYTESTR): Option[ByteStr] =
+      Some(arg.bs)
+  }
+
+  class CONST_STRING private (val s: String) extends EVALUATED {
+    override def toString: String                 = s
+    override def prettyString(level: Int): String = "\"" ++ escape(s) ++ "\""
+    override val weight: Long                     = s.getBytes.length
+
+    override def equals(obj: Any): Boolean =
+      obj match {
+        case CONST_STRING(`s`) => true
+        case _                 => false
+      }
+
+    override def hashCode(): Int = s.hashCode
+  }
+  object CONST_STRING {
+    def apply(s: String, reduceLimit: Boolean = true): Either[ExecutionError, EVALUATED] = {
+      val limit =
+        if (reduceLimit) DataEntryValueMax
+        else DataTxMaxBytes
+
+      val actualSize = s.getBytes(StandardCharsets.UTF_8).length
+
+      Either.cond(
+        actualSize <= limit,
+        new CONST_STRING(s),
+        s"String size=$actualSize exceeds $limit bytes"
+      )
+    }
+
+    def unapply(arg: CONST_STRING): Option[String] =
+      Some(arg.s)
+  }
+
+  private def escape(s: String): String = {
     // Simple and very naive implementation based on
     // https://github.com/linkedin/dustjs/blob/3fc12efd153433a21fd79ac81e8c5f5d6f273a1c/dist/dust-core.js#L1099
 
@@ -191,19 +244,6 @@ object Terms {
       .replace("\f", "\\f")
       .replace("\u2028", "\\u2028")
       .replace("\u2029", "\\u2029")
-  }
-  case class CONST_STRING private (s: String) extends EVALUATED {
-    override def toString: String                 = s
-    override def prettyString(level: Int): String = "\"" ++ escape(s) ++ "\""
-    override val weight: Long                     = s.getBytes.length
-  }
-  object CONST_STRING {
-    def apply(s: String): Either[ExecutionError, EVALUATED] =
-      Either.cond(
-        s.getBytes("UTF-8").length <= DATA_TX_BYTES_MAX,
-        new CONST_STRING(s),
-        s"String exceeds $DATA_TX_BYTES_MAX bytes"
-      )
   }
 
   case class CONST_BOOLEAN(b: Boolean) extends EVALUATED {

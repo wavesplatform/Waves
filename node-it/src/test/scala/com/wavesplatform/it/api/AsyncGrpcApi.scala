@@ -12,7 +12,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
-import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.{Script => Scr}
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
@@ -80,7 +80,7 @@ object AsyncGrpcApi {
         reissuable: Boolean,
         fee: Long,
         description: String = "",
-        script: Either[Array[Byte], Option[Script]] = Right(None),
+        script: Either[Array[Byte], Option[Scr]] = Right(None),
         version: Int = 2
     ): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
@@ -238,7 +238,7 @@ object AsyncGrpcApi {
       transactions.broadcast(transaction)
     }
 
-    private def toPBScript(v: Either[Array[Byte], Option[Script]]): ByteString = v match {
+    private def toPBScript(v: Either[Array[Byte], Option[Scr]]): ByteString = v match {
       case Left(bytes) if bytes.length > 0 => ByteString.copyFrom(bytes)
       case Right(maybeScript)              => PBTransactions.toPBScript(maybeScript)
       case _                               => ByteString.EMPTY
@@ -246,7 +246,7 @@ object AsyncGrpcApi {
 
     def setScript(
         sender: KeyPair,
-        script: Either[Array[Byte], Option[Script]],
+        script: Either[Array[Byte], Option[Scr]],
         fee: Long,
         timestamp: Long = System.currentTimeMillis(),
         version: Int = 1
@@ -434,7 +434,7 @@ object AsyncGrpcApi {
     def setAssetScript(
         sender: KeyPair,
         assetId: String,
-        script: Either[Array[Byte], Option[Script]],
+        script: Either[Array[Byte], Option[Scr]],
         fee: Long,
         timestamp: Long = System.currentTimeMillis(),
         version: Int = 1

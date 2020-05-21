@@ -123,23 +123,6 @@ object ContractCompiler {
       parsedNodeDecs = decsCompileResult.map(_.parseNodeExpr)
       duplicateVarsErr   <- validateDuplicateVarsInContract(parsedDapp).handleError()
       annFuncArgTypesErr <- validateAnnotatedFuncsArgTypes(ctx, parsedDapp).handleError()
-      funcNameWithWrongSize = parsedDapp.fs
-        .map(af => Expressions.PART.toOption[String](af.name))
-        .filter(fNameOpt => fNameOpt.nonEmpty && fNameOpt.get.getBytes("UTF-8").size > ContractLimits.MaxAnnotatedFunctionNameInBytes)
-        .map(_.get)
-      funcNameSizeErr <- Either
-        .cond(
-          funcNameWithWrongSize.isEmpty,
-          (),
-          Generic(
-            parsedDapp.position.start,
-            parsedDapp.position.end,
-            s"Annotated function name size in bytes must be less than ${ContractLimits.MaxAnnotatedFunctionNameInBytes} for functions with name: ${funcNameWithWrongSize
-              .mkString(", ")}"
-          )
-        )
-        .toCompileM
-        .handleError()
       compiledAnnFuncsWithErr <- parsedDapp.fs
         .traverse[CompileM, (Option[AnnotatedFunction], List[(String, Types.FINAL)], Expressions.ANNOTATEDFUNC, Iterable[CompilationError])](
           af => local(compileAnnotatedFunc(af, version, saveExprContext))
@@ -204,7 +187,6 @@ object ContractCompiler {
 
       errorList = duplicateVarsErr._2 ++
         annFuncArgTypesErr._2 ++
-        funcNameSizeErr._2 ++
         alreadyDefinedErr._2 ++
         funcArgumentCountErr._2 ++
         metaWithErr._2 ++

@@ -4,13 +4,10 @@ import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.NoShrink
-import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper, Single}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, V3, V4, DApp => DAppType}
 import com.wavesplatform.lang.v1.compiler
-import com.wavesplatform.lang.v1.compiler.Terms.{FUNC, REF}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
@@ -22,7 +19,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scala.collection.immutable.{ListMap, Map}
 
 class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink with Inside {
-  property("meta with union type parameters") {
+  property("meta v1 with union type parameters") {
     val ctx = Monoid.combine(
       compilerContext,
       WavesContext
@@ -60,20 +57,17 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
       Parser.parseContract(script).get.value
     }
 
-    val meta = DAppMeta(
+    val expectedMeta = DAppMeta(
       version = 1,
       List(
         CallableFuncSignature(ByteString.copyFrom(Array[Byte](15, 1, 9, 9, 14, 3))),
         CallableFuncSignature(ByteString.copyFrom(Array[Byte](5))),
       )
     )
-    compiler.ContractCompiler(ctx, expr, V3).map(_.meta) shouldBe Right(meta)
 
-    val callables = List(
-      CallableFunction(CallableAnnotation("invocation"), FUNC("foo", List("a", "b", "c", "d", "e", "f"), REF(""))),
-      CallableFunction(CallableAnnotation("invocation"), FUNC("bar", List("a"), REF("")))
-    )
-    val dApp = DApp(meta, Nil, callables, None)
+    val dApp = compiler.ContractCompiler(ctx, expr, V3).explicitGet()
+    dApp.meta shouldBe expectedMeta
+
     MetaMapper.dicFromProto(dApp) shouldBe Right(
       Dic(Map(
         "version" -> Single("1"),
@@ -94,12 +88,54 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
     )
   }
 
+  property("meta v1 with empty-param function") {
+    val ctx = Monoid.combine(
+      compilerContext,
+      WavesContext
+        .build(
+          DirectiveSet(V3, Account, DAppType).explicitGet()
+        )
+        .compilerContext
+    )
+    val expr = {
+      val script =
+        """
+          |
+          | {-# STDLIB_VERSION 3 #-}
+          | {-# CONTENT_TYPE DAPP #-}
+          | {-# SCRIPT_TYPE ACCOUNT #-}
+          |
+          | @Callable(i)
+          | func default() = WriteSet([])
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    val expectedMeta = DAppMeta(
+      version = 1,
+      List(
+        CallableFuncSignature(ByteString.EMPTY),
+      )
+    )
+
+    val dApp = compiler.ContractCompiler(ctx, expr, V3).explicitGet()
+    dApp.meta shouldBe expectedMeta
+
+    MetaMapper.dicFromProto(dApp) shouldBe Right(
+      Dic(Map(
+        "version" -> Single("1"),
+        "callableFuncTypes" -> Chain(List(Dic(Map())))
+      ))
+    )
+  }
+
   property("meta v2 supporting list parameters") {
     val ctx = Monoid.combine(
       compilerContext,
       WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
         .compilerContext
     )
+
     val expr = {
       val script =
         """
@@ -113,19 +149,18 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    val meta = DAppMeta(
+
+    val expectedMeta = DAppMeta(
       version = 2,
       List(
         CallableFuncSignature(ByteString.copyFrom(Array[Byte](17, 24, 2, 13))),
         CallableFuncSignature(ByteString.copyFrom(Array[Byte](18))),
       )
     )
-    compiler.ContractCompiler(ctx, expr, V4).map(_.meta) shouldBe Right(meta)
-    val callables = List(
-      CallableFunction(CallableAnnotation("invocation"), FUNC("foo", List("a", "b", "c", "d", "e", "f"), REF(""))),
-      CallableFunction(CallableAnnotation("invocation"), FUNC("bar", List("a"), REF("")))
-    )
-    val dApp = DApp(meta, Nil, callables, None)
+
+    val dApp = compiler.ContractCompiler(ctx, expr, V4).explicitGet()
+
+    dApp.meta shouldBe expectedMeta
     MetaMapper.dicFromProto(dApp) shouldBe Right(
       Dic(Map(
         "version" -> Single("2"),
@@ -140,6 +175,47 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
             "a" -> Single("List[ByteVector]")
           ))
         ))
+      ))
+    )
+  }
+
+  property("meta v2 with empty-param function") {
+    val ctx = Monoid.combine(
+      compilerContext,
+      WavesContext
+        .build(
+          DirectiveSet(V4, Account, DAppType).explicitGet()
+        )
+        .compilerContext
+    )
+    val expr = {
+      val script =
+        """
+          |
+          | {-# STDLIB_VERSION 4 #-}
+          | {-# CONTENT_TYPE DAPP #-}
+          | {-# SCRIPT_TYPE ACCOUNT #-}
+          |
+          | @Callable(i)
+          | func default() = []
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    val expectedMeta = DAppMeta(
+      version = 2,
+      List(
+        CallableFuncSignature(ByteString.EMPTY),
+      )
+    )
+
+    val dApp = compiler.ContractCompiler(ctx, expr, V4).explicitGet()
+    dApp.meta shouldBe expectedMeta
+
+    MetaMapper.dicFromProto(dApp) shouldBe Right(
+      Dic(Map(
+        "version" -> Single("2"),
+        "callableFuncTypes" -> Chain(List(Dic(Map())))
       ))
     )
   }

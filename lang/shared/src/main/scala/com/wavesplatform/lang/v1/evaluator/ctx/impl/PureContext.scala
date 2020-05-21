@@ -13,6 +13,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
@@ -30,11 +31,9 @@ object PureContext {
 
   implicit def intToLong(num: Int): Long = num.toLong
 
-  private lazy val defaultThrowMessage = "Explicit script termination"
-  lazy val MaxStringResult             = Short.MaxValue
-  lazy val MaxBytesResult              = 65536
-  lazy val MaxListLengthV4             = 1000
-  lazy val MaxListSizeForMedianCalc    = 100
+  private val defaultThrowMessage      = "Explicit script termination"
+  private val MaxListSizeForMedianCalc = 100
+  val MaxListLengthV4                  = 1000
 
   lazy val mulLong: BaseFunction[NoContext] =
     createTryOp(MUL_OP, LONG, LONG, MUL_LONG)((a, b) => Math.multiplyExact(a, b))
@@ -49,20 +48,20 @@ object PureContext {
   lazy val sumString: BaseFunction[NoContext] =
     createRawOp(SUM_OP, STRING, STRING, SUM_STRING, 10) {
       case (CONST_STRING(a), CONST_STRING(b)) =>
-        if(a.length + b.length <= MaxStringResult) {
+        if (a.length + b.length <= Terms.DataEntryValueMax) {
           CONST_STRING(a + b)
         } else {
-          Left("String is too large")
+          Left(s"String length = ${a.length + b.length} exceeds ${Terms.DataEntryValueMax}")
         }
       case _ => ???
     }
   lazy val sumByteStr: BaseFunction[NoContext] =
     createRawOp(SUM_OP, BYTESTR, BYTESTR, SUM_BYTES, 10) {
       case (CONST_BYTESTR(a), CONST_BYTESTR(b)) =>
-        if(a.arr.length + b.arr.length <= MaxStringResult) {
+        if (a.arr.length + b.arr.length <= Terms.DataEntryValueMax) {
           CONST_BYTESTR(a ++ b)
         } else {
-          Left("ByteVector is too large")
+          Left(s"ByteVector size = ${a.arr.length + b.arr.length} bytes exceeds ${Terms.DataEntryValueMax}")
         }
       case _ => ???
     }
@@ -74,7 +73,7 @@ object PureContext {
     NativeFunction(EQ_OP.func, 1, EQ, BOOLEAN, ("a", TYPEPARAM('T')), ("b", TYPEPARAM('T'))) {
       case a :: b :: Nil =>
         Either.cond(b.weight <= MaxCmpWeight || a.weight <= MaxCmpWeight, CONST_BOOLEAN(a == b), "Comparable value too heavy.")
-      case xs            => notImplemented[Id, EVALUATED](s"${EQ_OP.func}(a: T, b: T)", xs)
+      case xs => notImplemented[Id, EVALUATED](s"${EQ_OP.func}(a: T, b: T)", xs)
     }
 
   lazy val ne: BaseFunction[NoContext] =
@@ -296,7 +295,7 @@ object PureContext {
       ("tail", PARAMETERIZEDLIST(TYPEPARAM('B')))
     ) {
       case h :: (a @ ARR(t)) :: Nil => ARR(h +: t, h.weight + a.weight + ELEM_WEIGHT, checkSize)
-      case xs                 => notImplemented[Id, EVALUATED]("cons(head: T, tail: LIST[T]", xs)
+      case xs                       => notImplemented[Id, EVALUATED]("cons(head: T, tail: LIST[T]", xs)
     }
 
   lazy val listAppend: NativeFunction[NoContext] =
@@ -309,7 +308,7 @@ object PureContext {
       ("element", TYPEPARAM('B'))
     ) {
       case (a @ ARR(list)) :: element :: Nil => ARR(list :+ element, a.weight + element.weight + ELEM_WEIGHT, true)
-      case xs                          => notImplemented[Id, EVALUATED](s"list: List[T] ${LIST_APPEND_OP.func} value: T", xs)
+      case xs                                => notImplemented[Id, EVALUATED](s"list: List[T] ${LIST_APPEND_OP.func} value: T", xs)
     }
 
   lazy val listConcat: NativeFunction[NoContext] =
@@ -322,7 +321,7 @@ object PureContext {
       ("list2", PARAMETERIZEDLIST(TYPEPARAM('B')))
     ) {
       case (a1 @ ARR(l1)) :: (a2 @ ARR(l2)) :: Nil => ARR(l1 ++ l2, a1.weight + a2.weight - EMPTYARR_WEIGHT, true)
-      case xs                        => notImplemented[Id, EVALUATED](s"list1: List[T] ${LIST_CONCAT_OP.func} list2: List[T]", xs)
+      case xs                                      => notImplemented[Id, EVALUATED](s"list1: List[T] ${LIST_CONCAT_OP.func} list2: List[T]", xs)
     }
 
   lazy val dropString: BaseFunction[NoContext] =
@@ -367,14 +366,14 @@ object PureContext {
 
   val UTF8Decoder = UTF_8.newDecoder
 
-  lazy val toUtf8String: BaseFunction[NoContext] =
+  def toUtf8String(version: StdLibVersion): BaseFunction[NoContext] =
     NativeFunction("toUtf8String", 20, UTF8STRING, STRING, ("u", BYTESTR)) {
       case CONST_BYTESTR(u) :: Nil =>
         Try(ByteBuffer.wrap(u.arr))
           .map(UTF8Decoder.decode)
           .toEither
           .map(_.toString)
-          .flatMap(CONST_STRING(_))
+          .flatMap(CONST_STRING(_, reduceLimit = version >= V4))
           .leftMap {
             case _: MalformedInputException => "Input contents invalid UTF8 sequence"
             case e                          => e.toString
@@ -518,11 +517,14 @@ object PureContext {
   lazy val makeString: BaseFunction[NoContext] =
     NativeFunction("makeString", 30, MAKESTRING, listString, ("list", LIST(STRING)), ("separator", STRING)) {
       case (arr: ARR) :: CONST_STRING(separator) :: Nil =>
-        val expectedStringSize = arr.elementsWeightSum
-        if (expectedStringSize <= DATA_TX_BYTES_MAX)
+        val separatorStringSize =
+          if (arr.xs.length > 1) (arr.xs.length - 1) * separator.length
+          else 0
+        val expectedStringSize = arr.elementsWeightSum + separatorStringSize
+        if (expectedStringSize <= DataEntryValueMax)
           CONST_STRING(arr.xs.mkString(separator))
         else
-          Left(s"Constructing string size = $expectedStringSize bytes will exceed $DATA_TX_BYTES_MAX")
+          Left(s"Constructing string size = $expectedStringSize bytes will exceed $DataEntryValueMax")
       case xs =>
         notImplemented[Id, EVALUATED]("makeString(list: List[String], separator: String)", xs)
     }
@@ -889,7 +891,7 @@ object PureContext {
     val fromV3Funcs = Array(
       value,
       valueOrErrorMessage,
-      toUtf8String,
+      toUtf8String(version),
       toLong,
       toLongOffset,
       indexOf,

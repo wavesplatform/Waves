@@ -16,6 +16,10 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Time
+import com.wavesplatform.state.Blockchain
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.lang.directives.values._
 import monix.execution.Scheduler
 import play.api.libs.json._
 
@@ -23,7 +27,8 @@ case class UtilsApiRoute(
     timeService: Time,
     settings: RestAPISettings,
     estimator: ScriptEstimator,
-    limitedScheduler: Scheduler
+    limitedScheduler: Scheduler,
+    blockchain: Blockchain
 ) extends ApiRoute
     with AuthRoute
     with TimeLimitedRoute {
@@ -90,7 +95,8 @@ case class UtilsApiRoute(
 
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String])) { code =>
-      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator)) { result =>
+      def stdLib: StdLibVersion = if(blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) { V4 } else { StdLibVersion.VersionDic.default }
+      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator, defaultStdLib = stdLib)) { result =>
         complete(
           result
             .fold(

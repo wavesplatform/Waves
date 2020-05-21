@@ -12,6 +12,7 @@ package object smartcontract {
 
   def cryptoContextScript(accountScript: Boolean): String =
     s"""
+       |{-# STDLIB_VERSION 2 #-}
        |match tx {
        |  case ext : ExchangeTransaction =>
        |    # Crypto context
@@ -27,6 +28,7 @@ package object smartcontract {
 
   def pureContextScript(dtx: DataTransaction, accountScript: Boolean): String =
     s"""
+       |{-# STDLIB_VERSION 2 #-}
        |# Pure context
        |    let ext = tx
        |    let longAll = 1000 * 2 == 2000 && 1000 / 2 == 500 && 1000 % 2 == 0 && 1000 + 2 == 1002 && 1000 - 2 == 998
@@ -66,6 +68,7 @@ package object smartcontract {
 
   def wavesContextScript(dtx: DataTransaction, accountScript: Boolean): String =
     s"""
+       |{-# STDLIB_VERSION 2 #-}
        | match tx {
        |  case ext : ExchangeTransaction =>
        |    # Waves context

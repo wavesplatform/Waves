@@ -24,8 +24,6 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import monix.execution.Scheduler
@@ -51,7 +49,7 @@ case class TransactionsApiRoute(
 
   override lazy val route: Route =
     pathPrefix("transactions") {
-      unconfirmed ~ addressLimit ~ info ~ status ~ sign ~ calculateFee ~ byProto ~ signedBroadcast ~ merkleProof
+      unconfirmed ~ addressLimit ~ info ~ status ~ sign ~ calculateFee ~ signedBroadcast ~ merkleProof
     }
 
   def addressLimit: Route = {
@@ -148,14 +146,6 @@ case class TransactionsApiRoute(
           .map { case (assetId, assetAmount, _) => Json.obj("feeAssetId" -> assetId, "feeAmount" -> assetAmount) }
       }
     })
-
-  def byProto: Route = (pathPrefix("byProtoBytes" / Segment) & get) { (bytes) =>
-    PBTransactionSerializer.parseBytes(Base64.decode(bytes)).toOption match {
-      case Some(tx: TransferTransaction) =>
-        complete(txToExtendedJson(tx, true) ++ Json.obj("applicationStatus" -> "succeed"))
-      case _ => complete(ApiError.TransactionDoesNotExist)
-    }
-  }
 
   def sign: Route = (pathPrefix("sign") & withAuth) {
     pathEndOrSingleSlash(jsonPost[JsObject] { jsv =>

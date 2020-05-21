@@ -14,7 +14,6 @@ import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi}
 import com.wavesplatform.api.http._
-import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
@@ -71,7 +70,7 @@ case class DebugApiRoute(
   override val settings: RestAPISettings = ws.restAPISettings
   override lazy val route: Route = pathPrefix("debug") {
     stateChanges ~ balanceHistory ~ withAuth {
-      state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ historyInfo ~ configInfo ~ print ~ validate
+      state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ configInfo ~ print ~ validate
     }
   }
 
@@ -178,10 +177,6 @@ case class DebugApiRoute(
     )
   }
 
-  def historyInfo: Route = (path("historyInfo") & get) {
-    complete(???)
-  }
-
   def configInfo: Route = (path("configInfo") & get & parameter('full.as[Boolean])) { full =>
     complete(if (full) fullConfig else wavesConfig)
   }
@@ -245,8 +240,8 @@ case class DebugApiRoute(
   def stateChangesById: Route = (get & path("stateChanges" / "info" / TransactionId)) { id =>
     transactionsApi.transactionById(id) match {
       case Some((height, Right((ist, isr)), _)) => complete(ist.json() ++ Json.obj("height" -> height.toInt, "stateChanges" -> isr))
-      case Some(_)                                 => complete(ApiError.UnsupportedTransactionType)
-      case None                                    => complete(ApiError.TransactionDoesNotExist)
+      case Some(_)                              => complete(ApiError.UnsupportedTransactionType)
+      case None                                 => complete(ApiError.TransactionDoesNotExist)
     }
   }
 
@@ -257,15 +252,17 @@ case class DebugApiRoute(
           complete {
             implicit val ss: JsonEntityStreamingSupport = EntityStreamingSupport.json()
 
-            Source.fromPublisher(
-              transactionsApi
-                .invokeScriptResults(address, None, Set.empty, afterOpt)
-                .map {
-                  case (height, Right((ist, isr)), _) => ist.json() ++ Json.obj("height" -> JsNumber(height), "stateChanges" -> isr)
-                  case (height, Left(tx), _)          => tx.json() ++ Json.obj("height"  -> JsNumber(height))
-                }
-                .toReactivePublisher
-            ).take(limit)
+            Source
+              .fromPublisher(
+                transactionsApi
+                  .invokeScriptResults(address, None, Set.empty, afterOpt)
+                  .map {
+                    case (height, Right((ist, isr)), _) => ist.json() ++ Json.obj("height" -> JsNumber(height), "stateChanges" -> isr)
+                    case (height, Left(tx), _)          => tx.json() ++ Json.obj("height"  -> JsNumber(height))
+                  }
+                  .toReactivePublisher
+              )
+              .take(limit)
           }
         }
       }
@@ -297,22 +294,7 @@ object DebugApiRoute {
 
   implicit val accountMiningBalanceFormat: Format[AccountMiningInfo] = Json.format
 
-  implicit val addressWrites: Format[Address] = new Format[Address] {
-    override def writes(o: Address): JsValue = JsString(o.stringRepr)
-
-    override def reads(json: JsValue): JsResult[Address] = ???
-  }
-
-  case class HistoryInfo(lastBlockIds: Seq[BlockId], microBlockIds: Seq[BlockId])
-
-  implicit val historyInfoFormat: Format[HistoryInfo] = Format(
-    Reads { json =>
-      ???
-    },
-    Writes { info =>
-      ???
-    }
-  )
+  implicit val addressWrites: Writes[Address] = Writes((a: Address) => JsString(a.stringRepr))
 
   implicit val hrCacheSizesFormat: Format[HistoryReplier.CacheSizes]          = Json.format
   implicit val mbsCacheSizesFormat: Format[MicroBlockSynchronizer.CacheSizes] = Json.format
