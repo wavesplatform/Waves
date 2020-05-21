@@ -15,7 +15,7 @@ import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
 import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, Portfolio, Sponsorship}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError.{FailedScriptError, GenericError, UnsupportedTransactionType}
+import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError, UnsupportedTransactionType}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
@@ -227,7 +227,7 @@ object TransactionDiffer {
       Diff.empty.copy(
         transactions = mutable.LinkedHashMap((tx.id(), (tx, (portfolios.keys ++ maybeDApp.toList).toSet, false))),
         portfolios = portfolios,
-        scriptResults = Map(tx.id() -> InvokeScriptResult(errorMessage = error))
+        scriptResults = Map(tx.id() -> InvokeScriptResult(error = error))
       )
     }
   }
@@ -235,13 +235,13 @@ object TransactionDiffer {
   private object isFailedTransaction {
     def unapply(result: TracedResult[ValidationError, Diff]): Option[Option[ErrorMessage]] =
       result match {
-        case TracedResult(Left(TransactionValidationError(e: FailedScriptError, tx)), _) => Some(errorMessage(e, tx))
+        case TracedResult(Left(TransactionValidationError(e: FailedTransactionError, tx)), _) => Some(errorMessage(e, tx))
         case _                                                                           => None
       }
 
-    def errorMessage(cf: FailedScriptError, tx: Transaction): Option[ErrorMessage] =
+    def errorMessage(cf: FailedTransactionError, tx: Transaction): Option[ErrorMessage] =
       tx match {
-        case _: InvokeScriptTransaction => Some(ErrorMessage(cf.reason.code, cf.error))
+        case _: InvokeScriptTransaction => Some(ErrorMessage(cf.cause.code, cf.cause.error))
         case _                          => None
       }
   }

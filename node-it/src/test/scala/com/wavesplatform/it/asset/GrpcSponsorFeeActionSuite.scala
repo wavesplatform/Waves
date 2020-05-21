@@ -365,7 +365,7 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
         }
 
       val failedTx = miner.invokeScript(miner.address, dApp, Some("sponsor11assets"), waitForTx = true, fee = smartMinFee)
-      sender.debugStateChanges(failedTx._1.id).stateChanges.get.errorMessage.get.text should include("Too many script actions: max: 10, actual: 11")
+      sender.debugStateChanges(failedTx._1.id).stateChanges.get.error.get.text should include("Too many script actions: max: 10, actual: 11")
     }
 
     "SponsorFee is available for assets issued via transaction" in {
@@ -411,7 +411,7 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
       )
 
       val failedTx = miner.invokeScript(miner.address, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee)
-      val error = sender.debugStateChanges(failedTx._1.id).stateChanges.get.errorMessage.get.text
+      val error = sender.debugStateChanges(failedTx._1.id).stateChanges.get.error.get.text
       error should include("NegativeMinFee")
     }
 
@@ -434,7 +434,7 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
       )
 
       val failedTx = miner.invokeScript(miner.address, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee)
-      val error = sender.debugStateChanges(failedTx._1.id).stateChanges.get.errorMessage.get.text
+      val error = sender.debugStateChanges(failedTx._1.id).stateChanges.get.error.get.text
       error should include(s"SponsorFee assetId=$assetId was not issued from address of current dApp")
     }
 
@@ -459,7 +459,7 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
         dApp
       )
       val failedTx = miner.invokeScript(miner.address, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee + smartFee)
-      val error = sender.debugStateChanges(failedTx._1.id).stateChanges.get.errorMessage.get.text
+      val error = sender.debugStateChanges(failedTx._1.id).stateChanges.get.error.get.text
       error should include(s"Sponsorship smart assets is disabled.")
     }
   }
