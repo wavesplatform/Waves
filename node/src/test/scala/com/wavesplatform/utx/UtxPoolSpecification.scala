@@ -922,7 +922,6 @@ class UtxPoolSpecification
               ntpTime,
               stub[InvalidBlockStorage],
               stub[PeerDatabase],
-              stub[Miner],
               scheduler
             )(null, _)
 
