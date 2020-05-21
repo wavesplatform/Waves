@@ -328,10 +328,8 @@ object CryptoContext {
         case CONST_BYTESTR(messageHash: ByteStr) :: CONST_BYTESTR(signature: ByteStr) :: Nil =>
           if (messageHash.size != 32)
             Left(s"Invalid message hash size ${messageHash.size} bytes, must be equal to 32 bytes")
-          else if (signature.size > 65)
-            Left(s"Invalid signature size ${signature.size} bytes, must not be greater than 65 bytes")
-          else if (signature.isEmpty)
-            Left(s"Signature must not be empty")
+          else if (signature.size != 65)
+            Left(s"Invalid signature size ${signature.size} bytes, must be equal to 65 bytes")
           else
             CONST_BYTESTR(ByteStr(global.ecrecover(messageHash.arr, signature.arr)))
         case xs => notImplemented[Id, EVALUATED]("ecrecover(messageHash:ByteVector, signature:ByteVector)", xs)

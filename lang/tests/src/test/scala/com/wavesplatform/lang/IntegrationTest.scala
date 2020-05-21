@@ -1682,11 +1682,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[CONST_BYTESTR](s"ecrecover(base16'${"a" * 60}', base16'bbbb')", version = V4) should
       produce("Invalid message hash size 30 bytes, must be equal to 32 bytes")
 
-    eval[CONST_BYTESTR](s"ecrecover(base16'${"a" * 64}', base16'')", version = V4) should
-      produce("Signature must not be empty")
-
     eval[CONST_BYTESTR](s"ecrecover(base16'${"a" * 64}', base16'${"a" * 132}')", version = V4) should
-      produce("Invalid signature size 66 bytes, must not be greater than 65 bytes")
+      produce("Invalid signature size 66 bytes, must be equal to 65 bytes")
 
     eval[CONST_BYTESTR](s"ecrecover(base16'${"a" * 64}', base16'${"a" * 130}')", version = V4) should
       produce("Header byte out of range: 197")
