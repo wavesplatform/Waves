@@ -1,8 +1,6 @@
 package com.wavesplatform.state.diffs.invoke
 
-import cats.instances.map._
-import cats.syntax.either._
-import cats.syntax.semigroup._
+import cats.implicits._
 import com.google.common.base.Throwables
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, PublicKey}
@@ -110,7 +108,7 @@ object InvokeDiffsCommon {
       .map(dataItemToEntry)
 
     for {
-      _ <- TracedResult(checkDataEntries(tx, dataEntries)).leftMap(e => ScriptExecutionError.ByDAppScript(e))
+      _ <- TracedResult(checkDataEntries(tx, dataEntries, version)).leftMap(e => ScriptExecutionError.ByDAppScript(e))
       _ <- TracedResult(
         Either.cond(
           actions.length - dataEntries.length <= ContractLimits.MaxCallableActionsAmount,
@@ -261,7 +259,8 @@ object InvokeDiffsCommon {
 
   private[this] def checkDataEntries(
       tx: InvokeScriptTransaction,
-      dataEntries: Seq[DataEntry[_]]
+      dataEntries: Seq[DataEntry[_]],
+      stdLibVersion: StdLibVersion
   ): Either[String, Unit] =
     for {
       _ <- Either.cond(
@@ -269,11 +268,11 @@ object InvokeDiffsCommon {
         (),
         s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize} entries"
       )
-      _ <- Either.cond(
-        dataEntries.forall(_.key.utf8Bytes.length <= ContractLimits.MaxKeySizeInBytes),
-        (),
-        s"Key size must be less than ${ContractLimits.MaxKeySizeInBytes}"
-      )
+
+      maxKeySize = ContractLimits.MaxKeySizeInBytesByVersion(stdLibVersion)
+      _ <- dataEntries.find(_.key.utf8Bytes.length > maxKeySize)
+          .toLeft(())
+          .leftMap(d => s"Key size = ${d.key.utf8Bytes.length} bytes must be less than $maxKeySize")
 
       totalDataBytes = dataEntries.map(_.toBytes.length).sum
       _ <- Either.cond(

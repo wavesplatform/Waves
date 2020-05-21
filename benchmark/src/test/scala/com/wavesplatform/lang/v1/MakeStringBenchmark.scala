@@ -28,7 +28,7 @@ class MakeStringBenchmark {
 object MakeStringBenchmark {
   @State(Scope.Benchmark)
   class MakeStringSt {
-    val stringList = List.fill(1000)("a" * 150)
+    val stringList = List.fill(1000)("a" * 33)
   }
 
   @State(Scope.Benchmark)
