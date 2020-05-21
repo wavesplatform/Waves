@@ -15,6 +15,7 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEn
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import scala.concurrent.Await
@@ -47,6 +48,9 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   private def execute(expr: String): Either[String, String] =
     Await.result(repl.execute(expr), 2 seconds)
 
+  private def assert(expr: String, result: String): Assertion =
+    execute(expr).explicitGet() should endWith(result)
+
   test("prepare") {
     dataTxId = sender
       .putData(
@@ -69,15 +73,15 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   }
 
   test("this") {
-    execute("this.toString()").right.value should endWith(s""""${alice.toAddress.stringRepr}"""")
+    assert("this.toString()", s""""${alice.toAddress.stringRepr}"""")
   }
 
   test("height") {
-    execute("height > 0").right.value should endWith("true")
+    assert("height > 0", "true")
   }
 
   test("lastBlock") {
-    execute("lastBlock.height == height").right.value should endWith("true")
+    assert("lastBlock.height == height", "true")
   }
 
   test("tx variable doesn't exist") {
@@ -85,11 +89,12 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   }
 
   test("assetBalance()") {
-    execute(s"this.assetBalance(base58'$assetId')").right.value should endWith(" 900")
+    assert(s"this.assetBalance(base58'$assetId')", "= 900")
   }
 
   test("wavesBalance()") {
-    execute("this.wavesBalance()").right.value should endWith(
+    assert(
+      "this.wavesBalance()",
       """
         |BalanceDetails(
         |	available = 9899800000
@@ -102,48 +107,58 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   }
 
   test("getBinary()") {
-    execute("""this.getBinary("bin").value()""").right.value should endWith(s" base58\'${Base58.encode("binary".getBytes)}\'")
+    assert(
+      """this.getBinary("bin").value()""",
+      s" base58\'${Base58.encode("binary".getBytes)}\'"
+    )
   }
 
   test("getBinaryValue()") {
-    execute("""this.getBinaryValue("bin")""").right.value should endWith(s" base58\'${Base58.encode("binary".getBytes)}\'")
+    assert(
+      """this.getBinaryValue("bin")""",
+      s" base58\'${Base58.encode("binary".getBytes)}\'"
+    )
   }
 
   test("getBoolean()") {
-    execute("""this.getBoolean("bool1").value()""").right.value should endWith(" true")
-    execute("""this.getBoolean("bool2").value()""").right.value should endWith(" false")
+    assert("""this.getBoolean("bool1").value()""", " true")
+    assert("""this.getBoolean("bool2").value()"""," false")
   }
 
   test("getBooleanValue()") {
-    execute("""this.getBooleanValue("bool1")""").right.value should endWith(" true")
-    execute("""this.getBooleanValue("bool2")""").right.value should endWith(" false")
+    assert("""this.getBooleanValue("bool1")""", " true")
+    assert("""this.getBooleanValue("bool2")""", " false")
   }
 
   test("getInteger()") {
-    execute("""this.getInteger("int").value()""").right.value should endWith(" 100500")
+    assert("""this.getInteger("int").value()""", " 100500")
   }
 
   test("getIntegerValue()") {
-    execute("""this.getIntegerValue("int")""").right.value should endWith(" 100500")
+    assert("""this.getIntegerValue("int")""", " 100500")
   }
 
   test("getString()") {
-    execute("""this.getString("str").value()""").right.value should endWith(" \"Hello\"")
+    assert("""this.getString("str").value()""", " \"Hello\"")
   }
 
   test("getStringValue()") {
-    execute("""this.getStringValue("str")""").right.value should endWith(" \"Hello\"")
+    assert("""this.getStringValue("str")""", " \"Hello\"")
   }
 
   test("assetInfo()") {
-    execute(s"assetInfo(base58'$assetId').value().issuer.toString()").right.value should endWith(s""""${alice.toAddress.stringRepr}"""")
+    assert(
+      s"assetInfo(base58'$assetId').value().issuer.toString()",
+      s""""${alice.toAddress.stringRepr}""""
+    )
   }
 
   test("blockInfoByHeight()") {
     val h  = miner.height - 1
     val bi = miner.blockAt(h)
     execute(s"let bi = blockInfoByHeight($h).value()")
-    execute(s"bi").right.value should endWith(
+    assert(
+      s"bi",
       s"""
          |BlockInfo(
          |	baseTarget = ${bi.baseTarget.get}
@@ -161,7 +176,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   }
 
   test("transactionHeightById()") {
-    execute(s"transactionHeightById(base58'$dataTxId').value() > 0").right.value should endWith("true")
+    assert(s"transactionHeightById(base58'$dataTxId').value() > 0", "true")
   }
 
   test("transferTransactionById()") {
@@ -182,7 +197,8 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
       .value()
 
     execute(s"let transferTx = transferTransactionById(base58'$transferTxId').value()")
-    execute(s"transferTx").right.value should endWith(
+    assert(
+      "transferTx",
       s"""
          |TransferTransaction(
          |	recipient = Alias(
@@ -208,23 +224,29 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   }
 
   test("addressFromPublicKey()") {
-    execute(s"addressFromPublicKey(base58'${alice.publicKey}').value().toString()").right.value should endWith(
+    assert(
+      s"addressFromPublicKey(base58'${alice.publicKey}').value().toString()",
       s""""${alice.toAddress.stringRepr}""""
     )
   }
 
   test("addressFromRecipient() with alias") {
-    execute(s"""addressFromRecipient(transferTx.recipient).toString()""").explicitGet() should endWith(s""""${bob.toAddress.stringRepr}"""")
+    assert(
+      s"""addressFromRecipient(transferTx.recipient).toString()""",
+      s""""${bob.toAddress.stringRepr}""""
+    )
   }
 
   test("addressFromString()") {
-    execute(s"""addressFromString("${alice.toAddress.stringRepr}").value().toString()""").right.value should endWith(
+    assert(
+      s"""addressFromString("${alice.toAddress.stringRepr}").value().toString()""",
       s""""${alice.toAddress.stringRepr}""""
     )
   }
 
   test("addressFromStringValue()") {
-    execute(s"""addressFromStringValue("${alice.toAddress.stringRepr}").toString()""").right.value should endWith(
+    assert(
+      s"""addressFromStringValue("${alice.toAddress.stringRepr}").toString()""",
       s""""${alice.toAddress.stringRepr}""""
     )
   }
