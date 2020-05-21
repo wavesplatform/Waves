@@ -48,7 +48,6 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     blockBeforeActivationHeight.version.get shouldBe Block.RewardBlockVersion
     blockHeadersBeforeActivationHeight.version.get shouldBe Block.RewardBlockVersion
     Base58.decode(blockBeforeActivationHeight.generationSignature.get).length shouldBe Block.GenerationSignatureLength
-    Base58.decode(sender.blockGenerationSignature(blockBeforeActivationHeight.id).generationSignature).length shouldBe Block.GenerationSignatureLength
     blockBeforeActivationHeight.baseTarget shouldBe blockHeadersBeforeActivationHeight.baseTarget
   }
 

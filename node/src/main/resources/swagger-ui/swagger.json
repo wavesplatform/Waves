@@ -3007,34 +3007,6 @@
         }
       }
     },
-    "/consensus/generationsignature": {
-      "get": {
-        "tags": [
-          "consensus"
-        ],
-        "summary": "Generation signature last",
-        "description": "Generation signature of a last block",
-        "operationId": "generationSignature_1",
-        "parameters": [
-        ],
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "schema": {
-              "type": "object",
-              "required": [
-                "generationSignature"
-              ],
-              "properties": {
-                "generationSignature": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/consensus/generatingbalance/{address}": {
       "get": {
         "tags": [
@@ -3068,41 +3040,6 @@
                 "balance": {
                   "type": "integer",
                   "format": "int64"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/consensus/generationsignature/{blockId}": {
-      "get": {
-        "tags": [
-          "consensus"
-        ],
-        "summary": "Generation signature",
-        "description": "Generation signature of a block with specified id",
-        "operationId": "generationSignatureId_1",
-        "parameters": [
-          {
-            "name": "blockId",
-            "in": "path",
-            "description": "Block id",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "schema": {
-              "type": "object",
-              "required": [
-                "generationSignature"
-              ],
-              "properties": {
-                "generationSignature": {
-                  "type": "string"
                 }
               }
             }
@@ -3938,53 +3875,6 @@
                 "timestamp": {
                   "type": "integer",
                   "format": "int64"
-                }
-              }
-            }
-          },
-          "403": {
-            "$ref": "#/responses/ApiKeyNotValid"
-          }
-        },
-        "security": [
-          {
-            "API Key": [
-            ]
-          }
-        ]
-      }
-    },
-    "/debug/historyInfo": {
-      "get": {
-        "tags": [
-          "debug"
-        ],
-        "summary": "State",
-        "description": "All history info you need to debug",
-        "operationId": "historyInfo_1",
-        "parameters": [
-        ],
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "schema": {
-              "type": "object",
-              "required": [
-                "lastBlockIds",
-                "microBlockIds"
-              ],
-              "properties": {
-                "lastBlockIds": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "microBlockIds": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
                 }
               }
             }
