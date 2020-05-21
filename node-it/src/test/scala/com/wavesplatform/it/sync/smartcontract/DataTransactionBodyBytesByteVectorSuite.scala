@@ -45,7 +45,7 @@ class DataTransactionBodyBytesByteVectorSuite extends BaseTransactionSuite {
        """.stripMargin
     )
 
-  val scriptV4 =
+  private val scriptV4 =
     compile(
       s"""
          |{-# STDLIB_VERSION 4 #-}
