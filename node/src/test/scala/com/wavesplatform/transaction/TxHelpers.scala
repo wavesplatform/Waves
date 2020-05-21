@@ -26,9 +26,9 @@ object TxHelpers {
   def transfer(from: KeyPair, to: AddressOrAlias, amount: Long = TestValues.OneWaves, asset: Asset = Waves): TransferTransaction =
     TransferTransaction.selfSigned(TxVersion.V1, from, to, asset, amount, Waves, TestValues.fee, None, timestamp).explicitGet()
 
-  def issue(amount: Long = TestValues.ThousandWaves, script: Option[Script] = None): IssueTransaction =
+  def issue(amount: Long = TestValues.ThousandWaves, script: Script = null): IssueTransaction =
     IssueTransaction
-      .selfSigned(TxVersion.V2, defaultSigner, "test", "", amount, 0, reissuable = false, script, TestValues.OneWaves, timestamp)
+      .selfSigned(TxVersion.V2, defaultSigner, "test", "", amount, 0, reissuable = false, Option(script), TestValues.OneWaves, timestamp)
       .explicitGet()
 
   def orderV3(orderType: OrderType, asset: Asset, feeAsset: Asset): Order = {

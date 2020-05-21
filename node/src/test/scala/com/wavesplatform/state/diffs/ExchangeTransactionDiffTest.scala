@@ -8,7 +8,6 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
@@ -1126,9 +1125,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Tran
   }
 
   property("Counts exchange fee asset complexity") {
-    def test(assetScript: Option[Script], feeAssetScript: Option[Script]): Unit = {
-      val tradeableAssetIssue = TxHelpers.issue(script = assetScript)
-      val feeAssetIssue       = TxHelpers.issue(script = feeAssetScript)
+    def test(tradeableAssetIssue: IssueTransaction, feeAssetIssue: IssueTransaction, complexity: Long): Unit = {
       val order1              = TxHelpers.orderV3(OrderType.BUY, IssuedAsset(tradeableAssetIssue.assetId), IssuedAsset(feeAssetIssue.assetId))
       val order2              = TxHelpers.orderV3(OrderType.SELL, IssuedAsset(tradeableAssetIssue.assetId), IssuedAsset(feeAssetIssue.assetId))
       val exchange            = TxHelpers.exchange(order1, order2)
@@ -1138,16 +1135,35 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Tran
           TestFunctionalitySettings.withFeatures(BlockchainFeatures.SmartAssets, BlockchainFeatures.SmartAccountTrading, BlockchainFeatures.OrderV3)
         )
       ) { d =>
-        d.appendBlock(tradeableAssetIssue, feeAssetIssue)
+        d.appendBlock(Seq(tradeableAssetIssue, feeAssetIssue).distinct:_*)
         val newBlock = d.createBlock(2.toByte, Seq(exchange))
         val diff     = BlockDiffer.fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited).explicitGet()
-        diff.diff.scriptsComplexity shouldBe (assetScript.toSeq ++ feeAssetScript).length
+        diff.diff.scriptsComplexity shouldBe complexity
       }
     }
 
-    withClue("fee and asset")(test(Some(TestValues.assetScript), Some(TestValues.assetScript)))
-    withClue("only asset")(test(Some(TestValues.assetScript), None))
-    withClue("only fee")(test(None, Some(TestValues.assetScript)))
+    withClue("fee") {
+      val tradeableAssetIssue = TxHelpers.issue()
+      val feeAssetIssue       = TxHelpers.issue(script = TestValues.assetScript)
+      test(tradeableAssetIssue, feeAssetIssue, 1)
+    }
+
+    withClue("asset") {
+      val tradeableAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
+      val feeAssetIssue       = TxHelpers.issue()
+      test(tradeableAssetIssue, feeAssetIssue, 1)
+    }
+
+    withClue("fee and asset") {
+      val tradeableAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
+      val feeAssetIssue       = TxHelpers.issue(script = TestValues.assetScript)
+      test(tradeableAssetIssue, feeAssetIssue, 2)
+    }
+
+    withClue("fee and asset (same asset)") {
+      val tradeableAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
+      test(tradeableAssetIssue, tradeableAssetIssue, 1)
+    }
   }
 
   def scriptGen(caseType: String, v: Boolean): Gen[String] = Gen.oneOf(true, false).map { full =>
