@@ -293,7 +293,7 @@ class BlockchainUpdaterImpl(
                           )
 
                         maybeDiff.map { differResult =>
-                          val tempBlockchain = CompositeBlockchain(referencedBlockchain, Some(differResult.diff), Some(block), differResult.carry, reward)
+                          val tempBlockchain = CompositeBlockchain(referencedBlockchain, Some(differResult.diff), Some(block), differResult.carry, reward, Some(hitSource))
                           miner.scheduleMining(Some(tempBlockchain))
 
                           leveldb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)

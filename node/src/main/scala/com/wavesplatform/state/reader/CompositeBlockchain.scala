@@ -23,7 +23,8 @@ final case class CompositeBlockchain(
     maybeDiff: Option[Diff] = None,
     newBlock: Option[Block] = None,
     carry: Long = 0,
-    reward: Option[Long] = None
+    reward: Option[Long] = None,
+    hitSource: Option[ByteStr] = None
 ) extends Blockchain {
   override val settings: BlockchainSettings = inner.settings
 
@@ -166,7 +167,7 @@ final case class CompositeBlockchain(
 
   override def wavesAmount(height: Int): BigInt = inner.wavesAmount(height)
 
-  override def hitSource(height: Int): Option[ByteStr] = inner.hitSource(height)
+  override def hitSource(height: Int): Option[ByteStr] = hitSource.filter(_ => this.height == height) orElse inner.hitSource(height)
 }
 
 object CompositeBlockchain {

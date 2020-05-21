@@ -12,7 +12,7 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics.{BlockStats, Instrumented, _}
 import com.wavesplatform.mining.microblocks.MicroBlockMiner
 import com.wavesplatform.network._
-import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.transaction.TxValidationError.BlockFromFuture
@@ -97,9 +97,9 @@ class MinerImpl(
           )
       )
 
-  private def checkScript(account: KeyPair): Either[String, Unit] = {
+  private def checkScript(blockchain: Blockchain, account: KeyPair): Either[String, Unit] = {
     Either.cond(
-      !blockchainUpdater.hasAccountScript(account.toAddress),
+      !blockchain.hasAccountScript(account.toAddress),
       (),
       s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks"
     )
@@ -198,11 +198,12 @@ class MinerImpl(
     if (version < RewardBlockVersion) -1L
     else settings.rewardsSettings.desired.getOrElse(-1L)
 
-  private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: SignedBlockHeader, account: KeyPair): Either[String, Long] = {
-    val balance = blockchainUpdater.generatingBalance(account.toAddress, Some(block.id()))
+  private def nextBlockGenerationTime(blockchain: Blockchain, height: Int, block: SignedBlockHeader, account: KeyPair): Either[String, Long] = {
+    val fs = blockchain.settings.functionalitySettings
+    val balance = blockchain.generatingBalance(account.toAddress, Some(block.id()))
 
-    if (blockchainUpdater.isMiningAllowed(height, balance)) {
-      val blockDelayE = pos.getValidBlockDelay(height, account, block.header.baseTarget, balance)
+    if (blockchain.isMiningAllowed(height, balance)) {
+      val blockDelayE = pos.copy(blockchain = blockchain).getValidBlockDelay(height, account, block.header.baseTarget, balance)
       for {
         delay <- blockDelayE.leftMap(_.toString)
         expectedTS = delay + block.header.timestamp
@@ -220,8 +221,8 @@ class MinerImpl(
     val lastBlock = blockchain.lastBlockHeader.get
     for {
       _  <- checkAge(height, blockchain.lastBlockTimestamp.get) // lastBlock ?
-      _  <- checkScript(account)
-      ts <- nextBlockGenerationTime(blockchainSettings.functionalitySettings, height, lastBlock, account)
+      _  <- checkScript(blockchain, account)
+      ts <- nextBlockGenerationTime(blockchain, height, lastBlock, account)
       calculatedOffset = ts - timeService.correctedTime()
       offset           = Math.max(calculatedOffset, minerSettings.minimalBlockGenerationOffset.toMillis).millis
 
@@ -239,7 +240,7 @@ class MinerImpl(
       case Right(offset) =>
         def waitUntilBlockAppended(block: BlockId): Task[Unit] =
           if (blockchainUpdater.contains(block)) Task.unit
-          else Task.sleep(5 seconds).flatMap(_ => waitUntilBlockAppended(block))
+          else Task.defer(waitUntilBlockAppended(block)).delayExecution(1 seconds)
 
         log.debug(f"Next attempt for acc=${account.toAddress} in ${offset.toUnit(SECONDS)}%.3f seconds")
         val waitTask = maybeBlockchain match {
@@ -252,7 +253,6 @@ class MinerImpl(
         }.flatMap {
           case Right((estimators, block, totalConstraint)) =>
             BlockAppender(blockchainUpdater, timeService, utx, pos, appenderScheduler)(block)
-              .asyncBoundary(minerScheduler)
               .flatMap {
                 case Left(BlockFromFuture(_)) => // Time was corrected, retry
                   generateBlockTask(account)
@@ -270,6 +270,7 @@ class MinerImpl(
                 case Right(None) =>
                   Task.raiseError(new RuntimeException("Newly created block has already been appended, should not happen"))
               }
+              .uncancelable
 
           case Left(err) =>
             log.debug(s"No block generated because $err, retrying")
