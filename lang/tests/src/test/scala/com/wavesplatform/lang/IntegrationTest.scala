@@ -1662,9 +1662,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   property("list indexOf compare Limits") {
     val maxCmpWeightElement          = "a" * ContractLimits.MaxCmpWeight.toInt
-    val maxSizeElementToFound        = "a" * 150 * 1024
+    val maxSizeElementToFound        = "a" * Short.MaxValue
     val listWithMaxCmpWeightElements = List.fill(20)("b" * ContractLimits.MaxCmpWeight.toInt).map(s => s""""$s"""").mkString("[", ",", "]")
-    val listWithMaxSizeElements      = List.fill(2)("b" * 150 * 1000).map(s => s""""$s"""").mkString("[", ",", "]")
+    val listWithMaxSizeElements      = List.fill(2)("b" * Short.MaxValue).map(s => s""""$s"""").mkString("[", ",", "]")
 
     val tooHeavyCmpElement         = maxCmpWeightElement + "a"
     val listWithTooHeavyCmpElement = s""" ("$tooHeavyCmpElement" :: $listWithMaxCmpWeightElements) """
