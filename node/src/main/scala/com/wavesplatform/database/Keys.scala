@@ -47,7 +47,7 @@ object Keys {
   def updatedAssets(height: Int): Key[Seq[IssuedAsset]] =
     Key(UpdatedAssets, h(height), d => readAssetIds(d).map(IssuedAsset), ias => writeAssetIds(ias.map(_.id)))
   def sponsorshipAssets(height: Int): Key[Seq[IssuedAsset]] =
-    Key(SponsorshipAssets, h(height), d => readAssetIds(d).map(IssuedAsset), ias => writeAssetIds(ias.map(_.id)))
+    Key(SponsoredAssets, h(height), d => readAssetIds(d).map(IssuedAsset), ias => writeAssetIds(ias.map(_.id)))
 
 
   def leaseBalanceHistory(addressId: AddressId): Key[Seq[Int]] = historyKey(LeaseBalanceHistory, addressId.toByteArray)
@@ -62,6 +62,9 @@ object Keys {
     Key(FilledVolumeAndFee, hBytes(orderId.arr, height), readVolumeAndFee, writeVolumeAndFee)
 
   def changedAddresses(height: Int): Key[Seq[AddressId]] = Key(ChangedAddresses, h(height), readAddressIds, writeAddressIds)
+
+  def changedBalances(height: Int, asset: IssuedAsset): Key[Seq[AddressId]] =
+    Key(ChangedAssetBalances, h(height) ++ asset.id.arr, readAddressIds, writeAddressIds)
 
   def addressIdOfAlias(alias: Alias): Key[Option[AddressId]] = Key.opt(AddressIdOfAlias, alias.bytes, AddressId.fromByteArray, _.toByteArray)
 

@@ -432,7 +432,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
       def getAsset(d: Domain, txId: ByteStr): IssuedAsset = {
         val sr = d.blockchainUpdater.bestLiquidDiff.get.scriptResults(txId)
-        sr.errorMessage shouldBe 'empty
+        sr.error shouldBe 'empty
         IssuedAsset(sr.issues.head.id)
       }
 

@@ -152,7 +152,10 @@ case class Diff(
     scriptsRun: Int,
     scriptsComplexity: Long,
     scriptResults: Map[ByteStr, InvokeScriptResult]
-)
+) {
+  def bindTransaction(tx: Transaction): Diff =
+    copy(transactions = transactions + Diff.toDiffTxData(tx, portfolios, accountData))
+}
 
 object Diff {
   def stateOps(
@@ -166,7 +169,8 @@ object Diff {
       assetScripts: Map[IssuedAsset, Option[(Script, Long)]] = Map.empty,
       accountData: Map[Address, AccountDataInfo] = Map.empty,
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
-      scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
+      scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
+      scriptsRun: Int = 0
   ): Diff =
     Diff(
       transactions = LinkedHashMap(),
@@ -180,7 +184,7 @@ object Diff {
       assetScripts = assetScripts,
       accountData = accountData,
       sponsorship = sponsorship,
-      scriptsRun = 0,
+      scriptsRun = scriptsRun,
       scriptResults = scriptResults,
       scriptsComplexity = 0
     )
@@ -203,7 +207,7 @@ object Diff {
   ): Diff =
     Diff(
       // should be changed to VectorMap after 2.13 https://github.com/scala/scala/pull/6854
-      transactions = LinkedHashMap((tx.id(), (tx, (portfolios.keys ++ accountData.keys).toSet, true))),
+      transactions = LinkedHashMap(toDiffTxData(tx, portfolios, accountData)),
       portfolios = portfolios,
       issuedAssets = issuedAssets,
       updatedAssets = updatedAssets,
@@ -218,6 +222,13 @@ object Diff {
       scriptResults = scriptResults,
       scriptsComplexity = scriptsComplexity
     )
+
+  private def toDiffTxData(
+    tx: Transaction,
+    portfolios: Map[Address, Portfolio],
+    accountData: Map[Address, AccountDataInfo]
+  ): (ByteStr, (Transaction, Set[Address], Boolean)) =
+    (tx.id(), (tx, (portfolios.keys ++ accountData.keys).toSet, true))
 
   val empty =
     new Diff(LinkedHashMap(), Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, 0, 0, Map.empty)

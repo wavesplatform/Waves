@@ -10,7 +10,7 @@ import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.v1.CTX
+import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, FINAL, LONG, STRING}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
@@ -26,6 +26,9 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Issue
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import org.web3j.crypto.Keys
+import scorex.crypto.encode.Base16
+import scorex.crypto.hash.Keccak256
 
 import scala.util.{Random, Try}
 
@@ -1549,5 +1552,157 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val script = s"""fromBase16String("$value")"""
 
     eval(script) shouldBe CONST_BYTESTR(bytes(value.toUpperCase))
+  }
+
+  property("list indexOf") {
+    eval(""" ["a","b","c","d"].indexOf("a") """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" ["a","b","c","d","a"].indexOf("a") """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" ["a","b","c","d"].indexOf("d") """, version = V4) shouldBe Right(CONST_LONG(3))
+    eval(""" [-1,2,3,4].indexOf(-1) """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" [-1,2,3,4].indexOf(4) """, version = V4) shouldBe Right(CONST_LONG(3))
+    eval(""" [true, false].indexOf(true) """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" [true, false].indexOf(false) """, version = V4) shouldBe Right(CONST_LONG(1))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].indexOf(base58'a') """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].indexOf(base58'd') """, version = V4) shouldBe Right(CONST_LONG(3))
+    eval(""" ["a","b","c","d"].indexOf("e") """, version = V4) shouldBe Right(unit)
+
+    eval(""" [true, false].indexOf(0) """, version = V4) should produce("Can't find a function overload")
+    eval(""" [true, false].indexOf() """, version = V4) should produce("Can't find a function overload")
+    eval(""" ["a","b","c","d"].indexOf("a") """, version = V3) should produce("Can't find a function overload 'indexOf'")
+  }
+
+  property("list lastIndexOf") {
+    eval(""" ["a","b","a","c","d"].lastIndexOf("a") """, version = V4) shouldBe Right(CONST_LONG(2))
+    eval(""" ["d","a","b","c","d"].lastIndexOf("d") """, version = V4) shouldBe Right(CONST_LONG(4))
+    eval(""" [-1,2,3,4,-1].lastIndexOf(-1) """, version = V4) shouldBe Right(CONST_LONG(4))
+    eval(""" [4,-1,2,3].lastIndexOf(4) """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" [true, false].lastIndexOf(true) """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" [true, false].lastIndexOf(false) """, version = V4) shouldBe Right(CONST_LONG(1))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].lastIndexOf(base58'a') """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].lastIndexOf(base58'd') """, version = V4) shouldBe Right(CONST_LONG(3))
+    eval(""" ["a","b","c","d"].lastIndexOf("e") """, version = V4) shouldBe Right(unit)
+
+    eval(""" [true, false].lastIndexOf(0) """, version = V4) should produce("Can't find a function overload")
+    eval(""" [true, false].lastIndexOf() """, version = V4) should produce("Can't find a function overload")
+    eval(""" ["a","b","c","d"].lastIndexOf("a") """, version = V3) should produce("Can't find a function overload 'lastIndexOf'")
+  }
+
+  property("list indexOf compare Limits") {
+    val maxCmpWeightElement          = "a" * ContractLimits.MaxCmpWeight.toInt
+    val maxSizeElementToFound        = "a" * 150 * 1024
+    val listWithMaxCmpWeightElements = List.fill(20)("b" * ContractLimits.MaxCmpWeight.toInt).map(s => s""""$s"""").mkString("[", ",", "]")
+    val listWithMaxSizeElements      = List.fill(2)("b" * 150 * 1000).map(s => s""""$s"""").mkString("[", ",", "]")
+
+    val tooHeavyCmpElement         = maxCmpWeightElement + "a"
+    val listWithTooHeavyCmpElement = s""" ("$tooHeavyCmpElement" :: $listWithMaxCmpWeightElements) """
+
+    for (func <- Seq("indexOf", "lastIndexOf")) {
+      eval(s""" $listWithMaxSizeElements.$func("$maxCmpWeightElement") """, version = V4) shouldBe Right(unit)
+      eval(s""" $listWithMaxCmpWeightElements.$func("$maxSizeElementToFound") """, version = V4) shouldBe Right(unit)
+
+      eval(s""" $listWithMaxSizeElements.$func("$tooHeavyCmpElement") """, version = V4) should produce("are too heavy to compare")
+      eval(s""" $listWithTooHeavyCmpElement.$func("$maxSizeElementToFound") """, version = V4) should produce("are too heavy to compare")
+    }
+  }
+
+  property("list contains") {
+    eval(""" ["a","b","c","d"].containsElement("a") """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" ["a","b","c","d"].containsElement("d") """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" [-1,2,3,4].containsElement(-1) """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" [-1,2,3,4].containsElement(4) """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" [true, false].containsElement(true) """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" [true, false].containsElement(false) """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].containsElement(base58'a') """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].containsElement(base58'd') """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" ["a","b","c","d"].containsElement("e") """, version = V4) shouldBe Right(CONST_BOOLEAN(false))
+
+    eval(""" [true, false].containsElement(0) """, version = V4) should produce("Can't match inferred types")
+    eval(""" [true, false].containsElement() """, version = V4) should produce("Function 'containsElement' requires 2 arguments")
+    eval(""" ["a","b","c","d"].containsElement("a") """, version = V3) should produce("Can't find a function 'containsElement'")
+  }
+
+  property("list min") {
+    eval(""" [1, 2, 3, 4].min() """, version = V4) shouldBe Right(CONST_LONG(1))
+    eval(""" [-1, 2, 3, 4].min() """, version = V4) shouldBe Right(CONST_LONG(-1))
+    eval(""" [-1, -2, -3, -4].min() """, version = V4) shouldBe Right(CONST_LONG(-4))
+    eval(""" [1, 1, 2, 2].min() """, version = V4) shouldBe Right(CONST_LONG(1))
+    eval(""" [2].min() """, version = V4) shouldBe Right(CONST_LONG(2))
+
+    eval(""" [].min() """, version = V4) should produce("Can't find min for empty list")
+    eval(""" [1, 2].min() """, version = V3) should produce("Can't find a function 'min'")
+  }
+
+  property("list max") {
+    eval(""" [1, 2, 3, 4].max() """, version = V4) shouldBe Right(CONST_LONG(4))
+    eval(""" [-1, 2, 3, 4].max() """, version = V4) shouldBe Right(CONST_LONG(4))
+    eval(""" [-1, -2, -3, -4].max() """, version = V4) shouldBe Right(CONST_LONG(-1))
+    eval(""" [1, 1, 2, 2].max() """, version = V4) shouldBe Right(CONST_LONG(2))
+    eval(""" [2].max() """, version = V4) shouldBe Right(CONST_LONG(2))
+
+    eval(""" [].max() """, version = V4) should produce("Can't find max for empty list")
+    eval(""" [1, 2].max() """, version = V3) should produce("Can't find a function 'max'")
+  }
+
+  property("ecrecover positive cases") {
+    def hash(message: String): String = {
+      val prefix = "\u0019Ethereum Signed Message:\n" + message.length
+      Base16.encode(Keccak256.hash((prefix + message).getBytes))
+    }
+
+    def recoverPublicKey(message: String, signature: String): Array[Byte] = {
+      val script = s"ecrecover(base16'${hash(message)}', base16'$signature')"
+      eval[CONST_BYTESTR](script, version = V4).explicitGet().bs.arr
+    }
+
+    //source: https://etherscan.io/verifySig/2006
+    val signature1 =
+      "3b163bbd90556272b57c35d1185b46824f8e16ca229bdb3" +
+      "6f8dfd5eaaee9420723ef7bc3a6c0236568217aa990617c" +
+      "f292b1bef1e7d1d936fb2faef3d846c5751b"
+    val message1 = "what's up jim"
+    val expectedAddress1 = "85db9634489b76e238368e4a075cc6e5a56a714c"
+
+    Keys.getAddress(recoverPublicKey(message1, signature1)) shouldBe Base16.decode(expectedAddress1)
+
+    //source: https://etherscan.io/verifySig/2007
+    val signature2 =
+      "848ffb6a07e7ce335a2bfe373f1c17573eac320f658ea8" +
+      "cf07426544f2203e9d52dbba4584b0b6c0ed5333d84074" +
+      "002878082aa938fdf68c43367946b2f615d01b"
+    val message2 = "i am the owner"
+    val expectedAddress2 = "73f32c743e5928ff800ab8b05a52c73cd485f9c3"
+
+    Keys.getAddress(recoverPublicKey(message2, signature2)) shouldBe Base16.decode(expectedAddress2)
+  }
+
+  property("ecrecover negative cases") {
+    eval[CONST_BYTESTR](s"ecrecover(base16'aaaa', base16'bbbb')", version = V3) should
+      produce("Can't find a function 'ecrecover'")
+
+    eval[CONST_BYTESTR](s"ecrecover(base16'${"a" * 60}', base16'bbbb')", version = V4) should
+      produce("Invalid message hash size 30 bytes, must be equal to 32 bytes")
+
+    eval[CONST_BYTESTR](s"ecrecover(base16'${"a" * 64}', base16'')", version = V4) should
+      produce("Signature must not be empty")
+
+    eval[CONST_BYTESTR](s"ecrecover(base16'${"a" * 64}', base16'${"a" * 132}')", version = V4) should
+      produce("Invalid signature size 66 bytes, must not be greater than 65 bytes")
+
+    eval[CONST_BYTESTR](s"ecrecover(base16'${"a" * 64}', base16'${"a" * 130}')", version = V4) should
+      produce("Header byte out of range: 197")
+  }
+
+  property("makeString") {
+    eval(""" ["cat", "dog", "pig"].makeString(", ") """, version = V4) shouldBe CONST_STRING("cat, dog, pig")
+    eval(""" [].makeString(", ") """, version = V4) shouldBe CONST_STRING("")
+
+    val script = s""" [${s""" "${"a" * 1024}", """ * 150} "a"].makeString(", ") """
+    eval(script, version = V4) should produce("Constructing string size = 153601 bytes will exceed 153600")
+
+    val script2 = s""" [${s""" "${"a" * 1022}", """ * 149} "${"a" * 1024}"].makeString(", ") """
+    eval[CONST_STRING](script2, version = V4).explicitGet().s.length shouldBe 150 * 1024
+    // 1022 * 149 + 1024 + 2 * 149 = 150 * 1024
+
+    eval(""" [].makeString(", ") """, version = V3) should produce("Can't find a function 'makeString'")
   }
 }

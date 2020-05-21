@@ -6,7 +6,6 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.evaluator.Log
-import com.wavesplatform.transaction.TxValidationError.FailedScriptError.Reason
 import com.wavesplatform.transaction.assets.exchange.Order
 
 import scala.util.Either
@@ -48,105 +47,91 @@ object TxValidationError {
     override def toString: String = s"InvalidSignature(${s.toString + " reason: " + details})"
   }
 
-  trait HasScriptType extends ValidationError
-
   /** Errors which can produce failed transaction */
-  sealed trait FailedScriptError extends Product with Serializable with ValidationError {
-    def reason: Reason = Reason.Asset
-    def error: String
+  sealed trait FailedTransactionError extends Product with Serializable with ValidationError {
+    import FailedTransactionError._
+
+    def cause: Cause = this match {
+      case e: ScriptExecutionError.ByDAppScript                   => Cause(1, e.error)
+      case e: InsufficientInvokeActionFee                         => Cause(2, e.error)
+      case e: ScriptExecutionError.ByAssetScriptInAction          => Cause(3, assetScriptError(e.assetId, Some(e.error)))
+      case e: TransactionNotAllowedByScript.ByAssetScriptInAction => Cause(3, assetScriptError(e.assetId, None))
+      case e: ScriptExecutionError.ByAssetScript                  => Cause(4, assetScriptError(e.assetId, Some(e.error)))
+      case e: TransactionNotAllowedByScript.ByAssetScript         => Cause(4, assetScriptError(e.assetId, None))
+    }
+
+    private def assetScriptError(assetId: ByteStr, error: Option[String]): String =
+      s"Transaction is not allowed by script of the asset $assetId" + error.fold("")(e => s": $e")
+  }
+  sealed trait FailedExecutionError extends ScriptExecutionError with FailedTransactionError
+  sealed trait FailedResultError    extends TransactionNotAllowedByScript with FailedTransactionError
+
+  object FailedTransactionError {
+    case class Cause(code: Int, error: String)
   }
 
-  object FailedScriptError {
-    sealed trait Reason extends Product with Serializable {
-      def code: Int
-    }
-    object Reason {
-      final case object DApp extends Reason {
-        val code: Int = 1
-      }
-      final case object InsufficientFee extends Reason {
-        val code: Int = 2
-      }
-      final case object AssetInAction extends Reason {
-        val code: Int = 3
-      }
-      final case object Asset extends Reason {
-        val code: Int = 4
-      }
-    }
-  }
+  sealed trait ScriptExecutionError extends ValidationError {
+    import ScriptExecutionError._
 
-  sealed trait ScriptExecutionError extends ValidationError with HasScriptType {
     def error: String
     def log: Log[Id]
-    def target: String
+    val isAssetScript: Boolean = this match {
+      case _: ByAssetScript         => true
+      case _: ByAssetScriptInAction => true
+      case _: ByAccountScript       => false
+      case _: ByDAppScript          => false
+    }
+
+    private val target: String = this match {
+      case _: ByAssetScript         => "Asset"
+      case _: ByAssetScriptInAction => "Asset"
+      case _: ByAccountScript       => "Account"
+      case _: ByDAppScript          => "DApp"
+    }
 
     override def toString: String = s"ScriptExecutionError(error = $error, type = $target, log =${logToString(log)})"
   }
 
   object ScriptExecutionError {
-    def apply(error: String, log: Log[Id], isAssetScript: Boolean): ScriptExecutionError =
-      if (isAssetScript) ByAssetScript(error, log, Reason.Asset) else ByAccountScript(error, log)
+    def apply(error: String, log: Log[Id], assetId: Option[ByteStr]): ScriptExecutionError =
+      assetId.fold[ScriptExecutionError](ByAccountScript(error, log))(ai => ByAssetScript(error, log, ai))
 
-    def asset(error: String, log: Log[Id], reason: Reason): ScriptExecutionError with FailedScriptError = ByAssetScript(error, log, reason)
-    def dApp(error: String, log: Log[Id]): ScriptExecutionError with FailedScriptError                  = ByDAppScript(error, log)
-    def dApp(error: String): ScriptExecutionError with FailedScriptError                                = ByDAppScript(error, List.empty)
-
-    def unapply(e: ScriptExecutionError): Option[(String, Log[Id], Boolean)] =
-      e match {
-        case ByAccountScript(error, log)  => Some((error, log, false))
-        case ByDAppScript(error, log)     => Some((error, log, false))
-        case ByAssetScript(error, log, _) => Some((error, log, true))
-      }
-
-    private final case class ByAccountScript(error: String, log: Log[Id]) extends ScriptExecutionError {
-      override val target: String = "Account"
-    }
-
-    private final case class ByDAppScript(error: String, log: Log[Id]) extends ScriptExecutionError with FailedScriptError {
-      override val target: String = "DApp"
-      override val reason: Reason = Reason.DApp
-    }
-
-    private final case class ByAssetScript(error: String, log: Log[Id], override val reason: Reason)
-        extends ScriptExecutionError
-        with FailedScriptError {
-      override val target: String = "Asset"
-    }
+    final case class ByAccountScript(error: String, log: Log[Id])                         extends ScriptExecutionError
+    final case class ByDAppScript(error: String, log: Log[Id] = List.empty)               extends FailedExecutionError
+    final case class ByAssetScriptInAction(error: String, log: Log[Id], assetId: ByteStr) extends FailedExecutionError
+    final case class ByAssetScript(error: String, log: Log[Id], assetId: ByteStr)         extends FailedExecutionError
   }
 
-  case class InsufficientInvokeActionFee(error: String) extends ValidationError with FailedScriptError {
-    override def toString: String = s"ScriptExecutionError(error = $error)"
-    override val reason: Reason   = Reason.InsufficientFee
+  case class InsufficientInvokeActionFee(error: String) extends ValidationError with FailedTransactionError {
+    override def toString: String = s"InsufficientInvokeActionFee(error = $error)"
   }
 
-  sealed trait TransactionNotAllowedByScript extends ValidationError with HasScriptType {
+  sealed trait TransactionNotAllowedByScript extends ValidationError {
+    import TransactionNotAllowedByScript._
+
     def log: Log[Id]
-    def target: String
+    val isAssetScript: Boolean = this match {
+      case _: ByAssetScript         => true
+      case _: ByAssetScriptInAction => true
+      case _: ByAccountScript       => false
+    }
+
+    private val target: String = this match {
+      case _: ByAssetScript         => "Asset"
+      case _: ByAssetScriptInAction => "Asset"
+      case _: ByAccountScript       => "Account"
+    }
 
     override def toString: String = s"TransactionNotAllowedByScript(type = $target, log =${logToString(log)})"
   }
 
   object TransactionNotAllowedByScript {
-    def apply(log: Log[Id], isAssetScript: Boolean): TransactionNotAllowedByScript =
-      if (isAssetScript) ByAssetScript(log, Reason.Asset) else ByAccountScript(log)
+    def apply(log: Log[Id], assetId: Option[ByteStr]): TransactionNotAllowedByScript =
+      assetId.fold[TransactionNotAllowedByScript](ByAccountScript(log))(ai => ByAssetScript(log, ai))
 
-    def asset(log: Log[Id], reason: Reason): TransactionNotAllowedByScript with FailedScriptError = ByAssetScript(log, reason)
-
-    def unapply(e: TransactionNotAllowedByScript): Option[(Log[Id], Boolean)] =
-      e match {
-        case ByAccountScript(log)  => Some((log, false))
-        case ByAssetScript(log, _) => Some((log, true))
-      }
-
-    private final case class ByAccountScript(log: Log[Id]) extends TransactionNotAllowedByScript {
-      override val target: String = "Account"
-    }
-
-    private final case class ByAssetScript(log: Log[Id], override val reason: Reason) extends TransactionNotAllowedByScript with FailedScriptError {
-      override val target: String = "Asset"
-      override def error: String  = "Transaction is not allowed by token-script"
-    }
+    final case class ByAccountScript(log: Log[Id])                         extends TransactionNotAllowedByScript
+    final case class ByAssetScriptInAction(log: Log[Id], assetId: ByteStr) extends FailedResultError
+    final case class ByAssetScript(log: Log[Id], assetId: ByteStr)         extends FailedResultError
   }
 
   def logToString(log: Log[Id]): String =

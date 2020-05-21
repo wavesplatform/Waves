@@ -946,9 +946,9 @@ class InvokeScriptTransactionDiffTest
         assertDiffEiTraced(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
           blockDiffEi.resultE should produce("TransactionNotAllowedByScript")
           inside(blockDiffEi.trace) {
-            case List(_, AssetVerifierTrace(assetId, Some(TransactionNotAllowedByScript(_, isAssetScript)))) =>
+            case List(_, AssetVerifierTrace(assetId, Some(tne: TransactionNotAllowedByScript))) =>
               assetId shouldBe asset.id.value
-              isAssetScript shouldBe true
+              tne.isAssetScript shouldBe true
           }
         }
     }
@@ -1056,7 +1056,7 @@ class InvokeScriptTransactionDiffTest
             case List(
                 InvokeScriptTrace(dAppAddress, functionCall, Right(ScriptResultV3(_, transfers)), _),
                 AssetVerifierTrace(allowedAssetId, None),
-                AssetVerifierTrace(bannedAssetId, Some(TransactionNotAllowedByScript(_, _)))
+                AssetVerifierTrace(bannedAssetId, Some(_: TransactionNotAllowedByScript))
                 ) =>
               dAppAddress shouldBe ci.dAppAddressOrAlias
               functionCall shouldBe ci.funcCall
@@ -1844,7 +1844,7 @@ class InvokeScriptTransactionDiffTest
           )
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
             inside(ei) {
-              case Right(diff) => diff.scriptResults(invoke.id()).errorMessage.get.text should include("is already issued")
+              case Right(diff) => diff.scriptResults(invoke.id()).error.get.text should include("is already issued")
             }
           }
         }

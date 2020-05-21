@@ -91,7 +91,7 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
         waitForTx = true
       )._1.id
 
-    sender.debugStateChanges(tx1).stateChanges.get.errorMessage.get.text should include(s"Alias 'alias:I:$alias")
+    sender.debugStateChanges(tx1).stateChanges.get.error.get.text should include(s"Alias 'alias:I:$alias")
 
     val tx2 = sender
       .invokeScript(
@@ -103,7 +103,7 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
         waitForTx = true
       )._1.id
 
-    sender.debugStateChanges(tx2).stateChanges.get.errorMessage.get.text should include("Alias should contain only following characters")
+    sender.debugStateChanges(tx2).stateChanges.get.error.get.text should include("Alias should contain only following characters")
   }
 
   test("can invoke with no payments") {
