@@ -3,7 +3,7 @@ package com.wavesplatform.lang.v1.repl.node.http
 import cats.implicits._
 import cats.{Functor, Id}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.v1.repl.node.http.NodeClient._
 import com.wavesplatform.lang.v1.repl.node.http.response.ImplicitMappings
 import com.wavesplatform.lang.v1.repl.node.http.response.model._
@@ -85,9 +85,7 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
   override def multiPaymentAllowed: Boolean                                   = ???
   override def txId: ByteStr                                                  = ???
 
-  override def transferTransactionFromProto(b: Array[Byte]): Future[Option[Tx.Transfer]] = {
-    getEntity[Option, TransferTransaction, Tx.Transfer](s"/transactions/byProtoBytes/${Base64.encode(b).replace("/", "%2f").replace("+", "%2b")}")
-  }
+  override def transferTransactionFromProto(b: Array[Byte]): Future[Option[Tx.Transfer]] = ???
 
 
   private def getEntity[F[_] : Functor : ResponseWrapper, A <% B : Decoder, B](url: String): Future[F[B]] =
