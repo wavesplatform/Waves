@@ -1339,24 +1339,16 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(src, version = V4) shouldBe Right(CONST_LONG(-3))
   }
 
-  property("List[Int] median - 101 elements - error") {
-    val arr = (1 to 101).map(_ => Long.MaxValue)
+  property("List[Int] median - 1000 elements - success") {
     val src =
-      s"[${arr.mkString(",")}].median()"
-    eval(src, version = V4) should produce("Invalid list size. Size should be between 1 and")
-  }
-
-  property("List[Int] median - 500 elements - error") {
-    val arr = (1 to 500).map(_ => Long.MaxValue)
-    val src =
-      s"[${arr.mkString(",")}].median()"
-    eval(src, version = V4) should produce("Invalid list size. Size should be between 1 and")
+      s"[${(1 to 1000).mkString(",")}].median()"
+    eval(src, version = V4) shouldBe Right(CONST_LONG(Math.floorDiv(500 + 501, 2)))
   }
 
   property("List[Int] median - empty list - error") {
     val src =
       s"[].median()"
-    eval(src, version = V4) should produce("Invalid list size. Size should be between 1 and")
+    eval(src, version = V4) should produce("Can't find median for empty list")
   }
 
   property("List[Int] median - list with non int elements - error") {

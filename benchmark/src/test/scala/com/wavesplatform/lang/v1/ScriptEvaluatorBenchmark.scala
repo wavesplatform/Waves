@@ -9,11 +9,11 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values.{V1, V4}
-import com.wavesplatform.lang.v1.FunctionHeader.Native
+import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.ScriptEvaluatorBenchmark._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
+import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, FunctionIds}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.{FROMBASE58, SIGVERIFY, TOBASE58}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
@@ -30,13 +30,14 @@ object ScriptEvaluatorBenchmark {
   val evaluatorV1: EvaluatorV1[Id, NoContext]           = new EvaluatorV1[Id, NoContext]()
 }
 
-@OutputTimeUnit(TimeUnit.NANOSECONDS)
+@OutputTimeUnit(TimeUnit.MICROSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
-@Threads(4)
+@Threads(1)
 @Fork(1)
-@Warmup(iterations = 20)
+@Warmup(iterations = 10)
 @Measurement(iterations = 10)
 class ScriptEvaluatorBenchmark {
+/*
   @Benchmark
   def bigSum(st: BigSum, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](pureEvalContext, st.expr))
 
@@ -57,6 +58,7 @@ class ScriptEvaluatorBenchmark {
 
   @Benchmark
   def bytesConcat(st: Concat, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.bytes))
+*/
 
   @Benchmark
   def listMedian(st: Median, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.expr))
@@ -192,11 +194,11 @@ class Median {
   val context: EvaluationContext[NoContext, Id] = PureContext.build(Global, V4).evaluationContext
 
   val expr: EXPR = {
-    val listOfLong = (1 to 100).map(_ => CONST_LONG(Random.nextLong()))
+    val listOfLong = (1 to 1000).map(_ => CONST_LONG(Random.nextLong()))
 
     FUNCTION_CALL(
-      PureContext.getListMedian,
-      List(ARR(listOfLong, false).explicitGet())
+      Native(FunctionIds.MEDIAN_LIST),
+      List(ARR(listOfLong, limited = true).explicitGet())
     )
   }
 }

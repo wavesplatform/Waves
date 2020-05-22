@@ -11,6 +11,7 @@ import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
+import com.wavesplatform.lang.v1.BaseGlobal.ArrayView
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
@@ -21,6 +22,7 @@ import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
+import scala.annotation.tailrec
 import scala.concurrent.Future
 
 /**
@@ -224,6 +226,33 @@ trait BaseGlobal {
   def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean
 
   def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte]
+
+  def median(seq: Seq[Long]): Long = {
+    @tailrec
+    def findKMedianInPlace(arr: ArrayView, k: Int)(implicit choosePivot: ArrayView => Long): Long = {
+      val a = choosePivot(arr)
+      val (s, b) = arr partitionInPlace (a >)
+      if (s.size == k) a
+      // The following test is used to avoid infinite repetition
+      else if (s.isEmpty) {
+        val (s, b) = arr partitionInPlace (a ==)
+        if (s.size > k) a
+        else findKMedianInPlace(b, k - s.size)
+      } else if (s.size < k) findKMedianInPlace(b, k - s.size)
+      else findKMedianInPlace(s, k)
+    }
+
+    val pivot =
+      (arr: ArrayView) => arr(arr.size / 2)
+
+    if (seq.length % 2 == 1)
+      findKMedianInPlace(ArrayView(seq.toArray), (seq.size - 1) / 2)(pivot)
+    else {
+      val r1 = findKMedianInPlace(ArrayView(seq.toArray), seq.size / 2 - 1)(pivot)
+      val r2 = findKMedianInPlace(ArrayView(seq.toArray), seq.size / 2)(pivot)
+      Math.floorDiv(r1 + r2, 2)
+    }
+  }
 }
 
 object BaseGlobal {
@@ -235,4 +264,29 @@ object BaseGlobal {
   case class RoundHalfEven() extends Rounds
   case class RoundCeiling()  extends Rounds
   case class RoundFloor()    extends Rounds
+
+  private case class ArrayView(arr: Array[Long], from: Int, until: Int) {
+    def apply(n: Int): Long =
+      if (from + n < until) arr(from + n)
+      else throw new ArrayIndexOutOfBoundsException(n)
+
+    def partitionInPlace(p: Long => Boolean): (ArrayView, ArrayView) = {
+      var upper = until - 1
+      var lower = from
+      while (lower < upper) {
+        while (lower < until && p(arr(lower))) lower += 1
+        while (upper >= from && !p(arr(upper))) upper -= 1
+        if (lower < upper) { val tmp = arr(lower); arr(lower) = arr(upper); arr(upper) = tmp }
+      }
+      (copy(until = lower), copy(from = lower))
+    }
+
+    def size: Int = until - from
+    def isEmpty: Boolean = size <= 0
+  }
+
+  private object ArrayView {
+    def apply(arr: Array[Long]) =
+      new ArrayView(arr, 0, arr.length)
+  }
 }
