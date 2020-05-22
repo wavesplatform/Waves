@@ -11,6 +11,7 @@ import com.wavesplatform.lang.directives.values.{Account, Asset, Expression}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, TRUE}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, _}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -27,12 +28,18 @@ object ScriptRunner {
       script: Script,
       isAssetScript: Boolean,
       scriptContainerAddress: ByteStr
-  ): (Log[Id], Either[ExecutionError, EVALUATED]) =
+  ): (Log[Id], Either[ExecutionError, EVALUATED]) = {
+    val evaluate =
+      if (blockchain.settings.useEvaluatorV2)
+        EvaluatorV2.applyCompleted(_, _, script.stdLibVersion)
+      else
+        EvaluatorV1().applyWithLogging[EVALUATED] _
+
     script match {
       case s: ExprScript =>
-        val evalCtx = for {
-          ds <- DirectiveSet(script.stdLibVersion, if (isAssetScript) Asset else Account, Expression)
-          mi <- buildThisValue(in, blockchain, ds, Some(scriptContainerAddress))
+        val eval = for {
+          ds <- DirectiveSet(script.stdLibVersion, if (isAssetScript) Asset else Account, Expression).leftMap((Nil, _))
+          mi <- buildThisValue(in, blockchain, ds, Some(scriptContainerAddress)).leftMap((Nil, _))
           ctx <- BlockchainContext.build(
             script.stdLibVersion,
             AddressScheme.current.chainId,
@@ -43,20 +50,23 @@ object ScriptRunner {
             isContract = false,
             Coeval(scriptContainerAddress),
             in.eliminate(_.id(), _ => ByteStr.empty)
-          )
-        } yield ctx
-        EvaluatorV1().applyWithLogging[EVALUATED](evalCtx, s.expr)
+          ).leftMap((Nil, _))
+          result <- {
+            val (log, result) = evaluate(ctx, s.expr)
+            result.bimap((log, _), (log, _))
+          }
+        } yield result
+
+        eval.fold(
+          { case (log, error)  => (log, error.asLeft[EVALUATED]) },
+          { case (log, result) => (log, result.asRight[ExecutionError]) }
+        )
+
       case ContractScript.ContractScriptImpl(_, DApp(_, decls, _, Some(vf))) =>
         val r = for {
           ds <- DirectiveSet(script.stdLibVersion, if (isAssetScript) Asset else Account, Expression)
           mi <- buildThisValue(in, blockchain, ds, None)
-          entity_txId <- in.eliminate(
-            t => RealTransactionWrapper(t, blockchain, ds.stdLibVersion, DAppTarget).map(ContractEvaluator.verify(decls, vf, _) -> t.id()),
-            _.eliminate(
-              t => ContractEvaluator.verify(decls, vf, RealTransactionWrapper.ord(t)).asRight[ExecutionError].map(_ -> ByteStr.empty),
-              _ => ???
-            )
-          )
+          txId = in.eliminate(_.id(), _ => ByteStr.empty)
           ctx <- BlockchainContext.build(
             script.stdLibVersion,
             AddressScheme.current.chainId,
@@ -66,11 +76,20 @@ object ScriptRunner {
             isAssetScript,
             isContract = true,
             Coeval(scriptContainerAddress),
-            entity_txId._2
+            txId
           )
-        } yield EvaluatorV1().evalWithLogging(ctx, entity_txId._1)
+          verify = ContractEvaluator.verify(decls, vf, ctx, evaluate, _)
+          result <- in.eliminate(
+            t => RealTransactionWrapper(t, blockchain, ds.stdLibVersion, DAppTarget)
+              .map(tx => verify(Bindings.transactionObject(tx, proofsEnabled = true))),
+            _.eliminate(
+              t => verify(Bindings.orderObject(RealTransactionWrapper.ord(t), proofsEnabled = true)).asRight[ExecutionError],
+              _ => ???
+            )
+          )
+        } yield result
 
-        r.fold(e => (Nil, e.asLeft[EVALUATED]), identity)
+        r.fold(error => (Nil, Left(error)), identity)
 
       case ContractScript.ContractScriptImpl(_, DApp(_, _, _, None)) =>
         val t: Proven with Authorized =
@@ -81,4 +100,5 @@ object ScriptRunner {
         })
       case other => (List.empty, s"$other: Unsupported script version".asLeft[EVALUATED])
     }
+  }
 }

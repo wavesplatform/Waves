@@ -13,7 +13,7 @@ import com.wavesplatform.lang.v1.compiler.{ContractCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
 import com.wavesplatform.lang.v1.evaluator._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Bindings, WavesContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
@@ -174,8 +174,14 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
   def parseCompileAndVerify(script: String, tx: Tx): Either[ExecutionError, EVALUATED] = {
     val parsed   = Parser.parseContract(script).get.value
     val compiled = ContractCompiler(ctx.compilerContext, parsed, V3).explicitGet()
-    val evalm    = ContractEvaluator.verify(compiled.decs, compiled.verifierFuncOpt.get, tx)
-    EvaluatorV1().evalWithLogging(Right(ctx.evaluationContext(environment)), evalm)._2
+    val txObject = Bindings.transactionObject(tx, proofsEnabled = true)
+    ContractEvaluator.verify(
+      compiled.decs,
+      compiled.verifierFuncOpt.get,
+      ctx.evaluationContext(environment),
+      EvaluatorV2.applyCompleted(_, _, V3),
+      txObject
+    )._2
   }
 
   property("Simple verify") {

@@ -3,15 +3,18 @@ package com.wavesplatform.lang.v1.evaluator
 import cats.Id
 import cats.implicits._
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
-import com.wavesplatform.lang.v1.evaluator.ctx.{LoggedEvaluationContext, NativeFunction, UserFunction}
+import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext, NativeFunction, UserFunction}
 import com.wavesplatform.lang.v1.traits.Environment
 import monix.eval.Coeval
 
 import scala.annotation.tailrec
+import scala.collection.mutable.ListBuffer
+import scala.util.Try
 
 class EvaluatorV2(
     val ctx: LoggedEvaluationContext[Environment, Id],
@@ -235,4 +238,35 @@ class EvaluatorV2(
       case _ :: xs                               => findUserFunction(name, xs)
       case Nil                                   => None
     }
+}
+
+object EvaluatorV2 {
+  def applyWithLogging(
+      expr: EXPR,
+      limit: Int,
+      ctx: EvaluationContext[Environment, Id],
+      stdLibVersion: StdLibVersion
+  ): (Log[Id], Either[ExecutionError, (EXPR, Int)]) = {
+    val log       = ListBuffer[LogItem[Id]]()
+    val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => log.append((name, value)), ctx)
+    val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion)
+    (log.toList, Try(evaluator(expr, limit)).toEither.leftMap(_.getMessage))
+  }
+
+  def applyCompleted(
+      ctx: EvaluationContext[Environment, Id],
+      expr: EXPR,
+      stdLibVersion: StdLibVersion
+  ): (Log[Id], Either[ExecutionError, EVALUATED]) = {
+    val (log, result) = EvaluatorV2.applyWithLogging(expr, Int.MaxValue, ctx, stdLibVersion)
+    val completedResult =
+      result.flatMap {
+        case (expr, _) =>
+          expr match {
+            case evaluated: EVALUATED => Right(evaluated)
+            case expr: EXPR           => Left(s"Unexpected incomplete evaluation result $expr")
+          }
+      }
+    (log, completedResult)
+  }
 }

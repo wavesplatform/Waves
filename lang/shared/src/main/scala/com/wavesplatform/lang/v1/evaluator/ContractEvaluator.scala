@@ -11,12 +11,9 @@ import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
-import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal, LoggedEvaluationContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.{AttachedPayments, Ord, Recipient, Tx}
-
-import scala.collection.mutable.ListBuffer
-import scala.util.Try
+import com.wavesplatform.lang.v1.traits.domain.{AttachedPayments, Recipient}
 
 object ContractEvaluator {
 
@@ -65,20 +62,24 @@ object ContractEvaluator {
     }
   }
 
-  private def withDecls(dec: List[DECLARATION], block: BLOCK): EvalM[Id, Environment, EVALUATED] =
-    EvaluatorV1().evalExpr(foldDeclarations(dec, block))
-
   private def foldDeclarations(dec: List[DECLARATION], block: BLOCK) =
     dec.foldRight(block)((d, e) => BLOCK(d, e))
 
-  private def verifierBlock(v: VerifierFunction, entity: CaseObj) =
-    BLOCK(LET(v.annotation.invocationArgName, entity), BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(entity))))
+  def verify(
+      decls: List[DECLARATION],
+      v: VerifierFunction,
+      ctx: EvaluationContext[Environment, Id],
+      evaluate: (EvaluationContext[Environment, Id], EXPR) => (Log[Id], Either[ExecutionError, EVALUATED]),
+      entity: CaseObj
+  ): (Log[Id], Either[ExecutionError, EVALUATED]) = {
+    val verifierBlock =
+      BLOCK(
+        LET(v.annotation.invocationArgName, entity),
+        BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(entity)))
+      )
 
-  def verify(decls: List[DECLARATION], v: VerifierFunction, tx: Tx): EvalM[Id, Environment, EVALUATED] =
-    withDecls(decls, verifierBlock(v, Bindings.transactionObject(tx, proofsEnabled = true)))
-
-  def verify(decls: List[DECLARATION], v: VerifierFunction, ord: Ord): EvalM[Id, Environment, EVALUATED] =
-    withDecls(decls, verifierBlock(v, Bindings.orderObject(ord, proofsEnabled = true)))
+    evaluate(ctx, foldDeclarations(decls, verifierBlock))
+  }
 
   def apply(
       ctx: EvaluationContext[Environment, Id],
@@ -112,19 +113,17 @@ object ContractEvaluator {
       transactionId: ByteStr,
       limit: Int
   ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] = {
-    val exprWithLets = freezingLets.toStream.foldLeft(expr) {
-      case (buildingExpr, (letName, letValue)) =>
-        BLOCK(LET(letName, letValue.value.value.explicitGet()), buildingExpr)
-    }
-    val log       = ListBuffer[LogItem[Id]]()
-    val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => log.append((name, value)), ctx)
-    val evaluator = new EvaluatorV2(loggedCtx, version)
-    Try(evaluator(exprWithLets, limit)).toEither
-      .leftMap(_.getMessage)
+    val exprWithLets =
+      freezingLets.foldLeft(expr) {
+        case (buildingExpr, (letName, letValue)) =>
+          BLOCK(LET(letName, letValue.value.value.explicitGet()), buildingExpr)
+      }
+    val (log, result) = EvaluatorV2.applyWithLogging(exprWithLets, limit, ctx, version)
+    result
       .flatMap {
         case (value: EVALUATED, _)          => ScriptResult.fromObj(ctx, transactionId, value, version)
         case (expr: EXPR, unusedComplexity) => Right(IncompleteResult(expr, unusedComplexity))
       }
-      .bimap((_, log.toList), (_, log.toList))
+      .bimap((_, log), (_, log))
   }
 }
