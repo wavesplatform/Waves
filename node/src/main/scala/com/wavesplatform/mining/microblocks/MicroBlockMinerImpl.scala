@@ -1,6 +1,5 @@
 package com.wavesplatform.mining.microblocks
 
-import cats.effect.concurrent.Ref
 import cats.implicits._
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block.BlockId
@@ -25,7 +24,7 @@ import monix.execution.schedulers.SchedulerService
 import scala.concurrent.duration._
 
 class MicroBlockMinerImpl(
-    debugState: Ref[Task, MinerDebugInfo.State],
+    setDebugState: MinerDebugInfo.State => Unit,
     allChannels: ChannelGroup,
     blockchainUpdater: BlockchainUpdater with Blockchain,
     utx: UtxPool,
@@ -53,9 +52,8 @@ class MicroBlockMinerImpl(
             .defer(generateMicroBlockSequence(account, accumulatedBlock, constraints, restTotalConstraint, lastMicroBlock))
             .delayExecution(1 second)
         case Stop =>
-          debugState
-            .set(MinerDebugInfo.MiningBlocks) >>
-            Task(log.debug("MicroBlock mining completed, block is full"))
+          setDebugState(MinerDebugInfo.MiningBlocks)
+          Task(log.debug("MicroBlock mining completed, block is full"))
       }
       .recover { case e => log.error("Error mining microblock", e) }
   }

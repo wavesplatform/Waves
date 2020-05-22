@@ -1,6 +1,5 @@
 package com.wavesplatform.mining
 
-import cats.effect.concurrent.Ref
 import cats.implicits._
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block._
@@ -25,7 +24,7 @@ import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import monix.eval.Task
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
-import monix.execution.schedulers.{CanBlock, SchedulerService}
+import monix.execution.schedulers.SchedulerService
 
 import scala.concurrent.duration._
 
@@ -69,10 +68,11 @@ class MinerImpl(
   private[this] val scheduledAttempts = SerialCancelable()
   private[this] val microBlockAttempt = SerialCancelable()
 
-  private[this] val debugStateRef: Ref[Task, MinerDebugInfo.State] = Ref.unsafe[Task, MinerDebugInfo.State](MinerDebugInfo.Disabled)
+  @volatile
+  private[this] var debugStateRef: MinerDebugInfo.State = MinerDebugInfo.Disabled
 
   private[this] val microBlockMiner: MicroBlockMiner = MicroBlockMiner(
-    debugStateRef,
+    debugStateRef = _,
     allChannels,
     blockchainUpdater,
     utx,
@@ -199,7 +199,6 @@ class MinerImpl(
     else settings.rewardsSettings.desired.getOrElse(-1L)
 
   private def nextBlockGenerationTime(blockchain: Blockchain, height: Int, block: SignedBlockHeader, account: KeyPair): Either[String, Long] = {
-    val fs = blockchain.settings.functionalitySettings
     val balance = blockchain.generatingBalance(account.toAddress, Some(block.id()))
 
     if (blockchain.isMiningAllowed(height, balance)) {
@@ -279,7 +278,8 @@ class MinerImpl(
 
       case Left(err) =>
         log.debug(s"Not scheduling block mining because $err")
-        debugStateRef.set(MinerDebugInfo.Error(err))
+        debugStateRef = MinerDebugInfo.Error(err)
+        Task.unit
     }
   }
 
@@ -290,13 +290,11 @@ class MinerImpl(
     scheduledAttempts := CompositeCancelable.fromSet(nonScriptedAccounts.map { account =>
       generateBlockTask(account, tempBlockchain)
         .onErrorHandle(err => log.warn(s"Error mining Block: $err"))
-        .runToFuture
+        .runAsyncLogErr
     }.toSet)
     microBlockAttempt := SerialCancelable()
 
-    debugStateRef
-      .set(MinerDebugInfo.MiningBlocks)
-      .runSyncUnsafe(1.second)(minerScheduler, CanBlock.permit)
+    debugStateRef = MinerDebugInfo.MiningBlocks
   }
 
   private[this] def startMicroBlockMining(
@@ -305,7 +303,6 @@ class MinerImpl(
       constraints: MiningConstraints,
       restTotalConstraint: MiningConstraint
   ): Unit = {
-    log.info(s"Start mining microblocks")
     Miner.microMiningStarted.increment()
     microBlockAttempt := microBlockMiner
       .generateMicroBlockSequence(account, lastBlock, constraints, restTotalConstraint, 0)
@@ -313,7 +310,7 @@ class MinerImpl(
     log.trace(s"MicroBlock mining scheduled for acc=${account.toAddress}")
   }
 
-  override def state: MinerDebugInfo.State = debugStateRef.get.runSyncUnsafe(1.second)(minerScheduler, CanBlock.permit)
+  override def state: MinerDebugInfo.State = debugStateRef
 
   //noinspection TypeAnnotation,ScalaStyle
   private[this] object metrics {

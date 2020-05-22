@@ -1,6 +1,5 @@
 package com.wavesplatform.mining
 
-import cats.effect.concurrent.Ref
 import com.wavesplatform.account.Alias
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils._
@@ -32,7 +31,7 @@ class MicroBlockMinerSpec extends FlatSpec with Matchers with PrivateMethodTeste
       d.appendBlock(TestBlock.create(Seq(genesis)))
       val utxPool = new UtxPoolImpl(ntpTime, d.blockchainUpdater, ignoreSpendableBalanceChanged, settings.utxSettings, enablePriorityPool = true)
       val microBlockMiner = new MicroBlockMinerImpl(
-        Ref.unsafe[Task, MinerDebugInfo.State](MinerDebugInfo.Disabled),
+        _ => (),
         null,
         d.blockchainUpdater,
         utxPool,

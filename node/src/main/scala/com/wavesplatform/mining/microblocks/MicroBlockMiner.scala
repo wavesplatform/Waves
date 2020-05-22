@@ -1,6 +1,5 @@
 package com.wavesplatform.mining.microblocks
 
-import cats.effect.concurrent.Ref
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.mining.{MinerDebugInfo, MiningConstraint, MiningConstraints}
@@ -24,7 +23,7 @@ trait MicroBlockMiner {
 
 object MicroBlockMiner {
   def apply(
-      debugState: Ref[Task, MinerDebugInfo.State],
+      setDebugState: MinerDebugInfo.State => Unit,
       allChannels: ChannelGroup,
       blockchainUpdater: BlockchainUpdater with Blockchain,
       utx: UtxPool,
@@ -33,7 +32,7 @@ object MicroBlockMiner {
       appenderScheduler: SchedulerService
   ): MicroBlockMiner =
     new MicroBlockMinerImpl(
-      debugState,
+      setDebugState,
       allChannels,
       blockchainUpdater,
       utx,

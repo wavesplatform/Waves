@@ -204,7 +204,11 @@ class BlockchainUpdaterImpl(
                         miningConstraints.total,
                         verify
                       )
-                      .map(r => Option((r, Seq.empty[Transaction], reward, hitSource)))
+                      .map { r =>
+                        val refBlockchain = CompositeBlockchain(leveldb, Some(r.diff), Some(block), r.carry, reward, Some(hitSource))
+                        miner.scheduleMining(Some(refBlockchain))
+                        Option((r, Seq.empty[Transaction], reward, hitSource))
+                      }
                 }
               case Some(ng) =>
                 if (ng.base.header.reference == block.header.reference) {
