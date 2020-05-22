@@ -28,7 +28,7 @@ class FeatureProviderTest extends FlatSpec with Matchers with ScalaCheckProperty
 
     val blockchain = mock[Blockchain]
     (blockchain.activatedFeatures _).expects().anyNumberOfTimes().returning(features)
-    (blockchain.settings _).expects().anyNumberOfTimes().returning(BlockchainSettings('W', fs, GenesisSettings.MAINNET, RewardsSettings.MAINNET, useEvaluatorV2 = false))
+    (blockchain.settings _).expects().anyNumberOfTimes().returning(BlockchainSettings('W', fs, GenesisSettings.MAINNET, RewardsSettings.MAINNET, useEvaluatorV2 = true))
 
     forAll(Gen.choose(1, v5ActivationHeight * 2)) { h =>
       if (h == genesisAt) blockchain.blockVersionAt(h) shouldBe Block.GenesisBlockVersion

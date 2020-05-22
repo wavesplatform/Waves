@@ -20,7 +20,7 @@ package object history {
     functionalitySettings = TestFunctionalitySettings.Enabled,
     genesisSettings = GenesisSettings.TESTNET,
     rewardsSettings = RewardsSettings.TESTNET,
-    useEvaluatorV2 = false
+    useEvaluatorV2 = true
   )
 
   val config   = ConfigFactory.load()
