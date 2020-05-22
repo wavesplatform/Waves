@@ -1,7 +1,7 @@
 package com.wavesplatform.lang
 
 import cats.Id
-import cats.syntax.monoid._
+import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.EitherExt2
@@ -181,7 +181,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       ctx.evaluationContext(environment),
       EvaluatorV2.applyCompleted(_, _, V3),
       txObject
-    )._2
+    ).bimap(_._1, _._1)
   }
 
   property("Simple verify") {

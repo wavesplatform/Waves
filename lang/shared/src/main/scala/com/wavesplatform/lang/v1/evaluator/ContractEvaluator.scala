@@ -69,9 +69,9 @@ object ContractEvaluator {
       decls: List[DECLARATION],
       v: VerifierFunction,
       ctx: EvaluationContext[Environment, Id],
-      evaluate: (EvaluationContext[Environment, Id], EXPR) => (Log[Id], Either[ExecutionError, EVALUATED]),
+      evaluate: (EvaluationContext[Environment, Id], EXPR) => Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])],
       entity: CaseObj
-  ): (Log[Id], Either[ExecutionError, EVALUATED]) = {
+  ): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] = {
     val verifierBlock =
       BLOCK(
         LET(v.annotation.invocationArgName, entity),
@@ -88,9 +88,9 @@ object ContractEvaluator {
       version: StdLibVersion
   ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] =
     for {
-      expr <- buildExprFromInvocation(dApp, i, version).leftMap((_, Nil))
-      (log, evaluation) = EvaluatorV1().applyWithLogging[EVALUATED](ctx, expr)
-      result <- evaluation.flatMap(r => ScriptResult.fromObj(ctx, i.transactionId, r, version)).leftMap((_, log))
+      expr              <- buildExprFromInvocation(dApp, i, version).leftMap((_, Nil))
+      (evaluation, log) <- EvaluatorV1().applyWithLogging[EVALUATED](ctx, expr)
+      result            <- ScriptResult.fromObj(ctx, i.transactionId, evaluation, version).leftMap((_, log))
     } yield (result, log)
 
   def applyV2(
@@ -118,12 +118,15 @@ object ContractEvaluator {
         case (buildingExpr, (letName, letValue)) =>
           BLOCK(LET(letName, letValue.value.value.explicitGet()), buildingExpr)
       }
-    val (log, result) = EvaluatorV2.applyWithLogging(exprWithLets, limit, ctx, version)
-    result
+    EvaluatorV2.applyWithLogging(exprWithLets, limit, ctx, version)
       .flatMap {
-        case (value: EVALUATED, _)          => ScriptResult.fromObj(ctx, transactionId, value, version)
-        case (expr: EXPR, unusedComplexity) => Right(IncompleteResult(expr, unusedComplexity))
+        case (expr, unusedComplexity, log) =>
+          val result =
+            expr match {
+              case value: EVALUATED => ScriptResult.fromObj(ctx, transactionId, value, version)
+              case expr: EXPR       => Right(IncompleteResult(expr, unusedComplexity))
+            }
+        result.bimap((_, log), (_, log))
       }
-      .bimap((_, log), (_, log))
-  }
+   }
 }

@@ -38,8 +38,8 @@ object ScriptRunner {
     script match {
       case s: ExprScript =>
         val eval = for {
-          ds <- DirectiveSet(script.stdLibVersion, if (isAssetScript) Asset else Account, Expression).leftMap((Nil, _))
-          mi <- buildThisValue(in, blockchain, ds, Some(scriptContainerAddress)).leftMap((Nil, _))
+          ds <- DirectiveSet(script.stdLibVersion, if (isAssetScript) Asset else Account, Expression).leftMap((_, Nil))
+          mi <- buildThisValue(in, blockchain, ds, Some(scriptContainerAddress)).leftMap((_, Nil))
           ctx <- BlockchainContext.build(
             script.stdLibVersion,
             AddressScheme.current.chainId,
@@ -50,22 +50,19 @@ object ScriptRunner {
             isContract = false,
             Coeval(scriptContainerAddress),
             in.eliminate(_.id(), _ => ByteStr.empty)
-          ).leftMap((Nil, _))
-          result <- {
-            val (log, result) = evaluate(ctx, s.expr)
-            result.bimap((log, _), (log, _))
-          }
+          ).leftMap((_, Nil))
+          result <- evaluate(ctx, s.expr)
         } yield result
 
         eval.fold(
-          { case (log, error)  => (log, error.asLeft[EVALUATED]) },
-          { case (log, result) => (log, result.asRight[ExecutionError]) }
+          { case (error, log)  => (log, error.asLeft[EVALUATED]) },
+          { case (result, log) => (log, result.asRight[ExecutionError]) }
         )
 
       case ContractScript.ContractScriptImpl(_, DApp(_, decls, _, Some(vf))) =>
-        val r = for {
-          ds <- DirectiveSet(script.stdLibVersion, if (isAssetScript) Asset else Account, Expression)
-          mi <- buildThisValue(in, blockchain, ds, None)
+        val eval = for {
+          ds <- DirectiveSet(script.stdLibVersion, Account, Expression).leftMap((_, Nil))
+          mi <- buildThisValue(in, blockchain, ds, None).leftMap((_, Nil))
           txId = in.eliminate(_.id(), _ => ByteStr.empty)
           ctx <- BlockchainContext.build(
             script.stdLibVersion,
@@ -77,19 +74,23 @@ object ScriptRunner {
             isContract = true,
             Coeval(scriptContainerAddress),
             txId
-          )
+          ).leftMap((_, Nil))
           verify = ContractEvaluator.verify(decls, vf, ctx, evaluate, _)
-          result <- in.eliminate(
+          loggedResult <- in.eliminate(
             t => RealTransactionWrapper(t, blockchain, ds.stdLibVersion, DAppTarget)
-              .map(tx => verify(Bindings.transactionObject(tx, proofsEnabled = true))),
+              .leftMap((_, Nil))
+              .flatMap(tx => verify(Bindings.transactionObject(tx, proofsEnabled = true))),
             _.eliminate(
-              t => verify(Bindings.orderObject(RealTransactionWrapper.ord(t), proofsEnabled = true)).asRight[ExecutionError],
+              t => verify(Bindings.orderObject(RealTransactionWrapper.ord(t), proofsEnabled = true)),
               _ => ???
             )
           )
-        } yield result
+        } yield loggedResult
 
-        r.fold(error => (Nil, Left(error)), identity)
+        eval.fold(
+          { case (error, log)  => (log, error.asLeft[EVALUATED]) },
+          { case (result, log) => (log, result.asRight[ExecutionError]) }
+        )
 
       case ContractScript.ContractScriptImpl(_, DApp(_, _, _, None)) =>
         val t: Proven with Authorized =

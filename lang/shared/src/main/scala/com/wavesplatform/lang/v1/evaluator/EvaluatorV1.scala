@@ -136,15 +136,15 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, ?]]) {
   private def evalExpr(t: EXPR): EvalM[F, C, EVALUATED] =
     evalExprWithCtx(t).map(_._2)
 
-  def applyWithLogging[A <: EVALUATED](c: EvaluationContext[C, F], expr: EXPR): (Log[F], F[Either[ExecutionError, A]]) = {
+  def applyWithLogging[A <: EVALUATED](c: EvaluationContext[C, F], expr: EXPR): F[Either[(ExecutionError, Log[F]), (A, Log[F])]] = {
     val log = ListBuffer[LogItem[F]]()
     val lec = LoggedEvaluationContext[C, F]((str: String) => (v: LetExecResult[F]) => log.append((str, v)), c)
     val r = evalExpr(expr).map(_.asInstanceOf[A]).run(lec).value._2
-    (log.toList, r)
+    r.map(_.bimap((_, log.toList), (_, log.toList)))
   }
 
   def apply[A <: EVALUATED](c: EvaluationContext[C, F], expr: EXPR): F[Either[ExecutionError, A]] =
-    applyWithLogging[A](c, expr)._2
+    applyWithLogging[A](c, expr).map(_.bimap(_._1, _._1))
 
   def applyWithCtx(c: EvaluationContext[C, F], expr: EXPR): F[Either[ExecutionError, (EvaluationContext[C, F], EVALUATED)]] =
     evalExprWithCtx(expr)

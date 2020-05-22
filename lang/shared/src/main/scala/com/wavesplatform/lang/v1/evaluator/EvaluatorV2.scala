@@ -246,27 +246,30 @@ object EvaluatorV2 {
       limit: Int,
       ctx: EvaluationContext[Environment, Id],
       stdLibVersion: StdLibVersion
-  ): (Log[Id], Either[ExecutionError, (EXPR, Int)]) = {
+  ): Either[(ExecutionError, Log[Id]), (EXPR, Int, Log[Id])] = {
     val log       = ListBuffer[LogItem[Id]]()
     val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => log.append((name, value)), ctx)
     val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion)
-    (log.toList, Try(evaluator(expr, limit)).toEither.leftMap(_.getMessage))
+    Try(evaluator(expr, limit))
+      .toEither
+      .bimap(
+        err => (err.getMessage, log.toList),
+        { case (expr, unused) => (expr, unused, log.toList) }
+      )
   }
 
   def applyCompleted(
       ctx: EvaluationContext[Environment, Id],
       expr: EXPR,
       stdLibVersion: StdLibVersion
-  ): (Log[Id], Either[ExecutionError, EVALUATED]) = {
-    val (log, result) = EvaluatorV2.applyWithLogging(expr, Int.MaxValue, ctx, stdLibVersion)
-    val completedResult =
-      result.flatMap {
-        case (expr, _) =>
+  ): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] =
+    EvaluatorV2
+      .applyWithLogging(expr, Int.MaxValue, ctx, stdLibVersion)
+      .flatMap {
+        case (expr, _, log) =>
           expr match {
-            case evaluated: EVALUATED => Right(evaluated)
-            case expr: EXPR           => Left(s"Unexpected incomplete evaluation result $expr")
+            case evaluated: EVALUATED => Right((evaluated, log))
+            case expr: EXPR           => Left((s"Unexpected incomplete evaluation result $expr", log))
           }
       }
-    (log, completedResult)
-  }
 }
