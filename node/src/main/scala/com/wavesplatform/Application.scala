@@ -37,8 +37,7 @@ import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.state.{Blockchain, Diff, Height}
-import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.Schedulers._
@@ -55,6 +54,7 @@ import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.influxdb.dto.Point
+import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -66,6 +66,7 @@ import scala.util.control.NonFatal
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject, time: NTP) extends ScorexLogging {
   app =>
 
+  import Application._
   import monix.execution.Scheduler.Implicits.{global => scheduler}
 
   private val db = openDB(settings.dbSettings.directory)
@@ -192,17 +193,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val history = History(blockchainUpdater, blockchainUpdater.liquidBlock, blockchainUpdater.microBlock, db)
 
-    def loadBlockAt(height: Int): Option[(BlockMeta, Seq[Transaction])] =
-      loadBlockMetaAt(height).map { meta =>
-        meta -> blockchainUpdater
-          .liquidBlock(meta.id)
-          .orElse(db.readOnly(ro => database.loadBlock(Height(height), ro)))
-          .fold(Seq.empty[Transaction])(_.transactionData)
-      }
-
-    def loadBlockMetaAt(height: Int): Option[BlockMeta] =
-      blockchainUpdater.liquidBlockMeta.filter(_ => blockchainUpdater.height == height).orElse(db.get(Keys.blockMetaAt(Height(height))))
-
     val historyReplier = new HistoryReplier(blockchainUpdater.score, history, settings.synchronizationSettings)(historyRepliesScheduler)
 
     def rollbackTask(blockId: ByteStr, returnTxsToUtx: Boolean) =
@@ -239,9 +229,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         utxStorage,
         wallet,
         utxSynchronizer.publish,
-        loadBlockAt
+        loadBlockAt(db, blockchainUpdater)
       )
-      override val blocksApi: CommonBlocksApi     = CommonBlocksApi(blockchainUpdater, loadBlockMetaAt, loadBlockAt)
+      override val blocksApi: CommonBlocksApi     = CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockAt(db, blockchainUpdater))
       override val accountsApi: CommonAccountsApi = CommonAccountsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
       override val assetsApi: CommonAssetsApi     = CommonAssetsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
     }
@@ -513,6 +503,17 @@ object Application {
 
     settings
   }
+
+  private[wavesplatform] def loadBlockAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[(BlockMeta, Seq[Transaction])] =
+    loadBlockMetaAt(db, blockchainUpdater)(height).map { meta =>
+      meta -> blockchainUpdater
+        .liquidBlock(meta.id)
+        .orElse(db.readOnly(ro => database.loadBlock(Height(height), ro)))
+        .fold(Seq.empty[Transaction])(_.transactionData)
+    }
+
+  private[wavesplatform] def loadBlockMetaAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] =
+    blockchainUpdater.liquidBlockMeta.filter(_ => blockchainUpdater.height == height).orElse(db.get(Keys.blockMetaAt(Height(height))))
 
   def main(args: Array[String]): Unit = {
 
