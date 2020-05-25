@@ -2190,6 +2190,9 @@
             "in": "body",
             "name": "code",
             "description": "Script code with imports",
+            "schema": {
+              "type": "string"
+            },
             "required": true
           }
         ],
