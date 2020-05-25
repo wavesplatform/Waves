@@ -130,8 +130,8 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     val repl = Repl()
     repl.info("getInteger").split("\n") shouldBe Array(
       "func getInteger(addressOrAlias: Address|Alias, key: String): Int|Unit",
-      "func getInteger(data: List[DataEntry], key: String): Int|Unit",
-      "func getInteger(data: List[DataEntry], index: Int): Int|Unit"
+      "func getInteger(data: List[BinaryEntry|BooleanEntry|IntegerEntry|StringEntry], key: String): Int|Unit",
+      "func getInteger(data: List[BinaryEntry|BooleanEntry|IntegerEntry|StringEntry], index: Int): Int|Unit"
     )
     await(repl.execute("func my(a: Int) = toString(a)"))
     repl.info("my") shouldBe "func my(a: Int): String"
@@ -205,8 +205,8 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     val repl = Repl(Some(settings))
 
     await(repl.execute(""" this.getInteger("int") """))  shouldBe Right("res1: Int|Unit = 100500")
-    await(repl.execute(""" this.getString("str") """))   shouldBe Right("res2: String|Unit = text")
-    await(repl.execute(""" this.getBinary("bin") """))   shouldBe Right("res3: ByteVector|Unit = r1Mw3j9J")
+    await(repl.execute(""" this.getString("str") """))   shouldBe Right("res2: String|Unit = \"text\"")
+    await(repl.execute(""" this.getBinary("bin") """))   shouldBe Right("res3: ByteVector|Unit = base58'r1Mw3j9J'")
     await(repl.execute(""" this.getBoolean("bool") """)) shouldBe Right("res4: Boolean|Unit = true")
 
     await(repl.execute(""" height """)).explicitGet() should fullyMatch regex "res5: Int = \\d+".r
@@ -266,6 +266,7 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
           |		bytes = base58'3Mp6Lhe3sN97xtuFSunG7TCgVVh7QGoxzmu'
           |	)
           |	timestamp = 1567666635819
+          |	vrf = Unit
           |	height = 662371
           |	generationSignature = base58'BVGVtzt3wt646ECcaDV5ne8QcgsKs2vVQmJe8YSMkSHs'
           |	generatorPublicKey = base58'3NB1Yz7fH1bJ2gVDjyJnuyKNTdMFARkKEpV'
@@ -288,6 +289,6 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
        """
     )).explicitGet() should fullyMatch regex "res11: Int = \\d+".r
 
-    await(repl.execute(""" this.wavesBalance() """)).explicitGet() should fullyMatch regex "res12: Int = \\d+".r
+    await(repl.execute(""" this.wavesBalance().regular """)).explicitGet() should fullyMatch regex "res12: Int = \\d+".r
   }
 }

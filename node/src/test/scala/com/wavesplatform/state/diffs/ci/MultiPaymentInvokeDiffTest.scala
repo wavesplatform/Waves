@@ -139,7 +139,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
         ) {
           val expectedFee = (0.005 + 0.004 + 0.004 * (ContractLimits.MaxAttachedPaymentAmount - 1)) * Constants.UnitsInWave
           _ should produce(
-            s"Fee in WAVES for InvokeScriptTransaction (1 in WAVES) " +
+            s"Fee in WAVES for InvokeScriptTransaction (${ci.fee} in WAVES) " +
               s"with ${ContractLimits.MaxAttachedPaymentAmount} total scripts invoked " +
               s"does not exceed minimal value of ${expectedFee.toLong} WAVES"
           )
@@ -210,7 +210,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
       master        <- accountGen
       invoker       <- accountGen
       ts            <- timestampGen
-      fee           <- if (withEnoughFee) ciFee(ContractLimits.MaxAttachedPaymentAmount + 1) else Gen.const(1L)
+      fee           <- if (withEnoughFee) ciFee(ContractLimits.MaxAttachedPaymentAmount + 1) else ciFee(1)
       accountScript <- verifier
       commonIssues <- if (multiPayment)
         Gen.listOfN(
@@ -265,7 +265,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
           features
         ) {
           case Right(diff: Diff) =>
-            val errMsg = diff.scriptResults(diff.transactions.keys.head).errorMessage.get.text
+            val errMsg = diff.scriptResults(diff.transactions.keys.head).error.get.text
             ((message(oldVersion.id, maybeFailedAssetId)).r.findFirstIn(errMsg)) should not be empty
 
           case l @ Left(_) =>

@@ -128,9 +128,10 @@ object Types {
         FieldNames.IssueQuantity -> LONG,
         FieldNames.IssueDecimals -> LONG,
         FieldNames.IssueIsReissuable -> BOOLEAN,
-        FieldNames.IssueScript -> UNION(issueScriptType, UNIT),
+        FieldNames.IssueScriptField -> UNION(issueScriptType, UNIT),
         FieldNames.IssueNonce -> LONG,
-      )
+      ),
+      hideConstructor = true
     )
 
   val reissueActionType =

@@ -131,7 +131,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
       waitForTx = true
     )._1.id
 
-    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("Not enough balance")
+    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include("Not enough balance")
   }
 
   test("caller can withdraw less than he owns") {

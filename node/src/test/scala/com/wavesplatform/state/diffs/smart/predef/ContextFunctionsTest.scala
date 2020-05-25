@@ -275,7 +275,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
         |let dd = toBase64String( dc ); let de = toBytes( dd )
         |sha256( de ) != base58'123'
       """.stripMargin
-    runScript(script) shouldBe Left(s"base64Encode input exceeds ${Global.MaxBase64Bytes}")
+    runScript(script) shouldBe Left(s"ByteStr size=36408 exceeds 32767 bytes")
   }
 
   property("get assetInfo by asset id") {

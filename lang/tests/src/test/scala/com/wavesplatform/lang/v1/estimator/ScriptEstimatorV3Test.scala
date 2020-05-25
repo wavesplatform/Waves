@@ -109,6 +109,33 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3) {
     estimate(functionCosts(V3), compile(script)) shouldBe Right(1)
   }
 
+  property("different if branches") {
+    val script =
+      """
+        |let a = 1
+        |let b = "b"
+        |if (a == 1) then {
+        |    true
+        |} else {
+        |    if (a > 1) then {
+        |        b == "a"
+        |    } else {
+        |        false
+        |    }
+        |}
+      """.stripMargin
+
+    estimate(functionCosts(V3), compile(script)) shouldBe Right(
+        1 /* let a                      */ +
+        1 /* let b                      */ +
+        1 /* if-then-else               */ +
+        3 /* a == 1         condition   */ +
+        1 /* if-then-else               */ +
+        3 /* a > 1          condition   */ +
+        3 /* b == "a"       condition   */
+    )
+  }
+
   property("getter") {
     val script = "lastBlock.height"
     estimate(functionCosts(V3), compile(script)) shouldBe Right(2) /* ref eval and field access */

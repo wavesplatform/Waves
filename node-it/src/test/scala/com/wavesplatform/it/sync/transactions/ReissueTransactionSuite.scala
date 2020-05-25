@@ -9,6 +9,7 @@ import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
+import com.wavesplatform.transaction.assets.ReissueTransaction
 
 class ReissueTransactionSuite extends BaseTransactionSuite {
 
@@ -30,6 +31,9 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
       miner.assertBalances(firstAddress, balance - issueFee - reissueReducedFee, effectiveBalance - issueFee - reissueReducedFee)
       miner.assertAssetBalance(firstAddress, issuedAssetId, 2 * someAssetAmount)
     }
+
+    miner.transactionsByAddress(firstAddress, limit = 100)
+      .count(_._type == ReissueTransaction.typeId) shouldBe reissueTxSupportedVersions.length
   }
 
   test("can't reissue not reissuable asset") {

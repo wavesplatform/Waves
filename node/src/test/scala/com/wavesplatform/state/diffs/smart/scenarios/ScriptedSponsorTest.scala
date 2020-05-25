@@ -104,7 +104,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
       gen2 = GenesisTransaction
         .create(recipient.toAddress, ENOUGH_AMT, timestamp)
         .explicitGet()
-      (script, _) = ScriptCompiler(s"false", isAssetScript = false, estimator).explicitGet()
+      (script, _) = ScriptCompiler(s"{-# STDLIB_VERSION 2 #-}\n false", isAssetScript = false, estimator).explicitGet()
       issueTx = IssueTransaction(
         TxVersion.V1,
         contract.publicKey,
@@ -163,7 +163,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
       gen2 = GenesisTransaction
         .create(sponsor.toAddress, ENOUGH_AMT, timestamp)
         .explicitGet()
-      (script, _) = ScriptCompiler(s"true", isAssetScript = false, estimator).explicitGet()
+      (script, _) = ScriptCompiler(s"{-# STDLIB_VERSION 2 #-}\n true", isAssetScript = false, estimator).explicitGet()
       issueTx = IssueTransaction(
         TxVersion.V1,
         sponsor.publicKey,

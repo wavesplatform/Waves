@@ -6,6 +6,7 @@ import com.wavesplatform.it.api.BurnTransactionInfo
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{issueAmount, issueFee, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.transaction.assets.BurnTransaction
 
 class BurnTransactionSuite extends BaseTransactionSuite {
 
@@ -52,6 +53,9 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       val assetOptRest = miner.assetsBalance(firstAddress).balances.find(_.assetId == issuedAssetId)
       assert(assetOptRest.isEmpty)
     }
+
+    miner.transactionsByAddress(firstAddress, limit = 100)
+      .count(_._type == BurnTransaction.typeId) shouldBe burnTxSupportedVersions.length * 2
   }
 
   test("can burn non-owned asset; issuer asset balance decreased by transfer amount; burner balance decreased by burned amount") {

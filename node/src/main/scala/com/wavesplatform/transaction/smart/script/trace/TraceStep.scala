@@ -5,7 +5,7 @@ import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
-import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult, ScriptResultV3, ScriptResultV4}
+import com.wavesplatform.lang.v1.evaluator.{IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.transaction.TxValidationError.{ScriptExecutionError, TransactionNotAllowedByScript}
 import play.api.libs.json.Json.JsValueWrapper
@@ -13,7 +13,7 @@ import play.api.libs.json._
 
 sealed abstract class TraceStep {
   def json: JsObject
-  def loggedJson = json
+  def loggedJson: JsObject = json
 }
 
 case class AccountVerifierTrace(
@@ -82,14 +82,16 @@ case class InvokeScriptTrace(
       case ScriptResultV4(actions) =>
         Json.obj(
           "actions" -> actions.map {
-            case transfer: AssetTransfer => transferJson(transfer) + ("type"     -> JsString("transfer"))
-            case issue: Issue            => issueJson(issue) + ("type"           -> JsString("issue"))
-            case reissue: Reissue        => reissueJson(reissue) + ("type"       -> JsString("reissue"))
-            case burn: Burn              => burnJson(burn) + ("type"             -> JsString("burn"))
+            case transfer: AssetTransfer => transferJson(transfer) + ("type" -> JsString("transfer"))
+            case issue: Issue            => issueJson(issue) + ("type"       -> JsString("issue"))
+            case reissue: Reissue        => reissueJson(reissue) + ("type"   -> JsString("reissue"))
+            case burn: Burn              => burnJson(burn) + ("type"         -> JsString("burn"))
             case sponsorFee: SponsorFee  => sponsorFeeJson(sponsorFee) + ("type" -> JsString("sponsorFee"))
-            case item: DataItem[_]       => dataItemJson(item) + ("type"         -> JsString("dataItem"))
+            case item: DataItem[_]       => dataItemJson(item) + ("type"     -> JsString("dataItem"))
           }
         )
+      case i: IncompleteResult =>
+        throw new RuntimeException(s"Unexpected $i")
     }
 
   private def transferJson(transfer: AssetTransfer) =
@@ -143,9 +145,9 @@ case class InvokeScriptTrace(
 
 object TraceStep {
   def errorJson(e: ValidationError): JsValue = e match {
-    case ScriptExecutionError(error, log, isAssetScript)   => Json.obj(logType(isAssetScript), logJson(log), "reason" -> error)
-    case TransactionNotAllowedByScript(log, isAssetScript) => Json.obj(logType(isAssetScript), logJson(log))
-    case a                                                 => JsString(a.toString)
+    case see: ScriptExecutionError          => Json.obj(logType(see.isAssetScript), logJson(see.log), "reason" -> see.error)
+    case tne: TransactionNotAllowedByScript => Json.obj(logType(tne.isAssetScript), logJson(tne.log))
+    case a                                  => JsString(a.toString)
   }
 
   private def logType(isAssetScript: Boolean): (String, JsValueWrapper) =

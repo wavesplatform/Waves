@@ -31,19 +31,21 @@ object ScriptCompiler extends ScorexLogging {
   def compileAndEstimateCallables(
       scriptText: String,
       estimator: ScriptEstimator,
-      libraries: Map[String, String] = Map()
+      libraries: Map[String, String] = Map(),
+      defaultStdLib: => StdLibVersion = StdLibVersion.VersionDic.default
   ): Either[String, (Script, Script.ComplexityInfo)] =
-    compileAndEstimate(scriptText, estimator, libraries, Script.complexityInfo)
+    compileAndEstimate(scriptText, estimator, libraries, Script.complexityInfo, defaultStdLib)
 
   def compileAndEstimate[C](
       scriptText: String,
       estimator: ScriptEstimator,
       libraries: Map[String, String] = Map(),
-      estimate: (Script, ScriptEstimator, Boolean) => Either[String, C]
+      estimate: (Script, ScriptEstimator, Boolean) => Either[String, C],
+      defaultStdLib: => StdLibVersion = StdLibVersion.VersionDic.default
   ): Either[String, (Script, C)] =
     for {
       directives  <- DirectiveParser(scriptText)
-      ds          <- Directive.extractDirectives(directives)
+      ds          <- Directive.extractDirectives(directives, defaultStdLib)
       linkedInput <- ScriptPreprocessor(scriptText, libraries, ds.imports)
       result      <- applyAndEstimate(linkedInput, ds.scriptType == Asset, estimator, estimate)
     } yield result

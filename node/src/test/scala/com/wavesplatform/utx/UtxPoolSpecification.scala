@@ -100,7 +100,8 @@ class UtxPoolSpecification
           )
         ),
         genesisSettings,
-        RewardsSettings.TESTNET
+        RewardsSettings.TESTNET,
+        useEvaluatorV2 = false
       ),
       featuresSettings = origSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
     )

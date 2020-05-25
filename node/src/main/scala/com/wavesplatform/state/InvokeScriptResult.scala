@@ -22,7 +22,7 @@ final case class InvokeScriptResult(
     reissues: Seq[Reissue] = Nil,
     burns: Seq[Burn] = Nil,
     sponsorFees: Seq[SponsorFee] = Nil,
-    errorMessage: Option[ErrorMessage] = None
+    error: Option[ErrorMessage] = None
 )
 
 //noinspection TypeAnnotation
@@ -89,7 +89,7 @@ object InvokeScriptResult {
       isr.issues.map(toPbIssue),
       isr.reissues.map(toPbReissue),
       isr.burns.map(toPbBurn),
-      isr.errorMessage.map(toPbErrorMessage),
+      isr.error.map(toPbErrorMessage),
       isr.sponsorFees.map(toPbSponsorFee)
     )
   }
