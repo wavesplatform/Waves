@@ -24,6 +24,7 @@ import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
 import scala.annotation.tailrec
 import scala.concurrent.Future
+import scala.util.Random
 
 /**
   * This is a hack class for IDEA. The Global class is in JS/JVM modules.
@@ -243,7 +244,7 @@ trait BaseGlobal {
     }
 
     val pivot =
-      (arr: ArrayView) => arr(arr.size / 2)
+      (arr: ArrayView) => arr(Random.nextInt(arr.size))
 
     if (seq.length % 2 == 1)
       findKMedianInPlace(ArrayView(seq.toArray), (seq.size - 1) / 2)(pivot)
