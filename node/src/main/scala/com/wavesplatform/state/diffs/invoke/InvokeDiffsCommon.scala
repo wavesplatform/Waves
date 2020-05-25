@@ -123,7 +123,7 @@ object InvokeDiffsCommon {
 
       assetsComplexity = (tx.checkedAssets.map(_.id) ++ transferList.flatMap(_.assetId))
         .flatMap(id => blockchain.assetScript(IssuedAsset(id)))
-        .map(_._2)
+        .map(_.complexity)
 
       scriptsInvoked <- TracedResult {
         val stepLimit = ContractLimits.MaxComplexityByVersion(version)
@@ -164,7 +164,7 @@ object InvokeDiffsCommon {
       transfers = compositeDiff.portfolios |+| feeInfo._2.mapValues(_.negate)
 
       currentTxDiff         = compositeDiff.transactions(tx.id())
-      currentTxDiffWithKeys = currentTxDiff.copy(_2 = currentTxDiff._2 ++ transfers.keys ++ compositeDiff.accountData.keys)
+      currentTxDiffWithKeys = currentTxDiff.copy(affected = currentTxDiff.affected ++ transfers.keys ++ compositeDiff.accountData.keys)
       updatedTxDiff         = compositeDiff.transactions.updated(tx.id(), currentTxDiffWithKeys)
 
       resultSponsorFeeList = {
@@ -316,7 +316,7 @@ object InvokeDiffsCommon {
                 )
                 blockchain.assetScript(a) match {
                   case None => nextDiff.asRight[ValidationError]
-                  case Some((script, _)) =>
+                  case Some(AssetScriptInfo(script, _)) =>
                     val assetVerifierDiff =
                       if (blockchain.disallowSelfPayment) nextDiff
                       else
@@ -373,8 +373,8 @@ object InvokeDiffsCommon {
                     Diff(
                       tx = itx,
                       portfolios = Map(pk.toAddress -> Portfolio(balance = 0, lease = LeaseBalance.empty, assets = Map(asset -> issue.quantity))),
-                      issuedAssets = Map(asset      -> ((staticInfo, info, volumeInfo))),
-                      assetScripts = Map(asset      -> script.map(script => (script._1, script._2)))
+                      issuedAssets = Map(asset      -> NewAssetInfo(staticInfo, info, volumeInfo)),
+                      assetScripts = Map(asset      -> script.map(script => AssetScriptInfo(script._1, script._2)))
                     )
                 )
             }
@@ -414,7 +414,7 @@ object InvokeDiffsCommon {
           ): TracedResult[ValidationError, Diff] =
             blockchain.assetScript(IssuedAsset(assetId)) match {
               case None => actionDiff
-              case Some((script, _)) =>
+              case Some(AssetScriptInfo(script, _)) =>
                 val assetValidationDiff =
                   for {
                     result          <- actionDiff
