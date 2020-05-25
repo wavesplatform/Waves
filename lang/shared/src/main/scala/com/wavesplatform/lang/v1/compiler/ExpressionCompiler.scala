@@ -256,6 +256,14 @@ object ExpressionCompiler {
       saveExprContext: Boolean
   ): CompileM[CompilationStepResultExpr] =
     for {
+      _ <- {
+        val defaultCasesCount = cases.count(_.types.isEmpty)
+        Either.cond(
+          defaultCasesCount < 2,
+          (),
+          MultipleDefaultCases(p.start, p.end, defaultCasesCount)
+        ).toCompileM
+      }
       ctx       <- get[Id, CompilerContext, CompilationError]
       typedExpr <- compileExprWithCtx(expr, saveExprContext)
       exprTypesWithErr <- (typedExpr.t match {

@@ -314,6 +314,22 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
     ScriptCompiler.compile(script, estimator) shouldBe 'right
   }
 
+  property("forbid multiple default cases") {
+    val script =
+      """
+        | {-# STDLIB_VERSION 3 #-}
+        | {-# SCRIPT_TYPE ACCOUNT #-}
+        | {-# CONTENT_TYPE EXPRESSION #-}
+        |
+        | match tx {
+        |   case a => false
+        |   case b => false
+        | }
+      """.stripMargin
+
+    ScriptCompiler.compile(script, estimator) should produce("Match should have at most one default case, but 2 found")
+  }
+
   private val expectedExpr = LET_BLOCK(
     LET("x", CONST_LONG(10)),
     FUNCTION_CALL(
