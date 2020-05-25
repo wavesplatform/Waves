@@ -49,6 +49,11 @@ object CompilationError {
     val message = s"Match should have at most one default case, but $defaultCasesCount found"
   }
 
+  final case class TypeNamedCases(start: Int, end: Int, names: List[String]) extends CompilationError {
+    val message = s"Match case variables should not be named as RIDE types, " +
+      s"but ${names.map(n => s"`$n`").mkString(", ")} found"
+  }
+
   final case class AlreadyDefined(start: Int, end: Int, name: String, isFunction: Boolean) extends CompilationError {
     val message =
       if (isFunction) s"Value '$name' can't be defined because function with this name is already defined"

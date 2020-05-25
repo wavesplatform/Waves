@@ -256,7 +256,21 @@ object ExpressionCompiler {
       saveExprContext: Boolean
   ): CompileM[CompilationStepResultExpr] =
     for {
-      _ <- {
+      ctx <- get[Id, CompilerContext, CompilationError]
+      _   <- {
+        val types = ctx.predefTypes.keySet
+        val typeNamedCases =
+          cases.collect {
+            case MATCH_CASE(_, Some(PART.VALID(_, name)), _, _, _, _) if types.contains(name) => name
+          }
+
+        Either.cond(
+          typeNamedCases.isEmpty,
+          (),
+          TypeNamedCases(p.start, p.end, typeNamedCases)
+        ).toCompileM
+      }
+      _   <- {
         val defaultCasesCount = cases.count(_.types.isEmpty)
         Either.cond(
           defaultCasesCount < 2,
@@ -264,7 +278,6 @@ object ExpressionCompiler {
           MultipleDefaultCases(p.start, p.end, defaultCasesCount)
         ).toCompileM
       }
-      ctx       <- get[Id, CompilerContext, CompilationError]
       typedExpr <- compileExprWithCtx(expr, saveExprContext)
       exprTypesWithErr <- (typedExpr.t match {
         case u: UNION => u.pure[CompileM]
