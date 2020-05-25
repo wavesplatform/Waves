@@ -31,15 +31,19 @@ object FunctionIds {
   val SIZE_LIST: Short         = 400
   val GET_LIST: Short          = 401
   val MEDIAN_LIST: Short       = 405
+  val MAX_LIST: Short          = 406
+  val MIN_LIST: Short          = 407
   val LONG_TO_BYTES: Short     = 410
   val STRING_TO_BYTES: Short   = 411
   val BOOLEAN_TO_BYTES: Short  = 412
   val LONG_TO_STRING: Short    = 420
   val BOOLEAN_TO_STRING: Short = 421
 
-  val CREATE_LIST: Short = 1100
-  val APPEND_LIST: Short = 1101
-  val CONCAT_LIST: Short = 1102
+  val CREATE_LIST: Short        = 1100
+  val APPEND_LIST: Short        = 1101
+  val CONCAT_LIST: Short        = 1102
+  val INDEX_OF_LIST: Short      = 1103
+  val LAST_INDEX_OF_LIST: Short = 1104
 
   val UTF8STRING: Short   = 1200
   val BININT: Short       = 1201
@@ -50,6 +54,7 @@ object FunctionIds {
   val PARSEINT: Short     = 1206
   val LASTINDEXOF: Short  = 1207
   val LASTINDEXOFN: Short = 1208
+  val MAKESTRING: Short   = 1209
 
   // Crypto
   val SIGVERIFY: Short = 500
@@ -70,12 +75,14 @@ object FunctionIds {
 
   val BLS12_GROTH16_VERIFY: Short = 800
 
+  val ECRECOVER: Short = 900
+
   val BLS12_GROTH16_VERIFY_LIM: Short = 2400 // Reserved n id for generated limited functions
-  val SIGVERIFY_LIM: Short = 2500 // Reserved n id for generated limited functions
-  val RSAVERIFY_LIM: Short = 2600 // Reserved n id for generated limited functions
-  val KECCAK256_LIM: Short = 2700 // Reserved n id for generated limited functions
-  val BLAKE256_LIM : Short = 2800 // Reserved n id for generated limited functions
-  val SHA256_LIM   : Short = 2900 // Reserved n id for generated limited functions
+  val SIGVERIFY_LIM: Short            = 2500 // Reserved n id for generated limited functions
+  val RSAVERIFY_LIM: Short            = 2600 // Reserved n id for generated limited functions
+  val KECCAK256_LIM: Short            = 2700 // Reserved n id for generated limited functions
+  val BLAKE256_LIM: Short             = 2800 // Reserved n id for generated limited functions
+  val SHA256_LIM: Short               = 2900 // Reserved n id for generated limited functions
 
   // Waves
   val GETTRANSACTIONBYID: Short      = 1000
@@ -103,4 +110,7 @@ object FunctionIds {
   val TRANSFER_TRANSACTION_FROM_PROTO: Short = 1070
 
   val CALCULATE_ASSET_ID: Short = 1080
+
+  val SIMPLIFIED_ISSUE_ACTION_CONSTRUCTOR: Short = 1090
+  val DETAILED_ISSUE_ACTION_CONSTRUCTOR: Short   = 1091
 }

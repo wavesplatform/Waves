@@ -318,16 +318,17 @@ object AssetsApiRoute {
       desc                = description.description.toStringUtf8
     } yield JsObject(
       Seq(
-        "assetId"        -> JsString(id.id.toString),
-        "issueHeight"    -> JsNumber(height),
-        "issueTimestamp" -> JsNumber(timestamp),
-        "issuer"         -> JsString(description.issuer.toAddress.toString),
-        "name"           -> JsString(name),
-        "description"    -> JsString(desc),
-        "decimals"       -> JsNumber(description.decimals),
-        "reissuable"     -> JsBoolean(description.reissuable),
-        "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
-        "scripted"       -> JsBoolean(description.script.nonEmpty),
+        "assetId"         -> JsString(id.id.toString),
+        "issueHeight"     -> JsNumber(height),
+        "issueTimestamp"  -> JsNumber(timestamp),
+        "issuer"          -> JsString(description.issuer.toAddress.toString),
+        "issuerPublicKey" -> JsString(description.issuer.toString),
+        "name"            -> JsString(name),
+        "description"     -> JsString(desc),
+        "decimals"        -> JsNumber(description.decimals),
+        "reissuable"      -> JsBoolean(description.reissuable),
+        "quantity"        -> JsNumber(BigDecimal(description.totalVolume)),
+        "scripted"        -> JsBoolean(description.script.nonEmpty),
         "minSponsoredAssetFee" -> (description.sponsorship match {
           case 0           => JsNull
           case sponsorship => JsNumber(sponsorship)

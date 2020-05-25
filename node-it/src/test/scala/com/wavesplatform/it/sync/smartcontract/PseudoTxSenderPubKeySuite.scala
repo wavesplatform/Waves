@@ -120,7 +120,7 @@ class PseudoTxSenderPubKeySuite extends BaseTransactionSuite {
       fee = smartMinFee + smartFee,
       waitForTx = true
     )._1.id
-    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("Transaction is not allowed by token-script")
+    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include("Transaction is not allowed by script of the asset")
 
     sender.assetsDetails(secondAssetId).quantity shouldBe smartAssetQuantityBefore
   }
@@ -136,7 +136,7 @@ class PseudoTxSenderPubKeySuite extends BaseTransactionSuite {
       fee = smartMinFee + smartFee,
       waitForTx = true
     )._1.id
-    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("Transaction is not allowed by token-script")
+    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include("Transaction is not allowed by script of the asset")
 
     sender.assetsDetails(secondAssetId).quantity shouldBe smartAssetQuantityBefore
   }
@@ -155,7 +155,7 @@ class PseudoTxSenderPubKeySuite extends BaseTransactionSuite {
       fee = smartMinFee + smartFee,
       waitForTx = true
     )._1.id
-    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("Transaction is not allowed by token-script")
+    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include("Transaction is not allowed by script of the asset")
 
     sender.assetBalance(firstDApp, secondAssetId).balance shouldBe smartAssetBalanceBefore
   }

@@ -29,9 +29,9 @@ object DataEntry {
 
   type DataBytesOpt = Option[Array[Byte]]
 
-  val MaxKeySize   = 100
-  val MaxPBKeySize = 400
-  val MaxValueSize = Short.MaxValue
+  val MaxKeySize   = 100            // uses for RIDE ContractLimits
+  val MaxPBKeySize = 400            //
+  val MaxValueSize = Short.MaxValue // uses for RIDE CONST_STRING and CONST_BYTESTR limits
 
   object Type extends Enumeration {
     val Integer = Value(0)

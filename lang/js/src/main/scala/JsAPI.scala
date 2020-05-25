@@ -102,7 +102,7 @@ object JsAPI {
   @JSExportTopLevel("scriptInfo")
   def scriptInfo(input: String): js.Dynamic = {
     val info = DirectiveParser(input)
-      .flatMap(extractDirectives)
+      .flatMap(v => extractDirectives(v))
       .map {
         case DirectiveSet(ver, scriptType, contentType, imports) =>
           js.Dynamic.literal(

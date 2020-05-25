@@ -85,7 +85,7 @@ object AssetTransactionsDiff extends ScorexLogging {
         tx.fee,
         Reissue(tx.asset.id, tx.reissuable, tx.quantity)
       )
-      .map(Diff(tx = tx, scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)) |+| _)
+      .map(_.bindTransaction(tx) |+| Diff.stateOps(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
 
   def burn(blockchain: Blockchain)(tx: BurnTransaction): Either[ValidationError, Diff] =
     DiffsCommon
@@ -95,14 +95,11 @@ object AssetTransactionsDiff extends ScorexLogging {
         tx.fee,
         Burn(tx.asset.id, tx.quantity)
       )
-      .map(Diff(tx = tx, scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)) |+| _)
+      .map(_.bindTransaction(tx) |+| Diff.stateOps(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
 
-  def sponsor(blockchain: Blockchain, blockTime: Long)(tx: SponsorFeeTransaction): Either[ValidationError, Diff] =
+  def sponsor(blockchain: Blockchain)(tx: SponsorFeeTransaction): Either[ValidationError, Diff] =
     DiffsCommon.processSponsor(blockchain, tx.sender.toAddress, tx.fee, SponsorFee(tx.asset.id, tx.minSponsoredAssetFee))
-      .map(sponsorDiff =>
-        Diff(tx = tx, portfolios = sponsorDiff.portfolios) |+|
-        sponsorDiff.copy(portfolios = Map(), scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx))
-      )
+      .map(_.bindTransaction(tx) |+| Diff.stateOps(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
 
   def updateInfo(blockchain: Blockchain)(tx: UpdateAssetInfoTransaction): Either[ValidationError, Diff] =
     DiffsCommon.validateAsset(blockchain, tx.assetId, tx.sender.toAddress, issuerOnly = true) >> {

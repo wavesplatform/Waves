@@ -100,8 +100,8 @@ object Verifier extends ScorexLogging {
       val containerAddress = assetIdOpt.getOrElse(ByteStr(senderAddress.bytes))
       val eval             = ScriptRunner(Coproduct[TxOrd](transaction), blockchain, script, isAsset, containerAddress)
       val scriptResult = eval match {
-        case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, isAsset))
-        case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, isAsset))
+        case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, assetIdOpt))
+        case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, assetIdOpt))
         case (_, Right(TRUE))       => Right(transaction)
         case (_, Right(x))          => Left(GenericError(s"Script returned not a boolean result, but $x"))
       }
@@ -110,7 +110,7 @@ object Verifier extends ScorexLogging {
       scriptResult
     } match {
       case Failure(e) =>
-        Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, isAsset))
+        Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, assetIdOpt))
       case Success(s) => s
     }
     val error2Trace: Option[ValidationError] => List[TraceStep] =
@@ -132,10 +132,11 @@ object Verifier extends ScorexLogging {
   def verifyOrder(blockchain: Blockchain, script: Script, order: Order): ValidationResult[Order] =
     for {
       result <- Try {
-        val eval = ScriptRunner(Coproduct[ScriptRunner.TxOrd](order), blockchain, script, isAssetScript = false, ByteStr(order.sender.toAddress.bytes))
+        val eval =
+          ScriptRunner(Coproduct[ScriptRunner.TxOrd](order), blockchain, script, isAssetScript = false, ByteStr(order.sender.toAddress.bytes))
         val scriptResult = eval match {
-          case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, isAssetScript = false))
-          case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, isAssetScript = false))
+          case (log, Left(execError)) => Left(ScriptExecutionError.ByAccountScript(execError, log))
+          case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript.ByAccountScript(log))
           case (_, Right(TRUE))       => Right(order)
           case (_, Right(x))          => Left(GenericError(s"Script returned not a boolean result, but $x"))
         }
@@ -143,7 +144,7 @@ object Verifier extends ScorexLogging {
         logIfNecessary(scriptResult, logId, eval)
         scriptResult
       } match {
-        case Failure(e) => Left(ScriptExecutionError(s"Uncaught execution error: $e", List.empty, isAssetScript = false))
+        case Failure(e) => Left(ScriptExecutionError.ByAccountScript(s"Uncaught execution error: $e", List.empty))
         case Success(s) => s
       }
     } yield result

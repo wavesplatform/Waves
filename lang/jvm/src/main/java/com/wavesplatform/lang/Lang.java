@@ -26,6 +26,6 @@ public class Lang {
      * @return the resulting byte array
      */
     public static byte[] serialize(Terms.EXPR expr) {
-        return Serde.serialize(expr);
+        return Serde.serialize(expr, false);
     }
 }

@@ -794,7 +794,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract compilation fails if function name length is longer than 255 bytes") {
-    val longName = "a" * (ContractLimits.MaxAnnotatedFunctionNameInBytes + 1)
+    val longName = "a" * (ContractLimits.MaxDeclarationNameInBytes + 1)
     val ctx      = Monoid.combine(compilerContext, cmpCtx)
     val expr = {
       val script =
@@ -808,11 +808,11 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) should produce("must be less than")
+    compiler.ContractCompiler(ctx, expr, V3) should produce(s"Function '$longName' size = 256 bytes exceeds 255")
   }
 
   property("contract compiles if function name length is equal to 255 bytes") {
-    val longName = "a" * ContractLimits.MaxAnnotatedFunctionNameInBytes
+    val longName = "a" * ContractLimits.MaxDeclarationNameInBytes
     val ctx      = Monoid.combine(compilerContext, cmpCtx)
     val expr = {
       val script =

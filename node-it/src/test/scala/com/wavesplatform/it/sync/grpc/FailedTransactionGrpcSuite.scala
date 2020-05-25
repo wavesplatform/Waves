@@ -315,9 +315,9 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
           sc.issues.size shouldBe 0
           sc.reissues.size shouldBe 0
           sc.burns.size shouldBe 0
-          sc.errorMessage shouldBe 'defined
-          sc.errorMessage.get.code shouldBe 3
-          sc.errorMessage.get.text shouldBe "Transaction is not allowed by token-script"
+          sc.error shouldBe 'defined
+          sc.error.get.code shouldBe 3
+          sc.error.get.text should include("Transaction is not allowed by script of the asset")
       }
 
       failed
