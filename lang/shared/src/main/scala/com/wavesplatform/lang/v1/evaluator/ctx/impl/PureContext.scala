@@ -857,7 +857,7 @@ object PureContext {
       }
 
     val getListMedian: BaseFunction[NoContext] =
-      NativeFunction("median", 15, MEDIAN_LIST, LONG, ("arr", PARAMETERIZEDLIST(LONG))) {
+      NativeFunction("median", 20, MEDIAN_LIST, LONG, ("arr", PARAMETERIZEDLIST(LONG))) {
         case xs @ (ARR(arr) :: Nil) =>
           if (arr.headOption.forall(_.isInstanceOf[CONST_LONG])) {
             if (arr.nonEmpty)
