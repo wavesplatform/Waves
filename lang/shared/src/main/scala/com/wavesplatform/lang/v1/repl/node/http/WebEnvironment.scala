@@ -6,8 +6,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.v1.repl.node.http.NodeClient._
 import com.wavesplatform.lang.v1.repl.node.http.response.ImplicitMappings
-import com.wavesplatform.lang.v1.repl.node.http.response.model._
 import com.wavesplatform.lang.v1.repl.node.http.response.model.Transaction._
+import com.wavesplatform.lang.v1.repl.node.http.response.model._
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
@@ -19,12 +19,12 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extends Environment[Future] {
-  private val client = NodeClient(settings.normalizedUrl)
+  private val client   = NodeClient(settings.normalizedUrl)
   private val mappings = ImplicitMappings(settings.chainId)
   import mappings._
 
   override implicit def chainId: Byte = settings.chainId
-  override def tthis: Address = Address(ByteStr.decodeBase58(settings.address).get)
+  override def tthis: Address         = Address(ByteStr.decodeBase58(settings.address).get)
 
   override def height: Future[Long] =
     getEntity[Id, HeightResponse, Long]("/blocks/height")
@@ -55,23 +55,23 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
     getEntity[Either[String, ?], AddressResponse, Address](s"/alias/by-alias/$name")
 
   override def accountBalanceOf(
-    recipient: Recipient,
-    assetId:   Option[Array[Byte]]
+      recipient: Recipient,
+      assetId: Option[Array[Byte]]
   ): Future[Either[String, Long]] =
     for {
-     address <- extractAddress(recipient)
-     entity  <- getEntity[Either[String, ?], BalanceResponse, Long]((assetId match {
-       case Some(assetId) => s"/assets/balance/${address}/${Base58.encode(assetId)}"
-       case None => s"/address/balance/${address}"
-     }))
+      address <- extractAddress(recipient)
+      entity <- getEntity[Either[String, ?], BalanceResponse, Long]((assetId match {
+        case Some(assetId) => s"/assets/balance/${address}/${Base58.encode(assetId)}"
+        case None          => s"/address/balance/${address}"
+      }))
     } yield entity
 
   override def accountWavesBalanceOf(
-    recipient: Recipient
+      recipient: Recipient
   ): Future[Either[String, Environment.BalanceDetails]] =
     for {
-     address <- extractAddress(recipient)
-     entity  <- client.get[Either[String, ?], Environment.BalanceDetails](s"/addresses/balance/details/$address")
+      address <- extractAddress(recipient)
+      entity  <- client.get[Either[String, ?], Environment.BalanceDetails](s"/addresses/balance/details/$address")
     } yield entity
 
   private def extractAddress(addressOrAlias: Recipient): Future[String] =
@@ -80,14 +80,13 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
       case Alias(name)    => resolveAlias(name).map(_.explicitGet().bytes.toString)
     }
 
-  override def inputEntity: InputEntity                                       = ???
-  override def transactionById(id: Array[Byte]): Future[Option[Tx]]           = ???
-  override def multiPaymentAllowed: Boolean                                   = ???
-  override def txId: ByteStr                                                  = ???
+  override def inputEntity: InputEntity                             = ???
+  override def transactionById(id: Array[Byte]): Future[Option[Tx]] = ???
+  override def multiPaymentAllowed: Boolean                         = ???
+  override def txId: ByteStr                                        = ???
 
   override def transferTransactionFromProto(b: Array[Byte]): Future[Option[Tx.Transfer]] = ???
 
-
-  private def getEntity[F[_] : Functor : ResponseWrapper, A <% B : Decoder, B](url: String): Future[F[B]] =
+  private def getEntity[F[_]: Functor: ResponseWrapper, A <% B: Decoder, B](url: String): Future[F[B]] =
     client.get[F, A](url).map(_.map(r => r))
 }

@@ -66,18 +66,14 @@ object InvokeDiffsCommon {
       callableComplexities: Map[Int, Map[String, Long]],
       dAppAddress: Address
   ): Either[ValidationError, Long] = {
-    val complexityOpt =
       for {
-        complexitiesByCallable <- callableComplexities.get(blockchain.estimator.version)
-        complexity             <- complexitiesByCallable.get(tx.funcCall.function.funcName)
+        complexitiesByCallable <- callableComplexities.get(blockchain.estimator.version).toRight {
+          GenericError(s"Cannot find complexity storage, address = $dAppAddress, estimator version = ${blockchain.estimator.version}")
+        }
+        complexity             <- complexitiesByCallable.get(tx.funcCall.function.funcName).toRight {
+          GenericError(s"Cannot find callable function `${tx.funcCall.function.funcName}`, address = $dAppAddress`")
+        }
       } yield complexity
-
-    lazy val errorMessage =
-      s"Cannot find callable function `${tx.funcCall.function.funcName}` complexity, " +
-        s"address = $dAppAddress, " +
-        s"estimator version = ${blockchain.estimator.version}"
-
-    complexityOpt.toRight(GenericError(errorMessage))
   }
 
   def processActions(

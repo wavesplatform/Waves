@@ -22,9 +22,17 @@ object ExchangeTransactionDiff {
     val seller  = tx.sellOrder.senderPublicKey.toAddress
 
     val assetIds =
-      List(tx.buyOrder.assetPair.amountAsset, tx.buyOrder.assetPair.priceAsset, tx.sellOrder.assetPair.amountAsset, tx.sellOrder.assetPair.priceAsset).collect {
+      Set(
+        tx.buyOrder.assetPair.amountAsset,
+        tx.buyOrder.assetPair.priceAsset,
+        tx.buyOrder.matcherFeeAssetId,
+        tx.sellOrder.assetPair.amountAsset,
+        tx.sellOrder.assetPair.priceAsset,
+        tx.sellOrder.matcherFeeAssetId
+      ).collect {
         case asset: IssuedAsset => asset
-      }.distinct
+      }.toVector
+
     val assets = assetIds.map(id => id -> blockchain.assetDescription(id)).toMap
 
     val smartTradesEnabled = blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading)
@@ -188,7 +196,13 @@ object ExchangeTransactionDiff {
     else Right(exTrans)
   }
 
-  private[diffs] def getSpendAmount(order: Order, amountDecimals: Int, priceDecimals: Int, matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
+  private[diffs] def getSpendAmount(
+      order: Order,
+      amountDecimals: Int,
+      priceDecimals: Int,
+      matchAmount: Long,
+      matchPrice: Long
+  ): Either[ValidationError, Long] =
     Try {
       if (order.orderType == OrderType.SELL) matchAmount
       else {
@@ -199,7 +213,13 @@ object ExchangeTransactionDiff {
       }
     }.toEither.left.map(x => GenericError(x.getMessage))
 
-  private[diffs] def getReceiveAmount(order: Order, amountDecimals: Int, priceDecimals: Int, matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
+  private[diffs] def getReceiveAmount(
+      order: Order,
+      amountDecimals: Int,
+      priceDecimals: Int,
+      matchAmount: Long,
+      matchPrice: Long
+  ): Either[ValidationError, Long] =
     Try {
       if (order.orderType == OrderType.BUY) matchAmount
       else {
