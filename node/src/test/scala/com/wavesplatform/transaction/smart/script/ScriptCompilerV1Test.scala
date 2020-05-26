@@ -360,13 +360,43 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
         | {-# CONTENT_TYPE EXPRESSION #-}
         |
         | match tx {
-        |   case sstx: SetScriptTransaction => true
-        |   case _ => false
+        |   case unused1: SetScriptTransaction =>
+        |     let unused1 = 1
+        |     true
+        |   case unused2: DataTransaction =>
+        |     func unused2() = 1
+        |     true
+        |   case unused3: GenesisTransaction =>
+        |     func f(unused3: Int) = unused3 == unused3
+        |     f(1)
+        |   case unused4: IssueTransaction =>
+        |     let a = if (true) then 1 else ""
+        |     match a {
+        |       case unused4 => unused4 == unused4
+        |     }
+        |
+        |   case used1: BurnTransaction =>
+        |     let a = used1
+        |     a
+        |   case used2: ReissueTransaction =>
+        |     func f() = used2
+        |     f()
+        |   case used3: InvokeScriptTransaction =>
+        |     func f(used3: Int) = used3 == used3
+        |     f(used3)
+        |   case used4: ExchangeTransaction =>
+        |     used4.id == used4.id
+        |   case used5: LeaseTransaction =>
+        |     if (true) then true else used5 == used5
+        |   case used6 =>
+        |     match used6 {
+        |       case used6 => true
+        |     }
         | }
       """.stripMargin
 
     ScriptCompiler.compile(script, estimator) should produce(
-      "Compilation failed: Unused case variable(s) `sstx` in 91-166"
+      "Compilation failed: Unused case variable(s) `unused1`, `unused2`, `unused3`, `unused4` in 91-920"
     )
   }
 
