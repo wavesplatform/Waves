@@ -383,7 +383,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
                      |{-# SCRIPT_TYPE ACCOUNT #-}
                      |
                      |match (tx) {
-                     |  case t: InvokeScriptTransaction => false
+                     |  case _: InvokeScriptTransaction => false
                      |  case _ => true
                      |}
                      |""".stripMargin,

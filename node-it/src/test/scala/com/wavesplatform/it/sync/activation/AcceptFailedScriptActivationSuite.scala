@@ -459,7 +459,7 @@ object AcceptFailedScriptActivationSuite {
     mkScript(
       s"""
        |match tx {
-       |  case tx: SetAssetScriptTransaction => true
+       |  case _: SetAssetScriptTransaction => true
        |  case _ => $result
        |}
        |""".stripMargin
