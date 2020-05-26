@@ -29,6 +29,7 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{LoggerFacade, Schedulers, ScorexLogging, Time}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
+import monix.eval.Coeval
 import monix.execution.ExecutionModel
 import monix.execution.atomic.AtomicBoolean
 import monix.execution.schedulers.SchedulerService
@@ -63,6 +64,7 @@ class UtxPoolImpl(
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).isDefined) // TODO delete in the future
   private[this] val priorityTransactions  = mutable.LinkedHashMap.empty[ByteStr, Transaction]
+  private[this] var priorityDiff          = Coeval.now(Diff.empty)
 
   override def putIfNew(tx: Transaction): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id()) || priorityTransactions.contains(tx.id())) TracedResult.wrapValue(false)
@@ -169,7 +171,9 @@ class UtxPoolImpl(
 
   override def removeAll(txs: Traversable[Transaction]): Unit = {
     val ids = txs.map(_.id()).toSet
+    val priorityAffected = ids.exists(priorityTransactions.contains)
     removeIds(ids)
+    if (priorityAffected) recalcPriorityDiff()
   }
 
   private[this] def removeFromBothPools(txId: ByteStr): Unit = priorityTransactions.synchronized {
@@ -192,7 +196,15 @@ class UtxPoolImpl(
   }
 
   private[this] def addTransaction(tx: Transaction, verify: Boolean, priority: Boolean): TracedResult[ValidationError, Boolean] = {
-    val diffEi = TransactionDiffer.skipFailing(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(blockchain, tx)
+    val ordDiff = TransactionDiffer.skipFailing(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(blockchain, tx)
+
+    val diffEi =
+      if (ordDiff.resultE.isRight || !this.enablePriorityPool) ordDiff
+      else {
+        val patchedBlockchain = CompositeBlockchain(blockchain, Some(priorityDiff()))
+        TransactionDiffer.skipFailing(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(patchedBlockchain, tx)
+      }
+
     def addPortfolio(): Unit = diffEi.map { diff =>
       pessimisticPortfolios.add(tx.id(), diff)
       onEvent(UtxEvent.TxAdded(tx, diff))
@@ -422,7 +434,27 @@ class UtxPoolImpl(
       addTransaction(tx, verify = false, this.enablePriorityPool)
       if (this.enablePriorityPool) removeFromOrdPool(tx.id())
     }
+
+    if (transactions.nonEmpty && this.enablePriorityPool)
+      recalcPriorityDiff()
+
     TxCleanup.runCleanupAsync()
+  }
+
+  private[this] def recalcPriorityDiff(): Unit = {
+    this.priorityDiff = Coeval.evalOnce {
+      val txs = priorityTransactions.synchronized(priorityTransactions.values.toVector)
+
+      txs.foldLeft(Diff.empty) {
+        case (diff, tx) =>
+          val cb     = CompositeBlockchain(blockchain, Some(diff))
+          val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), verify = false)(cb, _)
+          differ(tx).resultE match {
+            case Left(_)        => diff
+            case Right(newDiff) => Monoid.combine(diff, newDiff)
+          }
+      }
+    }
   }
 
   override def close(): Unit = {
@@ -436,8 +468,9 @@ class UtxPoolImpl(
     private[this] val sizeStats  = Kamon.rangeSampler("utx.pool-size", MeasurementUnit.none, SampleInterval).withoutTags()
     private[this] val bytesStats = Kamon.rangeSampler("utx.pool-bytes", MeasurementUnit.information.bytes, SampleInterval).withoutTags()
 
-    private[this] val prioritySizeStats  = Kamon.rangeSampler("utx.priority-pool-size", MeasurementUnit.none, SampleInterval).withoutTags()
-    private[this] val priorityBytesStats = Kamon.rangeSampler("utx.priority-pool-bytes", MeasurementUnit.information.bytes, SampleInterval).withoutTags()
+    private[this] val prioritySizeStats = Kamon.rangeSampler("utx.priority-pool-size", MeasurementUnit.none, SampleInterval).withoutTags()
+    private[this] val priorityBytesStats =
+      Kamon.rangeSampler("utx.priority-pool-bytes", MeasurementUnit.information.bytes, SampleInterval).withoutTags()
 
     val putTimeStats    = Kamon.timer("utx.put-if-new")
     val putRequestStats = Kamon.counter("utx.put-if-new.requests").withoutTags()
