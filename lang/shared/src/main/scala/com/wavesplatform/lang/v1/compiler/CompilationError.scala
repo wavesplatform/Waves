@@ -54,6 +54,10 @@ object CompilationError {
       s"but ${names.map(n => s"`$n`").mkString(", ")} found"
   }
 
+  final case class UnusedCaseVariables(start: Int, end: Int, names: List[String]) extends CompilationError {
+    val message = s"Unused case variable(s) ${names.map(n => s"`$n`").mkString(", ")}"
+  }
+
   final case class AlreadyDefined(start: Int, end: Int, name: String, isFunction: Boolean) extends CompilationError {
     val message =
       if (isFunction) s"Value '$name' can't be defined because function with this name is already defined"
