@@ -83,7 +83,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
            |
            |{-# STDLIB_VERSION 3 #-}
            |match tx {
-           |  case tx:TransferTransaction => true
+           |  case _:TransferTransaction => true
            |  case _ => false
            |}""".stripMargin,
         estimator
@@ -100,7 +100,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
            |let a = this
            |
            |match tx {
-           |  case tx:TransferTransaction => true
+           |  case _:TransferTransaction => true
            |  case _ => false
            |}""".stripMargin,
         estimator
@@ -118,7 +118,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
            |let a = this
            |
            |match tx {
-           |  case tx:TransferTransaction => true
+           |  case _:TransferTransaction => true
            |  case _ => false
            |}""".stripMargin,
         estimator
@@ -349,6 +349,24 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
     ScriptCompiler.compile(script, estimator) should produce(
       "Compilation failed: Match case variables should not be named as RIDE types, " +
       "but `InvokeScriptTransaction`, `DataTransaction` found in 91-239"
+    )
+  }
+
+  property("forbid unused case variables") {
+    val script =
+      """
+        | {-# STDLIB_VERSION 3 #-}
+        | {-# SCRIPT_TYPE ACCOUNT #-}
+        | {-# CONTENT_TYPE EXPRESSION #-}
+        |
+        | match tx {
+        |   case sstx: SetScriptTransaction => true
+        |   case _ => false
+        | }
+      """.stripMargin
+
+    ScriptCompiler.compile(script, estimator) should produce(
+      "Compilation failed: Unused case variable(s) `sstx` in 91-166"
     )
   }
 
