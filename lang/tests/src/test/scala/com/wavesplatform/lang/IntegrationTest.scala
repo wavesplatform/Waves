@@ -1765,7 +1765,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("makeString") {
     eval(""" ["cat", "dog", "pig"].makeString(", ") """, version = V4) shouldBe CONST_STRING("cat, dog, pig")
     eval(""" [].makeString(", ") """, version = V4) shouldBe CONST_STRING("")
-    eval(""" ["abc"].makeString(", ") """, version = V4) shouldBe CONST_STRING("abc")
+    eval(""" ["abc"].makeString(", ") == "abc" """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
 
     val script = s""" [${s""" "${"a" * 1000}", """ * 32} "${"a" * 704}"].makeString(", ") """
     eval(script, version = V4) should produce("Constructing string size = 32768 bytes will exceed 32767")

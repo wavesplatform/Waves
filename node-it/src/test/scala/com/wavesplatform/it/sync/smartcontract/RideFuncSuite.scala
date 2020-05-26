@@ -15,7 +15,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalatest.CancelAfterFailure
 
-class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
+class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
   private val estimator = ScriptEstimatorV2
 
   override protected def nodeConfigs: Seq[Config] =

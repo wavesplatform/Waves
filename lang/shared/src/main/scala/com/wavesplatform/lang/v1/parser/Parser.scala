@@ -352,7 +352,7 @@ object Parser {
   lazy val baseExprOrDecl = P(binaryOp(baseAtom(blockOrDecl), opsByPriority))
 
   val singleBaseAtom = comment ~
-    P(ifP | matchP | maybeAccessP) ~
+    P(foldP | ifP | matchP | maybeAccessP) ~
     comment
 
   val singleBaseExpr = P(binaryOp(singleBaseAtom, opsByPriority))
