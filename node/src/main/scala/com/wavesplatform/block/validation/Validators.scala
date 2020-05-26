@@ -35,7 +35,7 @@ object Validators {
       _ <- validateBlock(block)
       // Verify signature
       _ <- Either.cond(
-        crypto.verify(block.signature, block.bytesWithoutSignature(), block.header.generator),
+        crypto.verify(block.signature, block.bodyBytes(), block.header.generator),
         (),
         GenericError("Passed genesis signature is not valid")
       )

@@ -15,7 +15,6 @@ import com.wavesplatform.transaction.GenesisTransaction
 import org.scalatest.{FreeSpecLike, Matchers}
 
 class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with WithState {
-
   private val TransactionFee = 10
 
   def randomKeyPair(): KeyPair = {
