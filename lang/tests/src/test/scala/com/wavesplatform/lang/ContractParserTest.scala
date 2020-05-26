@@ -307,4 +307,37 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
     parse(code)
   }
 
+  property("Unary expr") {
+    val code =
+      """{-# STDLIB_VERSION 4 #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |
+        |let a10 = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+        |
+        |func deleteEntry(acc: List[DeleteEntry], e: String) = DeleteEntry(e) :: acc
+        |
+        |func t() = delateEntry("q") :: FOLD<10>(a10, [], deleteEntry)
+        |
+        |@Callable(i) func f() = []
+        |""".stripMargin
+    Parser.parseContract(code) should matchPattern { case Success(_, _) => }
+  }
+
+  property("FOLD expr") {
+    val code =
+      """{-# STDLIB_VERSION 4 #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |
+        |let a10 = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+        |
+        |func deleteEntry(acc: List[DeleteEntry], e: String) = DeleteEntry(e) :: acc
+        |
+        |@Callable(i) func delete100Entries() = FOLD<10>(a10, [], deleteEntry)
+        |
+        |@Callable(i) func delete(k: String) = [DeleteEntry(k)]
+        |""".stripMargin
+    Parser.parseContract(code) should matchPattern { case Success(_, _) => }
+  }
 }

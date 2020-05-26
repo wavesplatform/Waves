@@ -4,7 +4,7 @@ import cats.{Order => _, _}
 import com.wavesplatform.account.{Address, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.WithState
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
@@ -13,6 +13,7 @@ import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.THROW
+import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ExchangeTransactionDiff.getOrderFeePortfolio
@@ -34,7 +35,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.util.Random
 
-class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with WithState with TransactionGen with Inside with NoShrink {
+class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with TransactionGen with Inside with NoShrink with WithDomain {
 
   private def wavesPortfolio(amt: Long) = Portfolio.waves(amt)
 
@@ -321,7 +322,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
       case (gen1, gen2, gen3, issue1, issue2, exchange) =>
         assertDiffEi(Seq(TestBlock.create(Seq(gen1, gen2, gen3, issue1, issue2))), TestBlock.create(Seq(exchange)), fsWithOrderFeature) {
           blockDiffEi =>
-            blockDiffEi should produce("negative asset balance")
+            blockDiffEi should produce("Assets should be issued")
         }
     }
   }
@@ -1072,7 +1073,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
                 order1 = tx.buyOrder.copy(amount = sellAmount).signWith(buyer.privateKey),
                 order2 = tx.sellOrder.copy(amount = buyAmount).signWith(seller.privateKey),
                 buyMatcherFee = (BigInt(tx.fee) * amount / buyAmount).toLong,
-                sellMatcherFee = (BigInt(tx.fee) * amount / sellAmount).toLong,
+                sellMatcherFee = (BigInt(tx.fee) * amount / sellAmount).toLong
               )
               .signWith(MATCHER.privateKey)
           }
@@ -1111,6 +1112,48 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
 
             state.transactionInfo(exchange.id()).map(r => r._2 -> r._3) shouldBe Some((exchange, false))
         }
+    }
+  }
+
+  property("Counts exchange fee asset complexity") {
+    def test(tradeableAssetIssue: IssueTransaction, feeAssetIssue: IssueTransaction, complexity: Long): Unit = {
+      val order1              = TxHelpers.orderV3(OrderType.BUY, IssuedAsset(tradeableAssetIssue.assetId), IssuedAsset(feeAssetIssue.assetId))
+      val order2              = TxHelpers.orderV3(OrderType.SELL, IssuedAsset(tradeableAssetIssue.assetId), IssuedAsset(feeAssetIssue.assetId))
+      val exchange            = TxHelpers.exchange(order1, order2)
+
+      withDomain(
+        domainSettingsWithFS(
+          TestFunctionalitySettings.withFeatures(BlockchainFeatures.SmartAssets, BlockchainFeatures.SmartAccountTrading, BlockchainFeatures.OrderV3)
+        )
+      ) { d =>
+        d.appendBlock(Seq(tradeableAssetIssue, feeAssetIssue).distinct:_*)
+        val newBlock = d.createBlock(2.toByte, Seq(exchange))
+        val diff     = BlockDiffer.fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited).explicitGet()
+        diff.diff.scriptsComplexity shouldBe complexity
+      }
+    }
+
+    withClue("fee") {
+      val tradeableAssetIssue = TxHelpers.issue()
+      val feeAssetIssue       = TxHelpers.issue(script = TestValues.assetScript)
+      test(tradeableAssetIssue, feeAssetIssue, 1)
+    }
+
+    withClue("asset") {
+      val tradeableAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
+      val feeAssetIssue       = TxHelpers.issue()
+      test(tradeableAssetIssue, feeAssetIssue, 1)
+    }
+
+    withClue("fee and asset") {
+      val tradeableAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
+      val feeAssetIssue       = TxHelpers.issue(script = TestValues.assetScript)
+      test(tradeableAssetIssue, feeAssetIssue, 2)
+    }
+
+    withClue("fee and asset (same asset)") {
+      val tradeableAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
+      test(tradeableAssetIssue, tradeableAssetIssue, 1)
     }
   }
 

@@ -1465,7 +1465,7 @@ class InvokeScriptTransactionDiffTest
     } yield (a, am, r._1, r._2, r._3)) {
       case (acc, amount, genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produce("Cannot find callable function `default` complexity")
+          _ should produce("Cannot find callable function `default`, address = ")
         }
     }
   }
