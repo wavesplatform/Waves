@@ -515,7 +515,7 @@ object PureContext {
   }
 
   lazy val makeString: BaseFunction[NoContext] =
-    NativeFunction("makeString", 30, MAKESTRING, listString, ("list", LIST(STRING)), ("separator", STRING)) {
+    NativeFunction("makeString", 30, MAKESTRING, STRING, ("list", LIST(STRING)), ("separator", STRING)) {
       case (arr: ARR) :: CONST_STRING(separator) :: Nil =>
         val separatorStringSize =
           if (arr.xs.length > 1) (arr.xs.length - 1) * separator.length
