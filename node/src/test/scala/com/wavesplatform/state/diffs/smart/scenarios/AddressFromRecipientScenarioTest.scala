@@ -33,7 +33,7 @@ class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with
   val script = """
     | match tx {
     |  case t : TransferTransaction =>  addressFromRecipient(t.recipient)
-    |  case other => throw()
+    |  case _ => throw()
     |  }
     |  """.stripMargin
 

@@ -49,7 +49,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       assetVerifier(
         """
           | match tx {
-          |   case r: ReissueTransaction => false
+          |   case _: ReissueTransaction => false
           |   case _ => true
           | }
         """.stripMargin
@@ -70,7 +70,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       assetVerifier(
         """
           | match tx {
-          |   case r: BurnTransaction => false
+          |   case _: BurnTransaction => false
           |   case _ => true
           | }
         """.stripMargin
@@ -91,7 +91,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       assetVerifier(
         """
           | match tx {
-          |   case t: ReissueTransaction | BurnTransaction => true
+          |   case _: ReissueTransaction | BurnTransaction => true
           |   case _ => false
           | }
         """.stripMargin
