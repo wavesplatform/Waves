@@ -8,6 +8,7 @@ import com.wavesplatform.lang.v1.compiler.CompilerContext.VariableInfo
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
@@ -243,7 +244,14 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
           AnyPos,
           Some(Expressions.PART.VALID(AnyPos, "p")),
           List(Expressions.PART.VALID(AnyPos, "PointA"), Expressions.PART.VALID(AnyPos, "PointB")),
-          Expressions.TRUE(AnyPos)
+          Expressions.FUNCTION_CALL(
+            AnyPos,
+            Expressions.PART.VALID(AnyPos, "=="),
+            List(
+              Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
+              Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p"))
+            )
+          )
         ),
         Expressions.MATCH_CASE(
           AnyPos,
@@ -269,7 +277,13 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
                  List(REF("$match0"), CONST_STRING("PointA").explicitGet())
                )
              ),
-             LET_BLOCK(LET("p", REF("$match0")), TRUE),
+             LET_BLOCK(
+               LET("p", REF("$match0")),
+               FUNCTION_CALL(
+                 FunctionHeader.Native(FunctionIds.EQ),
+                 List(REF("p"), REF("p"))
+               )
+             ),
              FALSE
            )
          ),
@@ -320,7 +334,14 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
             AnyPos,
             Some(Expressions.PART.VALID(AnyPos, "foo")),
             List(Expressions.PART.VALID(AnyPos, "PointA"), Expressions.PART.VALID(AnyPos, "PointB")),
-            Expressions.TRUE(AnyPos)
+            Expressions.FUNCTION_CALL(
+              AnyPos,
+              Expressions.PART.VALID(AnyPos, "=="),
+              List(
+                Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "foo")),
+                Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "foo"))
+              )
+            )
           ),
           Expressions.MATCH_CASE(
             AnyPos,
@@ -350,7 +371,14 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
           AnyPos,
           Some(Expressions.PART.VALID(AnyPos, "p")),
           List(Expressions.PART.VALID(AnyPos, "PointA"), Expressions.PART.VALID(AnyPos, "PointB")),
-          Expressions.TRUE(AnyPos)
+          Expressions.FUNCTION_CALL(
+            AnyPos,
+            Expressions.PART.VALID(AnyPos, "=="),
+            List(
+              Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
+              Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p"))
+            )
+          )
         ),
         Expressions.MATCH_CASE(
           AnyPos,
@@ -377,7 +405,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       List(
         Expressions.MATCH_CASE(
           AnyPos,
-          Some(Expressions.PART.VALID(AnyPos, "p1")),
+          None,
           List(Expressions.PART.VALID(AnyPos, "Point0"), Expressions.PART.VALID(AnyPos, "PointB")),
           Expressions.TRUE(AnyPos)
         ),
