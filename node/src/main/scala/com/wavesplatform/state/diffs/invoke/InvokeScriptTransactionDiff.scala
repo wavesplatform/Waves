@@ -119,15 +119,13 @@ object InvokeScriptTransactionDiff {
 
                   Try(evaluate(version, contract, directives, invocation, environment))
                     .fold(e => Left((e.getMessage, Nil)), identity)
-                    .leftMap { case (error, log) => ScriptExecutionError.ByDAppScript(error, log) }
+                    .leftMap { case (error, log) => FailedTransactionError.DAppExecutionError(error, invocationComplexity, log) }
                 })
                 TracedResult(
                   scriptResultE,
                   List(InvokeScriptTrace(tx.dAppAddressOrAlias, functionCall, scriptResultE.map(_._1), scriptResultE.fold(_.log, _._2)))
                 )
               }
-
-              verifierComplexity = blockchain.accountScript(tx.sender.toAddress).map(_.verifierComplexity).getOrElse(0L)
 
               doProcessActions = InvokeDiffsCommon.processActions(
                 _,
@@ -136,7 +134,6 @@ object InvokeScriptTransactionDiff {
                 pk,
                 feeInfo,
                 invocationComplexity,
-                verifierComplexity,
                 tx,
                 blockchain,
                 blockTime

@@ -43,7 +43,7 @@ case class ExchangeTransaction(
 
   override def checkedAssets: Seq[IssuedAsset] = {
     val pair = buyOrder.assetPair
-    Seq(pair.priceAsset, pair.amountAsset) collect { case a: IssuedAsset => a }
+    Seq(pair.priceAsset, pair.amountAsset, buyOrder.matcherFeeAssetId, sellOrder.matcherFeeAssetId) collect { case a: IssuedAsset => a }
   }
 }
 

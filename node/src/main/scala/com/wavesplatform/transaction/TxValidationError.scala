@@ -52,86 +52,39 @@ object TxValidationError {
     import FailedTransactionError._
 
     def cause: Cause = this match {
-      case e: ScriptExecutionError.ByDAppScript                   => Cause(1, e.error)
-      case e: InsufficientInvokeActionFee                         => Cause(2, e.error)
-      case e: ScriptExecutionError.ByAssetScriptInAction          => Cause(3, assetScriptError(e.assetId, Some(e.error)))
-      case e: TransactionNotAllowedByScript.ByAssetScriptInAction => Cause(3, assetScriptError(e.assetId, None))
-      case e: ScriptExecutionError.ByAssetScript                  => Cause(4, assetScriptError(e.assetId, Some(e.error)))
-      case e: TransactionNotAllowedByScript.ByAssetScript         => Cause(4, assetScriptError(e.assetId, None))
+      case e: DAppExecutionError                   => Cause(1, e.error)
+      case e: InsufficientFeeInActionError         => Cause(2, e.error)
+      case e: AssetScriptExecutionInActionError    => Cause(3, assetScriptError(e.assetId, Some(e.error)))
+      case e: NotAllowedByAssetScriptInActionError => Cause(3, assetScriptError(e.assetId, None))
+      case e: AssetScriptExecutionError            => Cause(4, assetScriptError(e.assetId, Some(e.error)))
+      case e: NotAllowedByAssetScriptError         => Cause(4, assetScriptError(e.assetId, None))
     }
 
     private def assetScriptError(assetId: ByteStr, error: Option[String]): String =
       s"Transaction is not allowed by script of the asset $assetId" + error.fold("")(e => s": $e")
   }
-  sealed trait FailedExecutionError extends ScriptExecutionError with FailedTransactionError
-  sealed trait FailedResultError    extends TransactionNotAllowedByScript with FailedTransactionError
 
   object FailedTransactionError {
     case class Cause(code: Int, error: String)
+
+    case class DAppExecutionError(error: String, spentComplexity: Long, log: Log[Id] = List.empty)                     extends FailedTransactionError
+    case class InsufficientFeeInActionError(error: String)                                                             extends FailedTransactionError
+    case class AssetScriptExecutionInActionError(error: String, spentComplexity: Long, log: Log[Id], assetId: ByteStr) extends FailedTransactionError
+    case class NotAllowedByAssetScriptInActionError(spentComplexity: Long, log: Log[Id], assetId: ByteStr)             extends FailedTransactionError
+    case class AssetScriptExecutionError(error: String, spentComplexity: Long, log: Log[Id], assetId: ByteStr)         extends FailedTransactionError
+    case class NotAllowedByAssetScriptError(spentComplexity: Long, log: Log[Id], assetId: ByteStr)                     extends FailedTransactionError
   }
 
-  sealed trait ScriptExecutionError extends ValidationError {
-    import ScriptExecutionError._
-
-    def error: String
-    def log: Log[Id]
-    val isAssetScript: Boolean = this match {
-      case _: ByAssetScript         => true
-      case _: ByAssetScriptInAction => true
-      case _: ByAccountScript       => false
-      case _: ByDAppScript          => false
-    }
-
-    private val target: String = this match {
-      case _: ByAssetScript         => "Asset"
-      case _: ByAssetScriptInAction => "Asset"
-      case _: ByAccountScript       => "Account"
-      case _: ByDAppScript          => "DApp"
-    }
-
+  case class ScriptExecutionError(error: String, log: Log[Id], assetId: Option[ByteStr]) extends ValidationError {
+    def isAssetScript: Boolean    = assetId.isDefined
+    private val target: String    = assetId.fold("Account")(_ => "Asset")
     override def toString: String = s"ScriptExecutionError(error = $error, type = $target, log =${logToString(log)})"
   }
 
-  object ScriptExecutionError {
-    def apply(error: String, log: Log[Id], assetId: Option[ByteStr]): ScriptExecutionError =
-      assetId.fold[ScriptExecutionError](ByAccountScript(error, log))(ai => ByAssetScript(error, log, ai))
-
-    final case class ByAccountScript(error: String, log: Log[Id])                         extends ScriptExecutionError
-    final case class ByDAppScript(error: String, log: Log[Id] = List.empty)               extends FailedExecutionError
-    final case class ByAssetScriptInAction(error: String, log: Log[Id], assetId: ByteStr) extends FailedExecutionError
-    final case class ByAssetScript(error: String, log: Log[Id], assetId: ByteStr)         extends FailedExecutionError
-  }
-
-  case class InsufficientInvokeActionFee(error: String) extends ValidationError with FailedTransactionError {
-    override def toString: String = s"InsufficientInvokeActionFee(error = $error)"
-  }
-
-  sealed trait TransactionNotAllowedByScript extends ValidationError {
-    import TransactionNotAllowedByScript._
-
-    def log: Log[Id]
-    val isAssetScript: Boolean = this match {
-      case _: ByAssetScript         => true
-      case _: ByAssetScriptInAction => true
-      case _: ByAccountScript       => false
-    }
-
-    private val target: String = this match {
-      case _: ByAssetScript         => "Asset"
-      case _: ByAssetScriptInAction => "Asset"
-      case _: ByAccountScript       => "Account"
-    }
-
+  case class TransactionNotAllowedByScript(log: Log[Id], assetId: Option[ByteStr]) extends ValidationError {
+    def isAssetScript: Boolean    = assetId.isDefined
+    private val target: String    = assetId.fold("Account")(_ => "Asset")
     override def toString: String = s"TransactionNotAllowedByScript(type = $target, log =${logToString(log)})"
-  }
-
-  object TransactionNotAllowedByScript {
-    def apply(log: Log[Id], assetId: Option[ByteStr]): TransactionNotAllowedByScript =
-      assetId.fold[TransactionNotAllowedByScript](ByAccountScript(log))(ai => ByAssetScript(log, ai))
-
-    final case class ByAccountScript(log: Log[Id])                         extends TransactionNotAllowedByScript
-    final case class ByAssetScriptInAction(log: Log[Id], assetId: ByteStr) extends FailedResultError
-    final case class ByAssetScript(log: Log[Id], assetId: ByteStr)         extends FailedResultError
   }
 
   def logToString(log: Log[Id]): String =

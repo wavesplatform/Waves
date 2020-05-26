@@ -15,7 +15,7 @@ import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
 import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, Portfolio, Sponsorship}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError, UnsupportedTransactionType}
+import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
@@ -58,13 +58,13 @@ object TransactionDiffer {
     // otherwise validate assets if `verify` is `true` or the transaction may fail
     val verifyAssets = if (skipFailing) false else verify || (mayFail(tx) && acceptFailed(blockchain))
     val result = for {
-      _    <- if (verify) validateCommon(blockchain, tx, prevBlockTimestamp, currentBlockTimestamp).traced else success
-      _    <- validateFunds(blockchain, tx).traced
-      _    <- if (verify) validateProofs(blockchain, tx) else success
-      diff <- transactionDiff(blockchain, tx, currentBlockTimestamp, skipFailing)
-      _    <- validateBalance(blockchain, tx.typeId, diff).traced
-      _    <- if (verifyAssets) validateAssets(blockchain, tx) else success
-    } yield diff
+      _               <- if (verify) validateCommon(blockchain, tx, prevBlockTimestamp, currentBlockTimestamp).traced else Right(()).traced
+      _               <- validateFunds(blockchain, tx).traced
+      accountsDiff    <- accountScriptsDiff(blockchain, tx, verify)
+      transactionDiff <- transactionDiff(blockchain, tx, currentBlockTimestamp, skipFailing)
+      _               <- validateBalance(blockchain, tx.typeId, transactionDiff).traced
+      assetsDiff      <- assetScriptsDiff(blockchain, tx, verifyAssets)
+    } yield Monoid.combineAll(Seq(accountsDiff, transactionDiff, assetsDiff))
     result.leftMap(TransactionValidationError(_, tx))
   }
 
@@ -104,9 +104,34 @@ object TransactionDiffer {
         }
       } yield ()
 
-  private def validateProofs(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Unit] = Verifier(blockchain)(tx).as(())
+  private def accountScriptsDiff(blockchain: Blockchain, tx: Transaction, verify: Boolean): TracedResult[ValidationError, Diff] = {
+    if (verify)
+      Verifier(blockchain)(tx)
+    else {
+      tx match {
+        case ptx: ProvenTransaction =>
+          Diff.empty.copy(scriptsComplexity = DiffsCommon.getAccountComplexity(blockchain, ptx)).asRight[ValidationError].traced
+        case _ => Diff.empty.asRight.traced
+      }
+    }
+  }
 
-  private def validateAssets(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Unit] = Verifier.assets(blockchain)(tx).as(())
+  private def assetScriptsDiff(blockchain: Blockchain, tx: Transaction, verify: Boolean): TracedResult[ValidationError, Diff] =
+    if (verify) {
+      Verifier.assets(blockchain)(tx).leftMap {
+        case (spentComplexity, ScriptExecutionError(error, log, Some(assetId))) if mayFail(tx) && acceptFailed(blockchain) =>
+          FailedTransactionError.AssetScriptExecutionError(error, spentComplexity, log, assetId)
+        case (spentComplexity, TransactionNotAllowedByScript(log, Some(assetId))) if mayFail(tx) && acceptFailed(blockchain) =>
+          FailedTransactionError.NotAllowedByAssetScriptError(spentComplexity, log, assetId)
+        case (_, ve) => ve
+      }
+    } else {
+      tx match {
+        case ptx: ProvenTransaction =>
+          Diff.empty.copy(scriptsComplexity = DiffsCommon.getAssetsComplexity(blockchain, ptx)).asRight[ValidationError].traced
+        case _ => Diff.empty.asRight.traced
+      }
+    }
 
   private def validateBalance(blockchain: Blockchain, txType: TxType, diff: Diff): Either[ValidationError, Unit] =
     stats.balanceValidation.measureForType(txType)(BalanceDiffValidation(blockchain)(diff).as(()))
@@ -120,36 +145,26 @@ object TransactionDiffer {
   ): TracedResult[ValidationError, Diff] =
     stats.transactionDiffValidation.measureForType(tx.typeId) {
       tx match {
-        case gtx: GenesisTransaction     => GenesisTransactionDiff(blockchain.height)(gtx).traced
-        case ptx: PaymentTransaction     => PaymentTransactionDiff(blockchain)(ptx).traced
-        case ci: InvokeScriptTransaction => InvokeScriptTransactionDiff(blockchain, currentBlockTs, skipExecution = skipFailing)(ci)
-        case etx: ExchangeTransaction    => ExchangeTransactionDiff(blockchain)(etx).traced
-        case ptx: ProvenTransaction      => provenTransactionDiff(blockchain, currentBlockTs)(ptx)
-        case _                           => UnsupportedTransactionType.asLeft.traced
+        case gtx: GenesisTransaction           => GenesisTransactionDiff(blockchain.height)(gtx).traced
+        case ptx: PaymentTransaction           => PaymentTransactionDiff(blockchain)(ptx).traced
+        case ci: InvokeScriptTransaction       => InvokeScriptTransactionDiff(blockchain, currentBlockTs, skipExecution = skipFailing)(ci)
+        case etx: ExchangeTransaction          => ExchangeTransactionDiff(blockchain)(etx).traced
+        case itx: IssueTransaction             => AssetTransactionsDiff.issue(blockchain)(itx).traced
+        case rtx: ReissueTransaction           => AssetTransactionsDiff.reissue(blockchain, currentBlockTs)(rtx).traced
+        case btx: BurnTransaction              => AssetTransactionsDiff.burn(blockchain)(btx).traced
+        case uaitx: UpdateAssetInfoTransaction => AssetTransactionsDiff.updateInfo(blockchain)(uaitx).traced
+        case ttx: TransferTransaction          => TransferTransactionDiff(blockchain, currentBlockTs)(ttx).traced
+        case mtx: MassTransferTransaction      => MassTransferTransactionDiff(blockchain, currentBlockTs)(mtx).traced
+        case ltx: LeaseTransaction             => LeaseTransactionsDiff.lease(blockchain)(ltx).traced
+        case ltx: LeaseCancelTransaction       => LeaseTransactionsDiff.leaseCancel(blockchain, currentBlockTs)(ltx).traced
+        case atx: CreateAliasTransaction       => CreateAliasTransactionDiff(blockchain)(atx).traced
+        case dtx: DataTransaction              => DataTransactionDiff(blockchain)(dtx).traced
+        case sstx: SetScriptTransaction        => SetScriptTransactionDiff(blockchain)(sstx).traced
+        case sstx: SetAssetScriptTransaction   => AssetTransactionsDiff.setAssetScript(blockchain, currentBlockTs)(sstx).traced
+        case stx: SponsorFeeTransaction        => AssetTransactionsDiff.sponsor(blockchain)(stx).traced
+        case _                                 => UnsupportedTransactionType.asLeft.traced
       }
     }
-
-  private def provenTransactionDiff(blockchain: Blockchain, currentBlockTs: Long)(tx: ProvenTransaction): TracedResult[ValidationError, Diff] = {
-    val diff = tx match {
-      case itx: IssueTransaction             => AssetTransactionsDiff.issue(blockchain)(itx)
-      case rtx: ReissueTransaction           => AssetTransactionsDiff.reissue(blockchain, currentBlockTs)(rtx)
-      case btx: BurnTransaction              => AssetTransactionsDiff.burn(blockchain)(btx)
-      case uaitx: UpdateAssetInfoTransaction => AssetTransactionsDiff.updateInfo(blockchain)(uaitx)
-      case ttx: TransferTransaction          => TransferTransactionDiff(blockchain, currentBlockTs)(ttx)
-      case mtx: MassTransferTransaction      => MassTransferTransactionDiff(blockchain, currentBlockTs)(mtx)
-      case ltx: LeaseTransaction             => LeaseTransactionsDiff.lease(blockchain)(ltx)
-      case ltx: LeaseCancelTransaction       => LeaseTransactionsDiff.leaseCancel(blockchain, currentBlockTs)(ltx)
-      case atx: CreateAliasTransaction       => CreateAliasTransactionDiff(blockchain)(atx)
-      case dtx: DataTransaction              => DataTransactionDiff(blockchain)(dtx)
-      case sstx: SetScriptTransaction        => SetScriptTransactionDiff(blockchain)(sstx)
-      case sstx: SetAssetScriptTransaction   => AssetTransactionsDiff.setAssetScript(blockchain, currentBlockTs)(sstx)
-      case stx: SponsorFeeTransaction        => AssetTransactionsDiff.sponsor(blockchain)(stx)
-      case _                                 => UnsupportedTransactionType.asLeft
-    }
-    val complexityDiff = Diff.empty.copy(scriptsComplexity = DiffsCommon.getScriptsComplexity(blockchain, tx)).asRight[ValidationError]
-
-    Monoid.combine(complexityDiff, diff).traced
-  }
 
   // insufficient funds related
   private def skipFundsSufficiency(blockchain: Blockchain, tx: Transaction): Boolean =
@@ -236,7 +251,7 @@ object TransactionDiffer {
     def unapply(result: TracedResult[ValidationError, Diff]): Option[Option[ErrorMessage]] =
       result match {
         case TracedResult(Left(TransactionValidationError(e: FailedTransactionError, tx)), _) => Some(errorMessage(e, tx))
-        case _                                                                           => None
+        case _                                                                                => None
       }
 
     def errorMessage(cf: FailedTransactionError, tx: Transaction): Option[ErrorMessage] =
@@ -275,8 +290,6 @@ object TransactionDiffer {
   private implicit final class EitherOps[E, A](val ei: Either[E, A]) extends AnyVal {
     def traced: TracedResult[E, A] = TracedResult.wrapE(ei)
   }
-
-  private val success: TracedResult[ValidationError, Unit] = Right(()).traced
 
   case class TransactionValidationError(cause: ValidationError, tx: Transaction) extends ValidationError {
     override def toString: String = s"TransactionValidationError(cause = $cause,\ntx = ${Json.prettyPrint(tx.json())})"

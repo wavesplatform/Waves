@@ -33,6 +33,7 @@ import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxValidationError.FailedTransactionError.NotAllowedByAssetScriptInActionError
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -1013,7 +1014,7 @@ class InvokeScriptTransactionDiffTest
     } yield (a, am, r._1, r._2, r._3, asset, master)) {
       case (acc, amount, genesis, setScript, ci, asset, master) =>
         assertDiffEiTraced(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
-          blockDiffEi.resultE should produce("TransactionNotAllowedByScript")
+          blockDiffEi.resultE should produce("NotAllowedByAssetScriptInActionError")
         }
     }
   }
@@ -1054,12 +1055,12 @@ class InvokeScriptTransactionDiffTest
     } yield (a, am, r._1, r._2, r._3, asset1, asset2, master)) {
       case (acc, amount, genesis, setScript, ci, asset1, asset2, master) =>
         assertDiffEiTraced(Seq(TestBlock.create(genesis ++ Seq(asset1, asset2, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
-          blockDiffEi.resultE should produce("TransactionNotAllowedByScript")
+          blockDiffEi.resultE should produce("NotAllowedByAssetScriptInActionError")
           inside(blockDiffEi.trace) {
             case List(
                 InvokeScriptTrace(dAppAddress, functionCall, Right(ScriptResultV3(_, transfers)), _),
                 AssetVerifierTrace(allowedAssetId, None),
-                AssetVerifierTrace(bannedAssetId, Some(_: TransactionNotAllowedByScript))
+                AssetVerifierTrace(bannedAssetId, Some(_: NotAllowedByAssetScriptInActionError))
                 ) =>
               dAppAddress shouldBe ci.dAppAddressOrAlias
               functionCall shouldBe ci.funcCall
