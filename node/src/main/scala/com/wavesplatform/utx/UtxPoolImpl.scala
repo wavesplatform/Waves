@@ -29,7 +29,6 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{LoggerFacade, Schedulers, ScorexLogging, Time}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
-import monix.eval.Coeval
 import monix.execution.ExecutionModel
 import monix.execution.atomic.AtomicBoolean
 import monix.execution.schedulers.SchedulerService
@@ -64,7 +63,7 @@ class UtxPoolImpl(
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).isDefined) // TODO delete in the future
   private[this] val priorityTransactions  = mutable.LinkedHashMap.empty[ByteStr, Transaction]
-  private[this] var priorityDiff          = Coeval.now(Diff.empty)
+  private[this] var priorityDiff          = Diff.empty
 
   override def putIfNew(tx: Transaction): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id()) || priorityTransactions.contains(tx.id())) TracedResult.wrapValue(false)
@@ -170,7 +169,7 @@ class UtxPoolImpl(
   }
 
   override def removeAll(txs: Traversable[Transaction]): Unit = {
-    val ids = txs.map(_.id()).toSet
+    val ids              = txs.map(_.id()).toSet
     val priorityAffected = ids.exists(priorityTransactions.contains)
     removeIds(ids)
     if (priorityAffected) recalcPriorityDiff()
@@ -196,14 +195,10 @@ class UtxPoolImpl(
   }
 
   private[this] def addTransaction(tx: Transaction, verify: Boolean, priority: Boolean): TracedResult[ValidationError, Boolean] = {
-    val ordDiff = TransactionDiffer.skipFailing(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(blockchain, tx)
-
-    val diffEi =
-      if (ordDiff.resultE.isRight || !this.enablePriorityPool) ordDiff
-      else {
-        val patchedBlockchain = CompositeBlockchain(blockchain, Some(priorityDiff()))
-        TransactionDiffer.skipFailing(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(patchedBlockchain, tx)
-      }
+    val diffEi = {
+      val patchedBlockchain = CompositeBlockchain(blockchain, Some(priorityDiff))
+      TransactionDiffer.skipFailing(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(patchedBlockchain, tx)
+    }
 
     def addPortfolio(): Unit = diffEi.map { diff =>
       pessimisticPortfolios.add(tx.id(), diff)
@@ -442,18 +437,15 @@ class UtxPoolImpl(
   }
 
   private[this] def recalcPriorityDiff(): Unit = {
-    this.priorityDiff = Coeval.evalOnce {
-      val txs = priorityTransactions.synchronized(priorityTransactions.values.toVector)
-
-      txs.foldLeft(Diff.empty) {
-        case (diff, tx) =>
-          val cb     = CompositeBlockchain(blockchain, Some(diff))
-          val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), verify = false)(cb, _)
-          differ(tx).resultE match {
-            case Left(_)        => diff
-            case Right(newDiff) => Monoid.combine(diff, newDiff)
-          }
-      }
+    val txs = priorityTransactions.synchronized(priorityTransactions.values.toVector)
+    this.priorityDiff = txs.foldLeft(Diff.empty) {
+      case (diff, tx) =>
+        val cb     = CompositeBlockchain(blockchain, Some(diff))
+        val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), verify = false)(cb, _)
+        differ(tx).resultE match {
+          case Left(_)        => diff
+          case Right(newDiff) => Monoid.combine(diff, newDiff)
+        }
     }
   }
 
