@@ -17,7 +17,7 @@ import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{Proofs, TxValidationError}
+import com.wavesplatform.transaction.{PaymentTransaction, Proofs, TxValidationError}
 import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.{transaction => vt}
 
@@ -111,7 +111,7 @@ object PBTransactions {
       case Data.Payment(PaymentTransactionData(recipient, amount)) =>
         for {
           addr <- PBRecipients.toAddress(recipient.toByteArray, chainId)
-          tx   <- vt.PaymentTransaction.create(sender, addr, amount, feeAmount, timestamp, signature)
+          tx   <- PaymentTransaction(sender, addr, amount, feeAmount, timestamp, signature, chainId).validatedEither
         } yield tx
 
       case Data.Transfer(TransferTransactionData(Some(recipient), Some(amount), attachment)) =>

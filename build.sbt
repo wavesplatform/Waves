@@ -33,12 +33,12 @@ lazy val lang =
           sourceGenerators += Tasks.docSource,
           PB.targets += scalapb.gen(flatPackage = true) -> (sourceManaged in Compile).value,
           PB.protoSources := Seq(baseDirectory.value.getParentFile / "shared" / "src" / "main" / "protobuf"),
-          PB.deleteTargetDirectory := false,
+          PB.deleteTargetDirectory := false
         )
       )
     )
 
-lazy val langJVM = lang.jvm
+lazy val `lang-jvm` = lang.jvm
   .settings(langPublishSettings)
   .settings(
     name := "RIDE Compiler",
@@ -47,38 +47,44 @@ lazy val langJVM = lang.jvm
     libraryDependencies += "org.scala-js" %% "scalajs-stubs" % "1.0.0" % Provided
   )
 
-lazy val langJS = lang.js
+lazy val `lang-js` = lang.js
   .enablePlugins(VersionObject)
   .settings(
     libraryDependencies += Dependencies.circeJsInterop.value
   )
 
 lazy val `lang-testkit` = project
-  .dependsOn(langJVM)
+  .dependsOn(`lang-jvm`)
   .in(file("lang/testkit"))
   .settings(langPublishSettings)
   .settings(
     libraryDependencies ++= Dependencies.test.map(_.withConfigurations(Some("compile")))
   )
 
-lazy val langTests = project.in(file("lang/tests")).dependsOn(`lang-testkit`)
+lazy val `lang-tests` = project.in(file("lang/tests")).dependsOn(`lang-testkit`)
 
-lazy val langDoc = project
+lazy val `lang-doc` = project
   .in(file("lang/doc"))
-  .dependsOn(langJVM)
+  .dependsOn(`lang-jvm`)
   .settings(
     libraryDependencies ++= Seq("com.github.spullara.mustache.java" % "compiler" % "0.9.5") ++ Dependencies.test
   )
 
-lazy val node           = project.dependsOn(langJVM, `lang-testkit` % "test")
-lazy val `node-testkit` = project.in(file("node/testkit")).dependsOn(node)
+lazy val node = project.dependsOn(`lang-jvm`, `lang-testkit` % "test")
+
+lazy val `node-testkit` = project
+  .in(file("node/testkit"))
+  .dependsOn(node)
+  .settings(libraryDependencies ++= Dependencies.nodeTestkit.value)
+
 lazy val `node-tests` = project
   .in(file("node/tests"))
   .dependsOn(`node-testkit` % "test", `lang-testkit` % "test")
   .settings(
-    libraryDependencies ++= Dependencies.nodeTests.value,
-    Test / parallelExecution := true
+    Test / parallelExecution := true,
+    libraryDependencies ++= Dependencies.logDeps
   )
+
 lazy val `grpc-server`    = project.dependsOn(node % "compile;runtime->provided", `node-testkit` % "test")
 lazy val `node-it`        = project.dependsOn(node, `node-testkit`, `grpc-server`)
 lazy val `node-generator` = project.dependsOn(node, `node-testkit`, `node`)
@@ -104,9 +110,13 @@ lazy val it = project
 
 lazy val root = (project in file("."))
   .aggregate(
-    langJS,
-    langJVM,
+    `lang-js`,
+    `lang-jvm`,
+    `lang-tests`,
+    `lang-testkit`,
     node,
+    `node-testkit`,
+    `node-tests`,
     `node-it`,
     `node-generator`,
     benchmark,
@@ -115,7 +125,7 @@ lazy val root = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion := "2.13.1",
+    scalaVersion := "2.13.2",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
     V.fallback := (1, 2, 5),
@@ -175,17 +185,17 @@ packageAll := Def
   .value
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
-checkPRRaw := Def.sequential(
-  clean,
-
-
-  Def.task {
-    (Test / compile).value
-    (langTests / Test / test).value
-    (langJS / Compile / fastOptJS).value
-    (`node-tests` / Test / test).value
-  }
-).value
+checkPRRaw := Def
+  .sequential(
+    root / clean,
+    Def.task {
+      (Test / compile).value
+      (`lang-tests` / Test / test).value
+      (`lang-js` / Compile / fastOptJS).value
+      (`node-tests` / Test / test).value
+    }
+  )
+  .value
 
 def checkPR: Command = Command.command("checkPR") { state =>
   val updatedState = Project

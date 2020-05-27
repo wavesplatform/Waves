@@ -72,7 +72,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
     } yield inetAddress -> ts
 
     forAll(genListOf(TestsCount, gen)) { m =>
-      (peerDatabase.knownPeers _).expects().returning(m.toMap[InetSocketAddress, Long])
+      (() => peerDatabase.knownPeers).expects().returning(m.toMap[InetSocketAddress, Long])
       val route  = PeersApiRoute(restAPISettings, connectToPeer, peerDatabase, new ConcurrentHashMap[Channel, PeerInfo]()).route
       val result = Get(routePath("/all")) ~> route ~> runRoute
 

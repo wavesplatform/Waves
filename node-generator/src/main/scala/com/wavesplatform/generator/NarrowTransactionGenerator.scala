@@ -569,7 +569,7 @@ object NarrowTransactionGenerator {
             tradeAsset.quantity / Universe.Accounts.size,
             Waves,
             900000,
-            Some(Attachment.Bin(Array.fill(random.nextInt(100))(random.nextInt().toByte))),
+            ByteStr(Array.fill(random.nextInt(100))(random.nextInt().toByte)),
             System.currentTimeMillis()
           )
         })

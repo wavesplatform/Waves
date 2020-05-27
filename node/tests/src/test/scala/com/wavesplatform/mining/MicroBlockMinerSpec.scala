@@ -1,11 +1,10 @@
 package com.wavesplatform.mining
 
 import com.wavesplatform.account.Alias
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, TestBlock}
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl.MicroBlockMiningResult
 import com.wavesplatform.settings.TestFunctionalitySettings
@@ -63,7 +62,7 @@ class MicroBlockMinerSpec extends FlatSpec with Matchers with PrivateMethodTeste
         result match {
           case res @ MicroBlockMinerImpl.Success(b, totalConstraint) =>
             val isFirstBlock = block.transactionData.isEmpty
-            val elapsed = (res.nanoTime - startTime).nanos.toMillis
+            val elapsed      = (res.nanoTime - startTime).nanos.toMillis
 
             if (isFirstBlock) elapsed should be < 1000L
             else elapsed shouldBe settings.minerSettings.microBlockInterval.toMillis +- 1000
@@ -93,8 +92,8 @@ class MicroBlockMinerSpec extends FlatSpec with Matchers with PrivateMethodTeste
       d.appendBlock(baseBlock)
 
       val constraint = OneDimensionalMiningConstraint(5, TxEstimators.one, "limit")
-      val lastBlock = generateBlocks(baseBlock, constraint, 0)
+      val lastBlock  = generateBlocks(baseBlock, constraint, 0)
       lastBlock.transactionData should have size constraint.rest.toInt
     }
-    }
+  }
 }

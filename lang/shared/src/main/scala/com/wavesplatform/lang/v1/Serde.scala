@@ -64,30 +64,33 @@ object Serde {
       case DEC_FUNC =>
         for {
           name <- Coeval.now(bb.getString)
-          args <- ({
+          args <- {
             val argsCnt = bb.getInt
             if (argsCnt <= (bb.limit() - bb.position()) / 2 && argsCnt >= 0) {
               Coeval.now(for (_ <- 1 to argsCnt) yield bb.getString)
             } else {
               Coeval.raiseError(new Exception(s"At position ${bb.position()} array of arguments names too big."))
             }
-          })
+          }
           body <- aux
         } yield FUNC(name, args.toList, body)
     }
   }
 
-  def desAux(bb: ByteBuffer, allowObjects: Boolean = false, acc: Coeval[Unit] = Coeval.now(())): Coeval[EXPR] = acc.flatMap { _ =>
+  def desAux(bb: ByteBuffer, allowObjects: Boolean = false, acc: Coeval[Unit] = Coeval.now(())): Coeval[EXPR] =
+    desAuxR(bb, allowObjects, acc)
+
+  private def desAuxR(bb: ByteBuffer, allowObjects: Boolean, acc: Coeval[Unit]): Coeval[EXPR] = acc.flatMap { _ =>
     bb.get() match {
       case E_LONG   => Coeval.now(CONST_LONG(bb.getLong))
       case E_BYTES  => Coeval.now(CONST_BYTESTR(ByteStr(bb.getBytes)).explicitGet())
       case E_STRING => Coeval.now(CONST_STRING(bb.getString).explicitGet())
-      case E_IF     => (desAux(bb, allowObjects), desAux(bb, allowObjects), desAux(bb, allowObjects)).mapN(IF)
+      case E_IF     => (desAuxR(bb, allowObjects, acc), desAuxR(bb, allowObjects, acc), desAuxR(bb, allowObjects, acc)).mapN(IF)
       case E_BLOCK =>
         for {
           name     <- Coeval.now(bb.getString)
-          letValue <- desAux(bb, allowObjects)
-          body     <- desAux(bb, allowObjects)
+          letValue <- desAuxR(bb, allowObjects, acc)
+          body     <- desAuxR(bb, allowObjects, acc)
         } yield LET_BLOCK(
           let = LET(name, letValue),
           body = body
@@ -95,20 +98,20 @@ object Serde {
       case E_BLOCK_V2 =>
         for {
           decType <- Coeval.now(bb.get())
-          dec     <- deserializeDeclaration(bb, desAux(bb, allowObjects), decType)
-          body    <- desAux(bb, allowObjects)
+          dec     <- deserializeDeclaration(bb, desAuxR(bb, allowObjects, acc), decType)
+          body    <- desAuxR(bb, allowObjects, acc)
         } yield BLOCK(dec, body)
       case E_REF    => Coeval.now(REF(bb.getString))
       case E_TRUE   => Coeval.now(TRUE)
       case E_FALSE  => Coeval.now(FALSE)
-      case E_GETTER => desAux(bb, allowObjects).map(GETTER(_, field = bb.getString))
+      case E_GETTER => desAuxR(bb, allowObjects, acc).map(GETTER(_, field = bb.getString))
       case E_FUNCALL =>
         Coeval
           .now((bb.getFunctionHeader, bb.getInt))
           .flatMap {
             case (header, argc) =>
               if (argc <= (bb.limit() - bb.position()) && argc >= 0) {
-                val args: List[Coeval[EXPR]] = (1 to argc).map(_ => desAux(bb, allowObjects)).toList
+                val args: List[Coeval[EXPR]] = (1 to argc).map(_ => desAuxR(bb, allowObjects, acc)).toList
                 args.sequence[Coeval, EXPR].map(FUNCTION_CALL(header, _))
               } else {
                 tooBigArray(bb)
@@ -121,7 +124,7 @@ object Serde {
             argsCount =>
               if (argsCount <= (bb.limit() - bb.position()) && argsCount >= 0)
                 (1 to argsCount).to(LazyList)
-                  .traverse(_ => evaluatedOnly(desAux(bb, allowObjects)))
+                  .traverse(_ => evaluatedOnly(desAuxR(bb, allowObjects, acc)))
                   .map(elements => ARR(elements.toIndexedSeq, limited = false).explicitGet())
               else
                 tooBigArray(bb)
@@ -134,7 +137,7 @@ object Serde {
               _ =>
                 for {
                   fieldName  <- Coeval.now(bb.getString)
-                  fieldValue <- evaluatedOnly(desAux(bb, allowObjects))
+                  fieldValue <- evaluatedOnly(desAuxR(bb, allowObjects, acc))
                 } yield (fieldName, fieldValue)
             )
         } yield CaseObj(CASETYPEREF(typeName, Nil), fields.toMap)

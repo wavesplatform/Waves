@@ -104,8 +104,8 @@ object Global extends BaseGlobal {
   ): Either[String, Long] =
     tryEi {
       val result = calc(
-        base * Math.pow(10, -baseScale),
-        exponent * Math.pow(10, -exponentScale)
+        base * Math.pow(10, -baseScale.toDouble),
+        exponent * Math.pow(10, -exponentScale.toDouble)
       )
       unscaled(result, resultScale, round)
     }

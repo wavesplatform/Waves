@@ -48,15 +48,18 @@ val aopMerge: MergeStrategy = new MergeStrategy {
   }
 }
 
+lazy val ModuleInfoPattern = raw"(META-INF/.*/|)module-info\.class".r
+
 inTask(assembly)(
   Seq(
     test := {},
     assemblyJarName := s"waves-all-${version.value}.jar",
     assemblyMergeStrategy := {
-      case "module-info.class"                                  => MergeStrategy.discard
+      case ModuleInfoPattern(_)                                 => MergeStrategy.discard
       case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.concat
       case PathList("META-INF", "aop.xml")                      => aopMerge
-      case other                                                => (assemblyMergeStrategy in assembly).value(other)
+      case other =>
+        if (other.endsWith(".proto")) MergeStrategy.discard else (assemblyMergeStrategy in assembly).value(other)
     }
   )
 )

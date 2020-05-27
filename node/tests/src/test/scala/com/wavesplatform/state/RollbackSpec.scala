@@ -75,7 +75,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             )
             .explicitGet()
         )
-      case _ => List(SignedTx.transfer(1.toByte, sender, recipient, Waves, amount, Waves, 1000, None, nextTs))
+      case _ => List(SignedTx.transfer(1.toByte, sender, recipient, Waves, amount, Waves, 1000, ByteStr.empty, nextTs))
     }
   }
 

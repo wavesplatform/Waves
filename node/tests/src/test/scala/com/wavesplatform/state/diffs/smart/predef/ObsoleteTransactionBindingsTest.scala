@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, PaymentTransaction}
+import com.wavesplatform.transaction.{GenesisTransaction, PaymentTransaction, SignedTx}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -73,7 +73,7 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
     ts        <- positiveIntGen
     fee       <- smallFeeGen
     genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT * 3, ts).explicitGet()
-    payment                     = PaymentTransaction.create(master, recipient.toAddress, ENOUGH_AMT * 2, fee, ts).explicitGet()
+    payment                     = SignedTx.payment(master, recipient.toAddress, ENOUGH_AMT * 2, fee, ts)
     untypedScript               = Parser.parseExpr(script(genesis, payment)).get.value
     typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1)
       .explicitGet()

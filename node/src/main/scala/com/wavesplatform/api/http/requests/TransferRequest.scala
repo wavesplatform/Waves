@@ -16,7 +16,7 @@ case class TransferRequest(
     amount: Long,
     feeAssetId: Option[Asset],
     fee: Long,
-    attachment: Option[Attachment],
+    attachment: Option[ByteStr],
     timestamp: Option[Long],
     signature: Option[ByteStr],
     proofs: Option[Proofs],

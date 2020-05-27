@@ -25,7 +25,7 @@ object TxHelpers {
     GenesisTransaction.create(address, amount, timestamp).explicitGet()
 
   def transfer(from: KeyPair, to: AddressOrAlias, amount: Long = TestValues.OneWaves, asset: Asset = Waves): TransferTransaction =
-    TransferTransaction.selfSigned(TxVersion.V1, from, to, asset, amount, Waves, TestValues.fee, ByteStr.empty, timestamp).explicitGet()
+    SignedTx.transfer(TxVersion.V1, from, to, asset, amount, Waves, TestValues.fee, ByteStr.empty, timestamp)
 
   def issue(amount: Long = TestValues.ThousandWaves, script: Script = null): IssueTransaction =
     IssueTransaction

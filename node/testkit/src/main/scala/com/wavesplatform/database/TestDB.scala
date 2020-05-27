@@ -47,7 +47,7 @@ class TestIterator(entries: mutable.SortedMap[ByteStr, Array[Byte]]) extends DBI
   private var iter = new EW(entries)
 
   override def seek(key: Array[Byte]): Unit = {
-    iter = new EW(entries.from(ByteStr(key)))
+    iter = new EW(entries.rangeFrom(ByteStr(key)))
   }
 
   override def seekToFirst(): Unit = {

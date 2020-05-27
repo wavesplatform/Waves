@@ -58,7 +58,7 @@ class TestIterator(entries: mutable.SortedMap[KW, Array[Byte]]) extends DBIterat
   private var iter = new EW(entries)
 
   override def seek(key: Array[Byte]): Unit = {
-    iter = new EW(entries.from(KW(key)))
+    iter = new EW(entries.rangeFrom(KW(key)))
   }
 
   override def seekToFirst(): Unit = {

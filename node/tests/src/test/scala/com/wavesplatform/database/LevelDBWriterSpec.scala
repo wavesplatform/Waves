@@ -160,7 +160,7 @@ class LevelDBWriterSpec
   }
 
   def createTransfer(master: KeyPair, recipient: Address, ts: Long): TransferTransaction =
-    SignedTx.transfer(1.toByte, master, recipient, Waves, ENOUGH_AMT / 10, Waves, 1000000, None, ts)
+    SignedTx.transfer(1.toByte, master, recipient, Waves, ENOUGH_AMT / 10, Waves, 1000000, ByteStr.empty, ts)
 
   def preconditions(ts: Long): Gen[(KeyPair, List[Block])] = {
     for {

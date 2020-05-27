@@ -68,10 +68,10 @@ object NxtPoSCalculator extends PoSCalculator {
       val baseTargetGamma = normalize(BaseTargetGamma, targetBlockDelaySeconds)
 
       val baseTarget = (if (meanBlockDelay > targetBlockDelaySeconds) {
-                          prevBaseTarget * Math.min(meanBlockDelay, maxBlockDelay) / targetBlockDelaySeconds
+                          prevBaseTarget * Math.min(meanBlockDelay.toDouble, maxBlockDelay) / targetBlockDelaySeconds
                         } else {
                           prevBaseTarget - prevBaseTarget * baseTargetGamma *
-                            (targetBlockDelaySeconds - Math.max(meanBlockDelay, minBlockDelay)) / (targetBlockDelaySeconds * 100)
+                            (targetBlockDelaySeconds - Math.max(meanBlockDelay.toDouble, minBlockDelay)) / (targetBlockDelaySeconds * 100)
                         }).toLong
 
       normalizeBaseTarget(baseTarget, targetBlockDelaySeconds)

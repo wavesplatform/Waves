@@ -14,11 +14,9 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset._
-import com.wavesplatform.transaction.{Proofs, TxVersion}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
-import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
 

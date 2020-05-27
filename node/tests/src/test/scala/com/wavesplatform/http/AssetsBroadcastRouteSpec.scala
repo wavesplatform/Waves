@@ -7,7 +7,7 @@ import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.requests.{SignedTransferV1Request, SignedTransferV2Request}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError

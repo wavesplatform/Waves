@@ -196,7 +196,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     for {
       amount: Long <- positiveLongGen
       fee: Long    <- smallFeeGen
-    } yield PaymentTransaction.create(sender, recipient, amount, fee, timestamp).explicitGet()
+    } yield SignedTx.payment(sender, recipient, amount, fee, timestamp)
 
   private val leaseParamGen = for {
     sender    <- accountGen
@@ -292,7 +292,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       amount: Option[TxAmount] = None,
       feeAsset: Option[Asset] = None,
       fee: Option[TxAmount] = None,
-      attachment: Option[Option[Attachment]] = None,
+      attachment: Option[ByteStr] = None,
       proofs: Option[Proofs] = None
   ): Gen[TransferTransaction] =
     for {
@@ -303,7 +303,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       amount     <- constOrGen(amount, positiveLongGen)
       feeAsset   <- constOrGen(feeAsset, assetIdGen.map(Asset.fromCompatId))
       fee        <- constOrGen(fee, smallFeeGen)
-      attachment <- constOrGen(attachment, Gen.option(attachmentGen))
+      attachment <- constOrGen(attachment, attachmentGen)
       proofs     <- constOrGen(proofs, proofsGen)
     } yield TransferTransaction(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, proofs, AddressScheme.current.chainId)
 
@@ -578,7 +578,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       minFee  <- smallFeeGen
       minFee1 <- smallFeeGen
       assetId = IssuedAsset(issue.assetId)
-      fee = (if (reducedFee) 0.001 * Constants.UnitsInWave else 1 * Constants.UnitsInWave).toLong
+      fee = (if (reducedFee) 0.001 * Constants.UnitsInWave.toDouble else 1 * Constants.UnitsInWave.toDouble).toLong
     } yield (
       issue,
       SponsorFeeTransaction.selfSigned(1.toByte, sender, assetId, Some(minFee), fee, timestamp).explicitGet(),

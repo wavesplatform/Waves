@@ -12,11 +12,8 @@ import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxVersion
-import com.wavesplatform.it.util._
-import com.wavesplatform.it.BaseSuite
-import com.wavesplatform.it.api.SyncHttpApi._
-import org.scalatest.Ignore
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import org.scalatest.Ignore
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}

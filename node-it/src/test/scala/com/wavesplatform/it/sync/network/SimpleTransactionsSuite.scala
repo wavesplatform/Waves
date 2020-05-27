@@ -36,7 +36,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers {
       1L,
       Waves,
       minFee,
-      None,
+      ByteStr.empty,
       System.currentTimeMillis()
     )
 
@@ -54,7 +54,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers {
       1L,
       Waves,
       minFee,
-      None,
+      ByteStr.empty,
       System.currentTimeMillis() + (1 days).toMillis
     )
 

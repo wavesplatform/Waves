@@ -1627,11 +1627,11 @@ class InvokeScriptTransactionDiffTest
           .anyNumberOfTimes()
         (blockchain.accountScript _).expects(invoke.sender.toAddress).returning(None).anyNumberOfTimes()
         (blockchain.hasAccountScript _).expects(invoke.sender.toAddress).returning(false).anyNumberOfTimes()
-        (blockchain.activatedFeatures _)
+        (() => blockchain.activatedFeatures)
           .expects()
           .returning(Map(BlockchainFeatures.Ride4DApps.id -> 0))
           .anyNumberOfTimes()
-        (blockchain.height _).expects().returning(1).anyNumberOfTimes()
+        (() => blockchain.height).expects().returning(1).anyNumberOfTimes()
         (blockchain.blockHeader _)
           .expects(*)
           .returning(

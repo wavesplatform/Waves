@@ -2,11 +2,11 @@ package com.wavesplatform.state.diffs
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressScheme, Alias}
+import com.wavesplatform.block.TestBlock
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
-import com.wavesplatform.block.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -18,7 +18,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, PaymentTransaction, Proofs, SignedTx, Transaction, TxVersion}
+import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Proofs, SignedTx, Transaction, TxVersion}
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -225,7 +225,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
 
       tx <- Gen.oneOf(
         GenesisTransaction.create(invChainAddr, amount, timestamp).explicitGet(),
-        PaymentTransaction.create(master, invChainAddr, amount, amount, timestamp).explicitGet(),
+        SignedTx.payment(master, invChainAddr, amount, amount, timestamp),
         TransferTransaction(
           TxVersion.V3,
           master.publicKey,

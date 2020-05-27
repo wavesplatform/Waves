@@ -664,9 +664,9 @@ class UtxPoolSpecification
         forAll(gen) {
           case (tx1, rest) =>
             val blockchain = stub[Blockchain]
-            (blockchain.settings _).when().returning(WavesSettings.default().blockchainSettings)
-            (blockchain.height _).when().returning(1)
-            (blockchain.activatedFeatures _).when().returning(Map.empty)
+            (() => blockchain.settings).when().returning(WavesSettings.default().blockchainSettings)
+            (() => blockchain.height).when().returning(1)
+            (() => blockchain.activatedFeatures).when().returning(Map.empty)
 
             val utx =
               new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, enablePriorityPool = true)
@@ -723,9 +723,9 @@ class UtxPoolSpecification
 
       def createState(scripted: Address, settings: WavesSettings = WavesSettings.default(), setBalance: Boolean = true): Blockchain = {
         val blockchain = stub[Blockchain]
-        (blockchain.settings _).when().returning(settings.blockchainSettings)
-        (blockchain.height _).when().returning(1)
-        (blockchain.activatedFeatures _).when().returning(Map(BlockchainFeatures.SmartAccounts.id -> 0))
+        (() => blockchain.settings).when().returning(settings.blockchainSettings)
+        (() => blockchain.height).when().returning(1)
+        (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SmartAccounts.id -> 0))
 
         if (setBalance) (blockchain.balance _).when(*, *).returning(ENOUGH_AMT)
         (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))

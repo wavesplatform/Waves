@@ -11,10 +11,7 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.Attachment.{Bin, Bool, Num, Str}
-import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
 import com.wavesplatform.transaction.{SignedTx, TxVersion}
-import com.wavesplatform.transaction.transfer.TransferTransaction
 
 class TransferTxFromProtoSuite extends BaseTransactionSuite {
   private val source    = firstAddress

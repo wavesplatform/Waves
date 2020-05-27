@@ -288,7 +288,7 @@ object JsAPI {
     jObj(
       "evaluate"    -> (repl.execute _ andThen mapResult),
       "info"        -> repl.info _,
-      "totalInfo"   -> repl.totalInfo _,
+      "totalInfo"   -> (() => repl.totalInfo),
       "clear"       -> repl.clear _,
       "reconfigure" -> (repl.reconfigure _ andThen asJs)
     )

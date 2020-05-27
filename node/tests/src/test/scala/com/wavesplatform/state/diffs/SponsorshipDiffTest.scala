@@ -115,7 +115,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
         1000000,
         IssuedAsset(assetId),
         issueTx.quantity + 1,
-        None,
+        ByteStr.empty,
         ts + 1
       )
       insufficientFee = SignedTx.transfer(
@@ -126,11 +126,11 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
         1000000,
         IssuedAsset(assetId),
         sponsorTx.minSponsoredAssetFee.get - 1,
-        None,
+        ByteStr.empty,
         ts + 2
       )
       fee            = 3000 * sponsorTx.minSponsoredAssetFee.get
-      wavesOverspend = SignedTx.transfer(1.toByte, master, recipient.toAddress, Waves, 1000000, IssuedAsset(assetId), fee, None, ts + 3)
+      wavesOverspend = SignedTx.transfer(1.toByte, master, recipient.toAddress, Waves, 1000000, IssuedAsset(assetId), fee, ByteStr.empty, ts + 3)
     } yield (genesis, issueTx, sponsorTx, assetOverspend, insufficientFee, wavesOverspend)
 
     forAll(setup) {
@@ -174,14 +174,13 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
       genesis2: GenesisTransaction = GenesisTransaction.create(bob.toAddress, amount, ts).explicitGet()
       (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
       assetId         = issueTx.id()
-      transferAssetTx = SignedTx.transfer(1.toByte, master, alice.toAddress, IssuedAsset(assetId), issueTx.quantity, Waves, fee, None, ts + 2)
+      transferAssetTx = SignedTx.transfer(1.toByte, master, alice.toAddress, IssuedAsset(assetId), issueTx.quantity, Waves, fee, ByteStr.empty, ts + 2)
       leasingTx = LeaseTransaction
         .selfSigned(1.toByte, master, bob.toAddress, amount - issueTx.fee - sponsorTx.fee - 2 * fee, fee, ts + 3)
         .explicitGet()
       leasingToMasterTx = LeaseTransaction
         .selfSigned(1.toByte, bob, master.toAddress, amount / 2, fee, ts + 3)
-        .right
-        .get
+        .explicitGet()
       insufficientFee = SignedTx.transfer(
         1.toByte,
         alice,
@@ -190,7 +189,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
         issueTx.quantity / 12,
         IssuedAsset(assetId),
         sponsorTx.minSponsoredAssetFee.get,
-        None,
+        ByteStr.empty,
         ts + 4
       )
     } yield (genesis, genesis2, issueTx, sponsorTx, transferAssetTx, leasingTx, insufficientFee, leasingToMasterTx)
@@ -292,9 +291,9 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
       ).signWith(master.privateKey)
       assetId           = IssuedAsset(issue.id())
       sponsor           = SponsorFeeTransaction.selfSigned(1.toByte, master, assetId, Some(100), 100000000, ts + 2).explicitGet()
-      assetTransfer     = SignedTx.transfer(1.toByte, master, recipient.toAddress, assetId, issue.quantity, Waves, 100000, None, ts + 3)
-      wavesTransfer     = SignedTx.transfer(1.toByte, master, recipient.toAddress, Waves, 99800000, Waves, 100000, None, ts + 4)
-      backWavesTransfer = SignedTx.transfer(1.toByte, recipient, master.toAddress, Waves, 100000, assetId, 100, None, ts + 5)
+      assetTransfer     = SignedTx.transfer(1.toByte, master, recipient.toAddress, assetId, issue.quantity, Waves, 100000, ByteStr.empty, ts + 3)
+      wavesTransfer     = SignedTx.transfer(1.toByte, master, recipient.toAddress, Waves, 99800000, Waves, 100000, ByteStr.empty, ts + 4)
+      backWavesTransfer = SignedTx.transfer(1.toByte, recipient, master.toAddress, Waves, 100000, assetId, 100, ByteStr.empty, ts + 5)
     } yield (genesis, issue, sponsor, assetTransfer, wavesTransfer, backWavesTransfer)
 
     forAll(setup) {

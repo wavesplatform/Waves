@@ -3,7 +3,6 @@ package com.wavesplatform.state.diffs.smart.scenarios
 import cats.implicits._
 import com.wavesplatform.account.Alias
 import com.wavesplatform.block.TestBlock
-import com.wavesplatform.account.Alias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
@@ -28,7 +27,6 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart._
-import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
 import org.scalatest.PropSpec

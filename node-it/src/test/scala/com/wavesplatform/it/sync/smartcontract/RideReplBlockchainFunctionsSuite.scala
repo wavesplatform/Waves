@@ -13,8 +13,7 @@ import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxVersion
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{SignedTx, TxVersion}
 import org.scalatest.{Assertion, Ignore}
 import org.scalatest.EitherValues._
 
@@ -42,7 +41,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   private var assetId      = ""
   private var transferTxId = ""
 
-  private val alias = "nickname"
+  private val alias          = "nickname"
   private val transferAmount = 100
 
   private def execute(expr: String): Either[String, String] =
@@ -122,7 +121,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
 
   test("getBoolean()") {
     assert("""this.getBoolean("bool1").value()""", " true")
-    assert("""this.getBoolean("bool2").value()"""," false")
+    assert("""this.getBoolean("bool2").value()""", " false")
   }
 
   test("getBooleanValue()") {
@@ -181,7 +180,8 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
 
   test("transferTransactionById()") {
     val responseTx = sender.transactionInfo[TransferTransactionInfo](transferTxId)
-    val bodyBytes = TransferTransaction.selfSigned(
+    val bodyBytes = SignedTx
+      .transfer(
         version = TxVersion.V2,
         sender = alice,
         recipient = Alias.createWithChainId(alias, chainId.toByte).explicitGet(),
@@ -192,7 +192,6 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
         attachment = ByteStr.empty,
         timestamp = responseTx.timestamp
       )
-      .explicitGet()
       .bodyBytes
       .value()
 

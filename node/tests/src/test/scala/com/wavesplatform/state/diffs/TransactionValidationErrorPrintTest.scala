@@ -1,10 +1,10 @@
 package com.wavesplatform.state.diffs
 
 import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.block.TestBlock
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
-import com.wavesplatform.block.TestBlock
 import com.wavesplatform.lang.directives.values.{Expression, V1}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils.compilerContext
@@ -14,9 +14,7 @@ import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationErro
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.ScriptExecutionError
 import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
-import com.wavesplatform.transaction.{GenesisTransaction, SignedTx, TxVersion}
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, TxValidationError, TxVersion}
+import com.wavesplatform.transaction.{GenesisTransaction, SignedTx, TxValidationError, TxVersion}
 import com.wavesplatform.utils._
 import org.scalatest.{EitherValues, Inside, PropSpec}
 
