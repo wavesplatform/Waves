@@ -30,7 +30,8 @@ object ContractScript {
   case class ContractScriptImpl(stdLibVersion: StdLibVersion, expr: DApp) extends Script {
     override type Expr = DApp
     override val bytes: Coeval[ByteStr] = Coeval.fromTry(
-      Global.serializeContract(expr, stdLibVersion)
+      Global
+        .serializeContract(expr, stdLibVersion)
         .bimap(new RuntimeException(_), ByteStr(_))
         .toTry
     )
@@ -38,9 +39,9 @@ object ContractScript {
   }
 
   def estimateComplexityByFunction(
-    version:   StdLibVersion,
-    contract:  DApp,
-    estimator: ScriptEstimator
+      version: StdLibVersion,
+      contract: DApp,
+      estimator: ScriptEstimator
   ): Either[String, List[(String, Long)]] =
     (contract.callableFuncs.map(func => (func.annotation.invocationArgName, func.u)) ++
       contract.verifierFuncOpt.map(func => (func.annotation.invocationArgName, func.u)))
@@ -54,21 +55,36 @@ object ContractScript {
       }
 
   def estimateComplexity(
-    version:   StdLibVersion,
-    contract:  DApp,
-    estimator: ScriptEstimator
+      version: StdLibVersion,
+      contract: DApp,
+      estimator: ScriptEstimator
   ): Either[String, (Long, Map[String, Long])] =
     for {
-      cbf <- estimateComplexityByFunction(version, contract, estimator)
-      max = cbf.maximumOption(_._2 compareTo _._2)
-      _   <- max.fold(().asRight[String])(m =>
-        Either.cond(
-          m._2 <= MaxComplexityByVersion(version),
-          (),
-          s"Contract function (${m._1}) is too complex: ${m._2} > ${MaxComplexityByVersion(version)}"
-        )
-      )
-    } yield (max.map(_._2).getOrElse(0L), cbf.toMap)
+      (maxComplexity, complexities) <- estimateComplexityExact(version, contract, estimator)
+      _                             <- checkComplexity(version, maxComplexity)
+    } yield (maxComplexity._2, complexities)
+
+  def checkComplexity(
+      version: StdLibVersion,
+      maxComplexity: (String, Long)
+  ): Either[String, Unit] = {
+    val limit = MaxComplexityByVersion(version)
+    Either.cond(
+      maxComplexity._2 <= limit,
+      (),
+      s"Contract function (${maxComplexity._1}) is too complex: ${maxComplexity._2} > $limit"
+    )
+  }
+
+  def estimateComplexityExact(
+      version: StdLibVersion,
+      contract: DApp,
+      estimator: ScriptEstimator
+  ): Either[String, ((String, Long), Map[String, Long])] =
+    for {
+      complexities <- estimateComplexityByFunction(version, contract, estimator)
+      max = complexities.maximumOption(_._2 compareTo _._2).getOrElse(("", 0L))
+    } yield (max, complexities.toMap)
 
   private def constructExprFromFuncAndContext(dec: List[DECLARATION], annotationArgName: String, funcExpr: FUNC): EXPR = {
     val funcWithAnnotationContext =
