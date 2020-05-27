@@ -171,7 +171,7 @@ class BlockchainUpdaterImpl(
       .orElse(lastBlockReward)
   }
 
-  override def processBlock(block: Block, hitSource: ByteStr, verify: Boolean = true): Either[ValidationError, Option[DiscardedTransactions]] =
+  override def processBlock(block: Block, hitSource: ByteStr, verify: Boolean = true): Either[ValidationError, Option[(DiscardedTransactions, Diff)]] =
     writeLock {
       val height                             = leveldb.height
       val notImplementedFeatures: Set[Short] = leveldb.activatedFeaturesAt(height).diff(BlockchainFeatures.implemented)
@@ -182,7 +182,7 @@ class BlockchainUpdaterImpl(
           (),
           GenericError(s"UNIMPLEMENTED ${displayFeatures(notImplementedFeatures)} ACTIVATED ON BLOCKCHAIN, UPDATE THE NODE IMMEDIATELY")
         )
-        .flatMap[ValidationError, Option[DiscardedTransactions]](
+        .flatMap[ValidationError, Option[(DiscardedTransactions, Diff)]](
           _ =>
             (ngState match {
               case None =>
@@ -203,7 +203,7 @@ class BlockchainUpdaterImpl(
                         miningConstraints.total,
                         verify
                       )
-                      .map(r => Option((r, Seq.empty[Transaction], reward, hitSource)))
+                      .map(r => Option((r, Seq.empty[Transaction], Diff.empty, reward, hitSource)))
                 }
               case Some(ng) =>
                 if (ng.base.header.reference == block.header.reference) {
@@ -225,7 +225,7 @@ class BlockchainUpdaterImpl(
                         log.trace(
                           s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})"
                         )
-                        Some((r, ng.transactions, ng.reward, hitSource))
+                        Some((r, ng.transactions, ng.bestLiquidDiff, ng.reward, hitSource))
                       }
                   } else if (areVersionsOfSameBlock(block, ng.base)) {
                     if (block.transactionData.lengthCompare(ng.transactions.size) <= 0) {
@@ -246,7 +246,7 @@ class BlockchainUpdaterImpl(
                           miningConstraints.total,
                           verify
                         )
-                        .map(r => Some((r, Seq.empty[Transaction], ng.reward, hitSource)))
+                        .map(r => Some((r, Seq.empty[Transaction], Diff.empty, ng.reward, hitSource)))
                     }
                   } else
                     Left(
@@ -294,7 +294,10 @@ class BlockchainUpdaterImpl(
                           leveldb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
                           BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
                           TxsInBlockchainStats.record(ng.transactions.size)
-                          Some((hardenedDiff, discarded.flatMap(_.transactionData), reward, hitSource))
+                          val (discTxs, discDiff) = discarded.foldLeft(Seq.empty[Transaction] -> Diff.empty) { case ((txs, discDiff), (mb, diff)) =>
+                            (txs ++ mb.transactionData, Monoid.combine(discDiff, diff))
+                          }
+                          Some((hardenedDiff, discTxs, discDiff, reward, hitSource))
                         }
                       } else {
                         val errorText = s"Forged block has invalid signature. Base: ${ng.base}, requested reference: ${block.header.reference}"
@@ -304,7 +307,7 @@ class BlockchainUpdaterImpl(
                   }
             }).map {
               _ map {
-                case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, detailedDiff), discarded, reward, hitSource) =>
+                case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, detailedDiff), discarded, discDiff, reward, hitSource) =>
                   val newHeight   = leveldb.height + 1
                   val prevNgState = ngState
 
@@ -331,7 +334,7 @@ class BlockchainUpdaterImpl(
 
                   blockchainUpdateTriggers.onProcessBlock(block, detailedDiff, reward, leveldb)
 
-                  discarded
+                  (discarded, discDiff)
               }
             }
         )

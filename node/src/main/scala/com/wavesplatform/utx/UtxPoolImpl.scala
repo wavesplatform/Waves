@@ -424,29 +424,16 @@ class UtxPoolImpl(
   }
 
   /** DOES NOT verify transactions */
-  def addAndCleanup(transactions: Seq[Transaction]): Unit = priorityTransactions.synchronized {
+  def addAndCleanup(transactions: Seq[Transaction], discDiff: Diff = Diff.empty): Unit = priorityTransactions.synchronized {
     transactions.foreach { tx =>
       addTransaction(tx, verify = false, this.enablePriorityPool)
       if (this.enablePriorityPool) removeFromOrdPool(tx.id())
     }
 
     if (transactions.nonEmpty && this.enablePriorityPool)
-      recalcPriorityDiff()
+      this.priorityDiff = discDiff
 
     TxCleanup.runCleanupAsync()
-  }
-
-  private[this] def recalcPriorityDiff(): Unit = {
-    val txs = priorityTransactions.synchronized(priorityTransactions.values.toVector)
-    this.priorityDiff = txs.foldLeft(Diff.empty) {
-      case (diff, tx) =>
-        val cb     = CompositeBlockchain(blockchain, Some(diff))
-        val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), verify = false)(cb, _)
-        differ(tx).resultE match {
-          case Left(_)        => diff
-          case Right(newDiff) => Monoid.combine(diff, newDiff)
-        }
-    }
   }
 
   override def close(): Unit = {
