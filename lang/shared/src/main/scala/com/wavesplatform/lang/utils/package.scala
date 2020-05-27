@@ -3,6 +3,7 @@ package com.wavesplatform.lang
 import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
@@ -10,7 +11,7 @@ import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, BlockInfo, Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader}
 import monix.eval.Coeval
@@ -25,18 +26,20 @@ package object utils {
     override def height: Long                                                                                    = 0
     override def chainId: Byte                                                                                   = 1: Byte
     override def inputEntity: Environment.InputEntity                                                            = null
+    override val txId: ByteStr                                                                                   = ByteStr.empty
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
-    override def transferTransactionById(id: Array[Byte]): Option[Tx]                                            = ???
+    override def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer]                                   = ???
     override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
     override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
     override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
     override def blockInfoByHeight(height: Int): Option[BlockInfo]                                               = ???
     override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
+    override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails]    = ???
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
-    override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = ???
     override def tthis: Recipient.Address                                                                        = ???
-    override def multiPaymentAllowed: Boolean                                                                    = ???
+    override def multiPaymentAllowed: Boolean                                                                    = true
+    override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
   }
 
   val lazyContexts: Map[DirectiveSet, Coeval[CTX[Environment]]] = {

@@ -2,6 +2,7 @@ package com.wavesplatform.lang
 
 import cats.Id
 import cats.kernel.Monoid
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.diffs.ProduceError
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.CTX
@@ -12,7 +13,7 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, _}
-import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, BlockInfo, Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import monix.eval.Coeval
 import org.scalacheck.Shrink
@@ -76,7 +77,7 @@ object Common {
     override def inputEntity   = in()
 
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
-    override def transferTransactionById(id: Array[Byte]): Option[Tx]                                            = ???
+    override def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer]                                   = ???
     override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
     override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
     override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
@@ -84,9 +85,11 @@ object Common {
     override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = ???
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
-    override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = ???
+    override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails]    = ???
     override def tthis: Recipient.Address                                                                        = ???
-    override def multiPaymentAllowed: Boolean                                                                    = ???
+    override def multiPaymentAllowed: Boolean                                                                    =  true
+    override def txId: ByteStr                                                                                   = ???
+    override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
   }
 
   def addressFromPublicKey(chainId: Byte, pk: Array[Byte], addressVersion: Byte = EnvironmentFunctions.AddressVersion): Array[Byte] = {

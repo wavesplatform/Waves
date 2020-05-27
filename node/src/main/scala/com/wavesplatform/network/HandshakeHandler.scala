@@ -81,8 +81,6 @@ abstract class HandshakeHandler(
   import HandshakeHandler._
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
-    case HandshakeTimeoutExpired =>
-      peerDatabase.blacklistAndClose(ctx.channel(), "Timeout expired while waiting for handshake")
     case remoteHandshake: Handshake =>
       if (localHandshake.applicationName != remoteHandshake.applicationName)
         peerDatabase.blacklistAndClose(
@@ -105,6 +103,8 @@ abstract class HandshakeHandler(
               establishedConnections.put(ctx.channel(), peerInfo(remoteHandshake, ctx.channel()))
 
               ctx.channel().attr(NodeNameAttributeKey).set(remoteHandshake.nodeName)
+              ctx.channel().attr(NodeVersionAttributeKey).set(remoteHandshake.applicationVersion)
+
               Option(ctx.channel().attr(ConnectionStartAttributeKey).get()).foreach { start =>
                 log.trace(s"Time taken to accept handshake = ${System.currentTimeMillis() - start} ms")
               }
@@ -140,6 +140,7 @@ abstract class HandshakeHandler(
 object HandshakeHandler extends ScorexLogging {
 
   val NodeNameAttributeKey        = AttributeKey.newInstance[String]("name")
+  val NodeVersionAttributeKey     = AttributeKey.newInstance[(Int, Int, Int)]("version")
   val ConnectionStartAttributeKey = AttributeKey.newInstance[Long]("connectionStart")
 
   def versionIsSupported(remoteVersion: (Int, Int, Int)): Boolean =
@@ -168,6 +169,15 @@ object HandshakeHandler extends ScorexLogging {
       peerDatabase: PeerDatabase,
       allChannels: ChannelGroup
   ) extends HandshakeHandler(handshake, establishedConnections, peerConnections, peerDatabase, allChannels) {
+
+    override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
+      case HandshakeTimeoutExpired =>
+        peerDatabase.blacklistAndClose(ctx.channel(), "Timeout expired while waiting for handshake")
+
+      case _ =>
+        super.channelRead(ctx, msg)
+    }
+
     override protected def connectionNegotiated(ctx: ChannelHandlerContext): Unit = {
       sendLocalHandshake(ctx)
       super.connectionNegotiated(ctx)
@@ -182,6 +192,16 @@ object HandshakeHandler extends ScorexLogging {
       peerDatabase: PeerDatabase,
       allChannels: ChannelGroup
   ) extends HandshakeHandler(handshake, establishedConnections, peerConnections, peerDatabase, allChannels) {
+
+    override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
+      case HandshakeTimeoutExpired =>
+        log.trace(s"Timeout expired while waiting for handshake: ${id(ctx.channel())}")
+        peerDatabase.suspendAndClose(ctx.channel())
+
+      case _ =>
+        super.channelRead(ctx, msg)
+    }
+
     override protected def channelActive(ctx: ChannelHandlerContext): Unit = {
       sendLocalHandshake(ctx)
       ctx.channel().attr(ConnectionStartAttributeKey).set(System.currentTimeMillis())

@@ -2,9 +2,9 @@ package com.wavesplatform.serialization.protobuf
 
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, _}
+import com.wavesplatform.common.utils._
 import com.wavesplatform.serialization.protobuf.SmartNoSmartBenchmark.ExchangeTransactionSt
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.{Proofs, TxVersion}
@@ -29,7 +29,7 @@ class SmartNoSmartBenchmark {
   @Benchmark
   def unsafeExchangeTX_test(st: ExchangeTransactionSt, bh: Blackhole): Unit = {
     import st._
-    val exchangeTransaction = ExchangeTransaction(TxVersion.V2, buy, sell, 2, 5000000000L, 1, 1, 1, 1526992336241L, proofs)
+    val exchangeTransaction = ExchangeTransaction(TxVersion.V2, buy, sell, 2, 5000000000L, 1, 1, 1, 1526992336241L, proofs, AddressScheme.current.chainId)
     bh.consume(exchangeTransaction)
   }
 }
@@ -62,7 +62,7 @@ object SmartNoSmartBenchmark {
       1526992336241L,
       1529584336241L,
       2,
-      proofs = Proofs(Base58.tryDecodeWithLimit("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
+      proofs = Proofs(ByteStr.decodeBase58("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
     )
 
     val proofs = Proofs(Seq(ByteStr.decodeBase58("5NxNhjMrrH5EWjSFnVnPbanpThic6fnNL48APVAkwq19y2FpQp4tNSqoAZgboC2ykUfqQs9suwBQj6wERmsWWNqa").get))

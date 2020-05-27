@@ -1,11 +1,11 @@
 package com.wavesplatform.utils
 
 import java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy
-import java.util.concurrent._
+import java.util.concurrent.{Future => JavaFuture, _}
 
 import io.netty.util.{Timeout, Timer}
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
-import monix.execution.{ExecutionModel, Features, UncaughtExceptionReporter}
+import monix.execution.{ExecutionModel, Features, Scheduler, UncaughtExceptionReporter}
 
 import scala.concurrent.duration._
 
@@ -18,9 +18,9 @@ object Schedulers {
       self.afterExecute(r, t)
       var exception: Throwable = t
 
-      if ((exception eq null) && r.isInstanceOf[Future[_]]) {
+      if ((exception eq null) && r.isInstanceOf[JavaFuture[_]]) {
         try {
-          val future = r.asInstanceOf[Future[_]]
+          val future = r.asInstanceOf[JavaFuture[_]]
           if (future.isDone) future.get()
         } catch {
           case ex: ExecutionException =>
@@ -75,10 +75,8 @@ object Schedulers {
     ExecutorScheduler(executor, reporter, executionModel, Features.empty)
   }
 
-  private[this] val m = classOf[Thread].getDeclaredMethod("stop0", classOf[java.lang.Object])
-  m.setAccessible(true)
-
   private class TimedWrapper[V](timer: Timer, timeout: FiniteDuration, delegate: RunnableScheduledFuture[V]) extends RunnableScheduledFuture[V] {
+    @volatile
     private[this] var maybeScheduledTimeout     = Option.empty[Timeout]
     override def isPeriodic: Boolean            = delegate.isPeriodic
     override def getDelay(unit: TimeUnit): Long = delegate.getDelay(unit)
@@ -87,7 +85,10 @@ object Schedulers {
       val workerThread = Thread.currentThread()
       maybeScheduledTimeout = Some(
         timer.newTimeout(
-          (t: Timeout) => if (!t.isCancelled) m.invoke(workerThread, new TimeoutException("Timeout executing task")),
+          (t: Timeout) =>
+            if (!t.isCancelled) {
+              workerThread.interrupt()
+            },
           timeout.toMillis,
           MILLISECONDS
         )
@@ -125,5 +126,18 @@ object Schedulers {
     }
 
     ExecutorScheduler(executor, reporter, executionModel, Features.empty)
+  }
+
+  import scala.concurrent.{Future, Promise}
+  import scala.util.control.NonFatal
+
+  // Catches InterruptedException correctly
+  def executeCatchingInterruptedException[T](pool: Scheduler)(f: => T): Future[T] = {
+    val promise = Promise[T]
+    pool.execute { () =>
+      try promise.success(f)
+      catch { case e @ (NonFatal(_) | _: InterruptedException) => promise.failure(e) }
+    }
+    promise.future
   }
 }

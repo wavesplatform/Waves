@@ -17,7 +17,7 @@ import scala.concurrent.duration._
 
 class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
   private val estimator = ScriptEstimatorV2
-  var asset = ""
+  var asset             = ""
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -38,9 +38,9 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
   }
 
   test("transfer verification with asset script") {
-    val firstAssetBalance = sender.assetBalance(firstAddress, asset).balance
+    val firstAssetBalance  = sender.assetBalance(firstAddress, asset).balance
     val secondAssetBalance = sender.assetBalance(secondAddress, asset).balance
-    val thirdAssetBalance = sender.assetBalance(thirdAddress, asset).balance
+    val thirdAssetBalance  = sender.assetBalance(thirdAddress, asset).balance
 
     sender.transfer(firstAddress, secondAddress, 100, smartMinFee, Some(asset), waitForTx = true)
 
@@ -78,10 +78,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       s"""
          |match tx {
          |  case s : SetAssetScriptTransaction => true
-         |  case t:  TransferTransaction => t.recipient == addressFromPublicKey(base58'${
-        ByteStr(
-          pkByAddress(secondAddress).publicKey).toString
-      }')
+         |  case t:  TransferTransaction => t.recipient == addressFromPublicKey(base58'${pkByAddress(secondAddress).publicKey}')
          |  case _ => false
          |}
          """.stripMargin,
@@ -100,13 +97,9 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       s"""
          |match tx {
          |  case s : SetAssetScriptTransaction => true
-         |  case t:  TransferTransaction => t.recipient != addressFromPublicKey(base58'${
-        ByteStr(
-          pkByAddress(secondAddress).publicKey).toString
-      }') && t.recipient != addressFromPublicKey(base58'${
-        ByteStr(
-          pkByAddress(firstAddress).publicKey).toString
-      }')
+         |  case t:  TransferTransaction => t.recipient != addressFromPublicKey(base58'${pkByAddress(secondAddress).publicKey}') && t.recipient != addressFromPublicKey(base58'${pkByAddress(
+           firstAddress
+         ).publicKey}')
          |  case _ => false
          |}
          """.stripMargin,
@@ -127,7 +120,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       .issue(firstAddress, "FeeAsset", "Asset for fee of Smart Asset", someAssetAmount, 2, reissuable = false, issueFee, waitForTx = true)
       .id
 
-    sender.sponsorAsset(firstAddress, feeAsset, baseFee = 2, fee = sponsorFee + smartFee, waitForTx = true)
+    sender.sponsorAsset(firstAddress, feeAsset, baseFee = 2, fee = sponsorReducedFee + smartFee, waitForTx = true)
 
     val scr = ScriptCompiler(
       s"""
@@ -185,12 +178,32 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     sender.setAssetScript(blackAsset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
     val blackTx = TransferTransaction
-      .selfSigned(2.toByte, pkByAddress(secondAddress), pkByAddress(thirdAddress), IssuedAsset(ByteStr.decodeBase58(blackAsset).get), 1, Waves, smartMinFee, None, System.currentTimeMillis + 1.minutes.toMillis)
+      .selfSigned(
+        2.toByte,
+        pkByAddress(secondAddress),
+        pkByAddress(thirdAddress).toAddress,
+        IssuedAsset(ByteStr.decodeBase58(blackAsset).get),
+        1,
+        Waves,
+        smartMinFee,
+        None,
+        System.currentTimeMillis + 1.minutes.toMillis
+      )
       .right
       .get
 
     val incorrectTx = TransferTransaction
-      .selfSigned(2.toByte, pkByAddress(secondAddress), pkByAddress(thirdAddress), IssuedAsset(ByteStr.decodeBase58(blackAsset).get), 1, Waves, smartMinFee, None, System.currentTimeMillis + 10.minutes.toMillis)
+      .selfSigned(
+        2.toByte,
+        pkByAddress(secondAddress),
+        pkByAddress(thirdAddress).toAddress,
+        IssuedAsset(ByteStr.decodeBase58(blackAsset).get),
+        1,
+        Waves,
+        smartMinFee,
+        None,
+        System.currentTimeMillis + 10.minutes.toMillis
+      )
       .right
       .get
 
@@ -213,7 +226,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       s"""
          |match tx {
          |  case s : SetAssetScriptTransaction => true
-         |  case b:  BurnTransaction => b.sender == addressFromPublicKey(base58'${ByteStr(pkByAddress(secondAddress).publicKey).toString}')
+         |  case b:  BurnTransaction => b.sender == addressFromPublicKey(base58'${pkByAddress(secondAddress).publicKey}')
          |  case _ => false
          |}
          """.stripMargin,
@@ -230,11 +243,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       s"""
          |match tx {
          |  case s : SetAssetScriptTransaction => true
-         |  case b:  BurnTransaction => b.sender != addressFromPublicKey(base58'${
-        ByteStr(
-          pkByAddress(secondAddress).publicKey
-        ).toString
-      }')
+         |  case b:  BurnTransaction => b.sender != addressFromPublicKey(base58'${pkByAddress(secondAddress).publicKey}')
          |  case _ => false
          |}
          """.stripMargin,
@@ -323,12 +332,12 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     ).explicitGet()._1.bytes.value.base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
-    val transfers = List(Transfer(firstAddress, 10), Transfer(secondAddress, 100))
+    val transfers       = List(Transfer(firstAddress, 10), Transfer(secondAddress, 100))
     val massTransferFee = calcMassTransferFee(transfers.size)
-    sender.massTransfer(firstAddress, transfers, massTransferFee + smartFee, Some(asset), waitForTx = true)
+    sender.massTransfer(firstAddress, transfers, massTransferFee + smartFee, assetId = Some(asset), waitForTx = true)
 
     val transfers2 = List(Transfer(firstAddress, 9), Transfer(secondAddress, 100))
-    assertApiError(sender.massTransfer(firstAddress, transfers2, massTransferFee + smartFee, Some(asset)), errNotAllowedByTokenApiError)
+    assertApiError(sender.massTransfer(firstAddress, transfers2, massTransferFee + smartFee, assetId = Some(asset)), errNotAllowedByTokenApiError)
   }
 
   test("masstransfer - transferCount <=2") {
@@ -346,9 +355,12 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     ).explicitGet()._1.bytes.value.base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
-    val transfers = List(Transfer(firstAddress, 10), Transfer(secondAddress, 100), Transfer(firstAddress, 10))
+    val transfers                  = List(Transfer(firstAddress, 10), Transfer(secondAddress, 100), Transfer(firstAddress, 10))
     val massTransferTransactionFee = calcMassTransferFee(transfers.size)
-    assertApiError(sender.massTransfer(firstAddress, transfers, massTransferTransactionFee + smartFee, Some(asset)), errNotAllowedByTokenApiError)
+    assertApiError(
+      sender.massTransfer(firstAddress, transfers, massTransferTransactionFee + smartFee, assetId = Some(asset)),
+      errNotAllowedByTokenApiError
+    )
   }
 
   test("reissue by non-issuer") {
@@ -362,7 +374,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       s"""
          |match tx {
          |  case s : SetAssetScriptTransaction => true
-         |  case r:  ReissueTransaction => r.sender == addressFromPublicKey(base58'${ByteStr(pkByAddress(secondAddress).publicKey).toString}')
+         |  case r:  ReissueTransaction => r.sender == addressFromPublicKey(base58'${pkByAddress(secondAddress).publicKey}')
          |  case _ => false
          |}
          """.stripMargin,
@@ -396,7 +408,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       s"""
          |match tx {
          |  case s : SetAssetScriptTransaction => true
-         |  case r:  ReissueTransaction => r.sender == addressFromPublicKey(base58'${ByteStr(pkByAddress(secondAddress).publicKey).toString}')
+         |  case r:  ReissueTransaction => r.sender == addressFromPublicKey(base58'${pkByAddress(secondAddress).publicKey}')
          |  case _ => false
          |}""".stripMargin,
       isAssetScript = true,
@@ -431,7 +443,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       )
       .id
 
-    assertApiError(sender.setAssetScript(assetWOSupport, firstAddress, smartMinFee, Some(scriptBase64)), errNotAllowedByTokenApiError)
+    assertApiError(sender.setAssetScript(assetWOSupport, firstAddress, setAssetScriptFee, Some(scriptBase64)), errNotAllowedByTokenApiError)
     assertApiError(sender.transfer(firstAddress, secondAddress, 100, smartMinFee, Some(assetWOSupport)), errNotAllowedByTokenApiError)
     assertApiError(sender.burn(firstAddress, assetWOSupport, 10, smartMinFee), errNotAllowedByTokenApiError)
     assertApiError(
@@ -441,7 +453,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     val transfers = List(Transfer(firstAddress, 10))
     assertApiError(
-      sender.massTransfer(firstAddress, transfers, calcMassTransferFee(transfers.size) + smartFee, Some(assetWOSupport)),
+      sender.massTransfer(firstAddress, transfers, calcMassTransferFee(transfers.size) + smartFee, assetId = Some(assetWOSupport)),
       errNotAllowedByTokenApiError
     )
 

@@ -3,6 +3,7 @@ package com.wavesplatform.utils
 import java.net.{InetAddress, SocketTimeoutException}
 
 import monix.eval.Task
+import monix.execution.ExecutionModel
 import monix.execution.schedulers.SchedulerService
 import org.apache.commons.net.ntp.NTPUDPClient
 
@@ -16,12 +17,15 @@ trait Time {
 
 class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable {
 
+  log.info("Initializing time")
+
   private val offsetPanicThreshold = 1000000L
   private val ExpirationTimeout    = 60.seconds
   private val RetryDelay           = 10.seconds
   private val ResponseTimeout      = 10.seconds
 
-  private implicit val scheduler: SchedulerService = Schedulers.singleThread(name = "time-impl", reporter = log.error("Error in NTP", _))
+  private implicit val scheduler: SchedulerService =
+    Schedulers.singleThread(name = "time-impl", reporter = log.error("Error in NTP", _), ExecutionModel.AlwaysAsyncExecution)
 
   private val client = new NTPUDPClient()
   client.setDefaultTimeout(ResponseTimeout.toMillis.toInt)

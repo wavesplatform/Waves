@@ -5,6 +5,7 @@ import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer._
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -57,14 +58,14 @@ class TransferTransactionV2Specification extends PropSpec with PropertyChecks wi
   property("VersionedTransferTransactionSpecification id doesn't depend on proof") {
     forAll(accountGen, accountGen, proofsGen, proofsGen, attachmentGen) {
       case (_, acc2, proofs1, proofs2, attachment) =>
-        val tx1 = TransferTransaction(2.toByte, acc2, acc2.toAddress, Waves, 1, Waves, 1, Some(attachment), 1, proofs1)
-        val tx2 = TransferTransaction(2.toByte, acc2, acc2.toAddress, Waves, 1, Waves, 1, Some(attachment), 1, proofs2)
+        val tx1 = TransferTransaction(2.toByte, acc2.publicKey, acc2.toAddress, Waves, 1, Waves, 1, Some(attachment), 1, proofs1, acc2.toAddress.chainId)
+        val tx2 = TransferTransaction(2.toByte, acc2.publicKey, acc2.toAddress, Waves, 1, Waves, 1, Some(attachment), 1, proofs2, acc2.toAddress.chainId)
         tx1.id() shouldBe tx2.id()
     }
   }
 
   private def assertTxs(first: TransferTransaction, second: TransferTransaction): Unit = {
-    first.sender.stringRepr shouldEqual second.sender.stringRepr
+    first.sender shouldEqual second.sender
     first.timestamp shouldEqual second.timestamp
     first.fee shouldEqual second.fee
     first.amount shouldEqual second.amount
@@ -96,6 +97,7 @@ class TransferTransactionV2Specification extends PropSpec with PropertyChecks wi
                        "attachment": "4t2Xazb2SX"}
     """)
 
+    val recipient = Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet()
     val tx = TransferTransaction(
       2.toByte,
       PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
@@ -106,9 +108,27 @@ class TransferTransactionV2Specification extends PropSpec with PropertyChecks wi
       100000000,
       Some(Attachment.Bin(Base58.tryDecodeWithLimit("4t2Xazb2SX").get)),
       1526641218066L,
-      Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))
+      Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)),
+      recipient.chainId
     )
 
     tx.json() shouldEqual js
+  }
+
+  property("not able to pass typed attachment for transactions V2") {
+    val recipient = Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet()
+    TransferTransaction(
+      2.toByte,
+      PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+      Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet(),
+      Waves,
+      100000000,
+      Waves,
+      100000000,
+      Some(Attachment.Str("somestring")),
+      1526641218066L,
+      Proofs.empty,
+      recipient.chainId
+    ).validatedEither shouldBe Left(GenericError("Typed attachment not allowed"))
   }
 }

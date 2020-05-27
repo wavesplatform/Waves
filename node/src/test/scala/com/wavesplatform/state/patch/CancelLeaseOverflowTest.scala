@@ -1,18 +1,18 @@
 package com.wavesplatform.state.patch
 
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.{NoShrink, TransactionGen}
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class CancelLeaseOverflowTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class CancelLeaseOverflowTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
 
   private val settings = TestFunctionalitySettings.Enabled.copy(blockVersion3AfterHeight = 5)
 
@@ -25,11 +25,11 @@ class CancelLeaseOverflowTest extends PropSpec with PropertyChecks with Matchers
       fee       <- smallFeeGen
       ts        <- timestampGen
     } yield (
-      GenesisTransaction.create(sender1, amount + fee, ts).explicitGet(),
-      GenesisTransaction.create(sender2, amount + fee * 2, ts).explicitGet(),
-      LeaseTransaction.selfSigned(1.toByte, sender1, sender2, amount, fee, ts).explicitGet(),
-      LeaseTransaction.selfSigned(1.toByte, sender2, recipient, amount, fee, ts).explicitGet(),
-      TransferTransaction.selfSigned(1.toByte, sender2, recipient, Waves, amount, Waves, fee, None, ts).explicitGet()
+      GenesisTransaction.create(sender1.toAddress, amount + fee, ts).explicitGet(),
+      GenesisTransaction.create(sender2.toAddress, amount + fee * 2, ts).explicitGet(),
+      LeaseTransaction.selfSigned(1.toByte, sender1, sender2.toAddress, amount, fee, ts).explicitGet(),
+      LeaseTransaction.selfSigned(1.toByte, sender2, recipient.toAddress, amount, fee, ts).explicitGet(),
+      TransferTransaction.selfSigned(1.toByte, sender2, recipient.toAddress, Waves, amount, Waves, fee, None, ts).explicitGet()
     )
 
     forAll(leaseOverflowGen) {

@@ -1,12 +1,13 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
-import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.account.{AddressOrAlias, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
@@ -142,7 +143,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val unsigned =
       TransferTransaction(
         version = 2.toByte,
-        sender = pkByAddress(swapBC1),
+        sender = pkByAddress(swapBC1).publicKey,
         recipient = AddressOrAlias.fromString(BobBC1).explicitGet(),
         assetId = Waves,
         amount = transferAmount,
@@ -150,11 +151,12 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         fee = setScriptFee + smartFee,
         attachment = None,
         timestamp = System.currentTimeMillis(),
-        proofs = Proofs.empty
+        proofs = Proofs.empty,
+        AddressScheme.current.chainId
       )
 
     val proof    = ByteStr(secretText.getBytes("UTF-8"))
-    val sigAlice = ByteStr(crypto.sign(AlicesPK, unsigned.bodyBytes()))
+    val sigAlice = crypto.sign(AlicesPK.privateKey, unsigned.bodyBytes())
     val signed   = unsigned.copy(proofs = Proofs(Seq(proof, sigAlice)))
 
     nodes.waitForHeightArise()
@@ -174,7 +176,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     nodes.waitForHeight(height + 20)
 
     miner.accountBalances(swapBC1)
-    assertBadRequestAndMessage(miner.transactionInfo(versionedTransferId), "transactions does not exist", 404)
+    assertBadRequestAndMessage(miner.transactionInfo[TransactionInfo](versionedTransferId), "transactions does not exist", 404)
 
     val selfSignedToAlice = TransferTransaction
       .selfSigned(

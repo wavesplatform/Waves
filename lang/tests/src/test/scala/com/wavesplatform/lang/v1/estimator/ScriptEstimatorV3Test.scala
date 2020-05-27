@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.estimator
 
-import com.wavesplatform.lang.directives.values.V3
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.utils.functionCosts
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 
@@ -109,8 +109,48 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3) {
     estimate(functionCosts(V3), compile(script)) shouldBe Right(1)
   }
 
+  property("different if branches") {
+    val script =
+      """
+        |let a = 1
+        |let b = "b"
+        |if (a == 1) then {
+        |    true
+        |} else {
+        |    if (a > 1) then {
+        |        b == "a"
+        |    } else {
+        |        false
+        |    }
+        |}
+      """.stripMargin
+
+    estimate(functionCosts(V3), compile(script)) shouldBe Right(
+        1 /* let a                      */ +
+        1 /* let b                      */ +
+        1 /* if-then-else               */ +
+        3 /* a == 1         condition   */ +
+        1 /* if-then-else               */ +
+        3 /* a > 1          condition   */ +
+        3 /* b == "a"       condition   */
+    )
+  }
+
   property("getter") {
     val script = "lastBlock.height"
     estimate(functionCosts(V3), compile(script)) shouldBe Right(2) /* ref eval and field access */
+  }
+
+  property("groth16Verify_Ninputs") {
+    implicit val version : StdLibVersion = V4
+    val c = Array(1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300, 2400, 2500, 2600)
+    for { (c, n) <- c.zipWithIndex } {
+      estimate(functionCosts(V4), compile(s"groth16Verify_${n+1}inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')")) shouldBe Right(c + 3)
+    }
+  }
+
+  property("groth16Verify") {
+    implicit val version : StdLibVersion = V4
+    estimate(functionCosts(V4), compile("groth16Verify(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')")) shouldBe Right(2703)
   }
 }

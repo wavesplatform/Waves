@@ -2,10 +2,11 @@ package com.wavesplatform
 
 import cats.syntax.either._
 import com.wavesplatform.account.PrivateKey
-import com.wavesplatform.block.merkle.Merkle
-import com.wavesplatform.block.merkle.Merkle.TransactionProof
+import com.wavesplatform.block.Block.{TransactionProof, TransactionsMerkleTree}
+import com.wavesplatform.common.merkle.Merkle._
 import com.wavesplatform.block.validation.Validators._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.transaction.Transaction
 
@@ -29,23 +30,29 @@ package object block {
 
   // Sign
   private[block] implicit class BlockSignOps(block: Block) {
-    def sign(signer: PrivateKey): Block = block.copy(signature = crypto.sign(signer, ByteStr(block.bytesWithoutSignature())))
+    def sign(signer: PrivateKey): Block = block.copy(signature = crypto.sign(signer, block.bodyBytes()))
   }
 
   private[block] implicit class MicroBlockSignOps(microBlock: MicroBlock) {
-    def sign(signer: PrivateKey): MicroBlock = microBlock.copy(signature = crypto.sign(signer, ByteStr(microBlock.bytesWithoutSignature())))
+    def sign(signer: PrivateKey): MicroBlock = microBlock.copy(signature = crypto.sign(signer, microBlock.bytesWithoutSignature()))
   }
 
-  // Merkle
-  implicit class BlockMerkleOps(block: Block) {
+  def transactionProof(transaction: Transaction, transactionData: Seq[Transaction]): Option[TransactionProof] =
+    transactionData.indexWhere(transaction.id() == _.id()) match {
+      case -1  => None
+      case idx => Some(TransactionProof(transaction.id(), idx, mkProofs(idx, mkMerkleTree(transactionData)).reverse))
+    }
 
-    def transactionProof(transaction: Transaction): Option[TransactionProof] =
-      Merkle.calcTransactionProof(block, transaction)
-
-    def verifyTransactionProof(transactionProof: TransactionProof): Boolean =
-      block.transactionData
-        .lift(transactionProof.transactionIndex)
-        .filter(tx => tx.id() == transactionProof.id)
-        .exists(tx => Merkle.verifyTransactionProof(transactionProof, tx, block.transactionData.size, block.header.transactionsRoot.arr))
+  implicit class MerkleTreeOps(private val levels: TransactionsMerkleTree) extends AnyVal {
+    def transactionsRoot: ByteStr = {
+      require(levels.nonEmpty && levels.head.nonEmpty, "Invalid merkle tree")
+      ByteStr(levels.head.head)
+    }
   }
+
+  def mkMerkleTree(txs: Seq[Transaction]): TransactionsMerkleTree = mkLevels(txs.map(PBTransactions.protobuf(_).toByteArray))
+
+  def mkTransactionsRoot(version: Byte, transactionData: Seq[Transaction]): ByteStr =
+    if (version < Block.ProtoBlockVersion) ByteStr.empty
+    else mkLevels(transactionData.map(PBTransactions.protobuf(_).toByteArray)).transactionsRoot
 }

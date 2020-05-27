@@ -2,12 +2,10 @@ package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
-import com.wavesplatform.utils._
 import play.api.libs.json.{Format, Json}
 
 case class IssueRequest(
@@ -37,8 +35,8 @@ case class IssueRequest(
       tx <- IssueTransaction.create(
         actualVersion,
         sender,
-        if (actualVersion >= TxVersion.V3) name else Base64.encode(name.utf8Bytes),
-        if (actualVersion >= TxVersion.V3) description else Base64.encode(description.utf8Bytes),
+        name,
+        description,
         quantity,
         decimals,
         reissuable,

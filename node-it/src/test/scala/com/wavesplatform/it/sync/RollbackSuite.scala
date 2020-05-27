@@ -7,6 +7,7 @@ import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{Node, NodeConfigs, ReportingTestName, TransferSending}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.{BooleanDataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -47,7 +48,8 @@ class RollbackSuite
 
     nodes.waitForHeightArise()
 
-    val stateAfterFirstTry = nodes.head.debugStateAt(sender.height)
+    val stateHeight = sender.height
+    val stateAfterFirstTry = nodes.head.debugStateAt(stateHeight)
 
     nodes.rollback(startHeight)
 
@@ -55,7 +57,7 @@ class RollbackSuite
 
     nodes.waitForHeightArise()
 
-    val stateAfterSecondTry = nodes.head.debugStateAt(sender.height)
+    val stateAfterSecondTry = nodes.head.debugStateAt(stateHeight)
 
     assert(stateAfterSecondTry.size == stateAfterFirstTry.size)
 
@@ -63,6 +65,7 @@ class RollbackSuite
   }
 
   test("Just rollback transactions") {
+    nodes.waitForHeightArise() // so that NG fees won't affect miner's balances
     val startHeight      = sender.height
     val stateBeforeApply = sender.debugStateAt(startHeight)
 
@@ -115,13 +118,13 @@ class RollbackSuite
     val entry3     = IntegerDataEntry("1", 1)
     val txsBefore0 = sender.transactionsByAddress(firstAddress, 10)
 
-    val tx1 = sender.putData(firstAddress, List(entry1), calcDataFee(List(entry1))).id
+    val tx1 = sender.putData(firstAddress, List(entry1), calcDataFee(List(entry1), TxVersion.V1)).id
     nodes.waitForHeightAriseAndTxPresent(tx1)
     val txsBefore1 = sender.transactionsByAddress(firstAddress, 10)
 
     val tx1height = sender.waitForTransaction(tx1).height
 
-    val tx2 = sender.putData(firstAddress, List(entry2, entry3), calcDataFee(List(entry2, entry3))).id
+    val tx2 = sender.putData(firstAddress, List(entry2, entry3), calcDataFee(List(entry2, entry3), TxVersion.V1)).id
     nodes.waitForHeightAriseAndTxPresent(tx2)
 
     val data2 = sender.getData(firstAddress)
@@ -197,7 +200,7 @@ class RollbackSuite
 
     nodes.waitForHeightArise()
     val entry1 = StringDataEntry("oracle", "yes")
-    val dtx    = sender.putData(firstAddress, List(entry1), calcDataFee(List(entry1)) + smartFee).id
+    val dtx    = sender.putData(firstAddress, List(entry1), calcDataFee(List(entry1), TxVersion.V1) + smartFee).id
     nodes.waitForHeightAriseAndTxPresent(dtx)
 
     val tx = sender.transfer(firstAddress, firstAddress, transferAmount, smartMinFee, waitForTx = true).id

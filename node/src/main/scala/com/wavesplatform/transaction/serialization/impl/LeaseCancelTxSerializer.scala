@@ -4,6 +4,7 @@ import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.transaction.lease.LeaseCancelTransaction
@@ -15,22 +16,22 @@ import scala.util.Try
 object LeaseCancelTxSerializer {
   def toJson(tx: LeaseCancelTransaction): JsObject =
     BaseTxJson.toJson(tx) ++ Json.obj("leaseId" -> tx.leaseId.toString) ++
-      (if (tx.version == TxVersion.V2) Json.obj("chainId" -> tx.chainByte) else Json.obj())
+      (if (tx.version == TxVersion.V2) Json.obj("chainId" -> tx.chainId) else Json.obj())
 
   def bodyBytes(tx: LeaseCancelTransaction): Array[Byte] = {
     import tx._
-    val baseBytes = Bytes.concat(sender, Longs.toByteArray(fee), Longs.toByteArray(timestamp), leaseId)
+    val baseBytes = Bytes.concat(sender.arr, Longs.toByteArray(fee), Longs.toByteArray(timestamp), leaseId.arr)
 
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
-      case TxVersion.V2 => Bytes.concat(Array(typeId, version, chainByte), baseBytes)
+      case TxVersion.V2 => Bytes.concat(Array(typeId, version, chainId), baseBytes)
       case _            => PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
   def toBytes(tx: LeaseCancelTransaction): Array[Byte] = {
     tx.version match {
-      case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), tx.proofs.toSignature)
+      case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), tx.proofs.toSignature.arr)
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
       case _            => PBTransactionSerializer.bytes(tx)
     }
@@ -42,7 +43,7 @@ object LeaseCancelTxSerializer {
       val fee       = buf.getLong
       val timestamp = buf.getLong
       val leaseId   = buf.getByteArray(crypto.DigestLength)
-      LeaseCancelTransaction(version, sender, leaseId, fee, timestamp, Nil)
+      LeaseCancelTransaction(version, sender, ByteStr(leaseId), fee, timestamp, Nil, AddressScheme.current.chainId)
     }
 
     require(bytes.length > 2, "buffer underflow while parsing transaction")
@@ -50,7 +51,6 @@ object LeaseCancelTxSerializer {
     if (bytes(0) == 0) {
       require(bytes(1) == LeaseCancelTransaction.typeId, "transaction type mismatch")
       require(bytes(2) == TxVersion.V2, "transaction version mismatch")
-      require(bytes(3) == AddressScheme.current.chainId, "transaction chainId mismatch")
       val buf = ByteBuffer.wrap(bytes, 4, bytes.length - 4)
       parseCommonPart(TxVersion.V2, buf).copy(proofs = buf.getProofs)
     } else {

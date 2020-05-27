@@ -22,10 +22,10 @@ case class Proofs(proofs: Seq[ByteStr]) {
 }
 
 object Proofs {
-  val Version            = 1: Byte
-  val MaxProofs          = 8
-  val MaxProofSize       = 64
-  val MaxProofStringSize = base58Length(MaxProofSize)
+  val Version: TxVersion      = 1: Byte
+  val MaxProofs: Int          = 8
+  val MaxProofSize: Int       = 64
+  val MaxProofStringSize: Int = base58Length(MaxProofSize)
 
   lazy val empty = new Proofs(Nil)
 
@@ -41,7 +41,7 @@ object Proofs {
     validate(proofs) map { _ =>
       new Proofs(proofs) {
         override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
-          val proofsLength = 3 + proofs.map(_.length + 2).sum
+          val proofsLength = 3 + proofs.map(_.arr.length + 2).sum
           if (parsedBytes.length == proofsLength) parsedBytes else parsedBytes.take(proofsLength)
         }
       }
@@ -53,12 +53,12 @@ object Proofs {
   def fromBytes(ab: Array[Byte]): Either[ValidationError, Proofs] =
     for {
       version <- Try(ab.head.toInt).toEither.left.map(err => GenericError(err.toString))
-      _    <- Either.cond(version == 1, (), UsupportedProofVersion(version, List(1)))
-      arrs <- Try(Deser.parseArrays(ab.tail)).toEither.left.map(er => GenericError(er.toString))
-      r    <- createWithBytes(arrs.map(ByteStr(_)), ab)
+      _       <- Either.cond(version == 1, (), UsupportedProofVersion(version, List(1)))
+      arrs    <- Try(Deser.parseArrays(ab.tail)).toEither.left.map(er => GenericError(er.toString))
+      r       <- createWithBytes(arrs.map(ByteStr(_)), ab)
     } yield r
 
   def apply(proof1: ByteStr, proofs: ByteStr*): Proofs = new Proofs(proof1 +: proofs)
-  implicit def apply(proofs: Seq[ByteStr]): Proofs = new Proofs(proofs)
-  implicit def toSeq(proofs: Proofs): Seq[ByteStr] = proofs.proofs
+  implicit def apply(proofs: Seq[ByteStr]): Proofs     = new Proofs(proofs)
+  implicit def toSeq(proofs: Proofs): Seq[ByteStr]     = proofs.proofs
 }

@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs.ci
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{Asset, V4}
@@ -10,21 +11,21 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.EmptyDataEntry
-import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
+import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
-import com.wavesplatform.state.diffs._
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, _}
+import com.wavesplatform.state.{EmptyDataEntry, SponsorshipValue}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Inside, Matchers, PropSpec}
+import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB with Inside {
+class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDomain {
   property("reissue and burn actions result state") {
     forAll(paymentPreconditions(feeMultiplier = 0)) {
       case (genesis, setScript, invoke, issue, master, reissueAmount, burnAmount) =>
@@ -38,7 +39,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
             val resultAmount = issue.quantity + reissueAmount - burnAmount
 
             blockchain.assetDescription(asset).get.totalVolume shouldBe resultAmount
-            blockchain.balance(master, asset) shouldBe resultAmount
+            blockchain.balance(master.toAddress, asset) shouldBe resultAmount
         }
     }
   }
@@ -60,7 +61,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           Seq(TestBlock.create(genesis :+ setScript :+ issue)),
           TestBlock.create(Seq(invoke)),
           features
-        )(_ should produce("TransactionNotAllowedByScript"))
+        )(_ should produce("Transaction is not allowed by script of the asset", requireFailed = true))
     }
   }
 
@@ -81,7 +82,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           Seq(TestBlock.create(genesis :+ setScript :+ issue)),
           TestBlock.create(Seq(invoke)),
           features
-        )(_ should produce("TransactionNotAllowedByScript"))
+        )(_ should produce("Transaction is not allowed by script of the asset", requireFailed = true))
     }
   }
 
@@ -121,8 +122,8 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
             val recipientResultAmount = transferAmount * 2
 
             blockchain.assetDescription(asset).get.totalVolume shouldBe totalResultAmount
-            blockchain.balance(master, asset) shouldBe issuerResultAmount
-            blockchain.balance(invoker, asset) shouldBe recipientResultAmount
+            blockchain.balance(master.toAddress, asset) shouldBe issuerResultAmount
+            blockchain.balance(invoker.toAddress, asset) shouldBe recipientResultAmount
         }
     }
   }
@@ -139,7 +140,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     }
   }
 
-  property("trace") {
+  ignore("trace") {
     forAll(multiActionPreconditions(feeMultiplier = 6, withScriptError = true)) {
       case (genesis, setScript, invoke, issue, _, _, _, _, _) =>
         assertDiffEiTraced(
@@ -177,10 +178,10 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       } yield {
         val dApp = Some(deleteEntryDApp)
         for {
-          genesis  <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
-          genesis2 <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
+          genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
+          genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
           setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, dApp, fee, ts + 2)
-          ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master, None, Nil, fee, Waves, ts + 3)
+          ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3)
         } yield (List(genesis, genesis2), setDApp, ci, master)
       }.explicitGet()
 
@@ -192,7 +193,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           features
         ) {
           case (diff, _) =>
-            diff.accountData(master).data shouldBe
+            diff.accountData(master.toAddress).data shouldBe
               Map(
                 "key1" -> EmptyDataEntry("key1"),
                 "key2" -> EmptyDataEntry("key2")
@@ -216,19 +217,36 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     } yield {
       val dApp = Some(reissueAndBurnDApp(issue.id.value, reissueAmount, burnAmount))
       for {
-        genesis  <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
-        genesis2 <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
+        genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
+        genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
         setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, dApp, fee, ts + 2)
-        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master, None, Nil, fee, Waves, ts + 3)
+        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3)
       } yield (List(genesis, genesis2), setDApp, ci, issue, master, reissueAmount, burnAmount)
     }.explicitGet()
 
-  def multiActionDApp(
-    assetId: ByteStr,
-    recipient: Address,
-    reissueAmount: Long,
-    burnAmount: Long,
-    transferAmount: Long
+  private def sponsorFeePreconditions: Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, Option[Long])] =
+    for {
+      master               <- accountGen
+      invoker              <- accountGen
+      ts                   <- timestampGen
+      fee                  <- ciFee(1).map(_ + FeeUnit * FeeConstants(IssueTransaction.typeId))
+      minSponsoredAssetFee <- Gen.oneOf(None, Some(1000L))
+    } yield {
+      val dApp = Some(sponsorFeeDApp(minSponsoredAssetFee))
+      for {
+        genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
+        genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
+        setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, dApp, fee, ts + 2)
+        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3)
+      } yield (List(genesis, genesis2), setDApp, ci, minSponsoredAssetFee)
+    }.explicitGet()
+
+  private def multiActionDApp(
+      assetId: ByteStr,
+      recipient: Address,
+      reissueAmount: Long,
+      burnAmount: Long,
+      transferAmount: Long
   ): Script =
     dApp(
       s"""
@@ -238,14 +256,14 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
            |
            |   Reissue(base58'$assetId', true, $reissueAmount),
            |   Burn(base58'$assetId', $burnAmount),
-           |   ScriptTransfer(Address(base58'${recipient.bytes}'), $transferAmount, base58'$assetId'),
+           |   ScriptTransfer(Address(base58'$recipient'), $transferAmount, base58'$assetId'),
            |
            |   StringEntry("str", "str"),
            |   BinaryEntry("bin", base58'$assetId'),
            |
            |   Reissue(base58'$assetId', false, $reissueAmount),
            |   Burn(base58'$assetId', $burnAmount),
-           |   ScriptTransfer(Address(base58'${recipient.bytes}'), $transferAmount, base58'$assetId')
+           |   ScriptTransfer(Address(base58'$recipient'), $transferAmount, base58'$assetId')
            | ]
        """.stripMargin
     )
@@ -267,7 +285,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
 
     assetVerifier(
       s"""
-           | let recipient = Address(base58'${recipient.bytes}')
+           | let recipient = Address(base58'$recipient')
            |
            | func checkState(expectedAmount1: Int, expectedAmount2: Int) =
            |   this.issuer.getInteger("int") == 1     &&
@@ -322,10 +340,10 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     } yield {
       val dApp = Some(multiActionDApp(issue.id.value, invoker.publicKey.toAddress, reissueAmount, burnAmount, transferAmount))
       for {
-        genesis  <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
-        genesis2 <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
+        genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
+        genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
         setDApp  <- SetScriptTransaction.selfSigned(TxVersion.V1, master, dApp, fee, ts + 2)
-        ci       <- InvokeScriptTransaction.selfSigned(TxVersion.V1, invoker, master, None, Nil, fee, Waves, ts + 3)
+        ci       <- InvokeScriptTransaction.selfSigned(TxVersion.V1, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3)
       } yield (List(genesis, genesis2), setDApp, ci, issue, master, invoker, reissueAmount, burnAmount, transferAmount)
     }.explicitGet()
 
@@ -355,6 +373,17 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
        """.stripMargin
     )
 
+  private def sponsorFeeDApp(minSponsoredAssetFee: Option[Long]): Script =
+    dApp(
+      s"""
+         | let i0 = Issue("SponsoredAsset0", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
+         | [
+         |   i0,
+         |   SponsorFee(calculateAssetId(i0), ${minSponsoredAssetFee.getOrElse("unit")})
+         | ]
+       """.stripMargin
+    )
+
   private def dApp(body: String): Script = {
     val script =
       s"""
@@ -363,8 +392,9 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
          | {-# SCRIPT_TYPE    ACCOUNT #-}
          |
          | @Callable(i)
-         | func default() = $body
-         |
+         | func default() = {
+         |   $body
+         | }
        """.stripMargin
 
     val expr     = Parser.parseContract(script).get.value
@@ -377,28 +407,29 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       BlockchainFeatures.SmartAccounts,
       BlockchainFeatures.SmartAssets,
       BlockchainFeatures.Ride4DApps,
-      BlockchainFeatures.MultiPaymentInvokeScript
+      BlockchainFeatures.BlockV5
     ).map(_.id -> 0).toMap
   )
 
   private def issuePreconditions(
       assetScript: Option[Script] = None,
-      feeMultiplier: Int
-  ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, KeyPair, Long)] =
+      feeMultiplier: Int,
+      issueFeeMultiplier: Int
+  ): Gen[(List[Transaction], InvokeScriptTransaction, KeyPair, KeyPair, Long)] =
     for {
       master  <- accountGen
       invoker <- accountGen
       ts      <- timestampGen
-      fee     <- ciFee(feeMultiplier)
+      fee     <- ciFee(feeMultiplier, issueFeeMultiplier)
       amount  <- Gen.choose(1L, 100000000L)
     } yield {
       val dApp = Some(issueDApp(amount))
       for {
-        genesis  <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
-        genesis2 <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
+        genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
+        genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
         setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, dApp, fee, ts + 2)
-        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master, None, Nil, fee, Waves, ts + 3)
-      } yield (List(genesis, genesis2), setDApp, ci, master, invoker, amount)
+        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3)
+      } yield (List(genesis, genesis2, setDApp), ci, master, invoker, amount)
     }.explicitGet()
 
   private def issueDApp(
@@ -411,27 +442,49 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     dApp(
       s"""
          | [
-         |   Issue(unit, $decimals, "$description", $reissuable, "$name", $issueAmount, 0)
+         |   Issue("$name", "$description", $issueAmount, $decimals, $reissuable, unit, 0)
          | ]
        """.stripMargin
     )
 
   property("issue action results state") {
-    forAll(issuePreconditions(feeMultiplier = 7)) {
-      case (genesis, setScript, invoke, master, invoker, amount) =>
+    forAll(issuePreconditions(feeMultiplier = 7, issueFeeMultiplier = 1)) {
+      case (genesis, invoke, master, invoker, amount) =>
+        withDomain() { d =>
+          val tb1 = TestBlock.create(genesis)
+          d.blockchainUpdater.processBlock(tb1, ByteStr(new Array[Byte](32)), false).explicitGet()
+          val tb2 = TestBlock.create(System.currentTimeMillis(), tb1.signature, Seq(invoke))
+          d.blockchainUpdater.processBlock(tb2, ByteStr(new Array[Byte](32)), false).explicitGet()
+
+          d.portfolio(master.toAddress).map(_._2) shouldEqual Seq(amount)
+          d.portfolio(invoker.toAddress) shouldEqual Seq()
+
+          d.blockchainUpdater.processBlock(
+            TestBlock.create(System.currentTimeMillis(), tb2.signature, Seq.empty),
+            ByteStr(new Array[Byte](32)),
+            verify = false
+          )
+
+          d.portfolio(master.toAddress).map(_._2) shouldEqual Seq(amount)
+          d.portfolio(invoker.toAddress) shouldEqual Seq()
+        }
+    }
+  }
+
+  property("sponsor fee action results state") {
+    forAll(sponsorFeePreconditions) {
+      case (genesis, setScript, invoke, minSponsoredAssetFee) =>
         assertDiffAndState(
           Seq(TestBlock.create(genesis :+ setScript)),
           TestBlock.create(Seq(invoke)),
           features
         ) {
-          case (_, blockchain) =>
-            val assets = blockchain.portfolio(master).assets
-            assets.values.toList shouldBe List(amount)
-
-            val assetsi = blockchain.portfolio(invoker).assets
-            assetsi.values.toList shouldBe List()
+          case (diff, blockchain) =>
+            val asset = diff.issuedAssets.head._1
+            val sponsorshipValue = minSponsoredAssetFee.getOrElse(0L)
+            diff.sponsorship shouldBe Map(asset -> SponsorshipValue(sponsorshipValue))
+            blockchain.assetDescription(asset).map(_.sponsorship) shouldBe Some(sponsorshipValue)
         }
     }
   }
-
 }

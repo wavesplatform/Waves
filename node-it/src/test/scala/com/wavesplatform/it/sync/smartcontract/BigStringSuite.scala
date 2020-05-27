@@ -20,18 +20,18 @@ class BigStringSuite extends BaseTransactionSuite with CancelAfterFailure {
   private val acc2 = pkByAddress(thirdAddress)
 
   test("set contract, make leasing and cancel leasing") {
-    val (balance1, eff1) = miner.accountBalances(acc0.stringRepr)
+    val (balance1, eff1) = miner.accountBalances(acc0.toAddress.toString)
     val (balance2, eff2) = miner.accountBalances(thirdAddress)
 
-    val txId = sender.transfer(sender.address, acc0.stringRepr, 10 * transferAmount, minFee).id
+    val txId = sender.transfer(sender.address, acc0.toAddress.toString, 10 * transferAmount, minFee).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
     miner.assertBalances(firstAddress, balance1 + 10 * transferAmount, eff1 + 10 * transferAmount)
 
     val scriptText = s"""
-        let pkA = base58'${ByteStr(acc0.publicKey)}'
-        let pkB = base58'${ByteStr(acc1.publicKey)}'
-        let pkC = base58'${ByteStr(acc2.publicKey)}'
+        let pkA = base58'${acc0.publicKey}'
+        let pkB = base58'${acc1.publicKey}'
+        let pkC = base58'${acc2.publicKey}'
 
         let a0 = "йцукенгшщзхъфывапролдячсмитьбюйцукпврарвараравртавтрвапваппвпавп"
         ${(for (b <- 1 to 20) yield { "let a" + b + "=a" + (b - 1) + "+a" + (b - 1) }).mkString("\n")}
@@ -58,8 +58,8 @@ class BigStringSuite extends BaseTransactionSuite with CancelAfterFailure {
       LeaseTransaction
         .create(
           2.toByte,
-          acc0,
-          acc2,
+          acc0.publicKey,
+          acc2.toAddress,
           transferAmount,
           minFee + 0.2.waves,
           System.currentTimeMillis(),
@@ -67,13 +67,13 @@ class BigStringSuite extends BaseTransactionSuite with CancelAfterFailure {
         )
         .explicitGet()
 
-    val sigLeasingA = ByteStr(crypto.sign(acc0, unsignedLeasing.bodyBytes()))
-    val sigLeasingC = ByteStr(crypto.sign(acc2, unsignedLeasing.bodyBytes()))
+    val sigLeasingA = crypto.sign(acc0.privateKey, unsignedLeasing.bodyBytes())
+    val sigLeasingC = crypto.sign(acc2.privateKey, unsignedLeasing.bodyBytes())
 
     val signedLeasing =
       unsignedLeasing.copy(proofs = Proofs(Seq(sigLeasingA, ByteStr.empty, sigLeasingC)))
 
-    assertBadRequestAndMessage(sender.signedBroadcast(signedLeasing.json()).id, "String is too large")
+    assertBadRequestAndMessage(sender.signedBroadcast(signedLeasing.json()).id, "String size=32768 exceeds 32767 bytes")
 
     val leasingId = Base58.encode(unsignedLeasing.id().arr)
 

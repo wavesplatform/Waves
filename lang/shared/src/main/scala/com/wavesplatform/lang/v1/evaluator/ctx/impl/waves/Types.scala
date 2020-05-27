@@ -11,26 +11,10 @@ object Types {
   lazy val aliasType          = CASETYPEREF("Alias", List("alias" -> STRING))
   lazy val addressOrAliasType = UNION(addressType, aliasType)
 
-  val blockHeader = CASETYPEREF(
-    "BlockHeader",
-    List(
-      "timestamp"                      -> LONG,
-      "version"                        -> LONG,
-      "reference"                      -> BYTESTR,
-      "generator"                      -> BYTESTR,
-      "generatorPublicKey"             -> BYTESTR,
-      "signature"                      -> BYTESTR,
-      "baseTarget"                     -> LONG,
-      "generationSignature"            -> BYTESTR,
-      "transactionCount"               -> LONG,
-      "featureVotes"                   -> LIST(LONG)
-    )
-  )
-
   def assetType(version: StdLibVersion) = {
-    val sponsoredFields =
-      if (version >= V4) "minSponsoredFee" -> optionLong
-      else "sponsored" -> BOOLEAN
+    val versionDepFields =
+      if (version >= V4) List("minSponsoredFee" -> optionLong, "name" -> STRING, "description" -> STRING)
+      else List("sponsored" -> BOOLEAN)
 
     CASETYPEREF(
       "Asset",
@@ -42,11 +26,11 @@ object Types {
         "issuerPublicKey" -> BYTESTR,
         "reissuable"      -> BOOLEAN,
         "scripted"        -> BOOLEAN
-      ) :+ sponsoredFields
+      ) ++ versionDepFields
     )
   }
 
-  val blockInfo = CASETYPEREF(
+  def blockInfo(version: StdLibVersion) = CASETYPEREF(
     "BlockInfo",
     List(
       "timestamp"           -> LONG,
@@ -55,7 +39,7 @@ object Types {
       "generationSignature" -> BYTESTR,
       "generator"           -> addressType,
       "generatorPublicKey"  -> BYTESTR
-    )
+    ) ::: (if (version >= V4) List("vrf" -> optionByteVector) else Nil)
   )
 
   def optionAsset(version: StdLibVersion) =
@@ -139,14 +123,15 @@ object Types {
     CASETYPEREF(
       FieldNames.Issue,
       List(
-        FieldNames.IssueScript -> UNION(issueScriptType, UNIT),
-        FieldNames.IssueDecimals -> LONG,
-        FieldNames.IssueDescription -> STRING,
-        FieldNames.IssueIsReissuable -> BOOLEAN,
         FieldNames.IssueName -> STRING,
+        FieldNames.IssueDescription -> STRING,
         FieldNames.IssueQuantity -> LONG,
+        FieldNames.IssueDecimals -> LONG,
+        FieldNames.IssueIsReissuable -> BOOLEAN,
+        FieldNames.IssueScriptField -> UNION(issueScriptType, UNIT),
         FieldNames.IssueNonce -> LONG,
-      )
+      ),
+      hideConstructor = true
     )
 
   val reissueActionType =
@@ -168,11 +153,20 @@ object Types {
       )
     )
 
+  val sponsorFeeActionType =
+    CASETYPEREF(
+      FieldNames.SponsorFee,
+      List(
+        FieldNames.SponsorFeeAssetId -> BYTESTR,
+        FieldNames.SponsorFeeMinFee -> optionLong
+      )
+    )
+
   private val callableV3Results =
     List(writeSetType, scriptTransferSetType, scriptResultType)
 
   private val callableV4Actions =
-    List(issueActionType, reissueActionType, burnActionType)
+    List(issueActionType, reissueActionType, burnActionType, sponsorFeeActionType)
 
   private def callableTypes(version: StdLibVersion) =
     if (version == V3) callableV3Results
@@ -185,7 +179,7 @@ object Types {
       scriptTransfer,
       invocationType(version),
       assetType(version),
-      blockInfo
+      blockInfo(version)
     ) ::: callableTypes(version)
 
   private val callableV3ReturnType =
@@ -247,7 +241,7 @@ object Types {
     )
 
   val genericAttachmentType: UNION =
-    UNION(BYTESTR, LONG, BOOLEAN, BYTESTR, UNIT)
+    UNION(BYTESTR, LONG, BOOLEAN, STRING, UNIT)
 
   private def buildAttachmentType(version: StdLibVersion) =
     "attachment" -> (if (version >= V4) genericAttachmentType else BYTESTR)
@@ -257,13 +251,13 @@ object Types {
     else commonFields
   }
 
-  def buildIssueTransactionType(proofsEnabled: Boolean) = CASETYPEREF(
+  def buildIssueTransactionType(proofsEnabled: Boolean, version: StdLibVersion) = CASETYPEREF(
     "IssueTransaction",
     addProofsIfNeeded(
       List(
         "quantity"    -> LONG,
-        "name"        -> BYTESTR,
-        "description" -> BYTESTR,
+        "name"        -> (if (version >= V4) STRING else BYTESTR),
+        "description" -> (if (version >= V4) STRING else BYTESTR),
         "reissuable"  -> BOOLEAN,
         "decimals"    -> LONG,
         "script"      -> optionByteVector
@@ -479,7 +473,7 @@ object Types {
   def buildActiveTransactionTypes(proofsEnabled: Boolean, v: StdLibVersion): List[CASETYPEREF] = {
     buildAssetSupportedTransactions(proofsEnabled, v) ++
       List(
-        buildIssueTransactionType(proofsEnabled),
+        buildIssueTransactionType(proofsEnabled, v),
         buildLeaseTransactionType(proofsEnabled),
         buildLeaseCancelTransactionType(proofsEnabled),
         buildCreateAliasTransactionType(proofsEnabled),
@@ -488,6 +482,16 @@ object Types {
         buildDataTransactionType(proofsEnabled, v)
       )
   }
+
+  val balanceDetailsType = CASETYPEREF(
+    "BalanceDetails",
+    List(
+      "available" -> LONG,
+      "regular" -> LONG,
+      "generating" -> LONG,
+      "effective" -> LONG
+      )
+  )
 
   def buildWavesTypes(proofsEnabled: Boolean, v: StdLibVersion): Seq[FINAL] = {
     val activeTxTypes                       = buildActiveTransactionTypes(proofsEnabled, v)
@@ -504,6 +508,6 @@ object Types {
       transactionsCommonType
     ) ++
       transactionTypes ++
-      (if (v >= V4) blockHeader :: deleteDataEntry :: typedDataEntries else Seq(genericDataEntry))
+      (if (v >= V4) balanceDetailsType :: deleteDataEntry :: typedDataEntries else Seq(genericDataEntry))
   }
 }

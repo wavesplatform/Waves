@@ -7,155 +7,199 @@ import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.contract.meta.{MetaMapper, V1, V2}
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
 import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Generic, WrongArgumentType}
-import com.wavesplatform.lang.v1.compiler.CompilerContext.vars
+import com.wavesplatform.lang.v1.compiler.CompilerContext.{VariableInfo, vars}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler._
-import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
 import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, LONG, STRING}
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
-import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, PART, Pos, Type}
-import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
-import com.wavesplatform.lang.v1.task.TaskMT
+import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
+import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, PART, Type}
+import com.wavesplatform.lang.v1.parser.{Expressions, Parser, ParserV2}
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 
 object ContractCompiler {
-  def compileAnnotatedFunc(
-    af: Expressions.ANNOTATEDFUNC,
-    version: StdLibVersion
-  ): CompileM[(AnnotatedFunction, List[(String, Types.FINAL)])] = {
-    val annotationsM: CompileM[List[Annotation]] = af.anns.toList.traverse[CompileM, Annotation] { ann =>
-      for {
-        n    <- handlePart(ann.name)
-        args <- ann.args.toList.traverse[CompileM, String](handlePart)
-        ann  <- Annotation.parse(n, args).toCompileM
-      } yield ann
-    }
-    val r = for {
-      annotations <- annotationsM
-      annotationBindings = annotations.flatMap(_.dic(version).toList)
-      compiledBody <- local {
-        for {
-          _ <- modify[Id, CompilerContext, CompilationError](vars.modify(_)(_ ++ annotationBindings))
-          r <- compiler.ExpressionCompiler.compileFunc(af.f.position, af.f, annotationBindings.map(_._1))
-        } yield r
-      }
-    } yield (annotations, compiledBody)
 
-    r flatMap {
-      case (List(c: CallableAnnotation), (func, resultType, typedParams)) =>
+  def compileAnnotatedFunc(
+      af: Expressions.ANNOTATEDFUNC,
+      version: StdLibVersion,
+      saveExprContext: Boolean
+  ): CompileM[(Option[AnnotatedFunction], List[(String, Types.FINAL)], Expressions.ANNOTATEDFUNC, Iterable[CompilationError])] = {
+
+    def getCompiledAnnotatedFunc(
+        annListWithErr: (Option[Iterable[Annotation]], Iterable[CompilationError]),
+        compiledBody: CompilationStepResultDec
+    ): CompileM[AnnotatedFunction] = (annListWithErr._1, compiledBody.dec) match {
+      case (Some(List(c: CallableAnnotation)), func: Terms.FUNC) =>
         callableReturnType(version)
-          .ensureOr(expectedType => callableResultError(expectedType, resultType))(resultType <= _)
+          .ensureOr(expectedType => callableResultError(expectedType, compiledBody.t))(compiledBody.t <= _)
           .bimap(
             Generic(0, 0, _),
-            _ => (CallableFunction(c, func): AnnotatedFunction, typedParams)
+            _ => CallableFunction(c, func): AnnotatedFunction
           )
           .toCompileM
 
-      case (List(c: VerifierAnnotation), (func, tpe, typedParams)) =>
+      case (Some(List(c: VerifierAnnotation)), func: Terms.FUNC) =>
         for {
           _ <- Either
-            .cond(tpe match {
-              case _ if tpe <= BOOLEAN => true
-              case _                   => false
-            }, (), Generic(0, 0, s"VerifierFunction must return BOOLEAN or it super type, but got '$tpe'"))
+            .cond(
+              compiledBody.t match {
+                case _ if compiledBody.t <= BOOLEAN => true
+                case _                              => false
+              },
+              (),
+              Generic(0, 0, s"VerifierFunction must return BOOLEAN or it super type, but got '${compiledBody.t}'")
+            )
             .toCompileM
-        } yield (VerifierFunction(c, func), typedParams)
+        } yield VerifierFunction(c, func)
+
+      case _ =>
+        raiseError(CompilationError.Generic(0, 0, "Annotated function compilation failed"))
     }
+
+    val annotationsWithErrM = af.anns.toList
+      .traverse[CompileM, Annotation] { ann =>
+        for {
+          n    <- handlePart(ann.name)
+          args <- ann.args.toList.traverse[CompileM, String](handlePart)
+          ann  <- Annotation.parse(n, args).toCompileM
+        } yield ann
+      }
+      .handleError()
+
+    for {
+      annotationsWithErr <- annotationsWithErrM
+      annotationBindings = annotationsWithErr._1
+        .map(
+          _.flatMap(_.dic(version).toList).map(nameAndType => (nameAndType._1, VariableInfo(AnyPos, nameAndType._2)))
+        )
+        .getOrElse(List.empty)
+      compiledBody <- local {
+        modify[Id, CompilerContext, CompilationError](vars.modify(_)(_ ++ annotationBindings)).flatMap(
+          _ => compiler.ExpressionCompiler.compileFunc(af.f.position, af.f, saveExprContext, annotationBindings.map(_._1))
+        )
+      }
+      annotatedFuncWithErr <- getCompiledAnnotatedFunc(annotationsWithErr, compiledBody._1).handleError()
+
+      errorList     = annotatedFuncWithErr._2 ++ annotationsWithErr._2 ++ compiledBody._1.errors
+      typedParams   = compiledBody._2
+      parseNodeExpr = af.copy(f = compiledBody._1.parseNodeExpr.asInstanceOf[Expressions.FUNC])
+      resultAnnFunc = if (annotatedFuncWithErr._2.isEmpty && !compiledBody._1.dec.isItFailed) {
+        Some(annotatedFuncWithErr._1.get)
+      } else {
+        None
+      }
+
+    } yield (resultAnnFunc, typedParams, parseNodeExpr, errorList)
   }
 
-  def compileDeclaration(dec: Expressions.Declaration): CompileM[DECLARATION] = {
+  def compileDeclaration(dec: Expressions.Declaration, saveExprContext: Boolean): CompileM[CompilationStepResultDec] = {
     dec match {
       case l: Expressions.LET =>
         for {
-          compiledLet <- compileLet(dec.position, l)
-          (letName, letType, letExpr) = compiledLet
-          _ <- updateCtx(letName, letType, dec.position)
-        } yield Terms.LET(letName, letExpr)
+          compiledLet      <- compileLet(dec.position, l, saveExprContext)
+          updateCtxWithErr <- updateCtx(compiledLet.dec.name, compiledLet.t, dec.position).handleError()
+        } yield compiledLet.copy(errors = compiledLet.errors ++ updateCtxWithErr._2)
       case f: FUNC =>
         for {
-          cf <- compileFunc(dec.position, f)
-          (func, compiledFuncBodyType, argTypes) = cf
-          typeSig                                = FunctionTypeSignature(compiledFuncBodyType, argTypes, FunctionHeader.User(func.name))
-          _ <- updateCtx(func.name, typeSig)
-        } yield func
+          compiledFunc <- compileFunc(dec.position, f, saveExprContext)
+          (funcName, compiledFuncBodyType, argTypes) = (compiledFunc._1.dec.name, compiledFunc._1.t, compiledFunc._2)
+          typeSig                                    = FunctionTypeSignature(compiledFuncBodyType, argTypes, FunctionHeader.User(funcName))
+          updateCtxWithErr <- updateCtx(funcName, typeSig, dec.position).handleError()
+        } yield compiledFunc._1.copy(errors = compiledFunc._1.errors ++ updateCtxWithErr._2)
     }
   }
 
-  private def compileContract(ctx: CompilerContext, contract: Expressions.DAPP, version: StdLibVersion): CompileM[DApp] = {
+  private def compileContract(
+      ctx: CompilerContext,
+      parsedDapp: Expressions.DAPP,
+      version: StdLibVersion,
+      saveExprContext: Boolean = false
+  ): CompileM[(Option[DApp], Expressions.DAPP, Iterable[CompilationError])] = {
     for {
-      decs <- contract.decs.traverse[CompileM, DECLARATION](compileDeclaration)
-      _    <- validateDuplicateVarsInContract(contract)
-      _    <- validateAnnotatedFuncsArgTypes(ctx, contract)
-      funcNameWithWrongSize = contract.fs
-        .map(af => Expressions.PART.toOption[String](af.name))
-        .filter(fNameOpt => fNameOpt.nonEmpty && fNameOpt.get.getBytes("UTF-8").size > ContractLimits.MaxAnnotatedFunctionNameInBytes)
-        .map(_.get)
-      _ <- Either
-        .cond(
-          funcNameWithWrongSize.isEmpty,
-          (),
-          Generic(
-            contract.position.start,
-            contract.position.end,
-            s"Annotated function name size in bytes must be less than ${ContractLimits.MaxAnnotatedFunctionNameInBytes} for functions with name: ${funcNameWithWrongSize
-              .mkString(", ")}"
-          )
+      decsCompileResult <- parsedDapp.decs.traverse[CompileM, CompilationStepResultDec](dec => compileDeclaration(dec, saveExprContext))
+      decs           = decsCompileResult.map(_.dec)
+      parsedNodeDecs = decsCompileResult.map(_.parseNodeExpr)
+      duplicateVarsErr   <- validateDuplicateVarsInContract(parsedDapp).handleError()
+      annFuncArgTypesErr <- validateAnnotatedFuncsArgTypes(ctx, parsedDapp).handleError()
+      compiledAnnFuncsWithErr <- parsedDapp.fs
+        .traverse[CompileM, (Option[AnnotatedFunction], List[(String, Types.FINAL)], Expressions.ANNOTATEDFUNC, Iterable[CompilationError])](
+          af => local(compileAnnotatedFunc(af, version, saveExprContext))
         )
-        .toCompileM
-      l <- contract.fs.traverse(func => local(compileAnnotatedFunc(func, version)))
-      annotatedFuncs = l.map(_._1)
+      annotatedFuncs   = compiledAnnFuncsWithErr.filter(_._1.nonEmpty).map(_._1.get)
+      parsedNodeAFuncs = compiledAnnFuncsWithErr.map(_._3)
 
       duplicatedFuncNames = annotatedFuncs.map(_.u.name).groupBy(identity).collect { case (x, List(_, _, _*)) => x }.toList
-      _ <- Either
+      alreadyDefinedErr <- Either
         .cond(
           duplicatedFuncNames.isEmpty,
           (),
-          AlreadyDefined(contract.position.start, contract.position.start, duplicatedFuncNames.mkString(", "), isFunction = true)
+          AlreadyDefined(parsedDapp.position.start, parsedDapp.position.start, duplicatedFuncNames.mkString(", "), isFunction = true)
         )
         .toCompileM
+        .handleError()
 
-      _ <- Either
+      funcArgumentCountErr <- Either
         .cond(
           annotatedFuncs.forall(_.u.args.size <= ContractLimits.MaxInvokeScriptArgs),
           (),
-          Generic(contract.position.start,
-                  contract.position.end,
-                  s"Script functions can have no more than ${ContractLimits.MaxInvokeScriptArgs} arguments")
+          Generic(
+            parsedDapp.position.start,
+            parsedDapp.position.end,
+            s"Script functions can have no more than ${ContractLimits.MaxInvokeScriptArgs} arguments"
+          )
         )
         .toCompileM
+        .handleError()
 
-      callableFuncsWithParams = l.filter(_._1.isInstanceOf[CallableFunction])
-      callableFuncs = callableFuncsWithParams.map(_._1.asInstanceOf[CallableFunction])
+      callableFuncsWithParams = compiledAnnFuncsWithErr.filter(_._1.exists(_.isInstanceOf[CallableFunction]))
+      callableFuncs           = callableFuncsWithParams.map(_._1.get.asInstanceOf[CallableFunction])
       callableFuncsTypeInfo = callableFuncsWithParams.map {
-        case (f, typedParams) => typedParams.map(_._2)
+        case (_, typedParams, _, _) => typedParams.map(_._2)
       }
 
-      mappedCallableTypes =
-        if (version <= V3)
-          MetaMapper.toProto(V1)(callableFuncsTypeInfo)
-        else
-          MetaMapper.toProto(V2)(callableFuncsTypeInfo)
+      mappedCallableTypes = if (version <= V3)
+        MetaMapper.toProto(V1)(callableFuncsTypeInfo)
+      else
+        MetaMapper.toProto(V2)(callableFuncsTypeInfo)
 
-      meta <- mappedCallableTypes
-        .leftMap(Generic(contract.position.start, contract.position.start, _))
+      metaWithErr <- mappedCallableTypes
+        .leftMap(Generic(parsedDapp.position.start, parsedDapp.position.start, _))
         .toCompileM
+        .handleError()
 
       verifierFunctions = annotatedFuncs.filter(_.isInstanceOf[VerifierFunction]).map(_.asInstanceOf[VerifierFunction])
-      verifierFuncOpt <- verifierFunctions match {
+      verifierFuncOptWithErr <- (verifierFunctions match {
         case Nil => Option.empty[VerifierFunction].pure[CompileM]
         case vf :: Nil =>
           if (vf.u.args.isEmpty)
             Option.apply(vf).pure[CompileM]
           else
             raiseError[Id, CompilerContext, CompilationError, Option[VerifierFunction]](
-              Generic(contract.position.start, contract.position.start, "Verifier function must have 0 arguments"))
+              Generic(parsedDapp.position.start, parsedDapp.position.start, "Verifier function must have 0 arguments")
+            )
         case _ =>
           raiseError[Id, CompilerContext, CompilationError, Option[VerifierFunction]](
-            Generic(contract.position.start, contract.position.start, "Can't have more than 1 verifier function defined"))
+            Generic(parsedDapp.position.start, parsedDapp.position.start, "Can't have more than 1 verifier function defined")
+          )
+      }).handleError()
+
+      errorList = duplicateVarsErr._2 ++
+        annFuncArgTypesErr._2 ++
+        alreadyDefinedErr._2 ++
+        funcArgumentCountErr._2 ++
+        metaWithErr._2 ++
+        verifierFuncOptWithErr._2
+      subExprErrorList = decsCompileResult.flatMap(_.errors) ++ compiledAnnFuncsWithErr.flatMap(_._4)
+      parsedDappResult = parsedDapp.copy(decs = parsedNodeDecs, fs = parsedNodeAFuncs)
+
+      result = if (errorList.isEmpty && !compiledAnnFuncsWithErr.exists(_._1.isEmpty)) {
+        (Some(DApp(metaWithErr._1.get, decs, callableFuncs, verifierFuncOptWithErr._1.get)), parsedDappResult, subExprErrorList)
+      } else {
+        (None, parsedDappResult, errorList ++ subExprErrorList)
       }
-    } yield DApp(meta, decs, callableFuncs, verifierFuncOpt)
+    } yield result
   }
 
   def handleValid[T](part: PART[T]): CompileM[PART.VALID[T]] = part match {
@@ -164,21 +208,24 @@ object ContractCompiler {
   }
 
   private def validateAnnotatedFuncsArgTypes(ctx: CompilerContext, contract: Expressions.DAPP): CompileM[Unit] =
-    contract.fs.traverse { func =>
-      for {
-        funcName <- handleValid(func.f.name)
-        funcArgs <- func.f.args.flatMap(_._2).toList.traverse(resolveGenericType)
-        () <- funcArgs.map { case (argType, typeParam) => (argType.v, typeParam.map(_.v)) }
+    contract.fs
+      .traverse { func =>
+        for {
+          funcName <- handleValid(func.f.name)
+          funcArgs <- func.f.args.flatMap(_._2).toList.traverse(resolveGenericType)
+          () <- funcArgs
+            .map { case (argType, typeParam) => (argType.v, typeParam.map(_.v)) }
             .find(!checkAnnotatedParamType(_))
             .map(argTypesError(func, funcName, _))
             .getOrElse(().pure[CompileM])
-      } yield ()
-    }.map(_ => ())
+        } yield ()
+      }
+      .map(_ => ())
 
   private def argTypesError(
-    func: Expressions.ANNOTATEDFUNC,
-    funcName: PART.VALID[String],
-    t: (String, Option[String])
+      func: Expressions.ANNOTATEDFUNC,
+      funcName: PART.VALID[String],
+      t: (String, Option[String])
   ): CompileM[Unit] =
     raiseError[Id, CompilerContext, CompilationError, Unit](
       WrongArgumentType(func.f.position.start, func.f.position.end, funcName.v, typeStr(t), allowedCallableTypesV4)
@@ -209,8 +256,9 @@ object ContractCompiler {
     for {
       ctx <- get[Id, CompilerContext, CompilationError]
       annotationVars = contract.fs.flatMap(_.anns.flatMap(_.args)).traverse[CompileM, PART.VALID[String]](handleValid)
-      annotatedFuncArgs: Seq[(Seq[Expressions.PART[String]], Seq[Expressions.PART[String]])] = contract.fs.map(af =>
-        (af.anns.flatMap(_.args), af.f.args.map(_._1)))
+      annotatedFuncArgs: Seq[(Seq[Expressions.PART[String]], Seq[Expressions.PART[String]])] = contract.fs.map(
+        af => (af.anns.flatMap(_.args), af.f.args.map(_._1))
+      )
       annAndFuncArgsIntersection = annotatedFuncArgs.toVector.traverse[CompileM, Option[PART.VALID[String]]] {
         case (annSeq, argSeq) =>
           for {
@@ -218,11 +266,14 @@ object ContractCompiler {
             args <- argSeq.toList.traverse[CompileM, PART.VALID[String]](handleValid)
           } yield anns.map(a => args.find(p => a.v == p.v)).find(_.nonEmpty).flatten
       }
-      _ <- annotationVars.flatMap(a =>
-        a.find(v => ctx.varDefs.contains(v.v)).fold(().pure[CompileM]) { p =>
-          raiseError[Id, CompilerContext, CompilationError, Unit](
-            Generic(p.position.start, p.position.start, s"Annotation binding `${p.v}` overrides already defined var"))
-      })
+      _ <- annotationVars.flatMap(
+        a =>
+          a.find(v => ctx.varDefs.contains(v.v)).fold(().pure[CompileM]) { p =>
+            raiseError[Id, CompilerContext, CompilationError, Unit](
+              Generic(p.position.start, p.position.start, s"Annotation binding `${p.v}` overrides already defined var")
+            )
+          }
+      )
       _ <- annAndFuncArgsIntersection.flatMap {
         _.headOption.flatten match {
           case None => ().pure[CompileM]
@@ -236,7 +287,13 @@ object ContractCompiler {
   def apply(c: CompilerContext, contract: Expressions.DAPP, version: StdLibVersion): Either[String, DApp] = {
     compileContract(c, contract, version)
       .run(c)
-      .map(_._2.leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}"))
+      .map(
+        _._2
+          .leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}")
+          .flatMap(
+            res => Either.cond(res._3.isEmpty, res._1.get, s"Compilation failed: [${res._3.map(e => Show[CompilationError].show(e)).mkString("; ")}]")
+          )
+      )
       .value
   }
 
@@ -248,6 +305,40 @@ object ContractCompiler {
           case Right(c)  => Right(c)
         }
       case f @ fastparse.core.Parsed.Failure(_, _, _) => Left(f.toString)
+    }
+  }
+
+  def compileWithParseResult(
+      input: String,
+      ctx: CompilerContext,
+      version: StdLibVersion,
+      saveExprContext: Boolean = true
+  ): Either[String, (Option[DApp], Expressions.DAPP, Iterable[CompilationError])] = {
+    ParserV2.parseDAPP(input) match {
+      case Right((parseResult, removedCharPosOpt)) =>
+        compileContract(ctx, parseResult, version, saveExprContext)
+          .run(ctx)
+          .map(
+            _._2
+              .map { compRes =>
+                val errorList =
+                  compRes._3 ++
+                    (if (removedCharPosOpt.isEmpty) Nil
+                     else
+                       List(
+                         Generic(
+                           removedCharPosOpt.get.start,
+                           removedCharPosOpt.get.end,
+                           "Parsing failed. Some chars was removed as result of recovery process."
+                         )
+                       ))
+                (compRes._1, compRes._2, errorList)
+              }
+              .leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}")
+          )
+          .value
+
+      case Left(error) => Left(error.toString)
     }
   }
 }

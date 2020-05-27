@@ -6,32 +6,39 @@ import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.estimator.v3.EstimatorContext.EvalM
 import com.wavesplatform.lang.v1.estimator.v3.EstimatorContext.Lenses._
+import com.wavesplatform.lang.v1.task.imports._
 import monix.eval.Coeval
 
 object ScriptEstimatorV3 extends ScriptEstimator {
+  override val version: Int = 3
+
   override def apply(
-    vars:  Set[String],
-    funcs: Map[FunctionHeader, Coeval[Long]],
-    expr:  EXPR
+      vars: Set[String],
+      funcs: Map[FunctionHeader, Coeval[Long]],
+      expr: EXPR
   ): Either[ExecutionError, Long] = {
     val f = funcs.mapValues(_.value)
     evalExpr(expr).run(EstimatorContext(f)).value._2
   }
 
   private def evalExpr(t: EXPR): EvalM[Long] =
-    t match {
-      case LET_BLOCK(let, inner)       => evalLetBlock(let, inner)
-      case BLOCK(let: LET, inner)      => evalLetBlock(let, inner)
-      case BLOCK(f: FUNC, inner)       => evalFuncBlock(f, inner)
-      case REF(str)                    => markRef(str)
-      case _: EVALUATED                => const(1L)
-      case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
-      case GETTER(expr, _)             => evalGetter(expr)
-      case FUNCTION_CALL(header, args) => evalFuncCall(header, args)
-    }
+    if (Thread.currentThread().isInterrupted)
+      raiseError("Script estimation was interrupted")
+    else
+      t match {
+        case LET_BLOCK(let, inner)       => evalLetBlock(let, inner)
+        case BLOCK(let: LET, inner)      => evalLetBlock(let, inner)
+        case BLOCK(f: FUNC, inner)       => evalFuncBlock(f, inner)
+        case BLOCK(_: FAILED_DEC, _)     => const(0)
+        case REF(str)                    => markRef(str)
+        case _: EVALUATED                => const(1L)
+        case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
+        case GETTER(expr, _)             => evalGetter(expr)
+        case FUNCTION_CALL(header, args) => evalFuncCall(header, args)
+        case _: FAILED_EXPR              => const(0)
+      }
 
   private def evalHoldingFuncs(expr: EXPR): EvalM[Long] =
     for {
@@ -43,9 +50,9 @@ object ScriptEstimatorV3 extends ScriptEstimator {
   private def evalLetBlock(let: LET, inner: EXPR): EvalM[Long] =
     for {
       startCtx <- get[Id, EstimatorContext, ExecutionError]
-      overlap   = startCtx.usedRefs.contains(let.name)
-      _        <- update(usedRefs.modify(_)(_ - let.name))
-      letEval   = evalHoldingFuncs(let.value)
+      overlap = startCtx.usedRefs.contains(let.name)
+      _ <- update(usedRefs.modify(_)(_ - let.name))
+      letEval = evalHoldingFuncs(let.value)
       nextCost <- evalExpr(inner)
       ctx      <- get[Id, EstimatorContext, ExecutionError]
       letCost  <- if (ctx.usedRefs.contains(let.name)) letEval else const(0L)
@@ -61,9 +68,9 @@ object ScriptEstimatorV3 extends ScriptEstimator {
 
   private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR): EvalM[Long] =
     for {
-      cond     <- evalHoldingFuncs(cond)
-      right    <- evalHoldingFuncs(ifTrue)
-      left     <- evalHoldingFuncs(ifFalse)
+      cond  <- evalHoldingFuncs(cond)
+      right <- evalHoldingFuncs(ifTrue)
+      left  <- evalHoldingFuncs(ifFalse)
     } yield cond + Math.max(right, left) + 1
 
   private def markRef(key: String): EvalM[Long] =
@@ -74,8 +81,11 @@ object ScriptEstimatorV3 extends ScriptEstimator {
 
   private def evalFuncCall(header: FunctionHeader, args: List[EXPR]): EvalM[Long] =
     for {
-      ctx      <- get[Id, EstimatorContext, ExecutionError]
-      bodyCost <- funcs.get(ctx).get(header).map(const)
+      ctx <- get[Id, EstimatorContext, ExecutionError]
+      bodyCost <- funcs
+        .get(ctx)
+        .get(header)
+        .map(const)
         .getOrElse(raiseError[Id, EstimatorContext, ExecutionError, Long](s"function '$header' not found"))
       argsCost <- args.traverse(evalHoldingFuncs)
     } yield argsCost.sum + bodyCost

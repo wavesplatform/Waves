@@ -7,9 +7,9 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.utils.Gen
-import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.generator.utils.Implicits.DoubleExt
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -43,7 +43,7 @@ class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[KeyPai
     val now = System.currentTimeMillis()
     val txs = Range(0, settings.transfers).map { i =>
       TransferTransaction
-        .selfSigned(2.toByte, bank, bank, Waves, 1.waves - 2 * fee, Waves, fee, None, now + i)
+        .selfSigned(2.toByte, bank, bank.toAddress, Waves, 1.waves - 2 * fee, Waves, fee, None, now + i)
         .explicitGet()
     }
 
@@ -56,10 +56,10 @@ class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[KeyPai
       val asset           = randomFrom(settings.assets.toSeq)
       val tradeAssetIssue = ByteStr.decodeBase58(asset.get).toOption
       val pair            = AssetPair(Waves, Asset.fromCompatId(tradeAssetIssue))
-      val sellOrder       = Order.sell(TxVersion.V2, seller, matcher, pair, 100000000L, 1, ts, ts + 30.days.toMillis, 0.003.waves)
-      val buyOrder        = Order.buy(TxVersion.V2, buyer, matcher, pair, 100000000L, 1, ts, ts + 1.day.toMillis, 0.003.waves)
+      val sellOrder       = Order.sell(TxVersion.V2, seller, matcher.publicKey, pair, 100000000L, 1, ts, ts + 30.days.toMillis, 0.003.waves)
+      val buyOrder        = Order.buy(TxVersion.V2, buyer, matcher.publicKey, pair, 100000000L, 1, ts, ts + 1.day.toMillis, 0.003.waves)
 
-      ExchangeTransaction.signed(TxVersion.V2, matcher, buyOrder, sellOrder, 100000000, 1, 0.003.waves, 0.003.waves, 0.011.waves, ts).explicitGet()
+      ExchangeTransaction.signed(TxVersion.V2, matcher.privateKey, buyOrder, sellOrder, 100000000, 1, 0.003.waves, 0.003.waves, 0.011.waves, ts).explicitGet()
     }
 
     setScripts ++ txs ++ extxs
@@ -85,6 +85,5 @@ object SmartGenerator {
          | assets = $assets
       """.stripMargin
     }
-
   }
 }

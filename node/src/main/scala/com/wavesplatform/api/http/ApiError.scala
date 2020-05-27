@@ -25,7 +25,7 @@ trait ApiError {
 
 //noinspection TypeAnnotation
 object ApiError {
-  implicit def fromValidationError(e: ValidationError): ApiError =
+  implicit def fromValidationError(e: ValidationError): ApiError = {
     e match {
       case TxValidationError.InvalidAddress(_)               => InvalidAddress
       case TxValidationError.NegativeAmount(x, of)           => NegativeAmount(s"$x of $of")
@@ -40,6 +40,7 @@ object ApiError {
       case TxValidationError.ToSelf                          => ToSelfError
       case TxValidationError.MissingSenderPrivateKey         => MissingSenderPrivateKey
       case TxValidationError.GenericError(ge)                => CustomValidationError(ge)
+      case TxValidationError.InsufficientInvokeActionFee(ge) => CustomValidationError(ge)
       case TxValidationError.AlreadyInTheState(tx, txHeight) => AlreadyInState(tx, txHeight)
       case TxValidationError.AccountBalanceError(errs)       => AccountBalanceErrors(errs)
       case TxValidationError.AliasDoesNotExist(tx)           => AliasDoesNotExist(tx)
@@ -51,15 +52,16 @@ object ApiError {
       case err: TxValidationError.ToBigProof                 => InvalidProofs(err.toString())
       case TransactionValidationError(error, tx) =>
         error match {
-          case TxValidationError.TransactionNotAllowedByScript(_, isTokenScript) =>
-            if (isTokenScript) TransactionNotAllowedByAssetScript(tx)
+          case e: TxValidationError.TransactionNotAllowedByScript =>
+            if (e.isAssetScript) TransactionNotAllowedByAssetScript(tx)
             else TransactionNotAllowedByAccountScript(tx)
-          case TxValidationError.Mistiming(errorMessage)               => Mistiming(errorMessage)
-          case TxValidationError.ScriptExecutionError(err, _, isToken) => ScriptExecutionError(tx, err, isToken)
-          case err                                                     => StateCheckFailed(tx, fromValidationError(err).message)
+          case TxValidationError.Mistiming(errorMessage) => Mistiming(errorMessage)
+          case e: TxValidationError.ScriptExecutionError => ScriptExecutionError(tx, e.error, isTokenScript = e.isAssetScript)
+          case err                                       => StateCheckFailed(tx, fromValidationError(err))
         }
       case error => CustomValidationError(error.toString)
     }
+  }
 
   case object Unknown extends ApiError {
     override val id      = 0
@@ -68,8 +70,8 @@ object ApiError {
   }
 
   final case class WrongJson(cause: Option[Throwable] = None, errors: Seq[(JsPath, Seq[JsonValidationError])] = Seq.empty) extends ApiError {
-    override val id           = WrongJson.Id
-    override val code         = StatusCodes.BadRequest
+    override val id              = WrongJson.Id
+    override val code            = StatusCodes.BadRequest
     override val message: String = WrongJson.Message
     override lazy val json: JsObject = Json.obj(
       "error"            -> id,
@@ -169,14 +171,17 @@ object ApiError {
     override val code: StatusCode = StatusCodes.BadRequest
   }
 
-  final case class StateCheckFailed(tx: Transaction, err: String) extends ApiError {
+  final case class StateCheckFailed(tx: Transaction, errorMsg: String, details: Option[JsObject]) extends ApiError {
     override val id: Int          = StateCheckFailed.Id
-    override val message: String  = StateCheckFailed.message(err)
+    override val message: String  = StateCheckFailed.message(errorMsg)
     override val code: StatusCode = StateCheckFailed.Code
-    override lazy val json        = Json.obj("error" -> id, "message" -> message, "tx" -> tx.json())
+    override lazy val json        = details.fold(JsObject.empty)(identity) ++ Json.obj("error" -> id, "message" -> message, "tx" -> tx.json())
   }
 
   case object StateCheckFailed {
+    def apply(tx: Transaction, errorMessage: String): StateCheckFailed = new StateCheckFailed(tx, errorMessage, None)
+    def apply(tx: Transaction, error: ApiError): StateCheckFailed      = new StateCheckFailed(tx, error.message, Some(error.json))
+
     val Id            = 112
     val MessagePrefix = "State check failed. Reason:"
     val Code          = StatusCodes.BadRequest
@@ -200,6 +205,18 @@ object ApiError {
     override val id: Int          = 115
     override val message: String  = "no private key for sender address in wallet"
     override val code: StatusCode = StatusCodes.BadRequest
+  }
+
+  case class InvalidIds(ids: Seq[String]) extends ApiError {
+    override val id: Int          = InvalidIds.Id
+    override val message: String  = s"Request contains invalid IDs. ${ids.mkString(", ")}"
+    override val code: StatusCode = StatusCodes.BadRequest
+
+    override lazy val json: JsObject = Json.obj("error" -> id, "message" -> message, "ids" -> ids)
+  }
+
+  case object InvalidIds {
+    val Id = 116
   }
 
   final case class CustomValidationError(errorMessage: String) extends ApiError {
@@ -458,5 +475,27 @@ object ApiError {
         "message"     -> message,
         "transaction" -> tx.json()
       )
+  }
+
+  case object InvalidBase58 extends ApiError {
+    override val id      = 406
+    override val message = "Invalid Base58 string"
+    override val code    = StatusCodes.BadRequest
+  }
+
+  case class InvalidTransactionId(message: String) extends ApiError {
+    override val id   = 4001
+    override val code = StatusCodes.BadRequest
+  }
+
+  case class InvalidBlockId(message: String) extends ApiError {
+    override val id   = 4002
+    override val code = StatusCodes.BadRequest
+  }
+
+  case object InvalidAssetId extends ApiError {
+    override val id      = 4007
+    override val message = "Invalid asset id"
+    override val code    = StatusCodes.BadRequest
   }
 }

@@ -27,13 +27,17 @@ object Bindings {
   )
 
   private def proofsPart(existingProofs: IndexedSeq[ByteStr]) =
-    "proofs" -> ARR((existingProofs ++ Seq.fill(8 - existingProofs.size)(ByteStr.empty)).map(b => CONST_BYTESTR(b).explicitGet()))
+    "proofs" -> ARR(existingProofs.map(b => CONST_BYTESTR(b).explicitGet) ++ Seq.fill(8 - existingProofs.size)(CONST_BYTESTR(ByteStr.empty).explicitGet), false).explicitGet
 
-  private def provenTxPart(tx: Proven, proofsEnabled: Boolean): Map[String, EVALUATED] = {
+  private def provenTxPart(tx: Proven, proofsEnabled: Boolean, version: StdLibVersion): Map[String, EVALUATED] = {
+    val limit =
+      if (version >= V4) CONST_BYTESTR.NoLimit
+      else CONST_BYTESTR.DataTxSize
+
     val commonPart = combine(Map(
                                "sender"          -> senderObject(tx.sender),
                                "senderPublicKey" -> tx.senderPk,
-                               "bodyBytes"       -> tx.bodyBytes
+                               "bodyBytes"       -> CONST_BYTESTR(tx.bodyBytes, limit).explicitGet()
                              ),
                              headerPart(tx.h))
 
@@ -64,7 +68,7 @@ object Bindings {
   private def buildPayments(payments: AttachedPayments): (String, EVALUATED) =
     payments match {
       case AttachedPayments.Single(p) => "payment"  -> fromOptionCO(p.map(mapPayment))
-      case AttachedPayments.Multi(p)  => "payments" -> ARR(p.map(mapPayment).toVector)
+      case AttachedPayments.Multi(p)  => "payments" -> ARR(p.map(mapPayment).toVector, false).explicitGet
     }
 
   private def mapPayment(payment: (Long, Option[ByteStr])): CaseObj = {
@@ -123,7 +127,7 @@ object Bindings {
         Proven(h = Header(id = ct.id, fee = 0, timestamp = ct.timestamp, version = 0),
                sender = ct.sender,
                bodyBytes = ByteStr.empty,
-               senderPk = ByteStr.empty,
+               senderPk = ct.senderPk,
                proofs = IndexedSeq.empty),
         feeAssetId = None,
         assetId = ct.assetId,
@@ -135,33 +139,50 @@ object Bindings {
       version
     )
 
-  def mapReissuePseudoTx(r: ReissuePseudoTx): CaseObj =
+  def mapReissuePseudoTx(r: ReissuePseudoTx, version: StdLibVersion): CaseObj =
     reissueTransactionObject(
       proofsEnabled = false,
       Proven(
         h = Header(id = r.txId, fee = 0, timestamp = r.timestamp, version = 0),
         sender = r.sender,
         bodyBytes = ByteStr.empty,
-        senderPk = ByteStr.empty,
+        senderPk = r.senderPk,
         proofs = IndexedSeq.empty
       ),
       r.reissue.quantity,
       r.reissue.assetId,
-      r.reissue.isReissuable
+      r.reissue.isReissuable,
+      version
     )
 
-  def mapBurnPseudoTx(b: BurnPseudoTx): CaseObj =
+  def mapBurnPseudoTx(b: BurnPseudoTx, version: StdLibVersion): CaseObj =
     burnTransactionObject(
       proofsEnabled = false,
       Proven(
         h = Header(id = b.txId, fee = 0, timestamp = b.timestamp, version = 0),
         sender = b.sender,
         bodyBytes = ByteStr.empty,
-        senderPk = ByteStr.empty,
+        senderPk = b.senderPk,
         proofs = IndexedSeq.empty
       ),
       b.burn.quantity,
-      b.burn.assetId
+      b.burn.assetId,
+      version
+    )
+
+  def mapSponsorFeePseudoTx(s: SponsorFeePseudoTx, version: StdLibVersion): CaseObj =
+    sponsorshipTransactionObject(
+      proofsEnabled = false,
+      Proven(
+        h = Header(id = s.txId, fee = 0, timestamp = s.timestamp, version = 0),
+        sender = s.sender,
+        bodyBytes = ByteStr.empty,
+        senderPk = s.senderPk,
+        proofs = IndexedSeq.empty
+      ),
+      s.sponsorFee.assetId,
+      s.sponsorFee.minSponsoredAssetFee,
+      version
     )
 
   def transactionObject(tx: Tx, proofsEnabled: Boolean, version: StdLibVersion = V3): CaseObj =
@@ -170,27 +191,27 @@ object Bindings {
         CaseObj(genesisTransactionType, Map("amount" -> CONST_LONG(amount)) ++ headerPart(h) + mapRecipient(recipient))
       case Tx.Payment(p, amount, recipient) =>
         CaseObj(buildPaymentTransactionType(proofsEnabled),
-                Map("amount" -> CONST_LONG(amount)) ++ provenTxPart(p, proofsEnabled) + mapRecipient(recipient))
+                Map("amount" -> CONST_LONG(amount)) ++ provenTxPart(p, proofsEnabled, version) + mapRecipient(recipient))
       case transfer: Tx.Transfer => transferTransactionObject(transfer, proofsEnabled, version)
       case Tx.Issue(p, quantity, name, description, reissuable, decimals, scriptOpt) =>
         CaseObj(
-          buildIssueTransactionType(proofsEnabled),
+          buildIssueTransactionType(proofsEnabled, version),
           combine(
             Map(
               "quantity"    -> quantity,
-              "name"        -> name,
-              "description" -> description,
+              "name"        -> (if (version >= V4) name.toUTF8String else name),
+              "description" -> (if (version >= V4) description.toUTF8String else description),
               "reissuable"  -> reissuable,
               "decimals"    -> decimals,
               "script"      -> scriptOpt
             ),
-            provenTxPart(p, proofsEnabled)
+            provenTxPart(p, proofsEnabled, version)
           )
         )
       case ReIssue(p, quantity, assetId, reissuable) =>
-        reissueTransactionObject(proofsEnabled, p, quantity, assetId, reissuable)
+        reissueTransactionObject(proofsEnabled, p, quantity, assetId, reissuable, version)
       case Tx.Burn(p, quantity, assetId) =>
-        burnTransactionObject(proofsEnabled, p, quantity, assetId)
+        burnTransactionObject(proofsEnabled, p, quantity, assetId, version)
       case CI(p, addressOrAlias, payments, feeAssetId, funcName, funcArgs) =>
         CaseObj(
           buildInvokeScriptTransactionType(proofsEnabled, version),
@@ -202,14 +223,14 @@ object Bindings {
               "args"       -> funcArgs
             ),
             Map(buildPayments(payments)),
-            provenTxPart(p, proofsEnabled)
+            provenTxPart(p, proofsEnabled, version)
           )
         )
 
       case Lease(p, amount, recipient) =>
         CaseObj(
           buildLeaseTransactionType(proofsEnabled),
-          combine(Map("amount" -> amount), provenTxPart(p, proofsEnabled) + mapRecipient(recipient))
+          combine(Map("amount" -> amount), provenTxPart(p, proofsEnabled, version) + mapRecipient(recipient))
         )
       case LeaseCancel(p, leaseId) =>
         CaseObj(
@@ -217,14 +238,14 @@ object Bindings {
           combine(Map(
                     "leaseId" -> leaseId,
                   ),
-                  provenTxPart(p, proofsEnabled))
+                  provenTxPart(p, proofsEnabled, version))
         )
       case CreateAlias(p, alias) =>
         CaseObj(buildCreateAliasTransactionType(proofsEnabled),
                 combine(Map(
                           "alias" -> alias,
                         ),
-                        provenTxPart(p, proofsEnabled)))
+                        provenTxPart(p, proofsEnabled, version)))
       case MassTransfer(p, assetId, transferCount, totalAmount, transfers, attachment) =>
         CaseObj(
           buildMassTransferTransactionType(proofsEnabled, version),
@@ -237,21 +258,18 @@ object Bindings {
               "totalAmount"   -> totalAmount,
               "attachment"    -> attachment.evaluated
             ),
-            provenTxPart(p, proofsEnabled)
+            provenTxPart(p, proofsEnabled, version)
           )
         )
       case SetScript(p, scriptOpt) =>
-        CaseObj(buildSetScriptTransactionType(proofsEnabled), Map("script" -> fromOptionBV(scriptOpt)) ++ provenTxPart(p, proofsEnabled))
+        CaseObj(buildSetScriptTransactionType(proofsEnabled), Map("script" -> fromOptionBV(scriptOpt)) ++ provenTxPart(p, proofsEnabled, version))
       case SetAssetScript(p, assetId, scriptOpt) =>
         CaseObj(
           buildSetAssetScriptTransactionType(proofsEnabled),
-          combine(Map("script" -> fromOptionBV(scriptOpt), "assetId" -> assetId), provenTxPart(p, proofsEnabled))
+          combine(Map("script" -> fromOptionBV(scriptOpt), "assetId" -> assetId), provenTxPart(p, proofsEnabled, version))
         )
       case Sponsorship(p, assetId, minSponsoredAssetFee) =>
-        CaseObj(
-          buildSponsorFeeTransactionType(proofsEnabled),
-          combine(Map("assetId" -> assetId, "minSponsoredAssetFee" -> minSponsoredAssetFee), provenTxPart(p, proofsEnabled))
-        )
+        sponsorshipTransactionObject(proofsEnabled, p, assetId, minSponsoredAssetFee, version)
       case Data(p, data) =>
         def mapValue(e: Any): (EVALUATED, CASETYPEREF) =
           e match {
@@ -279,7 +297,7 @@ object Bindings {
           buildDataTransactionType(proofsEnabled, version),
           combine(
             Map("data" -> data.map(mapDataEntry)),
-            provenTxPart(p, proofsEnabled)
+            provenTxPart(p, proofsEnabled, version)
           )
         )
       case Exchange(p, amount, price, buyMatcherFee, sellMatcherFee, buyOrder, sellOrder) =>
@@ -294,7 +312,7 @@ object Bindings {
               "buyMatcherFee"  -> buyMatcherFee,
               "sellMatcherFee" -> sellMatcherFee,
             ),
-            provenTxPart(p, proofsEnabled)
+            provenTxPart(p, proofsEnabled, version)
           )
         )
       case UpdateAssetInfo(p, assetId, name, description) =>
@@ -306,7 +324,7 @@ object Bindings {
               "name" -> name,
               "description" -> description
             ),
-            provenTxPart(p, proofsEnabled)
+            provenTxPart(p, proofsEnabled, version)
           )
         )
     }
@@ -316,7 +334,8 @@ object Bindings {
     p: Proven,
     quantity: Long,
     assetId: ByteStr,
-    reissuable: Boolean
+    reissuable: Boolean,
+    version: StdLibVersion
   ): CaseObj =
     CaseObj(
       buildReissueTransactionType(proofsEnabled),
@@ -326,7 +345,7 @@ object Bindings {
           "assetId" -> assetId,
           "reissuable" -> reissuable,
         ),
-        provenTxPart(p, proofsEnabled)
+        provenTxPart(p, proofsEnabled, version)
       )
     )
 
@@ -334,7 +353,8 @@ object Bindings {
     proofsEnabled: Boolean,
     p: Proven,
     quantity: Long,
-    assetId: ByteStr
+    assetId: ByteStr,
+    version: StdLibVersion
   ): CaseObj =
     CaseObj(
       buildBurnTransactionType(proofsEnabled),
@@ -343,25 +363,20 @@ object Bindings {
           "quantity" -> quantity,
           "assetId"  -> assetId
         ),
-        provenTxPart(p, proofsEnabled)
+        provenTxPart(p, proofsEnabled, version)
       )
     )
 
-  def blockHeaderObject(header: BlockHeader): CaseObj =
+  private def sponsorshipTransactionObject(
+    proofsEnabled: Boolean,
+    p: Proven,
+    assetId: ByteStr,
+    minSponsoredAssetFee: Option[Long],
+    version: StdLibVersion
+  ) =
     CaseObj(
-      blockHeader,
-      Map[String, EVALUATED](
-        "timestamp"           -> header.timestamp,
-        "version"             -> header.version,
-        "reference"           -> header.reference,
-        "generator"           -> header.generator,
-        "generatorPublicKey"  -> header.generatorPublicKey,
-        "signature"           -> header.signature,
-        "baseTarget"          -> header.baseTarget,
-        "generationSignature" -> header.generationSignature,
-        "transactionCount"    -> header.transactionCount,
-        "featureVotes"        -> header.featureVotes.map(CONST_LONG)
-      )
+      buildSponsorFeeTransactionType(proofsEnabled),
+      combine(Map("assetId" -> assetId, "minSponsoredAssetFee" -> minSponsoredAssetFee), provenTxPart(p, proofsEnabled, version))
     )
 
   def transferTransactionObject(tx: Tx.Transfer, proofsEnabled: Boolean, version: StdLibVersion): CaseObj =
@@ -374,7 +389,7 @@ object Bindings {
           "assetId"    -> tx.assetId,
           "attachment" -> tx.attachment.evaluated
         ),
-        provenTxPart(tx.p, proofsEnabled) + mapRecipient(tx.recipient)
+        provenTxPart(tx.p, proofsEnabled, version) + mapRecipient(tx.recipient)
       )
     )
 
@@ -390,21 +405,20 @@ object Bindings {
         "scripted"        -> sAInfo.scripted
       )
 
-    val sponsoredField: (String, EVALUATED) =
+    val versionDepField: Map[String, EVALUATED] =
       if (version >= V4)
-        "minSponsoredFee" -> sAInfo.minSponsoredFee
+        Map("minSponsoredFee" -> sAInfo.minSponsoredFee, "name" -> sAInfo.name, "description" -> sAInfo.description)
       else
-        "sponsored" -> sAInfo.minSponsoredFee.isDefined
+        Map("sponsored" -> sAInfo.minSponsoredFee.isDefined)
 
     CaseObj(
       assetType(version),
-      commonFields + sponsoredField
+      commonFields ++ versionDepField
     )
   }
 
-  def buildLastBlockInfo(blockInf: BlockInfo) =
-    CaseObj(
-      blockInfo,
+  def buildBlockInfo(blockInf: BlockInfo, version: StdLibVersion) = {
+    val commonFields: Map[String, EVALUATED] =
       Map(
         "timestamp"           -> blockInf.timestamp,
         "height"              -> blockInf.height.toLong,
@@ -413,6 +427,11 @@ object Bindings {
         "generator"           -> CaseObj(addressType, Map("bytes" -> blockInf.generator)),
         "generatorPublicKey"  -> blockInf.generatorPublicKey
       )
-    )
 
+    val vrfFieldOpt: Map[String, EVALUATED] =
+      if (version >= V4) Map[String, EVALUATED]("vrf" -> blockInf.vrf)
+      else Map()
+
+    CaseObj(blockInfo(version), commonFields ++ vrfFieldOpt)
+  }
 }

@@ -1,8 +1,9 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.NodeConfigs.Default
+import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -21,29 +22,41 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
 
   override protected def nodeConfigs: Seq[Config] = configWithRide4DAppsFeature
 
-  private val smartAcc  = pkByAddress(firstAddress)
-  private val callerAcc = pkByAddress(secondAddress)
+  private val smartAcc  = firstAddress
+  private val callerAcc = secondAddress
 
-  private val scriptV3 = ScriptCompiler.compile("""
-                                            |{-# STDLIB_VERSION 3 #-}
-                                            |{-# CONTENT_TYPE DAPP #-}
-                                            |
-                                            |@Callable(i)
-                                            |func doAction() = { WriteSet([DataEntry("0", true)]) }
-                                            |
-                                            |@Verifier(i)
-                                            |func verify() = { true }
-                                          """.stripMargin, estimator).explicitGet()._1.bytes().base64
-  private val scriptV2 = ScriptCompiler.compile("""
-                                          |func isTrue() = true
-                                          |isTrue()
-                                        """.stripMargin, estimator).explicitGet()._1.bytes().base64
+  private val scriptV3 = ScriptCompiler
+    .compile(
+      """{-# STDLIB_VERSION 3 #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |
+        |@Callable(i)
+        |func doAction() = { WriteSet([DataEntry("0", true)]) }
+        |
+        |@Verifier(i)
+        |func verify() = { true }""".stripMargin,
+      estimator
+    )
+    .explicitGet()
+    ._1
+    .bytes()
+    .base64
+  private val scriptV2 = ScriptCompiler
+    .compile(
+      """func isTrue() = true
+        |isTrue()""".stripMargin,
+      estimator
+    )
+    .explicitGet()
+    ._1
+    .bytes()
+    .base64
 
   test("send waves to accounts") {
     sender
       .transfer(
         sender.address,
-        recipient = smartAcc.stringRepr,
+        recipient = smartAcc,
         assetId = None,
         amount = 5.waves,
         fee = minFee,
@@ -54,7 +67,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
     sender
       .transfer(
         sender.address,
-        recipient = callerAcc.stringRepr,
+        recipient = callerAcc,
         assetId = None,
         amount = 5.waves,
         fee = minFee,
@@ -64,17 +77,19 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
   }
 
   test("can't set contract to account before Ride4DApps activation") {
-    assertBadRequestAndMessage(sender.setScript(smartAcc.stringRepr, Some(scriptV3), setScriptFee + smartFee),
-                               "RIDE 4 DAPPS feature has not been activated yet")
+    assertBadRequestAndMessage(
+      sender.setScript(smartAcc, Some(scriptV3), setScriptFee + smartFee),
+      "RIDE 4 DAPPS feature has not been activated yet"
+    )
   }
 
   test("can't set script with user function to account before Ride4DApps activation") {
-    assertBadRequestAndMessage(sender.setScript(smartAcc.stringRepr, Some(scriptV2), setScriptFee), "RIDE 4 DAPPS feature has not been activated yet")
+    assertBadRequestAndMessage(sender.setScript(smartAcc, Some(scriptV2), setScriptFee), "RIDE 4 DAPPS feature has not been activated yet")
   }
 
   test("can't invoke script before Ride4DApps activation") {
     assertBadRequestAndMessage(
-      sender.invokeScript(callerAcc.stringRepr, smartAcc.stringRepr, Some("foo"), List.empty, Seq.empty, smartMinFee, None),
+      sender.invokeScript(callerAcc, smartAcc, Some("foo"), List.empty, Seq.empty, smartMinFee, None),
       "RIDE 4 DAPPS feature has not been activated yet"
     )
   }
@@ -83,7 +98,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
 
     assertBadRequestAndMessage(
       sender.issue(
-        smartAcc.stringRepr,
+        smartAcc,
         "Test",
         "Test asset",
         1000,
@@ -98,10 +113,10 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
   test("can't set script with user function to asset before Ride4DApps activation") {
     assertBadRequestAndMessage(
       sender.setAssetScript(
-        Asset.IssuedAsset("Test".getBytes("UTF-8")).id.toString,
-        smartAcc.stringRepr,
+        Asset.IssuedAsset(ByteStr("Test".getBytes("UTF-8"))).id.toString,
+        smartAcc,
         issueFee,
-        Some(scriptV2),
+        Some(scriptV2)
       ),
       "RIDE 4 DAPPS feature has not been activated yet"
     )
@@ -114,7 +129,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
   test("can issue asset and set script with user function after Ride4DApps activation") {
     val issueTxId = sender
       .issue(
-        smartAcc.stringRepr,
+        smartAcc,
         "Test",
         "Test asset",
         1000,
@@ -129,7 +144,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
     sender
       .setAssetScript(
         issueTxId,
-        smartAcc.stringRepr,
+        smartAcc,
         issueFee,
         Some(scriptV2),
         waitForTx = true
@@ -139,34 +154,45 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
   }
 
   test("can set contract and invoke script after Ride4DApps activation") {
-  sender.setScript(smartAcc.stringRepr, Some(scriptV3), setScriptFee + smartFee, waitForTx = true).id
+    sender.setScript(smartAcc, Some(scriptV3), setScriptFee + smartFee, waitForTx = true).id
 
-    sender.invokeScript(
-        callerAcc.stringRepr,
-        smartAcc.stringRepr,
+    sender
+      .invokeScript(
+        callerAcc,
+        smartAcc,
         Some("doAction"),
         List.empty,
         Seq.empty,
         smartMinFee,
         None,
         waitForTx = true
-      )._1.id
+      )
+      ._1
+      .id
 
-    sender.setScript(smartAcc.stringRepr, Some(scriptV2), setScriptFee + smartFee, waitForTx = true).id
+    sender.setScript(smartAcc, Some(scriptV2), setScriptFee + smartFee, waitForTx = true).id
   }
 
   test("can add user function to account script after Ride4DApps activation") {
-    sender.setScript(smartAcc.stringRepr, Some(scriptV2), setScriptFee + smartFee, waitForTx = true).id
+    sender.setScript(smartAcc, Some(scriptV2), setScriptFee + smartFee, waitForTx = true).id
   }
 }
 
 object Ride4DAppsActivationTestSuite {
-  val activationHeight = 35
+  val activationHeight = 15
 
-  private val configWithRide4DAppsFeature: Seq[Config] =
-    Default.map(ConfigFactory.parseString(s"""
-                                             | waves.blockchain.custom.functionality {
-                                             |   pre-activated-features.11 = ${activationHeight - 1}
-                                             |}""".stripMargin).withFallback(_))
+  val configWithRide4DAppsFeature = NodeConfigs.newBuilder
+    .withDefault(1)
+    .withSpecial(1, _.nonMiner)
+    .buildNonConflicting()
+    .map(
+      ConfigFactory
+        .parseString(
+          s"""waves.blockchain.custom.functionality {
+             |  pre-activated-features.11 = ${activationHeight - 1}
+             |}""".stripMargin
+        )
+        .withFallback(_)
+    )
 
 }

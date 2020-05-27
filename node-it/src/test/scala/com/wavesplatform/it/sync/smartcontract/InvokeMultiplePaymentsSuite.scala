@@ -1,12 +1,13 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.api.http.ApiError.{NonPositiveAmount, ScriptExecutionError, StateCheckFailed}
+import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_STRING
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -15,17 +16,15 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
 class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterFailure {
-  import InvokeMultiplePaymentsSuite._
-
-  private val dApp = pkByAddress(firstAddress).stringRepr
-  private val caller = pkByAddress(secondAddress).stringRepr
+  private val dApp   = firstAddress
+  private val caller = secondAddress
 
   private var asset1: IssuedAsset = _
   private var asset2: IssuedAsset = _
 
   test("prerequisite: set contract and issue asset") {
     val source =
-    """
+      """
       |{-# STDLIB_VERSION 4 #-}
       |{-# CONTENT_TYPE DAPP #-}
       |{-# SCRIPT_TYPE ACCOUNT #-}
@@ -45,12 +44,66 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
       |    BinaryEntry("asset_1", pmt[1].assetId.parse())
       |  ] else nil)
       |}
+      |
+      |@Callable(inv)
+      |func f(toAlias: String) = {
+      | let pmt = inv.payments[0]
+      | #avoidbugcomment
+      | [ScriptTransfer(Alias(toAlias), pmt.amount, pmt.assetId)]
+      |}
       """.stripMargin
     val script = ScriptCompiler.compile(source, ScriptEstimatorV2).explicitGet()._1.bytes().base64
     sender.setScript(dApp, Some(script), setScriptFee, waitForTx = true)
 
     asset1 = IssuedAsset(ByteStr.decodeBase58(sender.issue(caller, waitForTx = true).id).get)
     asset2 = IssuedAsset(ByteStr.decodeBase58(sender.issue(caller, waitForTx = true).id).get)
+    sender.createAlias(caller, "recipientalias", smartMinFee, waitForTx = true)
+  }
+
+  test("can transfer to alias") {
+    val dAppBalance   = sender.balance(dApp).balance
+    val callerBalance = sender.balance(caller).balance
+
+    sender
+      .invokeScript(
+        caller,
+        dApp,
+        Some("f"),
+        payment = Seq(Payment(1.waves, Waves)),
+        args = List(CONST_STRING("recipientalias").explicitGet()),
+        waitForTx = true
+      )
+
+    sender.balance(dApp).balance shouldBe dAppBalance
+    sender.balance(caller).balance shouldBe callerBalance - smartMinFee
+  }
+
+  test("script should sheck if alias not exists") {
+    val alias = "unknown"
+
+    val tx1 = sender
+      .invokeScript(
+        caller,
+        dApp,
+        Some("f"),
+        payment = Seq(Payment(1.waves, Waves)),
+        args = List(CONST_STRING(alias).explicitGet()),
+        waitForTx = true
+      )._1.id
+
+    sender.debugStateChanges(tx1).stateChanges.get.error.get.text should include(s"Alias 'alias:I:$alias")
+
+    val tx2 = sender
+      .invokeScript(
+        caller,
+        dApp,
+        Some("f"),
+        payment = Seq(Payment(1.waves, Waves)),
+        args = List(CONST_STRING(s"alias:I:$alias").explicitGet()),
+        waitForTx = true
+      )._1.id
+
+    sender.debugStateChanges(tx2).stateChanges.get.error.get.text should include("Alias should contain only following characters")
   }
 
   test("can invoke with no payments") {
@@ -100,36 +153,42 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
   }
 
   test("can't invoke with three payments") {
-    assertApiError(sender.invokeScript(
-      caller,
-      dApp,
-      payment = Seq(Payment(3, Waves), Payment(6, Waves), Payment(7, Waves))
-    )) { error =>
+    assertApiError(
+      sender.invokeScript(
+        caller,
+        dApp,
+        payment = Seq(Payment(3, Waves), Payment(6, Waves), Payment(7, Waves))
+      )
+    ) { error =>
       error.message should include("Script payment amount=3 should not exceed 2")
-      error.id shouldBe ScriptExecutionError.Id
+      error.id shouldBe StateCheckFailed.Id
       error.statusCode shouldBe 400
     }
   }
 
   test("can't attach more than balance") {
-    val wavesBalance = sender.accountBalances(caller)._1
+    val wavesBalance  = sender.accountBalances(caller)._1
     val asset1Balance = sender.assetBalance(caller, asset1.id.toString).balance
 
-    assertApiError(sender.invokeScript(
-      caller,
-      dApp,
-      payment = Seq(Payment(wavesBalance - 1.waves, Waves), Payment(2.waves, Waves))
-    )) { error =>
+    assertApiError(
+      sender.invokeScript(
+        caller,
+        dApp,
+        payment = Seq(Payment(wavesBalance - 1.waves, Waves), Payment(2.waves, Waves))
+      )
+    ) { error =>
       error.message should include("Transaction application leads to negative waves balance to (at least) temporary negative state")
       error.id shouldBe StateCheckFailed.Id
       error.statusCode shouldBe 400
     }
 
-    assertApiError(sender.invokeScript(
-      caller,
-      dApp,
-      payment = Seq(Payment(asset1Balance - 1000, asset1), Payment(1001, asset1))
-    )) { error =>
+    assertApiError(
+      sender.invokeScript(
+        caller,
+        dApp,
+        payment = Seq(Payment(asset1Balance - 1000, asset1), Payment(1001, asset1))
+      )
+    ) { error =>
       error.message should include("Transaction application leads to negative asset")
       error.id shouldBe StateCheckFailed.Id
       error.statusCode shouldBe 400
@@ -143,9 +202,9 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
     assertApiError(
       sender.invokeScript(caller, dApp, payment = Seq(Payment(0.75.waves, Waves), Payment(0.75.waves, Waves)))
     ) { error =>
-        error.message should include("Accounts balance errors")
-        error.id shouldBe StateCheckFailed.Id
-        error.statusCode shouldBe 400
+      error.message should include("Accounts balance errors")
+      error.id shouldBe StateCheckFailed.Id
+      error.statusCode shouldBe 400
     }
   }
 
@@ -163,10 +222,4 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
     )
   }
 
-}
-
-object InvokeMultiplePaymentsSuite {
-  implicit class TypedDataEntry(entry: DataEntry[_]) {
-    def as[T]: T = entry.asInstanceOf[T]
-  }
 }

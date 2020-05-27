@@ -2,10 +2,7 @@ package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
 
-import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.common.utils.Base64
-import com.wavesplatform.serialization.{ByteBufferOps, Deser}
 import com.wavesplatform.serialization.{ByteBufferOps, Deser}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
@@ -18,21 +15,21 @@ object IssueTxSerializer {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId"     -> id().toString,
-      "name"        -> (if (isProtobufVersion) name else new String(Base64.decode(name), Charsets.UTF_8)),
+      "name"        -> name.toStringUtf8,
       "quantity"    -> quantity,
       "reissuable"  -> reissuable,
       "decimals"    -> decimals,
-      "description" -> (if (isProtobufVersion) description else new String(Base64.decode(description), Charsets.UTF_8))
+      "description" -> description.toStringUtf8
     ) ++ (if (version >= TxVersion.V2) Json.obj("script" -> script.map(_.bytes().base64)) else JsObject.empty) ++
-      (if (version == TxVersion.V2) Json.obj("chainId"   -> chainByte) else JsObject.empty)
+      (if (version == TxVersion.V2) Json.obj("chainId"   -> chainId) else JsObject.empty)
   }
 
   def bodyBytes(tx: IssueTransaction): Array[Byte] = {
     import tx._
     lazy val baseBytes = Bytes.concat(
-      sender,
-      Deser.serializeArrayWithLength(Base64.decode(name)),
-      Deser.serializeArrayWithLength(Base64.decode(description)),
+      sender.arr,
+      Deser.serializeArrayWithLength(name.toByteArray),
+      Deser.serializeArrayWithLength(description.toByteArray),
       Longs.toByteArray(quantity),
       Array(decimals),
       Deser.serializeBoolean(reissuable),
@@ -43,14 +40,14 @@ object IssueTxSerializer {
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
       case TxVersion.V2 =>
-        Bytes.concat(Array(builder.typeId, version, chainByte), baseBytes, Deser.serializeOptionOfArrayWithLength(script)(_.bytes()))
+        Bytes.concat(Array(builder.typeId, version, chainId), baseBytes, Deser.serializeOptionOfArrayWithLength(script)(_.bytes().arr))
       case _ => PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
   def toBytes(tx: IssueTransaction): Array[Byte] =
     tx.version match {
-      case TxVersion.V1 => Bytes.concat(Array(tx.typeId), tx.proofs.toSignature, this.bodyBytes(tx)) // Signature before body, typeId appears twice
+      case TxVersion.V1 => Bytes.concat(Array(tx.typeId), tx.proofs.toSignature.arr, this.bodyBytes(tx)) // Signature before body, typeId appears twice
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
       case _            => PBTransactionSerializer.bytes(tx)
     }

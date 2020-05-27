@@ -15,9 +15,9 @@ import org.scalatest.CancelAfterFailure
 class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with CancelAfterFailure {
   private val estimator = ScriptEstimatorV2
 
-  private val dApp     = pkByAddress(firstAddress).stringRepr
-  private val caller   = pkByAddress(secondAddress).stringRepr
-  private val receiver = pkByAddress(thirdAddress).stringRepr
+  private val dApp     = firstAddress
+  private val caller   = secondAddress
+  private val receiver = thirdAddress
 
   var dAppInitBalance: Long     = 0
   var callerInitBalance: Long   = 0
@@ -105,10 +105,9 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
     val paymentAmount = 10
     val fee           = smartMinFee + smartFee * 2
 
-    assertBadRequestAndMessage(
-      invoke("resendPayment", paymentAmount, issued(rejAssetId), fee),
-      "token-script"
-    )
+    val tx = invoke("resendPayment", paymentAmount, issued(rejAssetId), fee)
+    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include regex "Transaction is not allowed by script of the asset"
+
   }
 
   test("dApp can transfer payed Waves if its own balance is 0") {

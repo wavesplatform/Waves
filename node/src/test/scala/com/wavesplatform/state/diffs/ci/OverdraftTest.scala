@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.DirectiveDictionary
@@ -11,21 +12,21 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, assertDiffEi, produce}
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class OverdraftTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB with Inside {
+class OverdraftTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithState with Inside {
   private val InvokeFee    = FeeConstants(InvokeScriptTransaction.typeId) * FeeValidation.FeeUnit
-  private val SetScriptFee = FeeConstants(SetScriptTransaction.typeId)    * FeeValidation.FeeUnit
-  private val IssueFee     = FeeConstants(IssueTransaction.typeId)        * FeeValidation.FeeUnit
+  private val SetScriptFee = FeeConstants(SetScriptTransaction.typeId) * FeeValidation.FeeUnit
+  private val IssueFee     = FeeConstants(IssueTransaction.typeId) * FeeValidation.FeeUnit
 
   private val dAppVersionsWithActivation: List[(StdLibVersion, Boolean)] =
     DirectiveDictionary[StdLibVersion].all
@@ -44,10 +45,12 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
       } yield (genesis, setDApp, ci, activation)
     ) {
       case (genesis, setDApp, ci, activation) =>
-        assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), features(activation)) {
-          _ should produce(
-            s"Fee in WAVES for InvokeScriptTransaction (1 in WAVES) with 0 total scripts invoked does not exceed minimal value of $InvokeFee WAVES"
-          )
+        assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), features(activation)) { r =>
+          if (activation) r should produce("AccountBalanceError")
+          else
+            r should produce(
+              s"Fee in WAVES for InvokeScriptTransaction (1 in WAVES) does not exceed minimal value of $InvokeFee WAVES"
+            )
         }
     }
   }
@@ -60,8 +63,9 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
       } yield (genesis, setDApp, ci, activation)
     ) {
       case (genesis, setDApp, ci, activation) =>
-        assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), features(activation)) {
-          _ shouldBe 'right
+        assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), features(activation)) { r =>
+          if (activation) r should produce("AccountBalanceError")
+          else r shouldBe 'right
         }
     }
   }
@@ -89,7 +93,7 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
     ) {
       case (genesis, setDApp, ci, issue, activation) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ List(setDApp, issue))), TestBlock.create(Seq(ci)), features(activation)) {
-          _ shouldBe 'right
+          _ should produce("AccountBalanceError")
         }
     }
   }
@@ -109,9 +113,9 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
   }
 
   private def paymentPreconditions(
-    withEnoughFee: Boolean,
-    withPayment: Boolean,
-    dApp: Script
+      withEnoughFee: Boolean,
+      withPayment: Boolean,
+      dApp: Script
   ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction)] =
     for {
       master  <- accountGen
@@ -126,15 +130,15 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
         else
           (Nil, 0L)
       for {
-        genesis  <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
-        genesis2 <- GenesisTransaction.create(invoker, invokerBalance, ts)
+        genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
+        genesis2 <- GenesisTransaction.create(invoker.toAddress, invokerBalance, ts)
         setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, Some(dApp), SetScriptFee, ts + 2)
-        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master, None, payment, fee, Waves, ts + 3)
+        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, payment, fee, Waves, ts + 3)
       } yield (List(genesis, genesis2), setDApp, ci, issue)
     }.explicitGet()
 
   private def splitPaymentPreconditions(
-    version: StdLibVersion
+      version: StdLibVersion
   ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction)] =
     for {
       master  <- accountGen
@@ -142,13 +146,13 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
       ts      <- timestampGen
       issue   <- issueV2TransactionGen(invoker, Gen.const(None), feeParam = Some(IssueFee))
     } yield {
-      val count = ContractLimits.MaxAttachedPaymentAmount
+      val count    = ContractLimits.MaxAttachedPaymentAmount
       val payments = (1 to count).map(_ => Payment(issue.quantity / count + 1, IssuedAsset(issue.id.value())))
       for {
-        genesis  <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
-        genesis2 <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
+        genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
+        genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
         setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, Some(payingAssetDApp(version, issue.assetId)), SetScriptFee, ts + 2)
-        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master, None, payments, InvokeFee, Waves, ts + 3)
+        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, payments, InvokeFee, Waves, ts + 3)
       } yield (List(genesis, genesis2), setDApp, ci, issue)
     }.explicitGet()
 
@@ -159,13 +163,13 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
 
   private def payingDApp(version: StdLibVersion): Script = {
     val transfer = s"ScriptTransfer(i.caller, $InvokeFee, unit)"
-    val body = if (version >= V4) s"[$transfer]" else s"TransferSet([$transfer])"
+    val body     = if (version >= V4) s"[$transfer]" else s"TransferSet([$transfer])"
     dApp(body, version)
   }
 
   private def payingAssetDApp(version: StdLibVersion, assetId: ByteStr): Script = {
     val transfer = s"ScriptTransfer(i.caller, $InvokeFee, base58'${assetId.toString}')"
-    val body = if (version >= V4) s"[$transfer]" else s"TransferSet([$transfer])"
+    val body     = if (version >= V4) s"[$transfer]" else s"TransferSet([$transfer])"
     dApp(body, version)
   }
 
@@ -181,17 +185,17 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
          |
        """.stripMargin
 
-    val expr = Parser.parseContract(script).get.value
+    val expr     = Parser.parseContract(script).get.value
     val contract = compileContractFromExpr(expr, version)
     ContractScript(version, contract).explicitGet()
   }
 
   private def features(withV4: Boolean) = {
-    val v4ForkO = if (withV4) Seq(BlockchainFeatures.MultiPaymentInvokeScript) else Seq()
+    val v4ForkO = if (withV4) Seq(BlockchainFeatures.BlockV5) else Seq()
     val parameters = Seq(
       BlockchainFeatures.SmartAccounts,
       BlockchainFeatures.SmartAssets,
-      BlockchainFeatures.Ride4DApps,
+      BlockchainFeatures.Ride4DApps
     ) ++ v4ForkO
     TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = parameters.map(_.id -> 0).toMap)
   }

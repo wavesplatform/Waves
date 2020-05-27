@@ -3,7 +3,7 @@ package com.wavesplatform.block.serialization
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.block.MicroBlock
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.serialization.ByteBufferOps
@@ -15,7 +15,7 @@ object MicroBlockSerializer {
     val transactionDataBytes = writeTransactionData(microBlock.version, microBlock.transactionData)
     Bytes.concat(
       Array(microBlock.version),
-      microBlock.prevResBlockSig.arr,
+      microBlock.reference.arr,
       microBlock.totalResBlockSig.arr,
       Ints.toByteArray(transactionDataBytes.length),
       transactionDataBytes,
@@ -29,7 +29,7 @@ object MicroBlockSerializer {
       val buf = ByteBuffer.wrap(bytes).asReadOnlyBuffer()
 
       val version          = buf.get
-      val prevResBlockSig  = ByteStr(buf.getByteArray(SignatureLength))
+      val reference        = ByteStr(buf.getByteArray(Block.referenceLength(version)))
       val totalResBlockSig = ByteStr(buf.getByteArray(SignatureLength))
 
       buf.getInt
@@ -38,6 +38,6 @@ object MicroBlockSerializer {
       val generator       = buf.getPublicKey
       val signature       = ByteStr(buf.getByteArray(SignatureLength))
 
-      MicroBlock(version, generator, transactionData, prevResBlockSig, totalResBlockSig, signature)
+      MicroBlock(version, generator, transactionData, reference, totalResBlockSig, signature)
     }
 }

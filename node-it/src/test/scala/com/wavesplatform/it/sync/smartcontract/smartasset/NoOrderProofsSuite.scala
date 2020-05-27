@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract.smartasset
 
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -26,7 +27,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
         0,
         reissuable = true,
         issueFee,
-        2,
+        2: Byte,
         script = Some(
           ScriptCompiler(
             s"""
@@ -42,7 +43,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
 
       fail("ScriptCompiler didn't throw expected error")
     } catch {
-      case ex: java.lang.Exception => ex.getMessage should include("Compilation failed: Matching not exhaustive")
+      case ex: java.lang.Exception => ex.getMessage should include("Compilation failed: [Matching not exhaustive")
       case _: Throwable            => fail("ScriptCompiler works incorrect for orders with smart assets")
     }
   }
@@ -58,7 +59,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
         0,
         reissuable = true,
         issueFee,
-        2,
+        2: Byte,
         script = Some(
           ScriptCompiler(
             s"""
@@ -77,15 +78,16 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
 
     val incorrectTrTx = TransferTransaction(
       2.toByte,
-      pkByAddress(firstAddress),
-      pkByAddress(thirdAddress),
+      pkByAddress(firstAddress).publicKey,
+      pkByAddress(thirdAddress).toAddress,
       IssuedAsset(ByteStr.decodeBase58(assetWProofs).get),
       1,
       Waves,
       smartMinFee,
       None,
       System.currentTimeMillis + 10.minutes.toMillis,
-      Proofs(Seq(ByteStr("assetWProofs".getBytes("UTF-8"))))
+      Proofs(Seq(ByteStr("assetWProofs".getBytes("UTF-8")))),
+      AddressScheme.current.chainId
     )
 
     assertBadRequestAndMessage(
@@ -96,12 +98,13 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
     val incorrectBrTx = BurnTransaction
       .create(
         2.toByte,
-        pkByAddress(firstAddress),
+        pkByAddress(firstAddress).publicKey,
         IssuedAsset(ByteStr.decodeBase58(assetWProofs).get),
         1,
         smartMinFee,
         System.currentTimeMillis + 10.minutes.toMillis,
-        Proofs(Seq(ByteStr("assetWProofs".getBytes("UTF-8"))))
+        Proofs(Seq(ByteStr("assetWProofs".getBytes("UTF-8")))),
+        AddressScheme.current.chainId
       )
       .right
       .get

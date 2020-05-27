@@ -1,10 +1,12 @@
 package com.wavesplatform.lang
 
 import com.google.protobuf.ByteString
+import com.wavesplatform.common.state.diffs.ProduceError._
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
-import com.wavesplatform.lang.directives.values.V3
+import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
@@ -42,7 +44,8 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
         ),
         List.empty,
         None
-      ))
+      )
+    )
 
     "two-declarations" in roundTrip(
       DApp(
@@ -53,7 +56,8 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
         ),
         List.empty,
         None
-      ))
+      )
+    )
 
     "callable function" in roundTrip(
       DApp(
@@ -66,7 +70,8 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
           )
         ),
         None
-      ))
+      )
+    )
 
     "default function" in roundTrip(
       DApp(
@@ -114,7 +119,8 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
             FUNC("funcAgain", List("arg"), CONST_BOOLEAN(false))
           )
         )
-      ))
+      )
+    )
 
     "full contract with meta" in roundTrip(
       DApp(
@@ -146,6 +152,34 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
             FUNC("funcAgain", List("arg"), CONST_BOOLEAN(false))
           )
         )
-      ))
+      )
+    )
+  }
+
+  "limitations" - {
+    def oneCallableDApp(name: String) =
+      DApp(
+        DAppMeta(),
+        Nil,
+        List(
+          CallableFunction(
+            CallableAnnotation("i"),
+            FUNC(name, Nil, ARR(IndexedSeq(), limited = false).explicitGet())
+          )
+        ),
+        None
+      )
+
+    "callable name limit" in {
+      val limit = ContractLimits.MaxDeclarationNameInBytes
+
+      roundTrip(oneCallableDApp("a" * limit))
+
+      ContractSerDe.serialize(oneCallableDApp("a" * (limit + 1)))
+        .flatMap(ContractSerDe.deserialize) should produce(
+           s"Callable function name (${"a" * (limit + 1)}) size = ${limit + 1} bytes " +
+           s"exceeds $limit"
+        )
+    }
   }
 }

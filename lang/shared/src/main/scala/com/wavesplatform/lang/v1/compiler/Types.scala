@@ -31,7 +31,7 @@ object Types {
     override val name        = if (n.nonEmpty) n.get else typeList.sortBy(_.toString).mkString("|")
   }
 
-  case class CASETYPEREF(override val name: String, override val fields: List[(String, FINAL)], hideConscructor: Boolean = false) extends REAL {
+  case class CASETYPEREF(override val name: String, override val fields: List[(String, FINAL)], hideConstructor: Boolean = false) extends REAL {
     override def typeList: List[REAL] = List(this)
   }
 

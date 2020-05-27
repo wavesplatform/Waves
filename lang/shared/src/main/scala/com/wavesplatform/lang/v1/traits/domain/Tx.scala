@@ -12,6 +12,7 @@ sealed trait PseudoTx
 object Tx {
   case class ScriptTransfer(assetId: Option[ByteStr],
                             sender: Recipient.Address,
+                            senderPk: ByteStr,
                             recipient: Recipient.Address,
                             amount: Long,
                             timestamp: Long,
@@ -20,6 +21,7 @@ object Tx {
   case class ReissuePseudoTx(
     reissue: Reissue,
     sender: Recipient.Address,
+    senderPk: ByteStr,
     txId: ByteStr,
     timestamp: Long
   ) extends PseudoTx
@@ -27,6 +29,15 @@ object Tx {
   case class BurnPseudoTx(
     burn: BurnAction,
     sender: Recipient.Address,
+    senderPk: ByteStr,
+    txId: ByteStr,
+    timestamp: Long
+  ) extends PseudoTx
+
+  case class SponsorFeePseudoTx(
+    sponsorFee: SponsorFee,
+    sender: Recipient.Address,
+    senderPk: ByteStr,
     txId: ByteStr,
     timestamp: Long
   ) extends PseudoTx

@@ -2,7 +2,9 @@ package com.wavesplatform.lang
 
 import java.math.{MathContext, BigDecimal => BD}
 
+import cats.implicits._
 import ch.obermuhlner.math.big.BigDecimalMath
+import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.lang.v1.BaseGlobal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA
@@ -10,9 +12,12 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 import com.wavesplatform.utils.Merkle
 import com.wavesplatform.zwaves.bls12.Groth16
+import org.web3j.crypto.Sign
+import org.web3j.crypto.Sign.SignatureData
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
+import scala.annotation.tailrec
 import scala.concurrent.Future
 import scala.util.Try
 
@@ -34,6 +39,27 @@ object Global extends BaseGlobal {
       result <- Base64.tryDecode(input).toEither.left.map(_ => "can't parse Base64 string")
     } yield result
 
+  private val base16Encoder: BaseEncoding = BaseEncoding.base16().lowerCase()
+
+  override def base16EncodeImpl(input: Array[Byte]): Either[String, String] =
+    toEither(base16Encoder.encode(input))
+
+  override def base16DecodeImpl(input: String): Either[String, Array[Byte]] =
+    toEither(base16Encoder.decode(input.toLowerCase))
+
+  private def toEither[A](f: => A): Either[String, A] =
+    Try(f).toEither
+      .leftMap { exception =>
+        @tailrec
+        def findThrowableCause(th: Throwable): Throwable =
+          if (th.getCause == null) th
+          else findThrowableCause(th.getCause)
+
+        val cause = findThrowableCause(exception)
+        if (cause.getMessage != null) cause.getMessage
+        else cause.toString
+      }
+
   def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean = Curve25519.verify(Signature(sig), message, PublicKey(pub))
 
   override def rsaVerify(alg: DigestAlgorithm, message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean = RSA.verify(alg, message, sig, pub)
@@ -46,19 +72,21 @@ object Global extends BaseGlobal {
     Merkle.verify(rootBytes, proofBytes, valueBytes)
 
   // Math functions
-  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long] = (Try {
-        val base = BD.valueOf(b, bp.toInt)
-        val exp = BD.valueOf(e, ep.toInt)
-        val res = BigDecimalMath.pow(base, exp, MathContext.DECIMAL128)
-        res.setScale(rp.toInt, roundMode(round)).unscaledValue.longValueExact
-      }).toEither.left.map(_.toString)
+  def pow(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, Long] =
+    (Try {
+      val base = BD.valueOf(b, bp.toInt)
+      val exp  = BD.valueOf(e, ep.toInt)
+      val res  = BigDecimalMath.pow(base, exp, MathContext.DECIMAL128)
+      res.setScale(rp.toInt, roundMode(round)).unscaledValue.longValueExact
+    }).toEither.left.map(_.toString)
 
-  def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds) : Either[String, Long] = (Try {
-        val base = BD.valueOf(b, bp.toInt)
-        val exp = BD.valueOf(e, ep.toInt)
-        val res = BigDecimalMath.log(base, MathContext.DECIMAL128).divide(BigDecimalMath.log(exp, MathContext.DECIMAL128), MathContext.DECIMAL128)
-        res.setScale(rp.toInt, roundMode(round)).unscaledValue.longValueExact
-      }).toEither.left.map(_.toString)
+  def log(b: Long, bp: Long, e: Long, ep: Long, rp: Long, round: BaseGlobal.Rounds): Either[String, Long] =
+    (Try {
+      val base = BD.valueOf(b, bp.toInt)
+      val exp  = BD.valueOf(e, ep.toInt)
+      val res  = BigDecimalMath.log(base, MathContext.DECIMAL128).divide(BigDecimalMath.log(exp, MathContext.DECIMAL128), MathContext.DECIMAL128)
+      res.setScale(rp.toInt, roundMode(round)).unscaledValue.longValueExact
+    }).toEither.left.map(_.toString)
 
   private val client = new SttpClient()
   override def requestNode(url: String): Future[NodeResponse] =
@@ -66,4 +94,17 @@ object Global extends BaseGlobal {
 
   override def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
     Groth16.verify(verifyingKey, proof, inputs)
+
+  override def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte] = {
+    // https://github.com/web3j/web3j/blob/master/crypto/src/test/java/org/web3j/crypto/ECRecoverTest.java#L43
+    val signatureData = {
+      val vTemp = signature(64)
+      val v = if (vTemp < 27) (vTemp + 27).toByte else vTemp
+      val r = signature.slice(0, 32)
+      val s = signature.slice(32, 64)
+      new SignatureData(v, r, s)
+    }
+    val pk = Sign.signedMessageHashToKey(messageHash, signatureData)
+    base16Encoder.decode(pk.toString(16))
+  }
 }

@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBTransactions
@@ -13,8 +13,15 @@ import play.api.libs.json._
 
 import scala.util.Try
 
-case class DataTransaction(version: TxVersion, sender: PublicKey, data: Seq[DataEntry[_]], fee: TxTimestamp, timestamp: TxTimestamp, proofs: Proofs)
-    extends ProvenTransaction
+case class DataTransaction(
+    version: TxVersion,
+    sender: PublicKey,
+    data: Seq[DataEntry[_]],
+    fee: TxTimestamp,
+    timestamp: TxTimestamp,
+    proofs: Proofs,
+    chainId: Byte
+) extends ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InWaves
     with FastHashId
@@ -31,11 +38,13 @@ case class DataTransaction(version: TxVersion, sender: PublicKey, data: Seq[Data
 }
 
 object DataTransaction extends TransactionParser {
-  val MaxBytes: Int      = 150 * 1024 // implicitly used for RIDE CONST_STRING and CONST_BYTESTR
-  val MaxProtoBytes: Int = 165890
+  type TransactionT = DataTransaction
+
+  val MaxBytes: Int      = 150 * 1024 // uses for RIDE CONST_STRING and CONST_BYTESTR
+  val MaxProtoBytes: Int = 165890     // uses for RIDE CONST_BYTESTR
   val MaxEntryCount: Int = 100
 
-  override val typeId: TxType                    = 12
+  override val typeId: TxType                    = 12: Byte
   override val supportedVersions: Set[TxVersion] = Set(1, 2)
 
   implicit val validator: TxValidator[DataTransaction] = DataTxValidator
@@ -54,9 +63,10 @@ object DataTransaction extends TransactionParser {
       data: Seq[DataEntry[_]],
       fee: TxAmount,
       timestamp: TxTimestamp,
-      proofs: Proofs
+      proofs: Proofs,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, DataTransaction] =
-    DataTransaction(version, sender, data, fee, timestamp, proofs).validatedEither
+    DataTransaction(version, sender, data, fee, timestamp, proofs, chainId).validatedEither
 
   def signed(
       version: TxVersion,
@@ -75,5 +85,5 @@ object DataTransaction extends TransactionParser {
       fee: TxAmount,
       timestamp: TxTimestamp
   ): Either[ValidationError, DataTransaction] =
-    signed(version, sender, data, fee, timestamp, sender)
+    signed(version, sender.publicKey, data, fee, timestamp, sender.privateKey)
 }
