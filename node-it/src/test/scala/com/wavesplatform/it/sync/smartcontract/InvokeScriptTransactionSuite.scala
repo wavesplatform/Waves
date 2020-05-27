@@ -38,11 +38,12 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         sender.address,
         recipient = contract.stringRepr,
         assetId = None,
-        amount = 5.waves,
+        amount = 6.waves,
         fee = minFee,
         waitForTx = true
       )
       .id
+    sender.createAlias(contract.stringRepr, "alias", fee = 1.waves)
   }
 
   test("set contract to contract account") {
@@ -54,6 +55,11 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         | @Callable(inv)
         | func foo(a:ByteVector) = {
         |  WriteSet([DataEntry("a", a), DataEntry("sender", inv.caller.bytes)])
+        | }
+        |
+        | @Callable(inv)
+        | func baz() = {
+        |  WriteSet([DataEntry("test", this.bytes)])
         | }
         |
         | @Callable(inv)
@@ -96,6 +102,51 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     sender.getDataByKey(contract.stringRepr, "a") shouldBe BinaryDataEntry("a", arg)
     sender.getDataByKey(contract.stringRepr, "sender") shouldBe BinaryDataEntry("sender", caller.toAddress.bytes)
   }
+
+  test("contract caller invokes a function on a contract by alias") {
+    val arg               = ByteStr(Array(43: Byte))
+
+    val _ = sender.invokeScript(
+      caller.stringRepr,
+      "alias:I:alias",
+      func = Some("foo"),
+      args = List(CONST_BYTESTR(arg).explicitGet()),
+      payment = Seq(),
+      fee = 1.waves,
+      waitForTx = true
+    )
+
+    sender.getDataByKey(contract.stringRepr, "a") shouldBe BinaryDataEntry("a", arg)
+    sender.getDataByKey(contract.stringRepr, "sender") shouldBe BinaryDataEntry("sender", caller.toAddress.bytes)
+  }
+
+  test("disable use this with alias") {
+    assertApiErrorRaised(
+     sender.invokeScript(
+      caller.stringRepr,
+      "alias:I:alias",
+      func = Some("baz"),
+      args = List(),
+      payment = Seq(),
+      fee = 1.waves,
+      waitForTx = true
+     )
+    )
+  }
+
+  test("enable use this with address") {
+    sender.invokeScript(
+      caller.stringRepr,
+      contract.stringRepr,
+      func = Some("baz"),
+      args = List(),
+      payment = Seq(),
+      fee = 1.waves,
+      waitForTx = true
+     )
+    sender.getDataByKey(contract.stringRepr, "test") shouldBe BinaryDataEntry("test", contract.toAddress.bytes)
+  }
+
 
   test("contract caller invokes a default function on a contract") {
 

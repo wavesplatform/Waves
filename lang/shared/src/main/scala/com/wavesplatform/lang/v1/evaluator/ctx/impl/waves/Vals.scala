@@ -4,7 +4,7 @@ import cats.implicits._
 import cats.{Eval, Monad}
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, EVALUATED}
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, LONG, UNION}
 import com.wavesplatform.lang.v1.evaluator.ContextfulVal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{buildAssetInfo, ordType, orderObject, transactionObject}
@@ -58,8 +58,13 @@ object Vals {
     new ContextfulVal.Lifted[Environment] {
       override def liftF[F[_] : Monad](env: Environment[F]): Eval[Either[ExecutionError, EVALUATED]] =
         Eval.later {
-          (Bindings.senderObject(env.tthis): EVALUATED)
-            .asRight[ExecutionError]
+          if(env.dAppAlias) {
+            (FAIL("Use alias is disabled"): EVALUATED)
+              .asRight[ExecutionError]
+          } else {
+            (Bindings.senderObject(env.tthis): EVALUATED)
+              .asRight[ExecutionError]
+          }
         }
     }
 

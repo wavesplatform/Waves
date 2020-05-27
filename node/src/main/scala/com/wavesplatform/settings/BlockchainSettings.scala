@@ -72,7 +72,8 @@ case class FunctionalitySettings(
     lastTimeBasedForkParameter: Long = 0L,
     leaseExpiration: Int = 1000000,
     estimatorPreCheckHeight: Int = 0,
-    resetInvalidInvokeSponsoredFeeHeight: Int = 0
+    resetInvalidInvokeSponsoredFeeHeight: Int = 0,
+    disableAliasInThisHeight: Int = 0
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int        = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil                       = lastTimeBasedForkParameter
@@ -115,7 +116,8 @@ object FunctionalitySettings {
     blockVersion3AfterHeight = 795000,
     doubleFeaturesPeriodsAfterHeight = 810000,
     estimatorPreCheckHeight = 1847610,
-    resetInvalidInvokeSponsoredFeeHeight = 1950100
+    resetInvalidInvokeSponsoredFeeHeight = 1950100,
+    disableAliasInThisHeight = 2081400
   )
 
   val TESTNET = apply(
@@ -125,7 +127,8 @@ object FunctionalitySettings {
     blockVersion3AfterHeight = 161700,
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
     lastTimeBasedForkParameter = 1492560000000L,
-    estimatorPreCheckHeight = 817380
+    estimatorPreCheckHeight = 817380,
+    disableAliasInThisHeight = 1018400
   )
 
   val STAGENET = apply(

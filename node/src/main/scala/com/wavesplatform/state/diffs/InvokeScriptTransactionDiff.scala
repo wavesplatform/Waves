@@ -4,7 +4,7 @@ import cats.Id
 import cats.implicits._
 import cats.kernel.Monoid
 import com.google.common.base.Throwables
-import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.EstimatorProvider._
@@ -55,12 +55,14 @@ object InvokeScriptTransactionDiff {
       case Right(Some(sc @ ContractScriptImpl(_, contract))) =>
         val scriptResultE =
           stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
+
             val environment = new WavesEnvironment(
               AddressScheme.current.chainId,
               Coeval(tx.asInstanceOf[In]),
               Coeval(height),
               blockchain,
-              Coeval(tx.dAppAddressOrAlias.bytes)
+              Coeval(tx.dAppAddressOrAlias.bytes),
+              height >= blockchain.settings.functionalitySettings.disableAliasInThisHeight && tx.dAppAddressOrAlias.isInstanceOf[Alias]
             )
             val invoker                                       = tx.sender.toAddress.bytes
             val maybePayment: Option[(Long, Option[ByteStr])] = tx.payment.headOption.map(p => (p.amount, p.assetId.compatId))

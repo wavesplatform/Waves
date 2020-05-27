@@ -19,7 +19,7 @@ object WavesEnvironment {
   type In = Transaction :+: Order :+: ScriptTransfer :+: CNil
 }
 
-class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[Int], blockchain: Blockchain, address: Coeval[ByteStr])
+class WavesEnvironment(nByte: Byte, in: Coeval[WavesEnvironment.In], h: Coeval[Int], blockchain: Blockchain, address: Coeval[ByteStr], override val dAppAlias: Boolean = false)
     extends Environment[Id] {
   override def height: Long = h()
 

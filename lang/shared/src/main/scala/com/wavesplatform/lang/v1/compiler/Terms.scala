@@ -172,4 +172,8 @@ object Terms {
       ARR(xs, weight)
     }
   }
+
+  case class FAIL(reason: String) extends EVALUATED {
+    def weight: Long = 0
+  }
 }
