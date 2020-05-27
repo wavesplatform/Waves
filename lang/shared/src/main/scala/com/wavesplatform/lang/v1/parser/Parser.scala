@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1.parser
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions.PART.VALID
 import com.wavesplatform.lang.v1.parser.Expressions._
@@ -98,7 +99,7 @@ object Parser {
     .filter { case (_, x, _) => !keywords.contains(x) }
     .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
 
-  val anyVarName: P[PART[String]] = (Index ~~ (char ~~ (digit | char).repX()).! ~~ Index).map {
+  val anyVarName: P[PART[String]] = (Index ~~ ((char | "_") ~~ (digit | char).repX()).! ~~ Index).map {
     case (start, x, end) =>
       if (keywords.contains(x)) PART.INVALID(Pos(start, end), s"keywords are restricted: $x")
       else PART.VALID(Pos(start, end), x)
@@ -184,10 +185,26 @@ object Parser {
       }
   }
 
+  val tupleArgs: P[Seq[EXPR]] =
+    comment ~ baseExpr.rep(
+      sep = comment ~ "," ~ comment,
+      min = ContractLimits.MinTupleSize,
+      max = ContractLimits.MaxTupleSize
+    ) ~ comment
+
+  val tuple: P[EXPR] = (Index ~~ P("(") ~ tupleArgs ~ P(")") ~~ Index).map {
+    case (s, elements, f) => FUNCTION_CALL(
+      Pos(s, f),
+      PART.VALID(Pos(s, f), s"_Tuple${elements.length}"),
+      elements.toList
+    )
+  }
+
   val extractableAtom: P[EXPR] = P(
-    curlyBracesP | bracesP |
+    tuple | curlyBracesP | bracesP |
       byteVectorP | stringP | numberP | trueP | falseP | list |
-      maybeFunctionCallP)
+      maybeFunctionCallP
+  )
 
   abstract class Accessor
   case class Method(name: PART[String], args: Seq[EXPR]) extends Accessor

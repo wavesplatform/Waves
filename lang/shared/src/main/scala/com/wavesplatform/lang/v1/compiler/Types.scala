@@ -1,5 +1,7 @@
 package com.wavesplatform.lang.v1.compiler
 
+import cats.implicits._
+
 object Types {
 
   sealed trait TYPE
@@ -17,6 +19,7 @@ object Types {
   case class TYPEPARAM(char: Byte)               extends PARAMETERIZED with SINGLE { override def toString: String = char.toChar.toString }
   case class PARAMETERIZEDLIST(t: TYPE)          extends PARAMETERIZED with SINGLE { override def toString: String = s"List[$t]" }
   case class PARAMETERIZEDUNION(l: List[SINGLE]) extends PARAMETERIZED             { override def toString: String = l.mkString("|")}
+  case class PARAMETERIZEDTUPLE(t: List[TYPE])   extends PARAMETERIZED             { override def toString: String = t.mkString("(", ", ", ")") }
   case object NOTHING                            extends FINAL { override val name = "Nothing"; override val typeList = List() }
   case object LONG                               extends REAL { override val name = "Int"; override val typeList = List(this) }
   case object BYTESTR                            extends REAL { override val name = "ByteVector"; override val typeList = List(this) }
@@ -31,6 +34,14 @@ object Types {
     override val name        = if (n.nonEmpty) n.get else typeList.sortBy(_.toString).mkString("|")
   }
 
+  case class TUPLE(types: List[FINAL]) extends REAL {
+    override def name: String = types.mkString("(", ", ", ")")
+    override def typeList: List[REAL] = List(this)
+
+    override def fields: List[(String, FINAL)] =
+      types.mapWithIndex { case (t, i) => s"_${i + 1}" -> t }
+  }
+
   case class CASETYPEREF(override val name: String, override val fields: List[(String, FINAL)], hideConstructor: Boolean = false) extends REAL {
     override def typeList: List[REAL] = List(this)
   }
@@ -41,6 +52,7 @@ object Types {
       case tp: TYPEPARAM         => resolvedPlaceholders(tp)
       case PARAMETERIZEDUNION(l) => UNION.create(l.map(l => toFinal(l, resolvedPlaceholders)))
       case PARAMETERIZEDLIST(t)  => LIST(toFinal(t, resolvedPlaceholders))
+      case PARAMETERIZEDTUPLE(t) => TUPLE(t.map(toFinal(_, resolvedPlaceholders)))
       case c: FINAL              => c
     }
   }
@@ -78,6 +90,8 @@ object Types {
       case (_, NOTHING)           => true
       case (NOTHING, _)           => false
       case (LIST(t1), LIST(t2))   => t1 >= t2
+      case (TUPLE(types1), TUPLE(types2)) =>
+        types1.length == types2.length && (types1 zip types2).forall { case (t1, t2) => t1 >= t2 }
       case (l1: FINAL, l2: FINAL) => l1.union >= l2.union
     }
 

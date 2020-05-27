@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.v1.compiler
 
+import cats.implicits._
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.compiler.Types._
 
@@ -23,7 +24,11 @@ object TypeInferrer {
                 val commonTypeExists = plainTypes.exists { p =>
                   matchResults.map(_.tpe).forall(e => e >= p)
                 }
-                Either.cond(commonTypeExists, u, s"Can't match inferred types of ${h.name} over ${matchResults.map(_.tpe)}")
+                Either.cond(
+                  commonTypeExists,
+                  u,
+                  s"Can't match inferred types of ${h.name} over ${matchResults.map(_.tpe).mkString(", ")}"
+                )
             }
         }
         resolved.find(_._2.isLeft) match {
@@ -43,24 +48,32 @@ object TypeInferrer {
     lazy val err = s"Non-matching types: expected: $placeholder, actual: $argType"
 
     (placeholder, argType) match {
-      case (tp @ TYPEPARAM(char), _) =>
-        Right(Some(MatchResult(argType, tp)))
+      case (tp @ TYPEPARAM(char), _)                         => Right(Some(MatchResult(argType, tp)))
       case (tp @ PARAMETERIZEDLIST(innerTypeParam), LIST(t)) => matchTypes(t, innerTypeParam, knownTypes)
       case (tp @ PARAMETERIZEDLIST(_), _)                    => Left(err)
+      case (tp @ PARAMETERIZEDTUPLE(typeParams), TUPLE(types)) =>
+        if (typeParams.length != types.length)
+          Left(err)
+        else
+          (typeParams zip types)
+            .traverse { case (typeParam, t) => matchTypes(t, typeParam, knownTypes) }
+            .map(_ => None)
+
+      case (tp @ PARAMETERIZEDTUPLE(_), _) => Left(err)
       case (tp @ PARAMETERIZEDUNION(l), _) =>
-        val conctretes = UNION.create(
+        val concretes = UNION.create(
           l.filter(_.isInstanceOf[REAL])
             .map(_.asInstanceOf[REAL]))
         val parameterized = l
           .filter(_.isInstanceOf[PARAMETERIZED])
           .map(_.asInstanceOf[PARAMETERIZED])
-        if (conctretes >= UNION.create(argType.typeList)) Right(None)
+        if (concretes >= UNION.create(argType.typeList)) Right(None)
         else
           parameterized match {
             case singlePlaceholder :: Nil =>
               val nonMatchedArgTypes = argType match {
                 case NOTHING         => ???
-                case UNION(argTypes, _) => UNION(argTypes.filterNot(conctretes.typeList.contains))
+                case UNION(argTypes, _) => UNION(argTypes.filterNot(concretes.typeList.contains))
                 case s: SINGLE       => s
               }
               matchTypes(nonMatchedArgTypes, singlePlaceholder, knownTypes)

@@ -738,6 +738,27 @@ object PureContext {
       FUNCTION_CALL(User("!="), List(index, unit))
     }
 
+  val runtimeTuple: CASETYPEREF = CASETYPEREF("Tuple", Nil)
+
+  def createTupleN(resultSize: Int): NativeFunction[NoContext] = {
+    val typeParams =
+      ('A'.toInt until 'A'.toInt + resultSize).map(t => TYPEPARAM(t.toByte)).toList
+
+    NativeFunction(
+      s"_Tuple$resultSize",
+      1,
+      (CREATE_TUPLE + resultSize - 2).toShort,
+      PARAMETERIZEDTUPLE(typeParams),
+      typeParams.mapWithIndex { case (typeParam, i) => (s"element${i + 1}", typeParam) }: _*
+    ) {
+      case elements if elements.length == resultSize =>
+        val fields = elements.mapWithIndex { case (element, i) => (s"_${i + 1}", element) }.toMap
+        Right(CaseObj(runtimeTuple, fields))
+      case xs =>
+        notImplemented[Id, EVALUATED](typeParams.map(_.char).mkString("(", ", ", ")"), xs)
+    }
+  }
+
   lazy val uMinus: BaseFunction[NoContext] =
     UserFunction("-", Map[StdLibVersion, Long](V1 -> 9, V2 -> 9, V3 -> 1, V4 -> 1), LONG, ("@n", LONG)) {
       FUNCTION_CALL(subLong, List(CONST_LONG(0), REF("@n")))
@@ -929,8 +950,8 @@ object PureContext {
           listContains,
           listMin,
           listMax,
-          makeString
-        )
+          makeString,
+        ) ++ (MinTupleSize to MaxTupleSize).map(i => createTupleN(i))
 
     version match {
       case V1 | V2 => ctx

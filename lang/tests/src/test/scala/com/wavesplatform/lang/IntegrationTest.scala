@@ -1776,4 +1776,18 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
     eval(""" [].makeString(", ") """, version = V3) should produce("Can't find a function 'makeString'")
   }
+
+  property("tuple") {
+    val script =
+      """
+        | let a = ("a", true, 123, base58'aaaa')
+        | a._1 == "a"          &&
+        | a._2 == true         &&
+        | a._3 == 123          &&
+        | a._4 == base58'aaaa' &&
+        | a == ("a", true, 123, base58'aaaa')
+      """.stripMargin
+
+    eval(script, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+  }
 }
