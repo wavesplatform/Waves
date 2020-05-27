@@ -232,6 +232,8 @@ object Importer extends ScorexLogging {
       val result = Try(file match {
         case url if url.startsWith("http://") || url.startsWith("https://") || url.startsWith("ftp://") =>
           new URL(url).openStream()
+        case "-" =>
+          System.in
         case _ =>
           new FileInputStream(file)
       })
