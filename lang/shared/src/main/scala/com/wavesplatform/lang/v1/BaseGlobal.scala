@@ -145,7 +145,7 @@ trait BaseGlobal {
   ): Either[String, ContractInfo] =
     for {
       dApp                          <- ContractCompiler.compile(input, ctx)
-      (maxComplexity, complexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator)
+      (maxComplexity, complexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator, includeUserFunctions = true)
       bytes                         <- serializeContract(dApp, stdLibVersion)
     } yield (bytes, dApp, maxComplexity, complexities)
 

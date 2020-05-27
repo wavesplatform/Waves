@@ -38,29 +38,57 @@ object ContractScript {
     override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(true)
   }
 
-  def estimateComplexityByFunction(
+  private def estimateAnnotatedFunctions(
       version: StdLibVersion,
-      contract: DApp,
+      dApp: DApp,
       estimator: ScriptEstimator
   ): Either[String, List[(String, Long)]] =
-    (contract.callableFuncs.map(func => (func.annotation.invocationArgName, func.u)) ++
-      contract.verifierFuncOpt.map(func => (func.annotation.invocationArgName, func.u)))
-      .traverse {
-        case (annotationArgName, funcExpr) =>
-          estimator(
-            varNames(version, DAppType),
-            functionCosts(version),
-            constructExprFromFuncAndContext(contract.decs, annotationArgName, funcExpr)
-          ).map((funcExpr.name, _))
-      }
+    estimateFunctions(
+      version,
+      dApp,
+      estimator,
+      annotatedFunctions(dApp)
+    )
+
+  private def estimateAllFunctions(
+      version: StdLibVersion,
+      dApp: DApp,
+      estimator: ScriptEstimator
+  ): Either[String, List[(String, Long)]] =
+    estimateFunctions(
+      version,
+      dApp,
+      estimator,
+      annotatedFunctions(dApp) ::: dApp.decs.collect { case f: FUNC => (None, f) }
+    )
+
+  private def annotatedFunctions(dApp: DApp): List[(Some[String], FUNC)] =
+    (dApp.verifierFuncOpt ++ dApp.callableFuncs)
+      .map(func => (Some(func.annotation.invocationArgName), func.u))
+      .toList
+
+  private def estimateFunctions(
+      version: StdLibVersion,
+      dApp: DApp,
+      estimator: ScriptEstimator,
+      functions: List[(Option[String], FUNC)]
+  ): Either[String, List[(String, Long)]] =
+    functions.traverse {
+      case (annotationArgName, funcExpr) =>
+        estimator(
+          varNames(version, DAppType),
+          functionCosts(version),
+          constructExprFromFuncAndContext(dApp.decs, annotationArgName, funcExpr)
+        ).map((funcExpr.name, _))
+    }
 
   def estimateComplexity(
       version: StdLibVersion,
-      contract: DApp,
+      dApp: DApp,
       estimator: ScriptEstimator
   ): Either[String, (Long, Map[String, Long])] =
     for {
-      (maxComplexity, complexities) <- estimateComplexityExact(version, contract, estimator)
+      (maxComplexity, complexities) <- estimateComplexityExact(version, dApp, estimator)
       _                             <- checkComplexity(version, maxComplexity)
     } yield (maxComplexity._2, complexities)
 
@@ -78,24 +106,35 @@ object ContractScript {
 
   def estimateComplexityExact(
       version: StdLibVersion,
-      contract: DApp,
-      estimator: ScriptEstimator
+      dApp: DApp,
+      estimator: ScriptEstimator,
+      includeUserFunctions: Boolean = false,
   ): Either[String, ((String, Long), Map[String, Long])] =
     for {
-      complexities <- estimateComplexityByFunction(version, contract, estimator)
+      complexities <-
+        if (includeUserFunctions) estimateAllFunctions(version, dApp, estimator)
+        else estimateAnnotatedFunctions(version, dApp, estimator)
       max = complexities.maximumOption(_._2 compareTo _._2).getOrElse(("", 0L))
     } yield (max, complexities.toMap)
 
-  private def constructExprFromFuncAndContext(dec: List[DECLARATION], annotationArgName: String, funcExpr: FUNC): EXPR = {
-    val funcWithAnnotationContext =
+  private def constructExprFromFuncAndContext(
+      dec: List[DECLARATION],
+      annotationArgNameOpt: Option[String],
+      funcExpr: FUNC
+  ): EXPR = {
+    val callingFuncExpr =
       BLOCK(
-        LET(annotationArgName, TRUE),
-        BLOCK(
-          funcExpr,
-          FUNCTION_CALL(FunctionHeader.User(funcExpr.name), List.fill(funcExpr.args.size)(TRUE))
-        )
+        funcExpr,
+        FUNCTION_CALL(FunctionHeader.User(funcExpr.name), List.fill(funcExpr.args.size)(TRUE))
       )
-    val res = dec.foldRight(funcWithAnnotationContext)((d, e) => BLOCK(d, e))
-    res
+    val funcWithContext =
+      annotationArgNameOpt.fold(callingFuncExpr)(
+        annotationArgName =>
+          BLOCK(
+            LET(annotationArgName, TRUE),
+            callingFuncExpr
+          )
+      )
+    dec.foldRight(funcWithContext)((declaration, expr) => BLOCK(declaration, expr))
   }
 }
