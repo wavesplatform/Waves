@@ -43,24 +43,14 @@ object ContractScript {
       dApp: DApp,
       estimator: ScriptEstimator
   ): Either[String, List[(String, Long)]] =
-    estimateFunctions(
-      version,
-      dApp,
-      estimator,
-      annotatedFunctions(dApp)
-    )
+    estimateFunctions(version, dApp, estimator, annotatedFunctions(dApp))
 
-  private def estimateAllFunctions(
+  private def estimateUserFunctions(
       version: StdLibVersion,
       dApp: DApp,
       estimator: ScriptEstimator
   ): Either[String, List[(String, Long)]] =
-    estimateFunctions(
-      version,
-      dApp,
-      estimator,
-      annotatedFunctions(dApp) ::: dApp.decs.collect { case f: FUNC => (None, f) }
-    )
+    estimateFunctions(version, dApp, estimator, dApp.decs.collect { case f: FUNC => (None, f) })
 
   private def annotatedFunctions(dApp: DApp): List[(Some[String], FUNC)] =
     (dApp.verifierFuncOpt ++ dApp.callableFuncs)
@@ -111,10 +101,13 @@ object ContractScript {
       includeUserFunctions: Boolean = false,
   ): Either[String, ((String, Long), Map[String, Long])] =
     for {
+      annotatedFunctionComplexities <- estimateAnnotatedFunctions(version, dApp, estimator)
+      max = annotatedFunctionComplexities.maximumOption(_._2 compareTo _._2).getOrElse(("", 0L))
       complexities <-
-        if (includeUserFunctions) estimateAllFunctions(version, dApp, estimator)
-        else estimateAnnotatedFunctions(version, dApp, estimator)
-      max = complexities.maximumOption(_._2 compareTo _._2).getOrElse(("", 0L))
+        if (includeUserFunctions)
+          estimateUserFunctions(version, dApp, estimator).map(_ ::: annotatedFunctionComplexities)
+        else
+          Right(annotatedFunctionComplexities)
     } yield (max, complexities.toMap)
 
   private def constructExprFromFuncAndContext(
