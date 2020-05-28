@@ -192,7 +192,7 @@ object Parser {
       max = ContractLimits.MaxTupleSize
     ) ~ comment
 
-  val tuple: P[EXPR] = (Index ~~ P("(") ~ tupleArgs ~ P(")") ~~ Index).map {
+  val bracesOrTuple: P[EXPR] = (Index ~~ P("(") ~ tupleArgs ~ P(")") ~~ Index).map {
     case (_, Seq(expr), _) => expr
     case (s, elements, f) =>
       FUNCTION_CALL(
@@ -203,7 +203,7 @@ object Parser {
   }
 
   val extractableAtom: P[EXPR] = P(
-    curlyBracesP | tuple |
+    curlyBracesP | bracesOrTuple |
       byteVectorP | stringP | numberP | trueP | falseP | list |
       maybeFunctionCallP
   )
