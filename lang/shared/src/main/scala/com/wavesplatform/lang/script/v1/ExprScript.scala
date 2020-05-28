@@ -1,16 +1,16 @@
 package com.wavesplatform.lang.script.v1
 
+import cats.implicits._
+import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.utils._
+import com.wavesplatform.lang.v1.BaseGlobal
 import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.BaseGlobal
-import monix.eval.Coeval
-import cats.implicits._
-import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import monix.eval.Coeval
 
 object ExprScript {
 
@@ -33,19 +33,32 @@ object ExprScript {
       .asRight[String]
       .flatTap(s => if (checkSize) validateBytes(s.bytes().arr) else Right(()))
 
+  def estimateExact(
+      expr: EXPR,
+      version: StdLibVersion,
+      estimator: ScriptEstimator
+  ): Either[String, Long] =
+    estimator(varNames(version, Expression), functionCosts(version), expr)
+
   def estimate(
-    expr:      EXPR,
-    version:   StdLibVersion,
-    estimator: ScriptEstimator
+      expr: EXPR,
+      version: StdLibVersion,
+      estimator: ScriptEstimator
   ): Either[String, Long] =
     for {
-      scriptComplexity <- estimator(varNames(version, Expression), functionCosts(version), expr)
-      _ <- Either.cond(
-        scriptComplexity <= MaxComplexityByVersion(version),
-        (),
-        s"Script is too complex: $scriptComplexity > ${MaxComplexityByVersion(version)}"
-      )
-    } yield scriptComplexity
+      complexity <- estimateExact(expr, version, estimator)
+      _          <- checkComplexity(version, complexity)
+    } yield complexity
+
+  def checkComplexity(
+      version: StdLibVersion,
+      complexity: Long
+  ): Either[String, Unit] =
+    Either.cond(
+      complexity <= MaxComplexityByVersion(version),
+      (),
+      s"Script is too complex: $complexity > ${MaxComplexityByVersion(version)}"
+    )
 
   private case class ExprScriptImpl(stdLibVersion: StdLibVersion, expr: EXPR) extends ExprScript {
     override type Expr = EXPR

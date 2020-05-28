@@ -2,7 +2,7 @@ package com.wavesplatform.database
 
 import java.nio.ByteBuffer
 
-import cats.{Monoid, kernel}
+import cats.Monoid
 import com.google.common.cache.CacheBuilder
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.{Address, Alias}
