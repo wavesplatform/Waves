@@ -1,13 +1,17 @@
 {
-  "balances" : {
-    "3PE3mTBNLdMAdFZeVAMSzzRf7PwvLpu9gj6" : {
-      "in" : 0,
-      "out" : -11900000000
+  "balances": {
+    "3PE3mTBNLdMAdFZeVAMSzzRf7PwvLpu9gj6": {
+      "in": 0,
+      "out": -11900000000
     },
-    "3PNVLGdvUF8LnygRj7mcTDgjHuBvDCyEm8J" : {
-      "in" : 0,
-      "out" : -31000000000
+    "3PNVLGdvUF8LnygRj7mcTDgjHuBvDCyEm8J": {
+      "in": 0,
+      "out": -31000000000
     }
   },
-  "cancelledLeases" : [ "4X6kgy1QmPRjsXPJT6z9dJW9dFSuGQ6NwZoE6TcvgthW", "2T35YKdux2Hpb6FL8aEwqZZ94Kq5Aj1FMeUURDPLsZPh", "AnbPaS138EAafTDr1nci6N1ZMyceJifNoaxcjzkWgHgk", "DrSWzbQRPTAi2nJ33SDApfdwYcexbvPRRTuZMUjC6o6k" ]
+  "cancelledLeases": [
+    "4X6kgy1QmPRjsXPJT6z9dJW9dFSuGQ6NwZoE6TcvgthW",
+    "2T35YKdux2Hpb6FL8aEwqZZ94Kq5Aj1FMeUURDPLsZPh",
+    "AnbPaS138EAafTDr1nci6N1ZMyceJifNoaxcjzkWgHgk"
+  ]
 }

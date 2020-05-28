@@ -866,16 +866,6 @@ abstract class LevelDBWriter private[database] (
     activeLeaseTransactions.toSeq
   }
 
-  override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = readOnly { db =>
-    val b = Map.newBuilder[Address, A]
-    for (id <- 1L to db.get(Keys.lastAddressId).getOrElse(0L)) {
-      val addressId = AddressId(id)
-      val address   = db.get(Keys.idToAddress(addressId))
-      pf.runWith(b += address -> _)(address -> loadLposPortfolio(db, addressId))
-    }
-    b.result()
-  }
-
   def loadScoreOf(blockId: ByteStr): Option[BigInt] = {
     readOnly(db => db.get(Keys.heightOf(blockId)).map(h => db.get(Keys.score(h))))
   }

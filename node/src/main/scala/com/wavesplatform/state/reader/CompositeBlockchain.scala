@@ -83,15 +83,6 @@ final case class CompositeBlockchain(
   override def collectActiveLeases(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] =
     CompositeBlockchain.collectActiveLeases(inner, maybeDiff)(filter)
 
-  override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = {
-    val b = Map.newBuilder[Address, A]
-    for ((a, p) <- diff.portfolios if p.lease != LeaseBalance.empty || p.balance != 0) {
-      pf.runWith(b += a -> _)(a -> this.wavesPortfolio(a))
-    }
-
-    inner.collectLposPortfolios(pf) ++ b.result()
-  }
-
   override def containsTransaction(tx: Transaction): Boolean = diff.transactions.contains(tx.id()) || inner.containsTransaction(tx)
 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
