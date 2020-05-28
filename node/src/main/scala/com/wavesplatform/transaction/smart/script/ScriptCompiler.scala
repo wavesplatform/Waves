@@ -27,8 +27,8 @@ object ScriptCompiler extends ScorexLogging {
       scriptType  = if (isAssetScript) Asset else Account
       _      <- DirectiveSet(version, scriptType, contentType)
       script <- tryCompile(scriptText, contentType, version, isAssetScript)
-      complexity <- Script.estimate(script, estimator)
       _          <- if (checkWithEstimatorV1) Script.estimate(script, ScriptEstimatorV1) else Right(())
+      complexity <- Script.estimate(script, estimator)
     } yield (script, complexity)
 
   def compile(
