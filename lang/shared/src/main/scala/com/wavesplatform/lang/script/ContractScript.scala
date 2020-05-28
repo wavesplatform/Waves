@@ -30,56 +30,104 @@ object ContractScript {
   case class ContractScriptImpl(stdLibVersion: StdLibVersion, expr: DApp) extends Script {
     override type Expr = DApp
     override val bytes: Coeval[ByteStr] = Coeval.fromTry(
-      Global.serializeContract(expr, stdLibVersion)
+      Global
+        .serializeContract(expr, stdLibVersion)
         .bimap(new RuntimeException(_), ByteStr(_))
         .toTry
     )
     override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(true)
   }
 
-  def estimateComplexityByFunction(
-    version:   StdLibVersion,
-    contract:  DApp,
-    estimator: ScriptEstimator
+  private def estimateAnnotatedFunctions(
+      version: StdLibVersion,
+      dApp: DApp,
+      estimator: ScriptEstimator
   ): Either[String, List[(String, Long)]] =
-    (contract.callableFuncs.map(func => (func.annotation.invocationArgName, func.u)) ++
-      contract.verifierFuncOpt.map(func => (func.annotation.invocationArgName, func.u)))
-      .traverse {
-        case (annotationArgName, funcExpr) =>
-          estimator(
-            varNames(version, DAppType),
-            functionCosts(version),
-            constructExprFromFuncAndContext(contract.decs, annotationArgName, funcExpr)
-          ).map((funcExpr.name, _))
-      }
+    estimateFunctions(version, dApp, estimator, annotatedFunctions(dApp))
+
+  private def estimateUserFunctions(
+      version: StdLibVersion,
+      dApp: DApp,
+      estimator: ScriptEstimator
+  ): Either[String, List[(String, Long)]] =
+    estimateFunctions(version, dApp, estimator, dApp.decs.collect { case f: FUNC => (None, f) })
+
+  private def annotatedFunctions(dApp: DApp): List[(Some[String], FUNC)] =
+    (dApp.verifierFuncOpt ++ dApp.callableFuncs)
+      .map(func => (Some(func.annotation.invocationArgName), func.u))
+      .toList
+
+  private def estimateFunctions(
+      version: StdLibVersion,
+      dApp: DApp,
+      estimator: ScriptEstimator,
+      functions: List[(Option[String], FUNC)]
+  ): Either[String, List[(String, Long)]] =
+    functions.traverse {
+      case (annotationArgName, funcExpr) =>
+        estimator(
+          varNames(version, DAppType),
+          functionCosts(version),
+          constructExprFromFuncAndContext(dApp.decs, annotationArgName, funcExpr)
+        ).map((funcExpr.name, _))
+    }
 
   def estimateComplexity(
-    version:   StdLibVersion,
-    contract:  DApp,
-    estimator: ScriptEstimator
+      version: StdLibVersion,
+      dApp: DApp,
+      estimator: ScriptEstimator
   ): Either[String, (Long, Map[String, Long])] =
     for {
-      cbf <- estimateComplexityByFunction(version, contract, estimator)
-      max = cbf.maximumOption(_._2 compareTo _._2)
-      _   <- max.fold(().asRight[String])(m =>
-        Either.cond(
-          m._2 <= MaxComplexityByVersion(version),
-          (),
-          s"Contract function (${m._1}) is too complex: ${m._2} > ${MaxComplexityByVersion(version)}"
-        )
-      )
-    } yield (max.map(_._2).getOrElse(0L), cbf.toMap)
+      (maxComplexity, complexities) <- estimateComplexityExact(version, dApp, estimator)
+      _                             <- checkComplexity(version, maxComplexity)
+    } yield (maxComplexity._2, complexities)
 
-  private def constructExprFromFuncAndContext(dec: List[DECLARATION], annotationArgName: String, funcExpr: FUNC): EXPR = {
-    val funcWithAnnotationContext =
+  def checkComplexity(
+      version: StdLibVersion,
+      maxComplexity: (String, Long)
+  ): Either[String, Unit] = {
+    val limit = MaxComplexityByVersion(version)
+    Either.cond(
+      maxComplexity._2 <= limit,
+      (),
+      s"Contract function (${maxComplexity._1}) is too complex: ${maxComplexity._2} > $limit"
+    )
+  }
+
+  def estimateComplexityExact(
+      version: StdLibVersion,
+      dApp: DApp,
+      estimator: ScriptEstimator,
+      includeUserFunctions: Boolean = false,
+  ): Either[String, ((String, Long), Map[String, Long])] =
+    for {
+      annotatedFunctionComplexities <- estimateAnnotatedFunctions(version, dApp, estimator)
+      max = annotatedFunctionComplexities.maximumOption(_._2 compareTo _._2).getOrElse(("", 0L))
+      complexities <-
+        if (includeUserFunctions)
+          estimateUserFunctions(version, dApp, estimator).map(_ ::: annotatedFunctionComplexities)
+        else
+          Right(annotatedFunctionComplexities)
+    } yield (max, complexities.toMap)
+
+  private def constructExprFromFuncAndContext(
+      dec: List[DECLARATION],
+      annotationArgNameOpt: Option[String],
+      funcExpr: FUNC
+  ): EXPR = {
+    val callingFuncExpr =
       BLOCK(
-        LET(annotationArgName, TRUE),
-        BLOCK(
-          funcExpr,
-          FUNCTION_CALL(FunctionHeader.User(funcExpr.name), List.fill(funcExpr.args.size)(TRUE))
-        )
+        funcExpr,
+        FUNCTION_CALL(FunctionHeader.User(funcExpr.name), List.fill(funcExpr.args.size)(TRUE))
       )
-    val res = dec.foldRight(funcWithAnnotationContext)((d, e) => BLOCK(d, e))
-    res
+    val funcWithContext =
+      annotationArgNameOpt.fold(callingFuncExpr)(
+        annotationArgName =>
+          BLOCK(
+            LET(annotationArgName, TRUE),
+            callingFuncExpr
+          )
+      )
+    dec.foldRight(funcWithContext)((declaration, expr) => BLOCK(declaration, expr))
   }
 }
