@@ -32,13 +32,15 @@ object ScriptCompiler extends ScorexLogging {
   def compile(
     scriptText: String,
     estimator:  ScriptEstimator,
-    libraries:  Map[String, String] = Map()
+    libraries:  Map[String, String] = Map(),
+    checkWithEstimatorV1: Boolean = false
   ): Either[String, (Script, Long)] = {
     for {
       directives  <- DirectiveParser(scriptText)
       ds          <- Directive.extractDirectives(directives)
       linkedInput <- ScriptPreprocessor(scriptText, libraries, ds.imports)
       result      <- apply(linkedInput, ds.scriptType == Asset, estimator)
+      _           <- if (checkWithEstimatorV1) Script.estimate(result._1, ScriptEstimatorV1) else Right(())
     } yield result
   }
 

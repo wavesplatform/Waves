@@ -89,7 +89,7 @@ case class UtilsApiRoute(
 
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String])) { code =>
-      executeLimited(ScriptCompiler.compile(code, estimator)) { result =>
+      executeLimited(ScriptCompiler.compile(code, estimator, checkWithEstimatorV1 = true)) { result =>
         complete(
           result
             .fold(
