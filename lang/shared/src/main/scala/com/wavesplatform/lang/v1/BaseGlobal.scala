@@ -156,7 +156,7 @@ trait BaseGlobal {
       version: StdLibVersion
   ): Either[String, Unit] =
     for {
-      _ <- ContractScript.estimateComplexity(version, dApp , ScriptEstimatorV1)
+      _ <- ContractScript.estimateComplexity(version, dApp, ScriptEstimatorV1)
       _ <- ContractScript.checkComplexity(version, complexity)
     } yield ()
 
