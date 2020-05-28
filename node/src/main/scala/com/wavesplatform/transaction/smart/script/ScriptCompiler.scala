@@ -17,7 +17,8 @@ object ScriptCompiler extends ScorexLogging {
   def apply(
     scriptText:    String,
     isAssetScript: Boolean,
-    estimator:     ScriptEstimator
+    estimator:     ScriptEstimator,
+    checkWithEstimatorV1: Boolean = false
   ): Either[String, (Script, Long)] =
     for {
       directives <- DirectiveParser(scriptText)
@@ -26,19 +27,21 @@ object ScriptCompiler extends ScorexLogging {
       scriptType  = if (isAssetScript) Asset else Account
       _      <- DirectiveSet(version, scriptType, contentType)
       script <- tryCompile(scriptText, contentType, version, isAssetScript)
+      _          <- if (checkWithEstimatorV1) Script.estimate(script, ScriptEstimatorV1) else Right(())
       complexity <- Script.estimate(script, estimator)
     } yield (script, complexity)
 
   def compile(
     scriptText: String,
     estimator:  ScriptEstimator,
-    libraries:  Map[String, String] = Map()
+    libraries:  Map[String, String] = Map(),
+    checkWithEstimatorV1: Boolean = false
   ): Either[String, (Script, Long)] = {
     for {
       directives  <- DirectiveParser(scriptText)
       ds          <- Directive.extractDirectives(directives)
       linkedInput <- ScriptPreprocessor(scriptText, libraries, ds.imports)
-      result      <- apply(linkedInput, ds.scriptType == Asset, estimator)
+      result      <- apply(linkedInput, ds.scriptType == Asset, estimator, checkWithEstimatorV1)
     } yield result
   }
 

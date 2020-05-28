@@ -69,7 +69,7 @@ case class UtilsApiRoute(
   def compile: Route = path("script" / "compile") {
     (post & entity(as[String])) { code =>
       parameter('assetScript.as[Boolean] ? false) { isAssetScript =>
-        executeLimited(ScriptCompiler(code, isAssetScript, estimator)) { result =>
+        executeLimited(ScriptCompiler(code, isAssetScript, estimator, checkWithEstimatorV1 = true)) { result =>
           complete(
             result.fold(
               e => ScriptCompilerError(e), {
@@ -89,7 +89,7 @@ case class UtilsApiRoute(
 
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String])) { code =>
-      executeLimited(ScriptCompiler.compile(code, estimator)) { result =>
+      executeLimited(ScriptCompiler.compile(code, estimator, checkWithEstimatorV1 = true)) { result =>
         complete(
           result
             .fold(
