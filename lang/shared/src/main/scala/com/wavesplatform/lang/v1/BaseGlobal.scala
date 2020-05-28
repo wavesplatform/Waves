@@ -12,7 +12,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler}
-import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
@@ -124,6 +124,7 @@ trait BaseGlobal {
       version: StdLibVersion
   ): Either[String, Unit] =
     for {
+      _ <- ExprScript.estimate(expr, version, ScriptEstimatorV1)
       _ <- ExprScript.checkComplexity(version, complexity)
       illegalBlockVersionUsage =
         Set[StdLibVersion](V1, V2).contains(version) &&
@@ -150,10 +151,14 @@ trait BaseGlobal {
     } yield (bytes, dApp, maxComplexity, complexities)
 
   def checkContract(
+      dApp: DApp,
       complexity: (String, Long),
       version: StdLibVersion
   ): Either[String, Unit] =
-    ContractScript.checkComplexity(version, complexity)
+    for {
+      _ <- ContractScript.estimateComplexity(version, dApp , ScriptEstimatorV1)
+      _ <- ContractScript.checkComplexity(version, complexity)
+    } yield ()
 
   def decompile(compiledCode: String): Either[ScriptParseError, (String, Dic)] =
     for {
