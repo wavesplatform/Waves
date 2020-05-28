@@ -6,6 +6,7 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.evaluator.Log
+import com.wavesplatform.transaction.TxValidationError.FailedTransactionError.Cause
 import com.wavesplatform.transaction.assets.exchange.Order
 
 import scala.util.Either
@@ -48,31 +49,66 @@ object TxValidationError {
   }
 
   /** Errors which can produce failed transaction */
-  sealed trait FailedTransactionError extends Product with Serializable with ValidationError {
+  case class FailedTransactionError private (
+      cause: Cause,
+      spentComplexity: Long,
+      log: Log[Id],
+      error: Option[String],
+      assetId: Option[ByteStr]
+  ) extends ValidationError {
     import FailedTransactionError._
 
-    def cause: Cause = this match {
-      case e: DAppExecutionError                   => Cause(1, e.error)
-      case e: InsufficientFeeInActionError         => Cause(2, e.error)
-      case e: AssetScriptExecutionInActionError    => Cause(3, assetScriptError(e.assetId, Some(e.error)))
-      case e: NotAllowedByAssetScriptInActionError => Cause(3, assetScriptError(e.assetId, None))
-      case e: AssetScriptExecutionError            => Cause(4, assetScriptError(e.assetId, Some(e.error)))
-      case e: NotAllowedByAssetScriptError         => Cause(4, assetScriptError(e.assetId, None))
+    def code: Int = cause.code
+    def message: String = cause match {
+      case Cause.DAppExecution | Cause.FeeForActions     => error.get
+      case Cause.AssetScriptInAction | Cause.AssetScript => assetScriptError(assetId.get, error)
     }
+
+    def isAssetScript: Boolean    = assetId.isDefined
+    def isExecutionError: Boolean = error.nonEmpty
+
+    def addComplexity(complexity: Long): FailedTransactionError = copy(spentComplexity = spentComplexity + complexity)
 
     private def assetScriptError(assetId: ByteStr, error: Option[String]): String =
       s"Transaction is not allowed by script of the asset $assetId" + error.fold("")(e => s": $e")
   }
 
   object FailedTransactionError {
-    case class Cause(code: Int, error: String)
+    def dAppExecution(error: String, spentComplexity: Long, log: Log[Id] = List.empty): FailedTransactionError =
+      FailedTransactionError(Cause.DAppExecution, spentComplexity, log, Some(error), None)
 
-    case class DAppExecutionError(error: String, spentComplexity: Long, log: Log[Id] = List.empty)                     extends FailedTransactionError
-    case class InsufficientFeeInActionError(error: String)                                                             extends FailedTransactionError
-    case class AssetScriptExecutionInActionError(error: String, spentComplexity: Long, log: Log[Id], assetId: ByteStr) extends FailedTransactionError
-    case class NotAllowedByAssetScriptInActionError(spentComplexity: Long, log: Log[Id], assetId: ByteStr)             extends FailedTransactionError
-    case class AssetScriptExecutionError(error: String, spentComplexity: Long, log: Log[Id], assetId: ByteStr)         extends FailedTransactionError
-    case class NotAllowedByAssetScriptError(spentComplexity: Long, log: Log[Id], assetId: ByteStr)                     extends FailedTransactionError
+    def feeForActions(error: String, spentComplexity: Long): FailedTransactionError =
+      FailedTransactionError(Cause.FeeForActions, spentComplexity, List.empty, Some(error), None)
+
+    def assetExecutionInAction(error: String, spentComplexity: Long, log: Log[Id], assetId: ByteStr): FailedTransactionError =
+      FailedTransactionError(Cause.AssetScriptInAction, spentComplexity, log, Some(error), Some(assetId))
+
+    def notAllowedByAssetInAction(spentComplexity: Long, log: Log[Id], assetId: ByteStr): FailedTransactionError =
+      FailedTransactionError(Cause.AssetScriptInAction, spentComplexity, log, None, Some(assetId))
+
+    def assetExecution(error: String, spentComplexity: Long, log: Log[Id], assetId: ByteStr): FailedTransactionError =
+      FailedTransactionError(Cause.AssetScript, spentComplexity, log, Some(error), Some(assetId))
+
+    def notAllowedByAsset(spentComplexity: Long, log: Log[Id], assetId: ByteStr): FailedTransactionError =
+      FailedTransactionError(Cause.AssetScript, spentComplexity, log, None, Some(assetId))
+
+    sealed trait Cause extends Product with Serializable {
+      def code: Int
+    }
+    object Cause {
+      case object DAppExecution extends Cause {
+        override def code: Int = 1
+      }
+      case object FeeForActions extends Cause {
+        override def code: Int = 2
+      }
+      case object AssetScriptInAction extends Cause {
+        override def code: Int = 3
+      }
+      case object AssetScript extends Cause {
+        override def code: Int = 4
+      }
+    }
   }
 
   case class ScriptExecutionError(error: String, log: Log[Id], assetId: Option[ByteStr]) extends ValidationError {

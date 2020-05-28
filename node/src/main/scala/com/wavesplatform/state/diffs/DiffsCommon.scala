@@ -13,7 +13,7 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.traits.domain.{Burn, Reissue, SponsorFee}
 import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, Diff, LeaseBalance, Portfolio, SponsorshipValue}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.ProvenTransaction
+import com.wavesplatform.transaction.{ProvenTransaction, Transaction}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 
@@ -21,21 +21,31 @@ object DiffsCommon {
   def countScriptRuns(blockchain: Blockchain, tx: ProvenTransaction): Int =
     tx.checkedAssets.count(blockchain.hasAssetScript) + Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
 
-  def getAssetsComplexity(blockchain: Blockchain, tx: ProvenTransaction): Long =
-    tx.checkedAssets.toList
-      .flatMap(blockchain.assetScript)
-      .map(_._2).sum
-
-  def getAccountComplexity(blockchain: Blockchain, tx: ProvenTransaction): Long = {
-    val additionalAccounts = tx match {
-      case etx: ExchangeTransaction => Seq(etx.buyOrder.senderPublicKey.toAddress, etx.sellOrder.senderPublicKey.toAddress)
-      case _ => Seq.empty
+  def getAssetsComplexity(blockchain: Blockchain, tx: Transaction): Long =
+    tx match {
+      case ptx: ProvenTransaction =>
+        tx.checkedAssets.toList
+          .flatMap(blockchain.assetScript)
+          .map(_._2)
+          .sum
+      case _ => 0L
     }
 
-    (tx.sender.toAddress +: additionalAccounts)
-        .flatMap(blockchain.accountScript)
-        .map(_.verifierComplexity)
-        .sum
+  def getAccountsComplexity(blockchain: Blockchain, tx: Transaction): Long = {
+    tx match {
+      case ptx: ProvenTransaction =>
+        val additionalAccounts = ptx match {
+          case etx: ExchangeTransaction => Seq(etx.buyOrder.senderPublicKey.toAddress, etx.sellOrder.senderPublicKey.toAddress)
+          case _                        => Seq.empty
+        }
+
+        (ptx.sender.toAddress +: additionalAccounts)
+          .flatMap(blockchain.accountScript)
+          .map(_.verifierComplexity)
+          .sum
+      case _ => 0L
+    }
+
   }
 
   def countVerifierComplexity(

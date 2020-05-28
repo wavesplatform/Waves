@@ -119,7 +119,7 @@ object InvokeScriptTransactionDiff {
 
                   Try(evaluate(version, contract, directives, invocation, environment))
                     .fold(e => Left((e.getMessage, Nil)), identity)
-                    .leftMap { case (error, log) => FailedTransactionError.DAppExecutionError(error, invocationComplexity, log) }
+                    .leftMap { case (error, log) => FailedTransactionError.dAppExecution(error, invocationComplexity, log) }
                 })
                 TracedResult(
                   scriptResultE,
@@ -142,7 +142,7 @@ object InvokeScriptTransactionDiff {
               resultDiff <- scriptResult._1 match {
                 case ScriptResultV3(dataItems, transfers) => doProcessActions(dataItems ::: transfers)
                 case ScriptResultV4(actions)              => doProcessActions(actions)
-                case ir: IncompleteResult                 => TracedResult(Left(GenericError("Unexpected IncompleteResult")))
+                case _: IncompleteResult                  => TracedResult(Left(GenericError("Unexpected IncompleteResult")))
               }
             } yield resultDiff
           } else TracedResult.wrapValue(InvokeDiffsCommon.paymentsPart(tx, dAppAddress, feeInfo._2))

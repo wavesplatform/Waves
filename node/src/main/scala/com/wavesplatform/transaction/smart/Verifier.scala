@@ -1,8 +1,7 @@
 package com.wavesplatform.transaction.smart
 
 import cats.Id
-import cats.instances.either._
-import cats.syntax.functor._
+import cats.implicits._
 import com.google.common.base.Throwables
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -13,7 +12,6 @@ import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.DiffsCommon
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError, TransactionNotAllowedByScript}
 import com.wavesplatform.transaction._
@@ -36,21 +34,15 @@ object Verifier extends ScorexLogging {
 
   type ValidationResult[T] = Either[ValidationError, T]
 
-  /**
-    * Verifies proofs / account scripts (including dApp verifier and exchange seller/buyer scripts) and returns diff with complexity.
-    */
-  def apply(blockchain: Blockchain)(tx: Transaction): TracedResult[ValidationError, Diff] = tx match {
-    case _: GenesisTransaction => Right(Diff.empty)
+  def apply(blockchain: Blockchain)(tx: Transaction): TracedResult[ValidationError, Transaction] = tx match {
+    case _: GenesisTransaction => Right(tx)
     case pt: ProvenTransaction =>
-      lazy val diff = Diff.empty.copy(scriptsComplexity = DiffsCommon.getAccountComplexity(blockchain, pt))
       (pt, blockchain.accountScript(pt.sender.toAddress).map(_.script)) match {
         case (stx: SignedTransaction, None) =>
           stats.signatureVerification
             .measureForType(stx.typeId)(stx.signaturesValid())
-            .as(diff)
         case (et: ExchangeTransaction, scriptOpt) =>
           verifyExchange(et, blockchain, scriptOpt)
-            .as(diff)
         case (tx: SigProofsSwitch, Some(_)) if tx.usesLegacySignature =>
           Left(GenericError("Can't process transaction with signature from scripted account"))
         case (_: SignedTransaction, Some(_)) =>
@@ -58,11 +50,9 @@ object Verifier extends ScorexLogging {
         case (_, Some(script)) =>
           stats.accountScriptExecution
             .measureForType(pt.typeId)(verifyTx(blockchain, script, pt, None))
-            .as(diff)
         case _ =>
           stats.signatureVerification
             .measureForType(tx.typeId)(verifyAsEllipticCurveSignature(pt))
-            .as(diff)
       }
   }
 

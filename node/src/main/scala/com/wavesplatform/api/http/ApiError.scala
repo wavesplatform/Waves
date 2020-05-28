@@ -49,26 +49,16 @@ object ApiError {
       case TxValidationError.WrongChain(ex, pr)              => InvalidChainId(ex, pr)
       case err: TxValidationError.TooManyProofs              => InvalidProofs(err.toString())
       case err: TxValidationError.ToBigProof                 => InvalidProofs(err.toString())
-      case err: TxValidationError.FailedTransactionError.InsufficientFeeInActionError =>
-        CustomValidationError(err.error)
       case TransactionValidationError(error, tx) =>
         error match {
           case e: TxValidationError.TransactionNotAllowedByScript =>
             if (e.isAssetScript) TransactionNotAllowedByAssetScript(tx)
             else TransactionNotAllowedByAccountScript(tx)
-          case _: TxValidationError.FailedTransactionError.NotAllowedByAssetScriptError =>
-            TransactionNotAllowedByAssetScript(tx)
-          case _: TxValidationError.FailedTransactionError.NotAllowedByAssetScriptInActionError =>
-            TransactionNotAllowedByAssetScript(tx)
-          case TxValidationError.Mistiming(errorMessage) => Mistiming(errorMessage)
-          case e: TxValidationError.ScriptExecutionError => ScriptExecutionError(tx, e.error, isTokenScript = e.isAssetScript)
-          case e: TxValidationError.FailedTransactionError.AssetScriptExecutionError =>
-            ScriptExecutionError(tx, e.error, isTokenScript = true)
-          case e: TxValidationError.FailedTransactionError.AssetScriptExecutionInActionError =>
-            ScriptExecutionError(tx, e.error, isTokenScript = true)
-          case e: TxValidationError.FailedTransactionError.DAppExecutionError =>
-            ScriptExecutionError(tx, e.error, isTokenScript = false)
-          case err => StateCheckFailed(tx, fromValidationError(err))
+          case TxValidationError.Mistiming(errorMessage)                         => Mistiming(errorMessage)
+          case e: TxValidationError.ScriptExecutionError                         => ScriptExecutionError(tx, e.error, isTokenScript = e.isAssetScript)
+          case e: TxValidationError.FailedTransactionError if e.isExecutionError => ScriptExecutionError(tx, e.message, e.isAssetScript)
+          case e: TxValidationError.FailedTransactionError                       => TransactionNotAllowedByAssetScript(tx)
+          case err                                                               => StateCheckFailed(tx, fromValidationError(err))
         }
       case error => CustomValidationError(error.toString)
     }
