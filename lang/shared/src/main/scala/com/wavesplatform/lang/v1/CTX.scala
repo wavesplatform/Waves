@@ -30,7 +30,7 @@ case class CTX[C[_[_]]](
     EvaluationContext(
       env,
       typeDefs,
-      vars.mapValues(v => LazyVal.fromEval(v._2(env))),
+      vars.mapValues(v => LazyVal.fromEval(v._2(env))).toMap,
       functions.map(f => f.header -> f).toMap
     )
   }
@@ -43,7 +43,7 @@ case class CTX[C[_[_]]](
 
   lazy val compilerContext: CompilerContext = CompilerContext(
     typeDefs,
-    vars.mapValues(v => VariableInfo(AnyPos, v._1)),
+    vars.mapValues(v => VariableInfo(AnyPos, v._1)).toMap,
     functions.groupBy(_.name).map { case (k, v) => k -> FunctionInfo(AnyPos, v.map(_.signature).toList) }
   )
 

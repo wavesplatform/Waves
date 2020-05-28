@@ -5,11 +5,11 @@ case class Single(s: String)                extends RecKeyValue
 case class Chain(l: List[RecKeyValue])      extends RecKeyValue
 case class Dic(m: Map[String, RecKeyValue]) extends RecKeyValue
 
-case class RecKeyValueFolder[V, R <% V](
+case class RecKeyValueFolder[V, R](
     fromStr:  String => V,
     fromList: List[V] => V,
     fromDic:  Seq[(String, V)] => R
-) {
+    )(implicit ev: R => V) {
   def fold(rkv: RecKeyValue): V =
     rkv match {
       case Single(s) => fromStr(s)
@@ -18,7 +18,7 @@ case class RecKeyValueFolder[V, R <% V](
     }
 
   def foldRoot(dic: Dic): R = {
-    val result = dic.m.mapValues(fold)
+    val result = dic.m.view.mapValues(fold)
     fromDic(result.toSeq)
   }
 }

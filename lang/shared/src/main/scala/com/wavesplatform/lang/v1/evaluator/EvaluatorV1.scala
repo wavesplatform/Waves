@@ -156,7 +156,7 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, ?]]) {
 
   def evalWithLogging(c: EvaluationContext[C, F], evalC: EvalM[F, C, EVALUATED]): (Log[F], F[Either[ExecutionError, EVALUATED]]) = {
     val log = ListBuffer[LogItem[F]]()
-    val llc = (str: String) => (v: LetExecResult[F]) => log.append((str, v))
+    val llc = (str: String) => (v: LetExecResult[F]) => { log.append((str, v)) ; () }
     val lec = LoggedEvaluationContext(llc, c)
     val res = evalC.run(lec).value._2
     (log.toList, res)
@@ -167,7 +167,7 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, ?]]) {
     evalC: EvalM[F, C, EVALUATED]
   ): (Log[F], F[Either[ExecutionError, EVALUATED]]) = {
     val log = ListBuffer[LogItem[F]]()
-    val llc = (str: String) => (v: LetExecResult[F]) => log.append((str, v))
+    val llc = (str: String) => (v: LetExecResult[F]) => { log.append((str, v)) ; () }
     val res = ctx
       .map(LoggedEvaluationContext(llc, _))
       .flatTraverse(evalC.run(_).value._2)

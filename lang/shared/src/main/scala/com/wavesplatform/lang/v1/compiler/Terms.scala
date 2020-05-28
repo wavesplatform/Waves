@@ -88,7 +88,7 @@ object Terms {
   }
   case class CONST_LONG(t: Long) extends EVALUATED {
     override def toString: String = t.toString
-    override val weight: Long = 8l
+    override val weight: Long = 8L
   }
 
   case class CONST_BYTESTR private (bs: ByteStr) extends EVALUATED {
@@ -144,7 +144,7 @@ object Terms {
 
   case class CONST_BOOLEAN(b: Boolean)  extends EVALUATED {
     override def toString: String = b.toString
-    override val weight: Long = 1l
+    override val weight: Long = 1L
   }
 
   lazy val TRUE  = CONST_BOOLEAN(true)

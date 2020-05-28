@@ -29,12 +29,12 @@ object TypeInferrer {
         resolved.find(_._2.isLeft) match {
           case Some((_, left)) => left.asInstanceOf[Left[String, Nothing]]
           case None =>
-            Right(resolved.mapValues { t =>
+            Right((resolved.mapValues { t =>
               t.explicitGet() match {
                 case UNION(x :: Nil, _) => x
                 case x               => x
               }
-            })
+            }).toMap)
         }
     }
   }

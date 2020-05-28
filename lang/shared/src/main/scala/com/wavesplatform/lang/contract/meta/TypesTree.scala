@@ -14,7 +14,7 @@ trait TypesTree {
 
     val funcTypesJson = argsWithTypes.map(typedArgs =>
       Dic(
-        ListMap(typedArgs : _*).mapValues(t => Single(t.name))
+        ListMap(typedArgs : _*).mapValues(t => Single(t.name)).toMap
       )
     )
     Dic(Map(FieldName -> Chain(funcTypesJson)))

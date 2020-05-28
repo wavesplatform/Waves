@@ -38,25 +38,25 @@ object ExpressionCompiler {
 
   def compile(input: String, ctx: CompilerContext): Either[String, EXPR] = {
     Parser.parseExpr(input) match {
-      case fastparse.core.Parsed.Success(xs, _) =>
+      case fastparse.Parsed.Success(xs, _) =>
         ExpressionCompiler(ctx, xs) match {
           case Left(err)              => Left(err.toString)
           case Right((expr, BOOLEAN)) => Right(expr)
           case Right((_, _))          => Left("Script should return boolean")
         }
-      case f @ fastparse.core.Parsed.Failure(_, _, _) => Left(f.toString)
+      case f @ fastparse.Parsed.Failure(_, _, _) => Left(f.toString)
     }
   }
 
 
   def compileUntyped(input: String, ctx: CompilerContext): Either[String, EXPR] = {
     Parser.parseExpr(input) match {
-      case fastparse.core.Parsed.Success(xs, _) =>
+      case fastparse.Parsed.Success(xs, _) =>
         ExpressionCompiler(ctx, xs) match {
           case Left(err)              => Left(err.toString)
           case Right((expr, _)) => Right(expr)
         }
-      case f @ fastparse.core.Parsed.Failure(_, _, _) => Left(f.toString)
+      case f @ fastparse.Parsed.Failure(_, _, _) => Left(f.toString)
     }
   }
 
@@ -97,8 +97,8 @@ object ExpressionCompiler {
   def compileDecls(input: String, ctx: CompilerContext): Either[String, EXPR] = {
     val adjustedDecls = s"$input\n${PureContext.unitVarName}"
     Parser.parseExpr(adjustedDecls) match {
-      case fastparse.core.Parsed.Success(xs, _)       => ExpressionCompiler(ctx, xs).map(_._1)
-      case f @ fastparse.core.Parsed.Failure(_, _, _) => Left(f.toString)
+      case fastparse.Parsed.Success(xs, _)       => ExpressionCompiler(ctx, xs).map(_._1)
+      case f @ fastparse.Parsed.Failure(_, _, _) => Left(f.toString)
     }
   }
 
