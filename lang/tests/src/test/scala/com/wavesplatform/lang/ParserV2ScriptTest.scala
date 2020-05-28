@@ -7,7 +7,7 @@ import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Parser, ParserV2}
 import com.wavesplatform.lang.v1.testing.ScriptGenParser
-import fastparse.core.Parsed.Success
+import fastparse.Parsed.Success
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}

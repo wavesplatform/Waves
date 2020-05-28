@@ -809,7 +809,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       ))
 
     com.wavesplatform.lang.v1.parser.Parser.parseExpr(script) match {
-      case fastparse.core.Parsed.Success(xs, _) =>
+      case fastparse.Parsed.Success(xs, _) =>
         noContextEvaluator.applyWithLogging[EVALUATED](
           context.evaluationContext[Id],
           ExpressionCompiler
@@ -817,7 +817,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
             .explicitGet()
             ._1
         )
-      case fastparse.core.Parsed.Failure(_,index,_) => (List(), Left(s"Parse error at $index"))
+      case fastparse.Parsed.Failure(_,index,_) => (List(), Left(s"Parse error at $index"))
     }
   }
 
