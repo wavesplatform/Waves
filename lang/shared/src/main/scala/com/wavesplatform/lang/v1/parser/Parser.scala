@@ -99,11 +99,13 @@ object Parser {
     .filter { case (_, x, _) => !keywords.contains(x) }
     .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
 
-  val anyVarName: P[PART[String]] = (Index ~~ ((char | "_") ~~ (digit | char).repX()).! ~~ Index).map {
+  def genericVarName(nameP: P[Unit]): P[PART[String]] = (Index ~~ nameP.! ~~ Index).map {
     case (start, x, end) =>
       if (keywords.contains(x)) PART.INVALID(Pos(start, end), s"keywords are restricted: $x")
       else PART.VALID(Pos(start, end), x)
   }
+
+  val anyVarName: P[PART[String]] = genericVarName(char ~~ (digit | char).repX())
 
   val invalid: P[INVALID] = {
     val White = WhitespaceApi.Wrapper {
@@ -126,7 +128,6 @@ object Parser {
 
   val trueP: P[TRUE]        = P(Index ~~ "true".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => TRUE(Pos(start, end)) }
   val falseP: P[FALSE]      = P(Index ~~ "false".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => FALSE(Pos(start, end)) }
-  val bracesP: P[EXPR]      = P("(" ~ baseExpr ~ ")")
   val curlyBracesP: P[EXPR] = P("{" ~ baseExpr ~ "}")
 
   val refP: P[REF] = P(correctVarName).map { x =>
@@ -188,20 +189,21 @@ object Parser {
   val tupleArgs: P[Seq[EXPR]] =
     comment ~ baseExpr.rep(
       sep = comment ~ "," ~ comment,
-      min = ContractLimits.MinTupleSize,
       max = ContractLimits.MaxTupleSize
     ) ~ comment
 
   val tuple: P[EXPR] = (Index ~~ P("(") ~ tupleArgs ~ P(")") ~~ Index).map {
-    case (s, elements, f) => FUNCTION_CALL(
-      Pos(s, f),
-      PART.VALID(Pos(s, f), s"_Tuple${elements.length}"),
-      elements.toList
-    )
+    case (_, Seq(expr), _) => expr
+    case (s, elements, f) =>
+      FUNCTION_CALL(
+        Pos(s, f),
+        PART.VALID(Pos(s, f), s"_Tuple${elements.length}"),
+        elements.toList
+      )
   }
 
   val extractableAtom: P[EXPR] = P(
-    tuple | curlyBracesP | bracesP |
+    curlyBracesP | tuple |
       byteVectorP | stringP | numberP | trueP | falseP | list |
       maybeFunctionCallP
   )
@@ -274,8 +276,10 @@ object Parser {
         case (start, e, cases, end) => MATCH(Pos(start, end), e, cases.toList)
       }
 
+  val accessorName: P[PART[String]] = genericVarName((char | "_") ~~ (digit | char).repX())
+
   val accessP: P[(Int, Accessor, Int)] = P(
-    (("" ~ comment ~ Index ~ "." ~/ comment ~ (anyVarName.map(Getter) ~/ comment ~~ ("(" ~/ comment ~ functionCallArgs ~/ comment ~ ")").?).map {
+    (("" ~ comment ~ Index ~ "." ~/ comment ~ (accessorName.map(Getter) ~/ comment ~~ ("(" ~/ comment ~ functionCallArgs ~/ comment ~ ")").?).map {
       case ((g @ Getter(name)), args) => args.fold(g: Accessor)(a => Method(name, a))
     }) ~~ Index) | (Index ~~ "[" ~/ baseExpr.map(ListIndex) ~ "]" ~~ Index)
   )
