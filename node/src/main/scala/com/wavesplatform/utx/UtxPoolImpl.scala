@@ -411,6 +411,18 @@ class UtxPoolImpl(
       blockchain.assetDescription(asset).forall(_.reissuable)
   }
 
+  private[this] def recalcPriorityDiff(): Unit = priorityTransactions.synchronized {
+    this.priorityDiff = priorityTransactions.values.foldLeft(Diff.empty) {
+      case (diff, tx) =>
+        val cb     = CompositeBlockchain(blockchain, Some(diff))
+        val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), verify = false)(cb, _)
+        differ(tx).resultE match {
+          case Left(_)        => diff
+          case Right(newDiff) => Monoid.combine(diff, newDiff)
+        }
+    }
+  }
+
   private[this] object TxCleanup {
     private[this] val scheduled = AtomicBoolean(false)
 
