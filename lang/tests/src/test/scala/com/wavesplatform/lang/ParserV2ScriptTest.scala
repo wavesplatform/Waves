@@ -11,7 +11,7 @@ import fastparse.Parsed.Success
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import scorex.crypto.encode.{Base58 => ScorexBase58}
+import scorex.util.encode.{Base58 => ScorexBase58}
 
 class ParserV2ScriptTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
 
