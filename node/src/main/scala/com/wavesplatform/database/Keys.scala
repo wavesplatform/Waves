@@ -5,7 +5,6 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -93,7 +92,7 @@ object Keys {
   def carryFee(height: Int): Key[Long] = Key(CarryFee, h(height), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
   def assetScriptHistory(asset: IssuedAsset): Key[Seq[Int]] = historyKey(AssetScriptHistory, asset.id.arr)
-  def assetScript(asset: IssuedAsset)(height: Int): Key[Option[(Script, Long)]] =
+  def assetScript(asset: IssuedAsset)(height: Int): Key[Option[AssetScriptInfo]] =
     Key.opt(AssetScript, hBytes(asset.id.arr, height), readAssetScript, writeAssetScript)
   def assetScriptPresent(asset: IssuedAsset)(height: Int): Key[Option[Unit]] =
     Key.opt(AssetScript, hBytes(asset.id.arr, height), _ => (), _ => Array[Byte]())
