@@ -2,11 +2,8 @@ package com.wavesplatform.lang.script
 
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.contract.DApp.AnnotatedFunction
-import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{Account, StdLibVersion, DApp => DAppType}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, DApp => DAppType}
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -92,12 +89,12 @@ object ContractScript {
       version: StdLibVersion,
       dApp: DApp,
       estimator: ScriptEstimator,
-      useContractVerifierLimit: Boolean = true,
-      checkLimit: Boolean = true
+      useReducedVerifierLimit: Boolean = true
   ): Either[String, (Long, Map[String, Long])] =
     for {
       (maxComplexity, complexities) <- estimateComplexityExact(version, dApp, estimator)
       _                             <- checkComplexity(version, maxComplexity)
+      _                             <- if (useReducedVerifierLimit) estimateVerifierReduced(dApp, complexities, version) else Right(())
     } yield (maxComplexity._2, complexities)
 
   def checkComplexity(
@@ -112,41 +109,34 @@ object ContractScript {
     )
   }
 
-  private def estimateVerifier(
-    version: StdLibVersion,
-    dApp: DApp,
-    estimator: ScriptEstimator,
-    useContractVerifierLimit: Boolean
- ): Either[String, Option[(String, Long)]] =
-    dApp.verifierFuncOpt
-      .traverse(
-        func => {
-          val limit =
-            if (useContractVerifierLimit) MaxAccountVerifierComplexityByVersion(version)
-            else MaxComplexityByVersion(version)
-          estimateAnnotatedFunction(version, dApp, estimator, func)
-            .ensureOr(
-              complexity => s"Contract verifier is too complex: ${complexity._2} > $limit"
-            )(
-              _._2 <= limit
-            )
-        }
+  private def estimateVerifierReduced(
+      dApp: DApp,
+      complexities: Map[String, Long],
+      version: StdLibVersion
+  ): Either[String, Unit] =
+    dApp.verifierFuncOpt.fold(().asRight[String]) { verifier =>
+      val verifierComplexity = complexities(verifier.u.name)
+      val limit              = MaxAccountVerifierComplexityByVersion(version)
+      Either.cond(
+        verifierComplexity <= limit,
+        (),
+        s"Contract verifier is too complex: $verifierComplexity > $limit"
       )
+    }
 
   def estimateComplexityExact(
       version: StdLibVersion,
       dApp: DApp,
       estimator: ScriptEstimator,
-      includeUserFunctions: Boolean = false,
+      includeUserFunctions: Boolean = false
   ): Either[String, ((String, Long), Map[String, Long])] =
     for {
       annotatedFunctionComplexities <- estimateAnnotatedFunctions(version, dApp, estimator)
       max = annotatedFunctionComplexities.maximumOption(_._2 compareTo _._2).getOrElse(("", 0L))
-      complexities <-
-        if (includeUserFunctions)
-          estimateUserFunctions(version, dApp, estimator).map(_ ::: annotatedFunctionComplexities)
-        else
-          Right(annotatedFunctionComplexities)
+      complexities <- if (includeUserFunctions)
+        estimateUserFunctions(version, dApp, estimator).map(_ ::: annotatedFunctionComplexities)
+      else
+        Right(annotatedFunctionComplexities)
     } yield (max, complexities.toMap)
 
   private def constructExprFromFuncAndContext(

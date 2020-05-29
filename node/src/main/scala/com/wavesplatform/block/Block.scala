@@ -69,9 +69,6 @@ case class Block(
   override def toString: String =
     s"Block(${id()},${header.reference},${header.generator.toAddress}," +
       s"${header.timestamp},${header.featureVotes.mkString("[",",","]")}${if (header.rewardVote >= 0) s",${header.rewardVote}" else ""})"
-
-  def getHeader(): BlockHeader =
-    new BlockHeader(timestamp, version, reference, signerData, consensusData, transactionData.length, featureVotes, rewardVote)
 }
 
 object Block extends ScorexLogging {

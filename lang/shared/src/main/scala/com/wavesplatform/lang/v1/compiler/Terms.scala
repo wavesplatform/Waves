@@ -169,7 +169,6 @@ object Terms {
       }
     }
     override val weight: Long = bs.size
-    override val weight: Long = bs.size
 
     override def equals(obj: Any): Boolean =
       obj match {

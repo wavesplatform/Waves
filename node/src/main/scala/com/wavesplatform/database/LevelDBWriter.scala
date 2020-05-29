@@ -4,7 +4,6 @@ import java.nio.ByteBuffer
 
 import cats.data.Ior
 import cats.implicits._
-import cats.Monoid
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
 import com.google.common.primitives.{Ints, Shorts}

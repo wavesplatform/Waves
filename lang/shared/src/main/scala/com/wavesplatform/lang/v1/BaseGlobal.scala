@@ -6,7 +6,7 @@ import cats.implicits._
 import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper, MetaMapperStrategyV1}
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V1, V2, DApp => DAppType}
+import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, V1, V2, DApp => DAppType}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
@@ -14,8 +14,7 @@ import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext, ContractCompiler, ExpressionCompiler}
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
@@ -37,6 +36,8 @@ trait BaseGlobal {
   val MaxLiteralLength             = 12 * 1024
   val MaxAddressLength             = 36
   val MaxByteStrSizeForVerifyFuncs = 32 * 1024
+
+  val LetBlockVersions = Set[StdLibVersion](V1, V2)
 
   def base58Encode(input: Array[Byte]): Either[String, String]
   def base58Decode(input: String, limit: Int = MaxLiteralLength): Either[String, Array[Byte]]
@@ -135,7 +136,7 @@ trait BaseGlobal {
       input: String,
       context: CompilerContext,
       version: StdLibVersion,
-      isAsset: Boolean,estimator: ScriptEstimator,
+      estimator: ScriptEstimator,
       compiler: (String, CompilerContext) => Either[String, EXPR]
   ): Either[String, (Array[Byte], EXPR, Long)] =
     for {
@@ -147,14 +148,14 @@ trait BaseGlobal {
   def checkExpr(
       expr: EXPR,
       complexity: Long,
-      version: StdLibVersion
+      version: StdLibVersion,
+      isAsset: Boolean
   ): Either[String, Unit] =
     for {
-      _ <- ExprScript.estimate(expr, version, ScriptEstimatorV1)
-      _ <- ExprScript.checkComplexity(version, complexity)
+      _ <- ExprScript.checkComplexity(version, complexity, !isAsset)
       illegalBlockVersionUsage =
-        Set[StdLibVersion](V1, V2).contains(version) &&
-        com.wavesplatform.lang.v1.compiler.сontainsBlockV2(expr)
+        LetBlockVersions.contains(version) &&
+        com.wavesplatform.lang.v1.compiler.containsBlockV2(expr)
       _ <- Either.cond(
         !illegalBlockVersionUsage,
         (),
@@ -177,14 +178,10 @@ trait BaseGlobal {
     } yield (bytes, dApp, maxComplexity, complexities)
 
   def checkContract(
-      dApp: DApp,
       complexity: (String, Long),
       version: StdLibVersion
   ): Either[String, Unit] =
-    for {
-      _ <- ContractScript.estimateComplexity(version, dApp, ScriptEstimatorV1)
-      _ <- ContractScript.checkComplexity(version, complexity)
-    } yield ()
+    ContractScript.checkComplexity(version, complexity)
 
   def decompile(compiledCode: String): Either[ScriptParseError, (String, Dic)] =
     for {

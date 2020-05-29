@@ -2,13 +2,12 @@ import JsApiUtils._
 import cats.kernel.Monoid
 import com.wavesplatform.DocSource
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.meta.RecKeyValueFolder
 import com.wavesplatform.lang.directives.Directive.extractDirectives
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveParser, DirectiveSet}
 import com.wavesplatform.lang.script.ScriptPreprocessor
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.repl.Repl
@@ -142,7 +141,7 @@ object JsAPI {
       case Expression =>
         val ctx = buildScriptContext(stdLibVer, isAsset, ds.contentType == DAppType)
         Global
-          .parseAndCompileExpression(input, ctx.compilerContext, letBLockVersions.contains(stdLibVer), stdLibVer, estimator)
+          .parseAndCompileExpression(input, ctx.compilerContext, Global.LetBlockVersions.contains(stdLibVer), stdLibVer, estimator)
           .map {
             case (bytes, complexity, exprScript, compErrorList) =>
               js.Dynamic.literal(
@@ -155,7 +154,7 @@ object JsAPI {
       case Library =>
         val ctx = buildScriptContext(stdLibVer, isAsset, ds.contentType == DAppType)
         Global
-          .compileDecls(input, ctx.compilerContext, letBLockVersions.contains(stdLibVer), stdLibVer, isAsset, estimator)
+          .compileDecls(input, ctx.compilerContext, stdLibVer, estimator)
           .map {
             case (bytes, ast, complexity) =>
               js.Dynamic.literal(
@@ -197,7 +196,7 @@ object JsAPI {
     )
   }
 
-  val estimator = ScriptEstimatorV2
+  val estimator = ScriptEstimatorV3
 
   private def compileScript(ds: DirectiveSet, input: String): Either[String, js.Object with js.Dynamic] = {
     val version = ds.stdLibVersion
@@ -206,7 +205,7 @@ object JsAPI {
       case Expression =>
         val ctx = buildScriptContext(version, isAsset, ds.contentType == DAppType)
         Global
-          .compileExpression(input, ctx.compilerContext, version, isAsset, estimator)
+          .compileExpression(input, ctx.compilerContext, version, estimator)
           .map {
             case (bytes, expr, complexity) =>
               val resultFields: Seq[(String, Any)] = Seq(
@@ -215,7 +214,7 @@ object JsAPI {
                 "complexity" -> complexity
               )
               val errorFieldOpt: Seq[(String, Any)] =
-                Global.checkExpr(expr, complexity, version)
+                Global.checkExpr(expr, complexity, version, isAsset)
                   .fold(
                     error => Seq("error" -> error),
                     _     => Seq()
@@ -225,7 +224,7 @@ object JsAPI {
       case Library =>
         val ctx = buildScriptContext(version, isAsset, ds.contentType == DAppType)
         Global
-          .compileDecls(input, ctx.compilerContext, version, isAsset, estimator)
+          .compileDecls(input, ctx.compilerContext, version, estimator)
           .map {
             case (bytes, expr, complexity) =>
               js.Dynamic.literal(
@@ -247,7 +246,7 @@ object JsAPI {
                 "complexityByFunc" -> complexityByFunc.toJSDictionary
               )
               val errorFieldOpt: Seq[(String, Any)] =
-                Global.checkContract(dApp, maxComplexityFunc, version)
+                Global.checkContract(maxComplexityFunc, version)
                   .fold(
                     error => Seq("error" -> error),
                     _     => Seq()
