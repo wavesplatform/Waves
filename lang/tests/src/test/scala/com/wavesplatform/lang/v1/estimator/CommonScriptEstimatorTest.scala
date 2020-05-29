@@ -15,7 +15,7 @@ class CommonScriptEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV
       FUNC("x", List.empty, FUNCTION_CALL(FunctionHeader.User("y"), List.empty)),
       BLOCK(FUNC("y", List.empty, FUNCTION_CALL(FunctionHeader.User("x"), List.empty)), FUNCTION_CALL(FunctionHeader.User("y"), List.empty))
     )
-    estimate(customFunctionCosts, expr) shouldBe 'left
+    estimate(customFunctionCosts, expr) shouldBe Symbol("left")
   }
 
   property("context leak") {
@@ -54,7 +54,7 @@ class CommonScriptEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV
         FUNCTION_CALL(User("f"), Nil)
       )
 
-    estimate(functionCosts(V3), expr) shouldBe 'left
+    estimate(functionCosts(V3), expr) shouldBe Symbol("left")
   }
 
   property("func forward reference") {
@@ -65,7 +65,7 @@ class CommonScriptEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV
         CONST_LONG(1)
       )
     )
-    estimate(functionCosts(V3), expr) shouldBe 'left
+    estimate(functionCosts(V3), expr) shouldBe Symbol("left")
   }
 
   property("func decl overlapping inside let") {

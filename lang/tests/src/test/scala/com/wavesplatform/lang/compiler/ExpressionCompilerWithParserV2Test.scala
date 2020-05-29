@@ -45,7 +45,7 @@ class ExpressionCompilerWithParserV2Test extends PropSpec with PropertyChecks wi
 
     val result = compile(script)
 
-    result shouldBe 'right
+    result shouldBe Symbol("right")
     result.explicitGet() shouldBe
       BLOCK(
         AnyPos,
@@ -110,7 +110,7 @@ class ExpressionCompilerWithParserV2Test extends PropSpec with PropertyChecks wi
 
     val result = compile(script, true)
 
-    result shouldBe 'right
+    result shouldBe Symbol("right")
   }
 
   /*property("simple test 2") {
@@ -131,7 +131,7 @@ class ExpressionCompilerWithParserV2Test extends PropSpec with PropertyChecks wi
 
     val result = compile(script)
 
-    result shouldBe 'right
+    result shouldBe Symbol("right")
     result.explicitGet() shouldBe
       BLOCK(
         AnyPos,

@@ -734,7 +734,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       val bodyBytes = ("m" * ((16 << i)*1024)).getBytes("UTF-8")
 
       val r = hashTest(bodyBytes, h, i.toShort)
-      r shouldBe 'Right
+      r shouldBe Symbol("Right")
     }
   }
 
@@ -748,7 +748,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       val bodyBytes = ("m" * ((16 << i)*1024 + 1)).getBytes("UTF-8")
 
       val r = hashTest(bodyBytes, h, i.toShort)
-      r shouldBe 'Left
+      r shouldBe Symbol("Left")
     }
   }
 
@@ -857,14 +857,14 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
   property("recCmp fail by cmp") {
     val (log, result) = recCmp(5)()
 
-    result shouldBe 'Left
+    result shouldBe Symbol("Left")
   }
 
   property("recData fail by ARR") {
     val cnt = 8
     val (log, result) = recCmp(cnt)(gen => gen("x") ++ s"x${cnt+1}.size() == 3")
 
-    result shouldBe 'Left
+    result shouldBe Symbol("Left")
   }
 
   property("recData use uncomparable data") {
@@ -899,7 +899,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val environment = emptyBlockchainEnvironment()
     val term = genRCO(4)
 
-    defaultEvaluator.apply[CONST_BOOLEAN](defaultFullContext.evaluationContext(environment), FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, term))) shouldBe 'Left
+    defaultEvaluator.apply[CONST_BOOLEAN](defaultFullContext.evaluationContext(environment), FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, term))) shouldBe Symbol("Left")
   }
 
   property("recursive caseobject compare with unit") {
