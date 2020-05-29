@@ -301,10 +301,10 @@ object Parser {
   def block[_:P]: P[EXPR] = blockOr(INVALID(_, "expected ';'"))
 
   private def blockOr(otherExpr: Pos => EXPR)(implicit c: fastparse.P[Any]): P[EXPR] = {
-    val declaration = letP | funcP
+    def declaration(implicit c: fastparse.P[Any]) = letP | funcP
 
     // Hack to force parse of "\n". Otherwise it is treated as a separator
-    val newLineSep = {
+    def newLineSep(implicit c: fastparse.P[Any]) = {
 //      val rawSep = '\n'
 //      val white = WhitespaceApi.Wrapper {
 //        NoTrace(CharIn((Whitespaces - rawSep).toSeq).rep)
