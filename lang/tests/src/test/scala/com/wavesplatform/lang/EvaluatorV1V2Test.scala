@@ -25,11 +25,10 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, EnvironmentFunctions, PureContext, _}
-import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1, FunctionIds, Log}
-import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1, EvaluatorV2, Log, LogItem}
+import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1, EvaluatorV2, FunctionIds, Log, LogItem}
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
+import com.wavesplatform.lang.v1.{CTX, ContractLimits, FunctionHeader}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -1196,10 +1195,20 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
     val v3Ctx = defaultFullContext(V3).evaluationContext(emptyBlockchainEnvironment())
     val v4Ctx = defaultFullContext(V4).evaluationContext(emptyBlockchainEnvironment())
 
-    defaultEvaluator[EVALUATED](v3Ctx, script(string32Kb)) shouldBe CONST_BYTESTR(bytes(string32Kb))
-    defaultEvaluator[EVALUATED](v4Ctx, script(string32Kb)) shouldBe CONST_BYTESTR(bytes(string32Kb))
+    eval[EVALUATED](v3Ctx, script(string32Kb)) shouldBe CONST_BYTESTR(bytes(string32Kb))
+    eval[EVALUATED](v4Ctx, script(string32Kb)) shouldBe CONST_BYTESTR(bytes(string32Kb))
 
-    defaultEvaluator[EVALUATED](v3Ctx, script(string32Kb + "aa")) shouldBe CONST_BYTESTR(bytes(string32Kb + "aa"))
-    defaultEvaluator[EVALUATED](v4Ctx, script(string32Kb + "aa")) shouldBe Left("Base16 decode input length=32770 should not exceed 32768")
+    eval[EVALUATED](v3Ctx, script(string32Kb + "aa")) shouldBe CONST_BYTESTR(bytes(string32Kb + "aa"))
+    eval[EVALUATED](v4Ctx, script(string32Kb + "aa")) shouldBe Left("Base16 decode input length=32770 should not exceed 32768")
+  }
+
+  property("tuple size limit") {
+    def createTuple(size: Int) =
+      FUNCTION_CALL(Native((CREATE_TUPLE - 2 + size).toShort), List.fill(size)(CONST_LONG(1)))
+
+    val v4Ctx = defaultFullContext(V4).evaluationContext(emptyBlockchainEnvironment())
+
+    eval[CaseObj](v4Ctx, createTuple(ContractLimits.MaxTupleSize)).explicitGet().fields.size shouldBe ContractLimits.MaxTupleSize
+    eval[CaseObj](v4Ctx, createTuple(ContractLimits.MaxTupleSize + 1)) should produce("not found")
   }
 }

@@ -12,7 +12,6 @@ import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, FINAL, LONG, STRING}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
@@ -26,6 +25,7 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Issue
+import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import org.web3j.crypto.Keys
@@ -1777,17 +1777,23 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(""" [].makeString(", ") """, version = V3) should produce("Can't find a function 'makeString'")
   }
 
-  property("tuple") {
-    val script =
-      """
-        | let a = ("a", true, 123, base58'aaaa')
-        | a._1 == "a"          &&
-        | a._2 == true         &&
-        | a._3 == 123          &&
-        | a._4 == base58'aaaa' &&
-        | a == ("a", true, 123, base58'aaaa')
-      """.stripMargin
+  property("n-size generic tuple") {
+    lazy val getElement: Stream[String] =
+      Stream(""""a"""", "true", "123", "base58'aaaa'", "unit") #::: getElement
 
-    eval(script, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    def check(size: Int) = {
+      val tuple = (1 to size).map(getElement).mkString("(", ", ", ")")
+      val script =
+        s"""
+           | let a = $tuple
+           | ${(1 to size).map(i => s"a._$i == ${getElement(i)} &&").mkString(" ")}
+           | a == $tuple
+         """.stripMargin
+
+      eval(script, version = V3) should produce(s"Can't find a function '_Tuple$size'")
+      eval(script, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    }
+
+    ContractLimits.MinTupleSize to ContractLimits.MaxTupleSize foreach check
   }
 }
