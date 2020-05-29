@@ -1058,7 +1058,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Tran
         throwingScript = ExprScript(FUNCTION_CALL(Native(THROW), Nil)).explicitGet()
         quantity <- matcherAmountGen
         iTx = IssueTransaction
-          .selfSigned(TxVersion.V2, seller, "Asset", "", quantity, 8, false, Some(throwingScript), fee, ntpTime.getTimestamp() + 1)
+          .selfSigned(TxVersion.V2, seller, "Asset", "", quantity, 8, reissuable = false, Some(throwingScript), fee, ntpTime.getTimestamp() + 1)
           .explicitGet()
         asset = IssuedAsset(iTx.assetId)
         eTx <- exchangeGeneratorP(buyer, seller, asset, Waves, fixedMatcher = Some(MATCHER))
@@ -1080,19 +1080,20 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Tran
         buyerBalance   = Map(Waves -> ENOUGH_AMT, asset         -> 0L)
         sellerBalance  = Map(Waves -> (ENOUGH_AMT - fee), asset -> iTx.quantity)
         matcherBalance = Map(Waves -> ENOUGH_AMT, asset         -> 0L)
-      } yield (eTx, (buyerBalance, sellerBalance, matcherBalance), Seq(gTx1, gTx2, gTx3, iTx))
+      } yield (eTx, (buyerBalance, sellerBalance, matcherBalance), Seq(gTx1, gTx2, gTx3, iTx), throwingScript)
 
     forAll(scenario) {
-      case (exchange, (buyerBalance, sellerBalance, matcherBalance), genesisTxs) =>
+      case (exchange, (buyerBalance, sellerBalance, matcherBalance), genesisTxs, throwingScript) =>
         assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(exchange), Block.ProtoBlockVersion), fsWithOrderFeature) { ei =>
           ei shouldBe 'left
         }
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(exchange), Block.ProtoBlockVersion), fsWithBlockV5) {
           case (diff, state) =>
-            diff.scriptsRun shouldBe 0
             diff.portfolios(exchange.sender.toAddress).balance shouldBe -exchange.fee
             diff.portfolios.get(exchange.buyOrder.sender.toAddress) shouldBe None
             diff.portfolios.get(exchange.sellOrder.sender.toAddress) shouldBe None
+
+            diff.scriptsComplexity shouldBe DiffsCommon.countVerifierComplexity(Some(throwingScript), state, isAsset = true).explicitGet().get._2
 
             buyerBalance.foreach {
               case (asset, balance) =>
