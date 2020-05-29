@@ -18,7 +18,15 @@ object TypeInferrer {
           case matchResults @ (h :: t) =>
             val commonType = t.map(_.tpe).toVector.foldLeft(h.tpe)(findCommonType)
             commonType match {
-              case NOTHING   => Right(NOTHING)
+              case NOTHING => Right(NOTHING)
+              case commonTuple: TUPLE =>
+                val matchingTuples = matchResults.collect { case MatchResult(t: TUPLE, _) => t }.toList
+                val commonTypeExists = checkTuplesCommonType(matchingTuples, commonTuple)
+                Either.cond(
+                  commonTypeExists,
+                  commonTuple,
+                  s"Can't match inferred types of ${h.name} over ${matchResults.map(_.tpe).mkString(", ")}"
+                )
               case p: SINGLE => Right(p)
               case u @ UNION(plainTypes, _) =>
                 val commonTypeExists = plainTypes.exists { p =>
@@ -37,33 +45,42 @@ object TypeInferrer {
             Right(resolved.mapValues { t =>
               t.explicitGet() match {
                 case UNION(x :: Nil, _) => x
-                case x               => x
+                case x                  => x
               }
             })
         }
     }
   }
 
-  def matchTypes(argType: FINAL, placeholder: TYPE, knownTypes: Map[String, FINAL]): Either[String, Option[MatchResult]] = {
+  private def checkTuplesCommonType(matchingTuples: List[TUPLE], commonTuple: TUPLE): Boolean =
+    (groupByPosition(matchingTuples.map(_.types)) zip commonTuple.types)
+      .forall {
+        case (groupedTypes, t: TUPLE) =>
+          checkTuplesCommonType(groupedTypes.collect { case t: TUPLE => t }, t)
+        case (groupedTypes, singleType) =>
+          singleType.typeList.length < groupedTypes.map(_.typeList.length).sum
+      }
+
+  // ((1, "a", false), (2, "b", true)) => ((1, 2), ("a", "b"), (false, true))
+  private def groupByPosition[T](list: List[List[T]]): List[List[T]] =
+    list.foldRight(List.fill(list.head.length)(List.empty[T])) {
+      case (list, acc) => (list zip acc).map { case (element, p) => element :: p }
+    }
+
+  private def matchTypes(argType: FINAL, placeholder: TYPE, knownTypes: Map[String, FINAL]): Either[String, Option[MatchResult]] = {
     lazy val err = s"Non-matching types: expected: $placeholder, actual: $argType"
 
     (placeholder, argType) match {
-      case (tp @ TYPEPARAM(char), _)                         => Right(Some(MatchResult(argType, tp)))
-      case (tp @ PARAMETERIZEDLIST(innerTypeParam), LIST(t)) => matchTypes(t, innerTypeParam, knownTypes)
-      case (tp @ PARAMETERIZEDLIST(_), _)                    => Left(err)
-      case (tp @ PARAMETERIZEDTUPLE(typeParams), TUPLE(types)) =>
-        if (typeParams.length != types.length)
-          Left(err)
-        else
-          (typeParams zip types)
-            .traverse { case (typeParam, t) => matchTypes(t, typeParam, knownTypes) }
-            .map(_ => None)
-
-      case (tp @ PARAMETERIZEDTUPLE(_), _) => Left(err)
+      case (tp @ TYPEPARAM(char), _)                           => Right(Some(MatchResult(argType, tp)))
+      case (tp @ PARAMETERIZEDLIST(innerTypeParam), LIST(t))   => matchTypes(t, innerTypeParam, knownTypes)
+      case (tp @ PARAMETERIZEDLIST(_), _)                      => Left(err)
+      case (tp @ PARAMETERIZEDTUPLE(typeParams), TUPLE(types)) => matchTupleTypes(err, typeParams, types, knownTypes)
+      case (tp @ PARAMETERIZEDTUPLE(_), _)                     => Left(err)
       case (tp @ PARAMETERIZEDUNION(l), _) =>
         val concretes = UNION.create(
           l.filter(_.isInstanceOf[REAL])
-            .map(_.asInstanceOf[REAL]))
+            .map(_.asInstanceOf[REAL])
+        )
         val parameterized = l
           .filter(_.isInstanceOf[PARAMETERIZED])
           .map(_.asInstanceOf[PARAMETERIZED])
@@ -72,23 +89,37 @@ object TypeInferrer {
           parameterized match {
             case singlePlaceholder :: Nil =>
               val nonMatchedArgTypes = argType match {
-                case NOTHING         => ???
+                case NOTHING            => ???
                 case UNION(argTypes, _) => UNION(argTypes.filterNot(concretes.typeList.contains))
-                case s: SINGLE       => s
+                case s: SINGLE          => s
               }
               matchTypes(nonMatchedArgTypes, singlePlaceholder, knownTypes)
             case many => Left(s"Can't resolve correct type for parameterized $placeholder, actual: $argType")
           }
 
-      case (LIST(tp), LIST(t)) => matchTypes(t, tp, knownTypes)
+      case (LIST(tp), LIST(t))            => matchTypes(t, tp, knownTypes)
+      case (TUPLE(types1), TUPLE(types2)) => matchTupleTypes(err, types1, types2, knownTypes)
       case (placeholder: FINAL, _) =>
         Either.cond(placeholder >= UNION.create(argType.typeList), None, err)
     }
   }
 
+  private def matchTupleTypes(
+      err: => String,
+      placeholderTypes: List[TYPE],
+      targetTypes: List[FINAL],
+      knownTypes: Map[String, FINAL]
+  ) =
+    if (placeholderTypes.length != targetTypes.length)
+      Left(err)
+    else
+      (placeholderTypes zip targetTypes)
+        .traverse { case (typeParam, t) => matchTypes(t, typeParam, knownTypes) }
+        .map(_ => None)
+
   // match, e.g. many ifs
   def findCommonType(list: Seq[FINAL]): FINAL = list match {
-    case Nil => NOTHING
+    case Nil        => NOTHING
     case one :: Nil => one
     case head :: tail =>
       val t = findCommonType(tail)
@@ -102,6 +133,9 @@ object TypeInferrer {
     case (t1, t2) if t1 == t2 => t1
 
     case (LIST(it1), LIST(it2)) => LIST(findCommonType(it1, it2))
+    case (TUPLE(types1), TUPLE(types2)) if types1.length == types2.length =>
+      TUPLE((types1 zip types2).map { case (t1, t2) => findCommonType(t1, t2) })
+
     case (p1: SINGLE, p2: SINGLE) => UNION.create(List(p1, p2))
     case (r: UNION, a: UNION)     => UNION.create((r.typeList.toSet ++ a.typeList.toSet).toSeq)
     case (u: UNION, t: SINGLE)    => if (u.typeList.contains(t)) u else UNION.create(u.typeList :+ t)
