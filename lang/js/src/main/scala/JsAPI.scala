@@ -76,8 +76,8 @@ object JsAPI {
           "name"       -> f.name,
           "doc"        -> funcDoc,
           "resultType" -> typeRepr(f.signature.result),
-          "args" -> (f.args, f.signature.args, paramsDoc).zipped.toList.map { arg =>
-            js.Dynamic.literal("name" -> arg._1, "type" -> typeRepr(arg._2._2), "doc" -> arg._3)
+          "args" -> (f.args zip f.signature.args zip paramsDoc).map { arg =>
+            js.Dynamic.literal("name" -> arg._1._1, "type" -> typeRepr(arg._1._2._2), "doc" -> arg._2)
           }.toJSArray
         )
       })
