@@ -14,7 +14,6 @@ import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.script.Script
 import com.wavesplatform.metrics.{TxsInBlockchainStats, _}
 import com.wavesplatform.mining.{MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
@@ -611,7 +610,7 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.hasAccountScript(address)
   }
 
-  override def assetScript(asset: IssuedAsset): Option[(Script, Long)] = readLock {
+  override def assetScript(asset: IssuedAsset): Option[AssetScriptInfo] = readLock {
     compositeBlockchain.assetScript(asset)
   }
 
@@ -621,20 +620,6 @@ class BlockchainUpdaterImpl(
 
   def collectActiveLeases(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] =
     CompositeBlockchain.collectActiveLeases(leveldb, ngState.map(_.bestLiquidDiff))(filter)
-
-  /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
-    *
-    * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
-  override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = readLock {
-    ngState.fold(leveldb.collectLposPortfolios(pf)) { ng =>
-      val b = Map.newBuilder[Address, A]
-      for ((a, p) <- ng.bestLiquidDiff.portfolios if p.lease != LeaseBalance.empty || p.balance != 0) {
-        pf.runWith(b += a -> _)(a -> this.wavesPortfolio(a))
-      }
-
-      leveldb.collectLposPortfolios(pf) ++ b.result()
-    }
-  }
 
   override def transactionHeight(id: ByteStr): Option[Int] = readLock {
     compositeBlockchain.transactionHeight(id)

@@ -6,7 +6,6 @@ import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -60,7 +59,7 @@ trait Blockchain {
   def accountScript(address: Address): Option[AccountScriptInfo]
   def hasAccountScript(address: Address): Boolean
 
-  def assetScript(id: IssuedAsset): Option[(Script, Long)]
+  def assetScript(id: IssuedAsset): Option[AssetScriptInfo]
 
   def accountData(acc: Address, key: String): Option[DataEntry[_]]
 
@@ -69,11 +68,6 @@ trait Blockchain {
   def balance(address: Address, mayBeAssetId: Asset = Waves): Long
 
   def collectActiveLeases(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction]
-
-  /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
-    *
-    * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
-  def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A]
 }
 
 object Blockchain {

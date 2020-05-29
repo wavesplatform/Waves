@@ -5,6 +5,7 @@ import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError.TransactionDoesNotExist
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.state.AssetScriptInfo
 import com.wavesplatform.state.AssetDescription
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import io.grpc.stub.StreamObserver
@@ -51,7 +52,7 @@ class AssetsApiGrpcImpl(assetsApi: CommonAssetsApi, accountsApi: CommonAccountsA
       d.reissuable,
       d.totalVolume.longValue(),
       d.script.map {
-        case (script, complexity) =>
+        case AssetScriptInfo(script, complexity) =>
           ScriptData(
             PBTransactions.toPBScript(Some(script)),
             script.expr.toString,

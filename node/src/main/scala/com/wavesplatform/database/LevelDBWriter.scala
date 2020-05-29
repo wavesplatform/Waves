@@ -17,7 +17,6 @@ import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings, WavesSettings}
 import com.wavesplatform.state.reader.LeaseDetails
@@ -208,7 +207,7 @@ abstract class LevelDBWriter private[database] (
     }
   }
 
-  override protected def loadAssetScript(asset: IssuedAsset): Option[(Script, Long)] = readOnly { db =>
+  override protected def loadAssetScript(asset: IssuedAsset): Option[AssetScriptInfo] = readOnly { db =>
     db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
   }
 
@@ -292,7 +291,7 @@ abstract class LevelDBWriter private[database] (
 
   private def appendBalances(
       balances: Map[AddressId, Map[Asset, Long]],
-      issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)],
+      issuedAssets: Map[IssuedAsset, NewAssetInfo],
       rw: RW,
       threshold: Int,
       balanceThreshold: Int
@@ -323,7 +322,7 @@ abstract class LevelDBWriter private[database] (
               assetBalanceFilter.put(kabh.suffix)
               if (balance > 0 && issuedAssets
                     .get(a)
-                    .map(_._1.nft)
+                    .map(_.static.nft)
                     .orElse(assetDescription(a).map(_.nft))
                     .getOrElse(false)) {
                 updatedNftLists.put(addressId.toLong, a)
@@ -356,11 +355,11 @@ abstract class LevelDBWriter private[database] (
       leaseBalances: Map[AddressId, LeaseBalance],
       addressTransactions: Map[AddressId, Seq[TransactionId]],
       leaseStates: Map[ByteStr, Boolean],
-      issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)],
+      issuedAssets: Map[IssuedAsset, NewAssetInfo],
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
       filledQuantity: Map[ByteStr, VolumeAndFee],
       scripts: Map[AddressId, Option[AccountScriptInfo]],
-      assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
+      assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
       data: Map[Address, AccountDataInfo],
       aliases: Map[Alias, AddressId],
       sponsorship: Map[IssuedAsset, Sponsorship],
@@ -428,14 +427,14 @@ abstract class LevelDBWriter private[database] (
         expiredKeys ++= updateHistory(rw, Keys.filledVolumeAndFeeHistory(orderId), threshold, Keys.filledVolumeAndFee(orderId))
       }
 
-      for ((asset, (staticInfo, info, volumeInfo)) <- issuedAssets) {
+      for ((asset, NewAssetInfo(staticInfo, info, volumeInfo)) <- issuedAssets) {
         rw.put(Keys.assetStaticInfo(asset), staticInfo.some)
         rw.put(Keys.assetDetails(asset)(height), (info, volumeInfo))
       }
 
       for ((asset, infoToUpdate) <- updatedAssets) {
         rw.fromHistory(Keys.assetDetailsHistory(asset), Keys.assetDetails(asset))
-          .orElse(issuedAssets.get(asset).map { case (_, i, vi) => (i, vi) })
+          .orElse(issuedAssets.get(asset).map { case NewAssetInfo(_, i, vi) => (i, vi) })
           .foreach {
             case (info, vol) =>
               val updInfo = infoToUpdate.left
@@ -557,7 +556,7 @@ abstract class LevelDBWriter private[database] (
 
       expiredKeys.foreach(rw.delete(_, "expired-keys"))
 
-      if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(height)) {
+      if (DisableHijackedAliases.height == height) {
         disabledAliases = DisableHijackedAliases(rw)
       }
 
@@ -700,9 +699,8 @@ abstract class LevelDBWriter private[database] (
           rw.delete(Keys.blockReward(currentHeight))
           rw.delete(Keys.wavesAmount(currentHeight))
 
-          if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(currentHeight)) {
-            DisableHijackedAliases.revert(rw)
-            disabledAliases = Set.empty
+          if (DisableHijackedAliases.height == currentHeight) {
+            disabledAliases = DisableHijackedAliases.revert(rw)
           }
 
           val hitSource = rw.get(Keys.hitSource(currentHeight)).get
@@ -866,16 +864,6 @@ abstract class LevelDBWriter private[database] (
     } yield tx
 
     activeLeaseTransactions.toSeq
-  }
-
-  override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = readOnly { db =>
-    val b = Map.newBuilder[Address, A]
-    for (id <- 1L to db.get(Keys.lastAddressId).getOrElse(0L)) {
-      val addressId = AddressId(id)
-      val address   = db.get(Keys.idToAddress(addressId))
-      pf.runWith(b += address -> _)(address -> loadLposPortfolio(db, addressId))
-    }
-    b.result()
   }
 
   def loadScoreOf(blockId: ByteStr): Option[BigInt] = {

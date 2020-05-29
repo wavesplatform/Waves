@@ -456,11 +456,11 @@ package object database extends ScorexLogging {
   def createBlock(header: BlockHeader, signature: ByteStr, txs: Seq[Transaction]): Either[TxValidationError.GenericError, Block] =
     Validators.validateBlock(Block(header, signature, txs))
 
-  def writeAssetScript(script: (Script, Long)): Array[Byte] =
-    Longs.toByteArray(script._2) ++ script._1.bytes().arr
+  def writeAssetScript(script: AssetScriptInfo): Array[Byte] =
+    Longs.toByteArray(script.complexity) ++ script.script.bytes().arr
 
-  def readAssetScript(b: Array[Byte]): (Script, Long) =
-    ScriptReader.fromBytes(b.drop(8)).explicitGet() -> Longs.fromByteArray(b)
+  def readAssetScript(b: Array[Byte]): AssetScriptInfo =
+    AssetScriptInfo(ScriptReader.fromBytes(b.drop(8)).explicitGet(), Longs.fromByteArray(b))
 
   def writeAccountScriptInfo(scriptInfo: AccountScriptInfo): Array[Byte] =
     pb.AccountScriptInfo.toByteArray(
