@@ -20,23 +20,15 @@ object TypeInferrer {
             commonType match {
               case NOTHING => Right(NOTHING)
               case commonTuple: TUPLE =>
-                val matchingTuples = matchResults.collect { case MatchResult(t: TUPLE, _) => t }.toList
+                val matchingTuples   = matchResults.collect { case MatchResult(t: TUPLE, _) => t }.toList
                 val commonTypeExists = checkTuplesCommonType(matchingTuples, commonTuple)
-                Either.cond(
-                  commonTypeExists,
-                  commonTuple,
-                  s"Can't match inferred types of ${h.name} over ${matchResults.map(_.tpe).mkString(", ")}"
-                )
+                typeMatchResult(matchResults, h.name, commonTuple, commonTypeExists)
               case p: SINGLE => Right(p)
               case u @ UNION(plainTypes, _) =>
                 val commonTypeExists = plainTypes.exists { p =>
                   matchResults.map(_.tpe).forall(e => e >= p)
                 }
-                Either.cond(
-                  commonTypeExists,
-                  u,
-                  s"Can't match inferred types of ${h.name} over ${matchResults.map(_.tpe).mkString(", ")}"
-                )
+                typeMatchResult(matchResults, h.name, u, commonTypeExists)
             }
         }
         resolved.find(_._2.isLeft) match {
@@ -50,6 +42,19 @@ object TypeInferrer {
             })
         }
     }
+  }
+
+  private def typeMatchResult(
+      matchResults: Seq[MatchResult],
+      placeholder: TYPEPARAM,
+      commonType: FINAL,
+      commonTypeExists: Boolean
+  ) = {
+    Either.cond(
+      commonTypeExists,
+      commonType,
+      s"Can't match inferred types of $placeholder over ${matchResults.map(_.tpe).mkString(", ")}"
+    )
   }
 
   private def checkTuplesCommonType(matchingTuples: List[TUPLE], commonTuple: TUPLE): Boolean =
