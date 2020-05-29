@@ -107,6 +107,48 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     ExpressionCompiler(compilerContext, letExpr) shouldBe 'right
   }
 
+  property("tuple type checks") {
+    val script = """ ("a", true, 123, base58'aaaa')._3 == true  """
+    val expr = Parser.parseExpr(script).get.value
+    ExpressionCompiler(compilerContextV4, expr) should produce("Can't match inferred types of T over Int, Boolean")
+
+    val script2 = """ ("a", true, 123, base58'aaaa') == ("a", true, "b", base58'aaaa') """
+    val expr2 = Parser.parseExpr(script2).get.value
+    ExpressionCompiler(compilerContextV4, expr2) should produce(
+      "Can't match inferred types of T over (String, Boolean, Int, ByteVector), (String, Boolean, String, ByteVector)"
+    )
+
+    val script3 =
+      """
+        | let v = if (true) then 1 else "abc"
+        | let q = if (true) then 1 else if (true) then true else "abc"
+        |
+        | (v, v) == (v, v)     &&
+        | (v, q) == (q, v)     &&
+        | (q, q) == (v, v)     &&
+        | (v, q) == (1, "abc") &&
+        | (v, q) == ("abc", 1) &&
+        | (1, q) == (v, true)  &&
+        | (((v, q), (true, v)), q) == (((1, true), (q, q)), v)
+      """.stripMargin
+    val expr3 = Parser.parseExpr(script3).get.value
+    ExpressionCompiler(compilerContextV4, expr3) shouldBe 'right
+
+    val script4 =
+      """
+        | let v = if (true) then 1 else "abc"
+        | let q = if (true) then 1 else if (true) then true else "abc"
+        |
+        | (((v, q), (true, v)), q) == (((1, true), (v, q)), v)
+      """.stripMargin
+    val expr4 = Parser.parseExpr(script4).get.value
+    ExpressionCompiler(compilerContextV4, expr4) should produce(
+      "Can't match inferred types of T over " +
+        "(((Int|String, Boolean|Int|String), (Boolean, Int|String)), Boolean|Int|String), " +
+        "(((Int, Boolean), (Int|String, Boolean|Int|String)), Int|String) in 102-154"
+    )
+  }
+
   treeTypeTest("GETTER")(
     ctx =
       CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> VariableInfo(AnyPos, pointType)), functionDefs = Map.empty),
