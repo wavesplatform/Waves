@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs.invoke
 
 import cats.implicits._
-import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.account.{AddressScheme, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.FunctionCallPolicyProvider._
@@ -103,7 +103,9 @@ object InvokeScriptTransactionDiff {
                     blockchain,
                     Coeval(ByteStr(tx.dAppAddressOrAlias.bytes)),
                     directives,
-                    tx.id()
+                    tx.id(),
+                    blockchain.height >= blockchain.settings.functionalitySettings.disableAliasInThisHeight
+                      && tx.dAppAddressOrAlias.isInstanceOf[Alias]
                   )
 
                   val evaluate =
