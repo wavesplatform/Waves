@@ -6,24 +6,24 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.state.diffs._
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers with Inside {
   private val estimator = ScriptEstimatorV2
-  
+
   property("compile script with specified version") {
     val script = scriptWithVersion("1".some)
     ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Right((ExprScript(V1, expectedExpr).explicitGet(), 13))
   }
 
-  property("use version 2 if not specified") {
+  property("use version 3 if not specified") {
     val script = scriptWithVersion(none)
-    ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Right((ExprScript(V2, expectedExpr).explicitGet(), 13))
+    ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Right((ExprScript(V3, expectedExpr).explicitGet(), 13))
   }
 
   property("fails on unsupported version") {
@@ -53,7 +53,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
         | let a = 1000
         | a > b
       """.stripMargin
-    ScriptCompiler.compile(script, estimator) shouldBe Left("Compilation failed: A definition of 'b' is not found in 46-47")
+    ScriptCompiler.compile(script, estimator) shouldBe Left("Compilation failed: [A definition of 'b' is not found in 46-47]")
   }
 
   property("fails with contract for asset") {
@@ -186,21 +186,21 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
 
   property("complexity border") {
     def buildDirectives(
-                         version:     StdLibVersion,
-                         contentType: ContentType,
-                         scriptType:  ScriptType
-                       ): String =
-    s"""
+        version: StdLibVersion,
+        contentType: ContentType,
+        scriptType: ScriptType
+    ): String =
+      s"""
        | {-# STDLIB_VERSION ${version.value}     #-}
        | {-# CONTENT_TYPE   ${contentType.value} #-}
        | {-# SCRIPT_TYPE    ${scriptType.value}  #-}
      """.stripMargin
 
     def buildScript(
-                     assigns:      Int,
-                     conjunctions: Int,
-                     withVerifier: Boolean
-                   ): String =
+        assigns: Int,
+        conjunctions: Int,
+        withVerifier: Boolean
+    ): String =
       s"""
          | func script() = {
          |   let a0 = base58''
@@ -213,38 +213,44 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
       """.stripMargin
 
     def checkComplexityBorder(
-                               version:     StdLibVersion,
-                               contentType: ContentType,
-                               scriptType:  ScriptType,
-                               complexity:  Int
-                             ): Unit = {
+        version: StdLibVersion,
+        contentType: ContentType,
+        scriptType: ScriptType,
+        complexity: Int
+    ): Unit = {
 
       val directives = buildDirectives(version, contentType, scriptType)
       val (assigns, conjunctions) = (version, contentType, scriptType) match {
-        case (V3, DApp, Account) => (209, 2)
-        case (V3, Expression, _) => (209, 7)
-        case ( _, Expression, _) => (103, 14)
-        case _ => ???
+        case (V3 | V4, DApp, Account)       => (155, 15)
+        case (V3 | V4, Expression, Account) => (155, 20)
+        case (V3 | V4, Expression, Asset)   => (209, 7)
+        case (_, Expression, _)             => (103, 14)
+        case _                              => ???
       }
-      val withVerifier = contentType == DApp
-      val validScript          = directives + buildScript(assigns, conjunctions,     withVerifier)
+      val withVerifier         = contentType == DApp
+      val validScript          = directives + buildScript(assigns, conjunctions, withVerifier)
       val exceedingLimitScript = directives + buildScript(assigns, conjunctions + 1, withVerifier)
 
       inside(ScriptCompiler.compile(validScript, estimator)) { case Right((_, c)) => c shouldBe complexity }
       ScriptCompiler.compile(exceedingLimitScript, estimator) should produce(s"${complexity + 2} > $complexity")
     }
 
-    checkComplexityBorder(V3, DApp,       Account, 4000)
-    checkComplexityBorder(V3, Expression, Asset,   4000)
-    checkComplexityBorder(V3, Expression, Account, 4000)
-    checkComplexityBorder(V2, Expression, Asset,   2000)
+    checkComplexityBorder(V4, Expression, Asset, 4000)
+    checkComplexityBorder(V3, Expression, Asset, 4000)
+
+    checkComplexityBorder(V4, DApp, Account, 3000)
+    checkComplexityBorder(V3, DApp, Account, 3000)
+    checkComplexityBorder(V4, Expression, Account, 3000)
+    checkComplexityBorder(V3, Expression, Account, 3000)
+
+    checkComplexityBorder(V2, Expression, Asset, 2000)
     checkComplexityBorder(V2, Expression, Account, 2000)
-    checkComplexityBorder(V1, Expression, Asset,   2000)
+    checkComplexityBorder(V1, Expression, Asset, 2000)
     checkComplexityBorder(V1, Expression, Account, 2000)
   }
 
   property("transactionByID complexity") {
-    def transactionByIdComplexity(version: Int) = {
+    def transactionByIdComplexity(version: Int): Long = {
       val scriptWithoutTransactionById =
         s"""
           | {-# STDLIB_VERSION $version #-}
@@ -269,6 +275,27 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
     }
 
     transactionByIdComplexity(2) shouldBe 100
+  }
+
+  property("can compile V4 with new result") {
+    val source =
+      """{-# STDLIB_VERSION 4 #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |
+        |@Callable(inv)
+        |func default() = nil
+        |
+        |@Callable(inv)
+        |func default2() = []
+        |
+        |@Callable(inv)
+        |func paySelf(asset: String) = {
+        |  let id = asset.fromBase58String()
+        |  [ ScriptTransfer(this, 1, (if id.size() > 0 then id else unit)) ]
+        |}
+        |""".stripMargin
+    ScriptCompiler.compile(source, estimator) shouldBe 'right
   }
 
   property("library") {

@@ -1,6 +1,8 @@
 package com.wavesplatform.mining
 
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.{Blockchain, Diff}
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
 
@@ -12,8 +14,11 @@ object TxEstimators extends ScorexLogging {
   }
 
   case object sizeInBytes extends Fn {
-    override def apply(blockchain: Blockchain, tx: Transaction, diff: Diff): Long = tx.bytes().length // + headers
-    override val minEstimate                                                      = 109L
+    override def apply(blockchain: Blockchain, tx: Transaction, diff: Diff): Long =
+      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, blockchain.height + 1))
+        tx.protoSize()
+      else tx.bytesSize
+    override val minEstimate = 109L
   }
 
   case object one extends Fn {

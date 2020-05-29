@@ -1,12 +1,15 @@
 package com.wavesplatform.it.sync.transactions
 
-import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.account.{AddressOrAlias, AddressScheme}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.TransferTransactionInfo
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.transfer.Attachment.Bin
 import com.wavesplatform.transaction.transfer._
 import org.scalatest.CancelAfterFailure
 
@@ -15,7 +18,7 @@ import scala.concurrent.duration._
 class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
   test("asset transfer changes sender's and recipient's asset balance; issuer's.waves balance is decreased by fee") {
-    for (v <- supportedVersions) {
+    for (v <- transferTxSupportedVersions) {
       val (firstBalance, firstEffBalance)   = miner.accountBalances(firstAddress)
       val (secondBalance, secondEffBalance) = miner.accountBalances(secondAddress)
 
@@ -26,8 +29,12 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
       miner.assertBalances(firstAddress, firstBalance - issueFee, firstEffBalance - issueFee)
       miner.assertAssetBalance(firstAddress, issuedAssetId, someAssetAmount)
 
-      val transferTransactionId = sender.transfer(firstAddress, secondAddress, someAssetAmount, minFee, Some(issuedAssetId), version = v).id
-      nodes.waitForHeightAriseAndTxPresent(transferTransactionId)
+      val transferTransaction = sender.transfer(firstAddress, secondAddress, someAssetAmount, minFee, Some(issuedAssetId), version = v)
+      nodes.waitForHeightAriseAndTxPresent(transferTransaction.id)
+      if (v > 2) {
+        transferTransaction.chainId shouldBe Some(AddressScheme.current.chainId)
+        miner.transactionInfo[TransferTransactionInfo](transferTransaction.id).chainId shouldBe Some(AddressScheme.current.chainId)
+      }
 
       miner.assertBalances(firstAddress, firstBalance - minFee - issueFee, firstEffBalance - minFee - issueFee)
       miner.assertBalances(secondAddress, secondBalance, secondEffBalance)
@@ -37,7 +44,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
   }
 
   test("waves transfer changes waves balances and eff.b.") {
-    for (v <- supportedVersions) {
+    for (v <- transferTxSupportedVersions) {
       val (firstBalance, firstEffBalance)   = miner.accountBalances(firstAddress)
       val (secondBalance, secondEffBalance) = miner.accountBalances(secondAddress)
 
@@ -51,9 +58,9 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
   }
 
   test("invalid signed waves transfer should not be in UTX or blockchain") {
-    def invalidTx(timestamp: Long = System.currentTimeMillis, fee: Long = 100000): TransferTransactionV1.TransactionT =
-      TransferTransactionV1
-        .selfSigned(Waves, sender.privateKey, AddressOrAlias.fromString(sender.address).explicitGet(), 1, timestamp, Waves, fee, Array.emptyByteArray)
+    def invalidTx(timestamp: Long = System.currentTimeMillis, fee: Long = 100000): TransferTransaction =
+      TransferTransaction
+        .selfSigned(1.toByte, sender.keyPair, AddressOrAlias.fromString(sender.address).explicitGet(), Waves, 1, Waves, fee, None, timestamp)
         .right
         .get
 
@@ -66,7 +73,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
 
     for ((tx, diag) <- invalidTxs) {
       assertBadRequestAndResponse(sender.broadcastRequest(tx.json()), diag)
-      nodes.foreach(_.ensureTxDoesntExist(tx.id().base58))
+      nodes.foreach(_.ensureTxDoesntExist(tx.id().toString))
     }
 
     nodes.waitForHeightArise()
@@ -75,7 +82,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
   }
 
   test("can not make transfer without having enough effective balance") {
-    for (v <- supportedVersions) {
+    for (v <- transferTxSupportedVersions) {
       val (secondBalance, secondEffBalance) = miner.accountBalances(secondAddress)
 
       assertApiErrorRaised(sender.transfer(secondAddress, firstAddress, secondEffBalance, minFee, version = v))
@@ -86,17 +93,19 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
   }
 
   test("can not make transfer without having enough balance") {
-    for (v <- supportedVersions) {
+    for (v <- transferTxSupportedVersions) {
       val (secondBalance, secondEffBalance) = miner.accountBalances(secondAddress)
 
-      assertBadRequestAndResponse(sender.transfer(secondAddress, firstAddress, secondBalance + 1.waves, minFee, version = v),
-                                  "Attempt to transfer unavailable funds")
+      assertBadRequestAndResponse(
+        sender.transfer(secondAddress, firstAddress, secondBalance + 1.waves, minFee, version = v),
+        "Attempt to transfer unavailable funds"
+      )
       miner.assertBalances(secondAddress, secondBalance, secondEffBalance)
     }
   }
 
   test("can forge block with sending majority of some asset to self and to other account") {
-    for (v <- supportedVersions) {
+    for (v <- transferTxSupportedVersions) {
       val (firstBalance, firstEffBalance)   = miner.accountBalances(firstAddress)
       val (secondBalance, secondEffBalance) = miner.accountBalances(secondAddress)
 
@@ -116,5 +125,113 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
       miner.assertBalances(firstAddress, firstBalance - issueFee - 2 * minFee, firstEffBalance - issueFee - 2 * minFee)
       miner.assertBalances(secondAddress, secondBalance, secondEffBalance)
     }
+  }
+
+  test("able to pass typed attachment to transfer transaction V3") {
+
+    val txWithStringAtt =
+      sender.transfer(
+        firstAddress,
+        secondAddress,
+        transferAmount,
+        minFee,
+        version = TxVersion.V3,
+        typedAttachment = Some(Attachment.Str("somestring")),
+        waitForTx = true
+      )
+    val txWithStringAttInfo = sender.transactionInfo[TransferTransactionInfo](txWithStringAtt.id)
+    txWithStringAttInfo.typedAttachment shouldBe Some(Attachment.Str("somestring"))
+
+    val txWithBoolAtt =
+      sender.transfer(
+        firstAddress,
+        secondAddress,
+        transferAmount,
+        minFee,
+        version = TxVersion.V3,
+        typedAttachment = Some(Attachment.Bool(false)),
+        waitForTx = true
+      )
+    val txWithBoolAttInfo = sender.transactionInfo[TransferTransactionInfo](txWithBoolAtt.id)
+    txWithBoolAttInfo.typedAttachment shouldBe Some(Attachment.Bool(false))
+
+    val txWithIntAtt =
+      sender.transfer(
+        firstAddress,
+        secondAddress,
+        transferAmount,
+        minFee,
+        version = TxVersion.V3,
+        typedAttachment = Some(Attachment.Num(123)),
+        waitForTx = true
+      )
+    val txWithIntAttInfo = sender.transactionInfo[TransferTransactionInfo](txWithIntAtt.id)
+    txWithIntAttInfo.typedAttachment shouldBe Some(Attachment.Num(123))
+
+    val txWithBinaryAtt =
+      sender.transfer(
+        firstAddress,
+        secondAddress,
+        transferAmount,
+        minFee,
+        version = TxVersion.V3,
+        typedAttachment = Some(Attachment.Bin(Array[Byte](127.toByte, 0, 1, 1))),
+        waitForTx = true
+      )
+    val txWithBinaryAttInfo = sender.transactionInfo[TransferTransactionInfo](txWithBinaryAtt.id)
+    txWithBinaryAttInfo.typedAttachment.get.asInstanceOf[Bin].value shouldBe Attachment.Bin(Array[Byte](127.toByte, 0, 1, 1)).value
+  }
+
+  test("not able to pass typed attachment to transfer transaction V1,2") {
+    for (v <- transferTxSupportedVersions if v < 3) {
+      assertApiError(
+        sender.transfer(
+          firstAddress,
+          secondAddress,
+          transferAmount,
+          minFee,
+          version = v,
+          typedAttachment = Some(Attachment.Num(123))
+        )
+      ) { error =>
+        error.id shouldBe 199
+        error.message shouldBe "Typed attachment not allowed"
+      }
+    }
+  }
+
+  test("able to pass multiple typed attachments to transfer transaction V3") {
+    val txWithStringAtt =
+      sender.transfer(
+        firstAddress,
+        secondAddress,
+        transferAmount,
+        minFee,
+        version = TxVersion.V3,
+        typedAttachment = Some(Attachment.Str("somestring"))
+      )
+
+    val txWithBoolAtt =
+      sender.transfer(
+        firstAddress,
+        secondAddress,
+        transferAmount,
+        minFee,
+        version = TxVersion.V3,
+        typedAttachment = Some(Attachment.Bool(false))
+      )
+
+    val t1 = sender.waitForTransaction(txWithStringAtt.id)
+    val t2 = sender.waitForTransaction(txWithBoolAtt.id)
+
+    def checkBlock(h: Int): Unit = {
+      val block = sender.blockAt(h)
+      assert(Set(t1.id, t2.id).subsetOf(block.transactions.map(_.id).toSet))
+    }
+
+    val height = sender.height
+    checkBlock(height)
+    nodes.waitForHeightArise()
+    checkBlock(height)
   }
 }

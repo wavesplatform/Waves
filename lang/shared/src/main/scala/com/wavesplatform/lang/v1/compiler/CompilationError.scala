@@ -1,8 +1,13 @@
 package com.wavesplatform.lang.v1.compiler
 
+import java.nio.charset.StandardCharsets
+
 import cats.Show
+import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
+import com.wavesplatform.lang.v1.parser.Expressions
+import com.wavesplatform.lang.v1.parser.Expressions.{Declaration, PART}
 
 sealed trait CompilationError {
   def start: Int
@@ -52,6 +57,17 @@ object CompilationError {
     val message = s"Function '$name' declared with duplicating argument names"
   }
 
+  final case class TooLongDeclarationName(start: Int, end: Int, decl: Declaration) extends CompilationError {
+    private val declType = decl match {
+      case _: Expressions.LET => "Let"
+      case _: Expressions.FUNC => "Function"
+    }
+    private val name = decl.name.asInstanceOf[PART.VALID[String]].v
+    private val size = name.getBytes(StandardCharsets.UTF_8).length
+
+    val message = s"$declType '$name' size = $size bytes exceeds ${ContractLimits.MaxDeclarationNameInBytes}"
+  }
+
   final case class FunctionNotFound(start: Int, end: Int, name: String, argTypes: List[String]) extends CompilationError {
     val message = s"Can't find a function '$name'(${argTypes.mkString(", ")}) or it is @Callable"
   }
@@ -72,7 +88,7 @@ object CompilationError {
   final case class WrongArgumentsNumber(start: Int, end: Int, name: String, required: Int, found: Int) extends CompilationError {
     val message = s"Function '$name' requires $required arguments, but $found are provided"
   }
-  final case class WrongArgumentType(start: Int, end: Int, funcName: String, typeName: String, required: List[String]) extends CompilationError {
+  final case class WrongArgumentType(start: Int, end: Int, funcName: String, typeName: String, required: Iterable[String]) extends CompilationError {
     val message = s"Unexpected argument type in function '$funcName', required: (${required.mkString(", ")}), but $typeName type found"
   }
   final case class UnexpectedType(start: Int, end: Int, required: String, found: String) extends CompilationError {

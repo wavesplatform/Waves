@@ -1,22 +1,22 @@
 package com.wavesplatform.state.diffs
 
-import java.nio.charset.StandardCharsets
-
-import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
-import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
+import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{Expression, V1}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils.compilerContext
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.IssueTransactionV2
-import com.wavesplatform.transaction.transfer.TransferTransactionV2
+import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.utils._
 import org.scalatest.{Inside, PropSpec}
 
-class TransactionValidationErrorPrintTest extends PropSpec with Inside {
+class TransactionValidationErrorPrintTest extends PropSpec with Inside with WithState {
   property("output transaction error should be easy to read") {
     val assetScript =
       s"""
@@ -56,53 +56,84 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside {
     val typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1)
       .explicitGet()
 
-    val seed    = Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet()
-    val master  = Address.fromString("3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu").explicitGet()
-    val genesis = GenesisTransaction.create(master, 1000000000, 0).explicitGet()
+    val preTypedScript =
+      ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), Parser.parseExpr("true").get.value).explicitGet()._1)
+        .explicitGet()
 
-    val issueTransaction = IssueTransactionV2.selfSigned(
-      chainId     = AddressScheme.current.chainId,
-      sender      = KeyPair(seed.bytes),
-      name        = "name".getBytes(StandardCharsets.UTF_8),
-      description = "description".getBytes(StandardCharsets.UTF_8),
-      quantity    = 100,
-      decimals    = 0,
-      reissuable  = false,
-      script      = Some(typedScript),
-      fee         = 10000000,
-      timestamp   = 0
-    ).explicitGet()
+    val seed     = Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet()
+    val master   = Address.fromString("3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu").explicitGet()
+    val genesis1 = GenesisTransaction.create(master, 1000000000, 0).explicitGet()
+    val genesis2 = GenesisTransaction.create(KeyPair(master.bytes).toAddress, 1000000000, 0).explicitGet()
 
-    val transferTransaction = TransferTransactionV2.selfSigned(
-        assetId    = IssuedAsset(issueTransaction.id()),
-        sender     = KeyPair(master.bytes),
-        recipient  = master,
-        amount     = 1,
-        timestamp  = 0,
-        feeAssetId = Waves,
-        feeAmount  = 10000000,
-        attachment = Array[Byte]()
+    val issueTransaction = IssueTransaction(
+      TxVersion.V2,
+      KeyPair(seed.bytes).publicKey,
+      "name".utf8Bytes,
+      "description".utf8Bytes,
+      100,
+      0.toByte,
+      false,
+      Some(preTypedScript),
+      10000000,
+      0
+    ).signWith(KeyPair(seed.bytes).privateKey)
+
+    val preTransferTransaction = TransferTransaction
+      .selfSigned(
+        version = 2.toByte,
+        sender = KeyPair(seed.bytes),
+        recipient = KeyPair(master.bytes).toAddress,
+        asset = IssuedAsset(issueTransaction.id()),
+        amount = 1,
+        feeAsset = Waves,
+        fee = 10000000,
+        attachment = None,
+        timestamp = 0
+      )
+      .explicitGet()
+
+    val preSetAssetScriptTransaction = SetAssetScriptTransaction
+      .selfSigned(
+        version = 1.toByte,
+        sender = KeyPair(seed.bytes),
+        asset = IssuedAsset(issueTransaction.id()),
+        script = Some(typedScript),
+        fee = 10000000,
+        timestamp = 0
+      )
+      .explicitGet()
+
+    val transferTransaction = TransferTransaction
+      .selfSigned(
+        version = 2.toByte,
+        sender = KeyPair(master.bytes),
+        recipient = master,
+        asset = IssuedAsset(issueTransaction.id()),
+        amount = 1,
+        feeAsset = Waves,
+        fee = 10000000,
+        attachment = None,
+        timestamp = 0
       )
       .explicitGet()
 
     assertDiffEi(
-      Seq(TestBlock.create(Seq(genesis, issueTransaction))),
+      Seq(TestBlock.create(Seq(genesis1, genesis2, issueTransaction, preTransferTransaction, preSetAssetScriptTransaction))),
       TestBlock.create(Seq(transferTransaction))
-    ) {
-      error =>
-        val expected = //regex because of changeable proof
-          """Left\(TransactionValidationError\(cause = ScriptExecutionError\(error = Recipient address error:3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs, type = Asset, log =
+    ) { error =>
+      val expected = //regex because of changeable proof
+        """Left\(TransactionValidationError\(cause = ScriptExecutionError\(error = Recipient address error:3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs, type = Asset, log =
             |	\$match0 = TransferTransaction\(
             |		recipient = Address\(
             |			bytes = base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
             |		\)
             |		timestamp = 0
-            |		bodyBytes = base58'ZFDBCm7WGpX1zYwdAbbbk2XHyDz2urZGfPHjeiPWuGuemeZBqU4GzZ97iV2a1pt5X7YZttv41PSM3T2h1yMMNBrV6TaCHQK7U738Rs9nNPG241u6zzSCxyh2c7NQmfwq9YmZDb1mPcWXaoVCkCgYqnMk9v895vg4SGF'
-            |		assetId = base58'FDdeECUS9tKTjMNyRU8Z5E7dseqBsRWiE92vcsTT8o1i'
+            |		bodyBytes = base58'ZFDBCm7WGpX1zYwdAbbbk2XHyDz2urZGfPHjeiPWuGuemeYUAswXmdLfPhXamrydNQwFDR9QKFELsMaZDwneo16LGifGX71dUtdqfRtzzr3KvjVYD1uysyghj3KfWNDSriC3E1vKR6SWa91rqdzXhynrNZXHu9EJpud'
+            |		assetId = base58'6Jro1D97trbypmc4HDckkiy2qYtU2JoU7ZUjtwEPi32o'
             |		feeAssetId = Unit
             |		amount = 1
             |		version = 2
-            |		id = base58'4hhZQRZWCabo2JK2cdYnrV9w7u7LhvcdSpf3GYpn6TQA'
+            |		id = base58'FsqB36ighMWLbGS1te7gh9DRFbrCRVjvumgSKwdYAwxi'
             |		senderPublicKey = base58'EbxDdqXBhj3TEd1UFoi1UE1vm1k7gM9EMYAuLr62iaZF'
             |		attachment = base58''
             |		sender = Address\(
@@ -121,12 +152,12 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside {
             |			bytes = base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
             |		\)
             |		timestamp = 0
-            |		bodyBytes = base58'ZFDBCm7WGpX1zYwdAbbbk2XHyDz2urZGfPHjeiPWuGuemeZBqU4GzZ97iV2a1pt5X7YZttv41PSM3T2h1yMMNBrV6TaCHQK7U738Rs9nNPG241u6zzSCxyh2c7NQmfwq9YmZDb1mPcWXaoVCkCgYqnMk9v895vg4SGF'
-            |		assetId = base58'FDdeECUS9tKTjMNyRU8Z5E7dseqBsRWiE92vcsTT8o1i'
+            |		bodyBytes = base58'ZFDBCm7WGpX1zYwdAbbbk2XHyDz2urZGfPHjeiPWuGuemeYUAswXmdLfPhXamrydNQwFDR9QKFELsMaZDwneo16LGifGX71dUtdqfRtzzr3KvjVYD1uysyghj3KfWNDSriC3E1vKR6SWa91rqdzXhynrNZXHu9EJpud'
+            |		assetId = base58'6Jro1D97trbypmc4HDckkiy2qYtU2JoU7ZUjtwEPi32o'
             |		feeAssetId = Unit
             |		amount = 1
             |		version = 2
-            |		id = base58'4hhZQRZWCabo2JK2cdYnrV9w7u7LhvcdSpf3GYpn6TQA'
+            |		id = base58'FsqB36ighMWLbGS1te7gh9DRFbrCRVjvumgSKwdYAwxi'
             |		senderPublicKey = base58'EbxDdqXBhj3TEd1UFoi1UE1vm1k7gM9EMYAuLr62iaZF'
             |		attachment = base58''
             |		sender = Address\(
@@ -156,14 +187,14 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside {
             |  "sender" : "3Mrt6Y1QweDrKRRNuhhHGdHpu2kXLXq2QK5",
             |  "feeAssetId" : null,
             |  "proofs" : \[ "\w+" ],
-            |  "assetId" : "FDdeECUS9tKTjMNyRU8Z5E7dseqBsRWiE92vcsTT8o1i",
+            |  "assetId" : "6Jro1D97trbypmc4HDckkiy2qYtU2JoU7ZUjtwEPi32o",
             |  "recipient" : "3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu",
             |  "feeAsset" : null,
-            |  "id" : "4hhZQRZWCabo2JK2cdYnrV9w7u7LhvcdSpf3GYpn6TQA",
+            |  "id" : "FsqB36ighMWLbGS1te7gh9DRFbrCRVjvumgSKwdYAwxi",
             |  "timestamp" : 0
             |}\)\)""".stripMargin.r
 
-        error.toString should fullyMatch regex expected
+      error.toString should fullyMatch regex expected
     }
   }
 }

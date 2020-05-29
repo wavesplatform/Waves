@@ -43,27 +43,37 @@ object ExprScript {
   def estimate(
       expr: EXPR,
       version: StdLibVersion,
-      estimator: ScriptEstimator
+      estimator: ScriptEstimator,
+      useContractVerifierLimit: Boolean
   ): Either[String, Long] =
     for {
       complexity <- estimateExact(expr, version, estimator)
-      _          <- checkComplexity(version, complexity)
+      _          <- checkComplexity(version, complexity, useContractVerifierLimit)
     } yield complexity
 
   def checkComplexity(
       version: StdLibVersion,
-      complexity: Long
-  ): Either[String, Unit] =
+      complexity: Long,
+      useContractVerifierLimit: Boolean
+  ): Either[String, Unit] = {
+    val limit =
+      if (useContractVerifierLimit)
+        MaxAccountVerifierComplexityByVersion(version)
+      else
+        MaxComplexityByVersion(version)
+
     Either.cond(
-      complexity <= MaxComplexityByVersion(version),
+      complexity <= limit,
       (),
-      s"Script is too complex: $complexity > ${MaxComplexityByVersion(version)}"
+      s"Script is too complex: $complexity > $limit"
     )
+  }
 
   private case class ExprScriptImpl(stdLibVersion: StdLibVersion, expr: EXPR) extends ExprScript {
     override type Expr = EXPR
     override val bytes: Coeval[ByteStr]           = Coeval.evalOnce(ByteStr(Global.serializeExpression(expr, stdLibVersion)))
-    override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(com.wavesplatform.lang.v1.compiler.сontainsBlockV2(expr))
+    override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(com.wavesplatform.lang.v1.compiler.containsBlockV2(expr))
+    override val containsArray: Boolean           = com.wavesplatform.lang.v1.compiler.containsArray(expr)
   }
 
 }

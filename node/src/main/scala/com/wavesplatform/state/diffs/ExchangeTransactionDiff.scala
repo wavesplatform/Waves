@@ -4,62 +4,95 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderV3}
+import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
+import com.wavesplatform.transaction.{Asset, TxVersion}
 
-import scala.util.Right
+import scala.util.{Right, Try}
 
 object ExchangeTransactionDiff {
 
-  def apply(blockchain: Blockchain, height: Int)(tx: ExchangeTransaction): Either[ValidationError, Diff] = {
-
+  def apply(blockchain: Blockchain)(tx: ExchangeTransaction): Either[ValidationError, Diff] = {
     val matcher = tx.buyOrder.matcherPublicKey.toAddress
     val buyer   = tx.buyOrder.senderPublicKey.toAddress
     val seller  = tx.sellOrder.senderPublicKey.toAddress
+
     val assetIds =
-      Set(tx.buyOrder.assetPair.amountAsset, tx.buyOrder.assetPair.priceAsset, tx.sellOrder.assetPair.amountAsset, tx.sellOrder.assetPair.priceAsset)
-        .collect { case asset @ IssuedAsset(_) => asset }
-    val assets             = assetIds.map(blockchain.assetDescription)
-    val smartTradesEnabled = blockchain.activatedFeatures.contains(BlockchainFeatures.SmartAccountTrading.id)
-    val smartAssetsEnabled = blockchain.activatedFeatures.contains(BlockchainFeatures.SmartAssets.id)
+      Set(
+        tx.buyOrder.assetPair.amountAsset,
+        tx.buyOrder.assetPair.priceAsset,
+        tx.buyOrder.matcherFeeAssetId,
+        tx.sellOrder.assetPair.amountAsset,
+        tx.sellOrder.assetPair.priceAsset,
+        tx.sellOrder.matcherFeeAssetId
+      ).collect {
+        case asset: IssuedAsset => asset
+      }.toVector
+
+    val assets = assetIds.map(id => id -> blockchain.assetDescription(id)).toMap
+
+    val smartTradesEnabled = blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading)
+    val smartAssetsEnabled = blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets)
+
+    def isPriceValid(amountDecimals: Int, priceDecimals: Int) = {
+      def convertPrice(price: Long, amountDecimals: Int, priceDecimals: Int) =
+        Try {
+          (BigDecimal(price) / BigDecimal(10).pow(priceDecimals - amountDecimals)).toBigInt().bigInteger.longValueExact()
+        }.toEither.leftMap(x => GenericError(x.getMessage))
+
+      def orderPrice(order: Order, amountDecimals: Int, priceDecimals: Int) =
+        if (tx.version >= TxVersion.V3 && order.version < Order.V4) convertPrice(order.price, amountDecimals, priceDecimals)
+        else Right(order.price)
+
+      for {
+        _              <- Either.cond(tx.price != 0L, (), GenericError("price should be > 0"))
+        buyOrderPrice  <- orderPrice(tx.buyOrder, amountDecimals, priceDecimals)
+        sellOrderPrice <- orderPrice(tx.sellOrder, amountDecimals, priceDecimals)
+        _              <- Either.cond(tx.price <= buyOrderPrice, (), GenericError("price should be <= buyOrder.price"))
+        _              <- Either.cond(tx.price >= sellOrderPrice, (), GenericError("price should be >= sellOrder.price"))
+      } yield ()
+    }
 
     for {
-      _ <- Either.cond(assets.forall(_.isDefined), (), GenericError("Assets should be issued before they can be traded"))
-      assetScripted = assets.count(_.flatMap(_.script).isDefined)
+      _ <- Either.cond(assets.values.forall(_.isDefined), (), GenericError("Assets should be issued before they can be traded"))
+      assetScripted = assets.values.count(_.flatMap(_.script).isDefined)
       _ <- Either.cond(
         smartAssetsEnabled || assetScripted == 0,
         (),
         GenericError(s"Smart assets can't participate in ExchangeTransactions (SmartAssetsFeature is disabled)")
       )
-      buyerScripted = blockchain.hasScript(buyer)
+      buyerScripted = blockchain.hasAccountScript(buyer)
       _ <- Either.cond(
         smartTradesEnabled || !buyerScripted,
         (),
         GenericError(s"Buyer $buyer can't participate in ExchangeTransaction because it has assigned Script (SmartAccountsTrades is disabled)")
       )
-      sellerScripted = blockchain.hasScript(seller)
+      sellerScripted = blockchain.hasAccountScript(seller)
       _ <- Either.cond(
         smartTradesEnabled || !sellerScripted,
         (),
         GenericError(s"Seller $seller can't participate in ExchangeTransaction because it has assigned Script (SmartAccountsTrades is disabled)")
       )
-      t                     <- enoughVolume(tx, blockchain)
-      buyPriceAssetChange   <- t.buyOrder.getSpendAmount(t.amount, t.price).liftValidationError(tx).map(-_)
-      buyAmountAssetChange  <- t.buyOrder.getReceiveAmount(t.amount, t.price).liftValidationError(tx)
-      sellPriceAssetChange  <- t.sellOrder.getReceiveAmount(t.amount, t.price).liftValidationError(tx)
-      sellAmountAssetChange <- t.sellOrder.getSpendAmount(t.amount, t.price).liftValidationError(tx).map(-_)
+      amountDecimals = if (tx.version < TxVersion.V3) 8 else tx.buyOrder.assetPair.amountAsset.fold(8)(ia => assets(ia).get.decimals)
+      priceDecimals  = if (tx.version < TxVersion.V3) 8 else tx.buyOrder.assetPair.priceAsset.fold(8)(ia => assets(ia).get.decimals)
+      _                     <- isPriceValid(amountDecimals, priceDecimals)
+      tx                    <- enoughVolume(tx, blockchain)
+      buyPriceAssetChange   <- getSpendAmount(tx.buyOrder, amountDecimals, priceDecimals, tx.amount, tx.price).liftValidationError(tx).map(-_)
+      buyAmountAssetChange  <- getReceiveAmount(tx.buyOrder, amountDecimals, priceDecimals, tx.amount, tx.price).liftValidationError(tx)
+      sellPriceAssetChange  <- getReceiveAmount(tx.sellOrder, amountDecimals, priceDecimals, tx.amount, tx.price).liftValidationError(tx)
+      sellAmountAssetChange <- getSpendAmount(tx.sellOrder, amountDecimals, priceDecimals, tx.amount, tx.price).liftValidationError(tx).map(-_)
       scripts = {
         import com.wavesplatform.features.FeatureProvider._
 
-        val addressScripted = Some(tx.sender.toAddress).count(blockchain.hasScript)
+        val addressScripted = Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
 
         // Don't count before Ride4DApps activation
         val ordersScripted = Seq(buyerScripted, sellerScripted)
-          .filter(_ => blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, height))
+          .filter(_ => blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height))
           .count(identity)
 
         assetScripted +
@@ -67,49 +100,46 @@ object ExchangeTransactionDiff {
           ordersScripted
       }
 
-      assetsComplexity =
-        assetIds.toList
-          .flatMap(blockchain.assetScriptWithComplexity)
-          .map(_._2)
+      assetsComplexity = assetIds
+        .flatMap(blockchain.assetScript)
+        .map(_._2)
 
-      accountsComplexity =
-        List(tx.sender.toAddress, buyer, seller)
-          .flatMap(blockchain.accountScriptWithComplexity)
-          .map(_._2)
+      accountsComplexity = List(tx.sender.toAddress, buyer, seller)
+        .flatMap(blockchain.accountScript)
+        .map(_.verifierComplexity)
 
       scriptsComplexity = assetsComplexity.sum + accountsComplexity.sum
     } yield {
 
       def getAssetDiff(asset: Asset, buyAssetChange: Long, sellAssetChange: Long): Map[Address, Portfolio] = {
         Monoid.combine(
-          Map(buyer  → getAssetPortfolio(asset, buyAssetChange)),
-          Map(seller → getAssetPortfolio(asset, sellAssetChange)),
+          Map(buyer  → Portfolio.build(asset, buyAssetChange)),
+          Map(seller → Portfolio.build(asset, sellAssetChange))
         )
       }
 
       val matcherPortfolio =
         Monoid.combineAll(
           Seq(
-            getOrderFeePortfolio(t.buyOrder, t.buyMatcherFee),
-            getOrderFeePortfolio(t.sellOrder, t.sellMatcherFee),
-            wavesPortfolio(-t.fee),
+            getOrderFeePortfolio(tx.buyOrder, tx.buyMatcherFee),
+            getOrderFeePortfolio(tx.sellOrder, tx.sellMatcherFee),
+            Portfolio.waves(-tx.fee)
           )
         )
 
       val feeDiff = Monoid.combineAll(
         Seq(
           Map(matcher -> matcherPortfolio),
-          Map(buyer   -> getOrderFeePortfolio(t.buyOrder, -t.buyMatcherFee)),
-          Map(seller  -> getOrderFeePortfolio(t.sellOrder, -t.sellMatcherFee))
+          Map(buyer   -> getOrderFeePortfolio(tx.buyOrder, -tx.buyMatcherFee)),
+          Map(seller  -> getOrderFeePortfolio(tx.sellOrder, -tx.sellMatcherFee))
         )
       )
 
-      val priceDiff  = getAssetDiff(t.buyOrder.assetPair.priceAsset, buyPriceAssetChange, sellPriceAssetChange)
-      val amountDiff = getAssetDiff(t.buyOrder.assetPair.amountAsset, buyAmountAssetChange, sellAmountAssetChange)
+      val priceDiff  = getAssetDiff(tx.buyOrder.assetPair.priceAsset, buyPriceAssetChange, sellPriceAssetChange)
+      val amountDiff = getAssetDiff(tx.buyOrder.assetPair.amountAsset, buyAmountAssetChange, sellAmountAssetChange)
       val portfolios = Monoid.combineAll(Seq(feeDiff, priceDiff, amountDiff))
 
       Diff(
-        height,
         tx,
         portfolios = portfolios,
         orderFills = Map(
@@ -135,8 +165,8 @@ object ExchangeTransactionDiff {
 
     def isFeeValid(feeTotal: Long, amountTotal: Long, maxfee: Long, maxAmount: Long, order: Order): Boolean = {
       feeTotal <= (order match {
-        case _: OrderV3 => BigInt(maxfee)
-        case _          => BigInt(maxfee) * BigInt(amountTotal) / BigInt(maxAmount)
+        case o: Order if o.version >= Order.V3 => BigInt(maxfee)
+        case _                                 => BigInt(maxfee) * BigInt(amountTotal) / BigInt(maxAmount)
       })
     }
 
@@ -166,12 +196,40 @@ object ExchangeTransactionDiff {
     else Right(exTrans)
   }
 
-  def wavesPortfolio(amt: Long) = Portfolio(amt, LeaseBalance.empty, Map.empty)
+  private[diffs] def getSpendAmount(
+      order: Order,
+      amountDecimals: Int,
+      priceDecimals: Int,
+      matchAmount: Long,
+      matchPrice: Long
+  ): Either[ValidationError, Long] =
+    Try {
+      if (order.orderType == OrderType.SELL) matchAmount
+      else {
+        val spend = (BigDecimal(matchAmount) * matchPrice * BigDecimal(10).pow(priceDecimals - amountDecimals - 8)).toBigInt()
+        if (order.getSpendAssetId == Waves && !(spend + order.matcherFee).isValidLong) {
+          throw new ArithmeticException("BigInteger out of long range")
+        } else spend.bigInteger.longValueExact()
+      }
+    }.toEither.left.map(x => GenericError(x.getMessage))
 
-  def getAssetPortfolio(asset: Asset, amt: Long): Portfolio = {
-    asset.fold(wavesPortfolio(amt))(assetId => Portfolio(0, LeaseBalance.empty, Map(assetId -> amt)))
-  }
+  private[diffs] def getReceiveAmount(
+      order: Order,
+      amountDecimals: Int,
+      priceDecimals: Int,
+      matchAmount: Long,
+      matchPrice: Long
+  ): Either[ValidationError, Long] =
+    Try {
+      if (order.orderType == OrderType.BUY) matchAmount
+      else {
+        (BigDecimal(matchAmount) * matchPrice * BigDecimal(10).pow(priceDecimals - amountDecimals - 8)).toBigInt().bigInteger.longValueExact()
+      }
+    }.toEither.left.map(x => GenericError(x.getMessage))
 
-  /*** Calculates fee portfolio from the order (taking into account that in OrderV3 fee can be paid in asset != Waves) */
-  def getOrderFeePortfolio(order: Order, fee: Long): Portfolio = getAssetPortfolio(order.matcherFeeAssetId, fee)
+  /**
+    * Calculates fee portfolio from the order (taking into account that in OrderV3 fee can be paid in asset != Waves)
+    */
+  private[diffs] def getOrderFeePortfolio(order: Order, fee: Long): Portfolio =
+    Portfolio.build(order.matcherFeeAssetId, fee)
 }

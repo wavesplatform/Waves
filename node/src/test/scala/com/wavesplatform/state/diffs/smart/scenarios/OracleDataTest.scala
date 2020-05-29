@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs.smart.scenarios
 import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.Global.MaxBase58Bytes
 import com.wavesplatform.lang.directives.values._
@@ -17,19 +18,19 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Proofs}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class OracleDataTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class OracleDataTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
   val preconditions
-    : Gen[(GenesisTransaction, GenesisTransaction, CreateAliasTransaction, SetScriptTransaction, DataTransaction, TransferTransactionV2)] =
+    : Gen[(GenesisTransaction, GenesisTransaction, CreateAliasTransaction, SetScriptTransaction, DataTransaction, TransferTransaction)] =
     for {
       master <- accountGen
       oracle <- accountGen
       alice  <- accountGen
       ts     <- positiveIntGen
-      genesis  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      genesis2 = GenesisTransaction.create(oracle, ENOUGH_AMT, ts).explicitGet()
+      genesis  = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+      genesis2 = GenesisTransaction.create(oracle.toAddress, ENOUGH_AMT, ts).explicitGet()
       alias           <- aliasGen
       createAlias     <- createAliasGen(oracle, alias, 400000, System.currentTimeMillis())
       long            <- longEntryGen(dataAsciiKeyGen)
@@ -51,7 +52,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
                                    |   let oracle = Alias("${alias.name}")
                                    |   let long = extract(getInteger(oracle,"${long.key}")) == ${long.value}
                                    |   let bool = extract(getBoolean(oracle,"${bool.key}")) == ${bool.value}
-                                   |   let bin = extract(getBinary(oracle,"${bin.key}")) == base58'${bin.value.base58}'
+                                   |   let bin = extract(getBinary(oracle,"${bin.key}")) == base58'${bin.value.toString}'
                                    |   let str = extract(getString(oracle,"${str.key}")) == "${str.value}"
                                    |   long && bool && bin && str
                                    |}""".stripMargin
@@ -61,7 +62,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with Matchers with Tra
           ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedAllFieldsRequiredScript).explicitGet()._1
         selfSignedSetScriptTransactionGenP(master, ExprScript(typedAllFieldsRequiredScript).explicitGet())
       }
-      transferFromScripted <- versionedTransferGenP(master, alice, Proofs.empty)
+      transferFromScripted <- versionedTransferGenP(master.publicKey, alice.toAddress, Proofs.empty)
 
     } yield (genesis, genesis2, createAlias, setScript, dataTransaction, transferFromScripted)
 

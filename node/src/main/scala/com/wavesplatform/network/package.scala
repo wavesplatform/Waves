@@ -4,6 +4,9 @@ import java.net.{InetSocketAddress, SocketAddress, URI}
 import java.util.concurrent.Callable
 
 import cats.Eq
+import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture, ChannelMatcher}
 import io.netty.channel.local.LocalAddress
@@ -11,13 +14,10 @@ import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.channel.{Channel, ChannelHandlerContext}
 import io.netty.util.NetUtil.toSocketAddressString
 import io.netty.util.concurrent.{EventExecutorGroup, ScheduledFuture}
+import kamon.Kamon
 import monix.eval.Coeval
 import monix.execution.Scheduler
 import monix.reactive.Observable
-import com.wavesplatform.block.Block
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.transaction.Transaction
-import kamon.Kamon
 
 import scala.concurrent.duration._
 
@@ -50,7 +50,7 @@ package object network extends ScorexLogging {
   def id(chan: Channel, prefix: String = ""): String =
     if (chan == null) "???" else s"[$prefix${chan.id().asShortText()}${formatAddress(chan.remoteAddress())}]"
 
-  def formatBlocks(blocks: Seq[Block]): String = formatSignatures(blocks.view.map(_.uniqueId))
+  def formatBlocks(blocks: Seq[Block]): String = formatSignatures(blocks.view.map(_.id()))
 
   def formatSignatures(signatures: Seq[ByteStr]): String =
     if (signatures.isEmpty) "[Empty]"
@@ -73,7 +73,7 @@ package object network extends ScorexLogging {
 
     def broadcast(message: AnyRef, except: Set[Channel]): ChannelGroupFuture = {
       logBroadcast(message, except)
-      val st = broadcastTimeStats.refine("object", message.getClass.getSimpleName).start()
+      val st = broadcastTimeStats.withTag("object", message.getClass.getSimpleName).start()
       allChannels
         .writeAndFlush(message, { (channel: Channel) =>
           !except.contains(channel)
@@ -95,15 +95,22 @@ package object network extends ScorexLogging {
       allChannels.flush(channelMatcher)
     }
 
-    def broadcastTx(tx: Transaction, except: Option[Channel] = None): Unit = allChannels.broadcast(RawBytes.from(tx), except)
+    def broadcastTx(tx: Transaction, except: Option[Channel] = None): Unit = allChannels.broadcast(RawBytes.fromTransaction(tx), except)
 
-    def broadcastTx(txs: Seq[Transaction]): Unit = allChannels.broadcastMany(txs.map(RawBytes.from))
+    def broadcastTx(txs: Seq[Transaction]): Unit = allChannels.broadcastMany(txs.map(RawBytes.fromTransaction))
 
     private def logBroadcast(message: AnyRef, except: Set[Channel]): Unit = message match {
-      case RawBytes(TransactionSpec.messageCode, _) =>
+      case RawBytes(TransactionSpec.messageCode | PBTransactionSpec.messageCode, _) =>
       case _ =>
-        val exceptMsg = if (except.isEmpty) "" else s" (except ${except.map(id(_)).mkString(", ")})"
-        log.trace(s"Broadcasting $message to ${allChannels.size()} channels$exceptMsg")
+        log.trace {
+          val exceptMsg = if (except.isEmpty) "" else s" (except ${except.map(id(_)).mkString(", ")})"
+          val msgString = message match {
+            case t: Transaction => s"transaction ${t.id()}"
+            case BlockForged(b) => s"block ${b.id()}"
+            case other          => other.toString
+          }
+          s"Broadcasting $msgString to ${allChannels.size()} channels$exceptMsg"
+        }
     }
   }
 

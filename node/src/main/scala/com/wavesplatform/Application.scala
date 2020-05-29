@@ -14,17 +14,21 @@ import cats.syntax.option._
 import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
+import com.wavesplatform.api.BlockMeta
+import com.wavesplatform.api.common._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.AliasApiRoute
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.database.{DBExt, Keys, openDB}
+import com.wavesplatform.events.{BlockchainUpdateTriggersImpl, BlockchainUpdated, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.api.ActivationApiRoute
-import com.wavesplatform.history.StorageFactory
+import com.wavesplatform.history.{History, StorageFactory}
 import com.wavesplatform.http.{DebugApiRoute, NodeApiRoute}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.Metrics
@@ -32,10 +36,10 @@ import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.Schedulers._
 import com.wavesplatform.utils._
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
@@ -45,13 +49,12 @@ import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.HashedWheelTimer
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
-import kamon.influxdb.InfluxDBReporter
-import kamon.system.SystemMetrics
 import monix.eval.{Coeval, Task}
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.influxdb.dto.Point
+import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -63,6 +66,7 @@ import scala.util.control.NonFatal
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject, time: NTP) extends ScorexLogging {
   app =>
 
+  import Application._
   import monix.execution.Scheduler.Implicits.{global => scheduler}
 
   private val db = openDB(settings.dbSettings.directory)
@@ -70,8 +74,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val LocalScoreBroadcastDebounce = 1.second
 
   private val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Asset)]
-
-  private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged)
 
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
 
@@ -99,6 +101,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val historyRepliesScheduler         = fixedPool(poolSize = 2, "history-replier", reporter = log.error("Error in History Replier", _))
   private val minerScheduler                  = fixedPool(poolSize = 2, "miner-pool", reporter = log.error("Error in Miner", _))
 
+  private val blockchainUpdatesScheduler = singleThread("blockchain-updates", reporter = log.error("Error on sending blockchain updates", _))
+  private val blockchainUpdated          = ConcurrentSubject.publish[BlockchainUpdated](scheduler)
+  private val utxEvents                  = ConcurrentSubject.publish[UtxEvent](scheduler)
+  private val blockchainUpdateTriggers   = new BlockchainUpdateTriggersImpl(blockchainUpdated)
+
+  private val (blockchainUpdater, levelDB) = StorageFactory(settings, db, time, spendableBalanceChanged, blockchainUpdateTriggers)
+
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
   private var maybeUtx: Option[UtxPool]                                        = None
   private var maybeNetwork: Option[NS]                                         = None
@@ -113,7 +122,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   }
 
   def run(): Unit = {
-    checkGenesis(settings, blockchainUpdater)
+    // initialization
+    implicit val as: ActorSystem                 = actorSystem
+    implicit val materializer: ActorMaterializer = ActorMaterializer()
 
     if (wallet.privateKeyAccounts.isEmpty)
       wallet.generateNewAccounts(1)
@@ -121,8 +132,34 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val utxStorage =
-      new UtxPoolImpl(time, blockchainUpdater, spendableBalanceChanged, settings.utxSettings, enablePriorityPool = settings.minerSettings.enable)
+      new UtxPoolImpl(
+        time,
+        blockchainUpdater,
+        spendableBalanceChanged,
+        settings.utxSettings,
+        enablePriorityPool = settings.minerSettings.enable,
+        utxEvents.onNext
+      )
     maybeUtx = Some(utxStorage)
+
+    val timer                 = new HashedWheelTimer()
+    val utxSynchronizerLogger = LoggerFacade(LoggerFactory.getLogger(classOf[UtxPoolSynchronizerImpl]))
+    val utxSynchronizerScheduler =
+      Schedulers.timeBoundedFixedPool(
+        timer,
+        5.seconds,
+        settings.synchronizationSettings.utxSynchronizer.maxThreads,
+        "utx-pool-synchronizer",
+        reporter = utxSynchronizerLogger.trace("Uncaught exception in UTX Synchronizer", _)
+      )
+    val utxSynchronizer =
+      UtxPoolSynchronizer(
+        utxStorage,
+        settings.synchronizationSettings.utxSynchronizer,
+        allChannels,
+        blockchainUpdater.lastBlockInfo,
+        utxSynchronizerScheduler
+      )
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
 
@@ -154,9 +191,65 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         allChannels.broadcast(LocalScoreChanged(x))
       }(scheduler)
 
-    val historyReplier = new HistoryReplier(blockchainUpdater, settings.synchronizationSettings, historyRepliesScheduler)
+    val history = History(blockchainUpdater, blockchainUpdater.liquidBlock, blockchainUpdater.microBlock, db)
+
+    val historyReplier = new HistoryReplier(blockchainUpdater.score, history, settings.synchronizationSettings)(historyRepliesScheduler)
+
+    def rollbackTask(blockId: ByteStr, returnTxsToUtx: Boolean) =
+      Task(blockchainUpdater.removeAfter(blockId))
+        .executeOn(appenderScheduler)
+        .asyncBoundary
+        .map {
+          case Right(discardedBlocks) =>
+            allChannels.broadcast(LocalScoreChanged(blockchainUpdater.score))
+            if (returnTxsToUtx) utxStorage.addAndCleanup(discardedBlocks.view.flatMap(_._1.transactionData))
+            miner.scheduleMining()
+            Right(discardedBlocks)
+          case Left(error) => Left(error)
+        }
+
+    // Extensions start
+    val extensionContext: Context = new Context {
+      override def settings: WavesSettings                                                       = app.settings
+      override def blockchain: Blockchain                                                        = app.blockchainUpdater
+      override def rollbackTo(blockId: ByteStr): Task[Either[ValidationError, DiscardedBlocks]]  = rollbackTask(blockId, returnTxsToUtx = false)
+      override def time: Time                                                                    = app.time
+      override def wallet: Wallet                                                                = app.wallet
+      override def utx: UtxPool                                                                  = utxStorage
+      override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] = utxSynchronizer.publish(tx)
+      override def spendableBalanceChanged: Observable[(Address, Asset)]                         = app.spendableBalanceChanged
+      override def actorSystem: ActorSystem                                                      = app.actorSystem
+      override def utxEvents: Observable[UtxEvent]                                               = app.utxEvents
+      override def blockchainUpdated: Observable[BlockchainUpdated]                              = app.blockchainUpdated
+
+      override val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
+        blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
+        db,
+        blockchainUpdater,
+        utxStorage,
+        wallet,
+        utxSynchronizer.publish,
+        loadBlockAt(db, blockchainUpdater)
+      )
+      override val blocksApi: CommonBlocksApi     = CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockAt(db, blockchainUpdater))
+      override val accountsApi: CommonAccountsApi = CommonAccountsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
+      override val assetsApi: CommonAssetsApi     = CommonAssetsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
+    }
+
+    extensions = settings.extensions.map { extensionClassName =>
+      val extensionClass = Class.forName(extensionClassName).asInstanceOf[Class[Extension]]
+      val ctor           = extensionClass.getConstructor(classOf[Context])
+      log.info(s"Enable extension: $extensionClassName")
+      ctor.newInstance(extensionContext)
+    }
+    extensions.foreach(_.start())
+
+    // Node start
+    // After this point, node actually starts doing something
+    checkGenesis(settings, blockchainUpdater)
+
     val network =
-      NetworkServer(settings, lastBlockInfo, blockchainUpdater, historyReplier, utxStorage, peerDatabase, allChannels, establishedConnections)
+      NetworkServer(settings, lastBlockInfo, historyReplier, utxStorage, peerDatabase, allChannels, establishedConnections)
     maybeNetwork = Some(network)
     val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions) = network.messages
 
@@ -200,25 +293,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     rxExtensionLoaderShutdown = Some(sh)
 
-    val utxSynchronizerLogger = LoggerFacade(LoggerFactory.getLogger(classOf[UtxPoolSynchronizerImpl]))
-    val timer                 = new HashedWheelTimer()
-    val utxSynchronizerScheduler =
-      Schedulers.timeBoundedFixedPool(
-        timer,
-        5.seconds,
-        settings.synchronizationSettings.utxSynchronizer.maxThreads,
-        "utx-pool-synchronizer",
-        reporter = utxSynchronizerLogger.trace("Uncaught exception in UTX Synchronizer", _)
-      )
-    val utxSynchronizer =
-      UtxPoolSynchronizer(
-        utxStorage,
-        settings.synchronizationSettings.utxSynchronizer,
-        allChannels,
-        blockchainUpdater.lastBlockInfo,
-        utxSynchronizerScheduler
-      )
-
     transactions.foreach {
       case (channel, transaction) => utxSynchronizer.tryPublish(transaction, channel)
     }
@@ -239,28 +313,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       upnp.addPort(addr.getPort)
     }
 
-    implicit val as: ActorSystem                 = actorSystem
-    implicit val materializer: ActorMaterializer = ActorMaterializer()
-
-    val extensionContext = new Context {
-      override def settings: WavesSettings = app.settings
-      override def blockchain: Blockchain  = app.blockchainUpdater
-      override def time: Time              = app.time
-      override def wallet: Wallet          = app.wallet
-      override def utx: UtxPool            = utxStorage
-
-      override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] = utxSynchronizer.publish(tx)
-      override def spendableBalanceChanged: Observable[(Address, Asset)]                         = app.spendableBalanceChanged
-      override def actorSystem: ActorSystem                                                      = app.actorSystem
-    }
-
-    extensions = settings.extensions.map { extensionClassName =>
-      val extensionClass = Class.forName(extensionClassName).asInstanceOf[Class[Extension]]
-      val ctor           = extensionClass.getConstructor(classOf[Context])
-      log.info(s"Enable extension: $extensionClassName")
-      ctor.newInstance(extensionContext)
-    }
-
+    // API start
     if (settings.restAPISettings.enable) {
       if (settings.restAPISettings.apiKeyHash == "H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu") {
         log.error(
@@ -288,33 +341,32 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
-        BlocksApiRoute(settings.restAPISettings, blockchainUpdater),
-        TransactionsApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxStorage, utxSynchronizer, time),
+        BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi),
+        TransactionsApiRoute(
+          settings.restAPISettings,
+          extensionContext.transactionsApi,
+          wallet,
+          blockchainUpdater,
+          () => utxStorage.size,
+          utxSynchronizer,
+          time
+        ),
         NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater),
         WalletApiRoute(settings.restAPISettings, wallet),
-        UtilsApiRoute(time, settings.restAPISettings, blockchainUpdater.estimator, limitedScheduler),
+        UtilsApiRoute(time, settings.restAPISettings, blockchainUpdater.estimator, limitedScheduler, blockchainUpdater),
         PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
-        AddressApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time, limitedScheduler),
+        AddressApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time, limitedScheduler, extensionContext.accountsApi),
         DebugApiRoute(
           settings,
           time,
           blockchainUpdater,
           wallet,
-          blockchainUpdater,
+          extensionContext.accountsApi,
+          extensionContext.transactionsApi,
+          extensionContext.assetsApi,
           peerDatabase,
           establishedConnections,
-          (blockId, returnTxsToUtx) =>
-            Task(blockchainUpdater.removeAfter(blockId))
-              .executeOn(appenderScheduler)
-              .asyncBoundary
-              .map {
-                case Right(discardedBlocks) =>
-                  allChannels.broadcast(LocalScoreChanged(blockchainUpdater.score))
-                  if (returnTxsToUtx) utxStorage.addAndCleanup(discardedBlocks.view.flatMap(_.transactionData))
-                  miner.scheduleMining()
-                  Right(())
-                case Left(error) => Left(error)
-              },
+          (id, returnTxs) => rollbackTask(id, returnTxs).map(_.map(_ => ())),
           utxStorage,
           miner,
           historyReplier,
@@ -324,10 +376,18 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           configRoot,
           loadBalanceHistory
         ),
-        AssetsApiRoute(settings.restAPISettings, wallet, utxSynchronizer, blockchainUpdater, time),
+        AssetsApiRoute(
+          settings.restAPISettings,
+          wallet,
+          utxSynchronizer,
+          blockchainUpdater,
+          time,
+          extensionContext.accountsApi,
+          extensionContext.assetsApi
+        ),
         ActivationApiRoute(settings.restAPISettings, settings.featuresSettings, blockchainUpdater),
-        LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time),
-        AliasApiRoute(settings.restAPISettings, wallet, utxSynchronizer, time, blockchainUpdater),
+        LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time, extensionContext.accountsApi),
+        AliasApiRoute(settings.restAPISettings, extensionContext.transactionsApi, wallet, utxSynchronizer, time, blockchainUpdater),
         RewardApiRoute(blockchainUpdater)
       )
 
@@ -336,8 +396,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       serverBinding = Await.result(httpFuture, 20.seconds)
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
     }
-
-    extensions.foreach(_.start())
 
     // on unexpected shutdown
     sys.addShutdownHook {
@@ -379,10 +437,16 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       log.info("Stopping network services")
       network.shutdown()
 
+      blockchainUpdated.onComplete()
+
+      shutdownAndWait(blockchainUpdatesScheduler, "BlockchainUpdated")
       shutdownAndWait(minerScheduler, "Miner")
       shutdownAndWait(microblockSynchronizerScheduler, "MicroblockSynchronizer")
       shutdownAndWait(scoreObserverScheduler, "ScoreObserver")
       shutdownAndWait(extensionLoaderScheduler, "ExtensionLoader")
+
+      appenderScheduler.execute(() => levelDB.close())
+
       shutdownAndWait(appenderScheduler, "Appender", 5.minutes.some, tryForce = false)
 
       log.info("Closing storage")
@@ -429,17 +493,27 @@ object Application {
     //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
     Kamon.reconfigure(config)
     sys.addShutdownHook { () =>
-      Kamon.stopAllReporters()
+      Try(Await.result(Kamon.stopModules(), 30 seconds))
       Metrics.shutdown()
     }
 
     if (config.getBoolean("kamon.enable")) {
-      Kamon.addReporter(new InfluxDBReporter())
-      SystemMetrics.startCollecting()
+      Kamon.loadModules()
     }
 
     settings
   }
+
+  private[wavesplatform] def loadBlockAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[(BlockMeta, Seq[Transaction])] =
+    loadBlockMetaAt(db, blockchainUpdater)(height).map { meta =>
+      meta -> blockchainUpdater
+        .liquidBlock(meta.id)
+        .orElse(db.readOnly(ro => database.loadBlock(Height(height), ro)))
+        .fold(Seq.empty[Transaction])(_.transactionData)
+    }
+
+  private[wavesplatform] def loadBlockMetaAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] =
+    blockchainUpdater.liquidBlockMeta.filter(_ => blockchainUpdater.height == height).orElse(db.get(Keys.blockMetaAt(Height(height))))
 
   def main(args: Array[String]): Unit = {
 
@@ -474,28 +548,26 @@ object Application {
       SystemInformationReporter.report(settings.config)
     }
 
-    val time             = new NTP(settings.ntpServer)
-    val isMetricsStarted = Metrics.start(settings.metrics, time)
+    val time = new NTP(settings.ntpServer)
+    Metrics.start(settings.metrics, time)
+
+    def dumpMinerConfig(): Unit = {
+      import settings.synchronizationSettings.microBlockSynchronizer
+      import settings.{minerSettings => miner}
+
+      Metrics.write(
+        Point
+          .measurement("config")
+          .addField("miner-micro-block-interval", miner.microBlockInterval.toMillis)
+          .addField("miner-max-transactions-in-micro-block", miner.maxTransactionsInMicroBlock)
+          .addField("miner-min-micro-block-age", miner.minMicroBlockAge.toMillis)
+          .addField("mbs-wait-response-timeout", microBlockSynchronizer.waitResponseTimeout.toMillis)
+      )
+    }
 
     RootActorSystem.start("wavesplatform", settings.config) { actorSystem =>
-      isMetricsStarted.foreach { started =>
-        if (started) {
-          import settings.synchronizationSettings.microBlockSynchronizer
-          import settings.{minerSettings => miner}
-
-          Metrics.write(
-            Point
-              .measurement("config")
-              .addField("miner-micro-block-interval", miner.microBlockInterval.toMillis)
-              .addField("miner-max-transactions-in-micro-block", miner.maxTransactionsInMicroBlock)
-              .addField("miner-min-micro-block-age", miner.minMicroBlockAge.toMillis)
-              .addField("mbs-wait-response-timeout", microBlockSynchronizer.waitResponseTimeout.toMillis)
-          )
-        }
-      }
-
+      dumpMinerConfig()
       log.info(s"${Constants.AgentName} Blockchain Id: ${settings.blockchainSettings.addressSchemeCharacter}")
-
       new Application(actorSystem, settings, settings.config.root(), time).run()
     }
   }

@@ -2,14 +2,12 @@ package com.wavesplatform.network
 import java.util.concurrent.CountDownLatch
 
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.SynchronizationSettings.UtxSynchronizerSettings
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Schedulers
-import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.util.HashedWheelTimer
 import monix.execution.atomic.AtomicInt
 import monix.reactive.Observable
@@ -27,8 +25,7 @@ class UtxPoolSynchronizerSpec extends FreeSpec with Matchers with BeforeAndAfter
 
     def countTransactions(tx: Transaction): TracedResult[ValidationError, Boolean] = {
       if (counter.getAndDecrement() > 5)
-        while (!Thread.currentThread().isInterrupted) {}
-      else
+        while (!Thread.currentThread().isInterrupted) {} else
         latch.countDown()
 
       TracedResult(Right(true))
@@ -36,7 +33,7 @@ class UtxPoolSynchronizerSpec extends FreeSpec with Matchers with BeforeAndAfter
 
     "accepts only those transactions from network which can be validated quickly" in withUPS(countTransactions) { ups =>
       1 to 10 foreach { i =>
-        ups.tryPublish(GenesisTransaction.create(PublicKey(Array.emptyByteArray), i * 10L, 0L).explicitGet(), new EmbeddedChannel)
+        ups.publish(GenesisTransaction.create(PublicKey(new Array[Byte](32)).toAddress, i * 10L, 0L).explicitGet())
       }
       latch.await()
       counter.get() shouldEqual 0

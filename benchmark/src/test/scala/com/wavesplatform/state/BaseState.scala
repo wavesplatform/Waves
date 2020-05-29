@@ -9,7 +9,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{DBSettings, FunctionalitySettings}
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
@@ -18,8 +18,6 @@ import monix.reactive.Observer
 import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations.{Setup, TearDown}
 import org.scalacheck.{Arbitrary, Gen}
-
-import scala.concurrent.duration._
 
 trait BaseState {
   import BaseState._
@@ -33,7 +31,7 @@ trait BaseState {
   }
 
   private val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)
-  val state: LevelDBWriter     = TestLevelDB.withFunctionalitySettings(db, portfolioChanges, fsSettings, DBSettings("", false, false, 100000, 2000, (120 * 60 * 1000).millis))
+  val state: LevelDBWriter     = TestLevelDB.withFunctionalitySettings(db, portfolioChanges, fsSettings)
 
   private var _richAccount: KeyPair = _
   def richAccount: KeyPair          = _richAccount
@@ -52,31 +50,31 @@ trait BaseState {
   private def genBlock(base: Block, sender: KeyPair): Gen[Block] =
     for {
       transferTxs <- Gen.sequence[Vector[Transaction], Transaction]((1 to TxsInBlock).map { i =>
-        txGenP(sender, base.timestamp + i)
+        txGenP(sender, base.header.timestamp + i)
       })
     } yield
       TestBlock.create(
         time = transferTxs.last.timestamp,
-        ref = base.uniqueId,
+        ref = base.id(),
         txs = transferTxs
       )
 
   private val initGen: Gen[(KeyPair, Block)] = for {
     rich <- accountGen
   } yield {
-    val genesisTx = GenesisTransaction.create(rich, waves(100000000L), System.currentTimeMillis() - 10000).explicitGet()
+    val genesisTx = GenesisTransaction.create(rich.toAddress, waves(100000000L), System.currentTimeMillis() - 10000).explicitGet()
     (rich, TestBlock.create(time = genesisTx.timestamp, Seq(genesisTx)))
   }
 
   protected def nextBlock(txs: Seq[Transaction]): Block = TestBlock.create(
     time = txs.last.timestamp,
-    ref = lastBlock.uniqueId,
+    ref = lastBlock.id(),
     txs = txs
   )
 
   private def append(prev: Option[Block], next: Block): Unit = {
     val preconditionDiff = BlockDiffer.fromBlock(state, prev, next, MiningConstraint.Unlimited).explicitGet().diff
-    state.append(preconditionDiff, 0, 0, None, next)
+    state.append(preconditionDiff, 0, 0, None, next.header.generationSignature, next)
   }
 
   def applyBlock(b: Block): Unit = {

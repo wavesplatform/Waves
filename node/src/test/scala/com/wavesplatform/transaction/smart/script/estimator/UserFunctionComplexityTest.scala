@@ -22,7 +22,7 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
-  private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(null))
+  private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(null), DirectiveSet.contractDirectiveSet, ByteStr.empty)
 
   private def estimate(expr: EXPR, ctx: CTX[Environment], funcCosts: Map[FunctionHeader, Coeval[Long]]): Either[String, Long] = {
     estimator(ctx.evaluationContext(environment).letDefs.keySet, funcCosts, expr)
@@ -211,7 +211,7 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
     est(exprUNot).explicitGet() shouldBe 2
 
     val exprDataByIndex = LET_BLOCK(
-      LET("arr", FUNCTION_CALL(PureContext.listConstructor, List(CONST_STRING("str_1").explicitGet(), REF("nil")))),
+      LET("arr", FUNCTION_CALL(PureContext.listConstructor(checkSize = false), List(CONST_STRING("str_1").explicitGet(), REF("nil")))),
       FUNCTION_CALL(User("getString"), List(REF("arr"), CONST_LONG(0)))
     )
     est(exprDataByIndex).explicitGet() shouldBe 43

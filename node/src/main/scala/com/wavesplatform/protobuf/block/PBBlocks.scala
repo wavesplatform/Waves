@@ -1,65 +1,56 @@
 package com.wavesplatform.protobuf.block
-import cats.instances.all._
-import cats.syntax.traverse._
+
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressScheme, PublicKey}
-import com.wavesplatform.block.SignerData
+import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
-import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.transaction.{PBTransactions, VanillaTransaction}
-import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.protobuf.block.Block.{Header => PBHeader}
+import com.wavesplatform.protobuf.transaction.PBTransactions
+
+import scala.util.Try
 
 object PBBlocks {
-  def vanilla(block: PBBlock, unsafe: Boolean = false): Either[ValidationError, VanillaBlock] = {
-    def create(version: Int,
-               timestamp: Long,
-               reference: ByteStr,
-               consensusData: NxtLikeConsensusBlockData,
-               transactionData: Seq[VanillaTransaction],
-               featureVotes: Set[Short],
-               rewardVote: Long,
-               generator: PublicKey,
-               signature: ByteStr): VanillaBlock = {
-      VanillaBlock(timestamp, version.toByte, reference, SignerData(generator, signature), consensusData, transactionData, featureVotes, rewardVote)
-    }
+  def vanilla(header: PBBlock.Header): BlockHeader =
+    BlockHeader(
+      header.version.toByte,
+      header.timestamp,
+      ByteStr(header.reference.toByteArray),
+      header.baseTarget,
+      ByteStr(header.generationSignature.toByteArray),
+      PublicKey(header.generator.toByteArray),
+      header.featureVotes.map(_.toShort),
+      header.rewardVote,
+      ByteStr(header.transactionsRoot.toByteArray)
+    )
 
-    for {
-      header       <- block.header.toRight(GenericError("No block header"))
-      transactions <- block.transactions.map(PBTransactions.vanilla(_, unsafe)).toVector.sequence
-      result = create(
-        header.version,
-        header.timestamp,
-        ByteStr(header.reference.toByteArray),
-        NxtLikeConsensusBlockData(header.baseTarget, ByteStr(header.generationSignature.toByteArray)),
-        transactions,
-        header.featureVotes.map(intToShort).toSet,
-        header.rewardVote,
-        PublicKey(header.generator.toByteArray),
-        ByteStr(block.signature.toByteArray)
-      )
-    } yield result
+  def vanilla(block: PBBlock, unsafe: Boolean = false): Try[VanillaBlock] = Try {
+    require(block.header.isDefined, "block header is missing")
+    val header       = block.getHeader
+    val transactions = block.transactions.map(PBTransactions.vanilla(_, unsafe).explicitGet())
+
+    VanillaBlock(vanilla(header), ByteStr(block.signature.toByteArray), transactions)
   }
+
+  def protobuf(header: BlockHeader): PBHeader = PBBlock.Header(
+    AddressScheme.current.chainId,
+    ByteString.copyFrom(header.reference.arr),
+    header.baseTarget,
+    ByteString.copyFrom(header.generationSignature.arr),
+    header.featureVotes.map(_.toInt),
+    header.timestamp,
+    header.version,
+    ByteString.copyFrom(header.generator.arr),
+    header.rewardVote,
+    ByteString.copyFrom(header.transactionsRoot.arr)
+  )
 
   def protobuf(block: VanillaBlock): PBBlock = {
     import block._
-    import consensusData._
-    import signerData._
 
     new PBBlock(
-      Some(
-        PBBlock.Header(
-          AddressScheme.current.chainId,
-          ByteString.copyFrom(reference),
-          baseTarget,
-          ByteString.copyFrom(generationSignature),
-          featureVotes.map(shortToInt).toSeq,
-          timestamp,
-          version,
-          ByteString.copyFrom(generator),
-          rewardVote
-        )),
-      ByteString.copyFrom(signature),
+      Some(protobuf(header)),
+      ByteString.copyFrom(block.signature.arr),
       transactionData.map(PBTransactions.protobuf)
     )
   }
@@ -78,14 +69,5 @@ object PBBlocks {
       _.header.chainId := chainId,
       _.transactions.foreach(_.transaction.chainId := chainId)
     )
-  }
-
-  private[this] def shortToInt(s: Short): Int = {
-    java.lang.Short.toUnsignedInt(s)
-  }
-
-  private[this] def intToShort(int: Int): Short = {
-    require(int >= 0 && int <= 65535, s"Short overflow: $int")
-    int.toShort
   }
 }

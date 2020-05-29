@@ -6,54 +6,71 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values.{Account, Asset, Expression}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, TRUE}
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, _}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.smart.{BlockchainContext, RealTransactionWrapper, Verifier}
+import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import com.wavesplatform.transaction.{Authorized, Proven}
 import monix.eval.Coeval
 
 object ScriptRunner {
-  type TxOrd = BlockchainContext.In
+  type TxOrd         = BlockchainContext.In
 
-  def apply(height: Int,
-            in: TxOrd,
-            blockchain: Blockchain,
-            script: Script,
-            isAssetScript: Boolean,
-            scriptContainerAddress: ByteStr): (Log[Id], Either[ExecutionError, EVALUATED]) = {
+  def apply(
+      in: TxOrd,
+      blockchain: Blockchain,
+      script: Script,
+      isAssetScript: Boolean,
+      scriptContainerAddress: ByteStr
+  ): (Log[Id], Either[ExecutionError, EVALUATED]) =
     script match {
       case s: ExprScript =>
-        val ctx = BlockchainContext.build(
-          script.stdLibVersion,
-          AddressScheme.current.chainId,
-          Coeval.evalOnce(in),
-          Coeval.evalOnce(height),
-          blockchain,
-          isAssetScript,
-          false,
-          Coeval(scriptContainerAddress)
-        )
-        EvaluatorV1().applyWithLogging[EVALUATED](ctx, s.expr)
+        val evalCtx = for {
+          ds <- DirectiveSet(script.stdLibVersion, if (isAssetScript) Asset else Account, Expression)
+          mi <- buildThisValue(in, blockchain, ds, Some(scriptContainerAddress))
+          ctx <- BlockchainContext.build(
+            script.stdLibVersion,
+            AddressScheme.current.chainId,
+            Coeval.evalOnce(mi),
+            Coeval.evalOnce(blockchain.height),
+            blockchain,
+            isAssetScript,
+            isContract = false,
+            Coeval(scriptContainerAddress),
+            in.eliminate(_.id(), _ => ByteStr.empty)
+          )
+        } yield ctx
+        EvaluatorV1().applyWithLogging[EVALUATED](evalCtx, s.expr)
       case ContractScript.ContractScriptImpl(_, DApp(_, decls, _, Some(vf))) =>
-        val ctx = BlockchainContext.build(
-          script.stdLibVersion,
-          AddressScheme.current.chainId,
-          Coeval.evalOnce(in),
-          Coeval.evalOnce(height),
-          blockchain,
-          isAssetScript,
-          true,
-          Coeval(scriptContainerAddress)
-        )
-        val evalContract = in.eliminate(
-          t => ContractEvaluator.verify(decls, vf, RealTransactionWrapper.apply(t)),
-          _.eliminate(t => ContractEvaluator.verify(decls, vf, RealTransactionWrapper.ord(t)), _ => ???)
-        )
-        EvaluatorV1().evalWithLogging(ctx, evalContract)
+        val r = for {
+          ds <- DirectiveSet(script.stdLibVersion, if (isAssetScript) Asset else Account, Expression)
+          mi <- buildThisValue(in, blockchain, ds, None)
+          entity_txId <- in.eliminate(
+            t => RealTransactionWrapper(t, blockchain, ds.stdLibVersion, DAppTarget).map(ContractEvaluator.verify(decls, vf, _) -> t.id()),
+            _.eliminate(
+              t => ContractEvaluator.verify(decls, vf, RealTransactionWrapper.ord(t)).asRight[ExecutionError].map(_ -> ByteStr.empty),
+              _ => ???
+            )
+          )
+          ctx <- BlockchainContext.build(
+            script.stdLibVersion,
+            AddressScheme.current.chainId,
+            Coeval.evalOnce(mi),
+            Coeval.evalOnce(blockchain.height),
+            blockchain,
+            isAssetScript,
+            isContract = true,
+            Coeval(scriptContainerAddress),
+            entity_txId._2
+          )
+        } yield EvaluatorV1().evalWithLogging(ctx, entity_txId._1)
+
+        r.fold(e => (Nil, e.asLeft[EVALUATED]), identity)
 
       case ContractScript.ContractScriptImpl(_, DApp(_, _, _, None)) =>
         val t: Proven with Authorized =
@@ -62,7 +79,6 @@ object ScriptRunner {
           case Right(_)                => Right(TRUE)
           case Left(GenericError(err)) => Left(err)
         })
-      case _ => (List.empty, "Unsupported script version".asLeft[EVALUATED])
+      case other => (List.empty, s"$other: Unsupported script version".asLeft[EVALUATED])
     }
-  }
 }

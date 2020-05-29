@@ -1,23 +1,26 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.serialization.{BytesSerializable, JsonSerializable}
-import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import monix.eval.Coeval
-import play.api.libs.json.Json
+import play.api.libs.json.JsObject
 
-trait Transaction extends BytesSerializable with JsonSerializable {
+trait Transaction {
   val id: Coeval[ByteStr]
 
+  def typeId: Byte = builder.typeId
   def builder: TransactionParser
   def assetFee: (Asset, Long)
   def timestamp: Long
-  def chainByte: Option[Byte] = None
+  def chainId: Byte
+
+  def bytesSize: Int         = bytes().length
+  val protoSize: Coeval[Int] = Coeval(PBTransactions.protobuf(this).serializedSize)
+  val bytes: Coeval[Array[Byte]]
+  val json: Coeval[JsObject]
 
   override def toString: String = json().toString
-
-  def toPrettyString: String = json.map(Json.prettyPrint).value
 
   override def equals(other: Any): Boolean = other match {
     case tx: Transaction => id() == tx.id()
@@ -27,19 +30,12 @@ trait Transaction extends BytesSerializable with JsonSerializable {
   override def hashCode(): Int = id().hashCode
 
   val bodyBytes: Coeval[Array[Byte]]
-  def checkedAssets(): Seq[IssuedAsset] = Seq.empty
+  def checkedAssets: Seq[IssuedAsset] = Nil
 }
 
 object Transaction {
-
   type Type = Byte
 
-  implicit class TransactionExt(tx: Transaction) {
-    def feeDiff(): Portfolio = tx.assetFee match {
-      case (asset @ IssuedAsset(_), fee) =>
-        Portfolio(balance = 0, lease = LeaseBalance.empty, assets = Map(asset -> fee))
-      case (Waves, fee) => Portfolio(balance = fee, lease = LeaseBalance.empty, assets = Map.empty)
-    }
-  }
-
+  val V1: TxVersion = TxVersion.V1
+  val V2: TxVersion = TxVersion.V2
 }

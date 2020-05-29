@@ -3,6 +3,7 @@ package com.wavesplatform.mining.microblocks
 import cats.effect.concurrent.Ref
 import cats.implicits._
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics._
@@ -17,7 +18,6 @@ import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
-import kamon.metric.TimerMetric
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
 
@@ -34,7 +34,7 @@ class MicroBlockMinerImpl(
 ) extends MicroBlockMiner
     with ScorexLogging {
 
-  val microBlockBuildTimeStats: TimerMetric = Kamon.timer("miner.forge-microblock-time")
+  val microBlockBuildTimeStats = Kamon.timer("miner.forge-microblock-time")
 
   def generateMicroBlockSequence(
       account: KeyPair,
@@ -88,8 +88,8 @@ class MicroBlockMinerImpl(
                 .leftWiden[Throwable]
                 .liftTo[Task]
               (signedBlock, microBlock) = blocks
-              _ <- appendMicroBlock(microBlock)
-              _ <- broadcastMicroBlock(account, microBlock)
+              blockId <- appendMicroBlock(microBlock)
+              _ <- broadcastMicroBlock(account, microBlock, blockId)
             } yield {
               if (updatedTotalConstraint.isFull) Stop
               else Success(signedBlock, updatedTotalConstraint)
@@ -105,11 +105,11 @@ class MicroBlockMinerImpl(
         }
       }
 
-  private def broadcastMicroBlock(account: KeyPair, microBlock: MicroBlock): Task[Unit] =
-    Task(allChannels.broadcast(MicroBlockInv(account, microBlock.totalResBlockSig, microBlock.prevResBlockSig)))
+  private def broadcastMicroBlock(account: KeyPair, microBlock: MicroBlock, blockId: BlockId): Task[Unit] =
+    Task(allChannels.broadcast(MicroBlockInv(account, blockId, microBlock.reference)))
 
-  private def appendMicroBlock(microBlock: MicroBlock): Task[Unit] =
-    MicroblockAppender(blockchainUpdater, utx, appenderScheduler, verify = false)(microBlock)
+  private def appendMicroBlock(microBlock: MicroBlock): Task[BlockId] =
+    MicroblockAppender(blockchainUpdater, utx, appenderScheduler)(microBlock)
       .flatMap {
         case Left(err) => Task.raiseError(MicroBlockAppendError(microBlock, err))
         case Right(v)  => Task.now(v)
@@ -125,22 +125,18 @@ class MicroBlockMinerImpl(
         signedBlock <- Block
           .buildAndSign(
             version = blockchainUpdater.currentBlockVersion,
-            timestamp = accumulatedBlock.timestamp,
-            reference = accumulatedBlock.reference,
-            consensusData = accumulatedBlock.consensusData,
-            transactionData = accumulatedBlock.transactionData ++ unconfirmed,
+            timestamp = accumulatedBlock.header.timestamp,
+            reference = accumulatedBlock.header.reference,
+            baseTarget = accumulatedBlock.header.baseTarget,
+            generationSignature = accumulatedBlock.header.generationSignature,
+            txs = accumulatedBlock.transactionData ++ unconfirmed,
             signer = account,
-            featureVotes = accumulatedBlock.featureVotes,
-            rewardVote = accumulatedBlock.rewardVote
+            featureVotes = accumulatedBlock.header.featureVotes,
+            rewardVote = accumulatedBlock.header.rewardVote
           )
           .leftMap(BlockBuildError)
         microBlock <- MicroBlock
-          .buildAndSign(
-            account,
-            unconfirmed,
-            accumulatedBlock.signerData.signature,
-            signedBlock.signerData.signature
-          )
+          .buildAndSign(signedBlock.header.version, account, unconfirmed, accumulatedBlock.id(), signedBlock.signature)
           .leftMap(MicroBlockBuildError)
         _ = BlockStats.mined(microBlock)
       } yield (signedBlock, microBlock)

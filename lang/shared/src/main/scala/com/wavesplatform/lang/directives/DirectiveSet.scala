@@ -20,7 +20,7 @@ object DirectiveSet {
       imports:       Imports = Imports(Nil)
   ): Either[ExecutionError, DirectiveSet] =
     (stdLibVersion, scriptType, contentType, imports) match {
-      case (V3, Account, DApp, _)              => Right(contractDirectiveSet)
+      case (v, Account, DApp, _) if v >= V3    => Right(new DirectiveSet(v, Account, DApp, imports))
       case (v, sType, Expression, _)           => Right(new DirectiveSet(v, sType, Expression, imports))
       case (v, sType, Library, i@Imports(Nil)) => Right(new DirectiveSet(v, sType, Library, i))
       case (_,     _, Library, _)              => Left("Libraries should not contain imports")
@@ -30,6 +30,6 @@ object DirectiveSet {
   private def errorMsg(wrongSet: (StdLibVersion, ScriptType, ContentType, Imports)) = {
     val (ver, sType, cType, _) = wrongSet
     s"Inconsistent set of directives ${(ver, sType, cType)} " +
-    s"could be (V3, ACCOUNT, DAPP), (<any>, <any>, LIBRARY) or (<any>, <any>, EXPRESSION)"
+    s"could be (V3 or newer, ACCOUNT, DAPP), (<any>, <any>, LIBRARY) or (<any>, <any>, EXPRESSION)"
   }
 }

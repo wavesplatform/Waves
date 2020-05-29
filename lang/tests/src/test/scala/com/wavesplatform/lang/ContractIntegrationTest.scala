@@ -17,7 +17,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient, Tx}
+import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -80,7 +80,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         |
       """.stripMargin,
       "foo"
-    ).explicitGet()._1 shouldBe ScriptResult(
+    ).explicitGet()._1 shouldBe ScriptResultV3(
       List(
         DataItem.Bin("caller", callerAddress),
         DataItem.Bin("callerPk", callerPublicKey),
@@ -102,7 +102,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       """.stripMargin,
       "foo",
       Range(1, 23).map(i => Terms.CONST_LONG(i)).toList
-    ).explicitGet()._1 shouldBe ScriptResult(List(DataItem.Lng("1", 22)), List())
+    ).explicitGet()._1 shouldBe ScriptResultV3(List(DataItem.Lng("1", 22)), List())
   }
 
   property("@Callable exception error contains initialised values") {
@@ -143,7 +143,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
 
     val parsed = Parser.parseContract(src).get.value
 
-    ContractCompiler(ctx.compilerContext, parsed) should produce("no more than 22 arguments")
+    ContractCompiler(ctx.compilerContext, parsed, V3) should produce("no more than 22 arguments")
   }
 
 
@@ -152,7 +152,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
                               args  : List[Terms.EXPR] = List(Terms.CONST_BYTESTR(ByteStr.empty).explicitGet())
                              ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] = {
     val parsed   = Parser.parseContract(script).get.value
-    val compiled = ContractCompiler(ctx.compilerContext, parsed).explicitGet()
+    val compiled = ContractCompiler(ctx.compilerContext, parsed, V3).explicitGet()
 
     ContractEvaluator(
       ctx.evaluationContext(environment),
@@ -161,18 +161,19 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         Terms.FUNCTION_CALL(FunctionHeader.User(func), args),
         Recipient.Address(callerAddress),
         callerPublicKey,
-        None,
+        AttachedPayments.Single(None),
         ByteStr.empty,
         transactionId,
         fee,
         feeAssetId
-      )
+      ),
+      V3
     )
   }
 
   def parseCompileAndVerify(script: String, tx: Tx): Either[ExecutionError, EVALUATED] = {
     val parsed   = Parser.parseContract(script).get.value
-    val compiled = ContractCompiler(ctx.compilerContext, parsed).explicitGet()
+    val compiled = ContractCompiler(ctx.compilerContext, parsed, V3).explicitGet()
     val evalm    = ContractEvaluator.verify(compiled.decs, compiled.verifierFuncOpt.get, tx)
     EvaluatorV1().evalWithLogging(Right(ctx.evaluationContext(environment)), evalm)._2
   }
@@ -190,7 +191,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       assetId = None,
       amount = 0,
       recipient = Recipient.Address(ByteStr.empty),
-      attachment = ByteStr.empty
+      attachment = ByteStrValue(ByteStr.empty)
     )
     parseCompileAndVerify(
       """
@@ -225,7 +226,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         proofs = IndexedSeq.empty
       ),
       dAppAddressOrAlias = Recipient.Address(ByteStr.empty),
-      maybePayment = None,
+      payments = AttachedPayments.Single(None),
       feeAssetId = None,
       funcName = Some("foo"),
       funcArgs = List(CONST_LONG(1), CONST_BOOLEAN(true), CONST_BYTESTR(bytes).explicitGet(), CONST_STRING("ok").explicitGet())
@@ -283,7 +284,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         """.stripMargin,
       "test",
       args = Nil
-    ).explicitGet()._1 shouldBe ScriptResult(
+    ).explicitGet()._1 shouldBe ScriptResultV3(
       List(
         DataItem.Lng("a", 1),
         DataItem.Bool("b", true),
@@ -291,8 +292,8 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         DataItem.Bin("d", ByteStr.fromLong(256L))
       ),
       List(
-        (Recipient.Address(callerAddress), 1L, None),
-        (Recipient.Address(callerAddress), 2L, None)
+        AssetTransfer(Recipient.Address(callerAddress), 1L, None),
+        AssetTransfer(Recipient.Address(callerAddress), 2L, None)
       )
     )
   }
@@ -353,14 +354,14 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         """.stripMargin,
       "test",
       args = Nil
-    ).explicitGet()._1 shouldBe ScriptResult(
+    ).explicitGet()._1 shouldBe ScriptResultV3(
       List(
         DataItem.Lng("a", 1),
         DataItem.Lng("b", 2)
       ),
       List(
-        (Recipient.Address(callerAddress), 3, None),
-        (Recipient.Address(callerAddress), 4, None)
+        AssetTransfer(Recipient.Address(callerAddress), 3, None),
+        AssetTransfer(Recipient.Address(callerAddress), 4, None)
       )
     )
   }

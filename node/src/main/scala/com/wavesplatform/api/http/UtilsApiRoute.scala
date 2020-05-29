@@ -4,17 +4,22 @@ import java.security.SecureRandom
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.api.http.ApiError.{ScriptCompilerError, TooBigArrayAllocation}
+import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Time
+import com.wavesplatform.state.Blockchain
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.lang.directives.values._
 import monix.execution.Scheduler
 import play.api.libs.json._
 
@@ -22,7 +27,8 @@ case class UtilsApiRoute(
     timeService: Time,
     settings: RestAPISettings,
     estimator: ScriptEstimator,
-    limitedScheduler: Scheduler
+    limitedScheduler: Scheduler,
+    blockchain: Blockchain
 ) extends ApiRoute
     with AuthRoute
     with TimeLimitedRoute {
@@ -36,7 +42,7 @@ case class UtilsApiRoute(
   }
 
   override val route: Route = pathPrefix("utils") {
-    decompile ~ compile ~ compileCode ~ compileWithImports ~ scriptMeta ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
+    decompile ~ compile ~ compileCode ~ compileWithImports ~ scriptMeta ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ transactionSerialize
   }
 
   def decompile: Route = path("script" / "decompile") {
@@ -69,7 +75,7 @@ case class UtilsApiRoute(
   def compile: Route = path("script" / "compile") {
     (post & entity(as[String])) { code =>
       parameter('assetScript.as[Boolean] ? false) { isAssetScript =>
-        executeLimited(ScriptCompiler(code, isAssetScript, estimator, checkWithEstimatorV1 = true)) { result =>
+        executeLimited(ScriptCompiler(code, isAssetScript, estimator)) { result =>
           complete(
             result.fold(
               e => ScriptCompilerError(e), {
@@ -89,16 +95,19 @@ case class UtilsApiRoute(
 
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String])) { code =>
-      executeLimited(ScriptCompiler.compile(code, estimator, checkWithEstimatorV1 = true)) { result =>
+      def stdLib: StdLibVersion = if(blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) { V4 } else { StdLibVersion.VersionDic.default }
+      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator, defaultStdLib = stdLib)) { result =>
         complete(
           result
             .fold(
               e => ScriptCompilerError(e), {
-                case (script, complexity) =>
+                case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
                   Json.obj(
-                    "script"     -> script.bytes().base64,
-                    "complexity" -> complexity,
-                    "extraFee"   -> FeeValidation.ScriptExtraFee
+                    "script"               -> script.bytes().base64,
+                    "complexity"           -> maxComplexity,
+                    "verifierComplexity"   -> verifierComplexity,
+                    "callableComplexities" -> callableComplexities,
+                    "extraFee"             -> FeeValidation.ScriptExtraFee
                   )
               }
             )
@@ -138,18 +147,20 @@ case class UtilsApiRoute(
           .left
           .map(_.m)
           .flatMap { script =>
-            Script.estimate(script, estimator).map((script, _))
+            Script.complexityInfo(script, estimator, useContractVerifierLimit = false).map((script, _))
           }
       ) { result =>
         complete(
           result.fold(
             e => ScriptCompilerError(e), {
-              case (script, complexity) =>
+              case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
                 Json.obj(
-                  "script"     -> code,
-                  "scriptText" -> script.expr.toString, // [WAIT] Script.decompile(script),
-                  "complexity" -> complexity,
-                  "extraFee"   -> FeeValidation.ScriptExtraFee
+                  "script"               -> code,
+                  "scriptText"           -> script.expr.toString, // [WAIT] Script.decompile(script),
+                  "complexity"           -> maxComplexity,
+                  "verifierComplexity"   -> verifierComplexity,
+                  "callableComplexities" -> callableComplexities,
+                  "extraFee"             -> FeeValidation.ScriptExtraFee
                 )
             }
           )
@@ -190,18 +201,6 @@ case class UtilsApiRoute(
   def hashFast: Route = (path("hash" / "fast") & post) {
     entity(as[String]) { message =>
       complete(Json.obj("message" -> message, "hash" -> Base58.encode(crypto.fastHash(message))))
-    }
-  }
-
-  def sign: Route = (path("sign" / Segment) & post) { pk =>
-    entity(as[String]) { message =>
-      complete(
-        Json.obj(
-          "message" -> message,
-          "signature" ->
-            Base58.encode(crypto.sign(PrivateKey(Base58.tryDecodeWithLimit(pk).get), Base58.tryDecodeWithLimit(message).get))
-        )
-      )
     }
   }
 

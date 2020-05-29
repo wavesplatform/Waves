@@ -5,19 +5,19 @@ import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account._
+import com.wavesplatform.api.BlockMeta
+import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}
+import com.wavesplatform.database
+import com.wavesplatform.database.{DBExt, Keys, LevelDBFactory, LevelDBWriter}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.LevelDBWriterBenchmark._
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.utils.Implicits.SubjectOps
-import monix.reactive.subjects.Subject
+import com.wavesplatform.transaction.Transaction
 import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
-import scala.concurrent.duration.Duration
 import scala.io.Codec
 
 /**
@@ -37,25 +37,18 @@ import scala.io.Codec
 class LevelDBWriterBenchmark {
   @Benchmark
   def readFullBlock_test(st: BlocksByIdSt, bh: Blackhole): Unit = {
-    bh.consume(st.db.blockById(st.allBlocks.random).get)
+    bh.consume(st.blockById(st.allBlocks.random).get)
   }
 
   @Benchmark
-  def readBlockHeader_test(st: BlocksByIdSt, bh: Blackhole): Unit = {
-    bh.consume(st.db.blockHeaderAndSize(st.allBlocks.random).get)
+  def readBlockHeader_test(st: BlocksByHeightSt, bh: Blackhole): Unit = {
+    bh.consume(st.db.blockHeader(st.allBlocks.random).get)
   }
 
   @Benchmark
   def transactionById_test(st: TransactionByIdSt, bh: Blackhole): Unit = {
     bh.consume(st.db.transactionInfo(st.allTxs.random).get)
   }
-
-  @Benchmark
-  def transactionByAddress_test(st: TransactionByAddressSt, bh: Blackhole): Unit = {
-    import monix.execution.Scheduler.Implicits.global
-    bh.consume(st.db.addressTransactionsObservable(st.txsAddresses.random, Set.empty, None).firstL.runSyncUnsafe(Duration.Inf))
-  }
-
 }
 
 object LevelDBWriterBenchmark {
@@ -76,6 +69,11 @@ object LevelDBWriterBenchmark {
   }
 
   @State(Scope.Benchmark)
+  class BlocksByHeightSt extends BaseSt {
+    val allBlocks: Vector[Int] = load("blocksByHeight", benchSettings.blocksFile)(_.toInt)
+  }
+
+  @State(Scope.Benchmark)
   class BaseSt {
     protected val benchSettings: Settings = Settings.fromConfig(ConfigFactory.load())
     private val wavesSettings: WavesSettings = {
@@ -93,9 +91,18 @@ object LevelDBWriterBenchmark {
       LevelDBFactory.factory.open(dir, new Options)
     }
 
-    private val ignoreSpendableBalanceChanged = Subject.empty[(Address, Asset)]
+    val db = LevelDBWriter.readOnly(rawDB, wavesSettings)
 
-    val db = new LevelDBWriter(rawDB, ignoreSpendableBalanceChanged, wavesSettings.blockchainSettings, wavesSettings.dbSettings)
+    def loadBlockAt(height: Int): Option[(BlockMeta, Seq[Transaction])] =
+      loadBlockMetaAt(height).map { meta =>
+        meta -> rawDB.readOnly(ro => database.loadBlock(Height(height), ro)).fold(Seq.empty[Transaction])(_.transactionData)
+      }
+
+    def loadBlockMetaAt(height: Int): Option[BlockMeta] = rawDB.get(Keys.blockMetaAt(Height(height)))
+
+    val cba = CommonBlocksApi(db, loadBlockMetaAt, loadBlockAt)
+
+    def blockById(id: ByteStr): Option[(BlockMeta, Seq[Transaction])] = cba.block(id)
 
     @TearDown
     def close(): Unit = {

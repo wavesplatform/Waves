@@ -3,7 +3,7 @@ package com.wavesplatform.network
 import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.transaction.assets.IssueTransactionV1
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{ProvenTransaction, Transaction}
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.embedded.EmbeddedChannel
@@ -18,7 +18,7 @@ class MessageCodecSpec extends FreeSpec with Matchers with MockFactory with Prop
     val ch    = new EmbeddedChannel(codec)
 
     ch.writeInbound(RawBytes(TransactionSpec.messageCode, "foo".getBytes(StandardCharsets.UTF_8)))
-    ch.readInbound[IssueTransactionV1]()
+    ch.readInbound[IssueTransaction]()
 
     codec.blockCalls shouldBe 1
   }
@@ -27,7 +27,7 @@ class MessageCodecSpec extends FreeSpec with Matchers with MockFactory with Prop
     val codec = new SpiedMessageCodec
     val ch    = new EmbeddedChannel(codec)
 
-    ch.writeInbound(RawBytes.from(origTx))
+    ch.writeInbound(RawBytes.fromTransaction(origTx))
     val decodedTx = ch.readInbound[Transaction]()
 
     decodedTx shouldBe origTx

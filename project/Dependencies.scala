@@ -9,28 +9,32 @@ object Dependencies {
 
   private def akkaHttpModule(module: String)               = "com.typesafe.akka"             %% module            % "10.1.8"
   private def nettyModule(module: String)                  = "io.netty"                      % s"netty-$module"   % "4.1.33.Final"
-  private def kamonModule(module: String, v: String)       = "io.kamon"                      %% s"kamon-$module"  % v
+  private def kamonModule(module: String)                  = "io.kamon"                      %% s"kamon-$module"  % "2.1.0"
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.9.8"
   private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
 
   private def catsModule(module: String)  = Def.setting("org.typelevel" %%% s"cats-$module"  % "2.0.0")
   private def monixModule(module: String) = Def.setting("io.monix"      %%% s"monix-$module" % "3.1.0")
 
-  private val kindProjector = compilerPlugin("org.spire-math" %% "kind-projector" % "0.9.6")
+  private val kindProjector = compilerPlugin("org.spire-math"  %% "kind-projector" % "0.9.6")
+  private val paradise      = compilerPlugin("org.scalamacros" % "paradise"        % "2.1.1" cross CrossVersion.full)
 
   val akkaHttp                   = akkaHttpModule("akka-http")
   private val jacksonModuleScala = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
   private val googleGuava        = "com.google.guava" % "guava" % "27.0.1-jre"
-  private val kamonCore          = kamonModule("core", "1.1.6")
+  private val kamonCore          = kamonModule("core")
   private val machinist          = "org.typelevel" %% "machinist" % "0.6.6"
-  private val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
+  val logback                    = "ch.qos.logback" % "logback-classic" % "1.2.3"
   val janino                     = "org.codehaus.janino" % "janino" % "3.0.12"
+  val asyncHttpClient            = "org.asynchttpclient" % "async-http-client" % "2.7.0"
 
   private val catsEffect = catsModule("effect")
   private val catsCore   = catsModule("core")
   private val shapeless  = Def.setting("com.chuusai" %%% "shapeless" % "2.3.3")
 
   val scalaTest = "org.scalatest" %% "scalatest" % "3.0.6" % Test
+
+  val kafka = "org.apache.kafka" %% "kafka" % "2.1.0"
 
   val enforcedVersions = Def.setting(
     Seq(
@@ -65,7 +69,8 @@ object Dependencies {
       catsCore.value,
       catsModule("kernel").value,
       catsModule("macros").value,
-      shapeless.value
+      shapeless.value,
+      kafka
     )
   )
 
@@ -85,14 +90,16 @@ object Dependencies {
         .exclude("org.typelevel", "cats-effect_sjs0.6_2.12")
         .exclude("org.scala-js", "scalajs-library_2.12"),
       catsCore.value.exclude("org.scala-js", "scalajs-library_2.12"),
-      ("org.rudogma" %%% "supertagged" % "1.4").exclude("org.scala-js", "scalajs-library_2.12"),
-      ("com.lihaoyi" %%% "fastparse"   % "1.0.0").exclude("org.scala-js", "scalajs-library_2.12"),
+      ("org.rudogma"   %%% "supertagged" % "1.4").exclude("org.scala-js", "scalajs-library_2.12"),
+      ("com.lihaoyi"   %%% "fastparse"   % "1.0.0").exclude("org.scala-js", "scalajs-library_2.12"),
+      ("org.parboiled" %%% "parboiled"   % "2.1.8").exclude("org.scala-js", "scalajs-library_2.12"),
       shapeless.value.exclude("org.scala-js", "scalajs-library_2.12"),
       machinist.exclude("org.scala-js", "scalajs-library_2.12"),
       catsEffect.value.exclude("org.typelevel", "cats-core_sjs0.6_2.12"),
       ("org.typelevel" %% "cats-mtl-core" % "0.4.0").exclude("org.scalacheck", "scalacheck_2.12"),
-      "ch.obermuhlner"       % "big-math" % "2.1.0",
-      "org.scorexfoundation" %% "scrypto" % "2.0.4",
+      "ch.obermuhlner" % "big-math" % "2.1.0",
+      ("org.scorexfoundation" %% "scrypto" % "2.0.4").exclude("org.whispersystems", "curve25519-java"),
+      "com.wavesplatform" % "curve25519-java" % "0.6.3",
       ("org.bykn" %% "fastparse-cats-core" % "0.1.0")
         .exclude("org.scalatest", "scalatest_2.12")
         .exclude("org.scalacheck", "scalacheck_2.12")
@@ -101,7 +108,9 @@ object Dependencies {
       bouncyCastle("bcprov"),
       kindProjector,
       compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4"),
-      "com.softwaremill.sttp" %%% "core" % "1.6.4"
+      "com.softwaremill.sttp" %%% "core" % "1.6.4",
+      "com.wavesplatform"     % "zwaves" % "0.1.0-SNAPSHOT",
+      "org.web3j" % "crypto" % "4.5.18"
     ) ++ scalapbRuntime.value ++ circe.value
   )
 
@@ -109,8 +118,8 @@ object Dependencies {
     logback,
     "com.spotify" % "docker-client" % "8.15.1",
     jacksonModule("dataformat", "dataformat-properties"),
-    "org.asynchttpclient" % "async-http-client" % "2.7.0",
-    "org.scalacheck"      %% "scalacheck"       % "1.14.0"
+    asyncHttpClient,
+    "org.scalacheck" %% "scalacheck" % "1.14.0"
   ).map(_ % Test)
 
   lazy val test = scalaTest +: Seq(
@@ -144,8 +153,8 @@ object Dependencies {
       "com.iheart"           %% "ficus"                   % "1.4.2",
       "net.logstash.logback" % "logstash-logback-encoder" % "4.11" % Runtime,
       kamonCore,
-      kamonModule("system-metrics", "1.0.1"),
-      kamonModule("influxdb", "1.0.3"),
+      kamonModule("system-metrics"),
+      kamonModule("influxdb"),
       "org.influxdb" % "influxdb-java" % "2.14",
       googleGuava,
       "com.google.code.findbugs" % "jsr305"         % "3.0.2" % Compile, // javax.annotation stubs
@@ -156,8 +165,10 @@ object Dependencies {
       akkaHttp,
       "org.bitlet" % "weupnp" % "0.1.4",
       kindProjector,
+      paradise,
       monixModule("reactive").value,
       nettyModule("handler"),
+      "io.estatico"                       %% "newtype" % "0.4.3",
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test,
       ("org.iq80.leveldb" % "leveldb" % "0.12").exclude("com.google.guava", "guava") % Test
@@ -165,7 +176,7 @@ object Dependencies {
   )
 
   private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.0.0" classifier "proto"
+     "com.wavesplatform" % "protobuf-schemas" % "1.2.5" classifier "proto"
 
   lazy val scalapbRuntime = Def.setting {
     val version = scalapb.compiler.Version.scalapbVersion
@@ -187,7 +198,7 @@ object Dependencies {
   )
 
   lazy val circe = Def.setting {
-    val circeVersion = "0.12.0-RC4"
+    val circeVersion = "0.12.3"
     Seq(
       "io.circe" %%% "circe-core",
       "io.circe" %%% "circe-generic",

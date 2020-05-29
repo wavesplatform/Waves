@@ -14,7 +14,8 @@ object Asset {
   case object Waves                         extends Asset
 
   implicit val assetReads: Reads[IssuedAsset] = Reads {
-    case JsString(str) if str.length > AssetIdStringLength => JsError("invalid.feeAssetId")
+    case JsString(str) if str.length > AssetIdStringLength =>
+      JsError(s"Too long assetId: length of $str exceeds $AssetIdStringLength")
     case JsString(str) =>
       Base58.tryDecodeWithLimit(str) match {
         case Success(arr) => JsSuccess(IssuedAsset(ByteStr(arr)))
@@ -23,7 +24,7 @@ object Asset {
     case _ => JsError("Expected base58-encoded assetId")
   }
   implicit val assetWrites: Writes[IssuedAsset] = Writes { asset =>
-    JsString(asset.id.base58)
+    JsString(asset.id.toString)
   }
 
   implicit val assetIdReads: Reads[Asset] = Reads {
@@ -33,11 +34,13 @@ object Asset {
   }
   implicit val assetIdWrites: Writes[Asset] = Writes {
     case Waves           => JsNull
-    case IssuedAsset(id) => JsString(id.base58)
+    case IssuedAsset(id) => JsString(id.toString)
   }
 
-  implicit val assetJsonFormat: Format[IssuedAsset] = Format(assetReads, assetWrites)
-  implicit val assetIdJsonFormat: Format[Asset]     = Format(assetIdReads, assetIdWrites)
+  object Formats {
+    implicit val assetJsonFormat: Format[IssuedAsset] = Format(assetReads, assetWrites)
+    implicit val assetIdJsonFormat: Format[Asset]     = Format(assetIdReads, assetIdWrites)
+  }
 
   implicit val assetReader: ValueReader[Asset] = { (cfg, path) =>
     AssetPair.extractAssetId(cfg getString path).fold(ex => throw new Exception(ex.getMessage), identity)
@@ -64,7 +67,7 @@ object Asset {
 
     def maybeBase58Repr: Option[String] = ai match {
       case Waves           => None
-      case IssuedAsset(id) => Some(id.base58)
+      case IssuedAsset(id) => Some(id.toString)
     }
 
     def fold[A](onWaves: => A)(onAsset: IssuedAsset => A): A = ai match {

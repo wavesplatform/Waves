@@ -8,8 +8,10 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.Sponsorship
-import com.wavesplatform.transaction.assets.IssueTransactionV1
+import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.assets.IssueTransaction
 import org.scalatest.CancelAfterFailure
+import com.wavesplatform.utils._
 
 class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
@@ -26,7 +28,7 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val (balance2, eff2) = notMiner.accountBalances(secondAddress)
     val (balance3, eff3) = notMiner.accountBalances(minerAddress)
 
-    val req           = createSignedIssueRequest(assetTx)
+    val req           = createIssueRequest(assetTx)
     val issuedAssetId = notMiner.signedIssue(req).id
     nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
 
@@ -69,24 +71,24 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 object CustomFeeTransactionSuite {
   private val minerAddress             = Default.head.getString("address")
   private val senderAddress            = Default(2).getString("address")
-  private val defaultAssetQuantity     = 999999999999l
+  private val defaultAssetQuantity     = 999999999999L
   private val featureCheckBlocksPeriod = 13
 
   private val seed = Default(2).getString("account-seed")
   private val pk   = KeyPair.fromSeed(seed).explicitGet()
-  val assetTx = IssueTransactionV1
-    .selfSigned(
-      sender = pk,
-      name = "asset".getBytes("UTF-8"),
-      description = "asset description".getBytes("UTF-8"),
+  val assetTx = IssueTransaction(
+      TxVersion.V1,
+      sender = pk.publicKey,
+      "asset".utf8Bytes,
+      "asset description".utf8Bytes,
       quantity = defaultAssetQuantity,
       decimals = 2,
       reissuable = false,
+      script = None,
       fee = 1.waves,
       timestamp = System.currentTimeMillis()
     )
-    .right
-    .get
+    .signWith(pk.privateKey)
 
   val assetId = assetTx.id()
 
@@ -95,7 +97,7 @@ object CustomFeeTransactionSuite {
                                                          | waves.blockchain.custom.functionality {
                                                          |   feature-check-blocks-period = $featureCheckBlocksPeriod
                                                          |   blocks-for-feature-activation = $featureCheckBlocksPeriod
-                                                         |   pre-activated-features = { 7 = 0 }
+                                                         |   pre-activated-features = { 7 = 0, 14 = 1000000 }
                                                          |}""".stripMargin)
 
   private val notMinerConfig = ConfigFactory.parseString("waves.miner.enable=no").withFallback(minerConfig)

@@ -10,10 +10,15 @@ import com.wavesplatform.lang.directives.values.{StdLibVersion, V1, V2, DApp => 
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.utils
+import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler}
+import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext, ContractCompiler, ExpressionCompiler}
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
+import com.wavesplatform.lang.v1.parser.Expressions
+import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
 import scala.concurrent.Future
@@ -23,6 +28,8 @@ import scala.concurrent.Future
   * And IDEA can't find the Global class in the "shared" module, but it must!
   */
 trait BaseGlobal {
+  val MaxBase16Bytes               = 8 * 1024
+  val MaxBase16String              = 32 * 1024
   val MaxBase58Bytes               = 64
   val MaxBase58String              = 100
   val MaxBase64Bytes               = 32 * 1024
@@ -37,44 +44,21 @@ trait BaseGlobal {
   def base64Encode(input: Array[Byte]): Either[String, String]
   def base64Decode(input: String, limit: Int = MaxLiteralLength): Either[String, Array[Byte]]
 
-  val hex: Array[Char] = Array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f')
-  def base16Encode(input: Array[Byte]): Either[String, String] = {
-    val output = new StringBuilder(input.size * 2)
-    for (b <- input) {
-      output.append(hex((b >> 4) & 0xf))
-      output.append(hex(b & 0xf))
-    }
-    Right(output.result)
-  }
+  def base16Encode(input: Array[Byte], checkLength: Boolean): Either[String, String] =
+    if (checkLength && input.length > MaxBase16Bytes)
+      Left(s"Base16 encode input length=${input.length} should not exceed $MaxBase16Bytes")
+    else
+      base16EncodeImpl(input)
 
-  def base16Dig(c: Char): Either[String, Byte] = {
-    if ('0' <= c && c <= '9') {
-      Right((c - '0').toByte)
-    } else if ('a' <= c && c <= 'f') {
-      Right((10 + (c - 'a')).toByte)
-    } else if ('A' <= c && c <= 'F') {
-      Right((10 + (c - 'A')).toByte)
-    } else {
-      Left(s"$c isn't base16/hex digit")
-    }
-  }
+  def base16Decode(input: String, checkLength: Boolean): Either[String, Array[Byte]] =
+    if (checkLength && input.length > MaxBase16String)
+      Left(s"Base16 decode input length=${input.length} should not exceed $MaxBase16String")
+    else
+      base16DecodeImpl(input)
 
-  def base16Decode(input: String): Either[String, Array[Byte]] = {
-    val size = input.size
-    if (size % 2 == 1) {
-      Left("Need internal bytes number")
-    } else {
-      val bytes = new Array[Byte](size / 2)
-      for (i <- 0 to size / 2 - 1) {
-        (base16Dig(input(i * 2)), base16Dig(input(i * 2 + 1))) match {
-          case (Right(h), Right(l)) => bytes(i) = ((16: Byte) * h + l).toByte
-          case (Left(e), _)         => return Left(e)
-          case (_, Left(e))         => return Left(e)
-        }
-      }
-      Right(bytes)
-    }
-  }
+  protected def base16EncodeImpl(input: Array[Byte]): Either[String, String]
+
+  protected def base16DecodeImpl(input: String): Either[String, Array[Byte]]
 
   def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean
 
@@ -99,6 +83,48 @@ trait BaseGlobal {
       .map(Array(0: Byte, DAppType.id.toByte, stdLibVersion.id.toByte) ++ _)
       .map(r => r ++ checksum(r))
 
+  def parseAndCompileExpression(
+      input: String,
+      context: CompilerContext,
+      letBlockOnly: Boolean,
+      stdLibVersion: StdLibVersion,
+      estimator: ScriptEstimator
+  ): Either[String, (Array[Byte], Long, Expressions.SCRIPT, Iterable[CompilationError])] = {
+    (for {
+      compRes <- ExpressionCompiler.compileWithParseResult(input, context)
+      (compExpr, exprScript, compErrorList) = compRes
+      illegalBlockVersionUsage              = letBlockOnly && com.wavesplatform.lang.v1.compiler.containsBlockV2(compExpr)
+      _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3")
+      bytes = if (compErrorList.isEmpty) serializeExpression(compExpr, stdLibVersion) else Array.empty[Byte]
+
+      vars  = utils.varNames(stdLibVersion, Expression)
+      costs = utils.functionCosts(stdLibVersion)
+      complexity <- if (compErrorList.isEmpty) estimator(vars, costs, compExpr) else Either.right(0L)
+    } yield (bytes, complexity, exprScript, compErrorList))
+      .recover {
+        case e => (Array.empty, 0, Expressions.SCRIPT(AnyPos, Expressions.INVALID(AnyPos, "Unknown error.")), List(Generic(0, 0, e)))
+      }
+  }
+
+  def parseAndCompileContract(
+      input: String,
+      ctx: CompilerContext,
+      stdLibVersion: StdLibVersion,
+      estimator: ScriptEstimator
+  ): Either[String, (Array[Byte], (Long, Map[String, Long]), Expressions.DAPP, Iterable[CompilationError])] = {
+    (for {
+      compRes <- ContractCompiler.compileWithParseResult(input, ctx, stdLibVersion)
+      (compDAppOpt, exprDApp, compErrorList) = compRes
+      complexityWithMap <- if (compDAppOpt.nonEmpty && compErrorList.isEmpty)
+        ContractScript.estimateComplexity(stdLibVersion, compDAppOpt.get, estimator)
+      else Right((0L, Map.empty[String, Long]))
+      bytes <- if (compDAppOpt.nonEmpty && compErrorList.isEmpty) serializeContract(compDAppOpt.get, stdLibVersion) else Right(Array.empty[Byte])
+    } yield (bytes, complexityWithMap, exprDApp, compErrorList))
+      .recover {
+        case e => (Array.empty, (0, Map.empty), Expressions.DAPP(AnyPos, List.empty, List.empty), List(Generic(0, 0, e)))
+      }
+  }
+
   val compileExpression =
     compile(_, _, _, _, ExpressionCompiler.compile)
 
@@ -109,7 +135,7 @@ trait BaseGlobal {
       input: String,
       context: CompilerContext,
       version: StdLibVersion,
-      estimator: ScriptEstimator,
+      isAsset: Boolean,estimator: ScriptEstimator,
       compiler: (String, CompilerContext) => Either[String, EXPR]
   ): Either[String, (Array[Byte], EXPR, Long)] =
     for {
@@ -145,7 +171,7 @@ trait BaseGlobal {
       estimator: ScriptEstimator
   ): Either[String, ContractInfo] =
     for {
-      dApp                          <- ContractCompiler.compile(input, ctx)
+      dApp                          <- ContractCompiler.compile(input, ctx, stdLibVersion)
       (maxComplexity, complexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator, includeUserFunctions = true)
       bytes                         <- serializeContract(dApp, stdLibVersion)
     } yield (bytes, dApp, maxComplexity, complexities)
@@ -215,6 +241,10 @@ trait BaseGlobal {
     }
 
   def requestNode(url: String): Future[NodeResponse]
+
+  def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean
+
+  def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte]
 }
 
 object BaseGlobal {

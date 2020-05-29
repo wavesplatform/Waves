@@ -14,7 +14,7 @@ trait GrpcWaitForHeight extends BeforeAndAfterAll with ScorexLogging with Report
 
   abstract protected override def beforeAll(): Unit = {
     super.beforeAll()
-    Await.result(traverse(nodes)(_.waitForHeight(2)), 1.minute)
+    Await.result(traverse(nodes)(_.waitForHeight(2)), 2.minute)
   }
 
   def waitForTxsToReachAllNodes(nodes: Seq[Node] = nodes, txIds: Seq[String]): Future[_] = {

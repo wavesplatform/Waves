@@ -1,17 +1,21 @@
 package com.wavesplatform.transaction.assets.exchange
 
+import com.google.common.primitives.Bytes
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets.exchange.Order.assetIdBytes
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.json.{JsObject, Json}
 
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
-case class AssetPair(amountAsset: Asset, priceAsset: Asset) {
+
+case class AssetPair(
+     amountAsset: Asset,
+     priceAsset: Asset
+) {
   import AssetPair._
 
   lazy val priceAssetStr: String  = assetIdStr(priceAsset)
@@ -19,7 +23,7 @@ case class AssetPair(amountAsset: Asset, priceAsset: Asset) {
   override def toString: String   = key
   def key: String                 = amountAssetStr + "-" + priceAssetStr
   def isValid: Validation         = (amountAsset != priceAsset) :| "Invalid AssetPair"
-  def bytes: Array[Byte]          = assetIdBytes(amountAsset) ++ assetIdBytes(priceAsset)
+  def bytes: Array[Byte]          = Bytes.concat(amountAsset.byteRepr, priceAsset.byteRepr)
   def json: JsObject = Json.obj(
     "amountAsset" -> amountAsset.maybeBase58Repr,
     "priceAsset"  -> priceAsset.maybeBase58Repr
@@ -34,7 +38,7 @@ object AssetPair {
 
   def assetIdStr(aid: Asset): String = aid match {
     case Waves           => WavesName
-    case IssuedAsset(id) => id.base58
+    case IssuedAsset(id) => id.toString
   }
 
   def extractAssetId(a: String): Try[Asset] = a match {
@@ -57,13 +61,10 @@ object AssetPair {
     )
   }
 
-  implicit val assetPairReader: ValueReader[AssetPair] = { (cfg, path) =>
-    val source    = cfg.getString(path)
-    val sourceArr = source.split("-")
-    val res = sourceArr match {
-      case Array(amtAssetStr, prcAssetStr) => AssetPair.createAssetPair(amtAssetStr, prcAssetStr)
-      case _                               => throw new Exception(s"$source (incorrect assets count, expected 2 but got ${sourceArr.size})")
-    }
-    res fold (ex => throw new Exception(s"$source (${ex.getMessage})"), identity)
+  def fromString(s: String): Try[AssetPair] = Try(s.split("-")).flatMap {
+    case Array(amtAssetStr, prcAssetStr) => AssetPair.createAssetPair(amtAssetStr, prcAssetStr)
+    case xs                              => Failure(new Exception(s"$s (incorrect assets count, expected 2 but got ${xs.size}: ${xs.mkString(", ")})"))
   }
+
+  implicit val assetPairReader: ValueReader[AssetPair] = (cfg, path) => fromString(cfg.getString(path)).get
 }

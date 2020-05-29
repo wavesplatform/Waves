@@ -2,13 +2,17 @@ package com.wavesplatform.it.sync
 
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.transaction.DataTransaction
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransactionV2, Order}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.utils.Time
 import play.api.libs.json.JsObject
 
 package object smartcontract {
+  val invokeScrTxSupportedVersions: List[Byte] = List(1, 2)
+  val setScrTxSupportedVersions: List[Byte] = List(1, 2)
+
   def cryptoContextScript(accountScript: Boolean): String =
     s"""
+       |{-# STDLIB_VERSION 2 #-}
        |match tx {
        |  case ext : ExchangeTransaction =>
        |    # Crypto context
@@ -24,6 +28,7 @@ package object smartcontract {
 
   def pureContextScript(dtx: DataTransaction, accountScript: Boolean): String =
     s"""
+       |{-# STDLIB_VERSION 2 #-}
        |# Pure context
        |    let ext = tx
        |    let longAll = 1000 * 2 == 2000 && 1000 / 2 == 500 && 1000 % 2 == 0 && 1000 + 2 == 1002 && 1000 - 2 == 998
@@ -33,12 +38,12 @@ package object smartcontract {
        |    let eqUnion = ext.sender != Address(base58'')
        |    let basic = longAll && sumString && sumByteVector && eqUnion
        |    let nePrim = 1000 != 999 && "ha" +"ha" != "ha-ha" && ext.bodyBytes != base64'hahaha'
-       |    let dtx = extract(transactionById(base58'${dtx.id().base58}'))
+       |    let dtx = extract(transactionById(base58'${dtx.id().toString}'))
        |    let neDataEntryAndGetElement = match dtx {
        |       case ddtx : DataTransaction => ddtx.data[0] != DataEntry("ha", true)
        |       case _ => false
        |    }
-       |    let neOptionAndExtractHeight = extract(transactionHeightById(base58'${dtx.id().base58}')) > 0
+       |    let neOptionAndExtractHeight = extract(transactionHeightById(base58'${dtx.id().toString}')) > 0
        |    let ne = nePrim && neDataEntryAndGetElement && neOptionAndExtractHeight
        |    let gteLong = 1000 > 999 && 1000 >= 999
        |    let getListSize = match dtx {
@@ -63,10 +68,11 @@ package object smartcontract {
 
   def wavesContextScript(dtx: DataTransaction, accountScript: Boolean): String =
     s"""
+       |{-# STDLIB_VERSION 2 #-}
        | match tx {
        |  case ext : ExchangeTransaction =>
        |    # Waves context
-       |    let dtx = extract(transactionById(base58'${dtx.id().base58}'))
+       |    let dtx = extract(transactionById(base58'${dtx.id().toString}'))
        |    let entries = match dtx {
        |       case d: DataTransaction =>
        |         let int = extract(getInteger(d.data, "${dtx.data(0).key}"))
@@ -83,7 +89,7 @@ package object smartcontract {
        |         let dataByIndex = toBytes(d0) == base64'abcdef' || toBytes(d1) == base64'ghijkl' ||
        |                       isDefined(d2) || toBytes(extract(d3)) == base64'mnopqr'
        |
-       |         let add = Address(base58'${dtx.sender.bytes.base58}')
+       |         let add = Address(base58'${dtx.sender.toAddress}')
        |         let long = extract(getInteger(add,"${dtx.data(0).key}")) == ${dtx.data(0).value}
        |         let bool1 = extract(getBoolean(add,"${dtx.data(1).key}")) == ${dtx.data(1).value}
        |         let bin = extract(getBinary(add,"${dtx.data(2).key}")) ==  base58'${dtx.data(2).value}'
@@ -94,7 +100,7 @@ package object smartcontract {
        |     }
        |
        |     let aFromPK = addressFromPublicKey(ext.senderPublicKey) == ext.sender
-       |     let aFromStr = addressFromString("${dtx.sender.stringRepr}") == Address(base58'${dtx.sender.bytes.base58}')
+       |     let aFromStr = addressFromString("${dtx.sender.toAddress}") == Address(base58'${dtx.sender.toAddress}')
        |
        |     #case t1: TransferTransaction => addressFromRecipient(t1.recipient) == Address(base58'')
        |
@@ -119,11 +125,12 @@ package object smartcontract {
     val buyMatcherFee  = (BigInt(orderFee) * amount / buy.amount).toLong
     val sellMatcherFee = (BigInt(orderFee) * amount / sell.amount).toLong
 
-    val tx = ExchangeTransactionV2
-      .create(
-        matcher = matcher,
-        buyOrder = buy,
-        sellOrder = sell,
+    val tx = ExchangeTransaction
+      .signed(
+        2.toByte,
+        matcher = matcher.privateKey,
+        order1 = buy,
+        order2 = sell,
         amount = amount,
         price = sellPrice,
         buyMatcherFee = buyMatcherFee,
@@ -149,8 +156,8 @@ package object smartcontract {
     val buyAmount           = 2
     val sellAmount          = 3
 
-    val buy  = Order.buy(buyer, matcher, pair, buyAmount, buyPrice, ts, expirationTimestamp, fee, ord1Ver)
-    val sell = Order.sell(seller, matcher, pair, sellAmount, sellPrice, ts, expirationTimestamp, fee, ord2Ver)
+    val buy  = Order.buy(ord1Ver, buyer, matcher.publicKey, pair, buyAmount, buyPrice, ts, expirationTimestamp, fee)
+    val sell = Order.sell(ord2Ver, seller, matcher.publicKey, pair, sellAmount, sellPrice, ts, expirationTimestamp, fee)
 
     (buy, sell)
   }

@@ -4,11 +4,12 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{ReportingTestName, WaitForHeight2}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.transfer.TransferTransactionV2
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 
 class NodeRestartTestSuite extends FreeSpec with Matchers with WaitForHeight2 with CancelAfterFailure with ReportingTestName with NodesFromDocker {
@@ -33,22 +34,25 @@ class NodeRestartTestSuite extends FreeSpec with Matchers with WaitForHeight2 wi
   }
 
   "after restarting all the nodes, the duplicate transaction cannot be put into the blockchain" in {
-    val txJson = TransferTransactionV2
-      .selfSigned(Waves,
-                  nodeB.privateKey,
-                  AddressOrAlias.fromString(nodeA.address).explicitGet(),
-                  1.waves,
-                  System.currentTimeMillis(),
-                  Waves,
-                  minFee,
-                  Array[Byte]())
+    val txJson = TransferTransaction
+      .selfSigned(
+        1.toByte,
+        nodeB.keyPair,
+        AddressOrAlias.fromString(nodeA.address).explicitGet(),
+        Waves,
+        1.waves,
+        Waves,
+        minFee,
+        None,
+        System.currentTimeMillis()
+      )
       .explicitGet()
       .json()
 
     val tx = nodeB.signedBroadcast(txJson, waitForTx = true)
     nodeA.waitForTransaction(tx.id)
 
-    val txHeight = nodeA.transactionInfo(tx.id).height
+    val txHeight = nodeA.transactionInfo[TransactionInfo](tx.id).height
 
     nodes.waitForHeightArise()
 
@@ -57,8 +61,10 @@ class NodeRestartTestSuite extends FreeSpec with Matchers with WaitForHeight2 wi
 
     nodes.waitForHeight(txHeight + 2)
 
-    assertBadRequestAndMessage(nodeB.signedBroadcast(txJson, waitForTx = true),
-                               s"State check failed. Reason: Transaction ${tx.id} is already in the state on a height of $txHeight")
+    assertBadRequestAndMessage(
+      nodeB.signedBroadcast(txJson, waitForTx = true),
+      s"State check failed. Reason: Transaction ${tx.id} is already in the state on a height of $txHeight"
+    )
   }
 
 }

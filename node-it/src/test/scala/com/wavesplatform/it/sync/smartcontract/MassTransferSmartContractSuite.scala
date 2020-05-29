@@ -6,7 +6,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -28,34 +28,35 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
   test("airdrop emulation via MassTransfer") {
     val scriptText = s"""
-        match tx {
-          case ttx: MassTransferTransaction =>
-            let commonAmount = (ttx.transfers[0].amount + ttx.transfers[1].amount)
-            let totalAmountToUsers = commonAmount == 8000000000
-            let totalAmountToGov = commonAmount == 2000000000
-            let massTxSize = size(ttx.transfers) == 2
-
-            let accountPK = base58'${ByteStr(notMiner.publicKey)}'
-            let accSig = sigVerify(ttx.bodyBytes,ttx.proofs[0],accountPK)
-
-            let txToUsers = (massTxSize && totalAmountToUsers)
-
-            let mTx = transactionById(ttx.proofs[1])
-
-            if (txToUsers && accSig) then true
-            else
-            if(isDefined(mTx)) then
-                match extract(mTx) {
-                  case mt2: MassTransferTransaction =>
-                    let txToGov = (massTxSize && totalAmountToGov)
-                    let txToGovComplete = (ttx.timestamp > mt2.timestamp + 30000) && sigVerify(mt2.bodyBytes,mt2.proofs[0], accountPK)
-                    txToGovComplete && accSig && txToGov
-                  case _ => false
-                }
-            else false
-        case _ => false
-        }
-        """.stripMargin
+       |{-# STDLIB_VERSION 2 #-}
+       |match tx {
+       |  case ttx: MassTransferTransaction =>
+       |    let commonAmount = (ttx.transfers[0].amount + ttx.transfers[1].amount)
+       |    let totalAmountToUsers = commonAmount == 8000000000
+       |    let totalAmountToGov = commonAmount == 2000000000
+       |    let massTxSize = size(ttx.transfers) == 2
+       |
+       |    let accountPK = base58'${notMiner.publicKey}'
+       |    let accSig = sigVerify(ttx.bodyBytes,ttx.proofs[0],accountPK)
+       |
+       |    let txToUsers = (massTxSize && totalAmountToUsers)
+       |
+       |    let mTx = transactionById(ttx.proofs[1])
+       |
+       |    if (txToUsers && accSig) then true
+       |    else
+       |    if(isDefined(mTx)) then
+       |        match extract(mTx) {
+       |          case mt2: MassTransferTransaction =>
+       |            let txToGov = (massTxSize && totalAmountToGov)
+       |            let txToGovComplete = (ttx.timestamp > mt2.timestamp + 30000) && sigVerify(mt2.bodyBytes,mt2.proofs[0], accountPK)
+       |            txToGovComplete && accSig && txToGov
+       |          case _ => false
+       |        }
+       |    else false
+       |case _ => false
+       |}
+       |""".stripMargin
 
     // set script
     val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1.bytes().base64
@@ -75,11 +76,11 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
     val unsigned =
       MassTransferTransaction
-        .create(Waves, notMiner.publicKey, transfers, currTime, calcMassTransferFee(2) + smartFee, Array.emptyByteArray, Proofs.empty)
+        .create(1.toByte, notMiner.publicKey, Waves, transfers, calcMassTransferFee(2) + smartFee, currTime, None, Proofs.empty)
         .explicitGet()
 
-    val accountSig = ByteStr(crypto.sign(notMiner.privateKey, unsigned.bodyBytes()))
-    val signed     = unsigned.copy(proofs = Proofs(Seq(accountSig)))
+    val accountSig = crypto.sign(notMiner.keyPair.privateKey, unsigned.bodyBytes())
+    val signed     = unsigned.copy(1.toByte, proofs = Proofs(Seq(accountSig)))
     val toUsersID  = notMiner.signedBroadcast(signed.json(), waitForTx = true).id
 
     //make transfer with incorrect time
@@ -90,10 +91,10 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
     val unsignedToGov =
       MassTransferTransaction
-        .create(Waves, notMiner.publicKey, transfersToGov, currTime, calcMassTransferFee(2) + smartFee, Array.emptyByteArray, Proofs.empty)
+        .create(1.toByte, notMiner.publicKey, Waves, transfersToGov, calcMassTransferFee(2) + smartFee, currTime, None, Proofs.empty)
         .explicitGet()
-    val accountSigToGovFail = ByteStr(crypto.sign(notMiner.privateKey, unsignedToGov.bodyBytes()))
-    val signedToGovFail     = unsignedToGov.copy(proofs = Proofs(Seq(accountSigToGovFail)))
+    val accountSigToGovFail = crypto.sign(notMiner.keyPair.privateKey, unsignedToGov.bodyBytes())
+    val signedToGovFail     = unsignedToGov.copy(1.toByte, proofs = Proofs(Seq(accountSigToGovFail)))
 
     assertBadRequestAndResponse(
       notMiner.signedBroadcast(signedToGovFail.json()),
@@ -105,17 +106,11 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
     val unsignedToGovSecond =
       MassTransferTransaction
-        .create(Waves,
-                notMiner.publicKey,
-                transfersToGov,
-                System.currentTimeMillis(),
-                calcMassTransferFee(2) + smartFee,
-                Array.emptyByteArray,
-                Proofs.empty)
+        .create(1.toByte, notMiner.publicKey, Waves, transfersToGov, calcMassTransferFee(2) + smartFee, System.currentTimeMillis(), None, Proofs.empty)
         .explicitGet()
 
-    val accountSigToGov = ByteStr(crypto.sign(notMiner.privateKey, unsignedToGovSecond.bodyBytes()))
-    val signedToGovGood = unsignedToGovSecond.copy(proofs = Proofs(Seq(accountSigToGov, ByteStr(Base58.tryDecodeWithLimit(toUsersID).get))))
+    val accountSigToGov = crypto.sign(notMiner.keyPair.privateKey, unsignedToGovSecond.bodyBytes())
+    val signedToGovGood = unsignedToGovSecond.copy(1.toByte, proofs = Proofs(Seq(accountSigToGov, ByteStr(Base58.tryDecodeWithLimit(toUsersID).get))))
     notMiner.signedBroadcast(signedToGovGood.json(), waitForTx = true).id
   }
 }

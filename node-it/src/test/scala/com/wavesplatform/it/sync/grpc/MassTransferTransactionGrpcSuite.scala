@@ -1,47 +1,49 @@
 package com.wavesplatform.it.sync.grpc
 
 import com.google.protobuf.ByteString
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync._
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount}
-import com.wavesplatform.transaction.transfer.TransferTransaction.MaxAttachmentSize
 import com.wavesplatform.protobuf.transaction.MassTransferTransactionData.Transfer
 import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.MaxTransferCount
+import com.wavesplatform.transaction.transfer.TransferTransaction.MaxAttachmentSize
 import io.grpc.Status.Code
 
 class MassTransferTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
   test("asset mass transfer changes asset balances and sender's.waves balance is decreased by fee.") {
-    val firstBalance = sender.wavesBalance(firstAddress)
-    val secondBalance = sender.wavesBalance(secondAddress)
-    val attachment = ByteString.copyFrom("mass transfer description".getBytes("UTF-8"))
+    for (v <- massTransferTxSupportedVersions) {
+      val firstBalance = sender.wavesBalance(firstAddress)
+      val secondBalance = sender.wavesBalance(secondAddress)
+      val attachment = ByteString.copyFrom("mass transfer description".getBytes("UTF-8"))
 
-    val transfers = List(Transfer(Some(Recipient().withAddress(secondAddress)), transferAmount))
-    val assetId   = PBTransactions.vanilla(
-      sender.broadcastIssue(firstAcc, "name", issueAmount, 8, reissuable = false, issueFee, waitForTx = true)
-    ).explicitGet().id().base58
-    sender.waitForTransaction(assetId)
+      val transfers = List(Transfer(Some(Recipient().withPublicKeyHash(secondAddress)), transferAmount))
+      val assetId = PBTransactions.vanilla(
+        sender.broadcastIssue(firstAcc, "name", issueAmount, 8, reissuable = false, issueFee, waitForTx = true)
+      ).explicitGet().id().toString
+      sender.waitForTransaction(assetId)
 
-    val massTransferTransactionFee = calcMassTransferFee(transfers.size)
-    sender.broadcastMassTransfer(firstAcc, Some(assetId), transfers, attachment, massTransferTransactionFee, waitForTx = true)
+      val massTransferTransactionFee = calcMassTransferFee(transfers.size)
+      sender.broadcastMassTransfer(firstAcc, Some(assetId), transfers, attachment, massTransferTransactionFee, waitForTx = true)
 
-    val firstBalanceAfter = sender.wavesBalance(firstAddress)
-    val secondBalanceAfter = sender.wavesBalance(secondAddress)
+      val firstBalanceAfter = sender.wavesBalance(firstAddress)
+      val secondBalanceAfter = sender.wavesBalance(secondAddress)
 
-    firstBalanceAfter.regular shouldBe firstBalance.regular - issueFee - massTransferTransactionFee
-    firstBalanceAfter.effective shouldBe firstBalance.effective - issueFee - massTransferTransactionFee
-    sender.assetsBalance(firstAddress, Seq(assetId)).getOrElse(assetId, 0L) shouldBe issueAmount - transferAmount
-    secondBalanceAfter.regular shouldBe secondBalance.regular
-    secondBalanceAfter.effective shouldBe secondBalance.effective
-    sender.assetsBalance(secondAddress, Seq(assetId)).getOrElse(assetId, 0L) shouldBe transferAmount
+      firstBalanceAfter.regular shouldBe firstBalance.regular - issueFee - massTransferTransactionFee
+      firstBalanceAfter.effective shouldBe firstBalance.effective - issueFee - massTransferTransactionFee
+      sender.assetsBalance(firstAddress, Seq(assetId)).getOrElse(assetId, 0L) shouldBe issueAmount - transferAmount
+      secondBalanceAfter.regular shouldBe secondBalance.regular
+      secondBalanceAfter.effective shouldBe secondBalance.effective
+      sender.assetsBalance(secondAddress, Seq(assetId)).getOrElse(assetId, 0L) shouldBe transferAmount
+    }
   }
 
   test("waves mass transfer changes waves balances") {
     val firstBalance = sender.wavesBalance(firstAddress)
     val secondBalance = sender.wavesBalance(secondAddress)
     val thirdBalance = sender.wavesBalance(thirdAddress)
-    val transfers = List(Transfer(Some(Recipient().withAddress(secondAddress)), transferAmount), Transfer(Some(Recipient().withAddress(thirdAddress)), 2 * transferAmount))
+    val transfers = List(Transfer(Some(Recipient().withPublicKeyHash(secondAddress)), transferAmount), Transfer(Some(Recipient().withPublicKeyHash(thirdAddress)), 2 * transferAmount))
 
     val massTransferTransactionFee = calcMassTransferFee(transfers.size)
     sender.broadcastMassTransfer(firstAcc, transfers = transfers, fee = massTransferTransactionFee, waitForTx = true)
@@ -61,11 +63,11 @@ class MassTransferTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   test("can not make mass transfer without having enough waves") {
     val firstBalance = sender.wavesBalance(firstAddress)
     val secondBalance = sender.wavesBalance(secondAddress)
-    val transfers        = List(Transfer(Some(Recipient().withAddress(secondAddress)), firstBalance.regular / 2), Transfer(Some(Recipient().withAddress(thirdAddress)), firstBalance.regular / 2))
+    val transfers        = List(Transfer(Some(Recipient().withPublicKeyHash(secondAddress)), firstBalance.regular / 2), Transfer(Some(Recipient().withPublicKeyHash(thirdAddress)), firstBalance.regular / 2))
 
     assertGrpcError(
       sender.broadcastMassTransfer(firstAcc, transfers = transfers, fee = calcMassTransferFee(transfers.size)),
-      "negative waves balance",
+      "Attempt to transfer unavailable funds",
       Code.INVALID_ARGUMENT
     )
 
@@ -77,7 +79,7 @@ class MassTransferTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   test("cannot make mass transfer when fee less then minimal ") {
     val firstBalance = sender.wavesBalance(firstAddress)
     val secondBalance = sender.wavesBalance(secondAddress)
-    val transfers        = List(Transfer(Some(Recipient().withAddress(secondAddress)), transferAmount))
+    val transfers        = List(Transfer(Some(Recipient().withPublicKeyHash(secondAddress)), transferAmount))
     val massTransferTransactionFee = calcMassTransferFee(transfers.size)
 
     assertGrpcError(
@@ -94,10 +96,10 @@ class MassTransferTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   test("cannot make mass transfer without having enough of effective balance") {
     val firstBalance = sender.wavesBalance(firstAddress)
     val secondBalance = sender.wavesBalance(secondAddress)
-    val transfers        = List(Transfer(Some(Recipient().withAddress(secondAddress)), firstBalance.regular - 2 * minFee))
+    val transfers        = List(Transfer(Some(Recipient().withPublicKeyHash(secondAddress)), firstBalance.regular - 2 * minFee))
     val massTransferTransactionFee = calcMassTransferFee(transfers.size)
 
-    sender.broadcastLease(firstAcc, Recipient().withAddress(secondAddress), leasingAmount, minFee, waitForTx = true)
+    sender.broadcastLease(firstAcc, Recipient().withPublicKeyHash(secondAddress), leasingAmount, minFee, waitForTx = true)
 
     assertGrpcError(
       sender.broadcastMassTransfer(firstAcc, transfers = transfers, fee = massTransferTransactionFee),
@@ -114,27 +116,27 @@ class MassTransferTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   test("cannot broadcast invalid mass transfer tx") {
     val firstBalance = sender.wavesBalance(firstAddress)
     val secondBalance = sender.wavesBalance(secondAddress)
-    val defaultTransfer = List(Transfer(Some(Recipient().withAddress(secondAddress)), transferAmount))
+    val defaultTransfer = List(Transfer(Some(Recipient().withPublicKeyHash(secondAddress)), transferAmount))
 
-    val negativeTransfer = List(Transfer(Some(Recipient().withAddress(secondAddress)), -1))
+    val negativeTransfer = List(Transfer(Some(Recipient().withPublicKeyHash(secondAddress)), -1))
     assertGrpcError(
       sender.broadcastMassTransfer(firstAcc, transfers = negativeTransfer, fee = calcMassTransferFee(negativeTransfer.size)),
       "One of the transfers has negative amount",
-      Code.INTERNAL
+      Code.INVALID_ARGUMENT
     )
 
-    val tooManyTransfers = List.fill(MaxTransferCount + 1)(Transfer(Some(Recipient().withAddress(secondAddress)), 1))
+    val tooManyTransfers = List.fill(MaxTransferCount + 1)(Transfer(Some(Recipient().withPublicKeyHash(secondAddress)), 1))
     assertGrpcError(
       sender.broadcastMassTransfer(firstAcc, transfers = tooManyTransfers, fee = calcMassTransferFee(MaxTransferCount + 1)),
       s"Number of transfers ${MaxTransferCount + 1} is greater than 100",
-      Code.INTERNAL
+      Code.INVALID_ARGUMENT
     )
 
     val tooBigAttachment = ByteString.copyFrom(("a" * (MaxAttachmentSize + 1)).getBytes("UTF-8"))
     assertGrpcError(
       sender.broadcastMassTransfer(firstAcc, transfers = defaultTransfer, attachment = tooBigAttachment, fee = calcMassTransferFee(1)),
-      "TooBigArray",
-      Code.INTERNAL
+      "Too big sequences requested",
+      Code.INVALID_ARGUMENT
     )
 
     sender.wavesBalance(firstAddress) shouldBe firstBalance
@@ -148,7 +150,7 @@ class MassTransferTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     val maxAttachment = ByteString.copyFrom(("a" * MaxAttachmentSize).getBytes("UTF-8"))
 
 
-    val transfers  = List.fill(MaxTransferCount)(Transfer(Some(Recipient().withAddress(firstAddress)), amount))
+    val transfers  = List.fill(MaxTransferCount)(Transfer(Some(Recipient().withPublicKeyHash(firstAddress)), amount))
     sender.broadcastMassTransfer(firstAcc, transfers = transfers, fee = fee, attachment = maxAttachment, waitForTx = true)
 
     sender.wavesBalance(firstAddress).regular shouldBe firstBalance.regular - fee
@@ -163,7 +165,7 @@ class MassTransferTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
     sender.broadcastCreateAlias(secondAcc, alias, minFee, waitForTx = true)
 
-    val transfers = List(Transfer(Some(Recipient().withAddress(firstAddress)), transferAmount), Transfer(Some(Recipient().withAlias(alias)), transferAmount))
+    val transfers = List(Transfer(Some(Recipient().withPublicKeyHash(firstAddress)), transferAmount), Transfer(Some(Recipient().withAlias(alias)), transferAmount))
 
     val massTransferTransactionFee = calcMassTransferFee(transfers.size)
     sender.broadcastMassTransfer(firstAcc, transfers = transfers, fee = massTransferTransactionFee, waitForTx = true)
@@ -173,5 +175,4 @@ class MassTransferTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     sender.wavesBalance(secondAddress).regular shouldBe secondBalance.regular + transferAmount - minFee
     sender.wavesBalance(secondAddress).effective shouldBe secondBalance.effective + transferAmount - minFee
   }
-
 }

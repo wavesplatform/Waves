@@ -322,6 +322,13 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     client.killContainer(id, DockerClient.Signal.SIGQUIT)
   }
 
+  def startContainer(id: String): Unit = {
+    client.startContainer(id)
+    nodes.asScala.find(_.containerId == id).foreach { node =>
+      node.nodeInfo = getNodeInfo(node.containerId, node.settings)
+    }
+  }
+
   def killAndStartContainer(node: DockerNode): DockerNode = {
     val id = node.containerId
     log.info(s"Killing container with id: $id")
@@ -539,7 +546,7 @@ object Docker {
 
     val genesisConfig    = timestampOverrides.withFallback(configTemplate)
     val gs               = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")
-    val genesisSignature = Block.genesis(gs).explicitGet().uniqueId
+    val genesisSignature = Block.genesis(gs).explicitGet().id()
 
     parseString(s"waves.blockchain.custom.genesis.signature = $genesisSignature").withFallback(timestampOverrides)
   }

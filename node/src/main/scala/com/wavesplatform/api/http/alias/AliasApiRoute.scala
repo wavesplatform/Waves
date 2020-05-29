@@ -1,9 +1,14 @@
 package com.wavesplatform.api.http.alias
 
+import akka.NotUsed
+import akka.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSupport}
 import akka.http.scaladsl.server.Route
+import akka.stream.scaladsl.Source
 import cats.syntax.either._
 import com.wavesplatform.account.Alias
+import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http._
+import com.wavesplatform.api.http.requests.CreateAliasRequest
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
@@ -11,10 +16,16 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
-import play.api.libs.json.Json
+import play.api.libs.json.{JsString, JsValue, Json}
 
-case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time, blockchain: Blockchain)
-    extends ApiRoute
+case class AliasApiRoute(
+    settings: RestAPISettings,
+    commonApi: CommonTransactionsApi,
+    wallet: Wallet,
+    utxPoolSynchronizer: UtxPoolSynchronizer,
+    time: Time,
+    blockchain: Blockchain
+) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {
 
@@ -24,9 +35,9 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynch
 
   private def deprecatedRoute: Route =
     path("broadcast" / "create") {
-      broadcast[SignedCreateAliasV1Request](_.toTx)
+      broadcast[CreateAliasRequest](_.toTx)
     } ~ (path("create") & withAuth) {
-      broadcast[CreateAliasV1Request](TransactionFactory.aliasV1(_, wallet, time))
+      broadcast[CreateAliasRequest](TransactionFactory.createAlias(_, wallet, time))
     }
 
   def addressOfAlias: Route = (get & path("by-alias" / Segment)) { aliasName =>
@@ -39,11 +50,13 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynch
     }
   }
 
-  def aliasOfAddress: Route = (get & path("by-address" / Segment)) { addressString =>
-    complete {
-      com.wavesplatform.account.Address
-        .fromString(addressString)
-        .map(acc => blockchain.aliasesOfAddress(acc).map(_.stringRepr).toVector)
+  private implicit val ess: JsonEntityStreamingSupport = EntityStreamingSupport.json()
+
+  def aliasOfAddress: Route = (get & path("by-address" / AddrSegment)) { address =>
+    extractScheduler { implicit s =>
+      val value: Source[JsValue, NotUsed] =
+        Source.fromPublisher(commonApi.aliasesOfAddress(address).map { case (_, tx) => JsString(tx.alias.stringRepr) }.toReactivePublisher)
+      complete(value)
     }
   }
 }

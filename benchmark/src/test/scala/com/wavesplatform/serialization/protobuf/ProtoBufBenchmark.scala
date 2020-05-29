@@ -8,11 +8,12 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
+import com.wavesplatform.transaction.transfer.{Attachment, MassTransferTransaction}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
+//noinspection ScalaStyle
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
 @Threads(1)
@@ -26,18 +27,20 @@ class ProtoBufBenchmark {
     val vanillaTx = {
       val transfers = MassTransferTransaction
         .parseTransfersList(
-          List(Transfer("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", 100000000L), Transfer("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", 200000000L)))
+          List(Transfer("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", 100000000L), Transfer("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", 200000000L))
+        )
         .right
         .get
 
       MassTransferTransaction
         .create(
-          Waves,
+          1.toByte,
           PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
+          Waves,
           transfers,
-          1518091313964L,
           200000,
-          Base58.tryDecodeWithLimit("59QuUcqP6p").get,
+          1518091313964L,
+          Some(Attachment.Bin(Base58.tryDecodeWithLimit("59QuUcqP6p").get)),
           Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get))
         )
         .right
@@ -53,18 +56,20 @@ class ProtoBufBenchmark {
     val vanillaTx = {
       val transfers = MassTransferTransaction
         .parseTransfersList(
-          List(Transfer("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", 100000000L), Transfer("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", 200000000L)))
+          List(Transfer("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", 100000000L), Transfer("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", 200000000L))
+        )
         .right
         .get
 
       MassTransferTransaction
         .create(
-          Waves,
+          1.toByte,
           PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
+          Waves,
           transfers,
-          1518091313964L,
           200000,
-          Base58.tryDecodeWithLimit("59QuUcqP6p").get,
+          1518091313964L,
+          Some(Attachment.Bin(Base58.tryDecodeWithLimit("59QuUcqP6p").get)),
           Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get))
         )
         .right

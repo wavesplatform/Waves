@@ -1,6 +1,8 @@
 package com.wavesplatform.state.diffs.smart
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
@@ -8,8 +10,8 @@ import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.smart.BlockchainContext
 import com.wavesplatform.transaction.smart.BlockchainContext.In
+import com.wavesplatform.transaction.smart.{BlockchainContext, buildThisValue}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{DataTransaction, Transaction}
 import com.wavesplatform.utils.EmptyBlockchain
@@ -25,19 +27,21 @@ package object predef {
     for {
       compileResult <- ExpressionCompiler(compilerContext(version, Expression, isAssetScript = false), expr)
       (typedExpr, _) = compileResult
+      directives = DirectiveSet(version, Account, Expression).explicitGet()
       evalContext <- BlockchainContext.build(version,
                                              chainId,
-                                             Coeval.evalOnce(t),
+                                             Coeval.evalOnce(buildThisValue(t, blockchain, directives, None)).map(_.explicitGet()),
                                              Coeval.evalOnce(blockchain.height),
                                              blockchain,
                                              isTokenContext = false,
                                              isContract = false,
-                                             Coeval(???))
+                                             Coeval(???),
+                                             ByteStr.empty)
       r <- EvaluatorV1().apply[T](evalContext, typedExpr)
     } yield r
   }
 
-  def runScript[T <: EVALUATED](script: String, t: In = null, ctxV: StdLibVersion = V1): Either[String, T] =
+  def runScript[T <: EVALUATED](script: String, t: In = null, ctxV: StdLibVersion = V1, chainId: Byte = chainId): Either[String, T] =
     runScript[T](script, ctxV, t, EmptyBlockchain, chainId)
 
   def runScript[T <: EVALUATED](script: String, t: In, chainId: Byte): Either[String, T] =
@@ -46,8 +50,14 @@ package object predef {
   def runScript[T <: EVALUATED](script: String, tx: Transaction, blockchain: Blockchain): Either[String, T] =
     runScript[T](script, V1, Coproduct(tx), blockchain, chainId)
 
-  def runScriptWithCustomContext[T <: EVALUATED](script: String, t: In, chainId: Byte, ctxV: StdLibVersion = V1): Either[String, T] =
-    runScript[T](script, ctxV, t, EmptyBlockchain, chainId)
+  def runScriptWithCustomContext[T <: EVALUATED](
+    script: String,
+    t: In,
+    chainId: Byte,
+    ctxV: StdLibVersion = V1,
+    blockchain: Blockchain = EmptyBlockchain
+  ): Either[String, T] =
+    runScript[T](script, ctxV, t, blockchain, chainId)
 
   private def dropLastLine(str: String): String = str.replace("\r", "").split('\n').init.mkString("\n")
 
@@ -68,15 +78,14 @@ package object predef {
        | let sumByteVector = match tx {
        |     case d0: DataTransaction =>
        |      let body = d0.bodyBytes
-       |      body + base64'${ByteStr(tx.bodyBytes.apply()).base64}' == base64'${ByteStr(tx.bodyBytes.apply()).base64}' + base64'${ByteStr(
-         tx.bodyBytes.apply()).base64}'
+       |      body + base64'${Base64.encode(tx.bodyBytes())}' == base64'${Base64.encode(tx.bodyBytes())}' + base64'${Base64.encode(tx.bodyBytes())}'
        |     case _: TransferTransaction => true
        |     case _ => false
        |   }
        |
        | let eqUnion = match tx {
        |   case _: DataTransaction => true
-       |   case t0: TransferTransaction => t0.recipient == Address(base58'${t.recipient.bytes.base58}')
+       |   case t0: TransferTransaction => t0.recipient == Address(base58'${t.recipient.toString}')
        |   case _ => false
        | }
        |
@@ -130,8 +139,8 @@ package object predef {
        | let txById = match tx {
        |     case _: DataTransaction => true
        |     case _: TransferTransaction =>
-       |       let g = extract(transactionById(base58'${tx.id().base58}'))
-       |       g.id == base58'${tx.id().base58}'
+       |       let g = extract(transactionById(base58'${tx.id().toString}'))
+       |       g.id == base58'${tx.id().toString}'
        |     case _ => false
        | }
        | let entries = match tx {
@@ -153,7 +162,7 @@ package object predef {
        |     dataByKey && dataByIndex
        |
        |   case _: TransferTransaction =>
-       |     let add = Address(base58'${t.recipient.bytes.base58}')
+       |     let add = Address(base58'${t.recipient}')
        |     let long = extract(getInteger(add,"${tx.data(0).key}")) == ${tx.data(0).value}
        |     let bool1 = extract(getBoolean(add,"${tx.data(1).key}")) == ${tx.data(1).value}
        |     let bin = extract(getBinary(add,"${tx.data(2).key}")) ==  base58'${tx.data(2).value}'
@@ -167,8 +176,8 @@ package object predef {
        |
        | let aFromPK = addressFromPublicKey(tx.senderPublicKey) == tx.sender
        | let aFromStrOrRecip = match tx {
-       |   case _: DataTransaction => addressFromString("${tx.sender.stringRepr}") == Address(base58'${tx.sender.bytes.base58}')
-       |   case t1: TransferTransaction => addressFromRecipient(t1.recipient) == Address(base58'${t.recipient.bytes.base58}')
+       |   case _: DataTransaction => addressFromString("${tx.sender.toAddress}") == Address(base58'${tx.sender.toAddress}')
+       |   case t1: TransferTransaction => addressFromRecipient(t1.recipient) == Address(base58'${t.recipient}')
        |   case _ => false
        | }
        |

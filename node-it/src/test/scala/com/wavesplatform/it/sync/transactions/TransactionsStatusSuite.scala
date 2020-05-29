@@ -10,7 +10,7 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.ProvenTransaction
-import com.wavesplatform.transaction.transfer.TransferTransactionV2
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import play.api.libs.json._
 
 import scala.util.Random
@@ -77,16 +77,17 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
 
   private def mkTransactions: List[ProvenTransaction] =
     (1001 to 1020).map { amount =>
-      TransferTransactionV2
+      TransferTransaction
         .selfSigned(
-          Waves,
-          miner.privateKey,
+          2.toByte,
+          miner.keyPair,
           AddressOrAlias.fromString(secondAddress).explicitGet(),
+          Waves,
           amount,
-          ntpTime.correctedTime(),
           Waves,
           minFee,
-          Array.emptyByteArray
+          None,
+          ntpTime.correctedTime(),
         )
         .explicitGet()
     }.toList
@@ -107,9 +108,9 @@ object TransactionsStatusSuite {
   object CheckData {
     def apply(height: Int, confirmed: List[TransactionInfo], unconfirmed: List[String], notFound: List[String]): CheckData =
       new CheckData(
-        confirmed.map(info => TransactionStatus(info.id, "confirmed", Some(height - info.height), Some(info.height))),
-        unconfirmed.map(d => TransactionStatus(d, "unconfirmed", None, None)),
-        notFound.map(d => TransactionStatus(d, "not_found", None, None))
+        confirmed.map(info => TransactionStatus(info.id, "confirmed", Some(height - info.height), Some(info.height), Some("succeed"))),
+        unconfirmed.map(d => TransactionStatus(d, "unconfirmed", None, None, None)),
+        notFound.map(d => TransactionStatus(d, "not_found", None, None, None))
       )
   }
 }

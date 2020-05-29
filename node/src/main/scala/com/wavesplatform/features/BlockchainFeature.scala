@@ -18,7 +18,8 @@ object BlockchainFeatures {
   val OrderV3                         = BlockchainFeature(12, "Order Version 3")
   val ReduceNFTFee                    = BlockchainFeature(13, "Reduce NFT fee")
   val BlockReward                     = BlockchainFeature(14, "Block Reward and Community Driven Monetary Policy")
-  val LeaseExpiration                 = BlockchainFeature(15, "Lease Expiration")
+  val BlockV5                         = BlockchainFeature(15, "Ride V4, VRF, Protobuf, Failed transactions")
+  val LeaseExpiration                 = BlockchainFeature(16, "Lease Expiration")
 
   // When next fork-parameter is created, you must replace all uses of the DummyFeature with the new one.
   val Dummy = BlockchainFeature(-1, "Non Votable!")
@@ -37,7 +38,8 @@ object BlockchainFeatures {
     Ride4DApps,
     OrderV3,
     ReduceNFTFee,
-    BlockReward
+    BlockReward,
+    BlockV5
   ).map(f => f.id -> f).toMap
 
   val implemented: Set[Short] = dict.keySet

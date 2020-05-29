@@ -9,8 +9,10 @@ import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.BaseTransactionSuiteLike
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1}
-import com.wavesplatform.transaction.transfer.TransferTransactionV1
+import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.utils._
 import org.scalatest.FreeSpec
 import play.api.libs.json._
 
@@ -33,7 +35,7 @@ class NFTBalanceSuite extends FreeSpec with BaseTransactionSuiteLike {
 
   private val node: Node = nodes.head
 
-  private val issuer: KeyPair = KeyPair("issuer#1".getBytes("UTF-8"))
+  private val issuer: KeyPair = KeyPair("issuer#1".getBytes)
 
   private val (simple, nft) = fillPortfolio(issuer, 100, 100)
 
@@ -45,7 +47,7 @@ class NFTBalanceSuite extends FreeSpec with BaseTransactionSuiteLike {
     val fundAndIssue =
       for {
         _      <- traverse(nodes)(_.waitForHeight(2))
-        fundTx <- node.transfer(node.address, issuer.stringRepr, 1000.waves, 0.001.waves)
+        fundTx <- node.transfer(node.address, issuer.toAddress.toString, 1000.waves, 0.001.waves)
         _      <- node.waitForTransaction(fundTx.id)
         _ <- Future.sequence((simple ++ nft) map { tx =>
           for {
@@ -60,10 +62,10 @@ class NFTBalanceSuite extends FreeSpec with BaseTransactionSuiteLike {
 
   "after activation" - {
     "returns only non-nft portfolio on /balance/{address}" in {
-      val expectedIds = simple map (_.assetId.base58)
+      val expectedIds = simple map (_.assetId.toString)
 
       val assertion =
-        getPortfolio(node, issuer.stringRepr) map { ids =>
+        getPortfolio(node, issuer.toAddress.toString) map { ids =>
           ids.toSet shouldBe expectedIds.toSet
         }
 
@@ -71,10 +73,10 @@ class NFTBalanceSuite extends FreeSpec with BaseTransactionSuiteLike {
     }
 
     "returns issue transactions on /nft/{address}/limit/{limit}" in {
-      val expectedIds = nft.map(_.assetId.base58)
+      val expectedIds = nft.map(_.assetId.toString)
 
       val assertion =
-        getNFTPage(node, issuer.stringRepr, 1000, None) map { ids =>
+        getNFTPage(node, issuer.toAddress.toString, 1000, None) map { ids =>
           ids.toSet shouldBe expectedIds.toSet
         }
 
@@ -84,28 +86,19 @@ class NFTBalanceSuite extends FreeSpec with BaseTransactionSuiteLike {
     "returns only nft with balance > 0 on /nft/{address}/limit/{limit}" in {
       val other = KeyPair("other".getBytes)
 
-      val transfer = TransferTransactionV1
-        .selfSigned(
-          randomTokenToTransfer,
-          issuer,
-          other,
-          1,
-          System.currentTimeMillis(),
-          Waves,
-          0.001.waves,
-          Array.emptyByteArray
-        )
+      val transfer = TransferTransaction
+        .selfSigned(1.toByte, issuer, other.toAddress, randomTokenToTransfer, 1, Waves, 0.001.waves, None, System.currentTimeMillis())
         .explicitGet()
 
       val assertion = for {
         tx         <- node.signedBroadcast(transfer.json())
         _          <- node.waitForTransaction(tx.id)
         _          <- node.waitForHeightArise
-        issuerNFTs <- getNFTPage(node, issuer.stringRepr, 1000, None)
-        otherNFTs  <- getNFTPage(node, other.stringRepr, 1000, None)
+        issuerNFTs <- getNFTPage(node, issuer.toAddress.toString, 1000, None)
+        otherNFTs  <- getNFTPage(node, other.toAddress.toString, 1000, None)
       } yield {
-        issuerNFTs shouldNot contain(randomTokenToTransfer.id.base58)
-        otherNFTs should contain(randomTokenToTransfer.id.base58)
+        issuerNFTs shouldNot contain(randomTokenToTransfer.id.toString)
+        otherNFTs should contain(randomTokenToTransfer.id.toString)
       }
 
       Await.result(assertion, 50.seconds)
@@ -116,12 +109,12 @@ class NFTBalanceSuite extends FreeSpec with BaseTransactionSuiteLike {
     "works" in {
       val expectedIds = nft
         .filter(_.assetId != randomTokenToTransfer.id)
-        .map(_.assetId.base58)
+        .map(_.assetId.toString)
         .toSet
 
       val assertion = for {
-        pagedIds    <- getNFTPaged(node, issuer.stringRepr, 10).map(_.toSet)
-        nonPagedIds <- getNFTPage(node, issuer.stringRepr, 1000, None).map(_.toSet)
+        pagedIds    <- getNFTPaged(node, issuer.toAddress.toString, 10).map(_.toSet)
+        nonPagedIds <- getNFTPage(node, issuer.toAddress.toString, 1000, None).map(_.toSet)
       } yield {
         pagedIds shouldBe expectedIds
         nonPagedIds shouldBe expectedIds
@@ -134,7 +127,7 @@ class NFTBalanceSuite extends FreeSpec with BaseTransactionSuiteLike {
     }
 
     "returns error on wrong limit" in {
-      val assertion = getNFTPage(node, issuer.stringRepr, 10000000, None)
+      val assertion = getNFTPage(node, issuer.toAddress.toString, 10000000, None)
         .map(_ => org.scalatest.Assertions.fail("BadRequest expected"))
         .recoverWith {
           case ex: Throwable =>
@@ -147,12 +140,12 @@ class NFTBalanceSuite extends FreeSpec with BaseTransactionSuiteLike {
     }
 
     "returns error on wrong base58 in after" in {
-      val assertion = getNFTPage(node, issuer.stringRepr, 100, Some("wr0ngbase58str1ng"))
+      val assertion = getNFTPage(node, issuer.toAddress.toString, 100, Some("wr0ngbase58str1ng"))
         .map(_ => org.scalatest.Assertions.fail("BadRequest expected"))
         .recoverWith {
           case ex: Throwable =>
             Future.successful {
-              assert(ex.getMessage contains "Unable to decode asset id")
+              assert(ex.getMessage contains "Invalid asset id")
             }
         }
 
@@ -168,33 +161,33 @@ object NFTBalanceSuite {
   def fillPortfolio(issuer: KeyPair, nft: Int, simple: Int): (List[IssueTransaction], List[IssueTransaction]) = {
 
     val simpleAssets = List.fill[IssueTransaction](simple) {
-      IssueTransactionV1
-        .selfSigned(
-          issuer,
-          s"SimpleAsset".getBytes("UTF-8"),
-          s"Simple Test Asset ${Random.nextInt(1000)}".getBytes("UTF-8"),
-          1000,
-          8,
-          reissuable = true,
-          1.waves,
-          System.currentTimeMillis()
-        )
-        .explicitGet()
+      IssueTransaction(
+        TxVersion.V1,
+        issuer.publicKey,
+        "SimpleAsset".utf8Bytes,
+        s"Simple Test Asset ${Random.nextInt(1000)}".utf8Bytes,
+        1000,
+        8,
+        reissuable = true,
+        script = None,
+        1.waves,
+        System.currentTimeMillis()
+      ).signWith(issuer.privateKey)
     }
 
     val nonFungibleAssets = List.fill[IssueTransaction](nft) {
-      IssueTransactionV1
-        .selfSigned(
-          issuer,
-          "NonFungibleAsset".getBytes("UTF-8"),
-          s"NFT Test Asset ${Random.nextInt(1000)}".getBytes("UTF-8"),
-          1,
-          0,
-          reissuable = false,
-          1.waves,
-          System.currentTimeMillis()
-        )
-        .explicitGet()
+      IssueTransaction(
+        TxVersion.V1,
+        issuer.publicKey,
+        "NonFungibleAsset".utf8Bytes,
+        s"NFT Test Asset ${Random.nextInt(1000)}".utf8Bytes,
+        1,
+        0,
+        reissuable = false,
+        script = None,
+        1.waves,
+        System.currentTimeMillis()
+      ).signWith(issuer.privateKey)
     }
 
     (simpleAssets, nonFungibleAssets)
@@ -216,7 +209,7 @@ object NFTBalanceSuite {
     Await.ready(transactions, 30.seconds)
   }
 
-  // returns first page of issue transactions ids from addresses portfolio
+  // returns first page of asset ids from addresses portfolio
   // obtained via paged api
   def getNFTPage(node: Node, issuer: String, limit: Int, maybeAfter: Option[String]): Future[List[String]] = {
     val afterParam = maybeAfter.fold("")(id => s"?after=$id")
@@ -226,12 +219,12 @@ object NFTBalanceSuite {
       .as[JsArray]
       .map { arr =>
         arr.value.map { json =>
-          (json \ "id").as[String]
+          (json \ "assetId").as[String]
         }.toList
       }
   }
 
-  // returns issue transactions ids from addresses portfolio
+  // returns asset ids from addresses portfolio
   // obtained via paged api
   def getNFTPaged(node: Node, address: String, limit: Int): Future[List[String]] = {
     def loop(lastId: Option[String], acc: List[String]): Future[List[String]] = {
