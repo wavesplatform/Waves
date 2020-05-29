@@ -124,7 +124,7 @@ object Serde {
           .flatMap(argsCount =>
             if (argsCount <= (bb.limit() - bb.position()) && argsCount >= 0)
               (1 to argsCount)
-                .toStream
+                .to(LazyList)
                 .traverse(_ => evaluatedOnly(desAux(bb)))
                 .map(elements => ARR(elements.toIndexedSeq, false).explicitGet)
             else

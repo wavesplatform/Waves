@@ -36,7 +36,7 @@ class ReplEngine[F[_] : Monad] {
   private def parse(expr: String): Either[String, EXPR] =
     Parser.parseExprOrDecl(expr)
       .fold(
-        { case (_, _, err) => Left(err.traced.toString) },
+        { case (_, _, err) => Left(err.trace().toString) },
         { case (result, _) => Right(result) }
       )
 

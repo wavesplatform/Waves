@@ -147,7 +147,7 @@ object Decompiler {
       case Terms.FALSE                   => pureOut("false", i)
       case Terms.CONST_BOOLEAN(b)        => pureOut(b.toString.toLowerCase(), i)
       case Terms.CONST_LONG(t)           => pureOut(t.toLong.toString, i)
-      case Terms.CONST_STRING(s)         => pureOut('"' + s + '"', i)
+      case Terms.CONST_STRING(s)         => pureOut("\"" ++ s ++ "\"", i)
       case Terms.CONST_BYTESTR(bs)       => pureOut(if(bs.size <= 128) { "base58'" ++ bs.toString ++ "'" } else { "base64'" ++ bs.base64Raw ++ "'" }, i)
       case Terms.REF(ref)                => pureOut(ref, i)
       case Terms.GETTER(getExpr, fld)    => expr(pure(getExpr), ctx, BracesWhenNeccessary, firstLinePolicy).map(a => a + "." + fld)
