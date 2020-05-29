@@ -33,7 +33,7 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*)
   val Gt    = FunctionHeader.Native(GT_LONG)
 
   val customFunctionCosts: Map[FunctionHeader, Coeval[Long]] =
-    Map[FunctionHeader, Long](Plus -> 100, Minus -> 10, Gt -> 10).mapValues(Coeval.now)
+    Map[FunctionHeader, Long](Plus -> 100, Minus -> 10, Gt -> 10).mapValues(Coeval.now).toMap
 
   private val v3FunctionCosts = utils.functionCosts(V3)
 

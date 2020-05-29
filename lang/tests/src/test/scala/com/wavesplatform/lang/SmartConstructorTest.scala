@@ -14,7 +14,7 @@ class SmartConstructorTest extends PropSpec with Matchers with Inside {
     }
 
     val illegalBytes = ByteStr.fill(dataTxBytesMax + 1)(1)
-    CONST_BYTESTR(illegalBytes) shouldBe 'left
+    CONST_BYTESTR(illegalBytes) shouldBe Symbol("left")
   }
 
   property("CONST_STRING size limit") {
@@ -26,6 +26,6 @@ class SmartConstructorTest extends PropSpec with Matchers with Inside {
     }
 
     val illegalString = "ё" * (dataTxBytesMax / 2 + 1)
-    CONST_STRING(illegalString) shouldBe 'left
+    CONST_STRING(illegalString) shouldBe Symbol("left")
   }
 }

@@ -17,15 +17,15 @@ import scorex.crypto.encode.{Base58 => ScorexBase58}
 class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
 
   private def parse(x: String): EXPR = Parser.parseExpr(x) match {
-    case Success(r, _)            => r
-    case e: Failure[Char, String] => catchParseError(x, e)
+    case Success(r, _) => r
+    case e: Failure    => catchParseError(x, e)
   }
 
-  private def catchParseError(x: String, e: Failure[Char, String]): Nothing = {
+  private def catchParseError(x: String, e: Failure): Nothing = {
     import e.{index => i}
     println(s"val code1 = new String(Array[Byte](${x.getBytes("UTF-8").mkString(",")}))")
     println(s"""val code2 = "${escapedCode(x)}"""")
-    println(s"Can't parse (len=${x.length}): <START>\n$x\n<END>\nError: $e\nPosition ($i): '${x.slice(i, i + 1)}'\nTraced:\n${e.extra.traced.fullStack
+    println(s"Can't parse (len=${x.length}): <START>\n$x\n<END>\nError: $e\nPosition ($i): '${x.slice(i, i + 1)}'\nTraced:\n${e.extra.traced.stack
       .mkString("\n")}")
     throw new TestFailedException("Test failed", 0)
   }
@@ -1313,6 +1313,6 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
     }
     val script = s"$manyLets\n$lastStmt"
 
-    Parser.parseExpr(script) shouldBe an[Success[_, _, _]]
+    Parser.parseExpr(script) shouldBe an[Success[_]]
   }
 }

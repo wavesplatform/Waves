@@ -31,7 +31,7 @@ object Dependencies {
   private val catsCore   = catsModule("core")
   private val shapeless  = Def.setting("com.chuusai" %%% "shapeless" % "2.3.3")
 
-  val scalaTest = "org.scalatest" %% "scalatest" % "3.1.1" % Test
+  val scalaTest = "org.scalatest" %% "scalatest" % "3.0.8" % Test
 
   val kafka = "org.apache.kafka" %% "kafka" % "2.1.0"
 
@@ -110,13 +110,12 @@ object Dependencies {
     logback,
     "com.spotify" % "docker-client" % "8.15.1",
     jacksonModule("dataformat", "dataformat-properties"),
-    asyncHttpClient,
-    "org.scalacheck" %% "scalacheck" % "1.14.0"
+    asyncHttpClient
   ).map(_ % Test)
 
   lazy val test = scalaTest +: Seq(
     logback,
-    "org.scalacheck" %% "scalacheck" % "1.14.0",
+    "org.scalacheck" %% "scalacheck" % "1.14.1",
     "org.mockito"    % "mockito-all" % "1.10.19",
     "org.scalamock"  %% "scalamock"  % "4.4.0"
   ).map(_ % Test)
