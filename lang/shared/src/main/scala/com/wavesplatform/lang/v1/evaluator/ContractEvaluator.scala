@@ -118,7 +118,7 @@ object ContractEvaluator {
         case (buildingExpr, (letName, letValue)) =>
           BLOCK(LET(letName, letValue.value.value.explicitGet()), buildingExpr)
       }
-    EvaluatorV2.applyWithLogging(exprWithLets, limit, ctx, version)
+    EvaluatorV2.applyLimited(exprWithLets, limit, ctx, version)
       .flatMap {
         case (expr, unusedComplexity, log) =>
           val result =

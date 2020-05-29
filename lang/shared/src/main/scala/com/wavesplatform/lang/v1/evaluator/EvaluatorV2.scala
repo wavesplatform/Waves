@@ -125,21 +125,20 @@ class EvaluatorV2(
               }
           }
         evaluatedArgs
-          .flatMap { unusedArgsCoeval =>
+          .flatMap { unusedArgsComplexity =>
             if (fc.args.forall(_.isInstanceOf[EVALUATED])) {
               fc.function match {
                 case FunctionHeader.Native(_) =>
                   val NativeFunction(_, costByVersion, _, ev, _) = ctx.ec.functions(fc.function).asInstanceOf[NativeFunction[Environment]]
                   val cost                                       = costByVersion(stdLibVersion).toInt
-                  if (unusedArgsCoeval < cost) {
-                    Coeval.now(unusedArgsCoeval)
-                  } else {
+                  if (unusedArgsComplexity < cost)
+                    Coeval.now(unusedArgsComplexity)
+                  else
                     update(ev[Id]((ctx.ec.environment, fc.args.asInstanceOf[List[EVALUATED]])).explicitGet())
-                      .map(_ => unusedArgsCoeval - cost)
+                      .map(_ => unusedArgsComplexity - cost)
 
-                  }
                 case FunctionHeader.User(_, name) =>
-                  if (unusedArgsCoeval > 0)
+                  if (unusedArgsComplexity > 0)
                     ctx.ec.functions
                       .get(fc.function)
                       .map(_.asInstanceOf[UserFunction[Environment]])
@@ -152,17 +151,17 @@ class EvaluatorV2(
                               case ((argName, argValue), argsWithExpr) =>
                                 BLOCK(LET(argName, argValue), argsWithExpr)
                             }
-                        update(argsWithExpr).flatMap(_ => root(argsWithExpr, update, unusedArgsCoeval, parentBlocks))
+                        update(argsWithExpr).flatMap(_ => root(argsWithExpr, update, unusedArgsComplexity, parentBlocks))
                       }
                       .getOrElse {
                         val objectType = ctx.ec.typeDefs(name).asInstanceOf[CASETYPEREF] // todo handle absence
                         val fields     = objectType.fields.map(_._1) zip fc.args.asInstanceOf[List[EVALUATED]]
-                        root(CaseObj(objectType, fields.toMap), update, unusedArgsCoeval, parentBlocks)
+                        root(CaseObj(objectType, fields.toMap), update, unusedArgsComplexity, parentBlocks)
                       } else
-                    Coeval.now(unusedArgsCoeval)
+                    Coeval.now(unusedArgsComplexity)
               }
             } else {
-              Coeval.now(unusedArgsCoeval)
+              Coeval.now(unusedArgsComplexity)
             }
           }
       case evaluated: EVALUATED =>
@@ -241,7 +240,7 @@ class EvaluatorV2(
 }
 
 object EvaluatorV2 {
-  def applyWithLogging(
+  def applyLimited(
       expr: EXPR,
       limit: Int,
       ctx: EvaluationContext[Environment, Id],
@@ -264,7 +263,7 @@ object EvaluatorV2 {
       stdLibVersion: StdLibVersion
   ): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] =
     EvaluatorV2
-      .applyWithLogging(expr, Int.MaxValue, ctx, stdLibVersion)
+      .applyLimited(expr, Int.MaxValue, ctx, stdLibVersion)
       .flatMap {
         case (expr, _, log) =>
           expr match {
