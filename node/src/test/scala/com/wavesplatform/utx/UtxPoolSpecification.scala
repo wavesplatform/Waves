@@ -1001,7 +1001,7 @@ class UtxPoolSpecification
 
               def addUnverified(tx: Transaction): Unit = {
                 val addTransaction = PrivateMethod[TracedResult[ValidationError, Boolean]]('addTransaction)
-                utxPool invokePrivate addTransaction(tx, false, false)
+                utxPool invokePrivate addTransaction(tx, false)
               }
 
               val differ = TransactionDiffer(d.blockchainUpdater.lastBlockTimestamp, System.currentTimeMillis(), verify = false)(

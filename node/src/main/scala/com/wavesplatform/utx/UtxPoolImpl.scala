@@ -41,6 +41,7 @@ import scala.collection.mutable
 import scala.concurrent.duration.{Duration => ScalaDuration, _}
 import scala.util.{Left, Right}
 
+//noinspection ScalaStyle
 class UtxPoolImpl(
     time: Time,
     blockchain: Blockchain,
@@ -183,9 +184,13 @@ class UtxPoolImpl(
 
   private[this] def removeIds(removed: Set[ByteStr]): Unit = priorityDiffs.synchronized {
     val diffsToReset = priorityDiffs.filter(pd => removed.exists(pd.contains))
+    val factRemoved = Set.newBuilder[Transaction]
     diffsToReset.foreach { diff =>
       val fullyReset: Boolean = diff.transactions.keySet.forall(removed)
-      diff.transactionsValues.foreach(PoolMetrics.removeTransactionPriority)
+      diff.transactionsValues.foreach { tx =>
+        PoolMetrics.removeTransactionPriority(tx)
+        factRemoved += tx
+      }
       if (!fullyReset) {
         log.warn(s"Priority $diff is partially reset")
         val txsToAdd = diff.transactions.filterKeys(!removed(_)).values.map(_._1)
@@ -194,7 +199,9 @@ class UtxPoolImpl(
     }
     priorityDiffs --= diffsToReset
 
+    factRemoved ++= removed.flatMap(id => Option(transactions.get(id)))
     removed.foreach(removeFromOrdPool)
+    factRemoved.result().foreach(tx => onEvent(UtxEvent.TxRemoved(tx, None)))
   }
 
   private[this] def addTransaction(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
@@ -228,7 +235,7 @@ class UtxPoolImpl(
 
   override def pessimisticPortfolio(addr: Address): Portfolio = priorityDiffs.synchronized {
     val diffPf = for {
-      diff <- priorityDiffs.toVector
+      diff    <- priorityDiffs.toVector
       (a, pf) <- diff.portfolios if a == addr
     } yield pf.pessimistic
 
@@ -452,6 +459,10 @@ class UtxPoolImpl(
     cleanupScheduler.awaitTermination(10 seconds)
   }
 
+  override def finalize(): Unit = {
+    cleanupScheduler.shutdown()
+  }
+
   private[this] implicit class DiffExt(diff: Diff) {
     def contains(txId: ByteStr): Boolean     = diff.transactions.contains(txId)
     def transactionsValues: Seq[Transaction] = diff.transactions.values.map(_._1).toVector
@@ -502,13 +513,13 @@ class UtxPoolImpl(
 
 object UtxPoolImpl {
   private case class PackResult(
-                                 transactions: Option[Seq[Transaction]],
-                                 totalDiff: Diff,
-                                 constraint: MultiDimensionalMiningConstraint,
-                                 iterations: Int,
-                                 checkedAddresses: Set[Address],
-                                 validatedTransactions: Set[ByteStr],
-                                 removedTransactions: Set[ByteStr]
+      transactions: Option[Seq[Transaction]],
+      totalDiff: Diff,
+      constraint: MultiDimensionalMiningConstraint,
+      iterations: Int,
+      checkedAddresses: Set[Address],
+      validatedTransactions: Set[ByteStr],
+      removedTransactions: Set[ByteStr]
   )
 
   private class PessimisticPortfolios(spendableBalanceChanged: Observer[(Address, Asset)], isTxKnown: ByteStr => Boolean) {
