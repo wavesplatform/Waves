@@ -1781,13 +1781,21 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     lazy val getElement: Stream[String] =
       Stream(""""a"""", "true", "123", "base58'aaaa'", "unit") #::: getElement
 
+   /*  Example for size = 2
+    *
+    *  let a = (true, 123)
+    *  let (a1, a2) = a
+    *  a._1 == true && a1 == true && a._2 == 123 && a2 == 123 &&
+    *  a == (true, 123)
+    */
     def check(size: Int) = {
-      val tuple = (1 to size).map(getElement).mkString("(", ", ", ")")
+      val tupleDefinition = (1 to size).map(getElement).mkString("(", ", ", ")")
       val script =
         s"""
-           | let a = $tuple
-           | ${(1 to size).map(i => s"a._$i == ${getElement(i)} &&").mkString(" ")}
-           | a == $tuple
+           | let a = $tupleDefinition
+           | let ${(1 to size).map(i => s"a$i").mkString("(", ", ", ")")} = a
+           | ${(1 to size).map(i => s"a._$i == ${getElement(i)} && a$i == ${getElement(i)} &&").mkString(" ")}
+           | a == $tupleDefinition
          """.stripMargin
 
       eval(script, version = V3) should produce(s"Can't find a function '_Tuple$size'")

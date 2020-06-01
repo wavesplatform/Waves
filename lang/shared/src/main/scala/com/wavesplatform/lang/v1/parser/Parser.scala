@@ -315,21 +315,66 @@ object Parser {
           }
       }
 
-  val letP: P[LET] =
-    P(Index ~~ "let" ~~ &(CharIn(" \t\n\r")) ~/ comment ~ Index ~ anyVarName.? ~ comment ~ Index ~ ("=" ~/ Index ~ baseExpr.?).? ~~ Index)
+  private val destructuredTupleValuesP: P[Seq[(Int, Option[PART[String]])]] =
+    P("(") ~
+      (Index ~ anyVarName.?).rep(
+        sep = comment ~ "," ~ comment,
+        min = ContractLimits.MinTupleSize,
+        max = ContractLimits.MaxTupleSize
+      ) ~
+      P(")")
+
+  private val letNameP: P[Seq[(Int, Option[PART[String]])]] =
+    (Index ~ anyVarName.?).map(Seq(_))
+
+  val letP: P[Seq[LET]] =
+    P(Index ~~ "let" ~~ &(CharIn(" \t\n\r")) ~/ comment ~ (destructuredTupleValuesP | letNameP) ~ comment ~ Index ~ ("=" ~/ Index ~ baseExpr.?).? ~~ Index)
       .map {
-        case (start, namePos, nameRaw, valuePos, valueRaw, end) =>
-          val name = nameRaw.getOrElse(PART.INVALID(Pos(namePos, namePos), "expected a variable's name"))
-          val value = valueRaw
-            .map { case (pos, expr) => expr.getOrElse(INVALID(Pos(pos, pos), "expected a value's expression")) }
-            .getOrElse(INVALID(Pos(valuePos, valuePos), "expected a value"))
-          LET(Pos(start, end), name, value, Seq.empty)
+        case (start, names, valuePos, valueRaw, end) =>
+          val value = extractValue(valuePos, valueRaw)
+          val pos = Pos(start, end)
+          if (names.length == 1)
+            names.map { case (nameStart, nameRaw) =>
+              val name = extractName(Pos(nameStart, nameStart), nameRaw)
+              LET(pos, name, value, Seq.empty)
+            }
+          else {
+            val exprRefName = "$t0" + s"${pos.start}${pos.end}"
+            val exprRef = LET(pos, VALID(pos, exprRefName), value, Nil)
+            val tupleValues =
+              names.zipWithIndex
+                .map { case ((nameStart, nameRaw), i) =>
+                  val namePos = Pos(nameStart, nameStart)
+                  val name = extractName(namePos, nameRaw)
+                  val getter = GETTER(
+                    namePos,
+                    REF(namePos, VALID(namePos, exprRefName)),
+                    VALID(namePos, s"_${i + 1}")
+                  )
+                  LET(pos, name, getter, Nil)
+                }
+            exprRef +: tupleValues
+          }
       }
+
+  private def extractName(
+    namePos: Pos,
+    nameRaw: Option[PART[String]]
+  ): PART[String] =
+    nameRaw.getOrElse(PART.INVALID(namePos, "expected a variable's name"))
+
+  private def extractValue(
+    valuePos: Int,
+    valueRaw: Option[(Int, Option[EXPR])]
+  ): EXPR =
+    valueRaw
+      .map { case (pos, expr) => expr.getOrElse(INVALID(Pos(pos, pos), "expected a value's expression")) }
+      .getOrElse(INVALID(Pos(valuePos, valuePos), "expected a value"))
 
   val block: P[EXPR] = blockOr(INVALID(_, "expected ';'"))
 
   private def blockOr(otherExpr: Pos => EXPR): P[EXPR] = {
-    val declaration = letP | funcP
+    val declaration = letP | funcP.map(Seq(_))
 
     // Hack to force parse of "\n". Otherwise it is treated as a separator
     val newLineSep = {
@@ -354,8 +399,9 @@ object Parser {
         ) ~~
         Index
     ).map {
-      case (start, ls, body, end) => {
-        ls.reverse
+      case (start, declarations, body, end) => {
+        declarations.flatten
+          .reverse
           .foldLeft(body.getOrElse(INVALID(Pos(end, end), "expected a body"))) { (acc, l) =>
             BLOCK(Pos(start, end), l, acc)
           }
@@ -378,7 +424,7 @@ object Parser {
 
   val singleBaseExpr = P(binaryOp(singleBaseAtom, opsByPriority))
 
-  val declaration = P(letP | funcP)
+  val declaration = P(letP | funcP.map(Seq(_)))
 
   def revp[A, B](l: A, s: Seq[(B, A)], o: Seq[(A, B)] = Seq.empty): (Seq[(A, B)], A) = {
     s.foldLeft((o, l)) { (acc, op) =>
@@ -420,7 +466,7 @@ object Parser {
   def parseContract(str: String): core.Parsed[DAPP, Char, String] =
     P(Start ~ unusedText ~ (declaration.rep) ~ comment ~ (annotatedFunc.rep) ~ !declaration.rep(min = 1) ~ End ~~ Index)
       .map {
-        case (ds, fs, end) => DAPP(Pos(0, end), ds.toList, fs.toList)
+        case (ds, fs, end) => DAPP(Pos(0, end), ds.flatten.toList, fs.toList)
       }
       .parse(str) match {
       case (f @ Parsed.Failure(m, o, e)) if (m.toString.startsWith("!(declaration.rep(")) =>

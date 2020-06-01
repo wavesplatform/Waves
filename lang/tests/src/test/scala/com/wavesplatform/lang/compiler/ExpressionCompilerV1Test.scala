@@ -149,6 +149,17 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     )
   }
 
+  property("avoid duplicates of internal variable name of tuple destructuring") {
+    val script =
+      """
+        | let (a1, a2, a3) = (1, 2, 3)
+        | let (b1, b2, b3) = (1, 2, 3)
+        | a1 == b1
+      """.stripMargin
+    val expr = Parser.parseExpr(script).get.value
+    ExpressionCompiler(compilerContextV4, expr) shouldBe 'right
+  }
+
   treeTypeTest("GETTER")(
     ctx =
       CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> VariableInfo(AnyPos, pointType)), functionDefs = Map.empty),
