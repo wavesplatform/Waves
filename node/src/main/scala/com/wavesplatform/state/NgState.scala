@@ -107,6 +107,9 @@ class NgState(
 
   def bestLiquidDiff: Diff = bestLiquidDiffAndFees._1
 
+  def allDiffs: Seq[Diff] =
+    microBlocks.map(mb => microDiffs(mb.totalBlockId).diff).reverse
+
   def contains(blockId: BlockId): Boolean =
     base.id() == blockId || microBlocks.exists(_.idEquals(blockId))
 

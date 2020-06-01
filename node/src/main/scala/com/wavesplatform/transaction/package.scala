@@ -13,7 +13,6 @@ package object transaction {
   val AssetIdLength: Int       = com.wavesplatform.crypto.DigestLength
   val AssetIdStringLength: Int = base58Length(AssetIdLength)
 
-  type DiscardedTransactions = Seq[Transaction]
   type DiscardedBlocks       = Seq[(Block, ByteStr)]
   type DiscardedMicroBlocks  = Seq[(MicroBlock, Diff)]
   type AuthorizedTransaction = Authorized with Transaction

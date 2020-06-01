@@ -97,7 +97,7 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
       .when(*, *, *)
       .onCall { (block, _, _) =>
         minedBlock = block
-        Right(None)
+        Right(Nil)
       }
       .once()
     (blockchainUpdater.balanceSnapshots _).when(*, *, *).returning(Seq(BalanceSnapshot(1, ENOUGH_AMT, 0, 0)))
