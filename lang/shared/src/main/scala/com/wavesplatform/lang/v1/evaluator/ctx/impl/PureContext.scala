@@ -738,7 +738,7 @@ object PureContext {
       FUNCTION_CALL(User("!="), List(index, unit))
     }
 
-  val runtimeTuple: CASETYPEREF = CASETYPEREF("Tuple", Nil)
+  val runtimeTupleType: CASETYPEREF = CASETYPEREF("Tuple", Nil)
 
   def createTupleN(resultSize: Int): NativeFunction[NoContext] = {
     val typeParams =
@@ -753,7 +753,7 @@ object PureContext {
     ) {
       case elements if elements.length == resultSize =>
         val fields = elements.mapWithIndex { case (element, i) => (s"_${i + 1}", element) }.toMap
-        Right(CaseObj(runtimeTuple, fields))
+        Right(CaseObj(runtimeTupleType, fields))
       case xs =>
         notImplemented[Id, EVALUATED](typeParams.map(_.char).mkString("(", ", ", ")"), xs)
     }
