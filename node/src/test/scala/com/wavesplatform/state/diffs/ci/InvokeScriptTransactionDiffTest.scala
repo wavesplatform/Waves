@@ -1624,7 +1624,6 @@ class InvokeScriptTransactionDiffTest
     val blockchain: Blockchain = mock[Blockchain]
     forAll(uniqueAssetIdScenario) {
       case (asset, invoke, master, script, funcBinding) =>
-        (blockchain.settings _).expects().returning(TestSettings.Default.blockchainSettings)
         (blockchain.assetScript _).expects(*).returning(None)
         (blockchain.accountScript _)
           .expects(master.toAddress)
@@ -1648,6 +1647,7 @@ class InvokeScriptTransactionDiffTest
         (blockchain.settings _)
           .expects()
           .returning(BlockchainSettings('W', fs, GenesisSettings.MAINNET, RewardsSettings.MAINNET, useEvaluatorV2 = false))
+          .anyNumberOfTimes()
         (blockchain.assetDescription _)
           .expects(*)
           .returning(
