@@ -158,7 +158,7 @@ class AssetsBroadcastRouteSpec
         }
         forAll(longAttachment) { a =>
           posting(tr.copy(attachment = Some(a))) should produce(
-            WrongJson(errors = Seq(JsPath \ "attachment" -> Seq(JsonValidationError(s"attachment length ${a.length} exceeds maximum length of 192"))))
+            WrongJson(errors = Seq(JsPath \ "attachment" -> Seq(JsonValidationError(s"Length ${a.length} exceeds maximum length of 192"))))
           )
         }
         forAll(nonPositiveLong) { fee =>

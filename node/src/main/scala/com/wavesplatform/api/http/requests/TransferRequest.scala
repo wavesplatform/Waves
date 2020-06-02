@@ -16,10 +16,10 @@ case class TransferRequest(
     amount: Long,
     feeAssetId: Option[Asset],
     fee: Long,
-    attachment: ByteStr,
-    timestamp: Option[Long],
-    signature: Option[ByteStr],
-    proofs: Option[Proofs]
+    attachment: Option[ByteStr] = None,
+    timestamp: Option[Long]= None,
+    signature: Option[ByteStr] = None,
+    proofs: Option[Proofs] = None
 ) extends TxBroadcastRequest {
   def toTxFrom(sender: PublicKey): Either[ValidationError, TransferTransaction] =
     for {
@@ -33,7 +33,7 @@ case class TransferRequest(
         amount,
         feeAssetId.getOrElse(Asset.Waves),
         fee,
-        attachment,
+        attachment.getOrElse(ByteStr.empty),
         timestamp.getOrElse(0L),
         validProofs
       )

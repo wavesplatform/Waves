@@ -10,7 +10,7 @@ case class MassTransferRequest(
     sender: String,
     transfers: List[Transfer],
     fee: Long,
-    attachment: ByteStr,
+    attachment: Option[ByteStr] = None,
     timestamp: Option[Long] = None
 )
 

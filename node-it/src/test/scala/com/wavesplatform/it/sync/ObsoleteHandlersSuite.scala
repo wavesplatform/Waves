@@ -36,7 +36,7 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
   test("assets masstransfer") {
     val fee       = calcMassTransferFee(2)
     val transfers = List(Transfer(secondAddress, 1.waves), Transfer(thirdAddress, 2.waves))
-    val json      = sender.postJson("/assets/masstransfer", MassTransferRequest(None, None, firstAddress, transfers, fee, ByteStr.empty))
+    val json      = sender.postJson("/assets/masstransfer", MassTransferRequest(None, None, firstAddress, transfers, fee))
     val tx        = Json.parse(json.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(tx)
   }
@@ -44,7 +44,7 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
   test("assets transfer") {
     val json = sender.postJson(
       "/assets/transfer",
-      TransferRequest(Some(1.toByte), Some(firstAddress), None, secondAddress, None, transferAmount, None, minFee, ByteStr.empty, None, None, None)
+      TransferRequest(Some(1.toByte), Some(firstAddress), None, secondAddress, None, transferAmount, None, minFee, None, None, None)
     )
     val tx = Json.parse(json.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(tx)
