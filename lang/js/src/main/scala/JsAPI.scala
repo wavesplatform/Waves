@@ -210,7 +210,7 @@ object JsAPI {
                 "result"           -> Global.toBuffer(bytes),
                 "ast"              -> toJs(dApp),
                 "complexity"       -> maxComplexity,
-                "complexityByFunc" -> complexityByFunc.toJSDictionary
+                "complexityByFunc" -> complexityByFunc.mapValues(t => t: Any).toJSDictionary
               )
               val errorFieldOpt: Seq[(String, Any)] =
                 Global.checkContract(dApp, maxComplexityFunc, version)
