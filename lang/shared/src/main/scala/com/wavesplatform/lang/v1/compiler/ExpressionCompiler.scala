@@ -226,7 +226,7 @@ object ExpressionCompiler {
       pos: Pos,
       typeDefs: Map[String, FINAL],
       definedTypes: List[(String, Option[String])],
-      expectedTypes: List[String] = List(),
+      expectedTypes: List[String],
       varName: Option[String] = None
   ): Either[CompilationError, List[FINAL]] = {
     def f(t: String) = flatSingle(pos, typeDefs, definedTypes.map(_.toString), expectedTypes, varName, t)
