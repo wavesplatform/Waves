@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.Serde
@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{DataTransaction, Proofs}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalatest.{Matchers, PropSpec}
@@ -46,7 +46,7 @@ class SerContextFunctionsTest extends PropSpec with PropertyChecks with Matchers
         100000000,
         Waves,
         100000000,
-        Some(Attachment.Bin(Base58.tryDecodeWithLimit("4t2Xazb2SX").get)),
+        ByteStr.decodeBase58("4t2Xazb2SX").get,
         1526641218066L,
         Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)),
         recipient.chainId

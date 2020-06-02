@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs
 import cats.{Order => _, _}
 import com.wavesplatform.account.{Address, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
@@ -994,17 +995,16 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Tran
         fee  = 100000000L
         itx1 <- issueGen(MATCHER, Some(ENOUGH_AMT), fixedDecimals = Some(8.toByte))
         itx2 <- issueGen(MATCHER, Some(ENOUGH_AMT), fixedDecimals = Some(8.toByte))
-        ttx1 = TransferTransaction
-          .selfSigned(TxVersion.V3, MATCHER, seller.toAddress, IssuedAsset(itx1.assetId), ENOUGH_AMT / 2, Waves, fee, None, itx1.timestamp + 1)
+        ttx1 = TransferTransaction.selfSigned(TxVersion.V3, MATCHER, seller.toAddress, IssuedAsset(itx1.assetId), ENOUGH_AMT / 2, Waves, fee, ByteStr.empty, itx1.timestamp + 1)
           .explicitGet()
         ttx2 = TransferTransaction
-          .selfSigned(TxVersion.V3, MATCHER, buyer.toAddress, IssuedAsset(itx1.assetId), ENOUGH_AMT / 2, Waves, fee, None, itx1.timestamp + 1)
+          .selfSigned(TxVersion.V3, MATCHER, buyer.toAddress, IssuedAsset(itx1.assetId), ENOUGH_AMT / 2, Waves, fee, ByteStr.empty, itx1.timestamp + 1)
           .explicitGet()
         ttx3 = TransferTransaction
-          .selfSigned(TxVersion.V3, MATCHER, seller.toAddress, IssuedAsset(itx2.assetId), ENOUGH_AMT / 2, Waves, fee, None, itx2.timestamp + 1)
+          .selfSigned(TxVersion.V3, MATCHER, seller.toAddress, IssuedAsset(itx2.assetId), ENOUGH_AMT / 2, Waves, fee, ByteStr.empty, itx2.timestamp + 1)
           .explicitGet()
         ttx4 = TransferTransaction
-          .selfSigned(TxVersion.V3, MATCHER, buyer.toAddress, IssuedAsset(itx2.assetId), ENOUGH_AMT / 2, Waves, fee, None, itx2.timestamp + 1)
+          .selfSigned(TxVersion.V3, MATCHER, buyer.toAddress, IssuedAsset(itx2.assetId), ENOUGH_AMT / 2, Waves, fee, ByteStr.empty, itx2.timestamp + 1)
           .explicitGet()
         assets        = Seq(IssuedAsset(itx1.assetId), IssuedAsset(itx2.assetId), Waves)
         assetsDecimal = Map(IssuedAsset(itx1.assetId) -> itx1.decimals, IssuedAsset(itx2.assetId) -> itx2.decimals, Waves -> 8.toByte)
@@ -1382,7 +1382,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Tran
             transfers = sellers.map(seller => ParsedTransfer(seller.toAddress, issueTx2.quantity / sellOrdersCount)),
             fee = 1000L,
             genesisTimestamp + 1000L,
-            None
+            ByteStr.empty
           )
           .explicitGet()
 

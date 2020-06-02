@@ -58,8 +58,8 @@ class TransferTransactionV2Specification extends PropSpec with PropertyChecks wi
   property("VersionedTransferTransactionSpecification id doesn't depend on proof") {
     forAll(accountGen, accountGen, proofsGen, proofsGen, attachmentGen) {
       case (_, acc2, proofs1, proofs2, attachment) =>
-        val tx1 = TransferTransaction(2.toByte, acc2.publicKey, acc2.toAddress, Waves, 1, Waves, 1, Some(attachment), 1, proofs1, acc2.toAddress.chainId)
-        val tx2 = TransferTransaction(2.toByte, acc2.publicKey, acc2.toAddress, Waves, 1, Waves, 1, Some(attachment), 1, proofs2, acc2.toAddress.chainId)
+        val tx1 = TransferTransaction(2.toByte, acc2.publicKey, acc2.toAddress, Waves, 1, Waves, 1, attachment, 1, proofs1, acc2.toAddress.chainId)
+        val tx2 = TransferTransaction(2.toByte, acc2.publicKey, acc2.toAddress, Waves, 1, Waves, 1, attachment, 1, proofs2, acc2.toAddress.chainId)
         tx1.id() shouldBe tx2.id()
     }
   }
@@ -106,7 +106,7 @@ class TransferTransactionV2Specification extends PropSpec with PropertyChecks wi
       100000000,
       Waves,
       100000000,
-      Some(Attachment.Bin(Base58.tryDecodeWithLimit("4t2Xazb2SX").get)),
+      ByteStr.decodeBase58("4t2Xazb2SX").get,
       1526641218066L,
       Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)),
       recipient.chainId
@@ -125,7 +125,7 @@ class TransferTransactionV2Specification extends PropSpec with PropertyChecks wi
       100000000,
       Waves,
       100000000,
-      Some(Attachment.Str("somestring")),
+      ByteStr("somestring".getBytes),
       1526641218066L,
       Proofs.empty,
       recipient.chainId

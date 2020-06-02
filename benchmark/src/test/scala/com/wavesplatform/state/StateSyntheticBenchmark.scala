@@ -3,6 +3,7 @@ package com.wavesplatform.state
 import java.util.concurrent.TimeUnit
 
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -42,7 +43,7 @@ object StateSyntheticBenchmark {
       for {
         amount    <- Gen.choose(1, waves(1))
         recipient <- accountGen
-      } yield TransferTransaction.selfSigned(1.toByte, sender, recipient.toAddress, Waves, amount, Waves, 100000, None, ts).explicitGet()
+      } yield TransferTransaction.selfSigned(1.toByte, sender, recipient.toAddress, Waves, amount, Waves, 100000, ByteStr.empty, ts).explicitGet()
   }
 
   @State(Scope.Benchmark)
@@ -55,11 +56,10 @@ object StateSyntheticBenchmark {
     protected override def txGenP(sender: KeyPair, ts: Long): Gen[Transaction] =
       for {
         recipient: KeyPair <- accountGen
-        amount                    <- Gen.choose(1, waves(1))
-      } yield
-        TransferTransaction
-          .selfSigned(2.toByte, sender, recipient.toAddress, Waves, amount, Waves, 1000000, None, ts)
-          .explicitGet()
+        amount             <- Gen.choose(1, waves(1))
+      } yield TransferTransaction
+        .selfSigned(2.toByte, sender, recipient.toAddress, Waves, amount, Waves, 1000000, ByteStr.empty, ts)
+        .explicitGet()
 
     @Setup
     override def init(): Unit = {

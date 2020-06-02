@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -98,7 +99,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
           amount = 1000,
           feeAssetId = Waves,
           fee = minFee + 0.004.waves,
-          attachment = None,
+          attachment = ByteStr.empty,
           timestamp = System.currentTimeMillis(),
           proofs = Proofs.empty,
           acc3.toAddress.chainId

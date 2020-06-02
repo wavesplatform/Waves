@@ -75,10 +75,10 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
         val recipient1 = createAccount.toAddress
         val recipient2 = createAccount.toAddress
         val tx1 = TransferTransaction
-          .selfSigned(2.toByte, account, recipient1, Waves, 10 * Constants.UnitsInWave, Waves, 400000, None, ts)
+          .selfSigned(2.toByte, account, recipient1, Waves, 10 * Constants.UnitsInWave, Waves, 400000, ByteStr.empty, ts)
           .explicitGet()
         val tx2 = TransferTransaction
-          .selfSigned(2.toByte, account, recipient2, Waves, 5 * Constants.UnitsInWave, Waves, 400000, None, ts)
+          .selfSigned(2.toByte, account, recipient2, Waves, 5 * Constants.UnitsInWave, Waves, 400000, ByteStr.empty, ts)
           .explicitGet()
         TestBlock.create(time = ts, ref = reference, txs = Seq(tx1, tx2), version = Block.NgBlockVersion)
       }
@@ -88,7 +88,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
       (ts, account) => {
         val recipient1 = createAccount.toAddress
         TransferTransaction
-          .selfSigned(2.toByte, account, recipient1, Waves, 10 * Constants.UnitsInWave, Waves, 400000, None, ts)
+          .selfSigned(2.toByte, account, recipient1, Waves, 10 * Constants.UnitsInWave, Waves, 400000, ByteStr.empty, ts)
           .explicitGet()
       }
     )

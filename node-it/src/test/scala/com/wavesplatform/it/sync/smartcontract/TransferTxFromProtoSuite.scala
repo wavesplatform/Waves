@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -12,8 +12,7 @@ import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.Attachment.{Bin, Bool, Num, Str}
-import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 
 class TransferTxFromProtoSuite extends BaseTransactionSuite {
   val source    = firstAddress
@@ -66,7 +65,7 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
         amount = transferAmount,
         feeAsset = Waves,
         fee = minFee,
-        attachment = Some(Attachment.Str("WAVES transfer")),
+        attachment = ByteStr("WAVES transfer".getBytes),
         timestamp = System.currentTimeMillis()
       )
       .explicitGet()
@@ -108,7 +107,7 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
         amount = 10000,
         feeAsset = IssuedAsset(ByteStr.decodeBase58(assetId).get),
         fee = minFee,
-        attachment = Some(Attachment.Str("Some Attachment")),
+        attachment = ByteStr("Some Attachment".getBytes),
         timestamp = System.currentTimeMillis()
       )
       .explicitGet()
@@ -139,7 +138,7 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
         amount = 10000,
         feeAsset = Waves,
         fee = minFee,
-        attachment = Some(Attachment.Str("Some Attachment")),
+        attachment = ByteStr("Some Attachment".getBytes),
         timestamp = System.currentTimeMillis()
       )
       .explicitGet()
@@ -157,88 +156,5 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
     )
 
     sender.getDataByKey(dApp, "bodyBytes").value.asInstanceOf[ByteStr] shouldBe ByteStr(transferTx.bodyBytes())
-  }
-
-  test("TransferTransaction with different typed attachments from proto bytes") {
-    def transferTx(attachment: Option[Attachment]): TransferTransaction =
-      TransferTransaction
-        .selfSigned(
-          version = TxVersion.V3,
-          sender = pkByAddress(source),
-          recipient = AddressOrAlias.fromString(recipient).explicitGet(),
-          asset = Waves,
-          amount = transferAmount,
-          feeAsset = Waves,
-          fee = minFee,
-          attachment = attachment,
-          timestamp = System.currentTimeMillis()
-        )
-        .explicitGet()
-    val transferTxWithStrAttachment  = transferTx(Some(Attachment.Str("Some String")))
-    val transferTxWithBinAttachment  = transferTx(Some(Attachment.Bin(Array[Byte](127.toByte, 0, 1, 1))))
-    val transferTxWithNumAttachment  = transferTx(Some(Attachment.Num(123)))
-    val transferTxWithBoolAttachment = transferTx(Some(Attachment.Bool(true)))
-    val transferTxWithNoneAttachment = transferTx(None)
-
-    sender.signedBroadcast(transferTxWithStrAttachment.json(), waitForTx = true)
-    sender.signedBroadcast(transferTxWithBinAttachment.json(), waitForTx = true)
-    sender.signedBroadcast(transferTxWithNumAttachment.json(), waitForTx = true)
-    sender.signedBroadcast(transferTxWithBoolAttachment.json(), waitForTx = true)
-    sender.signedBroadcast(transferTxWithNoneAttachment.json(), waitForTx = true)
-
-    val protoTransferTxStrAttBytes  = PBTransactions.protobuf(transferTxWithStrAttachment).toByteArray
-    val protoTransferTxBinAttBytes  = PBTransactions.protobuf(transferTxWithBinAttachment).toByteArray
-    val protoTransferTxNumAttBytes  = PBTransactions.protobuf(transferTxWithNumAttachment).toByteArray
-    val protoTransferTxBoolAttBytes = PBTransactions.protobuf(transferTxWithBoolAttachment).toByteArray
-    val protoTransferTxNoneAttBytes = PBTransactions.protobuf(transferTxWithNoneAttachment).toByteArray
-
-    sender.invokeScript(
-      source,
-      dApp,
-      func = Some("foo"),
-      args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxStrAttBytes)).explicitGet()),
-      waitForTx = true
-    )
-    sender.getDataByKey(dApp, "attachment").value shouldBe transferTxWithStrAttachment.attachment.get.asInstanceOf[Str].value
-
-    sender.invokeScript(
-      source,
-      dApp,
-      func = Some("foo"),
-      args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxBinAttBytes)).explicitGet()),
-      waitForTx = true
-    )
-    sender.getDataByKey(dApp, "attachment").value shouldBe Base58.encode(transferTxWithBinAttachment.attachment.get.asInstanceOf[Bin].value)
-
-    sender.invokeScript(
-      source,
-      dApp,
-      func = Some("foo"),
-      args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxNumAttBytes)).explicitGet()),
-      waitForTx = true
-    )
-    sender.getDataByKey(dApp, "attachment").value shouldBe s"${transferTxWithNumAttachment.attachment.get.asInstanceOf[Num].value}"
-
-    sender.invokeScript(
-      source,
-      dApp,
-      func = Some("foo"),
-      args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxBoolAttBytes)).explicitGet()),
-      waitForTx = true
-    )
-    sender.getDataByKey(dApp, "attachment").value shouldBe s"${transferTxWithBoolAttachment.attachment.get.asInstanceOf[Bool].value}"
-
-    val tx =
-      sender
-        .invokeScript(
-          source,
-          dApp,
-          func = Some("foo"),
-          args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxNoneAttBytes)).explicitGet()),
-          waitForTx = true
-        )
-        ._1
-        .id
-    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include("Empty description")
   }
 }

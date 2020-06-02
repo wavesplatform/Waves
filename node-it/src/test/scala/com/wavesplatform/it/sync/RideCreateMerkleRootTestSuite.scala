@@ -1,23 +1,22 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.account._
 import com.wavesplatform.common.merkle.Merkle
-import com.wavesplatform.state._
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.Transaction
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{Node, NodeConfigs, ReportingTestName, TransferSending}
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.transaction.TxVersion
-import com.wavesplatform.account._
-import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.Asset._
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.state._
+import com.wavesplatform.transaction.Asset._
+import com.wavesplatform.transaction.{Proofs, TxVersion}
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
 
@@ -74,8 +73,7 @@ class RideCreateMerkleRootTestSuite
       Waves /* not support tx.asset.fold(Waves)(v => IssuedAsset(Base58.decode(v))) */,
       tx.amount.get,
       Waves /* not support tx.feeAsset.fold(Waves)(v => Issued(Base58.decode(v))) */,
-      tx.fee,
-      None, // attachment
+      tx.fee, ByteStr.empty,  // attachment
       tx.timestamp,
       Proofs(tx.proofs.get.map(v => ByteStr(Base58.decode(v))))
       ).explicitGet()

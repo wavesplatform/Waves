@@ -348,7 +348,6 @@ object AsyncHttpApi extends Assertions {
         assetId: Option[String] = None,
         feeAssetId: Option[String] = None,
         version: TxVersion = TxVersion.V2,
-        typedAttachment: Option[Attachment] = None,
         attachment: Option[String] = None
     ): Future[Transaction] = {
       signAndBroadcast(
@@ -365,13 +364,7 @@ object AsyncHttpApi extends Assertions {
           "feeAssetId" -> {
             if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull
           },
-          "attachment" -> {
-            if (attachment.isDefined || typedAttachment.isDefined) {
-              if (attachment.isDefined) {
-                attachment.get
-              } else Json.toJson(typedAttachment.get)
-            } else JsNull
-          }
+          "attachment" -> JsString(attachment.getOrElse(""))
         )
       )
     }
@@ -631,7 +624,7 @@ object AsyncHttpApi extends Assertions {
     def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
       postJson(
         "/assets/transfer",
-        TransferRequest(Some(1.toByte), Some(sourceAddress), None, recipient, None, amount, None, fee, None, None, None, None)
+        TransferRequest(Some(1.toByte), Some(sourceAddress), None, recipient, None, amount, None, fee, ByteStr.empty, None, None, None)
       ).as[Transaction]
 
     def massTransfer(
@@ -639,26 +632,19 @@ object AsyncHttpApi extends Assertions {
         transfers: List[Transfer],
         fee: Long,
         version: TxVersion = TxVersion.V2,
-        typedAttachment: Option[Attachment] = None,
         attachment: Option[String] = None,
         assetId: Option[String] = None,
         amountsAsStrings: Boolean = false
     ): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
-          "type"      -> MassTransferTransaction.typeId,
-          "assetId"   -> { if (assetId.isDefined) JsString(assetId.get) else JsNull },
-          "sender"    -> sourceAddress,
-          "fee"       -> fee,
-          "version"   -> version,
-          "transfers" -> Json.toJson(transfers),
-          "attachment" -> {
-            if (attachment.isDefined || typedAttachment.isDefined) {
-              if (attachment.isDefined) {
-                attachment.get
-              } else Json.toJson(typedAttachment.get)
-            } else JsNull
-          }
+          "type"       -> MassTransferTransaction.typeId,
+          "assetId"    -> { if (assetId.isDefined) JsString(assetId.get) else JsNull },
+          "sender"     -> sourceAddress,
+          "fee"        -> fee,
+          "version"    -> version,
+          "transfers"  -> Json.toJson(transfers),
+          "attachment" -> JsString(attachment.getOrElse(""))
         ),
         amountsAsStrings
       )

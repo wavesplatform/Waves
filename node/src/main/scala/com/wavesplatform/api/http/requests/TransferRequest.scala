@@ -3,7 +3,7 @@ package com.wavesplatform.api.http.requests
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Proofs}
 import play.api.libs.json._
 
@@ -16,7 +16,7 @@ case class TransferRequest(
     amount: Long,
     feeAssetId: Option[Asset],
     fee: Long,
-    attachment: Option[Attachment],
+    attachment: ByteStr,
     timestamp: Option[Long],
     signature: Option[ByteStr],
     proofs: Option[Proofs]

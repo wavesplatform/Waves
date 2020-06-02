@@ -6,6 +6,7 @@ import com.google.common.primitives.Ints
 import com.typesafe.config.Config
 import com.wavesplatform.account._
 import com.wavesplatform.api.http.requests.TransferRequest
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.TransferSending.Req
 import com.wavesplatform.it.api.AsyncHttpApi._
@@ -126,8 +127,8 @@ trait TransferSending extends ScorexLogging {
                 fee = x.fee,
                 attachment =
                   if (includeAttachment)
-                    Some(Attachment.Bin(Array.fill(TransferTransaction.MaxAttachmentSize)(ThreadLocalRandom.current().nextInt().toByte)))
-                  else None,
+                    ByteStr(Array.fill(TransferTransaction.MaxAttachmentSize)(ThreadLocalRandom.current().nextInt().toByte))
+                  else ByteStr.empty,
                 timestamp = start + i
               )
               .right

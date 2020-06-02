@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.account.{AddressScheme, Alias}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, setScriptFee, smartFee}
@@ -64,8 +65,7 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
 
     assertBadRequestAndResponse(
       sender.signedBroadcast(
-        TransferTransaction
-          .selfSigned(2.toByte, acc0, acc1.toAddress, Waves, 1000, Waves, minFee + smartFee, None, ts)
+        TransferTransaction.selfSigned(2.toByte, acc0, acc1.toAddress, Waves, 1000, Waves, minFee + smartFee, ByteStr.empty,  ts)
           .explicitGet()
           .json()
       ),

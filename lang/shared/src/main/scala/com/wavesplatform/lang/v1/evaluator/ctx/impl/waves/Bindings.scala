@@ -2,12 +2,11 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{converters, unit}
 import com.wavesplatform.lang.v1.traits.domain.Tx._
 import com.wavesplatform.lang.v1.traits.domain._
 
@@ -133,7 +132,7 @@ object Bindings {
         assetId = ct.assetId,
         amount = ct.amount,
         recipient = ct.recipient,
-        attachment = ByteStrValue(ByteStr.empty)
+        attachment = ByteStr.empty
       ),
       proofsEnabled = false,
       version
@@ -256,7 +255,7 @@ object Bindings {
               "assetId"       -> assetId,
               "transferCount" -> transferCount,
               "totalAmount"   -> totalAmount,
-              "attachment"    -> attachment.evaluated
+              "attachment"    -> attachment
             ),
             provenTxPart(p, proofsEnabled, version)
           )
@@ -387,7 +386,7 @@ object Bindings {
           "amount"     -> tx.amount,
           "feeAssetId" -> tx.feeAssetId,
           "assetId"    -> tx.assetId,
-          "attachment" -> tx.attachment.evaluated
+          "attachment" -> tx.attachment
         ),
         provenTxPart(tx.p, proofsEnabled, version) + mapRecipient(tx.recipient)
       )

@@ -95,7 +95,7 @@ class TransferTransactionV1Specification extends PropSpec with PropertyChecks wi
       1900000,
       Waves,
       100000,
-      Some(Attachment.Bin(Base58.tryDecodeWithLimit("4t2Xazb2SX").get)),
+      ByteStr.decodeBase58("4t2Xazb2SX").get,
       1526552510868L,
       Proofs(Seq(ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get)),
       recipient.chainId
@@ -122,7 +122,7 @@ class TransferTransactionV1Specification extends PropSpec with PropertyChecks wi
       100000000,
       Waves,
       100000000,
-      Some(Attachment.Str("somestring")),
+      ByteStr("somestring".getBytes),
       1526641218066L,
       Proofs.empty,
       recipient.chainId

@@ -188,7 +188,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
         amount = transferAmount,
         feeAsset = Waves,
         fee = responseTx.fee,
-        attachment = None,
+        attachment = ByteStr.empty,
         timestamp = responseTx.timestamp
       )
       .explicitGet()
