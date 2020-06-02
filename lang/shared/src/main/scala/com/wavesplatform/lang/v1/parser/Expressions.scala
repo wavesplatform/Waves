@@ -78,14 +78,29 @@ object Expressions {
   // TODO remove types
   case class LET(position: Pos, name: PART[String], value: EXPR, types: Seq[PART[String]], allowShadowing: Boolean = false) extends Declaration
 
+  // deprecated
   type TypeParam = Option[PART[String]]
-  type Type      = (PART[String], TypeParam)
-  type FuncArgs  = Seq[(PART[String], Seq[Type])]
+  type ArgType   = (PART[String], TypeParam)
+  type FuncArgs  = Seq[(PART[String], Seq[ArgType])]
+
+  sealed trait Type
+  case class Single(name: PART[String], parameter: Option[PART[String]]) extends Type
+  case class Union(types: Seq[Type])                                     extends Type
+  case class Tuple(types: Seq[Type])                                     extends Type
 
   type CtxOpt = Option[Map[String, Pos]]
 
-  case class FUNC(position: Pos, name: PART[String], args: FuncArgs, expr: EXPR) extends Declaration {
+  case class FUNC(position: Pos, expr: EXPR, name: PART[String], args: Seq[(PART[String], Type)]) extends Declaration {
     val allowShadowing = false
+  }
+  object FUNC {
+    def apply(position: Pos, name: PART[String], args: FuncArgs, expr: EXPR): FUNC =
+      FUNC(
+        position,
+        expr,
+        name,
+        args.map { case (name, t) => (name, Union(t.map { case (name, param) => Single(name, param) })) },
+      )
   }
 
   case class ANNOTATION(position: Pos, name: PART[String], args: Seq[PART[String]]) extends Positioned

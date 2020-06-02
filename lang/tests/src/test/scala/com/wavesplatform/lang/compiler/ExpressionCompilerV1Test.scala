@@ -160,6 +160,50 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     ExpressionCompiler(compilerContextV4, expr) shouldBe 'right
   }
 
+  property("function with tuple args") {
+    val script =
+      """
+        | func f(a: (Int, String), b: (String, Boolean)) =
+        |   a._2 == b._1
+        |
+        | func g(a: (Int, (Int, String, Boolean)), b: ((Boolean, Int)|String, Boolean)) =
+        |   a._2._3 == b._2
+        |
+        | f((1, "abc"), ("abc", true)) &&
+        | g((1, (1, "abc", true)), ("abc", true))
+        |
+        |
+      """.stripMargin
+    val expr = Parser.parseExpr(script).get.value
+    ExpressionCompiler(compilerContextV4, expr) shouldBe 'right
+
+    val script2 =
+      """
+        | func f(a: (Int, String), b: (String, Boolean)) =
+        |   a._2 == b._1
+        |
+        | f((1, "a"), true)
+        |
+      """.stripMargin
+    val expr2 = Parser.parseExpr(script2).get.value
+    ExpressionCompiler(compilerContextV4, expr2) should produce(
+      "Non-matching types: expected: (String, Boolean), actual: Boolean in 69-86"
+    )
+
+    val script3 =
+      """
+        | func f(a: (Int, String, Boolean)|((Int, String), Boolean)) =
+        |   a._1
+        |
+        | f((1, "a"))
+        |
+      """.stripMargin
+    val expr3 = Parser.parseExpr(script3).get.value
+    ExpressionCompiler(compilerContextV4, expr3) should produce(
+      "Non-matching types: expected: ((Int, String), Boolean)|(Int, String, Boolean), actual: (Int, String) in 73-84"
+    )
+  }
+
   treeTypeTest("GETTER")(
     ctx =
       CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> VariableInfo(AnyPos, pointType)), functionDefs = Map.empty),

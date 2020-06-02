@@ -12,9 +12,8 @@ import com.wavesplatform.lang.v1.compiler.Types.{FINAL, _}
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE, PART, Pos, TypeParam}
+import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE, PART, Pos}
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser, ParserV2}
-import com.wavesplatform.lang.v1.task.TaskM
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 
@@ -403,14 +402,8 @@ object ExpressionCompiler {
           case (argName, argType) =>
             for {
               name <- handlePart(argName)
-              typeDecls <- argType.toList
-                .traverse(handleGenericPart)
-                .ensure(NonExistingType(p.start, p.end, funcNameWithErr._1.getOrElse("NO_NAME"), ctx.predefTypes.keys.toList))(_.forall {
-                  case (t, param) => param.fold(ctx.predefTypes.contains(t))(ctx.predefTypes.contains)
-                })
-              types <- liftEither[Id, CompilerContext, CompilationError, List[FINAL]](genericFlat(p, ctx.predefTypes, typeDecls))
-              union = UNION.reduce(UNION.create(types))
-            } yield (name, VariableInfo(argName.position, union))
+              handledType <- handleCompositeType(p, argType)
+            } yield (name, VariableInfo(argName.position, handledType))
         }
         .handleError()
       compiledFuncBody <- local {
@@ -708,13 +701,24 @@ object ExpressionCompiler {
       .fold(err)(t => Right((ctx, getter, t)))
   }
 
-  private def handleGenericPart(
-      decl: (PART[String], TypeParam)
-  ): TaskM[CompilerContext, CompilationError, (String, Option[String])] =
-    for {
-      t1 <- handlePart(decl._1)
-      t2 <- decl._2.traverse(handlePart)
-    } yield (t1, t2)
+  private def handleCompositeType(pos: Pos, t: Expressions.Type): CompileM[FINAL] =
+    t match {
+      case Expressions.Single(name, parameter) =>
+        for {
+          ctx <- get[Id, CompilerContext, CompilationError]
+          handledName <- handlePart(name)
+          handledParameter <- parameter.traverse(handlePart)
+          foundType <- liftEither[Id, CompilerContext, CompilationError, List[FINAL]](genericFlat(pos, ctx.predefTypes, List((handledName, handledParameter)), ctx.predefTypes.keys.toList))
+        } yield UNION.reduce(UNION.create(foundType))
+      case Expressions.Union(types) =>
+        types.toList
+          .traverse(handleCompositeType(pos, _))
+          .map(types => UNION.reduce(UNION.create(types)))
+      case Expressions.Tuple(types) =>
+        types.toList
+          .traverse(handleCompositeType(pos, _))
+          .map(types => TUPLE(types))
+    }
 
   def handlePart[T](part: PART[T]): CompileM[T] = part match {
     case PART.VALID(_, x)         => x.pure[CompileM]

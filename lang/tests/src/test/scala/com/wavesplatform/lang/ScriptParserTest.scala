@@ -17,8 +17,8 @@ import scorex.crypto.encode.{Base58 => ScorexBase58}
 class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
 
   private def parse(x: String): EXPR = Parser.parseExpr(x) match {
-    case Success(r, _)    => r
-    case Failure(_, _, _) => throw new TestFailedException("Test failed", 0)
+    case Success(r, _)      => r
+    case f@Failure(_, _, _) => throw new TestFailedException(f.msg, 0)
   }
 
   private def cleanOffsets(l: LET): LET =

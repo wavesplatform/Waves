@@ -1306,7 +1306,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       ctxt = ctx,
       version = V4,
       env = utils.environment
-    ) should produce("non-existing type")
+    ) should produce("Undefined type")
   }
 
   property("List[Int] median - 100 elements") {
@@ -1778,24 +1778,37 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("n-size generic tuple") {
-    lazy val getElement: Stream[String] =
-      Stream(""""a"""", "true", "123", "base58'aaaa'", "unit") #::: getElement
+    lazy val getElement: Stream[(String, String)] =
+      Stream(
+        (""""a"""", "String"),
+        ("true", "Boolean"),
+        ("123", "Int"),
+        ("base58'aaaa'", "ByteVector"),
+        ("unit", "Unit")
+      ) #::: getElement
 
    /*  Example for size = 2
     *
     *  let a = (true, 123)
+    *  func f(x: (Boolean, Int)) == x
+    *
     *  let (a1, a2) = a
     *  a._1 == true && a1 == true && a._2 == 123 && a2 == 123 &&
-    *  a == (true, 123)
+    *  a == (true, 123) &&
+    *  f(a) == a
     */
     def check(size: Int) = {
-      val tupleDefinition = (1 to size).map(getElement).mkString("(", ", ", ")")
+      val valueDefinition = (1 to size).map(i => getElement(i)._1).mkString("(", ", ", ")")
+      val typeDefinition  = (1 to size).map(i => getElement(i)._2).mkString("(", ", ", ")")
       val script =
         s"""
-           | let a = $tupleDefinition
+           | let a = $valueDefinition
+           | func f(x: $typeDefinition) = x
+           |
            | let ${(1 to size).map(i => s"a$i").mkString("(", ", ", ")")} = a
-           | ${(1 to size).map(i => s"a._$i == ${getElement(i)} && a$i == ${getElement(i)} &&").mkString(" ")}
-           | a == $tupleDefinition
+           | ${(1 to size).map(i => s"a._$i == ${getElement(i)._1} && a$i == ${getElement(i)._1} &&").mkString(" ")}
+           | a == $valueDefinition &&
+           | f(a) == a
          """.stripMargin
 
       eval(script, version = V3) should produce(s"Can't find a function '_Tuple$size'")

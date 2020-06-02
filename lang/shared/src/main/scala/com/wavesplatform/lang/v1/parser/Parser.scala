@@ -217,13 +217,17 @@ object Parser {
   val genericTypesP: P[Seq[(PART[String], Option[PART[String]])]] =
     (anyVarName ~~ ("[" ~~ anyVarName ~~ "]").?).rep(min = 1, sep = comment ~ "|" ~ comment)
 
+  val singleTypeP: P[Single] = (anyVarName ~~ ("[" ~~ anyVarName ~~ "]").?).map { case (t, param) => Single(t, param) }
+  val tupleTypeP: P[Tuple]   = ("(" ~ P(singleTypeP | unionTypeP).rep(min = 1, sep = comment ~ "," ~ comment) ~ ")").map(Tuple)
+  val unionTypeP: P[Union]   = P(singleTypeP | tupleTypeP).rep(min = 1, sep = comment ~ "|" ~ comment).map(Union)
+
   val funcP: P[FUNC] = {
     val funcname    = anyVarName
-    val argWithType = anyVarName ~ ":" ~ genericTypesP ~ comment
+    val argWithType = anyVarName ~ ":" ~ unionTypeP ~ comment
     val args        = "(" ~ comment ~ argWithType.rep(sep = "," ~ comment) ~ ")" ~ comment
     val funcHeader  = Index ~~ "func" ~ funcname ~ comment ~ args ~ "=" ~ P(singleBaseExpr | ("{" ~ baseExpr ~ "}")) ~~ Index
     funcHeader.map {
-      case (start, name, args, expr, end) => FUNC(Pos(start, end), name, args, expr)
+      case (start, name, args, expr, end) => FUNC(Pos(start, end), expr, name, args)
     }
   }
 
