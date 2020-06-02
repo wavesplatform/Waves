@@ -171,7 +171,7 @@ object JsAPI {
               js.Dynamic.literal(
                 "result"           -> Global.toBuffer(bytes),
                 "complexity"       -> complexityWithMap._1,
-                "complexityByFunc" -> complexityWithMap._2.toJSDictionary,
+                "complexityByFunc" -> complexityWithMap._2.mapValues(c => c: Any).toJSDictionary,
                 "dAppAst"          -> dAppToJs(exprDApp),
                 "errorList"        -> compErrorList.map(compilationErrToJs).toJSArray
               )
@@ -243,7 +243,7 @@ object JsAPI {
                 "result"           -> Global.toBuffer(bytes),
                 "ast"              -> toJs(dApp),
                 "complexity"       -> maxComplexity,
-                "complexityByFunc" -> complexityByFunc.toJSDictionary
+                "complexityByFunc" -> complexityByFunc.mapValues(c => c: Any).toJSDictionary
               )
               val errorFieldOpt: Seq[(String, Any)] =
                 Global.checkContract(maxComplexityFunc, version)
