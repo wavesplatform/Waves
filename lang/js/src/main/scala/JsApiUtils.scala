@@ -198,18 +198,30 @@ package object JsApiUtils {
   }
 
   def serDec(dec: Expressions.Declaration): js.Object = {
+    def serType(t: Type): js.Object =
+      t match {
+        case Expressions.Single(name, parameter) =>
+          jObj.applyDynamic("apply")(
+            "typeName"  -> serPartStr(name),
+            "typeParam" -> parameter.map(serPartStr).orUndefined
+          )
+        case Expressions.Union(types) =>
+          jObj.applyDynamic("apply")(
+            "isUnion"  -> "true",
+            "typeList" -> types.map(serType).toJSArray
+          )
+        case Expressions.Tuple(types) =>
+          jObj.applyDynamic("apply")(
+            "isTuple"  -> "true",
+            "typeList" -> types.map(serType).toJSArray
+          )
+      }
 
-    def serFuncArg(argName: PART[String], argTypeList: Seq[Type]): js.Object = {
+    def serFuncArg(argName: PART[String], argType: Type): js.Object =
       jObj.applyDynamic("apply")(
         "argName" -> serPartStr(argName),
-        "typeList" -> argTypeList.map { t =>
-          jObj.applyDynamic("apply")(
-            "typeName"  -> serPartStr(t._1),
-            "typeParam" -> t._2.map(serPartStr).orUndefined
-          )
-        }.toJSArray
+        "type"    -> serType(argType)
       )
-    }
 
     dec match {
       case Expressions.LET(p, name, expr, _, _) =>
@@ -220,7 +232,7 @@ package object JsApiUtils {
           "name"     -> serPartStr(name),
           "expr"     -> serExpr(expr)
         )
-      case Expressions.FUNC(p, name, args, expr) =>
+      case Expressions.FUNC(p, expr, name, args) =>
         jObj.applyDynamic("apply")(
           "type"     -> "FUNC",
           "posStart" -> p.start,
