@@ -191,6 +191,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         allChannels.broadcast(LocalScoreChanged(x))
       }(scheduler)
 
+    lastBlockInfo.foreach { lbi =>
+      log.debug(s"Last block is now ${lbi.id} at ${lbi.height}")
+    }(scheduler)
+
     val history = History(blockchainUpdater, blockchainUpdater.liquidBlock, blockchainUpdater.microBlock, db)
 
     val historyReplier = new HistoryReplier(blockchainUpdater.score, history, settings.synchronizationSettings)(historyRepliesScheduler)

@@ -2,12 +2,13 @@ package com.wavesplatform.network
 
 import java.util.concurrent.TimeUnit
 
-import com.google.common.cache.{Cache, CacheBuilder}
+import com.google.common.cache.{Cache, CacheBuilder, RemovalNotification}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.MicroBlock
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.settings.SynchronizationSettings.MicroblockSynchronizerSettings
+import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel._
 import monix.eval.{Coeval, Task}
 import monix.execution.CancelableFuture
@@ -17,21 +18,23 @@ import monix.reactive.Observable
 import scala.collection.mutable.{Set => MSet}
 import scala.concurrent.duration.FiniteDuration
 
-object MicroBlockSynchronizer {
+object MicroBlockSynchronizer extends ScorexLogging {
 
-  def apply(settings: MicroblockSynchronizerSettings,
-            peerDatabase: PeerDatabase,
-            lastBlockIdEvents: Observable[ByteStr],
-            microblockInvs: ChannelObservable[MicroBlockInv],
-            microblockResponses: ChannelObservable[MicroBlockResponse],
-            scheduler: SchedulerService): (Observable[(Channel, MicroblockData)], Coeval[CacheSizes]) = {
+  def apply(
+      settings: MicroblockSynchronizerSettings,
+      peerDatabase: PeerDatabase,
+      lastBlockIdEvents: Observable[ByteStr],
+      microblockInvs: ChannelObservable[MicroBlockInv],
+      microblockResponses: ChannelObservable[MicroBlockResponse],
+      scheduler: SchedulerService
+  ): (Observable[(Channel, MicroblockData)], Coeval[CacheSizes]) = {
 
     implicit val schdlr: SchedulerService = scheduler
 
-    val microBlockOwners     = cache[MicroBlockSignature, MSet[Channel]](settings.invCacheTimeout)
-    val nextInvs             = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
-    val awaiting             = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
-    val successfullyReceived = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
+    val microBlockOwners     = cache[MicroBlockSignature, MSet[Channel]]("microBlockOwners", settings.invCacheTimeout)
+    val nextInvs             = cache[MicroBlockSignature, MicroBlockInv]("nextInvs", settings.invCacheTimeout)
+    val awaiting             = cache[MicroBlockSignature, MicroBlockInv]("awaiting", settings.invCacheTimeout)
+    val successfullyReceived = cache[MicroBlockSignature, Object]("successfullyReceived", settings.processedMicroBlocksCacheTimeout)
 
     val lastBlockId = lastObserved(lastBlockIdEvents)
 
@@ -66,13 +69,27 @@ object MicroBlockSynchronizer {
       task(MicroBlockDownloadAttempts, Set.empty).runAsyncLogErr
     }
 
-    def tryDownloadNext(prevBlockId: ByteStr): Unit = Option(nextInvs.getIfPresent(prevBlockId)).foreach(requestMicroBlock)
+    def tryDownloadNext(prevBlockId: ByteStr): Unit = Option(nextInvs.getIfPresent(prevBlockId)) match {
+      case Some(inv) =>
+        log.trace(s"Found $inv for $prevBlockId")
+        requestMicroBlock(inv)
+      case None =>
+        log.trace(s"Could not find inv for $prevBlockId")
+    }
 
-    lastBlockIdEvents.mapEval(f => Task(tryDownloadNext(f))).executeOn(scheduler).logErr.subscribe()
+    lastBlockIdEvents
+      .mapEval { f =>
+        log.trace(s"Last block id: $f")
+        Task(tryDownloadNext(f))
+      }
+      .executeOn(scheduler)
+      .logErr
+      .subscribe()
 
     microblockInvs
       .mapEval {
         case (ch, mbInv @ MicroBlockInv(_, totalRef, prevRef, _)) =>
+          log.trace(s"About to process $mbInv")
           Task {
             mbInv.signaturesValid() match {
               case Left(err) =>
@@ -83,11 +100,15 @@ object MicroBlockSynchronizer {
                   BlockStats.inv(mbInv, ch)
                   mbInv
                 })
-                lastBlockId()
-                  .filter(_ == prevRef && !alreadyRequested(totalRef))
-                  .foreach(tryDownloadNext)
+                lastBlockId() match {
+                  case Some(blockId) if blockId == prevRef && !alreadyRequested(totalRef) =>
+                    log.trace(s"About to download $blockId")
+                    tryDownloadNext(blockId)
+                  case other =>
+                    log.trace(s"NOT downloading, lastBlockId=$other, prevRef=$prevRef, alreadyRequested=${alreadyRequested(totalRef)}")
+                }
             }
-          }
+          }.logErr
       }
       .executeOn(scheduler)
       .logErr
@@ -120,13 +141,18 @@ object MicroBlockSynchronizer {
       s.drop(n).headOption
     }
 
-  def cache[K <: AnyRef, V <: AnyRef](timeout: FiniteDuration): Cache[K, V] =
+  def cache[K <: AnyRef, V <: AnyRef](name: String, timeout: FiniteDuration): Cache[K, V] =
     CacheBuilder
       .newBuilder()
       .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
+      .removalListener { rn: RemovalNotification[K, V] =>
+        log.trace(s"$name - REMOVED (${rn.getCause}, evicted=${rn.wasEvicted()}): ${rn.getKey} -> ${rn.getValue}")
+      }
       .build[K, V]()
 
   case class CacheSizes(microBlockOwners: Long, nextInvs: Long, awaiting: Long, successfullyReceived: Long)
 
-  private val dummy = new Object()
+  private val dummy = new Object() {
+    override def toString: String = "dummy stub"
+  }
 }
