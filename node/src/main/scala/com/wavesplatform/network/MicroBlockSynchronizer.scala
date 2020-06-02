@@ -91,10 +91,18 @@ object MicroBlockSynchronizer extends ScorexLogging {
         case (ch, mbInv @ MicroBlockInv(_, totalRef, prevRef, _)) =>
           log.trace(s"About to process $mbInv")
           Task {
-            mbInv.signaturesValid() match {
+            log.trace(s"Validating signatures in $mbInv")
+            val sig = try mbInv.signaturesValid()
+            catch {
+              case t: Throwable =>
+                log.error(s"Error validating signatures")
+                throw t
+            }
+            sig match {
               case Left(err) =>
                 peerDatabase.blacklistAndClose(ch, err.toString)
               case Right(_) =>
+                log.trace(s"Signatures valid, now updating caches")
                 microBlockOwners.get(totalRef, () => MSet.empty) += ch
                 nextInvs.get(prevRef, { () =>
                   BlockStats.inv(mbInv, ch)
