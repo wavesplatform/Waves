@@ -206,8 +206,7 @@ object Transaction {
         amount <- (jsv \ "amount").validateOpt[Long]
         description <- (jsv \ "description").validateOpt[String]
         attachment <- version match {
-          case Some(v) if v < 3 && _type == 4 => (jsv \ "attachment").validateOpt[String]
-          case Some(v) if v < 2 && _type == 11 => (jsv \ "attachment").validateOpt[String]
+          case Some(v) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
           case _ => JsSuccess(None)
         }
         price <- (jsv \ "price").validateOpt[Long]
@@ -512,8 +511,7 @@ object TransferTransactionInfo {
         version <- (jsv \ "version").validateOpt[Byte]
         chainId <- (jsv \ "chainId").validateOpt[Byte]
         attachment <- version match {
-          case Some(v) if v < 3 && _type == 4 => (jsv \ "attachment").validateOpt[String]
-          case Some(v) if v < 2 && _type == 11 => (jsv \ "attachment").validateOpt[String]
+          case Some(v) if _type == 4  || _type == 11 => (jsv \ "attachment").validateOpt[String]
           case _ => JsSuccess(None)
         }
         proofs <- (jsv \ "proofs").validateOpt[Seq[String]]
@@ -566,8 +564,7 @@ object MassTransferTransactionInfo {
         version <- (jsv \ "version").validateOpt[Byte]
         chainId <- (jsv \ "chainId").validateOpt[Byte]
         attachment <- version match {
-          case Some(v) if v < 3 && _type == 4 => (jsv \ "attachment").validateOpt[String]
-          case Some(v) if v < 2 && _type == 11 => (jsv \ "attachment").validateOpt[String]
+          case Some(v) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
           case _ => JsSuccess(None)
         }
         transfers <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
