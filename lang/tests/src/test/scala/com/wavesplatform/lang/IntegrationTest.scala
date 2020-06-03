@@ -1735,7 +1735,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val message1 = "what's up jim"
     val expectedAddress1 = "85db9634489b76e238368e4a075cc6e5a56a714c"
 
-    Keys.getAddress(recoverPublicKey(message1, signature1)) shouldBe Base16.decode(expectedAddress1)
+    Keys.getAddress(recoverPublicKey(message1, signature1)) shouldBe Base16.decode(expectedAddress1).get
 
     //source: https://etherscan.io/verifySig/2007
     val signature2 =
@@ -1745,7 +1745,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val message2 = "i am the owner"
     val expectedAddress2 = "73f32c743e5928ff800ab8b05a52c73cd485f9c3"
 
-    Keys.getAddress(recoverPublicKey(message2, signature2)) shouldBe Base16.decode(expectedAddress2)
+    Keys.getAddress(recoverPublicKey(message2, signature2)) shouldBe Base16.decode(expectedAddress2).get
   }
 
   property("ecrecover negative cases") {
