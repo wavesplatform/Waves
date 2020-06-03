@@ -407,14 +407,20 @@ object Parser {
   }
 
   def parseContract(str: String): Parsed[DAPP] = {
-    def contract[_:P] = P(Start ~ unusedText ~ (declaration.rep) ~ comment ~ (annotatedFunc.rep) ~ !declaration.rep(1) ~ End ~~ Index)
+    def contract[_:P] = P(Start ~ unusedText ~ (declaration.rep) ~ comment ~ (annotatedFunc.rep) ~ declaration.rep ~ End ~~ Index)
       .map {
-        case (ds, fs, end) => DAPP(Pos(0, end), ds.toList, fs.toList)
+        case (ds, fs, t, end) => (DAPP(Pos(0, end), ds.toList, fs.toList), t)
       }
     parse(str, contract(_)) match {
-      case (f @ Parsed.Failure(m, o, e)) if (m.toString.startsWith("!(declaration.rep(")) =>
-        Parsed.Failure(s"Local functions should be defined before @Callable one: ${str.substring(o)}", o, e)
-      case s => s
+      case Parsed.Success((s, t), _) if(t.nonEmpty) =>
+        def contract[_:P] = P(Start ~ unusedText ~ (declaration.rep) ~ comment ~ (annotatedFunc.rep) ~ !declaration.rep(1) ~ End ~~ Index)
+        parse(str, contract(_)) match {
+          case Parsed.Failure(m, o, e) =>
+            Parsed.Failure(s"Local functions should be defined before @Callable one: ${str.substring(o)}", o, e)
+          case _ => throw new Exception("Parser error")
+        }
+      case Parsed.Success((s, _), v) => Parsed.Success(s,v)
+      case Parsed.Failure(m, o, e) => Parsed.Failure(m, o, e)
     }
   }
 }
