@@ -82,10 +82,9 @@ class WavesEnvironment(
   override def resolveAlias(name: String): Either[String, Recipient.Address] =
     blockchain
       .resolveAlias(com.wavesplatform.account.Alias.create(name).explicitGet())
+      .map(a => Recipient.Address(ByteStr(a.bytes.arr)))
       .left
       .map(_.toString)
-      .right
-      .map(a => Recipient.Address(ByteStr(a.bytes.arr)))
 
   override def chainId: Byte = nByte
 

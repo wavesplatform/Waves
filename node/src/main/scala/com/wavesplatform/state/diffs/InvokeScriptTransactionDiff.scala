@@ -172,7 +172,7 @@ object InvokeScriptTransactionDiff {
               reissueList   = actionsByType(classOf[Reissue]).asInstanceOf[List[Reissue]]
               burnList      = actionsByType(classOf[Burn]).asInstanceOf[List[Burn]]
 
-              dataItems = actionsByType
+              dataItems = actionsByType.view
                 .filterKeys(classOf[DataItem[_]].isAssignableFrom)
                 .values
                 .flatten
@@ -222,11 +222,11 @@ object InvokeScriptTransactionDiff {
               }
               compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, pk)(actions, paymentsDiff).leftMap(asFailedScriptError)
             } yield {
-              val transfers = compositeDiff.portfolios |+| feeInfo._2.mapValues(_.negate)
+              val transfers = compositeDiff.portfolios |+| feeInfo._2.view.mapValues(_.negate).toMap
 
               val currentTxDiff         = compositeDiff.transactions(tx.id())
               val currentTxDiffWithKeys = currentTxDiff.copy(_2 = currentTxDiff._2 ++ transfers.keys ++ compositeDiff.accountData.keys)
-              val updatedTxDiff         = compositeDiff.transactions.updated(tx.id(), currentTxDiffWithKeys)
+              val updatedTxDiff         = compositeDiff.transactions.concat(Map(tx.id() -> currentTxDiffWithKeys))
 
               val isr = InvokeScriptResult(
                 dataEntries,
@@ -304,7 +304,7 @@ object InvokeScriptTransactionDiff {
     else
       ().asRight[ScriptExecutionError]
 
-  def checkOverflow(dataList: Traversable[Long]): Either[ScriptExecutionError, Unit] = {
+  def checkOverflow(dataList: Iterable[Long]): Either[ScriptExecutionError, Unit] = {
     Try(dataList.foldLeft(0L)(Math.addExact))
       .fold(
         _ => ScriptExecutionError.dApp("Attempt to transfer unavailable funds in contract payment").asLeft[Unit],

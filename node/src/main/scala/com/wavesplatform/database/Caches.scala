@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
 
@@ -111,7 +111,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   override def accountScript(address: Address): Option[AccountScriptInfo] = scriptCache.get(address)
   override def hasAccountScript(address: Address): Boolean =
-    Option(scriptCache.getIfPresent(address)).map(_.nonEmpty).getOrElse(hasScriptBytes(address))
+    Option(scriptCache.getIfPresent(address)).fold(hasScriptBytes(address))(_.nonEmpty)
 
   private val assetScriptCache: LoadingCache[IssuedAsset, Option[(Script, Long)]] =
     cache(dbSettings.maxCacheSize, loadAssetScript)
@@ -217,9 +217,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
             }
         }
         .groupBy(_._1)
+        .view
         .mapValues(_.map {
           case (_, txId) => txId
         })
+        .toMap
 
     current = (newHeight, current._2 + block.blockScore(), Some(block))
 

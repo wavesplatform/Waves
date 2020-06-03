@@ -53,7 +53,7 @@ case class TransactionsApiRoute(
     }
 
   def addressLimit: Route = {
-    (get & path("address" / AddrSegment / "limit" / IntNumber) & parameter('after.?)) { (address, limit, maybeAfter) =>
+    (get & path("address" / AddrSegment / "limit" / IntNumber) & parameter("after".?)) { (address, limit, maybeAfter) =>
       val after =
         maybeAfter.map(s => ByteStr.decodeBase58(s).getOrElse(throw ApiException(CustomValidationError(s"Unable to decode transaction id $s"))))
       if (limit > settings.transactionsByAddressLimit) throw ApiException(TooBigArrayAllocation)
@@ -160,12 +160,12 @@ case class TransactionsApiRoute(
   def signedBroadcast: Route = path("broadcast")(broadcast[JsValue](TransactionFactory.fromSignedRequest))
 
   def merkleProof: Route = path("merkleProof") {
-    (get & parameters('id.*))(ids => complete(merkleProof(ids.toList.reverse))) ~
+    (get & parameters("id".as[String].*))(ids => complete(merkleProof(ids.toList.reverse))) ~
       jsonPost[JsObject](
         jsv =>
           (jsv \ "ids").validate[List[String]] match {
             case JsSuccess(ids, _) => merkleProof(ids)
-            case JsError(err)      => WrongJson(errors = err)
+            case JsError(err)      => WrongJson(errors = err.toSeq)
           }
       )
   }

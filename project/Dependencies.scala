@@ -7,16 +7,16 @@ object Dependencies {
 
   def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.6.4"
 
-  private def akkaHttpModule(module: String)               = "com.typesafe.akka"             %% module            % "10.1.8"
+  private def akkaHttpModule(module: String)               = "com.typesafe.akka"             %% module            % "10.1.12"
   private def nettyModule(module: String)                  = "io.netty"                      % s"netty-$module"   % "4.1.33.Final"
   private def kamonModule(module: String)                  = "io.kamon"                      %% s"kamon-$module"  % "2.1.0"
-  private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.9.8"
+  private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.11.0"
   private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
 
-  private def catsModule(module: String)  = Def.setting("org.typelevel" %%% s"cats-$module"  % "2.0.0")
-  private def monixModule(module: String) = Def.setting("io.monix"      %%% s"monix-$module" % "3.1.0")
+  private def catsModule(module: String, version: String = "2.1.0") = Def.setting("org.typelevel" %%% s"cats-$module"  % version)
+  private def monixModule(module: String)                           = Def.setting("io.monix"      %%% s"monix-$module" % "3.2.1")
 
-  private val kindProjector = compilerPlugin("org.typelevel"   % "kind-projector" % "0.11.0" cross CrossVersion.full)
+  private val kindProjector = compilerPlugin("org.typelevel" % "kind-projector" % "0.11.0" cross CrossVersion.full)
 
   val akkaHttp                   = akkaHttpModule("akka-http")
   private val jacksonModuleScala = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
@@ -27,13 +27,13 @@ object Dependencies {
   val janino                     = "org.codehaus.janino" % "janino" % "3.0.12"
   val asyncHttpClient            = "org.asynchttpclient" % "async-http-client" % "2.7.0"
 
-  private val catsEffect = catsModule("effect")
+  private val catsEffect = catsModule("effect", "2.1.3")
   private val catsCore   = catsModule("core")
   private val shapeless  = Def.setting("com.chuusai" %%% "shapeless" % "2.3.3")
 
   val scalaTest = "org.scalatest" %% "scalatest" % "3.0.8" % Test
 
-  val kafka = "org.apache.kafka" %% "kafka" % "2.1.0"
+  val kafka = "org.apache.kafka" %% "kafka" % "2.5.0"
 
   val enforcedVersions = Def.setting(
     Seq(
@@ -148,7 +148,7 @@ object Dependencies {
       "org.influxdb" % "influxdb-java" % "2.14",
       googleGuava,
       "com.google.code.findbugs" % "jsr305"         % "3.0.2" % Compile, // javax.annotation stubs
-      "com.typesafe.play"        %% "play-json"     % "2.8.1",
+      "com.typesafe.play"        %% "play-json"     % "2.9.0",
       "org.ethereum"             % "leveldbjni-all" % "1.18.3",
       akkaModule("actor"),
       akkaModule("stream"),
@@ -157,7 +157,6 @@ object Dependencies {
       kindProjector,
       monixModule("reactive").value,
       nettyModule("handler"),
-      "io.estatico"                       %% "newtype" % "0.4.3",
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test,
       ("org.iq80.leveldb" % "leveldb" % "0.12").exclude("com.google.guava", "guava") % Test
@@ -171,7 +170,8 @@ object Dependencies {
     val version = scalapb.compiler.Version.scalapbVersion
     Seq(
       "com.thesamet.scalapb" %%% "scalapb-runtime" % version,
-      "com.thesamet.scalapb" %%% "scalapb-runtime" % version % "protobuf"
+      "com.thesamet.scalapb" %%% "scalapb-runtime" % version % "protobuf",
+      "com.thesamet.scalapb" %% "scalapb-json4s"   % "0.9.3"
     )
   }
 

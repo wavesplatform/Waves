@@ -13,7 +13,7 @@ import scala.concurrent.duration.Duration
 trait UtxPool extends AutoCloseable {
   def putIfNew(tx: Transaction): TracedResult[ValidationError, Boolean]
 
-  def removeAll(txs: Traversable[Transaction]): Unit
+  def removeAll(txs: Iterable[Transaction]): Unit
 
   def spendableBalance(addr: Address, assetId: Asset): Long
 

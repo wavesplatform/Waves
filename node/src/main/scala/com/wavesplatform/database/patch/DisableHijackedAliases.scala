@@ -7,7 +7,7 @@ import com.wavesplatform.database.{KeyTags, Keys, RW, readTransactionBytes}
 import com.wavesplatform.transaction.{CreateAliasTransaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 object DisableHijackedAliases extends ScorexLogging {
   def apply(rw: RW): Set[Alias] = {

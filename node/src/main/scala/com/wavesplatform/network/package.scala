@@ -52,9 +52,9 @@ package object network extends ScorexLogging {
 
   def formatBlocks(blocks: Seq[Block]): String = formatSignatures(blocks.view.map(_.id()))
 
-  def formatSignatures(signatures: Seq[ByteStr]): String =
+  def formatSignatures(signatures: Iterable[ByteStr]): String =
     if (signatures.isEmpty) "[Empty]"
-    else if (signatures.size == 1) s"[${signatures.head.trim}]"
+    else if (signatures.sizeCompare(1) <= 0) s"[${signatures.head.trim}]"
     else s"(total=${signatures.size}) [${signatures.head.trim} -- ${signatures.last.trim}]"
 
   implicit val channelEq: Eq[Channel] = Eq.fromUniversalEquals
@@ -73,7 +73,7 @@ package object network extends ScorexLogging {
 
     def broadcast(message: AnyRef, except: Set[Channel]): ChannelGroupFuture = {
       logBroadcast(message, except)
-      val st = broadcastTimeStats.refine("object", message.getClass.getSimpleName).start()
+      val st = broadcastTimeStats.withTag("object", message.getClass.getSimpleName).start()
       allChannels
         .writeAndFlush(message, { (channel: Channel) =>
           !except.contains(channel)

@@ -21,7 +21,7 @@ import io.netty.util.concurrent.DefaultThreadFactory
 import monix.reactive.Observable
 import org.influxdb.dto.Point
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
 import scala.util.Random
 
@@ -210,7 +210,6 @@ object NetworkServer extends ScorexLogging {
       log.trace(s"Next connection attempt in $delay")
 
       workerGroup.schedule(delay) {
-        import scala.collection.JavaConverters._
         val outgoing = outgoingChannels.keySet.iterator().asScala.toVector
 
         def outgoingStr = outgoing.map(_.toString).sorted.mkString("[", ", ", "]")

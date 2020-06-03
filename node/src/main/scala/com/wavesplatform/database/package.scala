@@ -26,10 +26,10 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.{ScorexLogging, _}
-import io.estatico.newtype.macros.newtype
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb._
+import supertagged.TaggedType
 
 package object database extends ScorexLogging {
   def openDB(path: String, recreate: Boolean = false): DB = {
@@ -572,12 +572,12 @@ package object database extends ScorexLogging {
       staticInfo.nft
     )
 
-  @newtype case class AddressId(toLong: Long) {
-    def toByteArray: Array[Byte] = toLong.toByteArray
+  object AddressId extends TaggedType[Long] {
+    def fromByteArray(bs: Array[Byte]): Type = AddressId(Longs.fromByteArray(bs))
   }
-
-  object AddressId {
-    def fromByteArray(bs: Array[Byte]): AddressId = AddressId(Longs.fromByteArray(bs))
+  type AddressId = AddressId.Type
+  implicit final class Ops(private val value: AddressId) extends AnyVal {
+    def toByteArray: Array[Byte] = Longs.toByteArray(AddressId.raw(value))
   }
 
   implicit class LongExt(val l: Long) extends AnyVal {

@@ -105,7 +105,7 @@ object LevelDBWriter extends ScorexLogging {
       }
     }
 
-    recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
+    recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty).toSeq
   }
 
   def apply(db: DB, spendableBalanceChanged: Observer[(Address, Asset)], settings: WavesSettings): LevelDBWriter with AutoCloseable = {
@@ -505,7 +505,7 @@ abstract class LevelDBWriter private[database] (
           approvedFeaturesCache = newlyApprovedFeatures ++ rw.get(Keys.approvedFeatures)
           rw.put(Keys.approvedFeatures, approvedFeaturesCache)
 
-          val featuresToSave = newlyApprovedFeatures.mapValues(_ + activationWindowSize) ++ rw.get(Keys.activatedFeatures)
+          val featuresToSave = (newlyApprovedFeatures.view.mapValues(_ + activationWindowSize) ++ rw.get(Keys.activatedFeatures)).toMap
 
           activatedFeaturesCache = featuresToSave ++ settings.functionalitySettings.preActivatedFeatures
           rw.put(Keys.activatedFeatures, featuresToSave)
@@ -742,7 +742,7 @@ abstract class LevelDBWriter private[database] (
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
     for {
       (height, num) <- db.get(Keys.transactionHNById(TransactionId @@ id))
-      tx  <- db.get(Keys.transferTransactionAt(height, num))
+      tx            <- db.get(Keys.transferTransactionAt(height, num))
     } yield (height, tx)
   }
 
@@ -873,11 +873,13 @@ abstract class LevelDBWriter private[database] (
       .flatMap { h =>
         val height = Height(h)
         db.get(Keys.blockMetaAt(height))
-          .map(_.header.featureVotes.toSeq)
+          .map(_.header.featureVotes)
           .getOrElse(Seq.empty)
       }
       .groupBy(identity)
+      .view
       .mapValues(_.size)
+      .toMap
   }
 
   override def blockRewardVotes(height: Int): Seq[Long] = readOnly { db =>

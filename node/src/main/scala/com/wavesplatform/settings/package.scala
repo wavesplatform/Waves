@@ -11,7 +11,7 @@ import net.ceedubs.ficus.readers.namemappers.HyphenNameMapper
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import org.apache.commons.lang3.SystemUtils
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.util.Try
 
 package object settings {
@@ -34,7 +34,12 @@ package object settings {
         case other =>
           throw new ConfigException.WrongType(config.getValue(path).origin(), path, ConfigValueType.OBJECT.name(), other.name())
       }
+  }
 
+  implicit val byteReader: ValueReader[Byte] = { (cfg: Config, path: String) =>
+    val x = cfg.getInt(path)
+    if (x.isValidByte) x.toByte
+    else throw new ConfigException.WrongType(cfg.origin(), s"$path has an invalid value: '$x' expected to be a byte")
   }
 
   implicit val inetSocketAddressReader: ValueReader[InetSocketAddress] = { (config: Config, path: String) =>

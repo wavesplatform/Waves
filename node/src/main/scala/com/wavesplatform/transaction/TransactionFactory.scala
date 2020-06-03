@@ -312,7 +312,6 @@ object TransactionFactory {
       assetId <- ByteStr
         .decodeBase58(request.assetId)
         .toEither
-        .right
         .map(IssuedAsset)
         .left
         .map(_ => GenericError(s"Wrong Base58 string: ${request.assetId}"))
@@ -332,7 +331,6 @@ object TransactionFactory {
       assetId <- ByteStr
         .decodeBase58(request.assetId)
         .toEither
-        .right
         .map(IssuedAsset)
         .left
         .map(_ => GenericError(s"Wrong Base58 string: ${request.assetId}"))

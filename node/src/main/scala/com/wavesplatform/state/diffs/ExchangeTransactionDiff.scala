@@ -33,7 +33,7 @@ object ExchangeTransactionDiff {
     def isPriceValid(amountDecimals: Int, priceDecimals: Int) = {
       def convertPrice(price: Long, amountDecimals: Int, priceDecimals: Int) =
         Try {
-          (BigDecimal(price) / BigDecimal(10).pow(priceDecimals - amountDecimals)).toBigInt().bigInteger.longValueExact()
+          (BigDecimal(price) / BigDecimal(10).pow(priceDecimals - amountDecimals)).toBigInt.bigInteger.longValueExact()
         }.toEither.leftMap(x => GenericError(x.getMessage))
 
       def orderPrice(order: Order, amountDecimals: Int, priceDecimals: Int) =
@@ -105,8 +105,8 @@ object ExchangeTransactionDiff {
 
       def getAssetDiff(asset: Asset, buyAssetChange: Long, sellAssetChange: Long): Map[Address, Portfolio] = {
         Monoid.combine(
-          Map(buyer  → Portfolio.build(asset, buyAssetChange)),
-          Map(seller → Portfolio.build(asset, sellAssetChange))
+          Map(buyer  -> Portfolio.build(asset, buyAssetChange)),
+          Map(seller -> Portfolio.build(asset, sellAssetChange))
         )
       }
 
@@ -192,7 +192,7 @@ object ExchangeTransactionDiff {
     Try {
       if (order.orderType == OrderType.SELL) matchAmount
       else {
-        val spend = (BigDecimal(matchAmount) * matchPrice * BigDecimal(10).pow(priceDecimals - amountDecimals - 8)).toBigInt()
+        val spend = (BigDecimal(matchAmount) * matchPrice * BigDecimal(10).pow(priceDecimals - amountDecimals - 8)).toBigInt
         if (order.getSpendAssetId == Waves && !(spend + order.matcherFee).isValidLong) {
           throw new ArithmeticException("BigInteger out of long range")
         } else spend.bigInteger.longValueExact()
@@ -203,7 +203,7 @@ object ExchangeTransactionDiff {
     Try {
       if (order.orderType == OrderType.BUY) matchAmount
       else {
-        (BigDecimal(matchAmount) * matchPrice * BigDecimal(10).pow(priceDecimals - amountDecimals - 8)).toBigInt().bigInteger.longValueExact()
+        (BigDecimal(matchAmount) * matchPrice * BigDecimal(10).pow(priceDecimals - amountDecimals - 8)).toBigInt.bigInteger.longValueExact()
       }
     }.toEither.left.map(x => GenericError(x.getMessage))
 

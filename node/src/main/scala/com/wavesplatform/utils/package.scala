@@ -6,8 +6,7 @@ import com.google.common.base.Charsets
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.ByteStr._
-import org.joda.time.Duration
-import org.joda.time.format.PeriodFormat
+import org.apache.commons.lang3.time.DurationFormatUtils
 import play.api.libs.json._
 
 import scala.annotation.tailrec
@@ -23,7 +22,7 @@ package object utils extends ScorexLogging {
   def base58Length(byteArrayLength: Int): Int = math.ceil(BytesLog / BaseLog * byteArrayLength).toInt
 
   def forceStopApplication(reason: ApplicationStopReason = Default): Unit =
-      System.exit(reason.code)
+    System.exit(reason.code)
 
   def humanReadableSize(bytes: Long, si: Boolean = true): String = {
     val (baseValue, unitStrings) =
@@ -47,10 +46,8 @@ package object utils extends ScorexLogging {
     f"${bytes / divisor}%.1f $unitString"
   }
 
-  def humanReadableDuration(duration: Long): String = {
-    val d = new Duration(duration)
-    PeriodFormat.getDefault.print(d.toPeriod)
-  }
+  def humanReadableDuration(duration: Long): String =
+    DurationFormatUtils.formatDurationHMS(duration)
 
   implicit class Tap[A](a: A) {
     def tap(g: A => Unit): A = {
@@ -75,7 +72,7 @@ package object utils extends ScorexLogging {
   }
 
   implicit class StringBytes(val s: String) extends AnyVal {
-    def utf8Bytes: Array[Byte] = s.getBytes(Charsets.UTF_8)
+    def utf8Bytes: Array[Byte]   = s.getBytes(Charsets.UTF_8)
     def toByteString: ByteString = ByteString.copyFromUtf8(s)
   }
 }

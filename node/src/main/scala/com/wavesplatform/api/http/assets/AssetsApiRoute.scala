@@ -91,21 +91,21 @@ case class AssetsApiRoute(
               }
           }
         } ~ pathPrefix("details") {
-          (pathEndOrSingleSlash & parameters(('id.*, 'full.as[Boolean] ? false))) { (ids, full) =>
+          (pathEndOrSingleSlash & parameters(("id".as[String].*, "full".as[Boolean] ? false))) { (ids, full) =>
             multipleDetailsGet(ids.toSeq, full)
-          } ~ (path(AssetId) & parameter('full.as[Boolean] ? false)) { (assetId, full) =>
+          } ~ (path(AssetId) & parameter("full".as[Boolean] ? false)) { (assetId, full) =>
             singleDetails(assetId, full)
           }
-        } ~ (path("nft" / AddrSegment / "limit" / IntNumber) & parameter('after.as[String].?)) { (address, limit, maybeAfter) =>
+        } ~ (path("nft" / AddrSegment / "limit" / IntNumber) & parameter("after".as[String].?)) { (address, limit, maybeAfter) =>
           nft(address, limit, maybeAfter)
         } ~ pathPrefix(AssetId / "distribution") { assetId =>
           pathEndOrSingleSlash(balanceDistribution(assetId)) ~
-            (path(IntNumber / "limit" / IntNumber) & parameter('after.?)) { (height, limit, maybeAfter) =>
+            (path(IntNumber / "limit" / IntNumber) & parameter("after".?)) { (height, limit, maybeAfter) =>
               balanceDistributionAtHeight(assetId, height, limit, maybeAfter)
             }
         }
       } ~ post {
-        (path("details") & parameter('full.as[Boolean] ? false)) { full =>
+        (path("details") & parameter("full".as[Boolean] ? false)) { full =>
           jsonPost[JsObject] { jsv =>
             (jsv \ "ids").validate[List[String]] match {
               case JsSuccess(ids, _) =>

@@ -69,7 +69,7 @@ case class UtilsApiRoute(
   // Deprecated
   def compile: Route = path("script" / "compile") {
     (post & entity(as[String])) { code =>
-      parameter('assetScript.as[Boolean] ? false) { isAssetScript =>
+      parameter("assetScript".as[Boolean] ? false) { isAssetScript =>
         executeLimited(ScriptCompiler(code, isAssetScript, estimator)) { result =>
           complete(
             result.fold(

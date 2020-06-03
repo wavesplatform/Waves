@@ -113,7 +113,7 @@ case class AddressApiRoute(
     complete(balanceJson(address))
   }
 
-  def balances: Route = (path("balance") & get & parameters('height.as[Int].?) & parameters('address.*) & parameters('asset.?)) {
+  def balances: Route = (path("balance") & get & parameters(("height".as[Int].?, "address".as[String].*, "asset".?))) {
     (height, addresses, assetId) =>
       complete(balancesJson(height.getOrElse(blockchain.height), addresses.toSeq, assetId.fold(Waves: Asset)(a => IssuedAsset(Base58.decode(a)))))
   }
@@ -237,7 +237,7 @@ case class AddressApiRoute(
       val balances = for {
         addressStr <- addresses.toSet[String]
         address    <- Address.fromString(addressStr).toOption
-      } yield blockchain.balanceOnlySnapshots(address, height, assetId).map(addressStr -> _._2).getOrElse(addressStr -> 0L)
+      } yield blockchain.balanceOnlySnapshots(address, height, assetId).fold(addressStr -> 0L)(addressStr -> _._2)
 
       ToResponseMarshallable(balances)
     }
@@ -323,9 +323,9 @@ object AddressApiRoute {
 
     implicit val signedFormat: Format[Signed] = Format(
       ((JsPath \ "message").read[String] and
-        ((JsPath \ "publickey")
+        (JsPath \ "publickey")
           .read[String]
-          .orElse((JsPath \ "publicKey").read[String]))
+          .orElse((JsPath \ "publicKey").read[String])
         and (JsPath \ "signature").read[String])(Signed.apply _),
       Json.writes[Signed]
     )

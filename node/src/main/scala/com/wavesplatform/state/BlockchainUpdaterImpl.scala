@@ -436,7 +436,7 @@ class BlockchainUpdaterImpl(
               _ <- Either
                 .cond(
                   totalSignatureValid,
-                  Unit,
+                  (),
                   MicroBlockAppendError("Invalid total block signature", microBlock)
                 )
               blockDifferResult <- {
@@ -472,7 +472,7 @@ class BlockchainUpdaterImpl(
   }
 
   override def activatedFeatures: Map[Short, Int] = readLock {
-    newlyApprovedFeatures.mapValues(_ + functionalitySettings.activationWindowSize(height)) ++ leveldb.activatedFeatures
+    (newlyApprovedFeatures.view.mapValues(_ + functionalitySettings.activationWindowSize(height)) ++ leveldb.activatedFeatures).toMap
   }
 
   override def featureVotes(height: Int): Map[Short, Int] = readLock {
@@ -513,7 +513,7 @@ class BlockchainUpdaterImpl(
   override def wavesAmount(height: Int): BigInt = readLock {
     ngState match {
       case Some(ng) if this.height == height =>
-        leveldb.wavesAmount(height - 1) + ng.reward.map(BigInt(_)).getOrElse(BigInt(0))
+        leveldb.wavesAmount(height - 1) + ng.reward.fold(BigInt(0))(BigInt(_))
       case _ => leveldb.wavesAmount(height)
     }
   }
@@ -556,7 +556,7 @@ class BlockchainUpdaterImpl(
   }
 
   override def carryFee: Long = readLock {
-    ngState.map(_.carryFee).getOrElse(leveldb.carryFee)
+    ngState.fold(leveldb.carryFee)(_.carryFee)
   }
 
   override def blockHeader(height: Int): Option[SignedBlockHeader] = readLock {
@@ -659,11 +659,11 @@ class BlockchainUpdaterImpl(
     ngState.fold(leveldb: Blockchain)(CompositeBlockchain(leveldb, _))
 
   private[this] object metrics {
-    val blockMicroForkStats       = Kamon.counter("blockchain-updater.block-micro-fork")
-    val microMicroForkStats       = Kamon.counter("blockchain-updater.micro-micro-fork")
-    val microBlockForkStats       = Kamon.counter("blockchain-updater.micro-block-fork")
-    val microBlockForkHeightStats = Kamon.histogram("blockchain-updater.micro-block-fork-height")
-    val forgeBlockTimeStats       = Kamon.timer("blockchain-updater.forge-block-time")
+    val blockMicroForkStats       = Kamon.counter("blockchain-updater.block-micro-fork").withoutTags()
+    val microMicroForkStats       = Kamon.counter("blockchain-updater.micro-micro-fork").withoutTags()
+    val microBlockForkStats       = Kamon.counter("blockchain-updater.micro-block-fork").withoutTags()
+    val microBlockForkHeightStats = Kamon.histogram("blockchain-updater.micro-block-fork-height").withoutTags()
+    val forgeBlockTimeStats       = Kamon.timer("blockchain-updater.forge-block-time").withoutTags()
   }
 }
 

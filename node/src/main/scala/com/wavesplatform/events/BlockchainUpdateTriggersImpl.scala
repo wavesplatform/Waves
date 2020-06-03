@@ -81,7 +81,7 @@ class BlockchainUpdateTriggersImpl(private val events: Observer[BlockchainUpdate
       existedBefore
     )
 
-    StateUpdate(balances, updatedLeases.toSeq, dataEntries, assets)
+    StateUpdate(balances.toSeq, updatedLeases.toSeq, dataEntries, assets)
   }
 
   private def containerStateUpdate(
@@ -102,6 +102,6 @@ class BlockchainUpdateTriggersImpl(private val events: Observer[BlockchainUpdate
           )
       }
 
-    (parentStateUpdate, txsStateUpdates)
+    (parentStateUpdate, txsStateUpdates.toSeq)
   }
 }

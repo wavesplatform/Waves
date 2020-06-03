@@ -82,7 +82,7 @@ case class DebugApiRoute(
     })
 
   def portfolios: Route = path("portfolios" / AddrSegment) { address =>
-    (get & parameter('considerUnspent.as[Boolean].?)) { considerUnspent =>
+    (get & parameter("considerUnspent".as[Boolean].?)) { considerUnspent =>
       extractScheduler { implicit s =>
         complete(accountsApi.portfolio(address).toListL.runToFuture.map { assetList =>
           val bd   = accountsApi.balanceDetails(address)
@@ -182,7 +182,7 @@ case class DebugApiRoute(
     complete(???)
   }
 
-  def configInfo: Route = (path("configInfo") & get & parameter('full.as[Boolean])) { full =>
+  def configInfo: Route = (path("configInfo") & get & parameter("full".as[Boolean])) { full =>
     complete(if (full) fullConfig else wavesConfig)
   }
 
@@ -251,7 +251,7 @@ case class DebugApiRoute(
   }
 
   def stateChangesByAddress: Route =
-    (get & path("stateChanges" / "address" / AddrSegment / "limit" / IntNumber) & parameter('after.as[ByteStr].?)) { (address, limit, afterOpt) =>
+    (get & path("stateChanges" / "address" / AddrSegment / "limit" / IntNumber) & parameter("after".as[ByteStr].?)) { (address, limit, afterOpt) =>
       validate(limit <= settings.transactionsByAddressLimit, s"Max limit is ${settings.transactionsByAddressLimit}") {
         extractScheduler { implicit s =>
           complete {

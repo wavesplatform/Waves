@@ -10,9 +10,9 @@ trait AutoParamsDirective { self: ApiRoute =>
   def protobufEntity[T <: GeneratedMessage with Message[T]: GeneratedMessageCompanion]: Directive1[T] = {
     def paramsJson(params: Seq[(String, String)]): String = {
       import play.api.libs.json.{JsArray, JsObject, JsString, Json}
-      val lists = params.groupBy(_._1).mapValues(_.map(_._2))
+      val lists  = params.groupBy(_._1).view.mapValues(_.map(_._2))
       val values = lists.collect { case (k, Seq(v)) => (k, v) }
-      Json.stringify(JsObject(values.map(v => v._1 -> JsString(v._2)) ++ lists.map(v => s"${v._1}s" -> JsArray(v._2.map(JsString)))))
+      Json.stringify(JsObject(values.map(v => v._1 -> JsString(v._2)).toSeq ++ lists.map(v => s"${v._1}s" -> JsArray(v._2.map(JsString)))))
     }
 
     def tryFromJson(d: Directive1[String]): Directive1[T] =
