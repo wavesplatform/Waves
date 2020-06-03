@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -29,9 +29,6 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
       |    let transferTx = transferTransactionFromProto(txProtoBytes).value()
       |    let transferTxAttachment = match (transferTx.attachment) {
       |        case b:ByteVector => b.toBase58String()
-      |        case integer:Int => integer.toString()
-      |        case bool:Boolean => bool.toString()
-      |        case s:String => s
       |        case _ => throw("Empty description")
       |      }
       |    let assetId = if (!transferTx.assetId.isDefined()) then {"WAVES"} else {transferTx.assetId.value().toBase58String()}
@@ -87,7 +84,7 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
     sender.getDataByKey(dApp, "id").value shouldBe transferTx.id().toString
     sender.getDataByKey(dApp, "assetId").value shouldBe "WAVES"
     sender.getDataByKey(dApp, "feeAssetId").value shouldBe "WAVES"
-    sender.getDataByKey(dApp, "attachment").value shouldBe "WAVES transfer"
+    sender.getDataByKey(dApp, "attachment").value shouldBe Base58.encode("WAVES transfer".getBytes)
     sender.getDataByKey(dApp, "senderPublicKey").value shouldBe transferTx.sender.toString
     sender.getDataByKey(dApp, "sender").value shouldBe transferTx.sender.toAddress.toString
     sender.getDataByKey(dApp, "recipient").value shouldBe transferTx.recipient.toString

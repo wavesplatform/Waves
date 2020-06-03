@@ -132,7 +132,7 @@ object Bindings {
         assetId = ct.assetId,
         amount = ct.amount,
         recipient = ct.recipient,
-        attachment = ByteStr.empty
+        attachment = None
       ),
       proofsEnabled = false,
       version

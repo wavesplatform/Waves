@@ -131,7 +131,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite /*with CancelAft
           fee: Long = calcMassTransferFee(1),
           timestamp: Long = System.currentTimeMillis,
           attachment: Array[Byte] = Array.emptyByteArray
-      ) = {
+      ): (SignedMassTransferRequest, Option[ByteStr]) = {
         val txEi = for {
           parsedTransfers <- MassTransferTransaction.parseTransfersList(transfers)
           tx <- MassTransferTransaction.selfSigned(
@@ -171,7 +171,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite /*with CancelAft
         (request(transfers = List(Transfer(secondAddress, -1))), "One of the transfers has negative amount"),
         (request(fee = 0), "insufficient fee"),
         (request(fee = 99999), "Fee .* does not exceed minimal value"),
-        (request(attachment = ("a" * (MaxAttachmentSize + 1)).getBytes("UTF-8")), "Too big sequences requested")
+        (request(attachment = ("a" * (MaxAttachmentSize + 1)).getBytes("UTF-8")), "exceeds maximum length")
       )
 
       for (((req, idOpt), diag) <- invalidTransfers) {
