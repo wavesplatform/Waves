@@ -694,7 +694,7 @@ object PureContext {
       ("element", TYPEPARAM('T'))
     ) {
       case ARR(list) :: element :: Nil =>
-        genericListIndexOf(element, list.lastIndexOf, list.lastIndexWhere)
+        genericListIndexOf(element, list.lastIndexOf(_, list.length-1), list.lastIndexWhere)
       case xs =>
         notImplemented[Id, EVALUATED]("lastIndexOf(list: List[T], element: T)", xs)
     }
