@@ -66,14 +66,14 @@ object InvokeDiffsCommon {
       callableComplexities: Map[Int, Map[String, Long]],
       dAppAddress: Address
   ): Either[ValidationError, Long] = {
-      for {
-        complexitiesByCallable <- callableComplexities.get(blockchain.estimator.version).toRight {
-          GenericError(s"Cannot find complexity storage, address = $dAppAddress, estimator version = ${blockchain.estimator.version}")
-        }
-        complexity             <- complexitiesByCallable.get(tx.funcCall.function.funcName).toRight {
-          GenericError(s"Cannot find callable function `${tx.funcCall.function.funcName}`, address = $dAppAddress`")
-        }
-      } yield complexity
+    for {
+      complexitiesByCallable <- callableComplexities.get(blockchain.estimator.version).toRight {
+        GenericError(s"Cannot find complexity storage, address = $dAppAddress, estimator version = ${blockchain.estimator.version}")
+      }
+      complexity <- complexitiesByCallable.get(tx.funcCall.function.funcName).toRight {
+        GenericError(s"Cannot find callable function `${tx.funcCall.function.funcName}`, address = $dAppAddress`")
+      }
+    } yield complexity
   }
 
   def processActions(
@@ -95,7 +95,7 @@ object InvokeDiffsCommon {
     val burnList       = actionsByType(classOf[Burn]).asInstanceOf[List[Burn]]
     val sponsorFeeList = actionsByType(classOf[SponsorFee]).asInstanceOf[List[SponsorFee]]
 
-    val dataEntries = actionsByType
+    val dataEntries = actionsByType.view
       .filterKeys(classOf[DataItem[_]].isAssignableFrom)
       .values
       .flatten
@@ -157,11 +157,11 @@ object InvokeDiffsCommon {
 
       compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey)(actions, paymentsAndFeeDiff).leftMap(asFailedScriptError)
 
-      transfers = compositeDiff.portfolios |+| feeInfo._2.mapValues(_.negate)
+      transfers = compositeDiff.portfolios |+| feeInfo._2.view.mapValues(_.negate).toMap
 
       currentTxDiff         = compositeDiff.transactions(tx.id())
       currentTxDiffWithKeys = currentTxDiff.copy(affected = currentTxDiff.affected ++ transfers.keys ++ compositeDiff.accountData.keys)
-      updatedTxDiff         = compositeDiff.transactions.updated(tx.id(), currentTxDiffWithKeys)
+      updatedTxDiff         = compositeDiff.transactions.concat(Map(tx.id() -> currentTxDiffWithKeys))
 
       resultSponsorFeeList = {
         val sponsorFeeDiff =
@@ -245,7 +245,7 @@ object InvokeDiffsCommon {
     else
       ().asRight[ScriptExecutionError]
 
-  private def checkOverflow(dataList: Traversable[Long]): Either[ScriptExecutionError, Unit] = {
+  private def checkOverflow(dataList: Iterable[Long]): Either[ScriptExecutionError, Unit] = {
     Try(dataList.foldLeft(0L)(Math.addExact))
       .fold(
         _ => ScriptExecutionError.ByDAppScript("Attempt to transfer unavailable funds in contract payment").asLeft[Unit],
@@ -266,9 +266,10 @@ object InvokeDiffsCommon {
       )
 
       maxKeySize = ContractLimits.MaxKeySizeInBytesByVersion(stdLibVersion)
-      _ <- dataEntries.find(_.key.utf8Bytes.length > maxKeySize)
-          .toLeft(())
-          .leftMap(d => s"Key size = ${d.key.utf8Bytes.length} bytes must be less than $maxKeySize")
+      _ <- dataEntries
+        .find(_.key.utf8Bytes.length > maxKeySize)
+        .toLeft(())
+        .leftMap(d => s"Key size = ${d.key.utf8Bytes.length} bytes must be less than $maxKeySize")
 
       totalDataBytes = dataEntries.map(_.toBytes.length).sum
       _ <- Either.cond(

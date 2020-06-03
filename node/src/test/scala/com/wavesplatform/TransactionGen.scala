@@ -747,8 +747,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       mkO2 <- Gen.oneOf(orderVersions.map(mkSellOrder).toSeq)
     } yield {
 
-      val buyFee  = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
-      val sellFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
+      val buyFee  = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue
+      val sellFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue
 
       val o1 = mkO1(buyer, matcher.publicKey, assetPair, amount1, price, timestamp, expiration, matcherFee)
       val o2 = mkO2(seller, matcher.publicKey, assetPair, amount2, price, timestamp, expiration, matcherFee)

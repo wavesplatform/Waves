@@ -194,9 +194,9 @@ object Importer extends ScorexLogging {
               BlockchainFeatures.BlockV5,
               blockchainUpdater.height + 1
             )
-            val Success(block) =
-              if (importOptions.format == Formats.Binary && !blockV5) Block.parseBytes(buffer)
-              else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(buffer)), unsafe = true)
+            val block =
+              (if (importOptions.format == Formats.Binary && !blockV5) Block.parseBytes(buffer)
+               else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(buffer)), unsafe = true)).get
 
             if (blockchainUpdater.lastBlockId.contains(block.header.reference)) {
               Await.result(appendBlock(block).runAsyncLogErr, Duration.Inf) match {
