@@ -211,7 +211,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
          |	version = 2
          |	id = base58'$transferTxId'
          |	senderPublicKey = base58'${alice.publicKey}'
-         |	attachment = Unit
+         |	attachment = base58''
          |	sender = Address(
          |		bytes = base58'${responseTx.sender.get}'
          |	)

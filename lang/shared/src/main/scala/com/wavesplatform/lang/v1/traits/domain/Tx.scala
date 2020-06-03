@@ -53,7 +53,7 @@ object Tx {
 
   case class Payment(p: Proven, amount: Long, recipient: Recipient) extends Tx
 
-  case class Transfer(p: Proven, feeAssetId: Option[ByteStr], assetId: Option[ByteStr], amount: Long, recipient: Recipient, attachment: Option[ByteStr])
+  case class Transfer(p: Proven, feeAssetId: Option[ByteStr], assetId: Option[ByteStr], amount: Long, recipient: Recipient, attachment: ByteStr)
       extends Tx
 
   case class Issue(p: Proven, quantity: Long, name: ByteStr, description: ByteStr, reissuable: Boolean, decimals: Long, script: Option[ByteStr])

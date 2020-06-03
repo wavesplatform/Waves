@@ -17,7 +17,7 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       tx.assetId.map(_.byteStr),
       tx.amount,
       tx.recipient,
-      tx.attachment.map(_.byteStr)
+      tx.attachment.byteStr
     )
 
   def toRideModelO(tx: TransferTransaction): Option[Transfer] =

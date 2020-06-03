@@ -137,7 +137,7 @@ object RealTransactionWrapper {
       assetId = t.assetId.compatId,
       amount = t.amount,
       recipient = t.recipient,
-      attachment = Option(t.attachment).filter(_.arr.nonEmpty)
+      attachment = t.attachment
     )
 
 }
