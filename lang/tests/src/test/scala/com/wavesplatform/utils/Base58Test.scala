@@ -4,7 +4,7 @@ import com.wavesplatform.common.utils.{Base58, FastBase58, StdBase58}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import scorex.crypto.encode.{Base58 => ScorexBase58}
+import scorex.util.encode.{Base58 => ScorexBase58}
 
 import scala.util.Success
 

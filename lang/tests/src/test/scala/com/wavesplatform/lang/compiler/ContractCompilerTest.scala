@@ -468,7 +468,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V4) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V4) shouldBe Symbol("right")
   }
 
   property("assetBalanceV4 allow issued assets only") {
@@ -517,7 +517,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("contract compilation fails if functions has the same name") {
@@ -977,7 +977,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V4) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V4) shouldBe Symbol("right")
   }
 
 

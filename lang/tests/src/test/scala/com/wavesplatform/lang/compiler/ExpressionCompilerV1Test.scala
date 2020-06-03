@@ -103,8 +103,8 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
         """.stripMargin
       Parser.parseExpr(script).get.value
     }
-    ExpressionCompiler(compilerContext, funcExpr) shouldBe 'right
-    ExpressionCompiler(compilerContext, letExpr) shouldBe 'right
+    ExpressionCompiler(compilerContext, funcExpr) shouldBe Symbol("right")
+    ExpressionCompiler(compilerContext, letExpr) shouldBe Symbol("right")
   }
 
   treeTypeTest("GETTER")(

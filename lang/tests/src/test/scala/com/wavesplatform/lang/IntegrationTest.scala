@@ -29,7 +29,7 @@ import com.wavesplatform.lang.v1.traits.domain.Issue
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import org.web3j.crypto.Keys
-import scorex.crypto.encode.Base16
+import scorex.util.encode.Base16
 import scorex.crypto.hash.Keccak256
 
 import scala.util.{Random, Try}

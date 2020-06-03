@@ -305,7 +305,7 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
         |
         |@Callable(i) func f() = []
         |""".stripMargin
-    ParserV2.parseDAPP(code) shouldBe 'right
+    ParserV2.parseDAPP(code) shouldBe Symbol("right")
   }
 
   property("FOLD expr") {
@@ -322,7 +322,7 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
         |
         |@Callable(i) func delete(k: String) = [DeleteEntry(k)]
         |""".stripMargin
-    ParserV2.parseDAPP(code) shouldBe 'right
+    ParserV2.parseDAPP(code) shouldBe Symbol("right")
   }
 
 }
