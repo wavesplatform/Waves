@@ -268,14 +268,13 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
       sender.assertAssetBalance(acc, asset2Id, 15)
     }
 
-    // TODO NODE-1968
-    "NFT burning removes it from list" ignore {
+    "NFT burning removes it from list" in {
       val acc     = createDapp(script(nftAsset))
       val txIssue = issue(acc, CallableMethod, nftAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, nftAsset, method = CallableMethod)
-      // sender.nftList(acc, 2).map(_.assetId) shouldBe Seq(assetId)
+      sender.nftList(acc, 2).map(r => Base58.encode(r.assetId.toByteArray)) shouldBe Seq(assetId)
       burn(acc, CallableMethod, assetId, 1)
-      // sender.nftList(acc, 1) shouldBe empty
+      sender.nftList(acc, 1) shouldBe empty
     }
 
     "liquid block works" in {
@@ -290,7 +289,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
         }
         assertQuantity(asset)(simpleReissuableAsset.quantity)
         sender.assertAssetBalance(acc, asset, simpleReissuableAsset.quantity)
-        // sender.nftList(acc, 10) should have size 1
+        sender.nftList(acc, 10) should have size 1
       }
       checks()
       miner.waitForHeightArise()
@@ -309,7 +308,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
       .explicitGet()
       ._1
 
-    miner.broadcastTransfer(sender.privateKey, PBRecipients.create(address), initialWavesBalance, minFee, waitForTx = true)
+    miner.broadcastTransfer(sender.keyPair, PBRecipients.create(address.toAddress), initialWavesBalance, minFee, waitForTx = true)
 
     miner.waitForTransaction(
       miner
@@ -350,7 +349,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
     val tx = miner
       .broadcastInvokeScript(
         address,
-        PBRecipients.create(address),
+        PBRecipients.create(address.toAddress),
         fee = fee,
         waitForTx = wait,
         functionCall = Some(fc),
@@ -602,7 +601,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
     method match {
       case CallableMethod =>
         val id = f
-        sender.stateChanges(id)._2.errorMessage.get.text should include(msg)
+        sender.stateChanges(id)._2.error.get.text should include(msg)
       case TransactionMethod =>
         assertGrpcError(f, msg)
     }

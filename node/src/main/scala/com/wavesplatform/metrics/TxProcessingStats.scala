@@ -3,7 +3,7 @@ package com.wavesplatform.metrics
 import com.google.common.base.CaseFormat
 import com.wavesplatform.settings.Constants
 import kamon.Kamon
-import kamon.metric.Timer
+import kamon.metric.Metric
 import supertagged._
 
 object TxProcessingStats {
@@ -16,7 +16,7 @@ object TxProcessingStats {
     Constants.TransactionNames.view.mapValues(timerName).toMap
   }
 
-  object TxTimer extends TaggedType[Timer]
+  object TxTimer extends TaggedType[Metric.Timer]
 
   type TxTimer = TxTimer.Type
 

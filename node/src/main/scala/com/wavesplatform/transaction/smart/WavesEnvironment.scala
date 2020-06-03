@@ -34,6 +34,7 @@ class WavesEnvironment(
     ds: DirectiveSet,
     override val txId: ByteStr
 ) extends Environment[Id] {
+  import com.wavesplatform.lang.v1.traits.Environment._
 
   override def height: Long = h()
 
@@ -49,9 +50,9 @@ class WavesEnvironment(
   override def inputEntity: InputEntity =
     in.value
 
-  override def transferTransactionById(id: Array[Byte]): Option[Tx] =
+  override def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer] =
     blockchain
-      .transferById(id)
+      .transferById(ByteStr(id))
       .map(t => RealTransactionWrapper.mapTransferTx(t._2, ds.stdLibVersion))
 
   override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any] = {
@@ -82,7 +83,7 @@ class WavesEnvironment(
   override def resolveAlias(name: String): Either[String, Recipient.Address] =
     blockchain
       .resolveAlias(com.wavesplatform.account.Alias.create(name).explicitGet())
-      .map(a => Recipient.Address(ByteStr(a.bytes.arr)))
+      .map(a => Recipient.Address(ByteStr(a.bytes)))
       .left
       .map(_.toString)
 
@@ -99,18 +100,38 @@ class WavesEnvironment(
     } yield balance).left.map(_.toString)
   }
 
+  override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails] = {
+    (for {
+      aoa <- addressOrAlias match {
+        case Address(bytes) => AddressOrAlias.fromBytes(bytes.arr, position = 0).map(_._1)
+        case Alias(name)    => com.wavesplatform.account.Alias.create(name)
+      }
+      address <- blockchain.resolveAlias(aoa)
+      portfolio = blockchain.wavesPortfolio(address)
+    } yield Environment.BalanceDetails(
+      portfolio.balance - portfolio.lease.out,
+      portfolio.balance,
+      blockchain.generatingBalance(address),
+      portfolio.effectiveBalance
+    )).left.map(_.toString)
+  }
+
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
     blockchain.transactionInfo(ByteStr(id)).filter(_._3).map(_._1.toLong)
 
   override def tthis: Address = Recipient.Address(address())
 
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
-    blockchain.assetDescription(IssuedAsset(id)).map { assetDesc =>
+    for {
+      assetDesc <- blockchain.assetDescription(IssuedAsset(ByteStr(id)))
+    } yield {
       ScriptAssetInfo(
-        id = id,
+        id = ByteStr(id),
+        name = assetDesc.name.toStringUtf8(),
+        description = assetDesc.description.toStringUtf8(),
         quantity = assetDesc.totalVolume.toLong,
         decimals = assetDesc.decimals,
-        issuer = Address(assetDesc.issuer.toAddress.bytes),
+        issuer = Address(ByteStr(assetDesc.issuer.toAddress.bytes)),
         issuerPk = assetDesc.issuer,
         reissuable = assetDesc.reissuable,
         scripted = assetDesc.script.nonEmpty,
@@ -134,8 +155,8 @@ class WavesEnvironment(
       height = bHeight,
       baseTarget = blockH.baseTarget,
       generationSignature = blockH.generationSignature,
-      generator = blockH.generator.toAddress.bytes,
-      generatorPublicKey = ByteStr(blockH.generator),
+      generator = ByteStr(blockH.generator.toAddress.bytes),
+      generatorPublicKey = blockH.generator,
       if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None
     )
   }

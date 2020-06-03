@@ -37,7 +37,6 @@ trait BaseGlobal {
   val MaxLiteralLength             = 12 * 1024
   val MaxAddressLength             = 36
   val MaxByteStrSizeForVerifyFuncs = 32 * 1024
-  val MaxByteStrSizeForVerifyFuncs_V4 = 150 * 1024
 
   def base58Encode(input: Array[Byte]): Either[String, String]
   def base58Decode(input: String, limit: Int = MaxLiteralLength): Either[String, Array[Byte]]
@@ -223,6 +222,8 @@ trait BaseGlobal {
   def requestNode(url: String): Future[NodeResponse]
 
   def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean
+
+  def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte]
 }
 
 object BaseGlobal {

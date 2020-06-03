@@ -34,15 +34,15 @@ object PBBlocks {
 
   def protobuf(header: BlockHeader): PBHeader = PBBlock.Header(
     AddressScheme.current.chainId,
-    ByteString.copyFrom(header.reference),
+    ByteString.copyFrom(header.reference.arr),
     header.baseTarget,
-    ByteString.copyFrom(header.generationSignature),
+    ByteString.copyFrom(header.generationSignature.arr),
     header.featureVotes.map(_.toInt),
     header.timestamp,
     header.version,
-    ByteString.copyFrom(header.generator),
+    ByteString.copyFrom(header.generator.arr),
     header.rewardVote,
-    ByteString.copyFrom(header.transactionsRoot)
+    ByteString.copyFrom(header.transactionsRoot.arr)
   )
 
   def protobuf(block: VanillaBlock): PBBlock = {
@@ -50,7 +50,7 @@ object PBBlocks {
 
     new PBBlock(
       Some(protobuf(header)),
-      ByteString.copyFrom(block.signature),
+      ByteString.copyFrom(block.signature.arr),
       transactionData.map(PBTransactions.protobuf)
     )
   }

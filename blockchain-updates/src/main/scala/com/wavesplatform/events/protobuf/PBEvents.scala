@@ -6,12 +6,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events
 import com.wavesplatform.events.protobuf.BlockchainUpdated.{Append => PBAppend, Rollback => PBRollback}
-import com.wavesplatform.events.protobuf.StateUpdate.{
-  AssetStateUpdate,
-  BalanceUpdate => PBBalanceUpdate,
-  DataEntryUpdate => PBDataEntryUpdate,
-  LeasingUpdate => PBLeasingUpdate
-}
+import com.wavesplatform.events.protobuf.StateUpdate.{AssetStateUpdate, BalanceUpdate => PBBalanceUpdate, DataEntryUpdate => PBDataEntryUpdate, LeasingUpdate => PBLeasingUpdate}
 import com.wavesplatform.protobuf.block.{PBBlocks, PBMicroBlocks}
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.Transaction
@@ -26,7 +21,7 @@ object PBEvents {
         val txsUpdates  = transactionStateUpdates.map(protobufStateUpdate)
 
         BlockchainUpdated(
-          id = sig,
+          id = sig.toByteString,
           height = height,
           update = BlockchainUpdated.Update.Append(
             PBAppend(
@@ -47,7 +42,7 @@ object PBEvents {
         val txsUpdates       = transactionStateUpdates.map(protobufStateUpdate)
 
         BlockchainUpdated(
-          id = totalBlockId,
+          id = totalBlockId.toByteString,
           height = height,
           update = BlockchainUpdated.Update.Append(
             PBAppend(
@@ -64,7 +59,7 @@ object PBEvents {
         )
       case events.RollbackCompleted(to, height) =>
         BlockchainUpdated(
-          id = to,
+          id = to.toByteString,
           height = height,
           update = BlockchainUpdated.Update.Rollback(
             PBRollback(PBRollback.RollbackType.BLOCK)
@@ -72,7 +67,7 @@ object PBEvents {
         )
       case events.MicroBlockRollbackCompleted(toSig, height) =>
         BlockchainUpdated(
-          id = toSig,
+          id = toSig.toByteString,
           height = height,
           update = BlockchainUpdated.Update.Rollback(
             PBRollback(PBRollback.RollbackType.MICROBLOCK)
@@ -80,17 +75,17 @@ object PBEvents {
         )
     }
 
-  private def toString(bytes: ByteStr): String = new String(bytes, StandardCharsets.UTF_8)
+  private def toString(bytes: ByteStr): String = new String(bytes.arr, StandardCharsets.UTF_8)
 
   private def protobufAssetStateUpdate(a: events.AssetStateUpdate): AssetStateUpdate =
     AssetStateUpdate(
-      assetId = a.asset.id,
+      assetId = a.asset.id.toByteString,
       decimals = a.decimals,
       name = toString(a.name),
       description = toString(a.description),
       reissuable = a.reissuable,
       volume = a.volume.longValue,
-      script = PBTransactions.toPBScript(a.script.map(_._1)),
+      script = PBTransactions.toPBScript(a.script.map(_.script)),
       sponsorship = a.sponsorship.getOrElse(0),
       nft = a.nft,
       assetExistedBefore = a.assetExistedBefore,

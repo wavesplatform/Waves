@@ -66,6 +66,8 @@ package object utils extends ScorexLogging {
     override def writes(o: ByteStr): JsValue = JsString(o.toString)
 
     override def reads(json: JsValue): JsResult[ByteStr] = json match {
+      case JsString(v) if v.startsWith("base64:") =>
+        decodeBase64(v.substring(7)).fold(e => JsError(s"Error parsing base64: ${e.getMessage}"), b => JsSuccess(b))
       case JsString(v) => decodeBase58(v).fold(e => JsError(s"Error parsing base58: ${e.getMessage}"), b => JsSuccess(b))
       case _           => JsError("Expected JsString")
     }

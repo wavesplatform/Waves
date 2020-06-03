@@ -45,12 +45,12 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
             val assetBalance = issues
               .map(_.id.value)
               .map(IssuedAsset)
-              .map(asset => asset -> blockchain.balance(dAppAcc, asset))
+              .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
               .toMap
 
-            diff.portfolios(dAppAcc).assets shouldBe assetBalance
-            diff.portfolios(dAppAcc).balance shouldBe -wavesTransfer
-            diff.portfolios(invoker).balance shouldBe wavesTransfer - fee
+            diff.portfolios(dAppAcc.toAddress).assets shouldBe assetBalance
+            diff.portfolios(dAppAcc.toAddress).balance shouldBe -wavesTransfer
+            diff.portfolios(invoker.toAddress).balance shouldBe wavesTransfer - fee
         }
     }
   }
@@ -74,10 +74,10 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
             val assetBalance = issues
               .map(_.id.value)
               .map(IssuedAsset)
-              .map(asset => asset -> blockchain.balance(dAppAcc, asset))
+              .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
               .toMap
 
-            diff.portfolios(dAppAcc).assets shouldBe assetBalance
+            diff.portfolios(dAppAcc.toAddress).assets shouldBe assetBalance
         }
     }
   }
@@ -102,7 +102,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
           TestBlock.create(Seq(ci)),
           features
         )(_ should matchPattern {
-          case Right(diff: Diff) if diff.transactions.exists(!_._2._3) =>
+          case Right(diff: Diff) if diff.transactions.exists(!_._2.applied) =>
         })
     }
   }
@@ -139,7 +139,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
         ) {
           val expectedFee = (0.005 + 0.004 + 0.004 * (ContractLimits.MaxAttachedPaymentAmount - 1)) * Constants.UnitsInWave
           _ should produce(
-            s"Fee in WAVES for InvokeScriptTransaction (1 in WAVES) " +
+            s"Fee in WAVES for InvokeScriptTransaction (${ci.fee} in WAVES) " +
               s"with ${ContractLimits.MaxAttachedPaymentAmount} total scripts invoked " +
               s"does not exceed minimal value of ${expectedFee.toLong} WAVES"
           )
@@ -167,12 +167,12 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
             val assetBalance = issues
               .map(_.id.value)
               .map(IssuedAsset)
-              .map(asset => asset -> blockchain.balance(dAppAcc, asset))
+              .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
               .toMap
 
-            diff.portfolios(dAppAcc).assets shouldBe assetBalance
-            diff.portfolios(dAppAcc).balance shouldBe -wavesTransfer
-            diff.portfolios(invoker).balance shouldBe wavesTransfer - fee
+            diff.portfolios(dAppAcc.toAddress).assets shouldBe assetBalance
+            diff.portfolios(dAppAcc.toAddress).balance shouldBe -wavesTransfer
+            diff.portfolios(invoker.toAddress).balance shouldBe wavesTransfer - fee
         }
     }
   }
@@ -210,7 +210,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
       master        <- accountGen
       invoker       <- accountGen
       ts            <- timestampGen
-      fee           <- if (withEnoughFee) ciFee(ContractLimits.MaxAttachedPaymentAmount + 1) else Gen.const(1L)
+      fee           <- if (withEnoughFee) ciFee(ContractLimits.MaxAttachedPaymentAmount + 1) else ciFee(1)
       accountScript <- verifier
       commonIssues <- if (multiPayment)
         Gen.listOfN(
@@ -221,8 +221,8 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
       specialIssue <- issueV2TransactionGen(invoker, additionalAssetScript.fold(Gen.const(none[Script]))(_.map(Some(_))))
     } yield {
       for {
-        genesis     <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
-        genesis2    <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
+        genesis     <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
+        genesis2    <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
         setVerifier <- SetScriptTransaction.selfSigned(1.toByte, invoker, Some(accountScript), fee, ts + 2)
         setDApp     <- SetScriptTransaction.selfSigned(1.toByte, master, Some(dApp(invoker)), fee, ts + 2)
         (issues, payments) = if (repeatAdditionalAsset) {
@@ -234,7 +234,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
           val payments = issues.map(i => Payment(1, IssuedAsset(i.id.value)))
           (issues, payments)
         }
-        ci <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master, None, payments, fee, Waves, ts + 3)
+        ci <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, payments, fee, Waves, ts + 3)
       } yield (List(genesis, genesis2), setVerifier, setDApp, ci, issues, master, invoker, fee)
     }.explicitGet()
 
@@ -265,7 +265,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
           features
         ) {
           case Right(diff: Diff) =>
-            val errMsg = diff.scriptResults(diff.transactions.keys.head).errorMessage.get.text
+            val errMsg = diff.scriptResults(diff.transactions.keys.head).error.get.text
             ((message(oldVersion.id, maybeFailedAssetId)).r.findFirstIn(errMsg)) should not be empty
 
           case l @ Left(_) =>
@@ -283,7 +283,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
          |
          | @Callable(i)
          | func default() = $resultSyntax([ScriptTransfer(
-         |    Address(base58'${transferRecipient.stringRepr}'),
+         |    Address(base58'${transferRecipient.toAddress}'),
          |    $transferPaymentAmount,
          |    unit
          | )])

@@ -12,6 +12,7 @@ import scala.concurrent.ExecutionContext
 
 class BaseSuite
     extends FreeSpec
+    with ReportingTestName
     with NodesFromDocker
     with Matchers
     with CancelAfterFailure

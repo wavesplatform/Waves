@@ -15,10 +15,10 @@ object Validators {
 
   def validateBlock(b: Block): Validation[Block] =
     (for {
-      _ <- Either.cond(Block.validateReferenceLength(b.header.reference.length), (), "Incorrect reference")
+      _ <- Either.cond(Block.validateReferenceLength(b.header.reference.arr.length), (), "Incorrect reference")
       genSigLength = if (b.header.version < ProtoBlockVersion) GenerationSignatureLength else GenerationVRFSignatureLength
       _ <- Either.cond(b.header.generationSignature.arr.length == genSigLength, (), "Incorrect generationSignature")
-      _ <- Either.cond(b.header.generator.length == KeyLength, (), "Incorrect signer")
+      _ <- Either.cond(b.header.generator.arr.length == KeyLength, (), "Incorrect signer")
       _ <- Either.cond(
         b.header.version > 2 || b.header.featureVotes.isEmpty,
         (),
@@ -35,7 +35,7 @@ object Validators {
       _ <- validateBlock(block)
       // Verify signature
       _ <- Either.cond(
-        crypto.verify(block.signature, block.bytesWithoutSignature(), block.header.generator),
+        crypto.verify(block.signature, block.bodyBytes(), block.header.generator),
         (),
         GenericError("Passed genesis signature is not valid")
       )
@@ -51,16 +51,16 @@ object Validators {
   def validateMicroBlock(mb: MicroBlock): Validation[MicroBlock] =
     (for {
       _ <- Either.cond(
-        MicroBlock.validateReferenceLength(mb.version, mb.reference.length),
+        MicroBlock.validateReferenceLength(mb.version, mb.reference.arr.length),
         (),
-        s"Incorrect prevResBlockSig: ${mb.reference.length}"
+        s"Incorrect prevResBlockSig: ${mb.reference.arr.length}"
       )
       _ <- Either.cond(
-        mb.totalResBlockSig.length == crypto.SignatureLength,
+        mb.totalResBlockSig.arr.length == crypto.SignatureLength,
         (),
-        s"Incorrect totalResBlockSig: ${mb.totalResBlockSig.length}"
+        s"Incorrect totalResBlockSig: ${mb.totalResBlockSig.arr.length}"
       )
-      _ <- Either.cond(mb.sender.length == KeyLength, (), s"Incorrect generator.publicKey: ${mb.sender.length}")
+      _ <- Either.cond(mb.sender.arr.length == KeyLength, (), s"Incorrect generator.publicKey: ${mb.sender.arr.length}")
       _ <- Either.cond(mb.transactionData.nonEmpty, (), "cannot create empty MicroBlock")
       _ <- Either.cond(
         mb.transactionData.size <= MaxTransactionsPerMicroblock,

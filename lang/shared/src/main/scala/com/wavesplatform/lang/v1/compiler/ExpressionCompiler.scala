@@ -1,9 +1,10 @@
 package com.wavesplatform.lang.v1.compiler
 
+import java.nio.charset.StandardCharsets
+
 import cats.implicits._
 import cats.{Id, Show}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.CompilationError._
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -15,6 +16,7 @@ import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE, PART
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser, ParserV2}
 import com.wavesplatform.lang.v1.task.TaskM
 import com.wavesplatform.lang.v1.task.imports._
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 
 import scala.util.Try
 
@@ -348,8 +350,16 @@ object ExpressionCompiler {
     } yield letName
   }
 
+  private def checkDeclarationNameSize(p: Pos, decl: Expressions.Declaration): CompileM[String] =
+    handlePart(decl.name).ensure(
+      TooLongDeclarationName(p.start, p.end, decl)
+    )(
+      _.getBytes(StandardCharsets.UTF_8).length <= ContractLimits.MaxDeclarationNameInBytes
+    )
+
   def compileLet(p: Pos, let: Expressions.LET, saveExprContext: Boolean): CompileM[CompilationStepResultDec] =
     for {
+      _              <- checkDeclarationNameSize(p, let)
       letNameWithErr <- validateShadowing(p, let).handleError()
       compiledLet    <- compileExprWithCtx(let.value, saveExprContext)
       ctx            <- get[Id, CompilerContext, CompilationError]
@@ -378,6 +388,7 @@ object ExpressionCompiler {
       annListVars: List[String] = List.empty
   ): CompileM[(CompilationStepResultDec, List[(String, FINAL)])] = {
     for {
+      _               <- checkDeclarationNameSize(p, func)
       funcNameWithErr <- validateShadowing(p, func, annListVars).handleError()
       argsWithErr <- func.args.toList
         .pure[CompileM]

@@ -28,9 +28,9 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with WithState with 
     val script =
       s"""
          |
-         |let A = base58'${ByteStr(pk0)}'
-         |let B = base58'${ByteStr(pk1)}'
-         |let C = base58'${ByteStr(pk2)}'
+         |let A = base58'$pk0'
+         |let B = base58'$pk1'
+         |let C = base58'$pk2'
          |
          |let proofs = tx.proofs
          |let AC = if(sigVerify(tx.bodyBytes,proofs[0],A)) then 1 else 0
@@ -51,17 +51,29 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with WithState with 
     s2        <- accountGen
     recipient <- accountGen
     ts        <- positiveIntGen
-    genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-    setScript <- selfSignedSetScriptTransactionGenP(master, ExprScript(multisigTypedExpr(s0, s1, s2)).explicitGet())
+    genesis = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+    setScript <- selfSignedSetScriptTransactionGenP(master, ExprScript(multisigTypedExpr(s0.publicKey, s1.publicKey, s2.publicKey)).explicitGet())
     amount    <- positiveLongGen
     fee       <- smallFeeGen
     timestamp <- timestampGen
   } yield {
     val unsigned =
-      TransferTransaction(2.toByte, master, recipient, Waves, amount, Waves, fee, None, timestamp, proofs = Proofs.empty, recipient.chainId)
-    val sig0 = ByteStr(crypto.sign(s0, unsigned.bodyBytes()))
-    val sig1 = ByteStr(crypto.sign(s1, unsigned.bodyBytes()))
-    val sig2 = ByteStr(crypto.sign(s2, unsigned.bodyBytes()))
+      TransferTransaction(
+        2.toByte,
+        master.publicKey,
+        recipient.toAddress,
+        Waves,
+        amount,
+        Waves,
+        fee,
+        None,
+        timestamp,
+        proofs = Proofs.empty,
+        recipient.toAddress.chainId
+      )
+    val sig0 = crypto.sign(s0.privateKey, unsigned.bodyBytes())
+    val sig1 = crypto.sign(s1.privateKey, unsigned.bodyBytes())
+    val sig2 = crypto.sign(s2.privateKey, unsigned.bodyBytes())
     (genesis, setScript, unsigned, Seq(sig0, sig1, sig2))
   }
 

@@ -4,6 +4,7 @@ import cats.Id
 import cats.syntax.monoid._
 import com.google.common.primitives.Ints
 import com.wavesplatform.common.merkle.Merkle._
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values._
@@ -14,6 +15,7 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.Common.{NoShrink, produce}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -23,7 +25,7 @@ import scorex.crypto.hash.{Blake2b256, CryptographicHash32, Digest, Digest32}
 
 import scala.util.Random
 
-class MerkleTest extends PropSpec with PropertyChecks with Matchers {
+class MerkleTest extends PropSpec with PropertyChecks with Matchers with NoShrink {
 
   val AMT: Long = 1000000 * 100000000L
 
@@ -141,9 +143,10 @@ class MerkleTest extends PropSpec with PropertyChecks with Matchers {
     val levels = mkLevels(leafs)
 
     forAll(Gen.oneOf(leafs.zipWithIndex)) { case (leaf, index) =>
-      val proofs = mkProofs(index, levels)
+      val proofs = mkProofs(index, levels).reverse
 
-      eval(scriptCreateRootSrc(proofs, hash(leaf), index), V4) shouldBe CONST_BYTESTR(levels.head.head)
+      eval(scriptCreateRootSrc(proofs, hash(leaf), index), V4) shouldBe CONST_BYTESTR(ByteStr(levels.head.head))
+      eval(scriptCreateRootSrc(proofs, hash(leaf), index + (1<<proofs.length)), V4) should produce("out of range allowed by proof list length")
     }
   }
 

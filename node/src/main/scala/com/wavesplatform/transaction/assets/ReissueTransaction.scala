@@ -89,5 +89,5 @@ object ReissueTransaction extends TransactionParser {
       fee: Long,
       timestamp: Long
   ): Either[ValidationError, ReissueTransaction] =
-    signed(version, sender, asset, quantity, reissuable, fee, timestamp, sender)
+    signed(version, sender.publicKey, asset, quantity, reissuable, fee, timestamp, sender.privateKey)
 }

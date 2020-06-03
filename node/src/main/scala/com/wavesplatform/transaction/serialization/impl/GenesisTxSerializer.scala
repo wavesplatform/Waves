@@ -31,7 +31,7 @@ object GenesisTxSerializer {
     import tx._
     val typeBytes      = Array(builder.typeId)
     val timestampBytes = Longs.toByteArray(timestamp)
-    val rcpBytes       = recipient.bytes.arr
+    val rcpBytes       = recipient.bytes
     val amountBytes    = Longs.toByteArray(amount)
     require(rcpBytes.length == Address.AddressLength)
     val res = Bytes.concat(typeBytes, timestampBytes, rcpBytes, amountBytes)

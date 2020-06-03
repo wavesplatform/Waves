@@ -115,19 +115,19 @@ class RemoveEntrySuite extends BaseSuite {
       val tx = miner.waitForTransaction(invokeScript(address, s"delete101Entries")).id
 
       miner.transactionStatus(Seq(tx)).head.applicationStatus shouldBe Some("scriptExecutionFailed")
-      miner.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include ("WriteSet can't contain more than 100 entries")
+      miner.debugStateChanges(tx).stateChanges.get.error.get.text should include ("WriteSet can't contain more than 100 entries")
 
       miner.getData(address) should have size 101
     }
 
     "Trying of writing key longer than 400 bytes and removing it should produce an error" in {
       val address    = createDapp(script)
-      val tooLongKey = new scala.util.Random().nextString(401)
+      val tooLongKey = new scala.util.Random().nextPrintableChar().toString * 401
 
       val tx = miner.waitForTransaction(invokeScript(address, s"write", tooLongKey, "value")).id
 
       miner.transactionStatus(Seq(tx)).head.applicationStatus shouldBe Some("scriptExecutionFailed")
-      miner.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include ("Key size must be less than 100")
+      miner.debugStateChanges(tx).stateChanges.get.error.get.text should include ("Key size = 401 bytes must be less than 400")
     }
   }
 
@@ -165,7 +165,7 @@ class RemoveEntrySuite extends BaseSuite {
       case "writeString"      => List(CONST_STRING(key).explicitGet(), CONST_STRING(value).explicitGet())
       case "writeInteger"     => List(CONST_STRING(key).explicitGet(), CONST_LONG(value.toLong))
       case "writeBoolean"     => List(CONST_STRING(key).explicitGet(), CONST_BOOLEAN(value.toBoolean))
-      case "writeBinary"      => List(CONST_STRING(key).explicitGet(), CONST_BYTESTR(value.getBytes()).explicitGet)
+      case "writeBinary"      => List(CONST_STRING(key).explicitGet(), CONST_BYTESTR(ByteStr(value.getBytes())).explicitGet())
       case "delete"           => List(CONST_STRING(key).explicitGet())
       case "write4"           => List.empty
       case "delete100Entries" => List.empty

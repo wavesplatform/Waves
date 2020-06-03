@@ -778,7 +778,8 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |     ScriptTransfer(i.caller, 1, base58''),
         |     Issue("name", "description", 1000, 4, true, unit, 0),
         |     Reissue(base58'', false, 1),
-        |     Burn(base58'', 1)
+        |     Burn(base58'', 1),
+        |     SponsorFee(base58'', unit)
         |   ]
         """.stripMargin
 
@@ -831,6 +832,13 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |   let v22 = toString(Address(base58''))
         |   let v23 = toBase16String(base58'')
         |   let v24 = fromBase16String("")
+        |   let v25 = indexOf(["a", "b", "c"], "a")
+        |   let v26 = lastIndexOf(["a", "b", "c"], "a")
+        |   let v27 = containsElement(["a", "b", "c"], "a")
+        |   let v28 = min([1, 2, 3])
+        |   let v29 = max([1, 2, 3])
+        |   let v30 = makeString(["a","b","c"],"|")
+        |   let v31 = ecrecover(base58'aaaa', base58'bbbb')
         |   nil
         | }
         """.stripMargin
@@ -845,8 +853,6 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       ))
 
     val Right(dApp) = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4)
-    println(ctx.compilerContext.functionDefs.mapValues(_.fSigList.map(_.header).filter(_.isInstanceOf[Native]).map(_.asInstanceOf[Native].name)).toList.flatMap { case (name, codes) => codes.map((_, name)) })
-    println(decompilerContextV4.opCodes)
     val res         = Decompiler(dApp, ctx.decompilerContext)
     res shouldEq script
   }
@@ -885,8 +891,6 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       ))
 
     val Right(dApp) = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4)
-    println(ctx.compilerContext.functionDefs.mapValues(_.fSigList.map(_.header).filter(_.isInstanceOf[Native]).map(_.asInstanceOf[Native].name)).toList.flatMap { case (name, codes) => codes.map((_, name)) })
-    println(decompilerContextV4.opCodes)
     val res         = Decompiler(dApp, ctx.decompilerContext)
     res shouldEq script("")
   }

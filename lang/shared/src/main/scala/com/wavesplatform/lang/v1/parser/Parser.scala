@@ -346,7 +346,7 @@ object Parser {
   def baseExprOrDecl[_:P] = binaryOp(baseAtom(blockOrDecl(_))(_), opsByPriority)
 
   def singleBaseAtom[_:P] = comment ~
-    P(ifP | matchP | maybeAccessP) ~
+    P(foldP | ifP | matchP | maybeAccessP) ~
     comment
 
   def singleBaseExpr[_:P] = P(binaryOp(singleBaseAtom(_), opsByPriority))
@@ -360,7 +360,7 @@ object Parser {
   }
 
   def binaryOp(atomA: fastparse.P[Any] => P[EXPR], rest: List[Either[List[BinaryOperation], List[BinaryOperation]]])(implicit c: fastparse.P[Any]): P[EXPR] = {
-    def atom(implicit c: fastparse.P[Any]) = atomA(c) 
+    def atom(implicit c: fastparse.P[Any]) = atomA(c)
     rest match {
       case Nil => unaryOp(atom(_), unaryOps)
       case Left(kinds) :: restOps =>
@@ -394,7 +394,7 @@ object Parser {
   def unaryOp(atom: fastparse.P[Any] => P[EXPR], ops: List[UnaryOperation])(implicit c: fastparse.P[Any]): P[EXPR] = (ops.foldRight(atom) {
     case (op, accc) =>
       def acc(implicit c: fastparse.P[Any]) = accc(c) ;
-      { implicit c: fastparse.P[Any] => 
+      { implicit c: fastparse.P[Any] =>
         (Index ~~ op.parser.map(_ => ()) ~ P(unaryOp(atom, ops)) ~~ Index).map {
           case (start, expr, end) => op.expr(start, end, expr)
         } | acc

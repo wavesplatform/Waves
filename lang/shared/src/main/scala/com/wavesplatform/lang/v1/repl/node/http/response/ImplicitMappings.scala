@@ -7,10 +7,20 @@ import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, ScriptAssetInfo, Tx}
 case class ImplicitMappings(chainId: Byte) {
   private val chainDependentMapper = new ChainDependentMapper(chainId)
 
+  implicit val heightO: HeightResponse => Option[Long] =
+    (r: HeightResponse) => if(r.succeed) {
+      Some(r.height)
+    } else {
+      None
+    }
+
   implicit val heightM: HeightResponse => Long =
     _.height
 
-  implicit val transferTxM: TransferTransaction => Tx =
+  implicit val transferTxO: TransferTransaction => Option[Tx.Transfer] =
+    chainDependentMapper.toRideModelO
+
+  implicit val transferTxM: TransferTransaction => Tx.Transfer =
     chainDependentMapper.toRideModel
 
   implicit val assetInfoM: AssetInfoResponse => ScriptAssetInfo =
@@ -27,4 +37,7 @@ case class ImplicitMappings(chainId: Byte) {
 
   implicit val balanceM: BalanceResponse => Long =
     _.balance
+
+  implicit val balancesM: List[BalanceResponse] => Long =
+    _.headOption.fold(0L)(_.balance)
 }

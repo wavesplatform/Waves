@@ -29,8 +29,8 @@ class OracleDataTest extends PropSpec with PropertyChecks with WithState with Tr
       oracle <- accountGen
       alice  <- accountGen
       ts     <- positiveIntGen
-      genesis  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      genesis2 = GenesisTransaction.create(oracle, ENOUGH_AMT, ts).explicitGet()
+      genesis  = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+      genesis2 = GenesisTransaction.create(oracle.toAddress, ENOUGH_AMT, ts).explicitGet()
       alias           <- aliasGen
       createAlias     <- createAliasGen(oracle, alias, 400000, System.currentTimeMillis())
       long            <- longEntryGen(dataAsciiKeyGen)
@@ -62,7 +62,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with WithState with Tr
           ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedAllFieldsRequiredScript).explicitGet()._1
         selfSignedSetScriptTransactionGenP(master, ExprScript(typedAllFieldsRequiredScript).explicitGet())
       }
-      transferFromScripted <- versionedTransferGenP(master, alice, Proofs.empty)
+      transferFromScripted <- versionedTransferGenP(master.publicKey, alice.toAddress, Proofs.empty)
 
     } yield (genesis, genesis2, createAlias, setScript, dataTransaction, transferFromScripted)
 

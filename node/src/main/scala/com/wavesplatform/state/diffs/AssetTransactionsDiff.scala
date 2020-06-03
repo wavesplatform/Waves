@@ -1,15 +1,15 @@
 package com.wavesplatform.state.diffs
 
-import cats.syntax.semigroup._
-import cats.syntax.ior._
 import cats.instances.either._
 import cats.syntax.flatMap._
+import cats.syntax.ior._
+import cats.syntax.semigroup._
 import com.google.common.base.Utf8
 import com.google.protobuf.ByteString
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.traits.domain.{Burn, Reissue}
+import com.wavesplatform.lang.v1.traits.domain.{Burn, Reissue, SponsorFee}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -44,8 +44,8 @@ object AssetTransactionsDiff extends ScorexLogging {
             Diff(
               tx = tx,
               portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity))),
-              issuedAssets = Map(asset             -> ((staticInfo, info, volumeInfo))),
-              assetScripts = Map(asset             -> script),
+              issuedAssets = Map(asset             -> NewAssetInfo(staticInfo, info, volumeInfo)),
+              assetScripts = Map(asset             -> script.map(AssetScriptInfo.tupled)),
               scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
             )
         )
@@ -53,7 +53,7 @@ object AssetTransactionsDiff extends ScorexLogging {
   }
 
   def setAssetScript(blockchain: Blockchain, blockTime: Long)(tx: SetAssetScriptTransaction): Either[ValidationError, Diff] =
-    DiffsCommon.validateAsset(blockchain, tx.asset, tx.sender, issuerOnly = true).flatMap { _ =>
+    DiffsCommon.validateAsset(blockchain, tx.asset, tx.sender.toAddress, issuerOnly = true).flatMap { _ =>
       if (blockchain.hasAssetScript(tx.asset)) {
         DiffsCommon
           .countVerifierComplexity(tx.script, blockchain, isAsset = true)
@@ -61,7 +61,7 @@ object AssetTransactionsDiff extends ScorexLogging {
             Diff(
               tx = tx,
               portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
-              assetScripts = Map(tx.asset -> script),
+              assetScripts = Map(tx.asset -> script.map(AssetScriptInfo.tupled)),
               scriptsRun =
                 // Asset script doesn't count before Ride4DApps activation
                 if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {
@@ -80,39 +80,29 @@ object AssetTransactionsDiff extends ScorexLogging {
     DiffsCommon
       .processReissue(
         blockchain,
-        tx.sender,
+        tx.sender.toAddress,
         blockTime,
         tx.fee,
         Reissue(tx.asset.id, tx.reissuable, tx.quantity)
       )
-      .map(Diff(tx = tx, scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)) |+| _)
+      .map(_.bindTransaction(tx) |+| Diff.stateOps(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
 
   def burn(blockchain: Blockchain)(tx: BurnTransaction): Either[ValidationError, Diff] =
     DiffsCommon
       .processBurn(
         blockchain,
-        tx.sender,
+        tx.sender.toAddress,
         tx.fee,
         Burn(tx.asset.id, tx.quantity)
       )
-      .map(Diff(tx = tx, scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)) |+| _)
+      .map(_.bindTransaction(tx) |+| Diff.stateOps(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
 
-  def sponsor(blockchain: Blockchain, blockTime: Long)(tx: SponsorFeeTransaction): Either[ValidationError, Diff] =
-    DiffsCommon.validateAsset(blockchain, tx.asset, tx.sender, issuerOnly = true).flatMap { _ =>
-      Either.cond(
-        !blockchain.hasAssetScript(tx.asset),
-        Diff(
-          tx = tx,
-          portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
-          sponsorship = Map(tx.asset           -> SponsorshipValue(tx.minSponsoredAssetFee.getOrElse(0))),
-          scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
-        ),
-        GenericError("Sponsorship smart assets is disabled.")
-      )
-    }
+  def sponsor(blockchain: Blockchain)(tx: SponsorFeeTransaction): Either[ValidationError, Diff] =
+    DiffsCommon.processSponsor(blockchain, tx.sender.toAddress, tx.fee, SponsorFee(tx.asset.id, tx.minSponsoredAssetFee))
+      .map(_.bindTransaction(tx) |+| Diff.stateOps(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
 
   def updateInfo(blockchain: Blockchain)(tx: UpdateAssetInfoTransaction): Either[ValidationError, Diff] =
-    DiffsCommon.validateAsset(blockchain, tx.assetId, tx.sender, issuerOnly = true) >> {
+    DiffsCommon.validateAsset(blockchain, tx.assetId, tx.sender.toAddress, issuerOnly = true) >> {
       lazy val portfolioUpdate = tx.feeAsset match {
         case ia @ IssuedAsset(_) => Portfolio(0L, LeaseBalance.empty, Map(ia -> -tx.feeAmount))
         case Asset.Waves         => Portfolio(balance = -tx.feeAmount, LeaseBalance.empty, Map.empty)

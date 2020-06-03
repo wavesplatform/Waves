@@ -106,6 +106,19 @@ package object database extends ScorexLogging {
   def writeAddressIds(values: Seq[AddressId]): Array[Byte] =
     values.foldLeft(ByteBuffer.allocate(values.length * java.lang.Long.BYTES)) { case (buf, aid) => buf.putLong(aid.toLong) }.array()
 
+  def readAssetIds(data: Array[Byte]): Seq[ByteStr] = Option(data).fold(Seq.empty[ByteStr]) { d =>
+    require(d.length % transaction.AssetIdLength == 0, s"Invalid data length: ${d.length}")
+    val buffer = ByteBuffer.wrap(d)
+    Seq.fill(d.length / transaction.AssetIdLength) {
+      val idBytes = new Array[Byte](transaction.AssetIdLength)
+      buffer.get(idBytes)
+      ByteStr(idBytes)
+    }
+  }
+
+  def writeAssetIds(values: Seq[ByteStr]): Array[Byte] =
+    values.foldLeft(ByteBuffer.allocate(values.length * transaction.AssetIdLength)) { case (buf, ai) => buf.put(ai.arr) }.array()
+
   def readTxIds(data: Array[Byte]): List[ByteStr] = Option(data).fold(List.empty[ByteStr]) { d =>
     val b   = ByteBuffer.wrap(d)
     val ids = List.newBuilder[ByteStr]
@@ -286,14 +299,14 @@ package object database extends ScorexLogging {
   def writeBlockMeta(data: BlockMeta): Array[Byte] =
     pb.BlockMeta(
         Some(PBBlocks.protobuf(data.header)),
-        ByteString.copyFrom(data.signature),
-        data.headerHash.fold(ByteString.EMPTY)(hh => ByteString.copyFrom(hh)),
+        ByteString.copyFrom(data.signature.arr),
+        data.headerHash.fold(ByteString.EMPTY)(hh => ByteString.copyFrom(hh.arr)),
         data.height,
         data.size,
         data.transactionCount,
         data.totalFeeInWaves,
         data.reward.getOrElse(-1L),
-        data.vrf.fold(ByteString.EMPTY)(vrf => ByteString.copyFrom(vrf))
+        data.vrf.fold(ByteString.EMPTY)(vrf => ByteString.copyFrom(vrf.arr))
       )
       .toByteArray
 
@@ -443,17 +456,17 @@ package object database extends ScorexLogging {
   def createBlock(header: BlockHeader, signature: ByteStr, txs: Seq[Transaction]): Either[TxValidationError.GenericError, Block] =
     Validators.validateBlock(Block(header, signature, txs))
 
-  def writeAssetScript(script: (Script, Long)): Array[Byte] =
-    Longs.toByteArray(script._2) ++ script._1.bytes().arr
+  def writeAssetScript(script: AssetScriptInfo): Array[Byte] =
+    Longs.toByteArray(script.complexity) ++ script.script.bytes().arr
 
-  def readAssetScript(b: Array[Byte]): (Script, Long) =
-    ScriptReader.fromBytes(b.drop(8)).explicitGet() -> Longs.fromByteArray(b)
+  def readAssetScript(b: Array[Byte]): AssetScriptInfo =
+    AssetScriptInfo(ScriptReader.fromBytes(b.drop(8)).explicitGet(), Longs.fromByteArray(b))
 
   def writeAccountScriptInfo(scriptInfo: AccountScriptInfo): Array[Byte] =
     pb.AccountScriptInfo.toByteArray(
       pb.AccountScriptInfo(
         ByteString.copyFrom(scriptInfo.publicKey.arr),
-        ByteString.copyFrom(scriptInfo.script.bytes()),
+        ByteString.copyFrom(scriptInfo.script.bytes().arr),
         scriptInfo.verifierComplexity,
         scriptInfo.complexitiesByEstimator.map {
           case (version, complexities) =>

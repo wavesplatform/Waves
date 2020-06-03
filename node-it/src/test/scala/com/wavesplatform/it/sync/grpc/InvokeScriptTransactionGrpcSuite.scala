@@ -90,7 +90,7 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         waitForTx = true
       )
 
-      sender.getDataByKey(contract, "a") shouldBe List(DataEntry("a", DataEntry.Value.BinaryValue(ByteString.copyFrom(arg))))
+      sender.getDataByKey(contract, "a") shouldBe List(DataEntry("a", DataEntry.Value.BinaryValue(ByteString.copyFrom(arg.arr))))
       sender.getDataByKey(contract, "sender") shouldBe List(
         DataEntry("sender", DataEntry.Value.BinaryValue(ByteString.copyFrom(caller.toAddress.bytes)))
       )
@@ -135,7 +135,7 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       waitForTx = true
     )
 
-    sender.stateChanges(tx1.id)._2.errorMessage.get.text should include("Empty keys aren't allowed in tx version >= 2")
+    sender.stateChanges(tx1.id)._2.error.get.text should include("Empty keys aren't allowed in tx version >= 2")
 
     val tx2 = sender.broadcastInvokeScript(
       caller,
@@ -146,6 +146,6 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       waitForTx = true
     )
 
-    sender.stateChanges(tx2.id)._2.errorMessage.get.text should include("Empty keys aren't allowed in tx version >= 2")
+    sender.stateChanges(tx2.id)._2.error.get.text should include("Empty keys aren't allowed in tx version >= 2")
   }
 }

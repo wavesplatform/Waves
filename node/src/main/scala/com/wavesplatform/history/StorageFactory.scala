@@ -3,6 +3,7 @@ package com.wavesplatform.history
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.events.BlockchainUpdateTriggers
+import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.BlockchainUpdaterImpl
 import com.wavesplatform.transaction.Asset
@@ -18,11 +19,12 @@ object StorageFactory extends ScorexLogging {
       db: DB,
       time: Time,
       spendableBalanceChanged: Observer[(Address, Asset)],
-      blockchainUpdateTriggers: BlockchainUpdateTriggers
+      blockchainUpdateTriggers: BlockchainUpdateTriggers,
+      miner: Miner = _ => ()
   ): (BlockchainUpdaterImpl, AutoCloseable) = {
     checkVersion(db)
     val levelDBWriter = LevelDBWriter(db, spendableBalanceChanged, settings)
-    (new BlockchainUpdaterImpl(levelDBWriter, spendableBalanceChanged, settings, time, blockchainUpdateTriggers), levelDBWriter)
+    (new BlockchainUpdaterImpl(levelDBWriter, spendableBalanceChanged, settings, time, blockchainUpdateTriggers, miner), levelDBWriter)
   }
 
   private def checkVersion(db: DB): Unit = db.readWrite { rw =>

@@ -22,7 +22,7 @@ import com.wavesplatform.http.{BroadcastRoute, CustomJson}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.{AssetDescription, Blockchain}
+import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -69,7 +69,7 @@ case class AssetsApiRoute(
     } ~ (path("sponsor") & withAuth) {
       broadcast[SponsorFeeRequest](TransactionFactory.sponsor(_, wallet, time))
     } ~ (path("order") & withAuth)(jsonPost[Order] { order =>
-      wallet.privateKeyAccount(order.senderPublicKey).map(pk => Order.sign(order, pk))
+      wallet.privateKeyAccount(order.senderPublicKey.toAddress).map(pk => Order.sign(order, pk.privateKey))
     }) ~ pathPrefix("broadcast")(
       path("issue")(broadcast[IssueRequest](_.toTx)) ~
         path("reissue")(broadcast[ReissueRequest](_.toTx)) ~
@@ -318,23 +318,24 @@ object AssetsApiRoute {
       desc                = description.description.toStringUtf8
     } yield JsObject(
       Seq(
-        "assetId"        -> JsString(id.id.toString),
-        "issueHeight"    -> JsNumber(height),
-        "issueTimestamp" -> JsNumber(timestamp),
-        "issuer"         -> JsString(description.issuer.stringRepr),
-        "name"           -> JsString(name),
-        "description"    -> JsString(desc),
-        "decimals"       -> JsNumber(description.decimals),
-        "reissuable"     -> JsBoolean(description.reissuable),
-        "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
-        "scripted"       -> JsBoolean(description.script.nonEmpty),
+        "assetId"         -> JsString(id.id.toString),
+        "issueHeight"     -> JsNumber(height),
+        "issueTimestamp"  -> JsNumber(timestamp),
+        "issuer"          -> JsString(description.issuer.toAddress.toString),
+        "issuerPublicKey" -> JsString(description.issuer.toString),
+        "name"            -> JsString(name),
+        "description"     -> JsString(desc),
+        "decimals"        -> JsNumber(description.decimals),
+        "reissuable"      -> JsBoolean(description.reissuable),
+        "quantity"        -> JsNumber(BigDecimal(description.totalVolume)),
+        "scripted"        -> JsBoolean(description.script.nonEmpty),
         "minSponsoredAssetFee" -> (description.sponsorship match {
           case 0           => JsNull
           case sponsorship => JsNumber(sponsorship)
         }),
         "originTransactionId" -> JsString(description.source.toString)
       ) ++ script.toSeq.map {
-        case (script, complexity) =>
+        case AssetScriptInfo(script, complexity) =>
           "scriptDetails" -> Json.obj(
             "scriptComplexity" -> JsNumber(BigDecimal(complexity)),
             "script"           -> JsString(script.bytes().base64),

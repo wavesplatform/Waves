@@ -88,10 +88,10 @@ class ListParamInvokeTest extends PropSpec with PropertyChecks with Matchers wit
           )
         )
       for {
-        genesis  <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
-        genesis2 <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
+        genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
+        genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
         setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, Some(dApp), fee, ts + 2)
-        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master, functionCall, Nil, fee, Waves, ts + 3)
+        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, functionCall, Nil, fee, Waves, ts + 3)
       } yield (List(genesis, genesis2), setDApp, ci, master.toAddress)
     }.explicitGet()
 

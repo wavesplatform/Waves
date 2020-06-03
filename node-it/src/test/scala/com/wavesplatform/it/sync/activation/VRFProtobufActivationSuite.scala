@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.activation
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, StateCheckFailed}
 import com.wavesplatform.block.Block
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
@@ -28,10 +28,11 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
       .overrideBase(_.raw(s"waves.blockchain.custom.functionality.min-asset-info-update-interval = $updateInterval"))
       .buildNonConflicting()
 
-  private val senderAcc    = pkByAddress(firstAddress)
-  private val recipientAcc = pkByAddress(secondAddress)
-  var assetId              = ""
-  var otherAssetId         = ""
+  private val senderAcc     = pkByAddress(firstAddress)
+  private val recipientAcc  = pkByAddress(secondAddress)
+  private var assetId               = ""
+  private var otherAssetId          = ""
+  private var secondUpdateAssetTxId = ""
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -46,16 +47,12 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     val blockHeadersBeforeActivationHeight = sender.blockHeadersAt(sender.height)
     blockBeforeActivationHeight.version.get shouldBe Block.RewardBlockVersion
     blockHeadersBeforeActivationHeight.version.get shouldBe Block.RewardBlockVersion
-    ByteStr.decodeBase58(blockBeforeActivationHeight.generationSignature.get).get.length shouldBe Block.GenerationSignatureLength
-    ByteStr
-      .decodeBase58(sender.blockGenerationSignature(blockBeforeActivationHeight.id).generationSignature)
-      .get
-      .length shouldBe Block.GenerationSignatureLength
+    Base58.decode(blockBeforeActivationHeight.generationSignature.get).length shouldBe Block.GenerationSignatureLength
     blockBeforeActivationHeight.baseTarget shouldBe blockHeadersBeforeActivationHeight.baseTarget
   }
 
   test("not able to broadcast tx of new versions before activation") {
-    assertApiError(sender.transfer(senderAcc.stringRepr, recipientAcc.stringRepr, transferAmount, version = TxVersion.V3)) { error =>
+    assertApiError(sender.transfer(senderAcc.toAddress.toString, recipientAcc.toAddress.toString, transferAmount, version = TxVersion.V3)) { error =>
       error.statusCode shouldBe 400
       error.message shouldBe "State check failed. Reason: ActivationError(Ride V4, VRF, Protobuf, Failed transactions feature has not been activated yet)"
       error.id shouldBe 112
@@ -73,8 +70,8 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   test("only able to get block by signature (that is equal to id) before activation") {
     sender.blockById(sender.blockAt(sender.height).signature) shouldBe sender.blockAt(sender.height)
     sender.blockAt(sender.height).signature shouldBe sender.blockAt(sender.height).id
-    ByteStr.decodeBase58(sender.blockAt(sender.height).signature).get.length shouldBe crypto.SignatureLength
-    ByteStr.decodeBase58(sender.blockAt(sender.height).id).get.length shouldBe crypto.SignatureLength
+    Base58.decode(sender.blockAt(sender.height).signature).length shouldBe crypto.SignatureLength
+    Base58.decode(sender.blockAt(sender.height).id).length shouldBe crypto.SignatureLength
   }
 
   test("not able to broadcast ExchangeTransaction with reversed buy/sell orders") {
@@ -82,7 +79,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
 
     assertApiError(
       sender.broadcastExchange(
-        sender.privateKey,
+        sender.keyPair,
         sellOrder,
         buyOrder,
         buyOrder.amount,
@@ -119,8 +116,8 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   test("only able to get block by id (that is not equal to signature) after activation") {
     sender.blockById(sender.blockAt(sender.height).id) shouldBe sender.blockAt(sender.height)
     sender.blockAt(sender.height).signature should not be sender.blockAt(sender.height).id
-    ByteStr.decodeBase58(sender.blockAt(sender.height).signature).get.length shouldBe crypto.SignatureLength
-    ByteStr.decodeBase58(sender.blockAt(sender.height).id).get.length shouldBe crypto.DigestLength
+    Base58.decode(sender.blockAt(sender.height).signature).length shouldBe crypto.SignatureLength
+    Base58.decode(sender.blockAt(sender.height).id).length shouldBe crypto.DigestLength
   }
 
   test("able to broadcast UpdateAssetInfoTransaction if interval's reached before activation") {
@@ -130,16 +127,16 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   test("able to broadcast UpdateAssetInfoTransaction after activation") {
     val nextTerm = sender.transactionInfo[TransactionInfo](otherAssetId).height + updateInterval + 1
     sender.waitForHeight(nextTerm, 2.minutes)
-    sender.updateAssetInfo(senderAcc, otherAssetId, "updatedName", "updatedDescription", minFee, waitForTx = true)
+    secondUpdateAssetTxId = sender.updateAssetInfo(senderAcc, otherAssetId, "updatedName", "updatedDescription", minFee, waitForTx = true)._1.id
   }
 
   test("able to broadcast tx of new version after activation") {
-    val senderWavesBalance    = sender.balanceDetails(senderAcc.stringRepr)
-    val recipientWavesBalance = sender.balanceDetails(recipientAcc.stringRepr)
-    sender.transfer(senderAcc.stringRepr, recipientAcc.stringRepr, transferAmount, version = TxVersion.V3, waitForTx = true)
+    val senderWavesBalance    = sender.balanceDetails(senderAcc.toAddress.toString)
+    val recipientWavesBalance = sender.balanceDetails(recipientAcc.toAddress.toString)
+    sender.transfer(senderAcc.toAddress.toString, recipientAcc.toAddress.toString, transferAmount, version = TxVersion.V3, waitForTx = true)
 
-    sender.balanceDetails(senderAcc.stringRepr).available shouldBe senderWavesBalance.available - transferAmount - minFee
-    sender.balanceDetails(recipientAcc.stringRepr).available shouldBe recipientWavesBalance.available + transferAmount
+    sender.balanceDetails(senderAcc.toAddress.toString).available shouldBe senderWavesBalance.available - transferAmount - minFee
+    sender.balanceDetails(recipientAcc.toAddress.toString).available shouldBe recipientWavesBalance.available + transferAmount
   }
 
   test("able to broadcast ExchangeTransaction with reversed buy/sell orders") {
@@ -147,7 +144,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
 
     assertApiError(
       sender.broadcastExchange(
-        sender.privateKey,
+        sender.keyPair,
         sellOrder,
         buyOrder,
         buyOrder.amount,
@@ -163,7 +160,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     }
 
     sender.broadcastExchange(
-      sender.privateKey,
+      sender.keyPair,
       sellOrder,
       buyOrder,
       buyOrder.amount,
@@ -182,7 +179,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
 
     val blockAtActivationHeight1 = sender.blockAt(activationHeight)
     blockAtActivationHeight1.version.get shouldBe Block.ProtoBlockVersion
-    val returnedTxIds = sender.utx().map(tx => tx.id)
+    val returnedTxIds = sender.utx().map(tx => tx.id).filter(_ != secondUpdateAssetTxId)
 
     sender.waitForHeight(activationHeight + 1, 2.minutes)
     val blockAfterActivationHeight1 = sender.blockAt(activationHeight + 1)
@@ -219,7 +216,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     val price  = 1000
     val buyOrder = Order.buy(
       version = TxVersion.V2,
-      sender.privateKey,
+      sender.keyPair,
       sender.publicKey,
       AssetPair.createAssetPair("WAVES", assetId).get,
       amount,
@@ -230,7 +227,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     )
     val sellOrder = Order.sell(
       version = TxVersion.V2,
-      sender.privateKey,
+      sender.keyPair,
       sender.publicKey,
       AssetPair.createAssetPair("WAVES", assetId).get,
       amount,

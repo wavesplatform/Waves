@@ -50,7 +50,7 @@ class AssetBalanceIterator(addressId: AddressId, resource: DBResource) extends A
   override def computeNext(): (IssuedAsset, Long) =
     if (resource.iterator.hasNext && stillSameAddress(resource.iterator.peekNext().getKey)) {
       val currentEntry = resource.iterator.next()
-      val assetId      = IssuedAsset(currentEntry.getKey.takeRight(crypto.DigestLength))
+      val assetId      = IssuedAsset(ByteStr(currentEntry.getKey.takeRight(crypto.DigestLength)))
       val history      = readIntSeq(currentEntry.getValue)
       val balance      = resource.get(Keys.assetBalance(addressId, assetId)(history.headOption.getOrElse(0)))
       assetId -> balance

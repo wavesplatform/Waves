@@ -52,12 +52,12 @@ object ApiError {
       case err: TxValidationError.ToBigProof                 => InvalidProofs(err.toString())
       case TransactionValidationError(error, tx) =>
         error match {
-          case TxValidationError.TransactionNotAllowedByScript(_, isTokenScript) =>
-            if (isTokenScript) TransactionNotAllowedByAssetScript(tx)
+          case e: TxValidationError.TransactionNotAllowedByScript =>
+            if (e.isAssetScript) TransactionNotAllowedByAssetScript(tx)
             else TransactionNotAllowedByAccountScript(tx)
-          case TxValidationError.Mistiming(errorMessage)               => Mistiming(errorMessage)
-          case TxValidationError.ScriptExecutionError(err, _, isToken) => ScriptExecutionError(tx, err, isToken)
-          case err                                                     => StateCheckFailed(tx, fromValidationError(err))
+          case TxValidationError.Mistiming(errorMessage) => Mistiming(errorMessage)
+          case e: TxValidationError.ScriptExecutionError => ScriptExecutionError(tx, e.error, isTokenScript = e.isAssetScript)
+          case err                                       => StateCheckFailed(tx, fromValidationError(err))
         }
       case error => CustomValidationError(error.toString)
     }

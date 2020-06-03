@@ -47,7 +47,7 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
         s"""
            |match tx {
            |case s : SetAssetScriptTransaction => true
-           |case e: ExchangeTransaction => e.sender == addressFromPublicKey(base58'${ByteStr(acc2.publicKey).toString}')
+           |case e: ExchangeTransaction => e.sender == addressFromPublicKey(base58'${acc2.publicKey}')
            |case _ => false}""".stripMargin,
         isAssetScript = true,
         estimator
@@ -75,7 +75,7 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
         s"""
            |match tx {
            |case s : SetAssetScriptTransaction => true
-           |case e: ExchangeTransaction => e.sender == addressFromPublicKey(base58'${ByteStr(acc1.publicKey).toString}')
+           |case e: ExchangeTransaction => e.sender == addressFromPublicKey(base58'${acc1.publicKey}')
            |case _ => false}""".stripMargin,
         isAssetScript = true,
         estimator

@@ -38,7 +38,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
 
     exchAsset = sender
       .issue(
-        acc0.stringRepr,
+        acc0.toAddress.toString,
         "ExchangeCoin",
         "ExchangeCoin for tests with exchange transaction",
         someAssetAmount,
@@ -180,7 +180,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
         val tx = ExchangeTransaction
           .signed(
             3.toByte,
-            matcher = matcher,
+            matcher = matcher.privateKey,
             order1 = sell,
             order2 = buy,
             amount = amount,
@@ -222,7 +222,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
       val tx = ExchangeTransaction
         .signed(
           2.toByte,
-          matcher = matcher,
+          matcher = matcher.privateKey,
           order1 = buy,
           order2 = sell,
           amount = amount,

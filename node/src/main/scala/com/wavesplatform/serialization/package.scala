@@ -68,7 +68,7 @@ package object serialization {
       result
     }
 
-    def getSignature: Array[Byte] = getByteArray(SignatureLength)
+    def getSignature: ByteStr = ByteStr(getByteArray(SignatureLength))
 
     def getPublicKey: PublicKey = PublicKey(getByteArray(KeyLength))
 

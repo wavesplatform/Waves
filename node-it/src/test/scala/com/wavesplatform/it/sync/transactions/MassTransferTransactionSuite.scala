@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.transactions
 import com.wavesplatform.account.{AddressScheme, Alias}
 import com.wavesplatform.api.http.requests.{MassTransferRequest, SignedMassTransferRequest}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.MassTransferTransactionInfo
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
@@ -137,7 +137,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite /*with CancelAft
           parsedTransfers <- MassTransferTransaction.parseTransfersList(transfers)
           tx <- MassTransferTransaction.selfSigned(
             1.toByte,
-            sender.privateKey,
+            sender.keyPair,
             Waves,
             parsedTransfers,
             fee,
@@ -150,7 +150,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite /*with CancelAft
 
         val req = SignedMassTransferRequest(
           Some(TxVersion.V1),
-          Base58.encode(sender.publicKey),
+          sender.publicKey.toString,
           None,
           transfers,
           fee,

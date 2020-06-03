@@ -2,22 +2,13 @@ package com.wavesplatform.lang.v1.estimator
 
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.utils.functionCosts
-import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.FunctionIds.SUM_LONG
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.lang.v1.evaluator.FunctionIds.SUM_LONG
 
-class CommonScriptEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV1, ScriptEstimatorV2, ScriptEstimatorV3) {
-  property("recursive func block") {
-    val expr = BLOCK(
-      FUNC("x", List.empty, FUNCTION_CALL(FunctionHeader.User("y"), List.empty)),
-      BLOCK(FUNC("y", List.empty, FUNCTION_CALL(FunctionHeader.User("x"), List.empty)), FUNCTION_CALL(FunctionHeader.User("y"), List.empty))
-    )
-    estimate(customFunctionCosts, expr) shouldBe Symbol("left")
-  }
-
+class CommonScriptEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV1, ScriptEstimatorV2, ScriptEstimatorV3, evaluatorV2AsEstimator) {
   property("context leak") {
     def script(ref: String) =
       compile {
@@ -28,33 +19,6 @@ class CommonScriptEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV
          """.stripMargin
       }
     estimateDelta(script("xxx"), script("y")) shouldBe Right(0)
-  }
-
-  property("overlapped func with recursion") {
-    val expr =
-      BLOCK(
-        FUNC(
-          "f",
-          Nil,
-          BLOCK(
-            FUNC("g", Nil, FUNCTION_CALL(User("f"), Nil)),
-            BLOCK(
-              FUNC(
-                "f",
-                Nil,
-                BLOCK(
-                  FUNC("f", Nil, FUNCTION_CALL(User("g"), Nil)),
-                  FUNCTION_CALL(User("f"), Nil)
-                ),
-              ),
-              FUNCTION_CALL(User("f"), Nil)
-            )
-          )
-        ),
-        FUNCTION_CALL(User("f"), Nil)
-      )
-
-    estimate(functionCosts(V3), expr) shouldBe Symbol("left")
   }
 
   property("func forward reference") {
@@ -91,7 +55,7 @@ class CommonScriptEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV
         1
       }
       f() + b
-    */
+     */
     estimateDelta(expr("f"), expr("g")) shouldBe Right(0)
   }
 
@@ -101,7 +65,8 @@ class CommonScriptEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV
         FUNC(outerFunc, Nil, FUNCTION_CALL(Native(SUM_LONG), List(CONST_LONG(1), CONST_LONG(1)))),
         BLOCK(
           FUNC(
-            "b", Nil,
+            "b",
+            Nil,
             BLOCK(
               FUNC("f", Nil, CONST_LONG(1)),
               FUNCTION_CALL(User("f"), Nil)
@@ -121,7 +86,7 @@ class CommonScriptEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV
         1
       }
       f() + b()
-    */
+     */
     estimateDelta(expr("f"), expr("g")) shouldBe Right(0)
   }
 
@@ -132,7 +97,8 @@ class CommonScriptEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV
         FUNCTION_CALL(
           Native(SUM_LONG),
           List(
-            IF(TRUE,
+            IF(
+              TRUE,
               BLOCK(
                 FUNC("f", Nil, CONST_LONG(1)),
                 FUNCTION_CALL(User("f"), Nil)
@@ -144,7 +110,6 @@ class CommonScriptEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV
         )
       )
 
-
     /*
       func f() = 1 + 1
       (
@@ -155,7 +120,7 @@ class CommonScriptEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV
         }
         else 1
       ) + f()
-    */
+     */
     estimateDelta(expr("f"), expr("g")) shouldBe Right(0)
   }
 
@@ -170,10 +135,12 @@ class CommonScriptEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV
             List(
               FUNCTION_CALL(
                 User("b"),
-                List(BLOCK(
-                  FUNC("f", Nil, CONST_LONG(1)),
-                  FUNCTION_CALL(User("f"), Nil)
-                ))
+                List(
+                  BLOCK(
+                    FUNC("f", Nil, CONST_LONG(1)),
+                    FUNCTION_CALL(User("f"), Nil)
+                  )
+                )
               ),
               FUNCTION_CALL(User(outerFunc), Nil)
             )
@@ -181,12 +148,11 @@ class CommonScriptEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV
         )
       )
 
-
     /*
       func f() = 1 + 1
       func b(a) = a
       b({func f() = 1; f()}) + f()
-    */
+     */
     estimateDelta(expr("f"), expr("g")) shouldBe Right(0)
   }
 
@@ -213,7 +179,7 @@ class CommonScriptEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV
         1
       }
       a + b
-    */
+     */
     estimateDelta(expr("a"), expr("x")) shouldBe Right(0)
   }
 }

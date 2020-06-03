@@ -12,6 +12,7 @@ package object smartcontract {
 
   def cryptoContextScript(accountScript: Boolean): String =
     s"""
+       |{-# STDLIB_VERSION 2 #-}
        |match tx {
        |  case ext : ExchangeTransaction =>
        |    # Crypto context
@@ -27,6 +28,7 @@ package object smartcontract {
 
   def pureContextScript(dtx: DataTransaction, accountScript: Boolean): String =
     s"""
+       |{-# STDLIB_VERSION 2 #-}
        |# Pure context
        |    let ext = tx
        |    let longAll = 1000 * 2 == 2000 && 1000 / 2 == 500 && 1000 % 2 == 0 && 1000 + 2 == 1002 && 1000 - 2 == 998
@@ -66,6 +68,7 @@ package object smartcontract {
 
   def wavesContextScript(dtx: DataTransaction, accountScript: Boolean): String =
     s"""
+       |{-# STDLIB_VERSION 2 #-}
        | match tx {
        |  case ext : ExchangeTransaction =>
        |    # Waves context
@@ -86,7 +89,7 @@ package object smartcontract {
        |         let dataByIndex = toBytes(d0) == base64'abcdef' || toBytes(d1) == base64'ghijkl' ||
        |                       isDefined(d2) || toBytes(extract(d3)) == base64'mnopqr'
        |
-       |         let add = Address(base58'${dtx.sender.bytes.toString}')
+       |         let add = Address(base58'${dtx.sender.toAddress}')
        |         let long = extract(getInteger(add,"${dtx.data(0).key}")) == ${dtx.data(0).value}
        |         let bool1 = extract(getBoolean(add,"${dtx.data(1).key}")) == ${dtx.data(1).value}
        |         let bin = extract(getBinary(add,"${dtx.data(2).key}")) ==  base58'${dtx.data(2).value}'
@@ -97,7 +100,7 @@ package object smartcontract {
        |     }
        |
        |     let aFromPK = addressFromPublicKey(ext.senderPublicKey) == ext.sender
-       |     let aFromStr = addressFromString("${dtx.sender.stringRepr}") == Address(base58'${dtx.sender.bytes.toString}')
+       |     let aFromStr = addressFromString("${dtx.sender.toAddress}") == Address(base58'${dtx.sender.toAddress}')
        |
        |     #case t1: TransferTransaction => addressFromRecipient(t1.recipient) == Address(base58'')
        |
@@ -125,7 +128,7 @@ package object smartcontract {
     val tx = ExchangeTransaction
       .signed(
         2.toByte,
-        matcher = matcher,
+        matcher = matcher.privateKey,
         order1 = buy,
         order2 = sell,
         amount = amount,
@@ -153,8 +156,8 @@ package object smartcontract {
     val buyAmount           = 2
     val sellAmount          = 3
 
-    val buy  = Order.buy(ord1Ver, buyer, matcher, pair, buyAmount, buyPrice, ts, expirationTimestamp, fee)
-    val sell = Order.sell(ord2Ver, seller, matcher, pair, sellAmount, sellPrice, ts, expirationTimestamp, fee)
+    val buy  = Order.buy(ord1Ver, buyer, matcher.publicKey, pair, buyAmount, buyPrice, ts, expirationTimestamp, fee)
+    val sell = Order.sell(ord2Ver, seller, matcher.publicKey, pair, sellAmount, sellPrice, ts, expirationTimestamp, fee)
 
     (buy, sell)
   }

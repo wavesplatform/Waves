@@ -5,7 +5,6 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.crypto._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
@@ -19,7 +18,8 @@ package object history {
     addressSchemeCharacter = 'N',
     functionalitySettings = TestFunctionalitySettings.Enabled,
     genesisSettings = GenesisSettings.TESTNET,
-    rewardsSettings = RewardsSettings.TESTNET
+    rewardsSettings = RewardsSettings.TESTNET,
+    useEvaluatorV2 = false
   )
 
   val config   = ConfigFactory.load()
@@ -41,9 +41,9 @@ package object history {
     featuresSettings = settings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
   )
 
-  val defaultSigner          = KeyPair(Array.fill(KeyLength)(0: Byte))
-  val generationSignature    = ByteStr(Array.fill(Block.GenerationSignatureLength)(0: Byte))
-  val generationVRFSignature = ByteStr(Array.fill(Block.GenerationVRFSignatureLength)(0: Byte))
+  val defaultSigner          = TestValues.keyPair
+  val generationSignature    = ByteStr(new Array[Byte](Block.GenerationSignatureLength))
+  val generationVRFSignature = ByteStr(new Array[Byte](Block.GenerationVRFSignatureLength))
 
   def correctGenerationSignature(version: Byte): ByteStr = if (version < Block.ProtoBlockVersion) generationSignature else generationVRFSignature
 

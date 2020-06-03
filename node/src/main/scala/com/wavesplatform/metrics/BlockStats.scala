@@ -45,7 +45,6 @@ object BlockStats {
   def received(b: Block, source: Source, ch: Channel): Unit = write(
     block(b, source)
       .addField("from", nodeName(ch))
-      .addField("prop-time", System.currentTimeMillis() - b.header.timestamp)
       .addField("bt", b.header.baseTarget),
     Event.Received,
     Seq.empty
@@ -136,7 +135,7 @@ object BlockStats {
   private def nodeName(ch: Channel): String =
     if (ch == null) "???" else Option(ch.attr(HandshakeHandler.NodeNameAttributeKey).get()).getOrElse("")
 
-  private def id(x: ByteStr): String = x.toString.take(StringIdLength)
+  def id(x: ByteStr): String = x.toString.take(StringIdLength)
 
   private def write(init: Point.Builder, event: Event, addFields: Seq[(String, String)]): Unit = {
     Metrics.write(addFields.foldLeft(init.tag("event", event.name)) { case (r, (k, v)) => r.addField(k, v) })

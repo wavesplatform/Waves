@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.smartcontract
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{DataResponse, DebugStateChanges, StateChangesDetails, TransactionInfo, TransfersInfoResponse}
-import com.wavesplatform.it.sync.setScriptFee
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CONST_STRING}
@@ -42,8 +42,8 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
                         List(Transfer(caller, 3000), Transfer(contract, 3000)),
                         0.01.waves,
                         assetId = Some(assetSponsoredByRecipient))
-    sender.sponsorAsset(contract, assetSponsoredByDApp, 1)
-    sender.sponsorAsset(recipient, assetSponsoredByRecipient, 5)
+    sender.sponsorAsset(contract, assetSponsoredByDApp, 1, fee = sponsorReducedFee + smartFee)
+    sender.sponsorAsset(recipient, assetSponsoredByRecipient, 5, fee = sponsorReducedFee + smartFee)
 
     val script = ScriptCompiler.compile("""
         |{-# STDLIB_VERSION 3 #-}
@@ -118,7 +118,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
 
     txInfoShouldBeEqual(txInfo, txStateChanges)
 
-    val expected = StateChangesDetails(Seq(DataResponse("integer", 10, "result")), Seq(), Seq(), Seq(), Seq(), None)
+    val expected = StateChangesDetails(Seq(DataResponse("integer", 10, "result")), Seq(), Seq(), Seq(), Seq(), Seq(), None)
     txStateChanges.stateChanges.get shouldBe expected
     callerStateChanges.head.stateChanges.get shouldBe expected
     dAppStateChanges.head.stateChanges.get shouldBe expected
@@ -163,7 +163,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
     txInfoShouldBeEqual(txInfo, dAppStateChanges.head)
     txInfoShouldBeEqual(txInfo, recipientStateChanges.head)
 
-    val expected = StateChangesDetails(Seq(), Seq(TransfersInfoResponse(recipient, Some(simpleAsset), 10)), Seq(), Seq(), Seq(), None)
+    val expected = StateChangesDetails(Seq(), Seq(TransfersInfoResponse(recipient, Some(simpleAsset), 10)), Seq(), Seq(), Seq(), Seq(), None)
     txStateChanges.stateChanges.get shouldBe expected
     callerStateChanges.head.stateChanges.get shouldBe expected
     dAppStateChanges.head.stateChanges.get shouldBe expected
@@ -208,6 +208,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
     val expected = StateChangesDetails(
       Seq(DataResponse("integer", 7, "result")),
       Seq(TransfersInfoResponse(caller, None, 10)),
+      Seq(),
       Seq(),
       Seq(),
       Seq(),

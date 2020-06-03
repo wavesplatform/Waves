@@ -9,7 +9,6 @@ import com.google.common.cache._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.script.Script
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
@@ -113,13 +112,13 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def hasAccountScript(address: Address): Boolean =
     Option(scriptCache.getIfPresent(address)).fold(hasScriptBytes(address))(_.nonEmpty)
 
-  private val assetScriptCache: LoadingCache[IssuedAsset, Option[(Script, Long)]] =
+  private val assetScriptCache: LoadingCache[IssuedAsset, Option[AssetScriptInfo]] =
     cache(dbSettings.maxCacheSize, loadAssetScript)
-  protected def loadAssetScript(asset: IssuedAsset): Option[(Script, Long)]
+  protected def loadAssetScript(asset: IssuedAsset): Option[AssetScriptInfo]
   protected def hasAssetScriptBytes(asset: IssuedAsset): Boolean
   protected def discardAssetScript(asset: IssuedAsset): Unit = assetScriptCache.invalidate(asset)
 
-  override def assetScript(asset: IssuedAsset): Option[(Script, Long)] = assetScriptCache.get(asset)
+  override def assetScript(asset: IssuedAsset): Option[AssetScriptInfo] = assetScriptCache.get(asset)
 
   private var lastAddressId = loadMaxAddressId()
   protected def loadMaxAddressId(): Long
@@ -159,11 +158,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       leaseBalances: Map[AddressId, LeaseBalance],
       addressTransactions: Map[AddressId, Seq[TransactionId]],
       leaseStates: Map[ByteStr, Boolean],
-      issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)],
+      issuedAssets: Map[IssuedAsset, NewAssetInfo],
       reissuedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
       filledQuantity: Map[ByteStr, VolumeAndFee],
       scripts: Map[AddressId, Option[AccountScriptInfo]],
-      assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
+      assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
       data: Map[Address, AccountDataInfo],
       aliases: Map[Alias, AddressId],
       sponsorship: Map[IssuedAsset, Sponsorship],
@@ -179,11 +178,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
     val newAddresses = Set.newBuilder[Address]
     newAddresses ++= diff.portfolios.keys.filter(addressIdCache.get(_).isEmpty)
-    for ((_, addresses, _) <- diff.transactions.values; address <- addresses if addressIdCache.get(address).isEmpty) {
+    for (NewTransactionInfo(_, addresses, _) <- diff.transactions.values; address <- addresses if addressIdCache.get(address).isEmpty) {
       newAddresses += address
     }
 
-    val failedTransactionIds: Set[ByteStr] = diff.transactions.collect { case (id, (_, _, false)) => id }.toSet
+    val failedTransactionIds: Set[ByteStr] = diff.transactions.collect { case (id, NewTransactionInfo(_, _, false)) => id }.toSet
 
     val newAddressIds = (for {
       (address, offset) <- newAddresses.result().zipWithIndex
@@ -202,14 +201,14 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     val transactionList = diff.transactions.toList
 
     transactionList.foreach {
-      case (_, (tx, _, _)) =>
+      case (_, NewTransactionInfo(tx, _, _)) =>
         transactionIds.put(tx.id(), newHeight)
     }
 
     val addressTransactions: Map[AddressId, Seq[TransactionId]] =
       transactionList
         .flatMap {
-          case (_, (tx, addrs, _)) =>
+          case (_, NewTransactionInfo(tx, addrs, _)) =>
             transactionIds.put(tx.id(), newHeight) // be careful here!
 
             addrs.map { addr =>

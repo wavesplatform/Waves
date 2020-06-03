@@ -11,11 +11,11 @@ class SponsorshipForContactsSuite extends BaseTransactionSuite with CancelAfterF
   test("sponsor continues to be a sponsor after setScript for account, fee not changed for others") {
     val acc0    = pkByAddress(firstAddress)
     val assetId = sender.issue(firstAddress, "asset", "decr", someAssetAmount, 0, reissuable = false, issueFee, 2, None, waitForTx = true).id
-    sender.sponsorAsset(firstAddress, assetId, 100, sponsorFee, waitForTx = true)
+    sender.sponsorAsset(firstAddress, assetId, 100, sponsorReducedFee, waitForTx = true)
     sender.transfer(firstAddress, secondAddress, someAssetAmount / 2, minFee, Some(assetId), None, waitForTx = true)
 
     val script = ScriptCompiler(s"""false""".stripMargin, isAssetScript = false, ScriptEstimatorV2).right.get._1.bytes().base64
-    val _ = sender.setScript(acc0.stringRepr, Some(script), setScriptFee, waitForTx = true)
+    val _      = sender.setScript(acc0.toAddress.toString, Some(script), setScriptFee, waitForTx = true)
 
     val firstAddressBalance       = sender.accountBalances(firstAddress)._1
     val secondAddressBalance      = sender.accountBalances(secondAddress)._1

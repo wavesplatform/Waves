@@ -53,8 +53,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
     master    <- accountGen
     recipient <- accountGen
     ts        <- positiveIntGen
-    genesis1 = GenesisTransaction.create(master, ENOUGH_AMT * 3, ts).explicitGet()
-    genesis2 = GenesisTransaction.create(recipient, ENOUGH_AMT * 3, ts).explicitGet()
+    genesis1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT * 3, ts).explicitGet()
+    genesis2 = GenesisTransaction.create(recipient.toAddress, ENOUGH_AMT * 3, ts).explicitGet()
     dataTransaction <- compactDataTransactionGen(recipient)
     transfer        <- transferGeneratorP(ts, master, recipient.toAddress, 100000000L)
     transfer2       <- transferGeneratorPV2(ts + 15, master, recipient.toAddress, 100000L)
@@ -275,7 +275,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
         |let dd = toBase64String( dc ); let de = toBytes( dd )
         |sha256( de ) != base58'123'
       """.stripMargin
-    runScript(script) shouldBe Left(s"base64Encode input exceeds ${Global.MaxBase64Bytes}")
+    runScript(script) shouldBe Left(s"ByteStr size=36408 exceeds 32767 bytes")
   }
 
   property("get assetInfo by asset id") {
@@ -303,7 +303,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
 
           val issueTx = IssueTransaction(
               TxVersion.V2,
-              masterAcc,
+              masterAcc.publicKey,
               "testAsset".utf8Bytes,
               "Test asset".utf8Bytes,
               quantity,
@@ -312,18 +312,18 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
               assetScript,
               MinIssueFee * 2,
               dataTransaction.timestamp + 5
-            ).signWith(masterAcc)
+            ).signWith(masterAcc.privateKey)
 
           val sponsoredFee = 100
           val sponsorTx =
             SponsorFeeTransaction.signed(
               TxVersion.V1,
-              masterAcc,
+              masterAcc.publicKey,
               IssuedAsset(issueTx.assetId),
               Some(sponsoredFee),
               MinIssueFee,
               dataTransaction.timestamp + 6,
-              masterAcc
+              masterAcc.privateKey
             ).explicitGet()
 
           append(Seq(transferTx, issueTx)).explicitGet()
@@ -348,7 +348,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
               | let id              = aInfo.id == base58'$assetId'
               | let quantity        = aInfo.quantity == $quantity
               | let decimals        = aInfo.decimals == $decimals
-              | let issuer          = aInfo.issuer.bytes == base58'${issueTx.sender.toAddress.bytes}'
+              | let issuer          = aInfo.issuer.bytes == base58'${issueTx.sender.toAddress}'
               | let issuerPublicKey = aInfo.issuerPublicKey == base58'${issueTx.sender}'
               | let scripted        = aInfo.scripted == ${assetScript.nonEmpty}
               | let reissuable      = aInfo.reissuable == $reissuable
@@ -397,8 +397,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
                  | let lastBlockGenerationSignature = lastBlock.generationSignature == base58'${ByteStr(
                    Array.fill(Block.GenerationSignatureLength)(0: Byte)
                  )}'
-                 | let lastBlockGenerator = lastBlock.generator.bytes == base58'${defaultSigner.publicKey.toAddress.bytes}'
-                 | let lastBlockGeneratorPublicKey = lastBlock.generatorPublicKey == base58'${ByteStr(defaultSigner.publicKey)}'
+                 | let lastBlockGenerator = lastBlock.generator.bytes == base58'${defaultSigner.publicKey.toAddress}'
+                 | let lastBlockGeneratorPublicKey = lastBlock.generatorPublicKey == base58'${defaultSigner.publicKey}'
                  |
                  | lastBlockBaseTarget && lastBlockGenerationSignature && lastBlockGenerator && lastBlockGeneratorPublicKey
                  |
@@ -463,8 +463,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
                  | let checkHeight = block.height == 3
                  | let checkBaseTarget = block.baseTarget == 2
                  | let checkGenSignature = block.generationSignature == base58'$generationSignature'
-                 | let checkGenerator = block.generator.bytes == base58'${defaultSigner.publicKey.toAddress.bytes}'
-                 | let checkGeneratorPublicKey = block.generatorPublicKey == base58'${ByteStr(defaultSigner.publicKey)}'
+                 | let checkGenerator = block.generator.bytes == base58'${defaultSigner.publicKey.toAddress}'
+                 | let checkGeneratorPublicKey = block.generatorPublicKey == base58'${defaultSigner.publicKey}'
                  | $v4DeclOpt
                  |
                  | nonExistedBlockNeg && nonExistedBlockZero && nonExistedBlockNextPlus && checkHeight && checkBaseTarget && checkGenSignature && checkGenerator && checkGeneratorPublicKey
@@ -532,7 +532,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
           val fc             = Terms.FUNCTION_CALL(FunctionHeader.User("compareBlocks"), List.empty)
 
           val ci = InvokeScriptTransaction
-            .selfSigned(1.toByte, masterAcc, masterAcc, Some(fc), Seq.empty, FeeValidation.FeeUnit * (FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + FeeValidation.ScriptExtraFee), Waves, System.currentTimeMillis())
+            .selfSigned(1.toByte, masterAcc, masterAcc.toAddress, Some(fc), Seq.empty, FeeValidation.FeeUnit * (FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + FeeValidation.ScriptExtraFee), Waves, System.currentTimeMillis())
             .explicitGet()
 
           append(Seq(setScriptTx)).explicitGet()
@@ -567,7 +567,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
                  | }
                  |
                  | let checkAddress = match transfer.recipient {
-                 |   case addr: Address => addr.bytes == base64'${transferTx.recipient.bytes.base64Raw}'
+                 |   case addr: Address => addr.bytes == base64'${ByteStr(transferTx.recipient.bytes).base64Raw}'
                  |   case _             => false
                  | }
                  |
@@ -627,7 +627,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
                  | {-# CONTENT_TYPE EXPRESSION #-}
                  | {-# SCRIPT_TYPE ACCOUNT #-}
                  |
-                 | this.bytes == base58'${masterAcc.stringRepr}'
+                 | this.bytes == base58'${masterAcc.toAddress}'
                  |
               """.stripMargin,
               estimator
@@ -658,7 +658,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
                  | {-# CONTENT_TYPE EXPRESSION #-}
                  | {-# SCRIPT_TYPE ACCOUNT #-}
                  |
-                 | let checkAddressToStrRight = this.toString() == "${masterAcc.stringRepr}"
+                 | let checkAddressToStrRight = this.toString() == "${masterAcc.toAddress}"
                  | let checkAddressToStr = this.bytes.toBase58String() == this.toString()
                  |
                  | checkAddressToStrRight && checkAddressToStr
@@ -702,9 +702,9 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
                  | let incorrectTx = transferTransactionFromProto(base58'aaaa')
                  |
                  | incorrectTx          == unit                                                  &&
-                 | transferTx.id        == base58'${transferTx.id.value()}'                      &&
+                 | transferTx.id        == base58'${transferTx.id()}'                      &&
                  | transferTx.amount    == ${transferTx.amount}                                  &&
-                 | transferTx.sender    == Address(base58'${transferTx.sender.toAddress.bytes}') &&
+                 | transferTx.sender    == Address(base58'${transferTx.sender.toAddress}') &&
                  | transferTx.recipient == Address(base58'${transferTx.recipient}')
                  |
                """.stripMargin,

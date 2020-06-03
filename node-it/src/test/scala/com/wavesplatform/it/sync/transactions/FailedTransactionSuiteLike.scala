@@ -29,12 +29,13 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
     * @param pt priority transaction sender
     * @param checker transactions checker (will be executed twice - immediately after emptying the utx pool and then after height arising)
     */
-  def sendTxsAndThenPriorityTx[S](t: Int => T, pt: () => T)(
+  def sendPriorityTxAndThenOtherTxs[S](t: Int => T, pt: () => T)(
       checker: (Seq[T], T) => Seq[S]
   ): Seq[S] = {
     val maxTxsInMicroBlock = sender.config.getInt("waves.miner.max-transactions-in-micro-block")
-    val txs                = (1 to maxTxsInMicroBlock * 2).map(i => t(i))
     val priorityTx         = pt()
+    // waitForEmptyUtx()
+    val txs                = (1 to maxTxsInMicroBlock * 2).map(i => t(i))
     waitForEmptyUtx()
 
     checker(txs, priorityTx) // liquid
@@ -127,7 +128,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
         .id
     }
 
-    def updateAccountScript(result: Option[Boolean], account: String, fee: Long): String = {
+    def updateAccountScript(result: Option[Boolean], account: String, fee: Long, waitForTx: Boolean = true): String = {
       sender
         .setScript(
           account,
@@ -154,7 +155,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
 
           },
           fee = fee,
-          waitForTx = true
+          waitForTx = waitForTx
         )
         .id
     }
@@ -229,7 +230,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
         )
     }
 
-    def updateAccountScript(result: Option[Boolean], account: KeyPair, fee: Long): PBSignedTransaction = {
+    def updateAccountScript(result: Option[Boolean], account: KeyPair, fee: Long, waitForTx: Boolean = true): PBSignedTransaction = {
       sender
         .setScript(
           account,
@@ -253,8 +254,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                 .map(_._1)
             }
           ),
-          fee = fee,
-          waitForTx = true
+          fee = fee
         )
     }
   }
@@ -281,12 +281,12 @@ object FailedTransactionSuiteLike {
     val ts   = System.currentTimeMillis()
     val bmfa = Asset.fromString(Some(buyMatcherFeeAsset))
     val smfa = Asset.fromString(Some(sellMatcherFeeAsset))
-    val buy  = Order.buy(Order.V4, buyer, matcher, assetPair, 100, 100, ts, ts + Order.MaxLiveTime, buyMatcherFee, bmfa)
-    val sell = Order.sell(Order.V4, seller, matcher, assetPair, 100, 100, ts, ts + Order.MaxLiveTime, sellMatcherFee, smfa)
+    val buy  = Order.buy(Order.V4, buyer, matcher.publicKey, assetPair, 100, 100, ts, ts + Order.MaxLiveTime, buyMatcherFee, bmfa)
+    val sell = Order.sell(Order.V4, seller, matcher.publicKey, assetPair, 100, 100, ts, ts + Order.MaxLiveTime, sellMatcherFee, smfa)
     ExchangeTransaction
       .signed(
         TxVersion.V3,
-        matcher,
+        matcher.privateKey,
         buy,
         sell,
         buy.amount,
@@ -302,6 +302,7 @@ object FailedTransactionSuiteLike {
 
   val configForMinMicroblockAge: Config = ConfigFactory.parseString(s"""
      |waves.miner.min-micro-block-age = 7
+     |waves.miner.max-transactions-in-micro-block = 1
      |""".stripMargin)
 
   val Configs: Seq[Config] =

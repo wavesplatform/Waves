@@ -270,7 +270,7 @@ object SyncHttpApi extends Assertions {
     ): Transaction = {
       val tx = IssueTransaction(
         TxVersion.V2,
-        sender = source,
+        sender = source.publicKey,
         name.utf8Bytes,
         description.utf8Bytes,
         quantity = quantity,
@@ -279,7 +279,7 @@ object SyncHttpApi extends Assertions {
         script = script.map(x => Script.fromBase64String(x).explicitGet()),
         fee = fee,
         timestamp = System.currentTimeMillis()
-      ).signWith(source)
+      ).signWith(source.privateKey)
 
       maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = waitForTx)
     }
@@ -358,7 +358,7 @@ object SyncHttpApi extends Assertions {
         sourceAddress: String,
         assetId: String,
         baseFee: Long,
-        fee: Long = sponsorFee,
+        fee: Long = sponsorReducedFee,
         version: Byte = 1,
         waitForTx: Boolean = false,
         amountsAsStrings: Boolean = false
@@ -626,6 +626,9 @@ object SyncHttpApi extends Assertions {
     def blacklist(address: InetSocketAddress): Unit =
       sync(async(n).blacklist(address))
 
+    def clearBlacklist(): Unit =
+      sync(async(n).clearBlacklist())
+
     def debugMinerInfo(): Seq[State] =
       sync(async(n).debugMinerInfo())
 
@@ -649,10 +652,6 @@ object SyncHttpApi extends Assertions {
 
     def blockHeadersSeq(fromHeight: Int, toHeight: Int, amountsAsStrings: Boolean = false): Seq[BlockHeader] =
       sync(async(n).blockHeadersSeq(fromHeight, toHeight, amountsAsStrings))
-
-    def blockGenerationSignature(signature: String): GenerationSignatureResponse = sync(async(n).blockGenerationSignature(signature))
-
-    def lastBlockGenerationSignature: String = sync(async(n).lastBlockGenerationSignature)
 
     def generatingBalance(address: String, amountsAsStrings: Boolean = false): GeneratingBalance =
       sync(async(n).generatingBalance(address, amountsAsStrings))
@@ -787,19 +786,36 @@ object SyncHttpApi extends Assertions {
     ): Boolean =
       sync(async(nodes).waitForSameBlockHeadersAt(height, retryInterval), conditionAwaitTime)
 
-    def waitFor[A](desc: String)(retryInterval: FiniteDuration)(request: Node => A, cond: Iterable[A] => Boolean): Boolean =
+    def waitFor[A](desc: String, retryInterval: FiniteDuration = 1.second)(request: Node => A)(cond: Iterable[A] => Boolean): Boolean =
       sync(
         async(nodes).waitFor(desc)(retryInterval)((n: Node) => Future(request(n))(scala.concurrent.ExecutionContext.Implicits.global), cond),
         ConditionAwaitTime
       )
 
-    def rollback(height: Int, returnToUTX: Boolean = true): Unit = {
+    def rollbackWithoutBlacklisting(height: Int, returnToUTX: Boolean = true): Unit = {
       sync(
         Future.traverse(nodes) { node =>
           com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi(node).rollback(height, returnToUTX)
         },
         ConditionAwaitTime
       )
+    }
+
+    def rollback(height: Int, returnToUTX: Boolean = true): Unit = {
+      val combinations = nodes.combinations(2).toSeq
+      nodes.combinations(2).foreach {
+        case Seq(n1, n2) =>
+          n1.blacklist(n2.networkAddress)
+          n2.blacklist(n1.networkAddress)
+      }
+
+      nodes.rollbackWithoutBlacklisting(height, returnToUTX)
+      nodes.foreach(_.clearBlacklist())
+
+      combinations.foreach {
+        case Seq(n1, n2) =>
+          n1.connect(n2.networkAddress)
+      }
     }
 
     def rollbackToBlockId(id: String): Unit = {

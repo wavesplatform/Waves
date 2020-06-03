@@ -47,14 +47,14 @@ case class Block(
 
   val blockScore: Coeval[BigInt] = Coeval.evalOnce((BigInt("18446744073709551616") / header.baseTarget).ensuring(_ > 0))
 
-  private[block] val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce {
+  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     if (header.version < Block.ProtoBlockVersion) copy(signature = ByteStr.empty).bytes()
     else PBBlocks.protobuf(this).header.get.toByteArray
   }
 
   val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
     val publicKey = header.generator
-    !crypto.isWeakPublicKey(publicKey.arr) && crypto.verify(signature, ByteStr(bytesWithoutSignature()), publicKey)
+    !crypto.isWeakPublicKey(publicKey.arr) && crypto.verify(signature, bodyBytes(), publicKey)
   }
 
   protected val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
@@ -67,8 +67,8 @@ case class Block(
   }
 
   override def toString: String =
-    s"Block(${id()} -> ${header.reference.trim}, " +
-      s"txs=${transactionData.size}, features=${header.featureVotes}${if (header.rewardVote >= 0) s", rewardVote=${header.rewardVote}" else ""})"
+    s"Block(${id()},${header.reference},${header.generator.toAddress}," +
+      s"${header.timestamp},${header.featureVotes.mkString("[",",","]")}${if (header.rewardVote >= 0) s",${header.rewardVote}" else ""})"
 }
 
 object Block extends ScorexLogging {
@@ -78,7 +78,7 @@ object Block extends ScorexLogging {
 
   def protoHeaderHash(h: BlockHeader): ByteStr = {
     require(h.version >= ProtoBlockVersion)
-    crypto.fastHash(PBBlockHeaders.protobuf(h).toByteArray)
+    ByteStr(crypto.fastHash(PBBlockHeaders.protobuf(h).toByteArray))
   }
 
   def referenceLength(version: Byte): Int =
@@ -125,7 +125,7 @@ object Block extends ScorexLogging {
       featureVotes: Seq[Short],
       rewardVote: Long
   ): Either[GenericError, Block] =
-    create(version, timestamp, reference, baseTarget, generationSignature, signer, featureVotes, rewardVote, txs).validate.map(_.sign(signer))
+    create(version, timestamp, reference, baseTarget, generationSignature, signer.publicKey, featureVotes, rewardVote, txs).validate.map(_.sign(signer.privateKey))
 
   def parseBytes(bytes: Array[Byte]): Try[Block] =
     BlockSerializer
@@ -151,9 +151,9 @@ object Block extends ScorexLogging {
       }.sequence
       baseTarget = genesisSettings.initialBaseTarget
       timestamp  = genesisSettings.blockTimestamp
-      block      = create(GenesisBlockVersion, timestamp, GenesisReference, baseTarget, GenesisGenerationSignature, GenesisGenerator, Seq(), -1L, txs)
+      block      = create(GenesisBlockVersion, timestamp, GenesisReference, baseTarget, GenesisGenerationSignature, GenesisGenerator.publicKey, Seq(), -1L, txs)
       signedBlock = genesisSettings.signature match {
-        case None             => block.sign(GenesisGenerator)
+        case None             => block.sign(GenesisGenerator.privateKey)
         case Some(predefined) => block.copy(signature = predefined)
       }
       validBlock <- signedBlock.validateGenesis(genesisSettings)
@@ -174,8 +174,8 @@ object Block extends ScorexLogging {
   val TransactionSizeLength                = 4
   val HitSourceLength                      = 32
 
-  val GenesisReference: Array[TxVersion] = Array.fill(SignatureLength)(-1: Byte)
-  val GenesisGenerator: KeyPair = KeyPair(ByteStr.empty)
+  val GenesisReference: BlockId           = ByteStr(Array.fill(SignatureLength)(-1: Byte))
+  val GenesisGenerator: KeyPair           = KeyPair(ByteStr.empty)
   val GenesisGenerationSignature: BlockId = ByteStr(new Array[Byte](crypto.DigestLength))
 
   val GenesisBlockVersion: Byte = 1

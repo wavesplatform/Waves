@@ -41,13 +41,13 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
     withEnv(Seq.empty) {
       case Env(_, account, miner, blockchain) =>
         val generateBlock = generateBlockTask(miner)(account)
-        val oldBalance    = blockchain.balance(account)
+        val oldBalance    = blockchain.balance(account.toAddress)
         val newBalance    = oldBalance + 2 * settings.blockchainSettings.rewardsSettings.initial
         for {
           _ <- generateBlock
           _ <- generateBlock
         } yield {
-          blockchain.balance(account) should be(newBalance)
+          blockchain.balance(account.toAddress) should be(newBalance)
           blockchain.height should be(3)
           blockchain.blockHeader(2).get.header.version should be(Block.RewardBlockVersion)
           blockchain.blockHeader(3).get.header.version should be(Block.RewardBlockVersion)
@@ -59,11 +59,11 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
     withEnv(Seq((ts, reference, _) => TestBlock.create(time = ts, ref = reference, txs = Seq.empty, version = Block.NgBlockVersion))) {
       case Env(_, account, miner, blockchain) =>
         val generateBlock = generateBlockTask(miner)(account)
-        val oldBalance    = blockchain.balance(account)
+        val oldBalance    = blockchain.balance(account.toAddress)
         val newBalance    = oldBalance + settings.blockchainSettings.rewardsSettings.initial
 
         generateBlock.map { _ =>
-          blockchain.balance(account) should be(newBalance)
+          blockchain.balance(account.toAddress) should be(newBalance)
           blockchain.height should be(3)
         }
     }
@@ -96,11 +96,11 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
     withEnv(bps, txs) {
       case Env(_, account, miner, blockchain) =>
         val generateBlock = generateBlockTask(miner)(account)
-        val oldBalance    = blockchain.balance(account)
+        val oldBalance    = blockchain.balance(account.toAddress)
         val newBalance    = oldBalance + settings.blockchainSettings.rewardsSettings.initial - 10 * Constants.UnitsInWave
 
         generateBlock.map { _ =>
-          blockchain.balance(account) should be(newBalance)
+          blockchain.balance(account.toAddress) should be(newBalance)
           blockchain.height should be(3)
         }
     }
@@ -120,7 +120,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
       case (blockchainUpdater, _) =>
         for {
           _ <- Task.unit
-          pos          = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
+          pos          = new PoSSelector(blockchainUpdater, settings.synchronizationSettings)
           utxPool      = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, settings.utxSettings, enablePriorityPool = true)
           scheduler    = Scheduler.singleThread("appender")
           allChannels  = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
@@ -128,7 +128,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
           miner        = new MinerImpl(allChannels, blockchainUpdater, settings, ntpTime, utxPool, wallet, pos, scheduler, scheduler)
           account      = createAccount
           ts           = ntpTime.correctedTime() - 60000
-          genesisBlock = TestBlock.create(ts + 2, List(GenesisTransaction.create(account, ENOUGH_AMT, ts + 1).explicitGet()))
+          genesisBlock = TestBlock.create(ts + 2, List(GenesisTransaction.create(account.toAddress, ENOUGH_AMT, ts + 1).explicitGet()))
           _ <- Task(blockchainUpdater.processBlock(genesisBlock, genesisBlock.header.generationSignature))
           blocks = bps.foldLeft {
             (ts + 1, Seq[Block](genesisBlock))
@@ -145,7 +145,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
     }
 
   private def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] =
-    miner.invokePrivate(PrivateMethod[Task[Unit]]('generateBlockTask)(account))
+    miner.invokePrivate(PrivateMethod[Task[Unit]]('generateBlockTask)(account, None))
 
   private def forgeBlock(miner: MinerImpl)(account: KeyPair): Either[String, (MiningConstraints, Block, MiningConstraint)] =
     miner.invokePrivate(PrivateMethod[Either[String, (MiningConstraints, Block, MiningConstraint)]]('forgeBlock)(account))

@@ -2,8 +2,8 @@ package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
-import com.wavesplatform.lang.v1.parser.{Expressions, Parser, ParserV2}
 import com.wavesplatform.lang.v1.parser.Expressions._
+import com.wavesplatform.lang.v1.parser.{Expressions, Parser, ParserV2}
 import com.wavesplatform.lang.v1.testing.ScriptGenParser
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.{Matchers, PropSpec}
@@ -13,49 +13,29 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
 
   private def parse(x: String): DAPP = ParserV2.parseDAPP(x) match {
     case Right((parsedScript, _)) => parsedScript
-    case _ => throw new TestFailedException("Test failed", 0)
+    case _                        => throw new TestFailedException("Test failed", 0)
   }
-
-  /*private def catchParseError(x: String, e: Failure[Char, String]): Nothing = {
-    import e.{index => i}
-    println(s"val code1 = new String(Array[Byte](${x.getBytes("UTF-8").mkString(",")}))")
-    println(s"""val code2 = "${escapedCode(x)}"""")
-    println(s"Can't parse (len=${x.length}): <START>\n$x\n<END>\nError: $e\nPosition ($i): '${x.slice(i, i + 1)}'\nTraced:\n${
-      e.extra.traced.fullStack
-        .mkString("\n")
-    }")
-    throw new TestFailedException("Test failed", 0)
-  }*/
-
-  /*private def escapedCode(s: String): String =
-    s.flatMap {
-      case '"' => "\\\""
-      case '\n' => "\\n"
-      case '\r' => "\\r"
-      case '\t' => "\\t"
-      case x => x.toChar.toString
-    }.mkString*/
 
   private def cleanOffsets(l: LET): LET =
     l.copy(Pos(0, 0), name = cleanOffsets(l.name), value = cleanOffsets(l.value), types = l.types.map(cleanOffsets(_)))
 
   private def cleanOffsets[T](p: PART[T]): PART[T] = p match {
-    case PART.VALID(_, x) => PART.VALID(AnyPos, x)
+    case PART.VALID(_, x)   => PART.VALID(AnyPos, x)
     case PART.INVALID(_, x) => PART.INVALID(AnyPos, x)
   }
 
   private def cleanOffsets(expr: EXPR): EXPR = expr match {
-    case x: CONST_LONG => x.copy(position = Pos(0, 0))
-    case x: REF => x.copy(position = Pos(0, 0), key = cleanOffsets(x.key))
-    case x: CONST_STRING => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
-    case x: CONST_BYTESTR => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
-    case x: TRUE => x.copy(position = Pos(0, 0))
-    case x: FALSE => x.copy(position = Pos(0, 0))
-    case x: BINARY_OP => x.copy(position = Pos(0, 0), a = cleanOffsets(x.a), b = cleanOffsets(x.b))
-    case x: IF => x.copy(position = Pos(0, 0), cond = cleanOffsets(x.cond), ifTrue = cleanOffsets(x.ifTrue), ifFalse = cleanOffsets(x.ifFalse))
-    case x@BLOCK(_, l: Expressions.LET, _, _, _) => x.copy(position = Pos(0, 0), let = cleanOffsets(l), body = cleanOffsets(x.body))
-    case x: FUNCTION_CALL => x.copy(position = Pos(0, 0), name = cleanOffsets(x.name), args = x.args.map(cleanOffsets(_)))
-    case _ => throw new NotImplementedError(s"toString for ${expr.getClass.getSimpleName}")
+    case x: CONST_LONG                             => x.copy(position = Pos(0, 0))
+    case x: REF                                    => x.copy(position = Pos(0, 0), key = cleanOffsets(x.key))
+    case x: CONST_STRING                           => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
+    case x: CONST_BYTESTR                          => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
+    case x: TRUE                                   => x.copy(position = Pos(0, 0))
+    case x: FALSE                                  => x.copy(position = Pos(0, 0))
+    case x: BINARY_OP                              => x.copy(position = Pos(0, 0), a = cleanOffsets(x.a), b = cleanOffsets(x.b))
+    case x: IF                                     => x.copy(position = Pos(0, 0), cond = cleanOffsets(x.cond), ifTrue = cleanOffsets(x.ifTrue), ifFalse = cleanOffsets(x.ifFalse))
+    case x @ BLOCK(_, l: Expressions.LET, _, _, _) => x.copy(position = Pos(0, 0), let = cleanOffsets(l), body = cleanOffsets(x.body))
+    case x: FUNCTION_CALL                          => x.copy(position = Pos(0, 0), name = cleanOffsets(x.name), args = x.args.map(cleanOffsets(_)))
+    case _                                         => throw new NotImplementedError(s"toString for ${expr.getClass.getSimpleName}")
   }
 
   property("simple 1-annotated function") {
@@ -310,4 +290,39 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
         |""".stripMargin
     Parser.parseContract(code).toString.contains("Local functions should be defined before @Callable one") shouldBe true
   }
+
+  property("Unary expr") {
+    val code =
+      """{-# STDLIB_VERSION 4 #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |
+        |let a10 = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+        |
+        |func deleteEntry(acc: List[DeleteEntry], e: String) = DeleteEntry(e) :: acc
+        |
+        |func t() = delateEntry("q") :: FOLD<10>(a10, [], deleteEntry)
+        |
+        |@Callable(i) func f() = []
+        |""".stripMargin
+    ParserV2.parseDAPP(code) shouldBe 'right
+  }
+
+  property("FOLD expr") {
+    val code =
+      """{-# STDLIB_VERSION 4 #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |
+        |let a10 = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+        |
+        |func deleteEntry(acc: List[DeleteEntry], e: String) = DeleteEntry(e) :: acc
+        |
+        |@Callable(i) func delete100Entries() = FOLD<10>(a10, [], deleteEntry)
+        |
+        |@Callable(i) func delete(k: String) = [DeleteEntry(k)]
+        |""".stripMargin
+    ParserV2.parseDAPP(code) shouldBe 'right
+  }
+
 }

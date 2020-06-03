@@ -23,14 +23,14 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with With
     master    <- accountGen
     recepient <- otherAccountGen(candidate = master)
     ts        <- positiveIntGen
-    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+    genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
     issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
     issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
     maybeAsset               <- Gen.option(issue1.id()) map Asset.fromCompatId
     maybeAsset2              <- Gen.option(issue2.id()) map Asset.fromCompatId
     maybeFeeAsset            <- Gen.oneOf(maybeAsset, maybeAsset2)
-    transferV1               <- transferGeneratorP(master, recepient, maybeAsset, maybeFeeAsset)
-    transferV2               <- versionedTransferGeneratorP(master, recepient, maybeAsset, maybeFeeAsset)
+    transferV1               <- transferGeneratorP(master, recepient.toAddress, maybeAsset, maybeFeeAsset)
+    transferV2               <- versionedTransferGeneratorP(master, recepient.toAddress, maybeAsset, maybeFeeAsset)
     transfer                 <- Gen.oneOf(transferV1, transferV2)
   } yield (genesis, issue1, issue2, transfer)
 
@@ -60,11 +60,11 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with With
       master    <- accountGen
       recepient <- otherAccountGen(master)
       ts        <- positiveIntGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       issue: IssueTransaction      <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
       feeIssue: IssueTransaction <- issueV2TransactionGen(master, scriptGen.map(_.some))
-      transferV1                   <- transferGeneratorP(master, recepient, IssuedAsset(issue.id()), IssuedAsset(feeIssue.id()))
-      transferV2                   <- transferGeneratorP(master, recepient, IssuedAsset(issue.id()), IssuedAsset(feeIssue.id()))
+      transferV1                   <- transferGeneratorP(master, recepient.toAddress, IssuedAsset(issue.id()), IssuedAsset(feeIssue.id()))
+      transferV2                   <- transferGeneratorP(master, recepient.toAddress, IssuedAsset(issue.id()), IssuedAsset(feeIssue.id()))
       transfer                     <- Gen.oneOf(transferV1, transferV2)
     } yield (genesis, issue, feeIssue, transfer)
   }
@@ -74,11 +74,11 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with With
       master    <- accountGen
       recepient <- otherAccountGen(candidate = master)
       ts        <- positiveIntGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       issue: IssueTransaction <- issueReissueBurnGeneratorP(Long.MaxValue, master).map(_._1)
       asset = IssuedAsset(issue.id())
       transfer = TransferTransaction
-        .selfSigned(1.toByte, master, recepient, asset, Long.MaxValue, Waves, 100000, None, ts)
+        .selfSigned(1.toByte, master, recepient.toAddress, asset, Long.MaxValue, Waves, 100000, None, ts)
         .explicitGet()
     } yield (genesis, issue, transfer)
 

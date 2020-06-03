@@ -3,6 +3,7 @@ package com.wavesplatform.transaction.validation.impl
 import cats.data.NonEmptyList
 import cats.data.Validated.{Invalid, Valid}
 import cats.implicits._
+import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.TxValidationError.{GenericError, NonPositiveAmount, TooBigArray}
@@ -32,6 +33,12 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
           .length <= ContractLimits.MaxInvokeScriptSizeInBytes
       else tx.bytes().length <= ContractLimits.MaxInvokeScriptSizeInBytes
 
+    val callableNameSize =
+      funcCallOpt match {
+        case Some(FUNCTION_CALL(FunctionHeader.User(internalName, _), _)) => internalName.utf8Bytes.length
+        case _ => 0
+      }
+
     V.seq(tx)(
       V.addressChainId(dAppAddressOrAlias, chainId),
       V.cond(
@@ -39,12 +46,8 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
         GenericError(s"InvokeScript can't have more than ${ContractLimits.MaxInvokeScriptArgs} arguments")
       ),
       V.cond(
-        funcCallOpt.isEmpty || (funcCallOpt.get.function match {
-          case FunctionHeader.User(internalName, _) =>
-            internalName.utf8Bytes.length <= ContractLimits.MaxAnnotatedFunctionNameInBytes
-          case _ => true
-        }),
-        GenericError(s"Callable function name size in bytes must be less than ${ContractLimits.MaxAnnotatedFunctionNameInBytes} bytes")
+        callableNameSize <= ContractLimits.MaxDeclarationNameInBytes,
+        GenericError(s"Callable function name size = $callableNameSize bytes must be less than ${ContractLimits.MaxDeclarationNameInBytes}")
       ),
       checkAmounts(payments),
       V.fee(fee),

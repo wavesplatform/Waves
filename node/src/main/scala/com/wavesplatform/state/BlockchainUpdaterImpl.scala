@@ -14,9 +14,8 @@ import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.script.Script
 import com.wavesplatform.metrics.{TxsInBlockchainStats, _}
-import com.wavesplatform.mining.{MiningConstraint, MiningConstraints}
+import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
@@ -35,7 +34,8 @@ class BlockchainUpdaterImpl(
     spendableBalanceChanged: Observer[(Address, Asset)],
     wavesSettings: WavesSettings,
     time: Time,
-    blockchainUpdateTriggers: BlockchainUpdateTriggers
+    blockchainUpdateTriggers: BlockchainUpdateTriggers,
+    miner: Miner = _ => ()
 ) extends Blockchain
     with BlockchainUpdater
     with NG
@@ -203,7 +203,11 @@ class BlockchainUpdaterImpl(
                         miningConstraints.total,
                         verify
                       )
-                      .map(r => Option((r, Seq.empty[Transaction], reward, hitSource)))
+                      .map { r =>
+                        val refBlockchain = CompositeBlockchain(leveldb, Some(r.diff), Some(block), r.carry, reward, Some(hitSource))
+                        miner.scheduleMining(Some(refBlockchain))
+                        Option((r, Seq.empty[Transaction], reward, hitSource))
+                      }
                 }
               case Some(ng) =>
                 if (ng.base.header.reference == block.header.reference) {
@@ -257,7 +261,7 @@ class BlockchainUpdaterImpl(
                       )
                     )
                 } else
-                  metrics.forgeBlockTimeStats.measureSuccessful(ng.totalDiffOf(block.header.reference)) match {
+                  metrics.forgeBlockTimeStats.measureOptional(ng.totalDiffOf(block.header.reference)) match {
                     case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
                     case Some((referencedForgedBlock, referencedLiquidDiff, carry, totalFee, discarded)) =>
                       if (!verify || referencedForgedBlock.signatureValid()) {
@@ -281,20 +285,24 @@ class BlockchainUpdaterImpl(
 
                         val liquidDiffWithCancelledLeases = ng.cancelExpiredLeases(referencedLiquidDiff)
 
-                        val diff = BlockDiffer
+                        val referencedBlockchain = CompositeBlockchain(leveldb, Some(liquidDiffWithCancelledLeases), Some(referencedForgedBlock), carry, reward)
+                        val maybeDiff = BlockDiffer
                           .fromBlock(
-                            CompositeBlockchain(leveldb, Some(liquidDiffWithCancelledLeases), Some(referencedForgedBlock), carry, reward),
+                            referencedBlockchain,
                             Some(referencedForgedBlock),
                             block,
                             constraint,
                             verify
                           )
 
-                        diff.map { hardenedDiff =>
+                        maybeDiff.map { differResult =>
+                          val tempBlockchain = CompositeBlockchain(referencedBlockchain, Some(differResult.diff), Some(block), differResult.carry, reward, Some(hitSource))
+                          miner.scheduleMining(Some(tempBlockchain))
+
                           leveldb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
                           BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
                           TxsInBlockchainStats.record(ng.transactions.size)
-                          Some((hardenedDiff, discarded.flatMap(_.transactionData), reward, hitSource))
+                          Some((differResult, discarded.flatMap(_.transactionData), reward, hitSource))
                         }
                       } else {
                         val errorText = s"Forged block has invalid signature. Base: ${ng.base}, requested reference: ${block.header.reference}"
@@ -388,6 +396,7 @@ class BlockchainUpdaterImpl(
 
     notifyChangedSpendable(prevNgState, ngState)
     publishLastBlockInfo()
+    miner.scheduleMining()
     result
   }
 
@@ -611,7 +620,7 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.hasAccountScript(address)
   }
 
-  override def assetScript(asset: IssuedAsset): Option[(Script, Long)] = readLock {
+  override def assetScript(asset: IssuedAsset): Option[AssetScriptInfo] = readLock {
     compositeBlockchain.assetScript(asset)
   }
 
@@ -621,20 +630,6 @@ class BlockchainUpdaterImpl(
 
   def collectActiveLeases(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] =
     CompositeBlockchain.collectActiveLeases(leveldb, ngState.map(_.bestLiquidDiff))(filter)
-
-  /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
-    *
-    * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
-  override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = readLock {
-    ngState.fold(leveldb.collectLposPortfolios(pf)) { ng =>
-      val b = Map.newBuilder[Address, A]
-      for ((a, p) <- ng.bestLiquidDiff.portfolios if p.lease != LeaseBalance.empty || p.balance != 0) {
-        pf.runWith(b += a -> _)(a -> this.wavesPortfolio(a))
-      }
-
-      leveldb.collectLposPortfolios(pf) ++ b.result()
-    }
-  }
 
   override def transactionHeight(id: ByteStr): Option[Int] = readLock {
     compositeBlockchain.transactionHeight(id)

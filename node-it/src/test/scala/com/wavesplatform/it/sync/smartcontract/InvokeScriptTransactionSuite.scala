@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync._
@@ -106,7 +106,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
       nodes.waitForHeightAriseAndTxPresent(invokeScriptTx._1.id)
 
       sender.getDataByKey(contract, "a") shouldBe BinaryDataEntry("a", arg)
-      sender.getDataByKey(contract, "sender") shouldBe BinaryDataEntry("sender", Base58.decode(caller))
+      sender.getDataByKey(contract, "sender") shouldBe BinaryDataEntry("sender", ByteStr.decodeBase58(caller).get)
     }
   }
 
@@ -152,7 +152,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
       ._1
       .id
 
-    sender.debugStateChanges(tx1).stateChanges.get.errorMessage.get.text should include("Empty keys aren't allowed in tx version >= 2")
+    sender.debugStateChanges(tx1).stateChanges.get.error.get.text should include("Empty keys aren't allowed in tx version >= 2")
 
     nodes.waitForHeightArise()
     sender.getData(secondContract).filter(_.key.isEmpty) shouldBe List.empty
@@ -170,7 +170,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
       ._1
       .id
 
-    sender.debugStateChanges(tx2).stateChanges.get.errorMessage.get.text should include("Empty keys aren't allowed in tx version >= 2")
+    sender.debugStateChanges(tx2).stateChanges.get.error.get.text should include("Empty keys aren't allowed in tx version >= 2")
 
     nodes.waitForHeightArise()
     sender.getData(thirdContract).filter(_.key.isEmpty) shouldBe List.empty

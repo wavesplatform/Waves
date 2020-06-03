@@ -100,7 +100,7 @@ object Explorer extends ScorexLogging {
         case "DA" =>
           val addressIds = mutable.Seq[(BigInt, Address)]()
           db.iterateOver(KeyTags.AddressId) { e =>
-            val address   = Address.fromBytes(ByteStr(e.getKey.drop(2)), settings.blockchainSettings.addressSchemeCharacter.toByte)
+            val address   = Address.fromBytes(e.getKey.drop(2), settings.blockchainSettings.addressSchemeCharacter.toByte)
             val addressId = BigInt(e.getValue)
             addressIds :+ (addressId -> address)
           }
@@ -168,7 +168,7 @@ object Explorer extends ScorexLogging {
 
           db.iterateOver(KeyTags.IdToAddress) { e =>
             result.compute(
-              Address.fromBytes(ByteStr(e.getValue)).explicitGet(),
+              Address.fromBytes(e.getValue).explicitGet(),
               (_, prev) =>
                 prev match {
                   case null    => 1

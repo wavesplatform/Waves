@@ -7,7 +7,6 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
-import com.wavesplatform.mining._
 import com.wavesplatform.network._
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import com.wavesplatform.transaction._
@@ -32,7 +31,6 @@ package object appender extends ScorexLogging {
   private[appender] def processAndBlacklistOnFailure[A, B](
       ch: Channel,
       peerDatabase: PeerDatabase,
-      miner: Miner,
       start: => String,
       success: => String,
       errorPrefix: String
@@ -41,7 +39,6 @@ package object appender extends ScorexLogging {
     f map {
       case Right(maybeNewScore) =>
         log.debug(success)
-        maybeNewScore.foreach(_ => miner.scheduleMining())
         Right(maybeNewScore)
       case Left(ve) =>
         log.warn(s"$errorPrefix: $ve")
@@ -73,12 +70,12 @@ package object appender extends ScorexLogging {
   )(block: Block): Either[ValidationError, Option[Int]] =
     for {
       _ <- Either.cond(
-        !blockchainUpdater.hasAccountScript(block.sender),
+        !blockchainUpdater.hasAccountScript(block.sender.toAddress),
         (),
         BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block)
       )
       hitSource <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime(), block) { (height, parent) =>
-        val balance = blockchainUpdater.generatingBalance(block.sender, Some(parent))
+        val balance = blockchainUpdater.generatingBalance(block.sender.toAddress, Some(parent))
         Either.cond(
           blockchainUpdater.isEffectiveBalanceValid(height, block, balance),
           balance,

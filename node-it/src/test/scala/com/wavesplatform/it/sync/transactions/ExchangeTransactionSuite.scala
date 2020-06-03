@@ -19,7 +19,7 @@ import play.api.libs.json.{JsNumber, JsObject, JsString, Json}
 class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
   var exchAsset: IssueTransaction = IssueTransaction(
     TxVersion.V1,
-    sender = sender.privateKey,
+    sender = sender.keyPair.publicKey,
     "myasset".utf8Bytes,
     "my asset description".utf8Bytes,
     quantity = someAssetAmount,
@@ -28,7 +28,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     script = None,
     fee = 1.waves,
     timestamp = System.currentTimeMillis()
-  ).signWith(sender.privateKey)
+  ).signWith(sender.keyPair.privateKey)
 
   private val acc0 = pkByAddress(firstAddress)
   private val acc1 = pkByAddress(secondAddress)
@@ -62,8 +62,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       val amount     = 1
 
       val pair = AssetPair.createAssetPair("WAVES", assetId).get
-      val buy  = Order.buy(buyVersion, buyer, matcher, pair, buyAmount, buyPrice, ts, expirationTimestamp, matcherFee)
-      val sell = Order.sell(sellVersion, seller, matcher, pair, sellAmount, sellPrice, ts, expirationTimestamp, matcherFee)
+      val buy  = Order.buy(buyVersion, buyer, matcher.publicKey, pair, buyAmount, buyPrice, ts, expirationTimestamp, matcherFee)
+      val sell = Order.sell(sellVersion, seller, matcher.publicKey, pair, sellAmount, sellPrice, ts, expirationTimestamp, matcherFee)
 
       val buyFee  = (BigInt(matcherFee) * amount / buy.amount).toLong
       val sellFee = (BigInt(matcherFee) * amount / sell.amount).toLong
@@ -117,7 +117,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
     val IssueTx: IssueTransaction = IssueTransaction(
       TxVersion.V1,
-      buyer,
+      buyer.publicKey,
       "myasset".utf8Bytes,
       assetDescription.utf8Bytes,
       quantity = someAssetAmount,
@@ -126,7 +126,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       script = None,
       fee = 1.waves,
       timestamp = System.currentTimeMillis()
-    ).signWith(buyer)
+    ).signWith(buyer.privateKey)
 
     val assetId = IssueTx.id()
 
@@ -152,7 +152,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
       if (matcherFeeOrder1 == Waves && matcherFeeOrder2 != Waves) {
         assetBalanceBefore = sender.assetBalance(secondAddress, assetId.toString).balance
-        sender.transfer(buyer.stringRepr, seller.stringRepr, 100000, minFee, Some(assetId.toString), waitForTx = true)
+        sender.transfer(buyer.toAddress.toString, seller.toAddress.toString, 100000, minFee, Some(assetId.toString), waitForTx = true)
       }
 
       val buyPrice   = 500000
@@ -160,15 +160,15 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       val buyAmount  = 40000000
       val sellAmount = 40000000
       val assetPair  = AssetPair.createAssetPair("WAVES", assetId.toString).get
-      val buy        = Order.buy(o1ver, buyer, matcher, assetPair, buyAmount, buyPrice, ts, expirationTimestamp, matcherFee, matcherFeeOrder1)
-      val sell       = Order.sell(o2ver, seller, matcher, assetPair, sellAmount, sellPrice, ts, expirationTimestamp, matcherFee, matcherFeeOrder2)
+      val buy        = Order.buy(o1ver, buyer, matcher.publicKey, assetPair, buyAmount, buyPrice, ts, expirationTimestamp, matcherFee, matcherFeeOrder1)
+      val sell       = Order.sell(o2ver, seller, matcher.publicKey, assetPair, sellAmount, sellPrice, ts, expirationTimestamp, matcherFee, matcherFeeOrder2)
       val amount     = 40000000
 
       val tx =
         ExchangeTransaction
           .signed(
             3.toByte,
-            matcher = matcher,
+            matcher = matcher.privateKey,
             order1 = buy,
             order2 = sell,
             amount = amount,
@@ -238,13 +238,13 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     val nftWavesPair      = AssetPair.createAssetPair(nftAsset, "WAVES").get
     val nftOtherAssetPair = AssetPair.createAssetPair(nftAsset, dec6AssetId).get
 
-    val sellNftForWaves = Order.sell(4.toByte, seller, matcher, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves)
-    val buyNftForWaves  = Order.buy(4.toByte, buyer, matcher, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves)
+    val sellNftForWaves = Order.sell(4.toByte, seller, matcher.publicKey, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves)
+    val buyNftForWaves  = Order.buy(4.toByte, buyer, matcher.publicKey, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves)
 
     val sellNftForOtherAsset =
-      Order.sell(4.toByte, buyer, matcher, nftOtherAssetPair, amount, nftForAssetPrice, ts, expirationTimestamp, matcherFee, Waves)
+      Order.sell(4.toByte, buyer, matcher.publicKey, nftOtherAssetPair, amount, nftForAssetPrice, ts, expirationTimestamp, matcherFee, Waves)
     val buyNftForOtherAsset =
-      Order.buy(4.toByte, seller, matcher, nftOtherAssetPair, amount, nftForAssetPrice, ts, expirationTimestamp, matcherFee, Waves)
+      Order.buy(4.toByte, seller, matcher.publicKey, nftOtherAssetPair, amount, nftForAssetPrice, ts, expirationTimestamp, matcherFee, Waves)
 
     val sellerBalance = sender.balanceDetails(sellerAddress).regular
     val buyerBalance  = sender.balanceDetails(buyerAddress).regular
@@ -253,7 +253,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       ExchangeTransaction
         .signed(
           3.toByte,
-          matcher = matcher,
+          matcher = matcher.privateKey,
           order1 = buyNftForWaves,
           order2 = sellNftForWaves,
           amount = amount,
@@ -280,7 +280,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       ExchangeTransaction
         .signed(
           3.toByte,
-          matcher = matcher,
+          matcher = matcher.privateKey,
           order1 = buyNftForOtherAsset,
           order2 = sellNftForOtherAsset,
           amount = amount,
