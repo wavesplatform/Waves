@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import java.util.concurrent.TimeUnit
 
-import com.google.common.cache.{Cache, CacheBuilder, RemovalNotification}
+import com.google.common.cache.{Cache, CacheBuilder}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.MicroBlock
 import com.wavesplatform.common.state.ByteStr
@@ -31,10 +31,10 @@ object MicroBlockSynchronizer extends ScorexLogging {
 
     implicit val schdlr: SchedulerService = scheduler
 
-    val microBlockOwners     = cache[MicroBlockSignature, MSet[Channel]]("microBlockOwners", settings.invCacheTimeout)
-    val nextInvs             = cache[MicroBlockSignature, MicroBlockInv]("nextInvs", settings.invCacheTimeout)
-    val awaiting             = cache[MicroBlockSignature, MicroBlockInv]("awaiting", settings.invCacheTimeout)
-    val successfullyReceived = cache[MicroBlockSignature, Object]("successfullyReceived", settings.processedMicroBlocksCacheTimeout)
+    val microBlockOwners     = cache[MicroBlockSignature, MSet[Channel]](settings.invCacheTimeout)
+    val nextInvs             = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
+    val awaiting             = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
+    val successfullyReceived = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
 
     val lastBlockId = lastObserved(lastBlockIdEvents)
 
@@ -149,18 +149,13 @@ object MicroBlockSynchronizer extends ScorexLogging {
       s.drop(n).headOption
     }
 
-  def cache[K <: AnyRef, V <: AnyRef](name: String, timeout: FiniteDuration): Cache[K, V] =
+  def cache[K <: AnyRef, V <: AnyRef](timeout: FiniteDuration): Cache[K, V] =
     CacheBuilder
       .newBuilder()
       .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
-      .removalListener { rn: RemovalNotification[K, V] =>
-        log.trace(s"$name - REMOVED (${rn.getCause}, evicted=${rn.wasEvicted()}): ${rn.getKey} -> ${rn.getValue}")
-      }
       .build[K, V]()
 
   case class CacheSizes(microBlockOwners: Long, nextInvs: Long, awaiting: Long, successfullyReceived: Long)
 
-  private val dummy = new Object() {
-    override def toString: String = "dummy stub"
-  }
+  private val dummy = new Object()
 }
