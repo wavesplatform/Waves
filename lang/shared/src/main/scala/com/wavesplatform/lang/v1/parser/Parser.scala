@@ -98,12 +98,7 @@ object Parser {
   }
 
   def invalid[_:P]: P[INVALID] = {
-//    val White = WhitespaceApi.Wrapper {
-//      import fastparse.all._
-//      NoTrace("")
-//    }
-//
-//    import White._
+    import fastparse.NoWhitespace._
     P(Index ~~ CharPred(_ != '\n').rep(1) ~~ Index)
       .map {
         case (start, end) => INVALID(Pos(start, end), "can't parse the expression")
