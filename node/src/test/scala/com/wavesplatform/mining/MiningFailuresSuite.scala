@@ -22,6 +22,8 @@ import monix.execution.Scheduler.Implicits.global
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{FlatSpec, Matchers}
 
+import scala.concurrent.duration._
+
 class MiningFailuresSuite extends FlatSpec with Matchers with PathMockFactory with WithDB with TransactionGen {
   trait BlockchainUpdaterNG extends Blockchain with BlockchainUpdater with NG
 
@@ -64,7 +66,8 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PathMockFactory wi
         wallet,
         pos,
         scheduler,
-        scheduler
+        scheduler,
+        Task.sleep(200 millis)
       )
     }
 

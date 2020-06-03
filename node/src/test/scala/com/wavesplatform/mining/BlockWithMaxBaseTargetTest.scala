@@ -44,7 +44,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
           val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
           val wallet      = Wallet(WalletSettings(None, Some("123"), None))
           val miner =
-            new MinerImpl(allChannels, bcu, settings, ntpTime, utxPoolStub, wallet, pos, scheduler, scheduler)
+            new MinerImpl(allChannels, bcu, settings, ntpTime, utxPoolStub, wallet, pos, scheduler, scheduler, Task.sleep(200 millis))
 
           val signal = new Semaphore(1)
           signal.acquire()

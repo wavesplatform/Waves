@@ -125,7 +125,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
           scheduler    = Scheduler.singleThread("appender")
           allChannels  = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
           wallet       = Wallet(WalletSettings(None, Some("123"), None))
-          miner        = new MinerImpl(allChannels, blockchainUpdater, settings, ntpTime, utxPool, wallet, pos, scheduler, scheduler)
+          miner        = new MinerImpl(allChannels, blockchainUpdater, settings, ntpTime, utxPool, wallet, pos, scheduler, scheduler, Task.sleep(200 millis))
           account      = createAccount
           ts           = ntpTime.correctedTime() - 60000
           genesisBlock = TestBlock.create(ts + 2, List(GenesisTransaction.create(account.toAddress, ENOUGH_AMT, ts + 1).explicitGet()))

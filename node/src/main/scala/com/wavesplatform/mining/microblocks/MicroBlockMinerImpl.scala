@@ -30,11 +30,12 @@ class MicroBlockMinerImpl(
     settings: MinerSettings,
     minerScheduler: SchedulerService,
     appenderScheduler: SchedulerService,
+    waitForUtxNonEmpty: Task[Unit],
     nextMicroBlockSize: Int => Int
 ) extends MicroBlockMiner
     with ScorexLogging {
 
-  private val microBlockBuildTimeStats = Kamon.timer("miner.forge-microblock-time").withoutTags()
+  private[this] val microBlockBuildTimeStats = Kamon.timer("miner.forge-microblock-time").withoutTags()
 
   def generateMicroBlockSequence(
       account: KeyPair,
@@ -47,9 +48,10 @@ class MicroBlockMinerImpl(
         case res @ Success(newBlock, newConstraint) =>
           Task.defer(generateMicroBlockSequence(account, newBlock, newConstraint, res.nanoTime))
         case Retry =>
-          Task
-            .defer(generateMicroBlockSequence(account, accumulatedBlock, restTotalConstraint, lastMicroBlock))
-            .delayExecution(1 second)
+          log.warn("Waiting for non-empty UTX")
+          waitForUtxNonEmpty
+            .map(_ => log.info("UTX event fired"))
+            .flatMap(_ => generateMicroBlockSequence(account, accumulatedBlock, restTotalConstraint, lastMicroBlock))
         case Stop =>
           setDebugState(MinerDebugInfo.MiningBlocks)
           Task(log.debug("MicroBlock mining completed, block is full"))

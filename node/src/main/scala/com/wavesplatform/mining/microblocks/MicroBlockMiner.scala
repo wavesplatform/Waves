@@ -29,6 +29,7 @@ object MicroBlockMiner {
       settings: MinerSettings,
       minerScheduler: SchedulerService,
       appenderScheduler: SchedulerService,
+      waitForUtxNonEmpty: Task[Unit],
       nextMicroBlockSize: Int => Int = identity
   ): MicroBlockMiner =
     new MicroBlockMinerImpl(
@@ -39,6 +40,7 @@ object MicroBlockMiner {
       settings,
       minerScheduler,
       appenderScheduler,
+      waitForUtxNonEmpty,
       nextMicroBlockSize
     )
 }

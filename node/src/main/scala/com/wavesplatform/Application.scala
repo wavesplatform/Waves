@@ -113,6 +113,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
+    utxEvents.foreach(e => log.warn(s"UTX event: $e"))
+
     val utxStorage =
       new UtxPoolImpl(time, blockchainUpdater, spendableBalanceChanged, settings.utxSettings, utxEvents.onNext)
     maybeUtx = Some(utxStorage)
@@ -141,7 +143,18 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val pos = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTargetOpt)
 
     if (settings.minerSettings.enable)
-      miner = new MinerImpl(allChannels, blockchainUpdater, settings, time, utxStorage, wallet, pos, minerScheduler, appenderScheduler)
+      miner = new MinerImpl(
+        allChannels,
+        blockchainUpdater,
+        settings,
+        time,
+        utxStorage,
+        wallet,
+        pos,
+        minerScheduler,
+        appenderScheduler,
+        Task.defer(utxEvents.collect { case UtxEvent.TxAdded(_, _) => () }.firstL)
+      )
 
     val processBlock =
       BlockAppender(blockchainUpdater, time, utxStorage, pos, allChannels, peerDatabase, appenderScheduler) _

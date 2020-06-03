@@ -55,7 +55,8 @@ class MinerImpl(
     wallet: Wallet,
     pos: PoSSelector,
     val minerScheduler: SchedulerService,
-    val appenderScheduler: SchedulerService
+    val appenderScheduler: SchedulerService,
+    waitForUtxNonEmpty: Task[Unit]
 ) extends Miner
     with MinerDebugInfo
     with ScorexLogging {
@@ -78,6 +79,7 @@ class MinerImpl(
     settings.minerSettings,
     minerScheduler,
     appenderScheduler,
+    waitForUtxNonEmpty,
     utx.priorityPool.nextMicroBlockSize
   )
 
