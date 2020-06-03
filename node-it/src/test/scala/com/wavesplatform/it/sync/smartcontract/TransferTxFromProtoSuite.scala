@@ -27,13 +27,7 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
       |@Callable(i)
       |func foo(txProtoBytes: ByteVector) = {
       |    let transferTx = transferTransactionFromProto(txProtoBytes).value()
-      |    let transferTxAttachment = match (transferTx.attachment) {
-      |        case b:ByteVector => b.toBase58String()
-      |        case integer:Int => integer.toString()
-      |        case bool:Boolean => bool.toString()
-      |        case s:String => s
-      |        case _ => throw("Empty description")
-      |      }
+      |    let transferTxAttachment = transferTx.attachment.toBase58String()
       |    let assetId = if (!transferTx.assetId.isDefined()) then {"WAVES"} else {transferTx.assetId.value().toBase58String()}
       |    let feeAssetId = if (!transferTx.feeAssetId.isDefined()) then {"WAVES"} else {transferTx.feeAssetId.value().toBase58String()}
       |[
