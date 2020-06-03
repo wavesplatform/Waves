@@ -93,21 +93,25 @@ object ContractScript {
   ): Either[String, (Long, Map[String, Long])] =
     for {
       (maxComplexity, complexities) <- estimateComplexityExact(version, dApp, estimator)
-      _                             <- checkComplexity(version, maxComplexity)
-      _                             <- if (useReducedVerifierLimit) estimateVerifierReduced(dApp, complexities, version) else Right(())
+      _                             <- checkComplexity(version, dApp, maxComplexity, complexities, useReducedVerifierLimit)
     } yield (maxComplexity._2, complexities)
 
   def checkComplexity(
       version: StdLibVersion,
-      maxComplexity: (String, Long)
-  ): Either[String, Unit] = {
-    val limit = MaxComplexityByVersion(version)
-    Either.cond(
-      maxComplexity._2 <= limit,
-      (),
-      s"Contract function (${maxComplexity._1}) is too complex: ${maxComplexity._2} > $limit"
-    )
-  }
+      dApp: DApp,
+      maxComplexity: (String, Long),
+      complexities: Map[String, Long],
+      useReducedVerifierLimit: Boolean
+  ): Either[String, Unit] =
+    for {
+      _ <- if (useReducedVerifierLimit) estimateVerifierReduced(dApp, complexities, version) else Right(())
+      limit = MaxComplexityByVersion(version)
+      _ <- Either.cond(
+        maxComplexity._2 <= limit,
+        (),
+        s"Contract function (${maxComplexity._1}) is too complex: ${maxComplexity._2} > $limit"
+      )
+    } yield ()
 
   private def estimateVerifierReduced(
       dApp: DApp,

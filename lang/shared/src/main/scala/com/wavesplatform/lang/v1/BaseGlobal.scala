@@ -178,10 +178,12 @@ trait BaseGlobal {
     } yield (bytes, dApp, maxComplexity, complexities)
 
   def checkContract(
-      complexity: (String, Long),
-      version: StdLibVersion
+    version: StdLibVersion,
+    dApp: DApp,
+    maxComplexity: (String, Long),
+    complexities: Map[String, Long]
   ): Either[String, Unit] =
-    ContractScript.checkComplexity(version, complexity)
+    ContractScript.checkComplexity(version, dApp, maxComplexity, complexities, useReducedVerifierLimit = true)
 
   def decompile(compiledCode: String): Either[ScriptParseError, (String, Dic)] =
     for {

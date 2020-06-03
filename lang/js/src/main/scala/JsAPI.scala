@@ -246,7 +246,7 @@ object JsAPI {
                 "complexityByFunc" -> complexityByFunc.mapValues(c => c: Any).toJSDictionary
               )
               val errorFieldOpt: Seq[(String, Any)] =
-                Global.checkContract(maxComplexityFunc, version)
+                Global.checkContract(version, dApp, maxComplexityFunc, complexityByFunc)
                   .fold(
                     error => Seq("error" -> error),
                     _     => Seq()
