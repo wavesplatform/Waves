@@ -66,7 +66,7 @@ case class TransactionsApiRoute(
   def info: Route = (pathPrefix("info") & get) {
     pathEndOrSingleSlash {
       complete(InvalidTransactionId("Transaction ID was not specified"))
-    } ~ (path(TransactionId) & parameter('bodyBytes.as[Boolean] ? false)) { (id, bodyBytes) =>
+    } ~ (path(TransactionId) & parameter("bodyBytes".as[Boolean] ? false)) { (id, bodyBytes) =>
       commonApi.transactionById(id) match {
         case Some((h, either, succeed)) =>
           complete(txToExtendedJson(either.fold(identity, _._1), bodyBytes) ++ applicationStatus(h, succeed) + ("height" -> JsNumber(h)))
