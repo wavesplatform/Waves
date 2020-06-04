@@ -6,7 +6,6 @@ import java.time.temporal.ChronoUnit
 
 import cats.Show
 import cats.effect.concurrent.Ref
-import cats.syntax.apply._
 import cats.syntax.flatMap._
 import com.wavesplatform.generator.Worker.{EmptyState, Settings, SkipState, State}
 import com.wavesplatform.network.client.NetworkSender
@@ -71,7 +70,7 @@ class Worker(
             .fromFuture(FutureConverters.toScala(httpClient.executeRequest(request).toCompletableFuture))
             .map(r => address -> (Json.parse(r.getResponseBody) \ "balance").as[Long])
         }
-        Task.gather(results).map(_.toMap)
+        Task.parSequence(results).map(_.toMap)
       }
       .onErrorFallbackTo(Task.now(Map()))
 

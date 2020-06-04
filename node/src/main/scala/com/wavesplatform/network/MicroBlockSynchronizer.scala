@@ -8,6 +8,7 @@ import com.wavesplatform.block.MicroBlock
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.settings.SynchronizationSettings.MicroblockSynchronizerSettings
+import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel._
 import monix.eval.{Coeval, Task}
 import monix.execution.CancelableFuture
@@ -17,14 +18,16 @@ import monix.reactive.Observable
 import scala.collection.mutable.{Set => MSet}
 import scala.concurrent.duration.FiniteDuration
 
-object MicroBlockSynchronizer {
+object MicroBlockSynchronizer extends ScorexLogging {
 
-  def apply(settings: MicroblockSynchronizerSettings,
-            peerDatabase: PeerDatabase,
-            lastBlockIdEvents: Observable[ByteStr],
-            microblockInvs: ChannelObservable[MicroBlockInv],
-            microblockResponses: ChannelObservable[MicroBlockResponse],
-            scheduler: SchedulerService): (Observable[(Channel, MicroblockData)], Coeval[CacheSizes]) = {
+  def apply(
+      settings: MicroblockSynchronizerSettings,
+      peerDatabase: PeerDatabase,
+      lastBlockIdEvents: Observable[ByteStr],
+      microblockInvs: ChannelObservable[MicroBlockInv],
+      microblockResponses: ChannelObservable[MicroBlockResponse],
+      scheduler: SchedulerService
+  ): (Observable[(Channel, MicroblockData)], Coeval[CacheSizes]) = {
 
     implicit val schdlr: SchedulerService = scheduler
 
@@ -66,28 +69,54 @@ object MicroBlockSynchronizer {
       task(MicroBlockDownloadAttempts, Set.empty).runAsyncLogErr
     }
 
-    def tryDownloadNext(prevBlockId: ByteStr): Unit = Option(nextInvs.getIfPresent(prevBlockId)).foreach(requestMicroBlock)
+    def tryDownloadNext(prevBlockId: ByteStr): Unit = Option(nextInvs.getIfPresent(prevBlockId)) match {
+      case Some(inv) =>
+        log.trace(s"Found $inv for $prevBlockId")
+        requestMicroBlock(inv)
+      case None =>
+        log.trace(s"Could not find inv for $prevBlockId")
+    }
 
-    lastBlockIdEvents.mapEval(f => Task(tryDownloadNext(f))).executeOn(scheduler).logErr.subscribe()
+    lastBlockIdEvents
+      .mapEval { f =>
+        log.trace(s"Last block id: $f")
+        Task(tryDownloadNext(f))
+      }
+      .executeOn(scheduler)
+      .logErr
+      .subscribe()
 
     microblockInvs
       .mapEval {
         case (ch, mbInv @ MicroBlockInv(_, totalRef, prevRef, _)) =>
+          log.trace(s"About to process $mbInv")
           Task {
-            mbInv.signaturesValid() match {
+            log.trace(s"Validating signatures in $mbInv")
+            val sig = try mbInv.signaturesValid()
+            catch {
+              case t: Throwable =>
+                log.error(s"Error validating signatures")
+                throw t
+            }
+            sig match {
               case Left(err) =>
                 peerDatabase.blacklistAndClose(ch, err.toString)
               case Right(_) =>
+                log.trace(s"Signatures valid, now updating caches")
                 microBlockOwners.get(totalRef, () => MSet.empty) += ch
                 nextInvs.get(prevRef, { () =>
                   BlockStats.inv(mbInv, ch)
                   mbInv
                 })
-                lastBlockId()
-                  .filter(_ == prevRef && !alreadyRequested(totalRef))
-                  .foreach(tryDownloadNext)
+                lastBlockId() match {
+                  case Some(blockId) if blockId == prevRef && !alreadyRequested(totalRef) =>
+                    log.trace(s"About to download $blockId")
+                    tryDownloadNext(blockId)
+                  case other =>
+                    log.trace(s"NOT downloading, lastBlockId=$other, prevRef=$prevRef, alreadyRequested=${alreadyRequested(totalRef)}")
+                }
             }
-          }
+          }.logErr
       }
       .executeOn(scheduler)
       .logErr
