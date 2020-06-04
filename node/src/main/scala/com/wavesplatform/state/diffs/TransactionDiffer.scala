@@ -137,6 +137,7 @@ object TransactionDiffer {
       currentBlockTs: Long,
       skipFailing: Boolean
   ): TracedResult[ValidationError, Diff] = {
+    val alreadySpentComplexity = DiffsCommon.getAccountsComplexity(blockchain, tx)
     val diff = stats.transactionDiffValidation.measureForType(tx.typeId) {
       tx match {
         case gtx: GenesisTransaction           => GenesisTransactionDiff(blockchain.height)(gtx).traced
@@ -159,7 +160,12 @@ object TransactionDiffer {
         case _                                 => UnsupportedTransactionType.asLeft.traced
       }
     }
-    diff.map(d => d.copy(scriptsComplexity = d.scriptsComplexity + DiffsCommon.getAccountsComplexity(blockchain, tx)))
+    diff
+      .map(d => d.copy(scriptsComplexity = d.scriptsComplexity + alreadySpentComplexity))
+      .leftMap {
+        case fte: FailedTransactionError => fte.addComplexity(alreadySpentComplexity)
+        case ve                          => ve
+      }
   }
 
   // insufficient funds related

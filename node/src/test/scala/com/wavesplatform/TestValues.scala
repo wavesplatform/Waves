@@ -35,4 +35,14 @@ object TestValues {
       |""".stripMargin,
     ScriptEstimatorV1
   )
+
+  val Right((rejectAssetScript, rejectAssetScriptComplexity)) = ScriptCompiler.compile(
+    """
+      |{-# STDLIB_VERSION 2 #-}
+      |{-# CONTENT_TYPE EXPRESSION #-}
+      |{-# SCRIPT_TYPE ASSET #-}
+      |false
+      |""".stripMargin,
+    ScriptEstimatorV1
+  )
 }

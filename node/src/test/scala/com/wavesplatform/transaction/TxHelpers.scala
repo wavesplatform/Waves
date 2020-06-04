@@ -32,11 +32,15 @@ object TxHelpers {
       .explicitGet()
 
   def orderV3(orderType: OrderType, asset: Asset, feeAsset: Asset): Order = {
+    orderV3(orderType, asset, Waves, feeAsset)
+  }
+
+  def orderV3(orderType: OrderType, amountAsset: Asset, priceAsset: Asset, feeAsset: Asset): Order = {
     Order.selfSigned(
       TxVersion.V3,
       defaultSigner,
       defaultSigner.publicKey,
-      AssetPair(asset, Waves),
+      AssetPair(amountAsset, priceAsset),
       orderType,
       1,
       1,

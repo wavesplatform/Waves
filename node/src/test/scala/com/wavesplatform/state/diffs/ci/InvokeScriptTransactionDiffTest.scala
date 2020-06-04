@@ -18,6 +18,7 @@ import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.{CREATE_LIST, THROW}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -30,19 +31,20 @@ import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.{BlockchainSettings, GenesisSettings, RewardsSettings, TestFunctionalitySettings, TestSettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
-import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
+import com.wavesplatform.state.diffs.invoke.{InvokeDiffsCommon, InvokeScriptTransactionDiff}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, _}
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
-import org.scalacheck.Gen
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -71,11 +73,12 @@ class InvokeScriptTransactionDiffTest
 
   private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
-      BlockchainFeatures.SmartAccounts.id  -> 0,
-      BlockchainFeatures.SmartAssets.id    -> 0,
-      BlockchainFeatures.Ride4DApps.id     -> 0,
-      BlockchainFeatures.FeeSponsorship.id -> 0,
-      BlockchainFeatures.BlockV5.id        -> 0
+      BlockchainFeatures.SmartAccounts.id   -> 0,
+      BlockchainFeatures.SmartAssets.id     -> 0,
+      BlockchainFeatures.Ride4DApps.id      -> 0,
+      BlockchainFeatures.FeeSponsorship.id  -> 0,
+      BlockchainFeatures.DataTransaction.id -> 0,
+      BlockchainFeatures.BlockV5.id         -> 0
     )
   )
 
@@ -1350,10 +1353,12 @@ class InvokeScriptTransactionDiffTest
   property("can't write entry with key size greater than limit") {
     forAll(for {
       version <- Gen.oneOf(V3, V4)
-      r <- preconditionsAndSetContract(s => writeSetWithKeyLength(s, ContractLimits.MaxKeySizeInBytesByVersion(version) + 1, version), version = version)
+      r <- preconditionsAndSetContract(
+        s => writeSetWithKeyLength(s, ContractLimits.MaxKeySizeInBytesByVersion(version) + 1, version),
+        version = version
+      )
     } yield (r._1, r._2, r._3, version)) {
       case (genesis, setScript, ci, version) =>
-
         val settings =
           if (version == V3) fs
           else fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
@@ -1361,7 +1366,7 @@ class InvokeScriptTransactionDiffTest
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), settings) {
           _ should produce(
             s"Key size = ${ContractLimits.MaxKeySizeInBytesByVersion(version) + 1} bytes " +
-            s"must be less than ${ContractLimits.MaxKeySizeInBytesByVersion(version)}"
+              s"must be less than ${ContractLimits.MaxKeySizeInBytesByVersion(version)}"
           )
         }
     }
@@ -1370,10 +1375,9 @@ class InvokeScriptTransactionDiffTest
   property("can write entry with key size equals limit") {
     forAll(for {
       version <- Gen.oneOf(V3, V4)
-      r <- preconditionsAndSetContract(s => writeSetWithKeyLength(s, ContractLimits.MaxKeySizeInBytesByVersion(version), version), version = version)
+      r       <- preconditionsAndSetContract(s => writeSetWithKeyLength(s, ContractLimits.MaxKeySizeInBytesByVersion(version), version), version = version)
     } yield (r._1, r._2, r._3, version)) {
       case (genesis, setScript, ci, version) =>
-
         val settings =
           if (version == V3) fs
           else fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
@@ -1641,7 +1645,10 @@ class InvokeScriptTransactionDiffTest
           .expects(*)
           .returning(
             Some(
-              SignedBlockHeader(BlockHeader(1, 1, ByteStr.empty, 1, ByteStr.empty, PublicKey(new Array[Byte](32)), Seq(), 1, ByteStr.empty), ByteStr.empty)
+              SignedBlockHeader(
+                BlockHeader(1, 1, ByteStr.empty, 1, ByteStr.empty, PublicKey(new Array[Byte](32)), Seq(), 1, ByteStr.empty),
+                ByteStr.empty
+              )
             )
           )
           .anyNumberOfTimes()
@@ -1976,6 +1983,168 @@ class InvokeScriptTransactionDiffTest
       case (invoke, genesisTxs) =>
         assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) { ei =>
           ei should produce("AccountBalanceError")
+        }
+    }
+  }
+
+  property("counts complexity correctly for failed transactions (validation fails)") {
+    def contract(asset: String): DApp = {
+      val expr = {
+        val script =
+          s"""
+             |{-# STDLIB_VERSION 4 #-}
+             |{-# CONTENT_TYPE DAPP #-}
+             |{-#SCRIPT_TYPE ACCOUNT#-}
+             |
+             |let a = base58'$asset'
+             |
+             |@Callable(inv)
+             |func sameComplexity(i: String) = {
+             | if (i == "throw") then
+             |   throw("Some error")
+             | else if (i == "insufficient fee") then
+             |   [ ${(1 to ContractLimits.MaxCallableActionsAmount).map(i => s"""Issue("Asset $i", "", 100, 8, true, unit, $i)""").mkString(",")} ]
+             | else if (i == "negative amount") then
+             |   [ ScriptTransfer(inv.caller, -1, a) ]
+             | else if (i == "overflow amount") then
+             |   [ ScriptTransfer(inv.caller, ${Long.MaxValue / 2}, a), ScriptTransfer(inv.caller, ${Long.MaxValue / 2 + 1}, a) ]
+             | else if (i == "self payment") then
+             |   [ ScriptTransfer(this, 10, unit) ]
+             | else if (i == "max actions") then
+             |   [ ${(0 to ContractLimits.MaxCallableActionsAmount).map(_ => "ScriptTransfer(inv.caller, 10, a)").mkString(",")} ]
+             | else if (i == "invalid data entries") then
+             |   [ ${(0 to ContractLimits.MaxWriteSetSize).map(x => s"""IntegerEntry("val", $x)""").mkString(",")},ScriptTransfer(inv.caller, 10, a)]
+             | else []
+             |}
+             |
+             |""".stripMargin
+        Parser.parseContract(script).get.value
+      }
+
+      compileContractFromExpr(expr, V4)
+    }
+
+    val scenario =
+      for {
+        master  <- accountGen
+        invoker <- accountGen
+        ts      <- timestampGen
+        fee     <- ciFee(1)
+        gTx1             = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+        gTx2             = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+        (assetScript, _) = ScriptCompiler.compile("false", ScriptEstimatorV3).explicitGet()
+        iTx = IssueTransaction
+          .selfSigned(2.toByte, master, "False asset", "", ENOUGH_AMT, 8, reissuable = true, Some(assetScript), fee, ts + 1)
+          .explicitGet()
+        script = ContractScript(V4, contract(iTx.assetId.toString))
+        ssTx   = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
+        txs = Seq("throw", "insufficient fee", "negative amount", "overflow amount", "self payment", "max actions", "invalid data entries", "ok")
+          .map { arg =>
+            val fc = Terms.FUNCTION_CALL(FunctionHeader.User("sameComplexity"), List(CONST_STRING(arg).explicitGet()))
+            InvokeScriptTransaction
+              .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 4)
+              .explicitGet()
+          }
+      } yield (Seq(gTx1, gTx2, ssTx, iTx), master.toAddress, txs)
+
+    forAll(scenario) {
+      case (genesisTxs, dApp, txs) =>
+        txs.foreach { invokeTx =>
+          assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
+            case (diff, bc) =>
+              val invocationComplexity =
+                InvokeDiffsCommon.getInvocationComplexity(bc, invokeTx, bc.accountScript(dApp).get.complexitiesByEstimator, dApp).explicitGet()
+              diff.scriptsComplexity shouldBe invocationComplexity
+          }
+        }
+    }
+  }
+
+  property("counts complexity correctly for failed transactions (asset script fails)") {
+    val (trueScript, trueComplexity) = {
+      val script = """
+         |{-# STDLIB_VERSION 4 #-}
+         |{-# CONTENT_TYPE EXPRESSION #-}
+         |
+         |true""".stripMargin
+      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()
+    }
+
+    val (falseScript, falseComplexity) = {
+      val script = """
+         |{-# STDLIB_VERSION 4 #-}
+         |{-# CONTENT_TYPE EXPRESSION #-}
+         |
+         |false""".stripMargin
+      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()
+    }
+
+    def contract(assets: Seq[String]): DApp = {
+      val expr = {
+        val script =
+          s"""
+             |{-# STDLIB_VERSION 4 #-}
+             |{-# CONTENT_TYPE DAPP #-}
+             |{-#SCRIPT_TYPE ACCOUNT#-}
+             |
+             |@Callable(inv)
+             |func foo() = {
+             | [ ${assets.map(a => s"""ScriptTransfer(inv.caller, 10, base58'$a')""").mkString(",")} ]
+             |}
+             |
+             |""".stripMargin
+        Parser.parseContract(script).get.value
+      }
+
+      compileContractFromExpr(expr, V4)
+    }
+    val scenario =
+      for {
+        master  <- accountGen
+        invoker <- accountGen
+        ts      <- timestampGen
+        fee     <- ciFee(7)
+        gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+        gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+        isAccountScripted <- Arbitrary.arbBool.arbitrary
+        invokerScriptTx = if (isAccountScripted) Seq(SetScriptTransaction.selfSigned(2.toByte, invoker, Some(trueScript), fee, ts + 1).explicitGet())
+        else Seq.empty
+
+        failAsset <- Gen.choose(1, 6)
+        assetScripts = (1 to 6).map(i => if (i == failAsset) falseScript else trueScript)
+        iTxs = (1 to 6).map { i =>
+          IssueTransaction
+            .selfSigned(2.toByte, master, s"Some asset #$i", "", ENOUGH_AMT, 8, reissuable = true, Some(trueScript), fee, ts + 2)
+            .explicitGet()
+        }
+        tTxs = iTxs.takeRight(3).map { tx =>
+          TransferTransaction
+            .selfSigned(1.toByte, master, invoker.toAddress, IssuedAsset(tx.assetId), ENOUGH_AMT / 2, Waves, fee, None, ts + 3)
+            .explicitGet()
+        }
+        saTxs = assetScripts.zipWithIndex.map {
+          case (sc, i) =>
+            SetAssetScriptTransaction
+              .selfSigned(2.toByte, master, IssuedAsset(iTxs(i).id()), Some(sc), fee, ts + 4)
+              .explicitGet()
+        }
+        complexity = trueComplexity * (failAsset - 1) + falseComplexity + (if (isAccountScripted) trueComplexity else 0L)
+        script     = ContractScript(V4, contract(iTxs.take(4).map(_.assetId.toString)))
+        ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 5).explicitGet()
+        fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
+        payments   = iTxs.takeRight(2).map(tx => Payment(10, IssuedAsset(tx.assetId)))
+        invokeTx = InvokeScriptTransaction
+          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .explicitGet()
+      } yield (Seq(gTx1, gTx2) ++ invokerScriptTx ++ iTxs ++ tTxs ++ saTxs :+ ssTx, invokeTx, master.toAddress, complexity)
+
+    forAll(scenario) {
+      case (genesisTxs, invokeTx, dApp, assetsComplexity) =>
+        assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
+          case (diff, bc) =>
+            val invocationComplexity =
+              InvokeDiffsCommon.getInvocationComplexity(bc, invokeTx, bc.accountScript(dApp).get.complexitiesByEstimator, dApp).explicitGet()
+            invocationComplexity + assetsComplexity shouldBe diff.scriptsComplexity
         }
     }
   }
