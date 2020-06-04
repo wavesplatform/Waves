@@ -61,7 +61,7 @@ object TransactionDiffer {
       _    <- if (verify) validateCommon(blockchain, tx, prevBlockTimestamp, currentBlockTimestamp).traced else success
       _    <- validateFunds(blockchain, tx).traced
       _    <- if (verify) validateProofs(blockchain, tx) else success
-      diff <- transactionDiff(blockchain, tx, currentBlockTimestamp, skipFailing)
+      diff <- transactionDiff(blockchain, tx, currentBlockTimestamp, skipFailing, verifyAssets)
       _    <- validateBalance(blockchain, tx.typeId, diff).traced
       _    <- if (verifyAssets) validateAssets(blockchain, tx) else success
     } yield diff
@@ -116,13 +116,14 @@ object TransactionDiffer {
       blockchain: Blockchain,
       tx: Transaction,
       currentBlockTs: Long,
-      skipFailing: Boolean
+      skipFailing: Boolean,
+      noVerify: Boolean
   ): TracedResult[ValidationError, Diff] =
     stats.transactionDiffValidation.measureForType(tx.typeId) {
       tx match {
         case gtx: GenesisTransaction     => GenesisTransactionDiff(blockchain.height)(gtx).traced
         case ptx: PaymentTransaction     => PaymentTransactionDiff(blockchain)(ptx).traced
-        case ci: InvokeScriptTransaction => InvokeScriptTransactionDiff(blockchain, currentBlockTs, skipExecution = skipFailing)(ci)
+        case ci: InvokeScriptTransaction => InvokeScriptTransactionDiff(blockchain, currentBlockTs, skipExecution = skipFailing, noVerify = noVerify)(ci)
         case etx: ExchangeTransaction    => ExchangeTransactionDiff(blockchain)(etx).traced
         case ptx: ProvenTransaction      => provenTransactionDiff(blockchain, currentBlockTs)(ptx)
         case _                           => UnsupportedTransactionType.asLeft.traced

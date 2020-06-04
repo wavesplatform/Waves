@@ -86,7 +86,8 @@ object InvokeDiffsCommon {
       verifierComplexity: Long,
       tx: InvokeScriptTransaction,
       blockchain: Blockchain,
-      blockTime: Long
+      blockTime: Long,
+      noVerify: Boolean
   ): TracedResult[ValidationError, Diff] = {
     val actionsByType  = actions.groupBy(_.getClass).withDefaultValue(Nil)
     val transferList   = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
@@ -155,7 +156,7 @@ object InvokeDiffsCommon {
 
       paymentsAndFeeDiff = paymentsPart(tx, dAppAddress, feeInfo._2)
 
-      compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey)(actions, paymentsAndFeeDiff).leftMap(asFailedScriptError)
+      compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey)(actions, paymentsAndFeeDiff, noVerify).leftMap(asFailedScriptError)
 
       transfers = compositeDiff.portfolios |+| feeInfo._2.mapValues(_.negate)
 
@@ -285,7 +286,8 @@ object InvokeDiffsCommon {
 
   private def foldActions(sblockchain: Blockchain, blockTime: Long, tx: InvokeScriptTransaction, dAppAddress: Address, pk: PublicKey)(
       ps: List[CallableAction],
-      paymentsDiff: Diff
+      paymentsDiff: Diff,
+      noVerify: Boolean
   ): TracedResult[ValidationError, Diff] =
     ps.foldLeft(TracedResult(paymentsDiff.asRight[ValidationError])) { (diffAcc, action) =>
       diffAcc match {
@@ -311,7 +313,8 @@ object InvokeDiffsCommon {
                       Map(dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount)))
                 )
                 blockchain.assetScript(a) match {
-                  case None => nextDiff.asRight[ValidationError]
+                  case None                => nextDiff.asRight[ValidationError]
+                  case Some(_) if noVerify => nextDiff.asRight[ValidationError]
                   case Some(AssetScriptInfo(script, _)) =>
                     val assetVerifierDiff =
                       if (blockchain.disallowSelfPayment) nextDiff
@@ -409,7 +412,8 @@ object InvokeDiffsCommon {
               pseudoTx: PseudoTx
           ): TracedResult[ValidationError, Diff] =
             blockchain.assetScript(IssuedAsset(assetId)) match {
-              case None => actionDiff
+              case None                => actionDiff
+              case Some(_) if noVerify => actionDiff
               case Some(AssetScriptInfo(script, _)) =>
                 val assetValidationDiff =
                   for {
