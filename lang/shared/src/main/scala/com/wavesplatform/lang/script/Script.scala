@@ -8,7 +8,9 @@ import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
+import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Decompiler
+import com.wavesplatform.lang.v1.compiler.Terms.{BLOCK, DECLARATION, EXPR, FUNC, FUNCTION_CALL, LET, TRUE}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import monix.eval.Coeval
 
@@ -102,4 +104,25 @@ object Script {
   ): Either[String, Long] =
     complexityInfo(script, estimator, useContractVerifierLimit)
       .map(_.verifierComplexity)
+
+  private[script] def constructExprFromFuncAndContext(
+      dec: List[DECLARATION],
+      annotationArgNameOpt: Option[String],
+      funcExpr: FUNC
+  ): EXPR = {
+    val callingFuncExpr =
+      BLOCK(
+        funcExpr,
+        FUNCTION_CALL(FunctionHeader.User(funcExpr.name), List.fill(funcExpr.args.size)(TRUE))
+      )
+    val funcWithContext =
+      annotationArgNameOpt.fold(callingFuncExpr)(
+        annotationArgName =>
+          BLOCK(
+            LET(annotationArgName, TRUE),
+            callingFuncExpr
+          )
+      )
+    dec.foldRight(funcWithContext)((declaration, expr) => BLOCK(declaration, expr))
+  }
 }

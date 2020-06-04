@@ -7,6 +7,7 @@ import com.wavesplatform.lang.directives.Directive.extractDirectives
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveParser, DirectiveSet}
 import com.wavesplatform.lang.script.ScriptPreprocessor
+import com.wavesplatform.lang.v1.BaseGlobal.DAppInfo
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -238,15 +239,17 @@ object JsAPI {
         Global
           .compileContract(input, fullDAppContext(ds.stdLibVersion).compilerContext, version, estimator)
           .map {
-            case (bytes, dApp, maxComplexityFunc @ (_, maxComplexity), complexityByFunc) =>
+            case DAppInfo(bytes, dApp, maxComplexityFunc @ (_, maxComplexity), verifierComplexity, callableComplexities, userFunctionComplexities) =>
               val resultFields: Seq[(String, Any)] = Seq(
-                "result"           -> Global.toBuffer(bytes),
-                "ast"              -> toJs(dApp),
-                "complexity"       -> maxComplexity,
-                "complexityByFunc" -> complexityByFunc.mapValues(c => c: Any).toJSDictionary
+                "result"                   -> Global.toBuffer(bytes),
+                "ast"                      -> toJs(dApp),
+                "complexity"               -> maxComplexity,
+                "verifierComplexity"       -> verifierComplexity,
+                "callableComplexities"     -> callableComplexities.mapValues(c => c: Any).toJSDictionary,
+                "userFunctionComplexities" -> userFunctionComplexities.mapValues(c => c: Any).toJSDictionary,
               )
               val errorFieldOpt: Seq[(String, Any)] =
-                Global.checkContract(version, dApp, maxComplexityFunc, complexityByFunc)
+                Global.checkContract(version, dApp, maxComplexityFunc, callableComplexities)
                   .fold(
                     error => Seq("error" -> error),
                     _     => Seq()

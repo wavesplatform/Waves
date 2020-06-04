@@ -11,6 +11,7 @@ import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
+import com.wavesplatform.lang.v1.BaseGlobal.DAppInfo
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext, ContractCompiler, ExpressionCompiler}
@@ -163,19 +164,24 @@ trait BaseGlobal {
       )
     } yield ()
 
-  type ContractInfo = (Array[Byte], DApp, (String, Long), Map[String, Long])
-
   def compileContract(
       input: String,
       ctx: CompilerContext,
       stdLibVersion: StdLibVersion,
       estimator: ScriptEstimator
-  ): Either[String, ContractInfo] =
+  ): Either[String, DAppInfo] =
     for {
-      dApp                          <- ContractCompiler.compile(input, ctx, stdLibVersion)
-      (maxComplexity, complexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator, includeUserFunctions = true)
-      bytes                         <- serializeContract(dApp, stdLibVersion)
-    } yield (bytes, dApp, maxComplexity, complexities)
+      dApp                                   <- ContractCompiler.compile(input, ctx, stdLibVersion)
+      userFunctionComplexities               <- ContractScript.estimateUserFunctions(stdLibVersion, dApp, estimator)
+      (maxComplexity, annotatedComplexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator)
+      (verifierComplexity, callableComplexities) =
+        dApp.verifierFuncOpt.fold(
+          (0L, annotatedComplexities)
+        )(v =>
+          (annotatedComplexities(v.u.name), annotatedComplexities - v.u.name)
+        )
+      bytes <- serializeContract(dApp, stdLibVersion)
+    } yield DAppInfo(bytes, dApp, maxComplexity, verifierComplexity, callableComplexities, userFunctionComplexities.toMap)
 
   def checkContract(
     version: StdLibVersion,
@@ -255,4 +261,13 @@ object BaseGlobal {
   case class RoundHalfEven() extends Rounds
   case class RoundCeiling()  extends Rounds
   case class RoundFloor()    extends Rounds
+
+  case class DAppInfo(
+    bytes: Array[Byte],
+    dApp: DApp,
+    maxComplexity: (String, Long),
+    verifierComplexity: Long,
+    callableComplexities: Map[String, Long],
+    userFunctionComplexities: Map[String, Long],
+  )
 }
