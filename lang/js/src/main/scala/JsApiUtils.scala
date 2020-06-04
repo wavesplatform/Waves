@@ -162,7 +162,7 @@ package object JsApiUtils {
       "posStart"   -> c.position.start,
       "posEnd"     -> c.position.end,
       "varName"    -> c.newVarName.map(serPartStr).orUndefined,
-      "varTypes"   -> c.types.map(serPartStr).toJSArray,
+      "varTypes"   -> serType(c.types),
       "resultType" -> c.resultType.getOrElse(NOTHING).toString,
       "expr"       -> serExpr(c.expr),
       "ctx"        -> serCtx(simpleCtx)
@@ -197,26 +197,26 @@ package object JsApiUtils {
     }.toJSArray
   }
 
-  def serDec(dec: Expressions.Declaration): js.Object = {
-    def serType(t: Type): js.Object =
-      t match {
-        case Expressions.Single(name, parameter) =>
-          jObj.applyDynamic("apply")(
-            "typeName"  -> serPartStr(name),
-            "typeParam" -> parameter.map(serPartStr).orUndefined
-          )
-        case Expressions.Union(types) =>
-          jObj.applyDynamic("apply")(
-            "isUnion"  -> "true",
-            "typeList" -> types.map(serType).toJSArray
-          )
-        case Expressions.Tuple(types) =>
-          jObj.applyDynamic("apply")(
-            "isTuple"  -> "true",
-            "typeList" -> types.map(serType).toJSArray
-          )
-      }
+  def serType(t: Type): js.Object =
+    t match {
+      case Expressions.Single(name, parameter) =>
+        jObj.applyDynamic("apply")(
+          "typeName"  -> serPartStr(name),
+          "typeParam" -> parameter.map(serPartStr).orUndefined
+        )
+      case Expressions.Union(types) =>
+        jObj.applyDynamic("apply")(
+          "isUnion"  -> "true",
+          "typeList" -> types.map(serType).toJSArray
+        )
+      case Expressions.Tuple(types) =>
+        jObj.applyDynamic("apply")(
+          "isTuple"  -> "true",
+          "typeList" -> types.map(serType).toJSArray
+        )
+    }
 
+  def serDec(dec: Expressions.Declaration): js.Object = {
     def serFuncArg(argName: PART[String], argType: Type): js.Object =
       jObj.applyDynamic("apply")(
         "argName" -> serPartStr(argName),
