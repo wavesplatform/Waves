@@ -192,7 +192,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
   private def createSettings(preActivatedFeatures: (BlockchainFeature, Int)*): FunctionalitySettings =
     TestFunctionalitySettings.Enabled
       .copy(
-        preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }(collection.breakOut),
+        preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }
         blocksForFeatureActivation = 1,
         featureCheckBlocksPeriod = 1
       )
