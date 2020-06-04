@@ -20,7 +20,7 @@ import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.{BlocksTransactionsHelpers, NoShrink, TransactionGen}
-import fastparse.core.Parsed
+import fastparse.Parsed
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}

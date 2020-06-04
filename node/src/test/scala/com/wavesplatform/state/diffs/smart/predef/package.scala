@@ -15,7 +15,7 @@ import com.wavesplatform.transaction.smart.{BlockchainContext, buildThisValue}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{DataTransaction, Transaction}
 import com.wavesplatform.utils.EmptyBlockchain
-import fastparse.core.Parsed.Success
+import fastparse.Parsed.Success
 import monix.eval.Coeval
 import shapeless.Coproduct
 

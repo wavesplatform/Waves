@@ -13,7 +13,7 @@ import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.utils.EmptyBlockchain
-import fastparse.core.Parsed.Success
+import fastparse.Parsed.Success
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
