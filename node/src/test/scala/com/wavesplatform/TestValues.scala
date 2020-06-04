@@ -14,6 +14,8 @@ object TestValues {
   val keyPair: KeyPair   = TxHelpers.defaultSigner
   val address: Address   = keyPair.toAddress
   val asset: IssuedAsset = IssuedAsset(ByteStr(("A" * 32).getBytes("ASCII")))
+  val bigMoney = com.wavesplatform.state.diffs.ENOUGH_AMT
+  val timestamp = System.currentTimeMillis()
   val fee                = 1e6.toLong
 
   val Right((script, scriptComplexity)) = ScriptCompiler.compile(

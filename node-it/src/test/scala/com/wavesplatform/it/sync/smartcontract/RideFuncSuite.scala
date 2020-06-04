@@ -39,8 +39,8 @@ class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
     val scriptSrc =
       s"""
          |match tx {
-         |  case tx : SetScriptTransaction => true
-         |  case other => assetBalance(tx.sender, base58'$asset') > 0
+         |  case _: SetScriptTransaction => true
+         |  case _ => assetBalance(tx.sender, base58'$asset') > 0
          |}
       """.stripMargin
 
@@ -78,8 +78,8 @@ class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
     val udpatedScript =
       s"""
          |match tx {
-         |  case tx : SetScriptTransaction => true
-         |  case other => assetBalance(tx.sender, base58'$asset') >= 900000000 && wavesBalance(tx.sender) >500000000
+         |  case _: SetScriptTransaction => true
+         |  case _ => assetBalance(tx.sender, base58'$asset') >= 900000000 && wavesBalance(tx.sender) >500000000
          |}
       """.stripMargin
 

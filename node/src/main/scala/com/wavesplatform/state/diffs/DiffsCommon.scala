@@ -26,7 +26,7 @@ object DiffsCommon {
       case ptx: ProvenTransaction =>
         tx.checkedAssets.toList
           .flatMap(blockchain.assetScript)
-          .map(_._2)
+          .map(_.complexity)
           .sum
       case _ => 0L
     }

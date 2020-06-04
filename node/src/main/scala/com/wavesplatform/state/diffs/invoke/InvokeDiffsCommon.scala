@@ -160,7 +160,7 @@ object InvokeDiffsCommon {
       transfers = compositeDiff.portfolios |+| feeInfo._2.mapValues(_.negate)
 
       currentTxDiff         = compositeDiff.transactions(tx.id())
-      currentTxDiffWithKeys = currentTxDiff.copy(_2 = currentTxDiff._2 ++ transfers.keys ++ compositeDiff.accountData.keys)
+      currentTxDiffWithKeys = currentTxDiff.copy(affected = currentTxDiff.affected ++ transfers.keys ++ compositeDiff.accountData.keys)
       updatedTxDiff         = compositeDiff.transactions.updated(tx.id(), currentTxDiffWithKeys)
 
       resultSponsorFeeList = {
@@ -312,7 +312,7 @@ object InvokeDiffsCommon {
                 )
                 blockchain.assetScript(a) match {
                   case None => nextDiff.asRight[FailedTransactionError]
-                  case Some((script, complexity)) =>
+                  case Some(AssetScriptInfo(script, complexity)) =>
                     val assetVerifierDiff =
                       if (blockchain.disallowSelfPayment) nextDiff
                       else
@@ -369,8 +369,8 @@ object InvokeDiffsCommon {
                     Diff(
                       tx = itx,
                       portfolios = Map(pk.toAddress -> Portfolio(balance = 0, lease = LeaseBalance.empty, assets = Map(asset -> issue.quantity))),
-                      issuedAssets = Map(asset      -> ((staticInfo, info, volumeInfo))),
-                      assetScripts = Map(asset      -> script.map(script => (script._1, script._2)))
+                      issuedAssets = Map(asset      -> NewAssetInfo(staticInfo, info, volumeInfo)),
+                      assetScripts = Map(asset      -> script.map(script => AssetScriptInfo(script._1, script._2)))
                     )
                 ).leftMap(asFailedScriptError)
             }
@@ -410,7 +410,7 @@ object InvokeDiffsCommon {
           ): TracedResult[FailedTransactionError, Diff] =
             blockchain.assetScript(IssuedAsset(assetId)) match {
               case None => actionDiff
-              case Some((script, complexity)) =>
+              case Some(AssetScriptInfo(script, complexity)) =>
                 val assetValidationDiff =
                   for {
                     result          <- actionDiff

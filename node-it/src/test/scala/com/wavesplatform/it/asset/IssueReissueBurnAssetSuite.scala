@@ -306,8 +306,8 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
     }
 
     "rollback works" in {
-      val acc         = createDapp(script(simpleReissuableAsset))
-      val assetA      = issueValidated(acc, simpleReissuableAsset)
+      val acc   = createDapp(script(simpleReissuableAsset))
+      val assetA = issueValidated(acc, simpleReissuableAsset)
 
       sender.debugStateChangesByAddress(acc, 100).flatMap(_.stateChanges) should matchPattern {
         case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, Nil, None)) if issue.name == simpleReissuableAsset.name =>

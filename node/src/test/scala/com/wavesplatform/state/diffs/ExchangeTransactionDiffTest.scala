@@ -1258,7 +1258,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Tran
     val expr =
       s"""
        |  match tx {
-       |   case o: $caseType => $v
+       |   case _: $caseType => $v
        |   case _ => ${!v}
        |  }
      """.stripMargin

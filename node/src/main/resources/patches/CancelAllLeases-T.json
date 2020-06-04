@@ -1,0 +1,53 @@
+{
+  "balances" : {
+    "3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8" : {
+      "in" : 1000000000000,
+      "out" : -10000000000000
+    },
+    "3MtHNCZA7EdzsLjH8V9FWUmPbV42RGXvNk3" : {
+      "in" : 0,
+      "out" : -100000000
+    },
+    "3MsiHfvFVUULdn8bpVoDQ7JLKKjtPXUrCLT" : {
+      "in" : -100000000,
+      "out" : 0
+    },
+    "3N65xeNsETsQT6NncwpufwVAkTpiabRRpUm" : {
+      "in" : 0,
+      "out" : -800000000
+    },
+    "3NBYqPnTDdGeXCBkegBQzzAVEjPxS478JVj" : {
+      "in" : -3163,
+      "out" : 0
+    },
+    "3MvhHXWL5TCskTpL3XS2euywQaoFyzLWHCu" : {
+      "in" : 0,
+      "out" : -5884000003163
+    },
+    "3MqCsTH9y6nFJEFL81DubDrpKnvreR9M52p" : {
+      "in" : -100000000,
+      "out" : 0
+    },
+    "3N5sUvKLnEUBwk7WFCSjJs8VoiLiuqTs29v" : {
+      "in" : -10000000000000,
+      "out" : 1000000000000
+    },
+    "3MtMoVbAHSitzohEvd6dJGR3kmJZHSePUkS" : {
+      "in" : -500000000,
+      "out" : 200000000
+    },
+    "3N38yU3szhRyJfVaDRQL9m9BtGiYHf4pJvV" : {
+      "in" : -100000000,
+      "out" : 0
+    },
+    "3NBEheVJmcexzJ9itP9KiiC2K6qnGQwpqMg" : {
+      "in" : -5883900000000,
+      "out" : -1000
+    },
+    "3N9JoRvFqR5orj6v3s6NwPSmtPeM57yPRdh" : {
+      "in" : -1000,
+      "out" : 0
+    }
+  },
+  "cancelledLeases" : [ "7517y2CZZZD6HUVy6bAV3R4EV4Zrd7ZtEW2WVawHiAgL", "4Hbi5w3kgh8nysJ31DavCrnnKecgV363MQ7TCDoqtgGV", "CAKWkcjwPD3df4QZr63cD2EjibsyqTf4pnKRQsjiSMam", "HhBunv6ncKgranbXVSV34fytKedw3bbw33PyJiAc98Nn", "CgBBk1LaYncvdmZYr1TLdT4KyLLjLaCXW391xtCHsZXA", "24GZaS72WsfkBewp21jwSQqEMBEzvwbHgkmKum4M64Wg", "D6YJmBUnLNvcEJ4ckdYduKprN78hCJLArkXKnd39Mofi", "9J3CRH94aoar5XrRi1m73SwZbTWx5xtSnR3Kcv8WBZUZ", "HFCeYLJ5LZ6GhwvmzNrBfejBos6xXG7Y37Hwop31y6jF", "yZnLyB9WUJAmYQw1poA5L3LK1kEtX8mAyTM8N9X7zTp", "H4dGT2ShWFzFZCD6q2KngjrTL8seUWhHJDkBwzfmQs25", "D4cYU5bgtsA1wNFSFose2zFEqKgdJX647byADFYnmkyr", "Dv19bBn7Mhc6B8DtepmhfFLTcoj6okYNThk7GSmoTZgv", "GW7dUbzDqbH9fkgXMa5kgJNTW2oCcRco5cAwWvCpfHKS" ]
+}

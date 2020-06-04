@@ -78,7 +78,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
            |{-# STDLIB_VERSION 3 #-}
            |match tx {
            |  case tx:InvokeScriptTransaction => extract(tx.payment).amount > 10
-           |  case tx:TransferTransaction => true
+           |  case _:TransferTransaction => true
            |  case _ => false
            |}""".stripMargin,
               estimator

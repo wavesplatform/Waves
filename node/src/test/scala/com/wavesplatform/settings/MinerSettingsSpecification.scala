@@ -20,7 +20,6 @@ class MinerSettingsSpecification extends FlatSpec with Matchers {
         |    minimal-block-generation-offset: 500ms
         |    max-transactions-in-micro-block: 400
         |    min-micro-block-age: 3s
-        |    max-pack-time: 5s
         |  }
         |}
       """.stripMargin).resolve()

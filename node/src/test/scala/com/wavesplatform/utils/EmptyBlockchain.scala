@@ -5,7 +5,6 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
@@ -68,7 +67,7 @@ case object EmptyBlockchain extends Blockchain {
 
   override def hasAccountScript(address: Address): Boolean = false
 
-  override def assetScript(asset: IssuedAsset): Option[(Script, Long)] = None
+  override def assetScript(asset: IssuedAsset): Option[AssetScriptInfo] = None
 
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = None
 
@@ -77,10 +76,4 @@ case object EmptyBlockchain extends Blockchain {
   override def leaseBalance(address: Address): LeaseBalance = LeaseBalance.empty
 
   override def collectActiveLeases(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = Seq.empty
-
-  /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
-    *
-    * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
-  override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = Map.empty
-
 }

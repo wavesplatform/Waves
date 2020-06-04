@@ -6,16 +6,15 @@ import cats.implicits._
 import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper, MetaMapperStrategyV1}
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
-import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, DApp => DAppType}
+import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, V1, V2, DApp => DAppType}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
-import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
+import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext, ContractCompiler, ExpressionCompiler}
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
@@ -37,6 +36,8 @@ trait BaseGlobal {
   val MaxLiteralLength             = 12 * 1024
   val MaxAddressLength             = 36
   val MaxByteStrSizeForVerifyFuncs = 32 * 1024
+
+  val LetBlockVersions = Set[StdLibVersion](V1, V2)
 
   def base58Encode(input: Array[Byte]): Either[String, String]
   def base58Decode(input: String, limit: Int = MaxLiteralLength): Either[String, Array[Byte]]
@@ -126,31 +127,43 @@ trait BaseGlobal {
   }
 
   val compileExpression =
-    compile(_, _, _, _, _, _, ExpressionCompiler.compile)
+    compile(_, _, _, _, ExpressionCompiler.compile)
 
   val compileDecls =
-    compile(_, _, _, _, _, _, ExpressionCompiler.compileDecls)
+    compile(_, _, _, _, ExpressionCompiler.compileDecls)
 
   private def compile(
       input: String,
       context: CompilerContext,
-      letBlockOnly: Boolean,
-      stdLibVersion: StdLibVersion,
-      isAsset: Boolean,
+      version: StdLibVersion,
       estimator: ScriptEstimator,
       compiler: (String, CompilerContext) => Either[String, EXPR]
-  ): Either[String, (Array[Byte], Terms.EXPR, Long)] =
+  ): Either[String, (Array[Byte], EXPR, Long)] =
     for {
-      ex <- compiler(input, context)
-      illegalBlockVersionUsage = letBlockOnly && com.wavesplatform.lang.v1.compiler.containsBlockV2(ex)
-      _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3")
-      x = serializeExpression(ex, stdLibVersion)
+      expr <- compiler(input, context)
+      bytes = serializeExpression(expr, version)
+      complexity <- ExprScript.estimateExact(expr, version, estimator)
+    } yield (bytes, expr, complexity)
 
-      _          <- ExprScript.estimate(ex, stdLibVersion, ScriptEstimatorV1, !isAsset)
-      complexity <- ExprScript.estimate(ex, stdLibVersion, ScriptEstimatorV2, !isAsset)
-    } yield (x, ex, complexity)
+  def checkExpr(
+      expr: EXPR,
+      complexity: Long,
+      version: StdLibVersion,
+      isAsset: Boolean
+  ): Either[String, Unit] =
+    for {
+      _ <- ExprScript.checkComplexity(version, complexity, !isAsset)
+      illegalBlockVersionUsage =
+        LetBlockVersions.contains(version) &&
+        com.wavesplatform.lang.v1.compiler.containsBlockV2(expr)
+      _ <- Either.cond(
+        !illegalBlockVersionUsage,
+        (),
+        "UserFunctions are only enabled in STDLIB_VERSION >= 3"
+      )
+    } yield ()
 
-  type ContractInfo = (Array[Byte], DApp, Long, Map[String, Long])
+  type ContractInfo = (Array[Byte], DApp, (String, Long), Map[String, Long])
 
   def compileContract(
       input: String,
@@ -159,11 +172,18 @@ trait BaseGlobal {
       estimator: ScriptEstimator
   ): Either[String, ContractInfo] =
     for {
-      dapp       <- ContractCompiler.compile(input, ctx, stdLibVersion)
-      _          <- ContractScript.estimateComplexity(stdLibVersion, dapp, ScriptEstimatorV1)
-      complexity <- ContractScript.estimateComplexity(stdLibVersion, dapp, ScriptEstimatorV2)
-      bytes      <- serializeContract(dapp, stdLibVersion)
-    } yield (bytes, dapp, complexity._1, complexity._2)
+      dApp                          <- ContractCompiler.compile(input, ctx, stdLibVersion)
+      (maxComplexity, complexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator, includeUserFunctions = true)
+      bytes                         <- serializeContract(dApp, stdLibVersion)
+    } yield (bytes, dApp, maxComplexity, complexities)
+
+  def checkContract(
+    version: StdLibVersion,
+    dApp: DApp,
+    maxComplexity: (String, Long),
+    complexities: Map[String, Long]
+  ): Either[String, Unit] =
+    ContractScript.checkComplexity(version, dApp, maxComplexity, complexities, useReducedVerifierLimit = true)
 
   def decompile(compiledCode: String): Either[ScriptParseError, (String, Dic)] =
     for {
