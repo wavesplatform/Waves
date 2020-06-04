@@ -8,7 +8,7 @@ import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveParser, DirectiveSet}
 import com.wavesplatform.lang.script.ScriptPreprocessor
 import com.wavesplatform.lang.v1.BaseGlobal.DAppInfo
-import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.repl.Repl
@@ -121,13 +121,14 @@ object JsAPI {
   @JSExportTopLevel("parseAndCompile")
   def parseAndCompile(
       input: String,
-      libraries: Dictionary[String] = Dictionary.empty
+      estimatorVersion: Int,
+      libraries: Dictionary[String] = Dictionary.empty,
   ): js.Dynamic = {
     val r = for {
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives)
       linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds.imports)
-      compiled    <- parseAndCompileScript(ds, linkedInput)
+      compiled    <- parseAndCompileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVersion - 1))
     } yield compiled
     r.fold(
       e => js.Dynamic.literal("error" -> e),
@@ -135,7 +136,7 @@ object JsAPI {
     )
   }
 
-  private def parseAndCompileScript(ds: DirectiveSet, input: String) = {
+  private def parseAndCompileScript(ds: DirectiveSet, input: String, estimator: ScriptEstimator) = {
     val stdLibVer = ds.stdLibVersion
     val isAsset = ds.scriptType == Asset
     ds.contentType match {
@@ -183,13 +184,14 @@ object JsAPI {
   @JSExportTopLevel("compile")
   def compile(
       input: String,
+      estimatorVersion: Int,
       libraries: Dictionary[String] = Dictionary.empty
   ): js.Dynamic = {
     val r = for {
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives)
       linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds.imports)
-      compiled    <- compileScript(ds, linkedInput)
+      compiled    <- compileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVersion - 1))
     } yield compiled
     r.fold(
       e => js.Dynamic.literal("error" -> e),
@@ -197,9 +199,7 @@ object JsAPI {
     )
   }
 
-  val estimator = ScriptEstimatorV3
-
-  private def compileScript(ds: DirectiveSet, input: String): Either[String, js.Object with js.Dynamic] = {
+  private def compileScript(ds: DirectiveSet, input: String, estimator: ScriptEstimator): Either[String, js.Object with js.Dynamic] = {
     val version = ds.stdLibVersion
     val isAsset = ds.scriptType == Asset
     ds.contentType match {
@@ -215,7 +215,7 @@ object JsAPI {
                 "complexity" -> complexity
               )
               val errorFieldOpt: Seq[(String, Any)] =
-                Global.checkExpr(expr, complexity, version, isAsset)
+                Global.checkExpr(expr, complexity, version, isAsset, estimator)
                   .fold(
                     error => Seq("error" -> error),
                     _     => Seq()
@@ -249,7 +249,7 @@ object JsAPI {
                 "userFunctionComplexities" -> userFunctionComplexities.mapValues(c => c: Any).toJSDictionary,
               )
               val errorFieldOpt: Seq[(String, Any)] =
-                Global.checkContract(version, dApp, maxComplexityFunc, callableComplexities)
+                Global.checkContract(version, dApp, maxComplexityFunc, callableComplexities, estimator)
                   .fold(
                     error => Seq("error" -> error),
                     _     => Seq()
