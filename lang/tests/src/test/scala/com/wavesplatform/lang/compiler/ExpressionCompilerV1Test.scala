@@ -214,12 +214,12 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
         |   case t2: ((Boolean, Int), ByteVector) => t2._1
         | }
         | let c = match b {
-        |   case v1: String         => true
-        |   case v2: (Boolean, Int) => true
+        |   case _: String         => true
+        |   case _: (Boolean, Int) => true
         | }
         | match b {
         |   case _: (Boolean, Int) => true
-        |   case x =>                 true
+        |   case _                 => true
         | }
         |
       """.stripMargin
