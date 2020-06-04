@@ -8,7 +8,6 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
-import com.wavesplatform.mining._
 import com.wavesplatform.network._
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import com.wavesplatform.transaction._
@@ -33,7 +32,6 @@ package object appender extends ScorexLogging {
   private[appender] def processAndBlacklistOnFailure[A, B](
       ch: Channel,
       peerDatabase: PeerDatabase,
-      miner: Miner,
       start: => String,
       success: => String,
       errorPrefix: String
@@ -42,7 +40,6 @@ package object appender extends ScorexLogging {
     f map {
       case Right(maybeNewScore) =>
         log.debug(success)
-        maybeNewScore.foreach(_ => miner.scheduleMining())
         Right(maybeNewScore)
       case Left(ve) =>
         log.warn(s"$errorPrefix: $ve")

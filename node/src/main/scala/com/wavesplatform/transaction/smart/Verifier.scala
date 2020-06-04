@@ -62,7 +62,7 @@ object Verifier extends ScorexLogging {
         case _                  => None
       }
       .foldRight(TracedResult(tx.asRight[ValidationError])) {
-        case (((script, _), id), txr) =>
+        case ((AssetScriptInfo(script, _), id), txr) =>
           txr.flatMap { tx =>
             stats.assetScriptExecution
               .measureForType(tx.typeId)(verifyTx(blockchain, script, tx, Some(id.id)))

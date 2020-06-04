@@ -20,12 +20,15 @@ object TestStorageFactory {
       spendableBalanceChanged: Observer[(Address, Asset)],
       blockchainUpdateTriggers: BlockchainUpdateTriggers
   ): (BlockchainUpdaterImpl, LevelDBWriter) = {
-    val levelDBWriter = new LevelDBWriter(db, spendableBalanceChanged, settings.blockchainSettings, settings.dbSettings) {
+    val levelDBWriter: LevelDBWriter = new LevelDBWriter(db, spendableBalanceChanged, settings.blockchainSettings, settings.dbSettings) {
       override val orderFilter: BloomFilter        = wrappedFilter()
       override val dataKeyFilter: BloomFilter      = wrappedFilter()
       override val wavesBalanceFilter: BloomFilter = wrappedFilter()
       override val assetBalanceFilter: BloomFilter = wrappedFilter()
     }
-    (new BlockchainUpdaterImpl(levelDBWriter, spendableBalanceChanged, settings, time, blockchainUpdateTriggers), levelDBWriter)
+    (
+      new BlockchainUpdaterImpl(levelDBWriter, spendableBalanceChanged, settings, time, blockchainUpdateTriggers, loadActiveLeases(db, _, _)),
+      levelDBWriter
+    )
   }
 }

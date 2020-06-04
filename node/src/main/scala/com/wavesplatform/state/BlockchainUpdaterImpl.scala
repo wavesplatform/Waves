@@ -14,9 +14,8 @@ import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.script.Script
 import com.wavesplatform.metrics.{TxsInBlockchainStats, _}
-import com.wavesplatform.mining.{MiningConstraint, MiningConstraints}
+import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
@@ -35,7 +34,9 @@ class BlockchainUpdaterImpl(
     spendableBalanceChanged: Observer[(Address, Asset)],
     wavesSettings: WavesSettings,
     time: Time,
-    blockchainUpdateTriggers: BlockchainUpdateTriggers
+    blockchainUpdateTriggers: BlockchainUpdateTriggers,
+    collectActiveLeases: (Int, Int) => Seq[LeaseTransaction],
+    miner: Miner = _ => ()
 ) extends Blockchain
     with BlockchainUpdater
     with NG
@@ -203,7 +204,11 @@ class BlockchainUpdaterImpl(
                         miningConstraints.total,
                         verify
                       )
-                      .map(r => Option((r, Nil, reward, hitSource)))
+                      .map { r =>
+                        val refBlockchain = CompositeBlockchain(leveldb, Some(r.diff), Some(block), r.carry, reward, Some(hitSource))
+                        miner.scheduleMining(Some(refBlockchain))
+                        Option((r, Nil, reward, hitSource))
+                      }
                 }
               case Some(ng) =>
                 if (ng.base.header.reference == block.header.reference) {
@@ -281,21 +286,25 @@ class BlockchainUpdaterImpl(
 
                         val liquidDiffWithCancelledLeases = ng.cancelExpiredLeases(referencedLiquidDiff)
 
-                        val diff = BlockDiffer
+                        val referencedBlockchain = CompositeBlockchain(leveldb, Some(liquidDiffWithCancelledLeases), Some(referencedForgedBlock), carry, reward)
+                        val maybeDiff = BlockDiffer
                           .fromBlock(
-                            CompositeBlockchain(leveldb, Some(liquidDiffWithCancelledLeases), Some(referencedForgedBlock), carry, reward),
+                            referencedBlockchain,
                             Some(referencedForgedBlock),
                             block,
                             constraint,
                             verify
                           )
 
-                        diff.map { hardenedDiff =>
+                        maybeDiff.map { differResult =>
+                          val tempBlockchain = CompositeBlockchain(referencedBlockchain, Some(differResult.diff), Some(block), differResult.carry, reward, Some(hitSource))
+                          miner.scheduleMining(Some(tempBlockchain))
+
                           leveldb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
                           BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
                           TxsInBlockchainStats.record(ng.transactions.size)
                           val discardedDiffs = discarded.map(_._2)
-                          Some((hardenedDiff, discardedDiffs, reward, hitSource))
+                          Some((differResult, discardedDiffs, reward, hitSource))
                         }
                       } else {
                         val errorText = s"Forged block has invalid signature. Base: ${ng.base}, requested reference: ${block.header.reference}"
@@ -342,11 +351,14 @@ class BlockchainUpdaterImpl(
     if (leveldb.isFeatureActivated(BlockchainFeatures.LeaseExpiration, newHeight)) {
       val toHeight = newHeight - leveldb.settings.functionalitySettings.leaseExpiration
       val fromHeight = leveldb.featureActivationHeight(BlockchainFeatures.LeaseExpiration.id) match {
-        case Some(activationHeight) if activationHeight == newHeight => 1
-        case _                                                       => toHeight
+        case Some(`newHeight`) =>
+          log.trace(s"Collecting leases created up till height $toHeight")
+          1
+        case _ =>
+          log.trace(s"Collecting leases created at height $toHeight")
+          toHeight
       }
-      log.trace(s"Collecting leases created within [$fromHeight, $toHeight]")
-      leveldb.collectActiveLeases(_ => true)
+      collectActiveLeases(fromHeight, toHeight)
     } else Seq.empty
 
   private def cancelLeases(leaseTransactions: Seq[LeaseTransaction]): Map[ByteStr, Diff] =
@@ -389,6 +401,7 @@ class BlockchainUpdaterImpl(
 
     notifyChangedSpendable(prevNgState, ngState)
     publishLastBlockInfo()
+    miner.scheduleMining()
     result
   }
 
@@ -449,7 +462,7 @@ class BlockchainUpdaterImpl(
               val blockId = ng.createBlockId(microBlock)
               blockchainUpdateTriggers.onProcessMicroBlock(microBlock, detailedDiff, this, blockId)
               ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis, Some(blockId))
-              log.info(s"$microBlock appended with id $blockId")
+              log.info(s"MicroBlock(${blockId.trim} ~> ${microBlock.reference.trim}, txs=${microBlock.transactionData.size}) appended")
               internalLastBlockInfo.onNext(LastBlockInfo(blockId, height, score, ready = true))
 
               for {
@@ -557,7 +570,7 @@ class BlockchainUpdaterImpl(
   }
 
   override def carryFee: Long = readLock {
-    ngState.map(_.carryFee).getOrElse(leveldb.carryFee)
+    ngState.fold(leveldb.carryFee)(_.carryFee)
   }
 
   override def blockHeader(height: Int): Option[SignedBlockHeader] = readLock {
@@ -595,8 +608,8 @@ class BlockchainUpdaterImpl(
   }
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
-  override def balanceOnlySnapshots(address: Address, h: Int, assetId: Asset = Waves): Option[(Int, Long)] = readLock {
-    compositeBlockchain.balanceOnlySnapshots(address, h, assetId)
+  override def balanceAtHeight(address: Address, h: Int, assetId: Asset = Waves): Option[(Int, Long)] = readLock {
+    compositeBlockchain.balanceAtHeight(address, h, assetId)
   }
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = readLock {
@@ -612,29 +625,12 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.hasAccountScript(address)
   }
 
-  override def assetScript(asset: IssuedAsset): Option[(Script, Long)] = readLock {
+  override def assetScript(asset: IssuedAsset): Option[AssetScriptInfo] = readLock {
     compositeBlockchain.assetScript(asset)
   }
 
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = readLock {
     compositeBlockchain.accountData(acc, key)
-  }
-
-  def collectActiveLeases(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] =
-    CompositeBlockchain.collectActiveLeases(leveldb, ngState.map(_.bestLiquidDiff))(filter)
-
-  /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
-    *
-    * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
-  override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = readLock {
-    ngState.fold(leveldb.collectLposPortfolios(pf)) { ng =>
-      val b = Map.newBuilder[Address, A]
-      for ((a, p) <- ng.bestLiquidDiff.portfolios if p.lease != LeaseBalance.empty || p.balance != 0) {
-        pf.runWith(b += a -> _)(a -> this.wavesPortfolio(a))
-      }
-
-      leveldb.collectLposPortfolios(pf) ++ b.result()
-    }
   }
 
   override def transactionHeight(id: ByteStr): Option[Int] = readLock {

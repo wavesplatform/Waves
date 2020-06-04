@@ -14,6 +14,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.UtxSettings
+import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.reader.CompositeBlockchain
@@ -27,6 +28,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{LoggerFacade, Schedulers, ScorexLogging, Time}
+import com.wavesplatform.utx.UtxPool.PackStrategy
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
 import monix.execution.ExecutionModel
@@ -38,7 +40,6 @@ import org.slf4j.LoggerFactory
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.collection.mutable
-import scala.concurrent.duration.{Duration => ScalaDuration, _}
 import scala.util.{Left, Right}
 
 //noinspection ScalaStyle
@@ -64,8 +65,9 @@ class UtxPoolImpl(
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).isDefined) // TODO delete in the future
 
-  private[this] val priorityDiffs        = mutable.LinkedHashSet.empty[Diff]
-  private[this] def priorityTransactions = priorityDiffs.toVector.flatMap(_.transactionsValues)
+  private[this] val priorityDiffs          = mutable.LinkedHashSet.empty[Diff]
+  private[this] def priorityTransactionIds = priorityDiffs.toVector.flatMap(_.transactions.keys)
+  private[this] def priorityTransactions   = priorityDiffs.toVector.flatMap(_.transactionsValues)
 
   override def putIfNew(tx: Transaction): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id()) || priorityDiffs.exists(_.contains(tx.id()))) TracedResult.wrapValue(false)
@@ -184,7 +186,7 @@ class UtxPoolImpl(
 
   private[this] def removeIds(removed: Set[ByteStr]): Unit = priorityDiffs.synchronized {
     val diffsToReset = priorityDiffs.filter(pd => removed.exists(pd.contains))
-    val factRemoved = Set.newBuilder[Transaction]
+    val factRemoved  = Set.newBuilder[Transaction]
     diffsToReset.foreach { diff =>
       val fullyReset: Boolean = diff.transactions.keySet.forall(removed)
       diff.transactionsValues.foreach { tx =>
@@ -193,7 +195,7 @@ class UtxPoolImpl(
       }
       if (!fullyReset) {
         log.warn(s"Priority $diff is partially reset")
-        val txsToAdd = diff.transactions.filterKeys(!removed(_)).values.map(_._1)
+        val txsToAdd = diff.transactions.filterKeys(!removed(_)).values.map(_.transaction)
         txsToAdd.foreach(addTransaction(_, verify = false))
       }
     }
@@ -274,25 +276,38 @@ class UtxPoolImpl(
 
   override def packUnconfirmed(
       initialConstraint: MultiDimensionalMiningConstraint,
-      maxPackTime: ScalaDuration
+      strategy: PackStrategy,
+      cancelled: () => Boolean
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
-    pack(TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime()))(initialConstraint, maxPackTime)
+    pack(TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime()))(initialConstraint, strategy, cancelled)
   }
 
   private def cleanUnconfirmed(): Unit =
     pack(TransactionDiffer.skipFailing(blockchain.lastBlockTimestamp, time.correctedTime()))(
       MultiDimensionalMiningConstraint.unlimited,
-      ScalaDuration.Inf
+      PackStrategy.Unlimited,
+      () => false
     )
 
   private def pack(differ: (Blockchain, Transaction) => TracedResult[ValidationError, Diff])(
       initialConstraint: MultiDimensionalMiningConstraint,
-      maxPackTime: ScalaDuration
+      strategy: PackStrategy,
+      cancelled: () => Boolean
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
 
     val packResult = PoolMetrics.packTimeStats.measure {
-      val startTime                   = nanoTimeSource()
-      def isTimeLimitReached: Boolean = maxPackTime.isFinite() && (nanoTimeSource() - startTime) >= maxPackTime.toNanos
+      val startTime = nanoTimeSource()
+
+      def isTimeLimitReached: Boolean = strategy match {
+        case PackStrategy.Limit(time)    => (nanoTimeSource() - startTime) >= time.toNanos
+        case PackStrategy.Estimate(time) => (nanoTimeSource() - startTime) >= time.toNanos
+        case PackStrategy.Unlimited      => false
+      }
+
+      def isTimeEstimateReached: Boolean = strategy match {
+        case PackStrategy.Estimate(time) => (nanoTimeSource() - startTime) >= time.toNanos
+        case _                           => true
+      }
 
       def packIteration(prevResult: PackResult, sortedTransactions: Iterator[TxEntry]): PackResult =
         sortedTransactions
@@ -302,7 +317,7 @@ class UtxPoolImpl(
               def isLimitReached   = r.transactions.exists(_.nonEmpty) && isTimeLimitReached
               def isAlreadyRemoved = !priority && !transactions.containsKey(tx.id())
 
-              if (r.constraint.isFull || isLimitReached || isAlreadyRemoved)
+              if (r.constraint.isFull || isLimitReached || isAlreadyRemoved || cancelled())
                 r // don't run any checks here to speed up mining
               else if (TxCheck.isExpired(tx)) {
                 log.debug(s"Transaction ${tx.id()} expired")
@@ -330,7 +345,14 @@ class UtxPoolImpl(
                           validatedTransactions = r.validatedTransactions + tx.id()
                         )
                       } else {
-                        log.trace(s"Packing transaction ${tx.id()}")
+                        newDiff.errorMessage(tx.id()) match {
+                          case Some(ErrorMessage(code, text)) =>
+                            log.trace(s"Packing transaction ${tx.id()} as failed due to $code: $text")
+
+                          case None =>
+                            log.trace(s"Packing transaction ${tx.id()}")
+                        }
+
                         PackResult(
                           Some(r.transactions.fold(Seq(tx))(tx +: _)),
                           r.totalDiff.combine(newDiff),
@@ -365,19 +387,33 @@ class UtxPoolImpl(
 
       @tailrec
       def loop(seed: PackResult): PackResult = {
-        if (isTimeLimitReached && seed.transactions.exists(_.nonEmpty) || (transactions.isEmpty && priorityTransactions.isEmpty)) seed
-        else {
-          val newSeed = packIteration(
-            seed.copy(checkedAddresses = Set.empty),
-            this.createTxEntrySeq().iterator
-          )
-          if (newSeed.constraint.isFull) {
-            log.trace(s"Block is full: ${newSeed.constraint}")
-            newSeed
-          } else if (transactions.keys().asScala.forall(newSeed.validatedTransactions)) {
+        def allValidated(seed: PackResult) = (transactions.keys().asScala ++ priorityTransactionIds).forall(seed.validatedTransactions)
+
+        val newSeed = packIteration(
+          seed.copy(checkedAddresses = Set.empty),
+          this.createTxEntrySeq().iterator
+        )
+        if (newSeed.constraint.isFull) {
+          log.trace(s"Block is full: ${newSeed.constraint}")
+          newSeed
+        } else {
+          if (isTimeEstimateReached && allValidated(newSeed)) {
             log.trace("No more transactions to validate")
             newSeed
-          } else loop(newSeed)
+          } else {
+            val continue = try {
+              while (!cancelled() && !isTimeEstimateReached && allValidated(newSeed)) Thread.sleep(200)
+              !cancelled() && !isTimeEstimateReached
+            } catch {
+              case _: InterruptedException =>
+                false
+            }
+            if (continue) loop(newSeed)
+            else {
+              if (cancelled()) log.trace("Pack cancelled")
+              newSeed
+            }
+          }
         }
       }
 
@@ -455,6 +491,7 @@ class UtxPoolImpl(
   }
 
   override def close(): Unit = {
+    import scala.concurrent.duration._
     cleanupScheduler.shutdown()
     cleanupScheduler.awaitTermination(10 seconds)
   }
@@ -465,7 +502,7 @@ class UtxPoolImpl(
 
   private[this] implicit class DiffExt(diff: Diff) {
     def contains(txId: ByteStr): Boolean     = diff.transactions.contains(txId)
-    def transactionsValues: Seq[Transaction] = diff.transactions.values.map(_._1).toVector
+    def transactionsValues: Seq[Transaction] = diff.transactions.values.map(_.transaction).toVector
   }
 
   //noinspection TypeAnnotation

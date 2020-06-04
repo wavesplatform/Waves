@@ -1,19 +1,31 @@
 package com.wavesplatform.state.patch
 
-import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils._
+import com.wavesplatform.state.{Diff, LeaseBalance, Portfolio}
+import play.api.libs.json.Json
 
-object CancelAllLeases extends ScorexLogging {
-  private def invertLeaseInfo(p: Portfolio) = Portfolio(0, LeaseBalance(-p.lease.in, -p.lease.out), Map.empty)
+case object CancelAllLeases extends DiffPatchFactory {
+  val height: Int = AddressScheme.current.chainId.toChar match {
+    case 'W' => 462000
+    case 'T' => 51500
+    case _   => 0
+  }
 
-  def apply(blockchain: Blockchain): Diff = {
-    log.info("Collecting all active leases")
-    val leasesToCancel = blockchain.allActiveLeases.map(_.id() -> false).toMap
-    leasesToCancel.foreach(id => log.info(s"Cancelling lease $id"))
-    val portfolios = blockchain.collectLposPortfolios { case (_, p) if p.lease != LeaseBalance.empty => invertLeaseInfo(p) }
-    portfolios.keys.foreach(addr => log.info(s"Resetting lease balance for $addr"))
-    log.info("Finished collecting all active leases")
+  private[patch] case class CancelledLeases(balances: Map[String, LeaseBalance], cancelledLeases: Set[String])
+  private[patch] object CancelledLeases {
+    implicit val jsonFormat = Json.format[CancelledLeases]
+  }
 
-    Diff.empty.copy(portfolios = portfolios, leaseState = leasesToCancel)
+  def apply(): Diff = {
+    val patch = PatchLoader.read[CancelledLeases](this)
+    val pfs = patch.balances.map {
+      case (address, lb) =>
+        Address.fromString(address).explicitGet() -> Portfolio(lease = lb)
+    }
+    val leasesToCancel = patch.cancelledLeases.map(str => ByteStr.decodeBase58(str).get)
+
+    Diff.empty.copy(portfolios = pfs, leaseState = leasesToCancel.map(_ -> false).toMap)
   }
 }

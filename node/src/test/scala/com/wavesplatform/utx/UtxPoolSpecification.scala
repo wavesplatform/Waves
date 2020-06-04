@@ -37,6 +37,7 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTran
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Transaction, _}
 import com.wavesplatform.utils.Time
+import com.wavesplatform.utx.UtxPool.PackStrategy
 import monix.execution.Scheduler
 import monix.reactive.subjects.PublishSubject
 import org.iq80.leveldb.DB
@@ -423,7 +424,7 @@ class UtxPoolSpecification
 
         val maxNumber             = Math.max(utx.all.size / 2, 3)
         val rest                  = limitByNumber(maxNumber)
-        val (packed, restUpdated) = utx.packUnconfirmed(rest, 5.seconds)
+        val (packed, restUpdated) = utx.packUnconfirmed(rest, PackStrategy.Unlimited)
 
         packed.get.lengthCompare(maxNumber) should be <= 0
         if (maxNumber <= utx.all.size) restUpdated shouldBe 'full
@@ -436,7 +437,7 @@ class UtxPoolSpecification
 
         time.advance(maxAge + 1000.millis)
 
-        val (packed, _) = utx.packUnconfirmed(limitByNumber(100), 5.seconds)
+        val (packed, _) = utx.packUnconfirmed(limitByNumber(100), PackStrategy.Unlimited)
         packed shouldBe 'empty
         utx.all shouldBe 'empty
     }
@@ -448,7 +449,7 @@ class UtxPoolSpecification
 
         time.advance(offset)
 
-        val (packed, _) = utx.packUnconfirmed(limitByNumber(100), 5.seconds)
+        val (packed, _) = utx.packUnconfirmed(limitByNumber(100), PackStrategy.Unlimited)
         packed.get.size shouldBe 2
         utx.all.size shouldBe 2
     }
@@ -503,7 +504,7 @@ class UtxPoolSpecification
             OneDimensionalMiningConstraint(Block.MaxTransactionsPerBlockVer3, TxEstimators.one, "KeyBlock")
           )
         )
-        val (packed, _) = utx.packUnconfirmed(constraint, 5.seconds)
+        val (packed, _) = utx.packUnconfirmed(constraint, PackStrategy.Unlimited)
         packed.get.size shouldBe (unscripted.size + 1)
         packed.get.count(scripted.contains) shouldBe 1
       }
@@ -534,7 +535,7 @@ class UtxPoolSpecification
           val poolSizeBefore  = utxPool.size
 
           time.advance(maxAge * 2)
-          utxPool.packUnconfirmed(limitByNumber(100), 5.seconds)
+          utxPool.packUnconfirmed(limitByNumber(100), PackStrategy.Unlimited)
 
           poolSizeBefore should be > utxPool.size
           val portfolioAfter = utxPool.pessimisticPortfolio(sender.toAddress)
@@ -643,8 +644,18 @@ class UtxPoolSpecification
             val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings, true, nanoTimeSource = () => nanoTimeSource())
 
             utxPool.putIfNew(transfer).resultE.explicitGet()
-            val (tx, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, 100.nanos)
+            val (tx, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Limit(100 nanos))
             tx.get should contain(transfer)
+        }
+
+        "retries until estimate" in withDomain() { d =>
+          val settings =
+            UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
+          val utxPool     = new UtxPoolImpl(ntpTime, d.blockchainUpdater, ignoreSpendableBalanceChanged, settings, true)
+          val startTime   = System.nanoTime()
+          val (result, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Estimate(3 seconds))
+          result shouldBe None
+          (System.nanoTime() - startTime).nanos.toMillis shouldBe 3000L +- 1000
         }
       }
     }
@@ -685,7 +696,7 @@ class UtxPoolSpecification
 
             utx.putIfNew(tx1).resultE shouldBe 'right
             all(rest.map(utx.putIfNew(_).resultE)) shouldBe 'right
-            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf) should matchPattern {
+            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited) should matchPattern {
               case (Some(Seq(`tx1`)), _) => // Success
             }
             utx.all shouldBe Seq(tx1)
@@ -762,11 +773,11 @@ class UtxPoolSpecification
           utx
             .packUnconfirmed(
               MultiDimensionalMiningConstraint(NonEmptyList.of(OneDimensionalMiningConstraint(1, TxEstimators.one, ""))),
-              Duration.Inf
+              PackStrategy.Unlimited
             )
             ._1 shouldBe Some(minedTxs.head +: Nil)
           val expectedTxs = minedTxs :+ tx1
-          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(expectedTxs)
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(expectedTxs)
           utx.all shouldBe expectedTxs
           assertPortfolios(utx, expectedTxs)
 
@@ -779,7 +790,7 @@ class UtxPoolSpecification
           val expectedTxs1 = right :+ tx1
           assertPortfolios(utx, expectedTxs1)
           all(right.map(utx.putIfNew(_).resultE)) shouldBe Right(false)
-          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(expectedTxs1)
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(expectedTxs1)
           utx.all shouldBe expectedTxs1
           assertPortfolios(utx, expectedTxs1)
 
@@ -792,7 +803,7 @@ class UtxPoolSpecification
 
           utx.removeAll(expectedTxs2)
           utx.all shouldBe empty
-          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe empty
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe empty
           all(expectedTxs2.map(tx => utx.pessimisticPortfolio(tx.sender.toAddress))) shouldBe empty
       }
 
@@ -814,7 +825,7 @@ class UtxPoolSpecification
           utx.addPriorityTxs(nonScripted)
           all(nonScripted.map(utx.putIfNew(_).resultE)) shouldBe 'right
           utx.invokePrivate(nonPriorityTransactions()) shouldBe empty
-          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(nonScripted)
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(nonScripted)
           utx.invokePrivate(nonPriorityTransactions()) shouldBe empty
       }
 
@@ -833,7 +844,7 @@ class UtxPoolSpecification
           utx.addPriorityTxs(nonScripted)
           all(nonScripted.map(utx.putIfNew(_).resultE)) shouldBe Right(false)
           val expectedTxs = nonScripted.sorted(TransactionsOrdering.InUTXPool)
-          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(expectedTxs)
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(expectedTxs)
           utx.invokePrivate(nonPriorityTransactions()) shouldBe expectedTxs
       }
 
@@ -856,7 +867,7 @@ class UtxPoolSpecification
           utx.addPriorityTxs(Seq(tx1))
           utx.invokePrivate(putNewTx(tx2, false)).resultE shouldBe 'right
           utx.invokePrivate(nonPriorityTransactions()) shouldBe Seq(tx2)
-          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(tx1 :: tx2 :: Nil)
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(tx1 :: tx2 :: Nil)
       }
 
       "runs cleanup on priority pool" in forAll(genDependent) {
@@ -921,7 +932,6 @@ class UtxPoolSpecification
               ntpTime,
               stub[InvalidBlockStorage],
               stub[PeerDatabase],
-              stub[Miner],
               scheduler
             )(null, _)
 
@@ -934,18 +944,18 @@ class UtxPoolSpecification
             all(mbs2.head.transactionData.map(utx.putIfNew(_).resultE)) shouldBe 'right
             extAppender(Seq(block2)).runSyncUnsafe() shouldBe 'right
             val expectedTxs1 = mbs1.last.transactionData ++ mbs2.head.transactionData.sorted(TransactionsOrdering.InUTXPool)
-            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(expectedTxs1)
+            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(expectedTxs1)
 
             all(mbs2.map(microBlockAppender(_).runSyncUnsafe())) shouldBe 'right
-            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(mbs1.last.transactionData)
+            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(mbs1.last.transactionData)
 
             extAppender(Seq(block3)).runSyncUnsafe() shouldBe 'right
-            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(mbs1.last.transactionData)
+            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(mbs1.last.transactionData)
 
             // Not supported at the moment
             //extAppender(Seq(block4)).runSyncUnsafe() shouldBe 'right
             //val expectedTxs2 = mbs1.flatMap(_.transactionData) ++ mbs2.head.transactionData ++ block3.transactionData
-            //utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(expectedTxs2)
+            //utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(expectedTxs2)
             utx.close()
           }
       }
@@ -962,7 +972,7 @@ class UtxPoolSpecification
           utx.addPriorityTxs(Seq(tx1))
           utx.invokePrivate(putNewTx(tx2, true)).resultE shouldBe 'right
           utx.invokePrivate(nonPriorityTransactions()) shouldBe Seq(tx2)
-          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(tx1 :: tx2 :: Nil)
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(tx1 :: tx2 :: Nil)
       }
     }
 
@@ -1015,7 +1025,7 @@ class UtxPoolSpecification
                 case UtxEvent.TxAdded(`validTransfer`, `validTransferDiff`) +: Nil => // Pass
               }
 
-              utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)
+              utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)
               assertEvents {
                 case UtxEvent.TxRemoved(`invalidTransfer`, Some(_)) +: Nil => // Pass
               }
@@ -1028,7 +1038,7 @@ class UtxPoolSpecification
               addUnverified(validTransfer)
               events.clear()
               time.advance(maxAge + 1000.millis)
-              utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)
+              utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)
               assertEvents {
                 case UtxEvent.TxRemoved(`validTransfer`, Some(GenericError("Expired"))) +: Nil => // Pass
               }

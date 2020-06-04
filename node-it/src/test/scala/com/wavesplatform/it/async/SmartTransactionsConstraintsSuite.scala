@@ -31,34 +31,20 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
          |}
          |
          |waves {
-         |  network.enable-peers-exchange = no
-         |
-         |  miner {
-         |    quorum = 0
-         |    minimal-block-generation-offset = 60000ms
-         |    micro-block-interval = 3s
-         |    max-transactions-in-key-block = 0
-         |    max-transactions-in-micro-block = 500
-         |  }
+         |  miner.quorum = 0
          |
          |  blockchain.custom {
          |    functionality {
-         |      feature-check-blocks-period = 1
-         |      blocks-for-feature-activation = 1
-         |
          |      pre-activated-features {
          |        2: 0
          |        4: 0
          |        11: 100500
          |      }
          |    }
-         |
-         |    store-transactions-in-state = false
          |  }
-         |
-         |  features.supported = [2, 4]
          |}""".stripMargin
-      ))
+      )
+    )
     .withDefault(1)
     .build(false)
 

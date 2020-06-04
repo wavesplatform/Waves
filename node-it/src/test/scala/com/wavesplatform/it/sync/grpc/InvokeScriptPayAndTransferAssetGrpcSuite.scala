@@ -41,7 +41,7 @@ class InvokeScriptPayAndTransferAssetGrpcSuite extends GrpcBaseTransactionSuite 
       .id()
       .toString
 
-    val scriptText  = "match tx {case t:TransferTransaction => false case _ => true}"
+    val scriptText  = "match tx {case _:TransferTransaction => false case _ => true}"
     val smartScript = Right(Some(ScriptCompiler.compile(scriptText, estimator).explicitGet()._1))
     rejAssetId = PBTransactions
       .vanilla(

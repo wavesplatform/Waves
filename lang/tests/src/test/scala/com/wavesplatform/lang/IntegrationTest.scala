@@ -115,7 +115,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val src =
       """
         |match p {
-        |  case pa: PointA => let x = 3
+        |  case _: PointA => let x = 3
         |  case _ => throw()
         |}
       """.stripMargin
@@ -125,9 +125,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("Exception handling") {
     val sampleScript =
       """match fn1(p) {
-        |  case pa: PointA => 0
-        |  case pa: PointB => 1
-        |  case pa: PointC => 2
+        |  case _: PointA => 0
+        |  case _: PointB => 1
+        |  case _: PointC => 2
         |}""".stripMargin
     eval[EVALUATED](sampleScript, Some(pointAInstance)) should produce(
       "An error during run <fn1(value: PointA|PointB|PointC): PointA|PointB|PointC>: class java.lang.Exception test exception"
@@ -137,9 +137,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("Security Exception handling") {
     val sampleScript =
       """match fn2(p) {
-        |  case pa: PointA => 0
-        |  case pa: PointB => 1
-        |  case pa: PointC => 2
+        |  case _: PointA => 0
+        |  case _: PointB => 1
+        |  case _: PointC => 2
         |}""".stripMargin
     eval[EVALUATED](sampleScript, Some(pointAInstance)) should produce(
       "An access to <fn2(value: PointA|PointB|PointC): PointA|PointB|PointC> is denied"
@@ -149,9 +149,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("patternMatching") {
     val sampleScript =
       """match p {
-        |  case pa: PointA => 0
-        |  case pa: PointB => 1
-        |  case pa: PointC => 2
+        |  case _: PointA => 0
+        |  case _: PointB => 1
+        |  case _: PointC => 2
         |}""".stripMargin
     eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
     eval[EVALUATED](sampleScript, Some(pointBInstance)) shouldBe evaluated(1)
@@ -160,8 +160,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("patternMatching with named union types") {
     val sampleScript =
       """match p {
-        |  case pa: PointA => 0
-        |  case pa: PointBC => 1
+        |  case _: PointA => 0
+        |  case _: PointBC => 1
         |}""".stripMargin
     eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
     eval[EVALUATED](sampleScript, Some(pointBInstance)) shouldBe evaluated(1)
@@ -324,7 +324,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |
         |match a {
         | case x: Int => x
-        | case y: String => 2
+        | case _: String => 2
         |}""".stripMargin) shouldBe evaluated(1)
   }
 
@@ -337,7 +337,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |      case pc: PointC => pc.YB
         |    }
         |  }
-        |  case other => throw()
+        |  case _ => throw()
         |}""".stripMargin
     eval[EVALUATED](sampleScript, Some(pointBInstance)) shouldBe evaluated(3)
     eval[EVALUATED](sampleScript, Some(pointCInstance)) shouldBe evaluated(42)
@@ -347,7 +347,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val sampleScript =
       """match (p.YB) {
         | case l: Int => l
-        | case u: Unit => 1
+        | case _: Unit => 1
         | }
       """.stripMargin
     eval[EVALUATED](sampleScript, Some(pointCInstance), CorD) shouldBe evaluated(42)
@@ -363,9 +363,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val script =
       """
         |let result = match p {
-        |  case a: PointA => 0
-        |  case b: PointB => throw()
-        |  case c: PointC => throw("arrgh")
+        |  case _: PointA => 0
+        |  case _: PointB => throw()
+        |  case _: PointC => throw("arrgh")
         |}
         |result
       """.stripMargin
@@ -1122,10 +1122,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          | let n = "qqq" :: l
          | match n[1] {
          |   case i: Int => i == 1
-         |   case s: String => false
+         |   case _: String => false
          | } &&
          | match n[0] {
-         |   case i: Int => false
+         |   case _: Int => false
          |   case s: String => s == "qqq"
          | }
       """.stripMargin
@@ -1765,7 +1765,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("makeString") {
     eval(""" ["cat", "dog", "pig"].makeString(", ") """, version = V4) shouldBe CONST_STRING("cat, dog, pig")
     eval(""" [].makeString(", ") """, version = V4) shouldBe CONST_STRING("")
-    eval(""" ["abc"].makeString(", ") """, version = V4) shouldBe CONST_STRING("abc")
+    eval(""" ["abc"].makeString(", ") == "abc" """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
 
     val script = s""" [${s""" "${"a" * 1000}", """ * 32} "${"a" * 704}"].makeString(", ") """
     eval(script, version = V4) should produce("Constructing string size = 32768 bytes will exceed 32767")

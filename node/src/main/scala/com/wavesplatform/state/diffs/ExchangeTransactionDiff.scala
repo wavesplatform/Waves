@@ -102,7 +102,7 @@ object ExchangeTransactionDiff {
 
       assetsComplexity = assetIds
         .flatMap(blockchain.assetScript)
-        .map(_._2)
+        .map(_.complexity)
 
       accountsComplexity = List(tx.sender.toAddress, buyer, seller)
         .flatMap(blockchain.accountScript)
