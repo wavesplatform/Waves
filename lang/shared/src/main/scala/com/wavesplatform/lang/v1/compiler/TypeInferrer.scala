@@ -16,7 +16,7 @@ object TypeInferrer {
         val resolved = matchResults.mapValues {
           case h :: Nil => Right(h.tpe)
           case matchResults @ (h :: t) =>
-            val commonType = t.map(_.tpe).toVector.foldLeft(h.tpe)(findCommonType)
+            val commonType = t.map(_.tpe).toVector.foldLeft(h.tpe)(findCommonType(_, _))
             commonType match {
               case NOTHING => Right(NOTHING)
               case commonTuple: TUPLE =>
@@ -132,13 +132,13 @@ object TypeInferrer {
   }
 
   // if-then-else
-  def findCommonType(t1: FINAL, t2: FINAL): FINAL = (t1, t2) match {
+  def findCommonType(t1: FINAL, t2: FINAL, mergeTuples: Boolean = true): FINAL = (t1, t2) match {
     case (t1, NOTHING)        => t1
     case (NOTHING, t2)        => t2
     case (t1, t2) if t1 == t2 => t1
 
     case (LIST(it1), LIST(it2)) => LIST(findCommonType(it1, it2))
-    case (TUPLE(types1), TUPLE(types2)) if types1.length == types2.length =>
+    case (TUPLE(types1), TUPLE(types2)) if mergeTuples && types1.length == types2.length =>
       TUPLE((types1 zip types2).map { case (t1, t2) => findCommonType(t1, t2) })
 
     case (p1: SINGLE, p2: SINGLE) => UNION.create(List(p1, p2))

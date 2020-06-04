@@ -32,6 +32,18 @@ object Types {
   case class UNION(override val typeList: List[REAL], n: Option[String] = None) extends FINAL {
     override lazy val fields = typeList.map(_.fields.toSet).reduce(_ intersect _).toList
     override val name        = if (n.nonEmpty) n.get else typeList.sortBy(_.toString).mkString("|")
+
+    def unfold: UNION = {
+      val unfolded = typeList.flatMap {
+        case t: TUPLE =>
+          t.unfold match {
+            case u: UNION => u.unfold.typeList
+            case single   => List(single)
+          }
+        case single => List(single)
+      }
+      UNION.create(unfolded)
+    }
   }
 
   case class TUPLE(types: List[FINAL]) extends REAL {
@@ -40,6 +52,27 @@ object Types {
 
     override def fields: List[(String, FINAL)] =
       types.mapWithIndex { case (t, i) => s"_${i + 1}" -> t }
+
+    /*
+        (A1 | ... | An, ..., Z1 | ... | Zk)
+                         ||
+                         \/
+        (A1, ..., Z1) | ... | (A1, ..., Zk) | ... | (An, ..., Zk)
+    */
+    def unfold: FINAL = {
+      def combine(accTypes: List[TUPLE], nextTypes: List[REAL]): List[TUPLE] =
+        if (accTypes.isEmpty)
+          nextTypes.map(t => TUPLE(List(t)))
+        else
+          for {
+            a <- accTypes
+            b <- nextTypes
+          } yield TUPLE(a.types :+ b)
+
+      UNION.reduce(UNION.create(
+        types.map(_.typeList).foldLeft(List.empty[TUPLE])(combine)
+      ))
+    }
   }
 
   case class CASETYPEREF(override val name: String, override val fields: List[(String, FINAL)], hideConstructor: Boolean = false) extends REAL {
@@ -68,7 +101,7 @@ object Types {
               .distinct,
             n)
     }
-    def apply(l: REAL*): UNION = create(l.toList)
+    def apply(l: FINAL*): UNION = create(l.toList)
 
     def reduce(u: UNION): FINAL = u.typeList match {
       case Nil      => throw new Exception("Empty union")
@@ -79,7 +112,18 @@ object Types {
 
   implicit class TypeExt(l1: FINAL) {
     def equivalent(l2: FINAL): Boolean = (l1, l2) match {
-      case (l1: UNION, l2: UNION) => l1.typeList.toSet == l2.typeList.toSet
+      case (l1: TUPLE, l2: TUPLE) =>
+        (l1.types.length == l2.types.length) && {
+        val unfolded = l1.unfold
+        if (l1 == unfolded)
+          (l1.types zip l2.types).forall { case (t1, t2) => t1 equivalent t2 }
+        else
+          unfolded equivalent l2.unfold
+    }
+      case (l1: REAL, l2: REAL)   => l1 == l2
+      case (l1: UNION, l2: UNION) =>
+          (l1.unfold.typeList.sortBy(_.name) zip l2.unfold.typeList.sortBy(_.name))
+            .forall { case (t1, t2) => t1 equivalent t2 }
       case (l1: FINAL, l2: FINAL) => l1.union equivalent l2.union
     }
 

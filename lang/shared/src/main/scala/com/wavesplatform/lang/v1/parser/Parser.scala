@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.v1.parser
 
+import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
@@ -186,13 +187,13 @@ object Parser {
       }
   }
 
-  val tupleArgs: P[Seq[EXPR]] =
+  val bracedArgs: P[Seq[EXPR]] =
     comment ~ baseExpr.rep(
       sep = comment ~ "," ~ comment,
       max = ContractLimits.MaxTupleSize
     ) ~ comment
 
-  val bracesOrTuple: P[EXPR] = (Index ~~ P("(") ~ tupleArgs ~ P(")") ~~ Index).map {
+  val bracesOrTuple: P[EXPR] = (Index ~~ P("(") ~ bracedArgs ~ P(")") ~~ Index).map {
     case (_, Seq(expr), _) => expr
     case (s, elements, f) =>
       FUNCTION_CALL(
@@ -213,13 +214,17 @@ object Parser {
   case class Getter(name: PART[String])                  extends Accessor
   case class ListIndex(index: EXPR)                      extends Accessor
 
-  val typesP: P[Seq[PART[String]]] = anyVarName.rep(min = 1, sep = comment ~ "|" ~ comment)
-  val genericTypesP: P[Seq[(PART[String], Option[PART[String]])]] =
-    (anyVarName ~~ ("[" ~~ anyVarName ~~ "]").?).rep(min = 1, sep = comment ~ "|" ~ comment)
-
   val singleTypeP: P[Single] = (anyVarName ~~ ("[" ~~ anyVarName ~~ "]").?).map { case (t, param) => Single(t, param) }
-  val tupleTypeP: P[Tuple]   = ("(" ~ P(singleTypeP | unionTypeP).rep(min = 1, sep = comment ~ "," ~ comment) ~ ")").map(Tuple)
   val unionTypeP: P[Union]   = P(singleTypeP | tupleTypeP).rep(min = 1, sep = comment ~ "|" ~ comment).map(Union)
+  val tupleTypeP: P[Tuple] =
+    ("(" ~
+      P(unionTypeP).rep(
+        min = ContractLimits.MinTupleSize,
+        max = ContractLimits.MaxTupleSize,
+        sep = comment ~ "," ~ comment
+      )
+      ~ ")")
+      .map(Tuple)
 
   val funcP: P[FUNC] = {
     val funcname    = anyVarName
@@ -240,15 +245,30 @@ object Parser {
   }
 
   val matchCaseP: P[MATCH_CASE] = {
+    def checkForGenericAndGetLastPos(t: Type): Either[INVALID, Option[Pos]] =
+      t match {
+        case Single(name, parameter) =>
+          parameter
+            .toLeft(Some(name.position))
+            .leftMap {
+              case VALID(position, v)              => INVALID(position, s"Unexpected generic match type [$v]")
+              case PART.INVALID(position, message) => INVALID(position, message)
+            }
+        case Union(types) =>
+          types.lastOption.flatTraverse(checkForGenericAndGetLastPos)
+        case Tuple(types) =>
+          types.lastOption.flatTraverse(checkForGenericAndGetLastPos)
+      }
+
     val restMatchCaseInvalidP: P[String] = P((!"=>" ~~ AnyChars(1).!).repX.map(_.mkString))
     val varDefP: P[Option[PART[String]]] = anyVarName.map(Some(_)) | "_".!.map(_ => None)
 
     val typesDefP = (
       ":" ~ comment ~
-        (typesP | (Index ~~ restMatchCaseInvalidP ~~ Index).map {
-          case (start, _, end) => Seq(PART.INVALID(Pos(start, end), "the type for variable should be specified: `case varName: Type => expr`"))
+        (unionTypeP | (Index ~~ restMatchCaseInvalidP ~~ Index).map {
+          case (start, _, end) => Single(PART.INVALID(Pos(start, end), "the type for variable should be specified: `case varName: Type => expr`"), None)
         })
-    ).?.map(_.getOrElse(List.empty))
+    ).?.map(_.getOrElse(Union(Seq())))
 
     P(
       Index ~~ "case" ~~ &(border) ~ comment ~/ (
@@ -257,19 +277,25 @@ object Parser {
             case (start, _, end) =>
               (
                 Some(PART.INVALID(Pos(start, end), "invalid syntax, should be: `case varName: Type => expr` or `case _ => expr`")),
-                Seq.empty[PART[String]]
+                Union(Seq())
               )
           }
       ) ~ comment ~ "=>" ~/ baseExpr.? ~~ Index
     ).map {
-      case (start, (v, types), e, end) =>
-        val exprStart = types.lastOption.orElse(v).fold(start)(_.position.end)
-        MATCH_CASE(
-          Pos(start, end),
-          newVarName = v,
-          types = types,
-          expr = e.getOrElse(INVALID(Pos(exprStart, end), "expected expression"))
-        )
+      case (caseStart, (v, types), e, end) =>
+        checkForGenericAndGetLastPos(types)
+          .fold(
+            error => MATCH_CASE(error.position, newVarName = v, types = types, expr = error),
+            { pos =>
+              val exprStart = pos.orElse(v.map(_.position)).fold(caseStart)(_.end)
+              MATCH_CASE(
+                Pos(caseStart, end),
+                newVarName = v,
+                types = types,
+                expr = e.getOrElse(INVALID(Pos(exprStart, end), "expected expression"))
+              )
+            }
+          )
     }
   }
 
@@ -340,11 +366,11 @@ object Parser {
           if (names.length == 1)
             names.map { case (nameStart, nameRaw) =>
               val name = extractName(Pos(nameStart, nameStart), nameRaw)
-              LET(pos, name, value, Seq.empty)
+              LET(pos, name, value)
             }
           else {
             val exprRefName = "$t0" + s"${pos.start}${pos.end}"
-            val exprRef = LET(pos, VALID(pos, exprRefName), value, Nil)
+            val exprRef = LET(pos, VALID(pos, exprRefName), value)
             val tupleValues =
               names.zipWithIndex
                 .map { case ((nameStart, nameRaw), i) =>
@@ -355,7 +381,7 @@ object Parser {
                     REF(namePos, VALID(namePos, exprRefName)),
                     VALID(namePos, s"_${i + 1}")
                   )
-                  LET(pos, name, getter, Nil)
+                  LET(pos, name, getter)
                 }
             exprRef +: tupleValues
           }

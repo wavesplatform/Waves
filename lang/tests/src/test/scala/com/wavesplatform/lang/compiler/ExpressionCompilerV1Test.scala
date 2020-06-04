@@ -204,6 +204,84 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     )
   }
 
+  property("tuple match") {
+    val script =
+      """
+        | let a = if (true) then (1, "abc") else ((true, 1), base58'')
+        | let b = match a {
+        |   case t1: (Int, String)                => t1._2
+        |   case t2: ((Boolean, Int), ByteVector) => t2._1
+        | }
+        | let c = match b {
+        |   case v1: String         => true
+        |   case v2: (Boolean, Int) => true
+        | }
+        | match b {
+        |   case _: (Boolean, Int) => true
+        |   case x =>                 true
+        | }
+        |
+      """.stripMargin
+    val expr = Parser.parseExpr(script).get.value
+    ExpressionCompiler(compilerContextV4, expr) shouldBe 'right
+
+    val script2 =
+      """
+        | let a = if (true) then (1, "abc") else ((true, 1), base58'')
+        | let b = match a {
+        |   case t1: (Int, String)              => t1._2
+        |   case t2: (Boolean, Int, ByteVector) => t2._1
+        | }
+        |
+      """.stripMargin
+    val expr2 = Parser.parseExpr(script2).get.value
+    ExpressionCompiler(compilerContextV4, expr2) should produce(
+      "Matching not exhaustive: " +
+        "possibleTypes are (Int, String), ((Boolean, Int), ByteVector), " +
+        "while matched are (Int, String), (Boolean, Int, ByteVector)"
+    )
+
+    val script3 =
+      """
+        | let a = if (true) then 1 else ("abc", (1, true))
+        | let b = if (true) then if (true) then (1, "abc") else (true, "abc") else (base58'', true, a)
+        |
+        | let c = match b {
+        |   case t1: (Int | Boolean, String)                         => t1._1
+        |   case t2: (ByteVector, Boolean, Int)                      => t2._1
+        |   case t3: (ByteVector, Boolean, (String, (Int, Boolean))) => t3._1
+        | }
+        |
+        | match b {
+        |   case t1: (Int, String)                                         => t1._1
+        |   case t2: (Boolean, String)                                     => t2._1
+        |   case t3: (ByteVector, Boolean, Int | (String, (Int, Boolean))) => t3._1
+        | }
+        |
+      """.stripMargin
+    val expr3 = Parser.parseExpr(script3).get.value
+    ExpressionCompiler(compilerContextV4, expr3) shouldBe 'right
+
+    val script4 =
+      """
+        | let a = if (true) then 1 else ("abc", (1, true))
+        | let b = if (true) then if (true) then (1, "abc") else (true, "abc") else (base58'', true, a)
+        | match b {
+        |   case t1: (Int | Boolean, String)                       => t1._1
+        |   case t2: (ByteVector, Boolean, Int)                    => t2._1
+        |   case t3: (ByteVector, Boolean, (String, Int, Boolean)) => t3._1
+        | }
+        |
+      """.stripMargin
+    val expr4 = Parser.parseExpr(script4).get.value
+    ExpressionCompiler(compilerContextV4, expr4) should produce(
+      "Matching not exhaustive: " +
+        "possibleTypes are (Int, String), (Boolean, String), (ByteVector, Boolean, (String, (Int, Boolean))|Int), " +
+        "while matched are (Boolean|Int, String), (ByteVector, Boolean, Int), (ByteVector, Boolean, (String, Int, Boolean)) " +
+        "in 146-359"
+    )
+  }
+
   treeTypeTest("GETTER")(
     ctx =
       CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> VariableInfo(AnyPos, pointType)), functionDefs = Map.empty),
@@ -296,8 +374,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
         Expressions.IF(AnyPos,
                        Expressions.TRUE(AnyPos),
                        Expressions.CONST_LONG(AnyPos, 1),
-                       Expressions.CONST_STRING(AnyPos, Expressions.PART.VALID(AnyPos, ""))),
-        Seq.empty
+                       Expressions.CONST_STRING(AnyPos, Expressions.PART.VALID(AnyPos, "")))
       ),
       Expressions.FUNCTION_CALL(
         AnyPos,
@@ -408,7 +485,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     ctx = compilerContext,
     expr = Expressions.BLOCK(
       AnyPos,
-      Expressions.LET(AnyPos, Expressions.PART.VALID(AnyPos, "foo"), Expressions.TRUE(AnyPos), Seq.empty),
+      Expressions.LET(AnyPos, Expressions.PART.VALID(AnyPos, "foo"), Expressions.TRUE(AnyPos)),
       Expressions.MATCH(
         AnyPos,
         Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
@@ -496,7 +573,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     ctx = compilerContext,
     expr = Expressions.BLOCK(
       AnyPos,
-      Expressions.LET(AnyPos, Expressions.PART.INVALID(Pos(0, 1), "can't parse"), Expressions.TRUE(AnyPos), Seq.empty),
+      Expressions.LET(AnyPos, Expressions.PART.INVALID(Pos(0, 1), "can't parse"), Expressions.TRUE(AnyPos)),
       Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
     ),
     expectedResult = {
