@@ -266,7 +266,6 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
 
   def waitForEmptyUtx(): Unit = {
     import com.wavesplatform.it.api.SyncHttpApi._
-
     sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
   }
 }

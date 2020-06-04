@@ -99,7 +99,7 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       val burnedQuantity = issuedQuantity * 2
 
       val issuedAssetId =
-        sender.issue(firstKeyPair, s"name+$v", "description", issuedQuantity, decimals, reissuable = false, issueFee).id
+        sender.issue(firstKeyPair, s"name+$v", "description", issuedQuantity, decimals, reissuable = false, issueFee, waitForTx = true).id
 
       nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
 

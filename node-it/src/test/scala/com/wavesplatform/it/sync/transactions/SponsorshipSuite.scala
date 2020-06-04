@@ -393,6 +393,9 @@ class SponsorshipSuite
       }
 
       "make transfer with updated min sponsored fee" in {
+        nodes.waitForEmptyUtx()
+        nodes.waitForHeightArise()
+
         val sponsoredBalance          = sender.accountBalances(sponsorAddress)
         val sponsorFirstAssetBalance  = sender.assetBalance(sponsorAddress, firstSponsorAssetId).balance
         val sponsorSecondAssetBalance = sender.assetBalance(sponsorAddress, secondSponsorAssetId).balance
@@ -408,7 +411,7 @@ class SponsorshipSuite
         nodes.waitForTransaction(transferTxCustomFeeAlice1)
         nodes.waitForTransaction(transferTxCustomFeeAlice2)
         val wavesFee = FeeValidation.FeeUnit * 2 * LargeFee / LargeFee
-        nodes.waitForHeightArise()
+        nodes.waitForEmptyUtx()
 
         sender.assertBalances(sponsorAddress, sponsoredBalance._1 - wavesFee, sponsoredBalance._2 - wavesFee)
         sender.assertAssetBalance(sponsorAddress, firstSponsorAssetId, sponsorFirstAssetBalance + LargeFee)

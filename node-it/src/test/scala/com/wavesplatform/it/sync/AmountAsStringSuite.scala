@@ -3,11 +3,12 @@ package com.wavesplatform.it.sync
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.{Transaction, TransactionInfo}
+import com.wavesplatform.it.api.{Block, Transaction, TransactionInfo}
 import com.wavesplatform.it.sync.transactions.OverflowBlock
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.state.IntegerDataEntry
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.{CreateAliasTransaction, TxVersion}
 import org.asynchttpclient.Response
@@ -95,7 +96,10 @@ class AmountAsStringSuite extends BaseTransactionSuite with OverflowBlock {
       ts + Order.MaxLiveTime,
       matcherFee
     )
+
+    nodes.waitForEmptyUtx()
     nodes.waitForHeightArise()
+    overflowBlock()
     val exchangeTx =
       sender.broadcastExchange(exchanger, buyOrder, sellOrder, amount, price, matcherFee, matcherFee, matcherFee, amountsAsStrings = true)
     checkExchangeTx(exchangeTx)
@@ -126,7 +130,7 @@ class AmountAsStringSuite extends BaseTransactionSuite with OverflowBlock {
   }
 
   test("amount as string in data transaction") {
-    nodes.waitForHeightArise()
+    overflowBlock()
     val dataEntries = List(IntegerDataEntry("int", 666))
     val dataFee     = calcDataFee(dataEntries, TxVersion.V1)
     val dataTx      = sender.putData(sender.keyPair, dataEntries, dataFee, amountsAsStrings = true)
@@ -137,21 +141,20 @@ class AmountAsStringSuite extends BaseTransactionSuite with OverflowBlock {
     sender.utxById(dataTx.id, amountsAsStrings = true).data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
 
     val dataTxHeight = sender.waitForTransaction(dataTx.id).height
-    sender.lastBlock(amountsAsStrings = true).transactions.head.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
-    sender.blockAt(dataTxHeight, amountsAsStrings = true).transactions.head.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
-    sender
-      .blockById(sender.lastBlock().id, amountsAsStrings = true)
-      .transactions
-      .head
-      .data
-      .map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
-    sender
-      .blockSeq(dataTxHeight, dataTxHeight, amountsAsStrings = true)
-      .head
-      .transactions
-      .head
-      .data
-      .map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
+
+    def findValue(block: Block): Any =
+      (for {
+        tx   <- block.transactions
+        data <- tx.data.getOrElse(Nil) if data.key == "int"
+      } yield data.value).head
+
+    findValue(sender.blockAt(dataTxHeight, amountsAsStrings = true)) shouldBe 666
+    findValue(sender.blockById(sender.lastBlock().id, amountsAsStrings = true)) shouldBe 666
+    findValue(
+      sender
+        .blockSeq(dataTxHeight, dataTxHeight, amountsAsStrings = true)
+        .head
+    ) shouldBe 666
 
     sender.transactionInfo[TransactionInfo](dataTx.id, amountsAsStrings = true).data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
     sender.getData(sender.address, amountsAsStrings = true).filter(_.key == "int").head.value shouldBe 666
@@ -163,7 +166,10 @@ class AmountAsStringSuite extends BaseTransactionSuite with OverflowBlock {
       tx.fee shouldBe sponsorFee
     }
     val sponsoredAssetId = sender.issue(sender.keyPair, "sponsor", "", someAssetAmount, 8, waitForTx = true).id
+
+    nodes.waitForEmptyUtx()
     nodes.waitForHeightArise()
+    overflowBlock()
     val sponsorshipTx = sender.sponsorAsset(sender.keyPair, sponsoredAssetId, 10000, sponsorFee, amountsAsStrings = true)
     checkSponsorshipTx(sponsorshipTx)
 
@@ -185,6 +191,7 @@ class AmountAsStringSuite extends BaseTransactionSuite with OverflowBlock {
     sponsorshipTxInfo.fee shouldBe sponsorFee
   }
   test("amount as string in masstransfer transaction") {
+    nodes.waitForEmptyUtx()
     nodes.waitForHeightArise()
     overflowBlock()
 
@@ -199,10 +206,20 @@ class AmountAsStringSuite extends BaseTransactionSuite with OverflowBlock {
     checkMassTransferTx(sender.utx(amountsAsStrings = true).head)
     checkMassTransferTx(sender.utxById(massTransferTx.id, amountsAsStrings = true))
 
-    val massTransferTxHeight           = sender.waitForTransaction(massTransferTx.id).height
-    val massTransferTxBlockAt          = sender.blockAt(massTransferTxHeight, amountsAsStrings = true).transactions.head
-    val massTransferTxBlockBySignature = sender.blockById(sender.blockAt(massTransferTxHeight).id, amountsAsStrings = true).transactions.head
-    val massTransferTxBlockSeq         = sender.blockSeq(massTransferTxHeight, massTransferTxHeight, amountsAsStrings = true).head.transactions.head
+    val massTransferTxHeight = sender.waitForTransaction(massTransferTx.id).height
+    val massTransferTxBlockAt =
+      sender.blockAt(massTransferTxHeight, amountsAsStrings = true).transactions.find(_._type == MassTransferTransaction.typeId).get
+    val massTransferTxBlockBySignature = sender
+      .blockById(sender.blockAt(massTransferTxHeight).id, amountsAsStrings = true)
+      .transactions
+      .find(_._type == MassTransferTransaction.typeId)
+      .get
+    val massTransferTxBlockSeq = sender
+      .blockSeq(massTransferTxHeight, massTransferTxHeight, amountsAsStrings = true)
+      .head
+      .transactions
+      .find(_._type == MassTransferTransaction.typeId)
+      .get
     checkMassTransferTx(massTransferTxBlockAt)
     checkMassTransferTx(massTransferTxBlockBySignature)
     checkMassTransferTx(massTransferTxBlockSeq)

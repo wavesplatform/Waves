@@ -15,6 +15,7 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction, TxVersion}
 import com.wavesplatform.utils.Schedulers
 import com.wavesplatform.utx.UtxPoolImpl
+import monix.eval.Task
 import monix.execution.Scheduler
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{FlatSpec, Matchers}
@@ -45,12 +46,14 @@ class MicroBlockMinerSpec extends FlatSpec with Matchers with PathMockFactory wi
           constraint: MiningConstraint,
           lastMicroBlock: Long
       ): Block = {
-        val task = Task.defer(microBlockMiner.generateOneMicroBlockTask(
-          acc,
-          block,
-          constraint,
-          lastMicroBlock
-        ))
+        val task = Task.defer(
+          microBlockMiner.generateOneMicroBlockTask(
+            acc,
+            block,
+            constraint,
+            lastMicroBlock
+          )
+        )
         import Scheduler.Implicits.global
         val startTime = System.nanoTime()
         val tx = CreateAliasTransaction
