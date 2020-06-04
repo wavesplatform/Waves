@@ -36,7 +36,6 @@ import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
-import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import scala.util.Try
 import scala.util.control.NonFatal
@@ -816,7 +815,7 @@ abstract class LevelDBWriter private[database] (
     .recordStats()
     .build[(Int, AddressId), LeaseBalance]()
 
-  override def balanceOnlySnapshots(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = readOnly { db =>
+  override def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = readOnly { db =>
     db.get(Keys.addressId(address)).flatMap { addressId =>
       assetId match {
         case Waves =>
@@ -844,26 +843,6 @@ abstract class LevelDBWriter private[database] (
         lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalance(addressId)(lh)))
       } yield BalanceSnapshot(wh.max(lh), wb, lb.in, lb.out)
     }
-  }
-
-  override def collectActiveLeases(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = readOnly { db =>
-    val activeLeaseIds = mutable.Set.empty[ByteStr]
-    db.iterateOver(KeyTags.LeaseStatus) { e =>
-      val leaseId = e.getKey.slice(2, e.getKey.length - 4)
-      if (e.getValue.headOption.contains(1.toByte)) {
-        activeLeaseIds += ByteStr(leaseId)
-      } else {
-        activeLeaseIds -= ByteStr(leaseId)
-      }
-    }
-
-    val activeLeaseTransactions = for {
-      leaseId <- activeLeaseIds
-      (h, n)  <- db.get(Keys.transactionHNById(TransactionId(leaseId)))
-      tx      <- db.get(Keys.transactionAt(h, n)).collect { case (lt: LeaseTransaction, true) if filter(lt) => lt }
-    } yield tx
-
-    activeLeaseTransactions.toSeq
   }
 
   def loadScoreOf(blockId: ByteStr): Option[BigInt] = {
