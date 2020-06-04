@@ -2184,19 +2184,20 @@
         "summary": "Compile script",
         "description": "Compiles string code to base64 script representation",
         "operationId": "compileCode_1",
-        "produces": [
-          "application/json"
-        ],
+	"consumes": ["text/plain"],
         "parameters": [
           {
             "in": "body",
             "name": "code",
-            "description": "Script code",
-            "required": true,
+            "description": "Script code with imports",
             "schema": {
               "type": "string"
-            }
+            },
+            "required": true
           }
+        ],
+        "produces": [
+          "application/json"
         ],
         "responses": {
           "200": {
