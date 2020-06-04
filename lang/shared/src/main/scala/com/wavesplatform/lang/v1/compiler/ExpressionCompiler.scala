@@ -355,7 +355,7 @@ object ExpressionCompiler {
             decl match {
               case Expressions.LET(_, _, value, _, _) =>
                 exprContainsRef(value, ref)
-              case Expressions.FUNC(_, _, args, expr) =>
+              case Expressions.FUNC(_, expr, _, args) =>
                 val refIsOverlappedByArg =
                   args.exists {
                     case (PART.VALID(_, name), _) if name == ref => true
