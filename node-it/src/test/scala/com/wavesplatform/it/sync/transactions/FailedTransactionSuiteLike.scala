@@ -111,7 +111,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
               .compile(
                 s"""
                    |match tx {
-                   |  case tx: SetAssetScriptTransaction => true
+                   |  case _: SetAssetScriptTransaction => true
                    |  case _ => $result
                    |}
                    |""".stripMargin,
@@ -141,7 +141,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                    |{-# SCRIPT_TYPE ACCOUNT #-}
                    |
                    |match (tx) {
-                   |  case t: SetScriptTransaction => true
+                   |  case _: SetScriptTransaction => true
                    |  case _ => $r
                    |}
                    |""".stripMargin,
@@ -216,7 +216,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
               .compile(
                 s"""
                    |match tx {
-                   |  case tx: SetAssetScriptTransaction => true
+                   |  case _: SetAssetScriptTransaction => true
                    |  case _ => $result
                    |}
                    |""".stripMargin,
@@ -244,7 +244,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                    |{-# SCRIPT_TYPE ACCOUNT #-}
                    |
                    |match (tx) {
-                   |  case t: SetScriptTransaction => true
+                   |  case _: SetScriptTransaction => true
                    |  case _ => $r
                    |}
                    |""".stripMargin,

@@ -44,6 +44,20 @@ object CompilationError {
   final case class MatchNotExhaustive(start: Int, end: Int, possible: List[TYPE], matched: List[TYPE]) extends CompilationError {
     val message = s"Matching not exhaustive: possibleTypes are $possible, while matched are $matched"
   }
+
+  final case class MultipleDefaultCases(start: Int, end: Int, defaultCasesCount: Int) extends CompilationError {
+    val message = s"Match should have at most one default case, but $defaultCasesCount found"
+  }
+
+  final case class TypeNamedCases(start: Int, end: Int, names: List[String]) extends CompilationError {
+    val message = s"Match case variables should not be named as RIDE types, " +
+      s"but ${names.map(n => s"`$n`").mkString(", ")} found"
+  }
+
+  final case class UnusedCaseVariables(start: Int, end: Int, names: List[String]) extends CompilationError {
+    val message = s"Unused case variable(s) ${names.map(n => s"`$n`").mkString(", ")}"
+  }
+
   final case class AlreadyDefined(start: Int, end: Int, name: String, isFunction: Boolean) extends CompilationError {
     val message =
       if (isFunction) s"Value '$name' can't be defined because function with this name is already defined"
@@ -59,7 +73,7 @@ object CompilationError {
 
   final case class TooLongDeclarationName(start: Int, end: Int, decl: Declaration) extends CompilationError {
     private val declType = decl match {
-      case _: Expressions.LET => "Let"
+      case _: Expressions.LET  => "Let"
       case _: Expressions.FUNC => "Function"
     }
     private val name = decl.name.asInstanceOf[PART.VALID[String]].v
@@ -95,12 +109,12 @@ object CompilationError {
     val message = s"Unexpected type, required: $required, but $found found"
   }
   final case class TypeNotFound(
-                                 start:         Int,
-                                 end:           Int,
-                                 name:          String,
-                                 expectedTypes: List[String],
-                                 varName:       Option[String]
-                               ) extends CompilationError {
+      start: Int,
+      end: Int,
+      name: String,
+      expectedTypes: List[String],
+      varName: Option[String]
+  ) extends CompilationError {
     val message = {
       val varStr = varName.fold("")(v => s" of variable `$v`")
       val expectedTypesStr =

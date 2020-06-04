@@ -36,7 +36,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
       val scriptText =
         s"""
         match tx {
-          case t: Transaction => {
+          case _: Transaction => {
             let A = base58'${acc1.publicKey}'
             let B = base58'${acc2.publicKey}'
             let AC = sigVerify(tx.bodyBytes,tx.proofs[0],A)

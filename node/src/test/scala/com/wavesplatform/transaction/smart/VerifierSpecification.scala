@@ -38,7 +38,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
 
       val scriptText =
         """match tx {
-          |  case o: Order => height >= 0
+          |  case _: Order => height >= 0
           |  case _ => true
           |}""".stripMargin
       val (script, complexity) = ScriptCompiler(scriptText, isAssetScript = false, estimator).explicitGet()

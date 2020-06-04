@@ -256,7 +256,39 @@ object ExpressionCompiler {
       saveExprContext: Boolean
   ): CompileM[CompilationStepResultExpr] =
     for {
-      ctx       <- get[Id, CompilerContext, CompilationError]
+      ctx <- get[Id, CompilerContext, CompilationError]
+      _   <- {
+        val types = ctx.predefTypes.keySet
+        val typeNamedCases =
+          cases.collect {
+            case MATCH_CASE(_, Some(PART.VALID(_, name)), _, _, _, _) if types.contains(name) => name
+          }
+
+        Either.cond(
+          typeNamedCases.isEmpty,
+          (),
+          TypeNamedCases(p.start, p.end, typeNamedCases)
+        ).toCompileM
+      }
+      _   <- {
+        val defaultCasesCount = cases.count(_.types.isEmpty)
+        Either.cond(
+          defaultCasesCount < 2,
+          (),
+          MultipleDefaultCases(p.start, p.end, defaultCasesCount)
+        ).toCompileM
+      }
+      _ <- {
+        val unusedCaseVariables =
+          cases.collect {
+            case MATCH_CASE(_, Some(PART.VALID(_, name)), _, expr, _, _) if !exprContainsRef(expr, name) => name
+          }
+        Either.cond(
+          unusedCaseVariables.isEmpty,
+          (),
+          UnusedCaseVariables(p.start, p.end, unusedCaseVariables)
+        ).toCompileM
+      }
       typedExpr <- compileExprWithCtx(expr, saveExprContext)
       exprTypesWithErr <- (typedExpr.t match {
         case u: UNION => u.pure[CompileM]
@@ -324,6 +356,62 @@ object ExpressionCompiler {
       }
 
     } yield result
+
+  private def exprContainsRef(expr: Expressions.EXPR, ref: String): Boolean =
+    expr match {
+      case Expressions.GETTER(_, expr, _, _, _) =>
+        exprContainsRef(expr, ref)
+
+      case Expressions.BLOCK(_, decl, body, _, _) =>
+        val refIsOverlappedByDecl =
+          decl.name match {
+            case PART.VALID(_, name) if name == ref => true
+            case _ => false
+          }
+        if (refIsOverlappedByDecl) false
+        else {
+          val declContainsRef =
+            decl match {
+              case Expressions.LET(_, _, value, _, _) =>
+                exprContainsRef(value, ref)
+              case Expressions.FUNC(_, _, args, expr) =>
+                val refIsOverlappedByArg =
+                  args.exists {
+                    case (PART.VALID(_, name), _) if name == ref => true
+                    case _ => false
+                  }
+                if (!refIsOverlappedByArg) exprContainsRef(expr, ref)
+                else false
+            }
+          declContainsRef || exprContainsRef(body, ref)
+        }
+
+      case Expressions.IF(_, cond, ifTrue, ifFalse, _, _) =>
+        exprContainsRef(cond, ref)   ||
+        exprContainsRef(ifTrue, ref) ||
+        exprContainsRef(ifFalse, ref)
+
+      case Expressions.FUNCTION_CALL(_, _, args, _, _) =>
+        args.exists(exprContainsRef(_, ref))
+
+      case Expressions.REF(_, PART.VALID(_, name), _, _) if name == ref =>
+        true
+
+      case BINARY_OP(_, a, _, b, _, _) =>
+        exprContainsRef(a, ref) || exprContainsRef(b, ref)
+
+      case Expressions.MATCH(_, matchingExpr, cases, _, _) =>
+        exprContainsRef(matchingExpr, ref) ||
+        cases.exists {
+          case MATCH_CASE(_, Some(PART.VALID(_, varName)), _, caseExpr, _, _) if varName != ref =>
+            exprContainsRef(caseExpr, ref)
+          case MATCH_CASE(_, None, _, caseExpr, _, _) =>
+            exprContainsRef(caseExpr, ref)
+          case _ => false
+        }
+
+      case _ => false
+    }
 
   def compileBlock(
       pos: Expressions.Pos,
