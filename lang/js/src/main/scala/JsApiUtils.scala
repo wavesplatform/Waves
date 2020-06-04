@@ -162,7 +162,7 @@ package object JsApiUtils {
       "posStart"   -> c.position.start,
       "posEnd"     -> c.position.end,
       "varName"    -> c.newVarName.map(serPartStr).orUndefined,
-      "varTypes"   -> serType(c.types),
+      "varTypes"   -> serType(c.caseType),
       "resultType" -> c.resultType.getOrElse(NOTHING).toString,
       "expr"       -> serExpr(c.expr),
       "ctx"        -> serCtx(simpleCtx)

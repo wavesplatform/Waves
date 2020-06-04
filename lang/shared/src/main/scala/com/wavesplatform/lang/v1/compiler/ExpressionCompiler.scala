@@ -262,7 +262,7 @@ object ExpressionCompiler {
         ).toCompileM
       }
       _   <- {
-        val defaultCasesCount = cases.count(_.types.isEmpty)
+        val defaultCasesCount = cases.count(_.caseType.isEmpty)
         Either.cond(
           defaultCasesCount < 2,
           (),
@@ -293,7 +293,7 @@ object ExpressionCompiler {
         case REF(k) => Some(k)
         case _      => None
       }
-      matchTypes <- cases.traverse(c => handleCompositeType(p, c.types, Some(exprTypes), allowShadowVarName))
+      matchTypes <- cases.traverse(c => handleCompositeType(p, c.caseType, Some(exprTypes), allowShadowVarName))
       ifCasesWithErr <- inspectFlat[Id, CompilerContext, CompilationError, Expressions.EXPR](
         updatedCtx => {
           val ref = Expressions.REF(p, PART.VALID(p, refTmpKey), ctxOpt = saveExprContext.toOption(updatedCtx.getSimpleContext()))
@@ -315,7 +315,7 @@ object ExpressionCompiler {
       matchedTypesUnion = UNION.create(matchTypes)
       checkWithErr <-
           Either.cond(
-              (cases.last.types.isEmpty && (exprTypes >= matchedTypesUnion)) || (exprTypes equivalent matchedTypesUnion),
+              (cases.last.caseType.isEmpty && (exprTypes >= matchedTypesUnion)) || (exprTypes equivalent matchedTypesUnion),
               (),
               MatchNotExhaustive(p.start, p.end, exprTypes.typeList, matchTypes)
             )

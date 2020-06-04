@@ -285,13 +285,13 @@ object Parser {
       case (caseStart, (v, types), e, end) =>
         checkForGenericAndGetLastPos(types)
           .fold(
-            error => MATCH_CASE(error.position, newVarName = v, types = types, expr = error),
+            error => MATCH_CASE(error.position, newVarName = v, caseType = types, expr = error),
             { pos =>
               val exprStart = pos.orElse(v.map(_.position)).fold(caseStart)(_.end)
               MATCH_CASE(
                 Pos(caseStart, end),
                 newVarName = v,
-                types = types,
+                caseType = types,
                 expr = e.getOrElse(INVALID(Pos(exprStart, end), "expected expression"))
               )
             }

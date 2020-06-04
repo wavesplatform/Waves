@@ -148,7 +148,7 @@ object Expressions {
   case class MATCH_CASE(
       position: Pos,
       newVarName: Option[PART[String]],
-      types: Type,
+      caseType: Type,
       expr: EXPR,
       resultType: Option[FINAL] = None,
       ctxOpt: CtxOpt = None
