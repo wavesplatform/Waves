@@ -37,7 +37,7 @@ object InvokeScriptTransactionDiff {
   private val stats = TxProcessingStats
   import stats.TxTimerExt
 
-  def apply(blockchain: Blockchain, blockTime: Long, skipExecution: Boolean = false, noVerify: Boolean = false)(
+  def apply(blockchain: Blockchain, blockTime: Long, skipExecution: Boolean = false, verifyAssets: Boolean = false)(
       tx: InvokeScriptTransaction
   ): TracedResult[ValidationError, Diff] = {
 
@@ -140,7 +140,7 @@ object InvokeScriptTransactionDiff {
                 tx,
                 blockchain,
                 blockTime,
-                noVerify
+                verifyAssets
               )
 
               resultDiff <- scriptResult._1 match {

@@ -113,17 +113,17 @@ object TransactionDiffer {
 
   // diff making related
   private def transactionDiff(
-      blockchain: Blockchain,
-      tx: Transaction,
-      currentBlockTs: Long,
-      skipFailing: Boolean,
-      noVerify: Boolean
+                               blockchain: Blockchain,
+                               tx: Transaction,
+                               currentBlockTs: Long,
+                               skipFailing: Boolean,
+                               verifyAssets: Boolean
   ): TracedResult[ValidationError, Diff] =
     stats.transactionDiffValidation.measureForType(tx.typeId) {
       tx match {
         case gtx: GenesisTransaction     => GenesisTransactionDiff(blockchain.height)(gtx).traced
         case ptx: PaymentTransaction     => PaymentTransactionDiff(blockchain)(ptx).traced
-        case ci: InvokeScriptTransaction => InvokeScriptTransactionDiff(blockchain, currentBlockTs, skipExecution = skipFailing, noVerify = noVerify)(ci)
+        case ci: InvokeScriptTransaction => InvokeScriptTransactionDiff(blockchain, currentBlockTs, skipExecution = skipFailing, verifyAssets = verifyAssets)(ci)
         case etx: ExchangeTransaction    => ExchangeTransactionDiff(blockchain)(etx).traced
         case ptx: ProvenTransaction      => provenTransactionDiff(blockchain, currentBlockTs)(ptx)
         case _                           => UnsupportedTransactionType.asLeft.traced
