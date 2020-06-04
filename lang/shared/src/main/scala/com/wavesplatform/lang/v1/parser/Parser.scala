@@ -300,14 +300,10 @@ object Parser {
 
     // Hack to force parse of "\n". Otherwise it is treated as a separator
     def newLineSep(implicit c: fastparse.P[Any]) = {
-//      val rawSep = '\n'
-//      val white = WhitespaceApi.Wrapper {
-//        NoTrace(CharIn((Whitespaces - rawSep).toSeq).rep)
-//      }
-//
-//      import white._
-//      P("" ~ rawSep.toString.rep(min = 1))
-      P("\n").rep(1)
+      def whitespace(implicit c: fastparse.P[Any]) = {
+        CharsWhileIn(" \t\r")
+      }
+      P(whitespace.rep ~~ "\n").repX(1)
     }
 
     P(
