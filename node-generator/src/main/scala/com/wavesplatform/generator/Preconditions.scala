@@ -18,7 +18,7 @@ import com.wavesplatform.utils.Time
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 
-import scala.collection.generic.CanBuildFrom
+import scala.collection.Factory
 
 object Preconditions {
   private[this] val Fee = 1500000L
@@ -169,19 +169,19 @@ object Preconditions {
       config.as[List[CreateAccountP]](s"$path.accounts")(
         traversableReader(
           accountSectionReader,
-          implicitly[CanBuildFrom[Nothing, CreateAccountP, List[CreateAccountP]]]
+          implicitly[Factory[CreateAccountP, List[CreateAccountP]]]
         )
       )
     val assets = config.as[List[IssueP]](s"$path.assets")(
       traversableReader(
         assetSectionReader,
-        implicitly[CanBuildFrom[Nothing, IssueP, List[IssueP]]]
+        implicitly[Factory[IssueP, List[IssueP]]]
       )
     )
     val leases = config.as[List[LeaseP]](s"$path.leases")(
       traversableReader(
         leasingSectionReader,
-        implicitly[CanBuildFrom[Nothing, LeaseP, List[LeaseP]]]
+        implicitly[Factory[LeaseP, List[LeaseP]]]
       )
     )
 
