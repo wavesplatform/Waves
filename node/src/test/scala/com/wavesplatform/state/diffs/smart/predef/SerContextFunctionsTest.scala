@@ -21,7 +21,7 @@ class SerContextFunctionsTest extends PropSpec with PropertyChecks with Matchers
   property("check serialization of script with all functions") {
     val entry1 = IntegerDataEntry("int", 24)
     val entry2 = BooleanDataEntry("bool", true)
-    val entry3 = BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=")))
+    val entry3 = BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=").get))
     val entry4 = StringDataEntry("str", "test")
 
     val dtx = DataTransaction

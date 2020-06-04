@@ -83,7 +83,7 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with P
   private def getAllFuncExpression(version: StdLibVersion): EXPR = {
     val entry1 = IntegerDataEntry("int", 24)
     val entry2 = BooleanDataEntry("bool", true)
-    val entry3 = BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=")))
+    val entry3 = BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=").get))
     val entry4 = StringDataEntry("str", "test")
 
     val dtx = DataTransaction
