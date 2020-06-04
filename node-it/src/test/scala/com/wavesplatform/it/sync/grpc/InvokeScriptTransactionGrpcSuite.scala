@@ -49,7 +49,7 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         | @Verifier(tx)
         | func verify() = {
         |    match tx {
-        |        case TransferTransaction => false
+        |        case _: TransferTransaction => false
         |        case _ => true
         | }
         |}

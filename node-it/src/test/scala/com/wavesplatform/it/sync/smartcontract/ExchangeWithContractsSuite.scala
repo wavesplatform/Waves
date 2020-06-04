@@ -24,12 +24,12 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
   val sc1: Option[String] = Some(s"true")
   val sc2: Option[String] = Some(s"""
                |match tx {
-               |  case s : SetScriptTransaction => true
+               |  case _: SetScriptTransaction => true
                |  case _ => false
                |}""".stripMargin)
   val sc3: Option[String] = Some(s"""
                |match tx {
-               |  case s : SetScriptTransaction => true
+               |  case _: SetScriptTransaction => true
                |  case _ => throw("Some generic error")
                |}""".stripMargin)
 

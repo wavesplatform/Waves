@@ -37,7 +37,7 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
   val duplicateNames =
     """
       |match tx {
-      |  case tx: TransferTransaction => true
+      |  case _: TransferTransaction => true
       |  case _ => false
       |}
     """.stripMargin

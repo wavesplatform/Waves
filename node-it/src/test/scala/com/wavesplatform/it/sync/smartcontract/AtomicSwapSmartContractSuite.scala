@@ -71,7 +71,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         let backToAliceAfterHeight = ((height >= (21 + $beforeHeight)) && (ttx.recipient == Alice))
 
         txToBob || backToAliceAfterHeight
-      case other => false
+      case _ => false
     }""".stripMargin
 
     val pkSwapBC1 = pkByAddress(swapBC1)

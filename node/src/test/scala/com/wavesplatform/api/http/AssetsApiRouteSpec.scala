@@ -8,7 +8,7 @@ import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.network.UtxPoolSynchronizer
-import com.wavesplatform.state.{AssetDescription, Blockchain, Height}
+import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.{NoShrink, TestTime, TestValues, TestWallet, TransactionGen}
@@ -47,7 +47,7 @@ class AssetsApiRouteSpec
       reissuable = smartAssetTx.reissuable,
       totalVolume = smartAssetTx.quantity,
       lastUpdatedAt = Height @@ 0,
-      script = Some((script, Script.estimate(script, ScriptEstimatorV1, useContractVerifierLimit = false).explicitGet())),
+      script = Some(AssetScriptInfo(script, Script.estimate(script, ScriptEstimatorV1, useContractVerifierLimit = false).explicitGet())),
       sponsorship = 0,
       nft = smartAssetTx.decimals == 0 && smartAssetTx.quantity == 1 && !smartAssetTx.reissuable
     )
