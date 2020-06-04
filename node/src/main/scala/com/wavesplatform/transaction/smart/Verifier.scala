@@ -60,12 +60,12 @@ object Verifier extends ScorexLogging {
   def assets(blockchain: Blockchain)(tx: Transaction): TracedResult[(Long, ValidationError), Diff] = {
     @tailrec
     def loop(
-        assets: List[((Script, Long), IssuedAsset)],
+        assets: List[(AssetScriptInfo, IssuedAsset)],
         fullComplexity: Long,
         fullTrace: List[TraceStep]
     ): (Long, TracedResult[ValidationError, Transaction]) = {
       assets match {
-        case ((script, complexity), asset) :: remaining =>
+        case (AssetScriptInfo(script, complexity), asset) :: remaining =>
           val spentComplexity = fullComplexity + complexity
           stats.assetScriptExecution
             .measureForType(tx.typeId)(verifyTx(blockchain, script, tx, Some(asset.id))) match {
