@@ -66,7 +66,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         |         DataEntry("fee",           invocation.fee),
         |         DataEntry("feeAssetId",    match invocation.feeAssetId  {
         |                                      case custom: ByteVector => custom
-        |                                      case waves:  Unit       => base64''
+        |                                      case _:  Unit           => base64''
         |                                    }
         |         )
         |      ]

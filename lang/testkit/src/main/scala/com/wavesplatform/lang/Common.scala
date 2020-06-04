@@ -77,7 +77,7 @@ object Common {
     override def inputEntity   = in()
 
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
-    override def transferTransactionById(id: Array[Byte]): Option[Tx]                                            = ???
+    override def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer]                                   = ???
     override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
     override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
     override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
@@ -85,6 +85,7 @@ object Common {
     override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = ???
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
+    override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails]    = ???
     override def tthis: Recipient.Address                                                                        = ???
     override def multiPaymentAllowed: Boolean                                                                    =  true
     override def txId: ByteStr                                                                                   = ???

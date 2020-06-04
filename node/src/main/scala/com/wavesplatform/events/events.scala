@@ -3,8 +3,7 @@ package com.wavesplatform.events
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.script.Script
-import com.wavesplatform.state.{DataEntry, LeaseBalance}
+import com.wavesplatform.state.{AssetScriptInfo, DataEntry, LeaseBalance}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 
@@ -15,10 +14,10 @@ final case class AssetStateUpdate(
     description: ByteStr,
     reissuable: Boolean,
     volume: BigInt,
-    script: Option[(Script, Long)],
+    script: Option[AssetScriptInfo],
     sponsorship: Option[Long],
     nft: Boolean,
-    assetExistedBefore: Boolean,
+    assetExistedBefore: Boolean
 )
 
 final case class StateUpdate(

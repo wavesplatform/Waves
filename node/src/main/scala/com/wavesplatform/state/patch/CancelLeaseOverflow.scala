@@ -1,29 +1,25 @@
 package com.wavesplatform.state.patch
 
-import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils._
+import com.wavesplatform.state.patch.CancelAllLeases.CancelledLeases
+import com.wavesplatform.state.{Diff, Portfolio}
 
-object CancelLeaseOverflow extends ScorexLogging {
-  def apply(blockchain: Blockchain): Diff = {
-    log.info("Cancelling all lease overflows for sender")
+case object CancelLeaseOverflow extends DiffPatchFactory {
+  val height: Int = AddressScheme.current.chainId.toChar match {
+    case 'W' => 795000
+    case _   => 0
+  }
 
-    val addressesWithLeaseOverflow = blockchain.collectLposPortfolios {
-      case (_, p) if p.balance < p.lease.out => Portfolio(0, LeaseBalance(0, -p.lease.out), Map.empty)
+  def apply(): Diff = {
+    val patch = PatchLoader.read[CancelledLeases](this)
+    val pfs = patch.balances.map {
+      case (address, lb) =>
+        Address.fromString(address).explicitGet() -> Portfolio(lease = lb)
     }
-
-    val addressSet = addressesWithLeaseOverflow.keySet
-    addressSet.foreach(addr => log.info(s"Resetting lease overflow for $addr"))
-
-    val leasesToCancel = concurrent.blocking {
-      blockchain
-        .collectActiveLeases(tx => addressSet(tx.sender.toAddress))
-        .map(_.id())
-        .toVector
-    }
-
-    leasesToCancel.foreach(id => log.info(s"Cancelling lease $id"))
-    log.info("Finished cancelling all lease overflows for sender")
-
-    Diff.empty.copy(portfolios = addressesWithLeaseOverflow, leaseState = leasesToCancel.map(_ -> false).toMap)
+    val leasesToCancel = patch.cancelledLeases.map(str => ByteStr.decodeBase58(str).get)
+    val diff           = Diff.empty.copy(portfolios = pfs, leaseState = leasesToCancel.map(_ -> false).toMap)
+    diff
   }
 }

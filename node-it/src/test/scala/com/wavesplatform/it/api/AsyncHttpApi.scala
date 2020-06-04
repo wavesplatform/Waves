@@ -145,6 +145,9 @@ object AsyncHttpApi extends Assertions {
     def blacklist(address: InetSocketAddress): Future[Unit] =
       post("/debug/blacklist", s"${address.getHostString}:${address.getPort}").map(_ => ())
 
+    def clearBlacklist(): Future[Unit] =
+      post(s"${n.nodeApiEndpoint}/peers/clearblacklist").map(_ => ())
+
     def printDebugMessage(db: DebugMessage): Future[Response] = postJsonWithApiKey("/debug/print", db)
 
     def connectedPeers: Future[Seq[Peer]] = get("/peers/connected").map { r =>
@@ -234,11 +237,6 @@ object AsyncHttpApi extends Assertions {
         .as[BlockHeader](amountsAsStrings)
 
     def status: Future[Status] = get("/node/status").as[Status]
-
-    def blockGenerationSignature(signature: String): Future[GenerationSignatureResponse] =
-      get(s"/consensus/generationsignature/$signature").as[GenerationSignatureResponse]
-
-    def lastBlockGenerationSignature: Future[String] = get(s"/consensus/generationsignature").as[String]
 
     def generatingBalance(address: String, amountsAsStrings: Boolean = false): Future[GeneratingBalance] = {
       get(s"/consensus/generatingbalance/$address", amountsAsStrings).as[GeneratingBalance](amountsAsStrings)

@@ -39,7 +39,7 @@ class BigStringSuite extends BaseTransactionSuite with CancelAfterFailure {
         a20 == a0 || match tx {
           case ltx: LeaseTransaction => sigVerify(ltx.bodyBytes,ltx.proofs[0],pkA) && sigVerify(ltx.bodyBytes,ltx.proofs[2],pkC)
           case lctx : LeaseCancelTransaction => sigVerify(lctx.bodyBytes,lctx.proofs[1],pkA) && sigVerify(lctx.bodyBytes,lctx.proofs[2],pkB)
-          case other => false
+          case _ => false
         }
         """.stripMargin
 
@@ -73,7 +73,7 @@ class BigStringSuite extends BaseTransactionSuite with CancelAfterFailure {
     val signedLeasing =
       unsignedLeasing.copy(proofs = Proofs(Seq(sigLeasingA, ByteStr.empty, sigLeasingC)))
 
-    assertBadRequestAndMessage(sender.signedBroadcast(signedLeasing.json()).id, "String is too large")
+    assertBadRequestAndMessage(sender.signedBroadcast(signedLeasing.json()).id, "String size=32768 exceeds 32767 bytes")
 
     val leasingId = Base58.encode(unsignedLeasing.id().arr)
 

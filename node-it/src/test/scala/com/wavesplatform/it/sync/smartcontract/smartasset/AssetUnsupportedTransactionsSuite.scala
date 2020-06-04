@@ -36,7 +36,7 @@ class AssetUnsupportedTransactionsSuite extends BaseTransactionSuite with TableD
             ScriptCompiler(
               s"""
                  |match tx {
-                 |  case s : $tx => true
+                 |  case _: $tx => true
                  |  case _ => true
                  |}""".stripMargin,
               isAssetScript = true,

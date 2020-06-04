@@ -6,12 +6,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events
 import com.wavesplatform.events.protobuf.BlockchainUpdated.{Append => PBAppend, Rollback => PBRollback}
-import com.wavesplatform.events.protobuf.StateUpdate.{
-  AssetStateUpdate,
-  BalanceUpdate => PBBalanceUpdate,
-  DataEntryUpdate => PBDataEntryUpdate,
-  LeasingUpdate => PBLeasingUpdate
-}
+import com.wavesplatform.events.protobuf.StateUpdate.{AssetStateUpdate, BalanceUpdate => PBBalanceUpdate, DataEntryUpdate => PBDataEntryUpdate, LeasingUpdate => PBLeasingUpdate}
 import com.wavesplatform.protobuf.block.{PBBlocks, PBMicroBlocks}
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.Transaction
@@ -90,7 +85,7 @@ object PBEvents {
       description = toString(a.description),
       reissuable = a.reissuable,
       volume = a.volume.longValue,
-      script = PBTransactions.toPBScript(a.script.map(_._1)),
+      script = PBTransactions.toPBScript(a.script.map(_.script)),
       sponsorship = a.sponsorship.getOrElse(0),
       nft = a.nft,
       assetExistedBefore = a.assetExistedBefore,

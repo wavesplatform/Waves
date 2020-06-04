@@ -3,7 +3,7 @@ package com.wavesplatform.api.common
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{DBExt, DBResource, Keys}
-import com.wavesplatform.state.{Diff, Height, InvokeScriptResult, TransactionId, TxNum}
+import com.wavesplatform.state.{Diff, Height, InvokeScriptResult, NewTransactionInfo, TransactionId, TxNum}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.{Authorized, GenesisTransaction, Transaction}
 import monix.reactive.Observable
@@ -107,7 +107,7 @@ object AddressTransactions {
   ): Iterable[(Height, Transaction, Boolean)] =
     (for {
       (h, diff)               <- maybeDiff.toSeq
-      (tx, addresses, status) <- diff.transactions.values.toSeq.reverse
+      NewTransactionInfo(tx, addresses, status) <- diff.transactions.values.toSeq.reverse
       if addresses(subject)
     } yield (h, tx, status))
       .dropWhile { case (_, tx, _) => fromId.isDefined && !fromId.contains(tx.id()) }

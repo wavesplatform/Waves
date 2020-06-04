@@ -23,7 +23,7 @@ package object utils extends ScorexLogging {
   def base58Length(byteArrayLength: Int): Int = math.ceil(BytesLog / BaseLog * byteArrayLength).toInt
 
   def forceStopApplication(reason: ApplicationStopReason = Default): Unit =
-      System.exit(reason.code)
+    System.exit(reason.code)
 
   def humanReadableSize(bytes: Long, si: Boolean = true): String = {
     val (baseValue, unitStrings) =
@@ -69,13 +69,15 @@ package object utils extends ScorexLogging {
     override def writes(o: ByteStr): JsValue = JsString(o.toString)
 
     override def reads(json: JsValue): JsResult[ByteStr] = json match {
+      case JsString(v) if v.startsWith("base64:") =>
+        decodeBase64(v.substring(7)).fold(e => JsError(s"Error parsing base64: ${e.getMessage}"), b => JsSuccess(b))
       case JsString(v) => decodeBase58(v).fold(e => JsError(s"Error parsing base58: ${e.getMessage}"), b => JsSuccess(b))
       case _           => JsError("Expected JsString")
     }
   }
 
   implicit class StringBytes(val s: String) extends AnyVal {
-    def utf8Bytes: Array[Byte] = s.getBytes(Charsets.UTF_8)
+    def utf8Bytes: Array[Byte]   = s.getBytes(Charsets.UTF_8)
     def toByteString: ByteString = ByteString.copyFromUtf8(s)
   }
 }

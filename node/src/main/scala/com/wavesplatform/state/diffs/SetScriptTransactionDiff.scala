@@ -57,5 +57,6 @@ object SetScriptTransactionDiff {
   ): Either[String, List[(Long, Map[String, Long])]] =
     ScriptEstimator.all
       .drop(blockchain.estimator.version)
-      .traverse(se => ContractScript.estimateComplexity(version, dApp, se, blockchain.useReducedVerifierComplexityLimit, checkLimit = false))
+      .traverse(se => ContractScript.estimateComplexityExact(version, dApp, se, blockchain.useReducedVerifierComplexityLimit)
+      .map { case ((_, maxComplexity), complexities) => (maxComplexity, complexities) })
 }

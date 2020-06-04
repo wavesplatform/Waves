@@ -87,7 +87,7 @@ object EnvironmentFunctionsBenchmark {
     override def chainId: Byte                                                                                   = ChainId
     override def inputEntity: Environment.InputEntity                                                            = ???
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
-    override def transferTransactionById(id: Array[Byte]): Option[Tx]                                            = ???
+    override def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer]                                   = ???
     override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = ???
     override def resolveAlias(alias: String): Either[String, Recipient.Address]                                  = ???
     override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
@@ -95,6 +95,7 @@ object EnvironmentFunctionsBenchmark {
     override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
     override def blockInfoByHeight(height: Int): Option[BlockInfo]                                               = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
+    override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails]    = ???
     override def tthis: Recipient.Address                                                                        = ???
     override def multiPaymentAllowed: Boolean                                                                    = ???
     override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???

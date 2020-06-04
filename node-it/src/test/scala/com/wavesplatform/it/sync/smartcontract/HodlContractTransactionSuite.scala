@@ -131,7 +131,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
       waitForTx = true
     )._1.id
 
-    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("Not enough balance")
+    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include("Not enough balance")
   }
 
   test("caller can withdraw less than he owns") {
@@ -158,7 +158,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
     val stateChangesData = stateChangesInfo.get.data.head
     stateChangesInfo.get.data.length shouldBe 1
     stateChangesData.`type` shouldBe "integer"
-    stateChangesData.value shouldBe 0.01.waves
+    stateChangesData.value.asInstanceOf[Long] shouldBe 0.01.waves
 
     val stateChangesTransfers = stateChangesInfo.get.transfers.head
     stateChangesInfo.get.transfers.length shouldBe 1

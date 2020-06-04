@@ -86,7 +86,7 @@ class InvokeScriptErrorMsgGrpcSuite extends GrpcBaseTransactionSuite {
     sender
       .stateChanges(tx.id)
       ._2
-      .errorMessage
+      .error
       .get
       .text should include regex "Fee in WAVES for InvokeScriptTransaction .* with 12 total scripts invoked does not exceed minimal value"
   }

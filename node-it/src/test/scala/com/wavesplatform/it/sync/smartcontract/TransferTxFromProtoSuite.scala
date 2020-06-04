@@ -239,6 +239,6 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
         )
         ._1
         .id
-    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("Empty description")
+    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include("Empty description")
   }
 }

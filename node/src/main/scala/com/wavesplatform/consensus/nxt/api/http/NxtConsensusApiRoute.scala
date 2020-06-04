@@ -15,7 +15,7 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchai
 
   override val route: Route =
     pathPrefix("consensus") {
-      algo ~ basetarget ~ baseTargetId ~ generationSignature ~ generationSignatureId ~ generatingBalance
+      algo ~ basetarget ~ baseTargetId ~ generatingBalance
     }
 
   def generatingBalance: Route = (path("generatingbalance" / AddrSegment) & get) { address =>
@@ -30,20 +30,8 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchai
       } yield f(meta.header)).toRight[ApiError](BlockDoesNotExist)
     }
 
-  def generationSignatureId: Route = (path("generationsignature" / BlockId) & get) { signature =>
-    headerForId(signature, m => Json.obj("generationSignature" -> m.generationSignature.toString))
-  }
-
   def baseTargetId: Route = (path("basetarget" / Signature) & get) { signature =>
     headerForId(signature, m => Json.obj("baseTarget" -> m.baseTarget))
-  }
-
-  def generationSignature: Route = (path("generationsignature") & get) {
-    complete(
-      blockchain.lastBlockHeader
-        .map(m => Json.obj("generationSignature" -> m.header.generationSignature.toString))
-        .toRight(BlockDoesNotExist)
-    )
   }
 
   def basetarget: Route = (path("basetarget") & get) {

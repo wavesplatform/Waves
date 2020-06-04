@@ -13,8 +13,8 @@ object Dependencies {
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.9.8"
   private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
 
-  private def catsModule(module: String)  = Def.setting("org.typelevel" %%% s"cats-$module"  % "2.0.0")
-  private def monixModule(module: String) = Def.setting("io.monix"      %%% s"monix-$module" % "3.1.0")
+  private def catsModule(module: String, version: String = "2.1.0")  = Def.setting("org.typelevel" %%% s"cats-$module"  % version)
+  private def monixModule(module: String) = Def.setting("io.monix"      %%% s"monix-$module" % "3.2.1")
 
   private val kindProjector = compilerPlugin("org.spire-math"  %% "kind-projector" % "0.9.6")
   private val paradise      = compilerPlugin("org.scalamacros" % "paradise"        % "2.1.1" cross CrossVersion.full)
@@ -28,7 +28,7 @@ object Dependencies {
   val janino                     = "org.codehaus.janino" % "janino" % "3.0.12"
   val asyncHttpClient            = "org.asynchttpclient" % "async-http-client" % "2.7.0"
 
-  private val catsEffect = catsModule("effect")
+  private val catsEffect = catsModule("effect", "2.1.3")
   private val catsCore   = catsModule("core")
   private val shapeless  = Def.setting("com.chuusai" %%% "shapeless" % "2.3.3")
 
@@ -109,7 +109,8 @@ object Dependencies {
       kindProjector,
       compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4"),
       "com.softwaremill.sttp" %%% "core" % "1.6.4",
-      "com.wavesplatform"     % "zwaves" % "0.1.0-SNAPSHOT"
+      "com.wavesplatform"     % "zwaves" % "0.1.0-SNAPSHOT",
+      "org.web3j" % "crypto" % "4.5.18"
     ) ++ scalapbRuntime.value ++ circe.value
   )
 
@@ -175,7 +176,7 @@ object Dependencies {
   )
 
   private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.2.5-N1968-3-SNAPSHOT" classifier "proto"
+     "com.wavesplatform" % "protobuf-schemas" % "1.2.5" classifier "proto"
 
   lazy val scalapbRuntime = Def.setting {
     val version = scalapb.compiler.Version.scalapbVersion
@@ -197,7 +198,7 @@ object Dependencies {
   )
 
   lazy val circe = Def.setting {
-    val circeVersion = "0.12.0-RC4"
+    val circeVersion = "0.12.3"
     Seq(
       "io.circe" %%% "circe-core",
       "io.circe" %%% "circe-generic",

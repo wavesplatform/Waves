@@ -7,11 +7,13 @@ import java.nio.{BufferUnderflowException, ByteBuffer}
 import cats.Id
 import cats.implicits._
 import cats.kernel.Monoid
+import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
@@ -29,11 +31,9 @@ object PureContext {
 
   implicit def intToLong(num: Int): Long = num.toLong
 
-  private lazy val defaultThrowMessage = "Explicit script termination"
-  lazy val MaxStringResult             = Short.MaxValue
-  lazy val MaxBytesResult              = 65536
-  lazy val MaxListLengthV4             = 1000
-  lazy val MaxListSizeForMedianCalc    = 100
+  private val defaultThrowMessage      = "Explicit script termination"
+  private val MaxListSizeForMedianCalc = 100
+  val MaxListLengthV4                  = 1000
 
   lazy val mulLong: BaseFunction[NoContext] =
     createTryOp(MUL_OP, LONG, LONG, MUL_LONG)((a, b) => Math.multiplyExact(a, b))
@@ -48,20 +48,20 @@ object PureContext {
   lazy val sumString: BaseFunction[NoContext] =
     createRawOp(SUM_OP, STRING, STRING, SUM_STRING, 10) {
       case (CONST_STRING(a), CONST_STRING(b)) =>
-        if(a.length + b.length <= MaxStringResult) {
+        if (a.length + b.length <= Terms.DataEntryValueMax) {
           CONST_STRING(a + b)
         } else {
-          Left("String is too large")
+          Left(s"String length = ${a.length + b.length} exceeds ${Terms.DataEntryValueMax}")
         }
       case _ => ???
     }
   lazy val sumByteStr: BaseFunction[NoContext] =
     createRawOp(SUM_OP, BYTESTR, BYTESTR, SUM_BYTES, 10) {
       case (CONST_BYTESTR(a), CONST_BYTESTR(b)) =>
-        if(a.arr.length + b.arr.length <= MaxStringResult) {
+        if (a.arr.length + b.arr.length <= Terms.DataEntryValueMax) {
           CONST_BYTESTR(a ++ b)
         } else {
-          Left("ByteVector is too large")
+          Left(s"ByteVector size = ${a.arr.length + b.arr.length} bytes exceeds ${Terms.DataEntryValueMax}")
         }
       case _ => ???
     }
@@ -73,7 +73,7 @@ object PureContext {
     NativeFunction(EQ_OP.func, 1, EQ, BOOLEAN, ("a", TYPEPARAM('T')), ("b", TYPEPARAM('T'))) {
       case a :: b :: Nil =>
         Either.cond(b.weight <= MaxCmpWeight || a.weight <= MaxCmpWeight, CONST_BOOLEAN(a == b), "Comparable value too heavy.")
-      case xs            => notImplemented[Id, EVALUATED](s"${EQ_OP.func}(a: T, b: T)", xs)
+      case xs => notImplemented[Id, EVALUATED](s"${EQ_OP.func}(a: T, b: T)", xs)
     }
 
   lazy val ne: BaseFunction[NoContext] =
@@ -295,7 +295,7 @@ object PureContext {
       ("tail", PARAMETERIZEDLIST(TYPEPARAM('B')))
     ) {
       case h :: (a @ ARR(t)) :: Nil => ARR(h +: t, h.weight + a.weight + ELEM_WEIGHT, checkSize)
-      case xs                 => notImplemented[Id, EVALUATED]("cons(head: T, tail: LIST[T]", xs)
+      case xs                       => notImplemented[Id, EVALUATED]("cons(head: T, tail: LIST[T]", xs)
     }
 
   lazy val listAppend: NativeFunction[NoContext] =
@@ -308,7 +308,7 @@ object PureContext {
       ("element", TYPEPARAM('B'))
     ) {
       case (a @ ARR(list)) :: element :: Nil => ARR(list :+ element, a.weight + element.weight + ELEM_WEIGHT, true)
-      case xs                          => notImplemented[Id, EVALUATED](s"list: List[T] ${LIST_APPEND_OP.func} value: T", xs)
+      case xs                                => notImplemented[Id, EVALUATED](s"list: List[T] ${LIST_APPEND_OP.func} value: T", xs)
     }
 
   lazy val listConcat: NativeFunction[NoContext] =
@@ -321,7 +321,7 @@ object PureContext {
       ("list2", PARAMETERIZEDLIST(TYPEPARAM('B')))
     ) {
       case (a1 @ ARR(l1)) :: (a2 @ ARR(l2)) :: Nil => ARR(l1 ++ l2, a1.weight + a2.weight - EMPTYARR_WEIGHT, true)
-      case xs                        => notImplemented[Id, EVALUATED](s"list1: List[T] ${LIST_CONCAT_OP.func} list2: List[T]", xs)
+      case xs                                      => notImplemented[Id, EVALUATED](s"list1: List[T] ${LIST_CONCAT_OP.func} list2: List[T]", xs)
     }
 
   lazy val dropString: BaseFunction[NoContext] =
@@ -366,14 +366,14 @@ object PureContext {
 
   val UTF8Decoder = UTF_8.newDecoder
 
-  lazy val toUtf8String: BaseFunction[NoContext] =
+  def toUtf8String(version: StdLibVersion): BaseFunction[NoContext] =
     NativeFunction("toUtf8String", 20, UTF8STRING, STRING, ("u", BYTESTR)) {
       case CONST_BYTESTR(u) :: Nil =>
         Try(ByteBuffer.wrap(u.arr))
           .map(UTF8Decoder.decode)
           .toEither
           .map(_.toString)
-          .flatMap(CONST_STRING(_))
+          .flatMap(CONST_STRING(_, reduceLimit = version >= V4))
           .leftMap {
             case _: MalformedInputException => "Input contents invalid UTF8 sequence"
             case e                          => e.toString
@@ -514,6 +514,21 @@ object PureContext {
       )
   }
 
+  lazy val makeString: BaseFunction[NoContext] =
+    NativeFunction("makeString", 30, MAKESTRING, STRING, ("list", LIST(STRING)), ("separator", STRING)) {
+      case (arr: ARR) :: CONST_STRING(separator) :: Nil =>
+        val separatorStringSize =
+          if (arr.xs.length > 1) (arr.xs.length - 1) * separator.length
+          else 0
+        val expectedStringSize = arr.elementsWeightSum + separatorStringSize
+        if (expectedStringSize <= DataEntryValueMax)
+          CONST_STRING(arr.xs.mkString(separator))
+        else
+          Left(s"Constructing string size = $expectedStringSize bytes will exceed $DataEntryValueMax")
+      case xs =>
+        notImplemented[Id, EVALUATED]("makeString(list: List[String], separator: String)", xs)
+    }
+
   lazy val contains: BaseFunction[NoContext] =
     UserFunction("contains", 20, BOOLEAN, ("@source", STRING), ("@substr", STRING)) {
       FUNCTION_CALL(
@@ -628,6 +643,99 @@ object PureContext {
         }
       }
       case xs => notImplemented[Id, EVALUATED](s"median(arr: List[Int])", xs)
+    }
+
+  lazy val listMax: BaseFunction[NoContext] =
+    NativeFunction("max", 3, MAX_LIST, LONG, ("list", PARAMETERIZEDLIST(LONG))) {
+      case ARR(list) :: Nil =>
+        Either.cond(
+          list.nonEmpty,
+          list.asInstanceOf[IndexedSeq[CONST_LONG]].max,
+          "Can't find max for empty list"
+        )
+      case xs =>
+        notImplemented[Id, EVALUATED]("max(list: List[Int])", xs)
+    }
+
+  lazy val listMin: BaseFunction[NoContext] =
+    NativeFunction("min", 3, MIN_LIST, LONG, ("list", PARAMETERIZEDLIST(LONG))) {
+      case ARR(list) :: Nil =>
+        Either.cond(
+          list.nonEmpty,
+          list.asInstanceOf[IndexedSeq[CONST_LONG]].min,
+          "Can't find min for empty list"
+        )
+      case xs =>
+        notImplemented[Id, EVALUATED]("min(list: List[Int])", xs)
+    }
+
+  lazy val listIndexOf: BaseFunction[NoContext] =
+    NativeFunction(
+      "indexOf",
+      5,
+      INDEX_OF_LIST,
+      optionLong,
+      ("list", PARAMETERIZEDLIST(TYPEPARAM('T'))),
+      ("element", TYPEPARAM('T'))
+    ) {
+      case ARR(list) :: element :: Nil =>
+        genericListIndexOf(element, list.indexOf, list.indexWhere)
+      case xs =>
+        notImplemented[Id, EVALUATED]("indexOf(list: List[T], element: T)", xs)
+    }
+
+  lazy val listLastIndexOf: BaseFunction[NoContext] =
+    NativeFunction(
+      "lastIndexOf",
+      5,
+      LAST_INDEX_OF_LIST,
+      optionLong,
+      ("list", PARAMETERIZEDLIST(TYPEPARAM('T'))),
+      ("element", TYPEPARAM('T'))
+    ) {
+      case ARR(list) :: element :: Nil =>
+        genericListIndexOf(element, list.lastIndexOf, list.lastIndexWhere)
+      case xs =>
+        notImplemented[Id, EVALUATED]("lastIndexOf(list: List[T], element: T)", xs)
+    }
+
+  @VisibleForTesting
+  private[v1] def genericListIndexOf(
+     element: EVALUATED,
+     indexOf: EVALUATED => Int,
+     indexWhere: (EVALUATED => Boolean) => Int
+  ): Either[String, EVALUATED] =
+    if (element.weight <= MaxCmpWeight)
+      Right {
+        val i = indexOf(element)
+        if (i != -1) CONST_LONG(i.toLong) else unit
+      }
+    else Try {
+      indexWhere { listElement =>
+        if (listElement.weight > MaxCmpWeight)
+          throw new RuntimeException(
+            s"Both element to search for `$element` " +
+            s"and list element `$listElement` " +
+            s"are too heavy to compare"
+          )
+        listElement == element
+      }
+    }.toEither
+      .bimap(
+        _.getMessage,
+        index => if (index != -1) CONST_LONG(index.toLong) else unit
+      )
+
+  lazy val listContains: BaseFunction[NoContext] =
+    UserFunction(
+      "containsElement",
+      5,
+      BOOLEAN,
+      ("@list", PARAMETERIZEDLIST(TYPEPARAM('T'))),
+      ("@element", TYPEPARAM('T'))
+    ) {
+      val index = FUNCTION_CALL(Native(INDEX_OF_LIST), List(REF("@list"), REF("@element")))
+      FUNCTION_CALL(User("!="), List(index, unit))
     }
 
   lazy val uMinus: BaseFunction[NoContext] =
@@ -783,7 +891,7 @@ object PureContext {
     val fromV3Funcs = Array(
       value,
       valueOrErrorMessage,
-      toUtf8String,
+      toUtf8String(version),
       toLong,
       toLongOffset,
       indexOf,
@@ -801,7 +909,7 @@ object PureContext {
       ctx,
       CTX[NoContext](
         Seq.empty,
-        Map(("nil", (LIST(NOTHING), ContextfulVal.pure[NoContext](ARR(IndexedSeq.empty[EVALUATED], EMPTYARR_WEIGHT, false).explicitGet)))),
+        Map(("nil", (LIST(NOTHING), ContextfulVal.pure[NoContext](ARR(IndexedSeq.empty[EVALUATED], EMPTYARR_WEIGHT, limited = false).explicitGet())))),
         fromV3Funcs :+ listConstructor(checkSize = false)
       )
     )
@@ -809,7 +917,20 @@ object PureContext {
     val v4Functions =
       ctx.functions ++
         fromV3Funcs ++
-        Array(contains, valueOrElse, listAppend, listConcat, listConstructor(checkSize = true), getListMedian)
+        Array(
+          contains,
+          valueOrElse,
+          listAppend,
+          listConcat,
+          listConstructor(checkSize = true),
+          getListMedian,
+          listIndexOf,
+          listLastIndexOf,
+          listContains,
+          listMin,
+          listMax,
+          makeString
+        )
 
     version match {
       case V1 | V2 => ctx
