@@ -19,8 +19,7 @@ package object history {
     addressSchemeCharacter = 'N',
     functionalitySettings = TestFunctionalitySettings.Enabled,
     genesisSettings = GenesisSettings.TESTNET,
-    rewardsSettings = RewardsSettings.TESTNET,
-    useEvaluatorV2 = true
+    rewardsSettings = RewardsSettings.TESTNET
   )
 
   val config   = ConfigFactory.load()

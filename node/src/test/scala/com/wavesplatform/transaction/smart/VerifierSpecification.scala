@@ -39,8 +39,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
             addressSchemeCharacter = 'N',
             functionalitySettings = TestFunctionalitySettings.Enabled,
             genesisSettings = GenesisSettings.TESTNET,
-            rewardsSettings = RewardsSettings.TESTNET,
-            useEvaluatorV2 = true
+            rewardsSettings = RewardsSettings.TESTNET
           ))
         }
 
@@ -91,8 +90,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
       addressSchemeCharacter = 'N',
       functionalitySettings = TestFunctionalitySettings.Enabled,
       genesisSettings = GenesisSettings.TESTNET,
-      rewardsSettings = RewardsSettings.TESTNET,
-      useEvaluatorV2 = true
+      rewardsSettings = RewardsSettings.TESTNET
     ))
 
     def activate(features: (BlockchainFeature, Int)*): Unit = {

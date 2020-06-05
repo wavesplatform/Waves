@@ -11,9 +11,9 @@ import com.wavesplatform.lang.directives.values.{Account, Asset, Expression}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, TRUE}
+import com.wavesplatform.lang.v1.evaluator._
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
-import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, _}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
@@ -61,11 +61,7 @@ object ScriptRunner {
       )
     }
 
-    val evaluate =
-      if (blockchain.settings.useEvaluatorV2)
-        EvaluatorV2.applyCompleted(_, _, script.stdLibVersion)
-      else
-        EvaluatorV1().applyWithLogging[EVALUATED] _
+    val evaluate = EvaluatorV2.applyCompleted(_, _, script.stdLibVersion)
 
     script match {
       case s: ExprScript =>

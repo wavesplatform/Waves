@@ -13,7 +13,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |  data-directory = "/waves/data"
         |  blockchain {
         |    type = CUSTOM
-        |    use-evaluator-v2 = false
         |    custom {
         |      address-scheme-character = "C"
         |      functionality {
@@ -77,7 +76,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.genesisSettings.transactions should be(
       Seq(GenesisTransactionSettings("BASE58ADDRESS1", 50000000000001L), GenesisTransactionSettings("BASE58ADDRESS2", 49999999999999L))
     )
-    settings.useEvaluatorV2 shouldBe false
   }
 
   it should "read testnet settings" in {
@@ -116,7 +114,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         GenesisTransactionSettings("3N18z4B8kyyQ96PhN5eyhCAbg4j49CgwZJx", 9000000000000000L)
       )
     )
-    settings.useEvaluatorV2 shouldBe true
   }
 
   it should "read mainnet settings" in {
@@ -154,6 +151,5 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         GenesisTransactionSettings("3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6J", 100000000L)
       )
     )
-    settings.useEvaluatorV2 shouldBe true
   }
 }
