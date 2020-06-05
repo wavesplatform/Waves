@@ -303,7 +303,7 @@ object Parser {
       def whitespace(implicit c: fastparse.P[Any]) = {
         CharsWhileIn(" \t\r")
       }
-      P(whitespace.rep ~~ "\n").repX(1)
+      P(whitespace.repX  ~~ "\n").repX(1)
     }
 
     P(
