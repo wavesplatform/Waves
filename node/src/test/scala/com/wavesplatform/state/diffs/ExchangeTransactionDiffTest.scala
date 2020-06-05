@@ -676,7 +676,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Tran
   private def createSettings(preActivatedFeatures: (BlockchainFeature, Int)*): FunctionalitySettings =
     TestFunctionalitySettings.Enabled
       .copy(
-        preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }
+        preActivatedFeatures = preActivatedFeatures.map({ case (k, v) => k.id -> v }).toMap,
         blocksForFeatureActivation = 1,
         featureCheckBlocksPeriod = 1
       )

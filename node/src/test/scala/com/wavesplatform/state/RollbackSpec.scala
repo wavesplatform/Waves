@@ -650,7 +650,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
     def createSettings(preActivatedFeatures: (BlockchainFeature, Int)*): WavesSettings = {
       val tfs = TestFunctionalitySettings.Enabled.copy(
-        preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }
+        preActivatedFeatures = preActivatedFeatures.map({ case (k, v) => k.id -> v }).toMap,
         blocksForFeatureActivation = 1,
         featureCheckBlocksPeriod = 1
       )
