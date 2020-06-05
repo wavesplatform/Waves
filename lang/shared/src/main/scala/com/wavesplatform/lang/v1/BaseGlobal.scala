@@ -183,7 +183,15 @@ trait BaseGlobal {
         (0L, annotatedComplexities)
       )(v => (annotatedComplexities(v.u.name), annotatedComplexities - v.u.name))
       bytes <- serializeContract(dApp, stdLibVersion)
-    } yield DAppInfo(bytes, dApp, maxComplexity, verifierComplexity, callableComplexities, userFunctionComplexities.toMap)
+    } yield DAppInfo(
+      bytes,
+      dApp,
+      maxComplexity,
+      annotatedComplexities,
+      verifierComplexity,
+      callableComplexities,
+      userFunctionComplexities.toMap
+    )
 
   def checkContract(
       version: StdLibVersion,
@@ -276,6 +284,7 @@ object BaseGlobal {
       bytes: Array[Byte],
       dApp: DApp,
       maxComplexity: (String, Long),
+      annotatedComplexities: Map[String, Long],
       verifierComplexity: Long,
       callableComplexities: Map[String, Long],
       userFunctionComplexities: Map[String, Long]

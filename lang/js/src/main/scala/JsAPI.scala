@@ -239,7 +239,15 @@ object JsAPI {
         Global
           .compileContract(input, fullDAppContext(ds.stdLibVersion).compilerContext, version, estimator)
           .map {
-            case DAppInfo(bytes, dApp, maxComplexityFunc @ (_, maxComplexity), verifierComplexity, callableComplexities, userFunctionComplexities) =>
+            case DAppInfo(
+              bytes,
+              dApp,
+              maxComplexityFunc @ (_, maxComplexity),
+              annotatedComplexities,
+              verifierComplexity,
+              callableComplexities,
+              userFunctionComplexities
+            ) =>
               val resultFields: Seq[(String, Any)] = Seq(
                 "result"                   -> Global.toBuffer(bytes),
                 "ast"                      -> toJs(dApp),
@@ -248,14 +256,14 @@ object JsAPI {
                 "callableComplexities"     -> callableComplexities.mapValues(c => c: Any).toJSDictionary,
                 "userFunctionComplexities" -> userFunctionComplexities.mapValues(c => c: Any).toJSDictionary,
               )
-              val errorFieldOpt: Seq[(String, Any)] =
-                Global.checkContract(version, dApp, maxComplexityFunc, callableComplexities, estimator)
+              val errorFieldOpt: Seq[(String, Any)] = {
+                Global.checkContract(version, dApp, maxComplexityFunc, annotatedComplexities, estimator)
                   .fold(
                     error => Seq("error" -> error),
                     _     => Seq()
                   )
+              }
               js.Dynamic.literal.applyDynamic("apply")(resultFields ++ errorFieldOpt: _*)
-
           }
     }
   }
