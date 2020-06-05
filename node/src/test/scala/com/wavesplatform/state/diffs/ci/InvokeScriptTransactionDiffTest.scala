@@ -1645,9 +1645,6 @@ class InvokeScriptTransactionDiffTest
             )
           )
           .anyNumberOfTimes()
-        (blockchain.settings _)
-          .expects()
-          .returning(BlockchainSettings('W', fs, GenesisSettings.MAINNET, RewardsSettings.MAINNET))
         (blockchain.assetDescription _)
           .expects(*)
           .returning(
