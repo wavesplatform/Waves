@@ -34,6 +34,7 @@ trait BaseTransactionSuiteLike extends WaitForHeight2 with IntegrationSuiteWithT
           .parseFile(new File(filePath))
           .getConfigList("nodes")
           .asScala
+          .toSeq
           .map(cfg => new ExternalNode(cfg.withFallback(defaultConfig).resolve()))
     }
   }
