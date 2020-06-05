@@ -246,15 +246,17 @@ object JsAPI {
               annotatedComplexities,
               verifierComplexity,
               callableComplexities,
-              userFunctionComplexities
+              userFunctionComplexities,
+              globalVariableComplexities
             ) =>
               val resultFields: Seq[(String, Any)] = Seq(
-                "result"                   -> Global.toBuffer(bytes),
-                "ast"                      -> toJs(dApp),
-                "complexity"               -> maxComplexity,
-                "verifierComplexity"       -> verifierComplexity,
-                "callableComplexities"     -> callableComplexities.mapValues(c => c: Any).toJSDictionary,
-                "userFunctionComplexities" -> userFunctionComplexities.mapValues(c => c: Any).toJSDictionary,
+                "result"                     -> Global.toBuffer(bytes),
+                "ast"                        -> toJs(dApp),
+                "complexity"                 -> maxComplexity,
+                "verifierComplexity"         -> verifierComplexity,
+                "callableComplexities"       -> callableComplexities.mapValues(c => c: Any).toJSDictionary,
+                "userFunctionComplexities"   -> userFunctionComplexities.mapValues(c => c: Any).toJSDictionary,
+                "globalVariableComplexities" -> globalVariableComplexities.mapValues(c => c: Any).toJSDictionary,
               )
               val errorFieldOpt: Seq[(String, Any)] = {
                 Global.checkContract(version, dApp, maxComplexityFunc, annotatedComplexities, estimator)

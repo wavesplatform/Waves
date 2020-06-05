@@ -178,6 +178,7 @@ trait BaseGlobal {
     for {
       dApp                                   <- ContractCompiler.compile(input, ctx, stdLibVersion)
       userFunctionComplexities               <- ContractScript.estimateUserFunctions(stdLibVersion, dApp, estimator)
+      globalVariableComplexities             <- ContractScript.estimateGlobalVariables(stdLibVersion, dApp, estimator)
       (maxComplexity, annotatedComplexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator)
       (verifierComplexity, callableComplexities) = dApp.verifierFuncOpt.fold(
         (0L, annotatedComplexities)
@@ -190,7 +191,8 @@ trait BaseGlobal {
       annotatedComplexities,
       verifierComplexity,
       callableComplexities,
-      userFunctionComplexities.toMap
+      userFunctionComplexities.toMap,
+      globalVariableComplexities.toMap
     )
 
   def checkContract(
@@ -287,6 +289,7 @@ object BaseGlobal {
       annotatedComplexities: Map[String, Long],
       verifierComplexity: Long,
       callableComplexities: Map[String, Long],
-      userFunctionComplexities: Map[String, Long]
+      userFunctionComplexities: Map[String, Long],
+      globalVariableComplexities: Map[String, Long]
   )
 }

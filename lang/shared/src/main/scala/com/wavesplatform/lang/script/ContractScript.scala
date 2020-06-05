@@ -5,10 +5,11 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values.{StdLibVersion, DApp => DAppType}
 import com.wavesplatform.lang.utils._
-import com.wavesplatform.lang.v1.BaseGlobal
 import com.wavesplatform.lang.v1.ContractLimits._
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
 import monix.eval.Coeval
 
 object ContractScript {
@@ -56,34 +57,66 @@ object ContractScript {
       dApp: DApp,
       estimator: ScriptEstimator
   ): Either[String, List[(String, Long)]] =
-    estimateFunctions(version, dApp, estimator, annotatedFunctions(dApp))
+    estimateDeclarations(version, dApp, estimator, annotatedFunctions(dApp))
 
   def estimateUserFunctions(
       version: StdLibVersion,
       dApp: DApp,
       estimator: ScriptEstimator
   ): Either[String, List[(String, Long)]] =
-    estimateFunctions(version, dApp, estimator, dApp.decs.collect { case f: FUNC => (None, f) })
+    estimateDeclarations(version, dApp, estimator, dApp.decs.collect { case f: FUNC => (None, f) })
+
+  def estimateGlobalVariables(
+      version: StdLibVersion,
+      dApp: DApp,
+      estimator: ScriptEstimator
+  ): Either[String, List[(String, Long)]] =
+    estimateDeclarations(version, dApp, estimator, dApp.decs.collect { case l: LET => (None, l) })
 
   private def annotatedFunctions(dApp: DApp): List[(Some[String], FUNC)] =
     (dApp.verifierFuncOpt ++ dApp.callableFuncs)
       .map(func => (Some(func.annotation.invocationArgName), func.u))
       .toList
 
-  private def estimateFunctions(
+  private def estimateDeclarations(
       version: StdLibVersion,
       dApp: DApp,
       estimator: ScriptEstimator,
-      functions: List[(Option[String], FUNC)]
+      functions: List[(Option[String], DECLARATION)]
   ): Either[String, List[(String, Long)]] =
     functions.traverse {
       case (annotationArgName, funcExpr) =>
         estimator(
           varNames(version, DAppType),
           functionCosts(version),
-          Script.constructExprFromFuncAndContext(dApp.decs, annotationArgName, funcExpr)
+          constructExprFromDeclAndContext(dApp.decs, annotationArgName, funcExpr)
         ).map((funcExpr.name, _))
     }
+
+  private[script] def constructExprFromDeclAndContext(
+    dec: List[DECLARATION],
+    annotationArgNameOpt: Option[String],
+    decl: DECLARATION
+  ): EXPR = {
+    val declExpr =
+      decl match {
+        case let@LET(name, _) =>
+          BLOCK(let, REF(name))
+        case func@FUNC(name, args, _) =>
+          BLOCK(
+            func,
+            FUNCTION_CALL(FunctionHeader.User(name), List.fill(args.size)(TRUE))
+          )
+        case Terms.FAILED_DEC() =>
+          FAILED_EXPR()
+      }
+    val funcWithContext =
+      annotationArgNameOpt.fold(declExpr)(
+        annotationArgName =>
+          BLOCK(LET(annotationArgName, TRUE), declExpr)
+      )
+    dec.foldRight(funcWithContext)((declaration, expr) => BLOCK(declaration, expr))
+  }
 
   def estimateComplexity(
       version: StdLibVersion,
