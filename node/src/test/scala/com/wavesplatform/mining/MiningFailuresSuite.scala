@@ -53,7 +53,7 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
       val scheduler   = Scheduler.singleThread("appender")
       val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
       val wallet      = Wallet(WalletSettings(None, Some("123"), None))
-      val utxPool     = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, wavesSettings.utxSettings, enablePriorityPool = true)
+      val utxPool     = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, wavesSettings.utxSettings)
       val pos         = PoSSelector(blockchainUpdater, wavesSettings.synchronizationSettings)
       new MinerImpl(allChannels, blockchainUpdater, wavesSettings.copy(blockchainSettings = blockchainSettings), ntpTime, utxPool, wallet, pos, scheduler, scheduler)
     }

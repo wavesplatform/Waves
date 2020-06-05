@@ -230,7 +230,9 @@ class BlockchainUpdaterImpl(
                         log.trace(
                           s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})"
                         )
-                        Some((r, ng.allDiffs, ng.reward, hitSource))
+                        val (mbs, diffs) = ng.allDiffs.unzip
+                        log.trace(s"Discarded microblocks: $mbs")
+                        Some((r, diffs, ng.reward, hitSource))
                       }
                   } else if (areVersionsOfSameBlock(block, ng.base)) {
                     if (block.transactionData.lengthCompare(ng.transactions.size) <= 0) {
@@ -303,7 +305,8 @@ class BlockchainUpdaterImpl(
                           leveldb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
                           BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
                           TxsInBlockchainStats.record(ng.transactions.size)
-                          val discardedDiffs = discarded.map(_._2)
+                          val (discardedMbs, discardedDiffs) = discarded.unzip
+                          log.trace(s"Discarded microblocks: $discardedMbs")
                           Some((differResult, discardedDiffs, reward, hitSource))
                         }
                       } else {

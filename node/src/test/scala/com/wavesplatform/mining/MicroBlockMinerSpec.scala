@@ -29,7 +29,7 @@ class MicroBlockMinerSpec extends FlatSpec with Matchers with PrivateMethodTeste
     val settings  = domainSettingsWithFS(TestFunctionalitySettings.withFeatures(BlockchainFeatures.NG))
     withDomain(settings) { d =>
       d.appendBlock(TestBlock.create(Seq(genesis)))
-      val utxPool = new UtxPoolImpl(ntpTime, d.blockchainUpdater, ignoreSpendableBalanceChanged, settings.utxSettings, enablePriorityPool = true)
+      val utxPool = new UtxPoolImpl(ntpTime, d.blockchainUpdater, ignoreSpendableBalanceChanged, settings.utxSettings)
       val microBlockMiner = new MicroBlockMinerImpl(
         _ => (),
         null,

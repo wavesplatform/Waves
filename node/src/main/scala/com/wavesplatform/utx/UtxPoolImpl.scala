@@ -48,9 +48,8 @@ class UtxPoolImpl(
     blockchain: Blockchain,
     spendableBalanceChanged: Observer[(Address, Asset)],
     utxSettings: UtxSettings,
-    enablePriorityPool: Boolean,
     onEvent: UtxEvent => Unit = _ => (),
-    nanoTimeSource: () => Long = () => System.nanoTime()
+    nanoTimeSource: () => TxTimestamp = () => System.nanoTime()
 ) extends ScorexLogging
     with AutoCloseable
     with UtxPool {
@@ -66,8 +65,8 @@ class UtxPoolImpl(
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).isDefined) // TODO delete in the future
 
   private[this] val priorityDiffs          = mutable.LinkedHashSet.empty[Diff]
-  private[this] def priorityTransactionIds = priorityDiffs.toVector.flatMap(_.transactions.keys)
-  private[this] def priorityTransactions   = priorityDiffs.toVector.flatMap(_.transactionsValues)
+  private[this] def priorityTransactionIds = priorityDiffs.synchronized(priorityDiffs.toVector.flatMap(_.transactions.keys))
+  private[this] def priorityTransactions   = priorityDiffs.synchronized(priorityDiffs.toVector.flatMap(_.transactionsValues))
 
   override def putIfNew(tx: Transaction): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id()) || priorityDiffs.exists(_.contains(tx.id()))) TracedResult.wrapValue(false)
@@ -207,7 +206,7 @@ class UtxPoolImpl(
   }
 
   private[this] def addTransaction(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
-    val diffEi = {
+    val diffEi = priorityDiffs.synchronized {
       val patchedBlockchain = CompositeBlockchain(blockchain, Some(Monoid.combineAll(priorityDiffs)))
       TransactionDiffer.skipFailing(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(patchedBlockchain, tx)
     }
@@ -270,7 +269,7 @@ class UtxPoolImpl(
   private[this] case class TxEntry(tx: Transaction, priority: Boolean)
 
   private[this] def createTxEntrySeq(): Seq[TxEntry] =
-    priorityDiffs.synchronized(priorityTransactions.map(TxEntry(_, priority = true))) ++ nonPriorityTransactions.map(
+    priorityTransactions.map(TxEntry(_, priority = true)) ++ nonPriorityTransactions.map(
       TxEntry(_, priority = false)
     )
 
@@ -475,19 +474,19 @@ class UtxPoolImpl(
   }
 
   /** DOES NOT verify transactions */
-  def addAndCleanup(transactions: Seq[Transaction]): Unit = priorityDiffs.synchronized {
+  def addAndCleanup(transactions: Seq[Transaction]): Unit = {
     transactions.foreach(addTransaction(_, verify = false))
     TxCleanup.runCleanupAsync()
   }
 
   def addAndCleanupPriority(discDiffs: Seq[Diff] = Nil): Unit = priorityDiffs.synchronized {
-    if (this.enablePriorityPool) {
-      discDiffs.filterNot(priorityDiffs.contains).foreach { diff =>
-        diff.transactionsValues.foreach(PoolMetrics.addTransactionPriority(_))
-        priorityDiffs += diff
-      }
-      TxCleanup.runCleanupAsync()
-    } else addAndCleanup(discDiffs.flatMap(_.transactionsValues))
+    discDiffs.filterNot(priorityDiffs.contains).foreach { diff =>
+      diff.transactionsValues.foreach(PoolMetrics.addTransactionPriority(_))
+      priorityDiffs += diff
+    }
+    log.trace(s"Priority pool new diffs: $discDiffs")
+    log.trace(s"Priority pool transactions order: ${priorityTransactionIds.mkString(", ")}")
+    TxCleanup.runCleanupAsync()
   }
 
   override def close(): Unit = {
