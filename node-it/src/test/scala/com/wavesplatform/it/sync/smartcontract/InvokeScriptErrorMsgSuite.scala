@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
-class InvokeScriptErrorMsgSuite extends BaseTransactionSuite with CancelAfterFailure {
+class InvoSuiteInvokeScriptErrorMsgSuite extends BaseTransactionSuite with CancelAfterFailure {
   private val contract = firstAddress
   private val caller   = secondAddress
 
