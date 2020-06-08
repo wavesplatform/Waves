@@ -10,7 +10,7 @@ object MetaMapper {
     version.strategy.toProto(data)
 
   def dicFromProto(dApp: DApp): Either[String, Dic] = {
-    val versionEntry = Map("version" -> Single(dApp.meta.version.toString))
+    val versionEntry = Map("version" -> Str(dApp.meta.version.toString))
     extractMeta(dApp).value
       .map(meta => Dic(versionEntry ++ meta.map(_.m).getOrElse(Map())))
   }

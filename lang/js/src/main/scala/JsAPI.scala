@@ -287,6 +287,7 @@ object JsAPI {
   lazy val metaConverter: RecKeyValueFolder[Any, js.Object with js.Dynamic] =
     RecKeyValueFolder(
       Any.fromString,
+      Any.fromBoolean,
       _.toJSArray,
       js.Dynamic.literal.applyDynamic("apply")(_: _*)
     )

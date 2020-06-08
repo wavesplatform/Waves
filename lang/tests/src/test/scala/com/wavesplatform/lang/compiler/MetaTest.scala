@@ -4,7 +4,7 @@ import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.NoShrink
-import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper, Single}
+import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper, Str}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, V3, V4, DApp => DAppType}
 import com.wavesplatform.lang.v1.compiler
@@ -70,18 +70,18 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
 
     MetaMapper.dicFromProto(dApp) shouldBe Right(
       Dic(Map(
-        "version" -> Single("1"),
+        "version" -> Str("1"),
         "callableFuncTypes" -> Chain(List(
           Dic(ListMap(
-            "a" -> Single("Boolean|ByteVector|Int|String"),
-            "b" -> Single("Int"),
-            "c" -> Single("Int|String"),
-            "d" -> Single("Int|String"),
-            "e" -> Single("Boolean|ByteVector|String"),
-            "f" -> Single("ByteVector|Int")
+            "a" -> Str("Boolean|ByteVector|Int|String"),
+            "b" -> Str("Int"),
+            "c" -> Str("Int|String"),
+            "d" -> Str("Int|String"),
+            "e" -> Str("Boolean|ByteVector|String"),
+            "f" -> Str("ByteVector|Int")
           )),
           Dic(Map(
-            "a" -> Single("Boolean|Int")
+            "a" -> Str("Boolean|Int")
           ))
         ))
       ))
@@ -123,7 +123,7 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
 
     MetaMapper.dicFromProto(dApp) shouldBe Right(
       Dic(Map(
-        "version" -> Single("1"),
+        "version" -> Str("1"),
         "callableFuncTypes" -> Chain(List(Dic(Map())))
       ))
     )
@@ -163,16 +163,16 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
     dApp.meta shouldBe expectedMeta
     MetaMapper.dicFromProto(dApp) shouldBe Right(
       Dic(Map(
-        "version" -> Single("2"),
+        "version" -> Str("2"),
         "callableFuncTypes" -> Chain(List(
           Dic(ListMap(
-            "a" -> Single("List[Int]"),
-            "b" -> Single("List[String]"),
-            "c" -> Single("ByteVector"),
-            "d" -> Single("Boolean|Int|String"),
+            "a" -> Str("List[Int]"),
+            "b" -> Str("List[String]"),
+            "c" -> Str("ByteVector"),
+            "d" -> Str("Boolean|Int|String"),
           )),
           Dic(Map(
-            "a" -> Single("List[ByteVector]")
+            "a" -> Str("List[ByteVector]")
           ))
         ))
       ))
@@ -214,7 +214,7 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
 
     MetaMapper.dicFromProto(dApp) shouldBe Right(
       Dic(Map(
-        "version" -> Single("2"),
+        "version" -> Str("2"),
         "callableFuncTypes" -> Chain(List(Dic(Map())))
       ))
     )

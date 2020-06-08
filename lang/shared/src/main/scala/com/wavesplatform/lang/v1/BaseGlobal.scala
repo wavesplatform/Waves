@@ -237,11 +237,11 @@ trait BaseGlobal {
     }
 
   private def combineMetaWithDApp(dic: Dic, dApp: DApp): Dic =
-    dic.m.get(MetaMapperStrategyV1.FieldName).fold(dic) {
+    dic.m.get(MetaMapperStrategyV1.CallableFuncTypesField).fold(dic) {
       case Chain(paramTypes) =>
         val funcsName      = dApp.callableFuncs.map(_.u.name)
         val paramsWithFunc = Dic((funcsName zip paramTypes).toMap)
-        Dic(dic.m.updated(MetaMapperStrategyV1.FieldName, paramsWithFunc))
+        Dic(dic.m.updated(MetaMapperStrategyV1.CallableFuncTypesField, paramsWithFunc))
       case _ => Dic(Map())
     }
 

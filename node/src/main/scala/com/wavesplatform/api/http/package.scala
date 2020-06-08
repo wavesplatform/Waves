@@ -193,6 +193,7 @@ package object http extends ApiMarshallers with ScorexLogging {
   lazy val metaConverter: RecKeyValueFolder[JsValueWrapper, JsObject] =
     RecKeyValueFolder(
       Json.toJsFieldJsValueWrapper(_),
+      Json.toJsFieldJsValueWrapper(_),
       l => Json.arr(l: _*),
       m => Json.obj(m: _*)
     )
