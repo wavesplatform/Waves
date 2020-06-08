@@ -118,7 +118,10 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
          |func defineTxHeight(id: ByteVector) = [BooleanEntry(toBase58String(id), transactionHeightById(id).isDefined())]
          |
          |@Callable(inv)
-         |func blockIsEven() = if height % 2 == 0 then [] else throw("block height is odd")
+         |func blockIsEven() =
+         |  if (${"sigVerify(base58'', base58'', base58'') ||" * 8} height % 2 == 0)
+         |  then []
+         |  else throw("block height is odd")
          |
         """.stripMargin
 

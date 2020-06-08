@@ -20,7 +20,7 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
   val recipient = secondAddress
   val dApp      = thirdAddress
   val scriptText =
-    """
+   s"""
       |{-# STDLIB_VERSION 4 #-}
       |{-# CONTENT_TYPE DAPP #-}
       |{-# SCRIPT_TYPE ACCOUNT #-}
@@ -33,7 +33,12 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
       |        case integer:Int => integer.toString()
       |        case bool:Boolean => bool.toString()
       |        case s:String => s
-      |        case _ => throw("Empty description")
+      |        case _ =>
+      |         if (${"sigVerify(base58'', base58'', base58'') ||" * 8} true)
+      |            then
+      |               throw("Empty description")
+      |            else
+      |               throw("unexpected")
       |      }
       |    let assetId = if (!transferTx.assetId.isDefined()) then {"WAVES"} else {transferTx.assetId.value().toBase58String()}
       |    let feeAssetId = if (!transferTx.feeAssetId.isDefined()) then {"WAVES"} else {transferTx.feeAssetId.value().toBase58String()}
