@@ -49,6 +49,12 @@
       paramsDoc: [ "The string.", "The separator." ]
     }
     {
+      name: "split_10El"
+      params: [ "String", "String" ]
+      doc: "Splits a string delimited by a separator into a list of substrings. Max 10 elements."
+      paramsDoc: [ "The string.", "The separator." ]
+    }
+    {
       name: "size"
       params: [ "String" ]
       doc: "Returns the size of a string"

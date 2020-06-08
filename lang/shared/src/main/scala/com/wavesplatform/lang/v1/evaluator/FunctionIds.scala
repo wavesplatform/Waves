@@ -51,6 +51,7 @@ object FunctionIds {
   val INDEXOF: Short      = 1203
   val INDEXOFN: Short     = 1204
   val SPLIT: Short        = 1205
+  val SPLIT10: Short      = 1210
   val PARSEINT: Short     = 1206
   val LASTINDEXOF: Short  = 1207
   val LASTINDEXOFN: Short = 1208

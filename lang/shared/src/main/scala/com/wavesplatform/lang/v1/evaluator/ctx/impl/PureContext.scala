@@ -490,25 +490,36 @@ object PureContext {
       case xs => notImplemented[Id, EVALUATED]("split(str: String, separator: String)", xs)
     }
 
-  private def split(str: String, sep: String) =
+  lazy val splitStr10: BaseFunction[NoContext] =
+    NativeFunction("split_10El", 10, SPLIT10, listString, ("str", STRING), ("separator", STRING)) {
+      case CONST_STRING(str) :: CONST_STRING(sep) :: Nil =>
+        split(str, sep, Some(10))
+          .traverse(CONST_STRING(_))
+          .flatMap(s => ARR(s.toIndexedSeq, true))
+      case xs => notImplemented[Id, EVALUATED]("split(str: String, separator: String)", xs)
+    }
+
+  private def split(str: String, sep: String, limitOpt: Option[Int] = None) =
     if (str == "") listWithEmptyStr
     else if (sep == "") 1 to str.length map (i => String.valueOf(str.charAt(i - 1))) toList
-    else splitRec(str, sep).reverse
+    else splitRec(str, sep, limitOpt).reverse
 
   private val listWithEmptyStr = List("")
 
   @tailrec private def splitRec(
       str: String,
       sep: String,
+      limitOpt: Option[Int],
       offset: Int = 0,
       splitted: List[String] = Nil
   ): List[String] = {
     val index = str.indexOf(sep, offset)
-    if (index == -1) str.substring(offset, str.length) :: splitted
+    if (index == -1 || limitOpt.exists(splitted.size > _) ) str.substring(offset, str.length) :: splitted
     else
       splitRec(
         str,
         sep,
+        limitOpt,
         index + sep.length,
         str.substring(offset, index) :: splitted
       )
@@ -929,7 +940,8 @@ object PureContext {
           listContains,
           listMin,
           listMax,
-          makeString
+          makeString,
+          splitStr10
         )
 
     version match {
