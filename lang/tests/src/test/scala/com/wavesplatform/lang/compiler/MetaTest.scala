@@ -4,7 +4,7 @@ import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.NoShrink
-import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper, Str}
+import com.wavesplatform.lang.contract.meta.{Bool, Chain, Dic, MetaMapper, Str}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, V3, V4, DApp => DAppType}
 import com.wavesplatform.lang.v1.compiler
@@ -72,18 +72,19 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
       Dic(Map(
         "version" -> Str("1"),
         "callableFuncTypes" -> Chain(List(
-          Dic(ListMap(
-            "a" -> Str("Boolean|ByteVector|Int|String"),
-            "b" -> Str("Int"),
-            "c" -> Str("Int|String"),
-            "d" -> Str("Int|String"),
-            "e" -> Str("Boolean|ByteVector|String"),
-            "f" -> Str("ByteVector|Int")
+          Chain(List(
+            Dic(Map("name" -> Str("a"), "type" -> Str("Boolean|ByteVector|Int|String"))),
+            Dic(Map("name" -> Str("b"), "type" -> Str("Int"))),
+            Dic(Map("name" -> Str("c"), "type" -> Str("Int|String"))),
+            Dic(Map("name" -> Str("d"), "type" -> Str("Int|String"))),
+            Dic(Map("name" -> Str("e"), "type" -> Str("Boolean|ByteVector|String"))),
+            Dic(Map("name" -> Str("f"), "type" -> Str("ByteVector|Int")))
           )),
-          Dic(Map(
-            "a" -> Str("Boolean|Int")
+          Chain(List(
+            Dic(Map("name" -> Str("a"), "type" -> Str("Boolean|Int")))
           ))
-        ))
+        )),
+        "isArrayArguments" -> Bool(true)
       ))
     )
   }
@@ -124,7 +125,8 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
     MetaMapper.dicFromProto(dApp) shouldBe Right(
       Dic(Map(
         "version" -> Str("1"),
-        "callableFuncTypes" -> Chain(List(Dic(Map())))
+        "callableFuncTypes" -> Chain(List(Chain(List()))),
+        "isArrayArguments" -> Bool(true)
       ))
     )
   }
@@ -165,16 +167,17 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
       Dic(Map(
         "version" -> Str("2"),
         "callableFuncTypes" -> Chain(List(
-          Dic(ListMap(
-            "a" -> Str("List[Int]"),
-            "b" -> Str("List[String]"),
-            "c" -> Str("ByteVector"),
-            "d" -> Str("Boolean|Int|String"),
+          Chain(List(
+            Dic(Map("name" -> Str("a"), "type" -> Str("List[Int]"))),
+            Dic(Map("name" -> Str("b"), "type" -> Str("List[String]"))),
+            Dic(Map("name" -> Str("c"), "type" -> Str("ByteVector"))),
+            Dic(Map("name" -> Str("d"), "type" -> Str("Boolean|Int|String"))),
           )),
-          Dic(Map(
-            "a" -> Str("List[ByteVector]")
+          Chain(List(
+            Dic(Map("name" -> Str("a"), "type" -> Str("List[ByteVector]"))),
           ))
-        ))
+        )),
+        "isArrayArguments" -> Bool(true)
       ))
     )
   }
@@ -215,7 +218,8 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
     MetaMapper.dicFromProto(dApp) shouldBe Right(
       Dic(Map(
         "version" -> Str("2"),
-        "callableFuncTypes" -> Chain(List(Dic(Map())))
+        "callableFuncTypes" -> Chain(List(Chain(List()))),
+        "isArrayArguments" -> Bool(true)
       ))
     )
   }
