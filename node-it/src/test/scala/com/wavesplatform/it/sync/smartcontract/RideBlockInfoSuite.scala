@@ -82,13 +82,15 @@ class RideBlockInfoSuite extends BaseTransactionSuite {
   }
 
   test("not able to retrieve vrf from block V4") {
-    val tx = sender.invokeScript(caller, dApp, func = Some("blockInfoV5"), args = List(CONST_LONG(activationHeight - 1)), waitForTx = true)._1.id
-    sender.debugStateChanges(tx).stateChanges.get.error shouldBe 'defined
+    val tx = sender.invokeScript(caller, dApp, func = Some("blockInfoV5"), args = List(CONST_LONG(activationHeight - 1)))._1.id
+    sender.waitForHeight(sender.height + 1)
+    sender.transactionStatus(Seq(tx)).head.status shouldBe "not_found"
   }
 
   test("not able to retrieve vrf from block V3") {
-    val tx = sender.invokeScript(caller, dApp, func = Some("blockInfoV5"), args = List(CONST_LONG(activationHeight - 2)), waitForTx = true)._1.id
-    sender.debugStateChanges(tx).stateChanges.get.error shouldBe 'defined
+    val tx = sender.invokeScript(caller, dApp, func = Some("blockInfoV5"), args = List(CONST_LONG(activationHeight - 2)))._1.id
+    sender.waitForHeight(sender.height + 1)
+    sender.transactionStatus(Seq(tx)).head.status shouldBe "not_found"
   }
 
   test("able to retrieve block V4 info") {
