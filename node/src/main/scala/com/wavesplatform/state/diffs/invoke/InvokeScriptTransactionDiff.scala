@@ -106,18 +106,14 @@ object InvokeScriptTransactionDiff {
                     tx.id()
                   )
 
-                  val evaluate =
-                    if (blockchain.settings.useEvaluatorV2) {
-                      //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
-                      val evaluatorV2Limit =
-                        if (blockchain.estimator.version == 2)
-                          Int.MaxValue
-                        else
-                          ContractLimits.MaxComplexityByVersion(version)
-                      evaluateV2(_, _, _, _, _, evaluatorV2Limit)
-                    } else evaluateV1 _
+                  //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
+                  val evaluatorV2Limit =
+                    if (blockchain.estimator.version == 2)
+                      Int.MaxValue
+                    else
+                      ContractLimits.MaxComplexityByVersion(version)
 
-                  Try(evaluate(version, contract, directives, invocation, environment))
+                  Try(evaluateV2(version, contract, directives, invocation, environment, evaluatorV2Limit))
                     .fold(e => Left((e.getMessage, Nil)), identity)
                     .leftMap { case (error, log) => ScriptExecutionError.ByDAppScript(error, log) }
                 })
@@ -154,21 +150,6 @@ object InvokeScriptTransactionDiff {
       case Left(l) => TracedResult(Left(l))
       case _       => TracedResult(Left(GenericError(s"No contract at address ${tx.dAppAddressOrAlias}")))
     }
-  }
-
-  private def evaluateV1(
-      version: StdLibVersion,
-      contract: DApp,
-      directives: DirectiveSet,
-      invocation: ContractEvaluator.Invocation,
-      environment: WavesEnvironment
-  ) = {
-    val ctx =
-      PureContext.build(Global, version).withEnvironment[Environment] |+|
-        CryptoContext.build(Global, version).withEnvironment[Environment] |+|
-        WavesContext.build(directives)
-
-    ContractEvaluator(ctx.evaluationContext(environment), contract, invocation, version)
   }
 
   private def evaluateV2(
