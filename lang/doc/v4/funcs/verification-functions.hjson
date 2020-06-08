@@ -42,9 +42,20 @@
       paramsDoc: [ "The RSA algorithm.", "The message.", "The signature.", "The public key." ]
     }
     {
+      name: "rsaVerify"
+      params: [
+        "RsaDigistAlgs"
+        "ByteVector"
+        "ByteVector"
+        "ByteVector"
+      ]
+      doc: "Verifies an [RSA](https://en.wikipedia.org/wiki/RSA_%28cryptosystem%29) signature."
+      paramsDoc: [ "The RSA algorithm.", "The message.", "The signature.", "The public key." ]
+    }
+    {
       name: "rsaVerify_16Kb"
       params: [
-        "Md5|NoAlg|Sha1|Sha224|Sha256|Sha3224|Sha3256|Sha3384|Sha3512|Sha384|Sha512"
+        "RsaDigistAlgs"
         "ByteVector"
         "ByteVector"
         "ByteVector"
@@ -55,7 +66,7 @@
     {
       name: "rsaVerify_32Kb"
       params: [
-        "Md5|NoAlg|Sha1|Sha224|Sha256|Sha3224|Sha3256|Sha3384|Sha3512|Sha384|Sha512"
+        "RsaDigistAlgs"
         "ByteVector"
         "ByteVector"
         "ByteVector"
@@ -66,7 +77,7 @@
     {
       name: "rsaVerify_64Kb"
       params: [
-        "Md5|NoAlg|Sha1|Sha224|Sha256|Sha3224|Sha3256|Sha3384|Sha3512|Sha384|Sha512"
+        "RsaDigistAlgs"
         "ByteVector"
         "ByteVector"
         "ByteVector"
@@ -77,7 +88,7 @@
     {
       name: "rsaVerify_128Kb"
       params: [
-        "Md5|NoAlg|Sha1|Sha224|Sha256|Sha3224|Sha3256|Sha3384|Sha3512|Sha384|Sha512"
+        "RsaDigistAlgs"
         "ByteVector"
         "ByteVector"
         "ByteVector"
