@@ -14,7 +14,7 @@ import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{DataTransaction, Transaction}
 
 class OracleTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair], estimator: ScriptEstimator) extends TransactionGenerator {
-  override def next(): Iterator[Transaction] = generate(settings).toIterator
+  override def next(): Iterator[Transaction] = generate(settings).iterator
 
   def generate(settings: Settings): Seq[Transaction] = {
     val oracle = accounts.last

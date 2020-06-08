@@ -22,9 +22,7 @@ class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[KeyPai
   private def r                                   = ThreadLocalRandom.current
   private def randomFrom[T](c: Seq[T]): Option[T] = if (c.nonEmpty) Some(c(r.nextInt(c.size))) else None
 
-  override def next(): Iterator[Transaction] = {
-    generate(settings).toIterator
-  }
+  override def next(): Iterator[Transaction] = generate(settings).iterator
 
   private def generate(settings: SmartGenerator.Settings): Seq[Transaction] = {
     val bank = randomFrom(accounts).get

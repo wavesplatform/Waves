@@ -49,8 +49,7 @@ class NarrowTransactionGenerator(
     if (settings.protobuf) (v + 1).toByte
     else v
 
-  override def next(): Iterator[Transaction] =
-    generate(settings.transactions).toIterator
+  override def next(): Iterator[Transaction] = generate(settings.transactions).iterator
 
   private[this] def generate(n: Int): Seq[Transaction] = {
     val now = System.currentTimeMillis()
@@ -350,7 +349,7 @@ class NarrowTransactionGenerator(
             ).logNone("There is no issued smart assets, may be you need to increase issue transaction's probability or pre-configure them")
         }
 
-        (tx.map(tx => allTxsWithValid :+ tx).getOrElse(allTxsWithValid), tx match {
+        (tx.fold(allTxsWithValid)(tx => allTxsWithValid :+ tx), tx match {
           case Some(tx: IssueTransaction) => validIssueTxs :+ tx
           case _                          => validIssueTxs
         }, tx match {
@@ -369,7 +368,7 @@ class NarrowTransactionGenerator(
 
     Universe.Leases = generated._4
 
-    log.trace(s"Distribution:\n${generated._1.groupBy(_.getClass).mapValues(_.size).mkString("\t", "\n\t", "")}")
+    log.trace(s"Distribution:\n${generated._1.groupBy(_.getClass).view.mapValues(_.size).mkString("\t", "\n\t", "")}")
 
     generated._1
   }
@@ -504,7 +503,7 @@ object NarrowTransactionGenerator {
                 .selfSigned(2.toByte, richAccount, account.toAddress, Waves, balance, Waves, fee, None, time.correctedTime())
                 .explicitGet()
 
-              val Right((script, _)) = ScriptCompiler.compile(new String(Files.readAllBytes(Paths.get(scriptFile))), estimator)
+              val script = ScriptCompiler.compile(new String(Files.readAllBytes(Paths.get(scriptFile))), estimator).explicitGet()._1
               val scriptTx           = SetScriptTransaction.selfSigned(TxVersion.V1, account, Some(script), fee, time.correctedTime()).explicitGet()
 
               (initTxs :+ transferTx, tailInitTxs :+ scriptTx, accounts :+ account)
@@ -517,7 +516,7 @@ object NarrowTransactionGenerator {
                 import assetsSettings._
 
                 val issuer             = randomFrom(accounts).get
-                val Right((script, _)) = ScriptCompiler.compile(new String(Files.readAllBytes(Paths.get(scriptFile))), estimator)
+                val script = ScriptCompiler.compile(new String(Files.readAllBytes(Paths.get(scriptFile))), estimator).explicitGet()._1
 
                 val tx = IssueTransaction
                   .selfSigned(

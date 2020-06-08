@@ -18,9 +18,7 @@ import scala.util.Random
 class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settings, val accounts: Seq[KeyPair], estimator: ScriptEstimator)
     extends TransactionGenerator {
 
-  override def next(): Iterator[Transaction] = {
-    generate(settings).toIterator
-  }
+  override def next(): Iterator[Transaction] = generate(settings).iterator
 
   private def generate(settings: MultisigTransactionGenerator.Settings): Seq[Transaction] = {
 
