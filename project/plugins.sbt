@@ -12,7 +12,7 @@ Seq(
   "com.eed3si9n"       % "sbt-assembly"              % "0.14.10",
   "com.typesafe.sbt"   % "sbt-native-packager"       % "1.3.25",
   "org.scalastyle"     %% "scalastyle-sbt-plugin"    % "1.0.0",
-  "org.scoverage"      % "sbt-scoverage"             % "1.5.1",
+  "org.scoverage"      % "sbt-scoverage"             % "1.6.1",
   "se.marcuslonnberg"  % "sbt-docker"                % "1.4.1",
   "com.typesafe.sbt"   % "sbt-git"                   % "1.0.0",
   "org.scala-js"       % "sbt-scalajs"               % "0.6.31",
