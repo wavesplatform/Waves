@@ -86,7 +86,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest
         domain.blockchainUpdater.processBlock(block0).explicitGet()
         domain.blockchainUpdater.processMicroBlock(microBlocks0(0)).explicitGet()
         domain.blockchainUpdater.processMicroBlock(microBlocks0(1)).explicitGet()
-        domain.blockchainUpdater.processBlock(block1) shouldBe 'right
+        domain.blockchainUpdater.processBlock(block1).explicitGet()
 
         effBalance(genesis.recipient, domain) > 0 shouldBe true
         effBalance(masterToAlice.recipient, domain) > 0 shouldBe true
@@ -103,7 +103,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest
         domain.blockchainUpdater.processBlock(block0).explicitGet()
         domain.blockchainUpdater.processBlock(block1).explicitGet()
         domain.blockchainUpdater.processMicroBlock(microBlocks1.head).explicitGet()
-        domain.blockchainUpdater.processBlock(block2) shouldBe 'right
+        domain.blockchainUpdater.processBlock(block2).explicitGet()
 
         effBalance(genesis.recipient, domain) > 0 shouldBe true
         effBalance(masterToAlice.recipient, domain) shouldBe 0
@@ -138,7 +138,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest
         domain.blockchainUpdater.processBlock(block0).explicitGet()
         domain.blockchainUpdater.processBlock(block1).explicitGet()
         domain.blockchainUpdater.processMicroBlock(microBlocks1(0)).explicitGet()
-        domain.blockchainUpdater.processBlock(block2) shouldBe 'right
+        domain.blockchainUpdater.processBlock(block2).explicitGet()
 
         effBalance(genesis.recipient, domain) > 0 shouldBe true
         effBalance(masterToAlice.recipient, domain) shouldBe 1

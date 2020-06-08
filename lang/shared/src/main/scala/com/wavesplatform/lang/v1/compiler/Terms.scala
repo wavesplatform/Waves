@@ -276,7 +276,7 @@ object Terms {
   abstract case class ARR private (xs: IndexedSeq[EVALUATED]) extends EVALUATED {
     override def toString: String = TermPrinter.string(this)
 
-    val elementsWeightSum: Long =
+    lazy val elementsWeightSum: Long =
       weight - EMPTYARR_WEIGHT - ELEM_WEIGHT * xs.size
   }
 
@@ -287,7 +287,7 @@ object Terms {
       } else {
         Either.cond(
           mweight <= MaxWeight,
-          new { override val weight: Long = mweight } with ARR(xs),
+          new ARR(xs) { override val weight: Long = mweight },
           s"The list is too heavy. Actual weight: $mweight, limit: $MaxWeight"
         )
       }

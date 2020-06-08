@@ -437,8 +437,8 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
         d.blockchainUpdater.processBlock(b4).explicitGet()
         d.blockchainUpdater.blockReward(16) shouldBe (7 * Constants.UnitsInWave).some
 
-        route.getRewards(9).right.get.votes.increase shouldBe 0
-        route.getRewards(10).right.get.votes.increase shouldBe 1
+        route.getRewards(9).explicitGet().votes.increase shouldBe 0
+        route.getRewards(10).explicitGet().votes.increase shouldBe 1
 
       }
   }

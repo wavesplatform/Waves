@@ -2,6 +2,7 @@ package com.wavesplatform.network
 
 import java.net.InetSocketAddress
 
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.network.message.{MessageSpec, Message => ScorexMessage}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
@@ -88,8 +89,7 @@ class LegacyFrameCodecSpec extends FreeSpec with Matchers with MockFactory with 
   "should pack update asset info in PB message" in {
     val tx = UpdateAssetInfoTransaction
       .selfSigned(1, TestValues.keyPair, TestValues.asset.id, "bomz", "", System.currentTimeMillis(), TestValues.fee, Waves)
-      .right
-      .get
+      .explicitGet()
     RawBytes.fromTransaction(tx) shouldBe RawBytes(PBTransactionSpec.messageCode, PBTransactionSpec.serializeData(tx))
   }
 

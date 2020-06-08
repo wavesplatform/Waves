@@ -223,7 +223,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
   "minSponsoredAssetFee": null
  }"""
 
-    val req = Json.parse(js1).validate[SignedSponsorFeeRequest].get.toTx.right.get
+    val req = Json.parse(js1).validate[SignedSponsorFeeRequest].get.toTx.explicitGet()
     req.proofs shouldBe Proofs(
       Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get)
     )
@@ -231,7 +231,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     req.minSponsoredAssetFee shouldBe Some(100000)
 
     for (js <- Seq(js2, js3, js4)) {
-      val req = Json.parse(js).validate[SignedSponsorFeeRequest].get.toTx.right.get
+      val req = Json.parse(js).validate[SignedSponsorFeeRequest].get.toTx.explicitGet()
       Proofs(Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get))
       req.fee shouldBe 100000000L
       req.minSponsoredAssetFee shouldBe None

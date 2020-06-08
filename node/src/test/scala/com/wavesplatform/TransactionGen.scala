@@ -418,8 +418,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   ): Gen[ReissueTransaction] = {
     for {
       tx <- Gen.oneOf(
-        ReissueTransaction.selfSigned(1.toByte, reissuer, assetId, quantity, reissuable, fee, timestamp).right.get,
-        ReissueTransaction.selfSigned(2.toByte, reissuer, assetId, quantity, reissuable, fee, timestamp).right.get
+        ReissueTransaction.selfSigned(1.toByte, reissuer, assetId, quantity, reissuable, fee, timestamp).explicitGet(),
+        ReissueTransaction.selfSigned(2.toByte, reissuer, assetId, quantity, reissuable, fee, timestamp).explicitGet()
       )
     } yield tx
   }

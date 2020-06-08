@@ -69,20 +69,20 @@ class BlockV5Test
     val blockWithBadVotes = updateHeader(block, _.copy(featureVotes = features))
 
     withClue("validations") {
-      Validators.validateBlock(blockWithBadVotes) shouldBe 'left
-      Validators.validateBlock(block) shouldBe 'right
+      Validators.validateBlock(blockWithBadVotes).left.value
+      Validators.validateBlock(block).explicitGet()
       Validators.validateBlock(
         updateHeader(block, _.copy(version = Block.NgBlockVersion))
-      ) shouldBe 'left
+      ).left.value
       Validators.validateBlock(
         updateHeader(block, _.copy(generationSignature = ByteStr(new Array[Byte](32))))
-      ) shouldBe 'left
+      ).left.value
       Validators.validateBlock(
         updateHeader(block, _.copy(featureVotes = Seq[Short](1, 1, 1)))
-      ) shouldBe 'left
+      ).left.value
       Validators.validateBlock(
         updateHeader(blockWithBadVotes, _.copy(version = Block.NgBlockVersion, generationSignature = ByteStr(new Array[Byte](32))))
-      ) shouldBe 'right
+      ).explicitGet()
     }
 
     withClue("preserve feature order") {
@@ -128,9 +128,8 @@ class BlockV5Test
               shiftTime(miner, minerAcc1)
 
               val forge = miner invokePrivate forgeBlock(minerAcc1)
-              forge shouldBe 'right
-              val block = forge.right.value._2
-              Await.result(appender(block).runToFuture(scheduler), 10.seconds).right.value shouldBe 'defined
+              val block = forge.explicitGet()._2
+              Await.result(appender(block).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
               blockchain.height shouldBe h
             }
 
@@ -139,11 +138,10 @@ class BlockV5Test
             shiftTime(miner, minerAcc2)
 
             val forgedAtActivationHeight = miner invokePrivate forgeBlock(minerAcc2)
-            forgedAtActivationHeight shouldBe 'right
-            val blockAtActivationHeight = forgedAtActivationHeight.right.value._2
+            val blockAtActivationHeight = forgedAtActivationHeight.explicitGet()._2
             blockAtActivationHeight.header.version shouldBe Block.ProtoBlockVersion
 
-            Await.result(appender(blockAtActivationHeight).runToFuture(scheduler), 10.seconds).right.value shouldBe 'defined
+            Await.result(appender(blockAtActivationHeight).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
             blockchain.height shouldBe BlockV5ActivationHeight
             blockchain.lastBlockHeader.value.header.version shouldBe Block.ProtoBlockVersion
             blockAtActivationHeight.signature shouldBe blockchain.lastBlockHeader.value.signature
@@ -163,11 +161,10 @@ class BlockV5Test
             shiftTime(miner, minerAcc1)
 
             val forgedAfterActivationHeight = miner invokePrivate forgeBlock(minerAcc1)
-            forgedAfterActivationHeight shouldBe 'right
-            val blockAfterActivationHeight = forgedAfterActivationHeight.right.value._2
+            val blockAfterActivationHeight = forgedAfterActivationHeight.explicitGet()._2
             blockAfterActivationHeight.header.version shouldBe Block.ProtoBlockVersion
 
-            Await.result(appender(blockAfterActivationHeight).runToFuture(scheduler), 10.seconds).right.value shouldBe 'defined
+            Await.result(appender(blockAfterActivationHeight).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
             blockchain.height shouldBe BlockV5ActivationHeight + 1
             blockchain.lastBlockHeader.value.header.version shouldBe Block.ProtoBlockVersion
             blockAfterActivationHeight.signature shouldBe blockchain.lastBlockHeader.value.signature
@@ -184,11 +181,10 @@ class BlockV5Test
             shiftTime(miner, minerAcc2)
 
             val forgedAfterVRFUsing = miner invokePrivate forgeBlock(minerAcc2)
-            forgedAfterVRFUsing shouldBe 'right
-            val blockAfterVRFUsing = forgedAfterVRFUsing.right.value._2
+            val blockAfterVRFUsing = forgedAfterVRFUsing.explicitGet()._2
             blockAfterVRFUsing.header.version shouldBe Block.ProtoBlockVersion
 
-            Await.result(appender(blockAfterVRFUsing).runToFuture(scheduler), 10.seconds).right.value shouldBe 'defined
+            Await.result(appender(blockAfterVRFUsing).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
             blockchain.height shouldBe BlockV5ActivationHeight + 2
             blockchain.lastBlockHeader.value.header.version shouldBe Block.ProtoBlockVersion
             blockAfterVRFUsing.signature shouldBe blockchain.lastBlockHeader.value.signature
@@ -214,23 +210,21 @@ class BlockV5Test
             shiftTime(miner, minerAcc2)
 
             val oldVersionBlockForge = miner invokePrivate forgeBlock(minerAcc2)
-            oldVersionBlockForge shouldBe 'right
-            val oldVersionBlock = oldVersionBlockForge.right.value._2
+            val oldVersionBlock = oldVersionBlockForge.explicitGet()._2
             oldVersionBlock.header.version shouldBe Block.RewardBlockVersion
 
             disabledFeatures.set(Set())
-            Await.result(appender(oldVersionBlock).runToFuture(scheduler), 10.seconds) shouldBe 'left
+            Await.result(appender(oldVersionBlock).runToFuture(scheduler), 10.seconds).left.value
 
             for (h <- blockchain.height to 110) {
 
               shiftTime(miner, minerAcc1)
 
               val forged = miner invokePrivate forgeBlock(minerAcc1)
-              forged shouldBe 'right
-              val block = forged.right.value._2
+              val block = forged.explicitGet()._2
               block.header.version shouldBe Block.ProtoBlockVersion
 
-              Await.result(appender(block).runToFuture(scheduler), 10.seconds).right.value shouldBe 'defined
+              Await.result(appender(block).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
               blockchain.height shouldBe (h + 1)
 
               val hitSource     = blockchain.hitSource(if (h > 100) h - 100 else h).value
@@ -260,11 +254,10 @@ class BlockV5Test
               shiftTime(miner, minerAcc1)
 
               val forged = miner invokePrivate forgeBlock(minerAcc1)
-              forged shouldBe 'right
-              val block = forged.right.value._2
+              val block = forged.explicitGet()._2
               block.header.version shouldBe Block.ProtoBlockVersion
 
-              Await.result(appender(block).runToFuture(scheduler), 10.seconds).right.value shouldBe 'defined
+              Await.result(appender(block).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
               blockchain.height shouldBe (h + 1)
             }
         }
@@ -280,14 +273,13 @@ class BlockV5Test
           case (miner, appender, scheduler) =>
             def forge(): Block = {
               val forge = miner invokePrivate forgeBlock(minerAcc)
-              forge shouldBe 'right
-              forge.right.value._2
+              forge.explicitGet()._2
             }
 
             def forgeAppendAndValidate(version: Byte, height: Int): Unit = {
               val block = forge()
               block.header.version shouldBe version
-              Await.result(appender(block).runToFuture(scheduler), 10.seconds).right.value shouldBe 'defined
+              Await.result(appender(block).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
               blockchain.height shouldBe height
             }
 
@@ -309,7 +301,7 @@ class BlockV5Test
             val badNgBlock = forge()
             badNgBlock.header.version shouldBe Block.NgBlockVersion
             disabledFeatures.set(Set())
-            Await.result(appender(badNgBlock).runToFuture(scheduler), 10.seconds) shouldBe 'left
+            Await.result(appender(badNgBlock).runToFuture(scheduler), 10.seconds).left.value
 
             shiftTime(miner, minerAcc)
             forgeAppendAndValidate(Block.RewardBlockVersion, BlockRewardActivationHeight + 1)
@@ -324,8 +316,8 @@ class BlockV5Test
             val badRewardBlock = forge()
             badRewardBlock.header.version shouldBe Block.RewardBlockVersion
             disabledFeatures.set(Set())
-            Await.result(appender(badNgBlock).runToFuture(scheduler), 10.seconds) shouldBe 'left
-            Await.result(appender(badRewardBlock).runToFuture(scheduler), 10.seconds) shouldBe 'left
+            Await.result(appender(badNgBlock).runToFuture(scheduler), 10.seconds).left.value
+            Await.result(appender(badRewardBlock).runToFuture(scheduler), 10.seconds).left.value
 
             shiftTime(miner, minerAcc)
             forgeAppendAndValidate(Block.ProtoBlockVersion, BlockV5ActivationHeight)
@@ -434,7 +426,7 @@ class BlockV5Test
     }
   }
 
-  private val forgeBlock = PrivateMethod[Either[String, (MiningConstraints, Block, MiningConstraint)]]('forgeBlock)
+  private val forgeBlock = PrivateMethod[Either[String, (MiningConstraints, Block, MiningConstraint)]](Symbol("forgeBlock"))
 
   private def genesis: Gen[(KeyPair, KeyPair, Block)] =
     for {

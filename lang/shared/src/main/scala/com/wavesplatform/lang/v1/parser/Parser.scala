@@ -300,10 +300,7 @@ object Parser {
 
     // Hack to force parse of "\n". Otherwise it is treated as a separator
     def newLineSep(implicit c: fastparse.P[Any]) = {
-      def whitespace(implicit c: fastparse.P[Any]) = {
-        CharsWhileIn(" \t\r")
-      }
-      P(whitespace.repX  ~~ "\n").repX(1)
+      P(CharsWhileIn(" \t\r").repX  ~~ "\n").repX(1)
     }
 
     P(

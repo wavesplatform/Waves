@@ -403,7 +403,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite /*with CancelAft
           "fee"        -> calcMassTransferFee(1),
           "version"    -> 1,
           "transfers"  -> Json.toJson(List(Transfer(firstAddress, 1000))),
-          "attachment" -> Json.toJson(Attachment.Str("somestring"))
+          "attachment" -> Json.toJson[Attachment](Attachment.Str("somestring"))
         )
       )
     ) { error =>

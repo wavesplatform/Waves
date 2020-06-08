@@ -15,7 +15,6 @@ import com.wavesplatform.transaction.smart.{BlockchainContext, buildThisValue}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{DataTransaction, Transaction}
 import com.wavesplatform.utils.EmptyBlockchain
-import fastparse.Parsed.Success
 import monix.eval.Coeval
 import shapeless.Coproduct
 
@@ -23,7 +22,7 @@ package object predef {
   val chainId: Byte = 'u'
 
   def runScript[T <: EVALUATED](script: String, version: StdLibVersion, t: In, blockchain: Blockchain, chainId: Byte): Either[String, T] = {
-    val Success(expr, _) = Parser.parseExpr(script)
+    val expr = Parser.parseExpr(script).get.value
     for {
       compileResult <- ExpressionCompiler(compilerContext(version, Expression, isAssetScript = false), expr)
       (typedExpr, _) = compileResult

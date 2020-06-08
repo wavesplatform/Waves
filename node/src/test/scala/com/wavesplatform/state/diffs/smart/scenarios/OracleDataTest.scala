@@ -18,12 +18,12 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Proofs}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.PropSpec
+import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class OracleDataTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
+class OracleDataTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink with Matchers {
   val preconditions
-    : Gen[(GenesisTransaction, GenesisTransaction, CreateAliasTransaction, SetScriptTransaction, DataTransaction, TransferTransaction)] =
+      : Gen[(GenesisTransaction, GenesisTransaction, CreateAliasTransaction, SetScriptTransaction, DataTransaction, TransferTransaction)] =
     for {
       master <- accountGen
       oracle <- accountGen
@@ -69,12 +69,16 @@ class OracleDataTest extends PropSpec with PropertyChecks with WithState with Tr
   property("simple oracle value required to transfer") {
     forAll(preconditions) {
       case (genesis, genesis2, createAlias, setScript, dataTransaction, transferFromScripted) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, genesis2, createAlias, setScript, dataTransaction))),
-                           TestBlock.create(Seq(transferFromScripted)),
-                           smartEnabledFS) { case _ => () }
-        assertDiffEi(Seq(TestBlock.create(Seq(genesis, genesis2, createAlias, setScript))),
-                     TestBlock.create(Seq(transferFromScripted)),
-                     smartEnabledFS)(totalDiffEi => totalDiffEi shouldBe Left(_: ScriptExecutionError))
+        assertDiffAndState(
+          Seq(TestBlock.create(Seq(genesis, genesis2, createAlias, setScript, dataTransaction))),
+          TestBlock.create(Seq(transferFromScripted)),
+          smartEnabledFS
+        ) { case _ => () }
+        assertDiffEi(
+          Seq(TestBlock.create(Seq(genesis, genesis2, createAlias, setScript))),
+          TestBlock.create(Seq(transferFromScripted)),
+          smartEnabledFS
+        )(_ should matchPattern { case Left(_: ScriptExecutionError) => })
     }
   }
 }

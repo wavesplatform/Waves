@@ -177,6 +177,7 @@ packageAll := Def
   )
   .value
 
+
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
 checkPRRaw := {
   try {

@@ -37,8 +37,8 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       deser.timestamp shouldEqual transaction.timestamp
       deser.proofs shouldEqual transaction.proofs
       bytes shouldEqual deser.bytes()
-      Verifier.verifyAsEllipticCurveSignature(transaction) shouldBe 'right
-      Verifier.verifyAsEllipticCurveSignature(deser) shouldBe 'right // !!!!!!!!!!!!!!!
+      Verifier.verifyAsEllipticCurveSignature(transaction).explicitGet()
+      Verifier.verifyAsEllipticCurveSignature(deser).explicitGet() // !!!!!!!!!!!!!!!
     }
   }
 
@@ -155,8 +155,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
         Waves,
         1526910778245L
       )
-      .right
-      .get
+      .explicitGet()
 
     (tx.json() - "proofs") shouldEqual (js.asInstanceOf[JsObject] - "proofs")
 
@@ -195,8 +194,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
         Waves,
         1526910778245L
       )
-      .right
-      .get
+      .explicitGet()
 
     (tx.json() - "proofs") shouldEqual (js.asInstanceOf[JsObject] - "proofs")
 
@@ -222,7 +220,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       timestamp = 11,
       proofs = Proofs(List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").map(s => ByteStr.decodeBase58(s).get))
     )
-    req.toTx shouldBe 'right
+    req.toTx.explicitGet()
     AddressScheme.current = DefaultAddressScheme
   }
 
@@ -251,7 +249,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       Some(
         Terms.FUNCTION_CALL(
           FunctionHeader.User("foo"),
-          List(ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L)), false).explicitGet)
+          List(ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L)), false).explicitGet())
         )
       ),
       Seq(),
@@ -259,7 +257,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       Waves,
       1,
       Proofs.empty
-    ) shouldBe 'right
+    ).explicitGet()
   }
 
   property(s"can't call a func with non native(simple) args - CaseObj") {

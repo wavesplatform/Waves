@@ -90,7 +90,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
     Post(connectUri, ConnectReq("example.com", 1)) ~> route should produce(ApiKeyNotValid)
     Post(connectUri, "") ~> ApiKeyHeader ~> route ~> check(handled shouldEqual false)
     Post(connectUri, Json.obj()) ~> ApiKeyHeader ~> route ~> check {
-      (responseAs[JsValue] \ "validationErrors").as[JsObject].keys should not be 'empty
+      (responseAs[JsValue] \ "validationErrors").as[JsObject].keys should not be empty
     }
 
     val address = inetSocketAddressGen.sample.get

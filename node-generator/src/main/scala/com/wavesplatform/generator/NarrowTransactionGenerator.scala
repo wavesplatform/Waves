@@ -556,8 +556,7 @@ object NarrowTransactionGenerator {
           timestamp = System.currentTimeMillis(),
           script = None
         )
-        .right
-        .get
+        .explicitGet()
 
       val tradeAssetDistribution: Seq[Transaction] = {
         (Universe.Accounts.map(_.keyPair).toSet - trader).toSeq.map(acc => {
@@ -573,8 +572,7 @@ object NarrowTransactionGenerator {
               Some(Attachment.Bin(Array.fill(random.nextInt(100))(random.nextInt().toByte))),
               System.currentTimeMillis()
             )
-            .right
-            .get
+            .explicitGet()
         })
       }
 

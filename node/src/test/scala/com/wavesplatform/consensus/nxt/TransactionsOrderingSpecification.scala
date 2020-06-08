@@ -28,8 +28,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           None,
           1
         )
-        .right
-        .get,
+        .explicitGet(),
       TransferTransaction
         .selfSigned(
           1.toByte,
@@ -42,8 +41,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           None,
           2
         )
-        .right
-        .get,
+        .explicitGet(),
       TransferTransaction
         .selfSigned(
           1.toByte,
@@ -56,8 +54,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           None,
           1
         )
-        .right
-        .get,
+        .explicitGet(),
       TransferTransaction
         .selfSigned(
           1.toByte,
@@ -70,8 +67,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           None,
           2
         )
-        .right
-        .get,
+        .explicitGet(),
       TransferTransaction
         .selfSigned(
           1.toByte,
@@ -84,8 +80,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           None,
           1
         )
-        .right
-        .get
+        .explicitGet()
     )
 
     val sorted = Random.shuffle(correctSeq).sorted(TransactionsOrdering.InBlock)
@@ -107,8 +102,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           None,
           1
         )
-        .right
-        .get,
+        .explicitGet(),
       TransferTransaction
         .selfSigned(
           1.toByte,
@@ -121,8 +115,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           None,
           1
         )
-        .right
-        .get,
+        .explicitGet(),
       TransferTransaction
         .selfSigned(
           1.toByte,
@@ -135,8 +128,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           None,
           2
         )
-        .right
-        .get,
+        .explicitGet(),
       TransferTransaction
         .selfSigned(
           1.toByte,
@@ -149,8 +141,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           None,
           1
         )
-        .right
-        .get,
+        .explicitGet(),
       TransferTransaction
         .selfSigned(
           1.toByte,
@@ -163,8 +154,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           None,
           2
         )
-        .right
-        .get
+        .explicitGet()
     )
 
     val sorted = Random.shuffle(correctSeq).sorted(TransactionsOrdering.InUTXPool)
@@ -186,8 +176,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           None,
           124L
         )
-        .right
-        .get,
+        .explicitGet(),
       TransferTransaction
         .selfSigned(
           1.toByte,
@@ -200,8 +189,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           None,
           123L
         )
-        .right
-        .get
+        .explicitGet()
     )
 
     Random.shuffle(correctSeq).sorted(TransactionsOrdering.InBlock) shouldBe correctSeq
@@ -221,8 +209,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           None,
           123L
         )
-        .right
-        .get,
+        .explicitGet(),
       TransferTransaction
         .selfSigned(
           1.toByte,
@@ -235,8 +222,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           None,
           124L
         )
-        .right
-        .get
+        .explicitGet()
     )
     Random.shuffle(correctSeq).sorted(TransactionsOrdering.InUTXPool) shouldBe correctSeq
   }

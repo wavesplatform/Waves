@@ -112,7 +112,7 @@ object ContractEvaluator {
       transactionId: ByteStr,
       limit: Int
   ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] = {
-    val exprWithLets = freezingLets.toStream.foldLeft(expr) {
+    val exprWithLets = freezingLets.to(LazyList).foldLeft(expr) {
       case (buildingExpr, (letName, letValue)) =>
         BLOCK(LET(letName, letValue.value.value.explicitGet()), buildingExpr)
     }

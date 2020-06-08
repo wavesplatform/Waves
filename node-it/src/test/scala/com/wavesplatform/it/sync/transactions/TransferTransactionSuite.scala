@@ -61,8 +61,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
     def invalidTx(timestamp: Long = System.currentTimeMillis, fee: Long = 100000): TransferTransaction =
       TransferTransaction
         .selfSigned(1.toByte, sender.keyPair, AddressOrAlias.fromString(sender.address).explicitGet(), Waves, 1, Waves, fee, None, timestamp)
-        .right
-        .get
+        .explicitGet()
 
     val (balance1, eff1) = miner.accountBalances(firstAddress)
 

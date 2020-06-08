@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.transactions
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, Mistiming, StateCheckFailed, WrongJson}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{script, someAssetAmount, _}
@@ -16,7 +16,6 @@ import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import play.api.libs.json._
-import scorex.crypto.encode.Base58
 
 import scala.concurrent.duration._
 import scala.util.Random
@@ -221,8 +220,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       ): SetAssetScriptTransaction =
         SetAssetScriptTransaction
           .signed(version = v, sender.keyPair.publicKey, assetId, Some(script), fee, timestamp, sender.keyPair.privateKey)
-          .right
-          .get
+          .explicitGet()
 
       val (balance, eff) = miner.accountBalances(firstAddress)
 
@@ -358,8 +356,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
           setScriptFee + smartFee,
           System.currentTimeMillis()
         )
-        .right
-        .get
+        .explicitGet()
 
       val setScriptId = sender
         .signedBroadcast(setScriptTransaction.json())

@@ -175,7 +175,7 @@ object NetworkServer extends ScorexLogging {
       if (thisConnFuture.isSuccess) {
         log.trace(formatOutgoingChannelEvent(thisConnFuture.channel(), "Connection established"))
         peerDatabase.touch(remoteAddress)
-        thisConnFuture.channel().closeFuture().addListener(handleOutgoingChannelClosed(remoteAddress))
+        thisConnFuture.channel().closeFuture().addListener(f => handleOutgoingChannelClosed(remoteAddress)(f))
       } else if (thisConnFuture.cause() != null) {
         peerDatabase.suspendAndClose(thisConnFuture.channel())
         outgoingChannels.remove(remoteAddress, thisConnFuture.channel())
@@ -200,7 +200,7 @@ object NetworkServer extends ScorexLogging {
           val newConnFuture = bootstrap.connect(remoteAddress)
 
           log.trace(s"${id(newConnFuture.channel())} Connecting to $remoteAddress")
-          newConnFuture.addListener(handleConnectionAttempt(remoteAddress)).channel()
+          newConnFuture.addListener(f => handleConnectionAttempt(remoteAddress)(f)).channel()
         }
       )
 

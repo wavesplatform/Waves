@@ -52,8 +52,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
         None,
         ts + 1
       )
-      .right
-      .get
+      .explicitGet()
     aliceToBob: TransferTransaction = TransferTransaction
       .selfSigned(
         1.toByte,
@@ -66,8 +65,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
         None,
         ts + 2
       )
-      .right
-      .get
+      .explicitGet()
     bobToMaster: TransferTransaction = TransferTransaction
       .selfSigned(
         1.toByte,
@@ -80,8 +78,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
         None,
         ts + 3
       )
-      .right
-      .get
+      .explicitGet()
     bobToMaster2: TransferTransaction = TransferTransaction
       .selfSigned(
         1.toByte,
@@ -94,8 +91,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
         None,
         ts + 4
       )
-      .right
-      .get
+      .explicitGet()
   } yield (genesis, masterToAlice, feeAsset, sponsorTx, aliceToBob, bobToMaster, bobToMaster2)
 
   val SponsoredFeeActivatedAt0BlockchainSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
@@ -145,13 +141,13 @@ class BlockchainUpdaterSponsoredFeeBlockTest
           .sum
 
         {
-          domain.blockchainUpdater.processBlock(block0) shouldBe 'right
+          domain.blockchainUpdater.processBlock(block0).explicitGet()
           domain.blockchainUpdater.bestLiquidDiffAndFees.map(_._3) should contain(block0TotalFee)
         }
 
         {
-          domain.blockchainUpdater.processMicroBlock(microBlocks(0)) shouldBe 'right
-          domain.blockchainUpdater.processMicroBlock(microBlocks(1)) shouldBe 'right
+          domain.blockchainUpdater.processMicroBlock(microBlocks(0)).explicitGet()
+          domain.blockchainUpdater.processMicroBlock(microBlocks(1)).explicitGet()
 
           val microBlocksWavesFee = microBlocks
             .flatMap(_.transactionData)

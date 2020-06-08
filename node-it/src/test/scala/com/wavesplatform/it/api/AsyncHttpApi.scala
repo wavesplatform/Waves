@@ -20,6 +20,7 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
+import com.wavesplatform.state.DataEntry.Format
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EmptyDataEntry, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
@@ -695,12 +696,17 @@ object AsyncHttpApi extends Assertions {
       signedBroadcast(tx.json())
     }
 
-    def removeData(sourceAddress: String, data: Seq[String], fee: Long, version: Byte = 2): Future[Transaction] = {
+    def removeData(sourceAddress: String, data: Seq[String], fee: Long, version: Byte = 2): Future[Transaction] =
       signAndBroadcast(
         Json
-          .obj("type" -> DataTransaction.typeId, "sender" -> sourceAddress, "fee" -> fee, "version" -> version, "data" -> data.map(EmptyDataEntry(_)))
+          .obj(
+            "type"    -> DataTransaction.typeId,
+            "sender"  -> sourceAddress,
+            "fee"     -> fee,
+            "version" -> version,
+            "data"    -> data.map(e => Json.toJson[DataEntry[_]](EmptyDataEntry(e)))
+          )
       )
-    }
 
     def getData(address: String, amountsAsStrings: Boolean = false): Future[List[DataEntry[_]]] =
       get(s"/addresses/data/$address", amountsAsStrings).as[List[DataEntry[_]]](amountsAsStrings)
@@ -810,7 +816,7 @@ object AsyncHttpApi extends Assertions {
         chainId = AddressScheme.current.chainId
       ).signWith(matcher.privateKey)
 
-      val json = if (validate) tx.validatedEither.right.get.json() else tx.json()
+      val json = if (validate) tx.validatedEither.explicitGet().json() else tx.json()
       signedBroadcast(json, amountsAsStrings)
     }
 

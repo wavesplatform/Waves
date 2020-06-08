@@ -6,8 +6,6 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scorex.util.encode.{Base58 => ScorexBase58}
 
-import scala.util.Success
-
 class Base58Test extends PropSpec with PropertyChecks with Matchers {
   import org.scalacheck.Shrink
   implicit val noShrink: Shrink[String] = Shrink.shrinkAny
@@ -63,8 +61,8 @@ class Base58Test extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("handles zeroes at start") {
-    val encodedString  = "11WH5tQgZH6Djm7RS2guC"
-    val Success(bytes) = ScorexBase58.decode(encodedString)
+    val encodedString = "11WH5tQgZH6Djm7RS2guC"
+    val bytes         = ScorexBase58.decode(encodedString).get
 
     val stdStr  = StdBase58.encode(bytes)
     val fastStr = FastBase58.encode(bytes)

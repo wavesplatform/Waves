@@ -129,7 +129,7 @@ object Serde {
       case E_CASE_OBJ if allowObjects =>
         for {
           (typeName, fieldsNumber) <- Coeval((bb.getString, bb.getInt))
-          fields <- (1 to fieldsNumber).toStream
+          fields <- (1 to fieldsNumber).to(LazyList)
             .traverse(
               _ =>
                 for {

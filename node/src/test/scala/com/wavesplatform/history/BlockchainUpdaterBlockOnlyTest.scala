@@ -27,7 +27,7 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
     scenario(preconditionsAndPayments(1)) {
       case (domain, (genesis, payments)) =>
         val blocks = chainBlocks(Seq(Seq(genesis), Seq(payments.head)))
-        all(blocks.map(block => domain.blockchainUpdater.processBlock(block))) shouldBe 'right
+        blocks.map(block => domain.blockchainUpdater.processBlock(block).explicitGet())
     }
   }
 
@@ -36,14 +36,14 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
     scenario(preconditionsAndPayments(2)) {
       case (domain, (genesis, payments)) =>
         val blocks = chainBlocks(Seq(Seq(genesis), Seq(payments(0)), Seq(payments(1))))
-        domain.blockchainUpdater.processBlock(blocks.head) shouldBe 'right
+        domain.blockchainUpdater.processBlock(blocks.head).explicitGet()
         domain.blockchainUpdater.height shouldBe 1
-        domain.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
+        domain.blockchainUpdater.processBlock(blocks(1)).explicitGet()
         domain.blockchainUpdater.height shouldBe 2
-        domain.blockchainUpdater.removeAfter(blocks.head.id()) shouldBe 'right
+        domain.blockchainUpdater.removeAfter(blocks.head.id()).explicitGet()
         domain.blockchainUpdater.height shouldBe 1
-        domain.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
-        domain.blockchainUpdater.processBlock(blocks(2)) shouldBe 'right
+        domain.blockchainUpdater.processBlock(blocks(1)).explicitGet()
+        domain.blockchainUpdater.processBlock(blocks(2)).explicitGet()
     }
   }
 
@@ -52,7 +52,7 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
     scenario(preconditionsAndPayments(1)) {
       case (domain, (genesis, payment)) =>
         val blocks = chainBlocks(Seq(Seq(genesis), payment))
-        domain.blockchainUpdater.processBlock(blocks.head) shouldBe 'right
+        domain.blockchainUpdater.processBlock(blocks.head).explicitGet()
         domain.blockchainUpdater.processBlock(spoilSignature(blocks.last)) should produce("invalid signature")
     }
   }
@@ -62,9 +62,9 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
     scenario(preconditionsAndPayments(1)) {
       case (domain, (genesis, payment)) =>
         val blocks = chainBlocks(Seq(Seq(genesis), payment))
-        domain.blockchainUpdater.processBlock(blocks.head) shouldBe 'right
-        domain.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
-        domain.blockchainUpdater.removeAfter(blocks.head.id()) shouldBe 'right
+        domain.blockchainUpdater.processBlock(blocks.head).explicitGet()
+        domain.blockchainUpdater.processBlock(blocks(1)).explicitGet()
+        domain.blockchainUpdater.removeAfter(blocks.head.id()).explicitGet()
         domain.blockchainUpdater.processBlock(spoilSignature(blocks(1))) should produce("invalid signature")
     }
   }
@@ -75,9 +75,9 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
       case (domain, (genesis, payments)) =>
         val blocks = chainBlocks(Seq(genesis) +: payments.map(Seq(_)))
         blocks.foreach { b =>
-          domain.blockchainUpdater.processBlock(b) shouldBe 'right
+          domain.blockchainUpdater.processBlock(b).explicitGet()
         }
-        domain.blockchainUpdater.removeAfter(blocks.head.id()) shouldBe 'right
+        domain.blockchainUpdater.removeAfter(blocks.head.id()).explicitGet()
     }
   }
 }

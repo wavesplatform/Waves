@@ -3,10 +3,10 @@ package com.wavesplatform.history
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -35,7 +35,7 @@ class BlockchainUpdaterGeneratorFeeSameBlockTest
     scenario(preconditionsAndPayments, DefaultWavesSettings) {
       case (domain, (genesis, somePayment, generatorPaymentOnFee)) =>
         val blocks = chainBlocks(Seq(Seq(genesis), Seq(generatorPaymentOnFee, somePayment)))
-        all(blocks.map(block => domain.blockchainUpdater.processBlock(block))) shouldBe 'right
+        blocks.foreach(block => domain.blockchainUpdater.processBlock(block).explicitGet())
     }
   }
 

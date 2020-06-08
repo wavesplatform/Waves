@@ -6,6 +6,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.grpc.{ApplicationStatus, TransactionsByIdRequest, TransactionStatus => PBTransactionStatus}
 import com.wavesplatform.api.http.ApiError.TransactionDoesNotExist
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.TransactionStatus
 import com.wavesplatform.it.{Node, NodeConfigs}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
@@ -63,7 +64,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
 
       all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
 
-      val failedIdsByHeight = failed.groupBy(_.height.get).mapValues(_.map(_.id))
+      val failedIdsByHeight = failed.groupBy(_.height.get).view.mapValues(_.map(_.id))
 
       failedIdsByHeight.foreach {
         case (h, ids) =>
@@ -117,8 +118,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                    |""".stripMargin,
                 ScriptEstimatorV3
               )
-              .right
-              .get
+              .explicitGet()
               ._1
               .bytes()
               .base64
@@ -147,8 +147,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                    |""".stripMargin,
                 ScriptEstimatorV3
               )
-              .right
-              .get
+              .explicitGet()
               ._1
               .bytes()
               .base64
@@ -180,7 +179,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
       failed.size should be > 0
       all(failed.map(_.applicationStatus)) shouldBe ApplicationStatus.SCRIPT_EXECUTION_FAILED
 
-      val failedIdsByHeight = failed.groupBy(_.height.toInt).mapValues(_.map(_.id))
+      val failedIdsByHeight = failed.groupBy(_.height.toInt).view.mapValues(_.map(_.id))
 
       failedIdsByHeight.foreach {
         case (h, ids) =>
@@ -296,8 +295,7 @@ object FailedTransactionSuiteLike {
         fee,
         ts
       )
-      .right
-      .get
+      .explicitGet()
   }
 
   val configForMinMicroblockAge: Config = ConfigFactory.parseString(s"""

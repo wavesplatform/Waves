@@ -16,7 +16,6 @@ import com.wavesplatform.lang.contract.meta.Dic
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.network.UtxPoolSynchronizer
-import com.wavesplatform.protobuf.api
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.FeeValidation
@@ -41,7 +40,6 @@ case class AddressApiRoute(
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute
-    with AutoParamsDirective
     with TimeLimitedRoute {
 
   import AddressApiRoute._
@@ -116,7 +114,9 @@ case class AddressApiRoute(
 
   def balances: Route = (path("balance") & get & parameters(("height".as[Int].?, "address".as[String].*, "asset".?))) {
     (height, addresses, assetId) =>
-      complete(balancesJson(height.getOrElse(blockchain.height), addresses.toSeq, assetId.fold(Waves: Asset)(a => IssuedAsset(ByteStr.decodeBase58(a).get))))
+      complete(
+        balancesJson(height.getOrElse(blockchain.height), addresses.toSeq, assetId.fold(Waves: Asset)(a => IssuedAsset(ByteStr.decodeBase58(a).get)))
+      )
   }
 
   def balancesPost: Route = (path("balance") & (post & entity(as[JsObject]))) { request =>
@@ -177,19 +177,19 @@ case class AddressApiRoute(
     extractScheduler(
       implicit sc =>
         path("data" / AddrSegment) { address =>
-          protobufEntity(api.DataRequest) { request =>
-            if (request.matches.nonEmpty)
-              complete(
-                Try(request.matches.r)
-                  .fold(
-                    { e =>
-                      log.trace(s"Error compiling regex ${request.matches}: ${e.getMessage}")
-                      ApiError.fromValidationError(GenericError(s"Cannot compile regex"))
-                    },
-                    _ => accountData(address, request.matches)
-                  )
-              )
-            else complete(accountDataList(address, request.keys: _*))
+          parameter("matches") { matches =>
+            complete(
+              Try(matches.r)
+                .fold(
+                  { e =>
+                    log.trace(s"Error compiling regex $matches: ${e.getMessage}")
+                    ApiError.fromValidationError(GenericError(s"Cannot compile regex"))
+                  },
+                  _ => accountData(address, matches)
+                )
+            )
+          } ~ parameter("id".as[String].*) { keys =>
+            complete(accountDataList(address, keys.toSeq: _*))
           } ~ get {
             complete(accountData(address))
           }
@@ -335,7 +335,7 @@ object AddressApiRoute {
   case class AccountScriptMeta(address: String, meta: Option[Dic])
 
   object AccountScriptMeta {
-    implicit lazy val dicFormat: Writes[Dic]                             = metaConverter.foldRoot
+    implicit lazy val dicFormat: Writes[Dic]                             = dic => metaConverter.foldRoot(dic)
     implicit lazy val accountScriptMetaWrites: Writes[AccountScriptMeta] = Json.writes[AccountScriptMeta]
   }
 }

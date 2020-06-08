@@ -116,7 +116,7 @@ object Dependencies {
 
   lazy val test = scalaTest +: Seq(
     logback,
-    "org.scalacheck" %% "scalacheck" % "1.14.1",
+    "org.scalacheck" %% "scalacheck" % "1.14.3",
     "org.mockito"    % "mockito-all" % "1.10.19",
     "org.scalamock"  %% "scalamock"  % "4.4.0"
   ).map(_ % Test)

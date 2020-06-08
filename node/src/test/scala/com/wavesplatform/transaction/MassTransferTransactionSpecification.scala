@@ -156,8 +156,7 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
       .parseTransfersList(
         List(Transfer("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", 100000000L), Transfer("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", 200000000L))
       )
-      .right
-      .get
+      .explicitGet()
 
     val tx = MassTransferTransaction
       .create(
@@ -170,8 +169,7 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
         Some(Attachment.Bin(Base58.tryDecodeWithLimit("59QuUcqP6p").get)),
         Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get))
       )
-      .right
-      .get
+      .explicitGet()
 
     js shouldEqual tx.json()
   }

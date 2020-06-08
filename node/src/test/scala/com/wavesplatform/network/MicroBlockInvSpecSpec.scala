@@ -2,6 +2,7 @@ package com.wavesplatform.network
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import org.scalacheck.Gen
 import org.scalatest.concurrent.Eventually
@@ -20,9 +21,9 @@ class MicroBlockInvSpecSpec extends FreeSpec with Matchers with PropertyChecks w
     import MicroBlockInvSpec._
 
     "deserializeData(serializedData(data)) == data" in forAll(microBlockInvGen) { inv =>
-      inv.signaturesValid() shouldBe 'right
+      inv.signaturesValid().explicitGet()
       val restoredInv = deserializeData(serializeData(inv)).get
-      restoredInv.signaturesValid() shouldBe 'right
+      restoredInv.signaturesValid().explicitGet()
 
       restoredInv shouldBe inv
     }

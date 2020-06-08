@@ -133,10 +133,10 @@ object ExtractInfo extends App with ScorexLogging {
     r
   }
 
-  def write(label: String, absolutePath: String, data: TraversableOnce[String]): Unit = {
+  def write(label: String, absolutePath: String, data: IterableOnce[String]): Unit = {
     log.info(s"Writing $label to '$absolutePath'")
     val printWriter = new PrintWriter(absolutePath)
-    data.foreach(printWriter.println)
+    data.iterator.foreach(printWriter.println)
     printWriter.close()
   }
 

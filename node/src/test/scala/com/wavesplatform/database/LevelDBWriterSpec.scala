@@ -242,12 +242,12 @@ class LevelDBWriterSpec
           version = Block.ProtoBlockVersion
         )
 
-      bcu.processBlock(genesisBlock, genesisBlock.header.generationSignature) shouldBe 'right
-      bcu.processBlock(block1, block1.header.generationSignature) shouldBe 'right
-      bcu.processBlock(block2, block2.header.generationSignature) shouldBe 'right
-      bcu.processBlock(block3, block3.header.generationSignature) shouldBe 'right
-      bcu.processBlock(block4, block4.header.generationSignature) shouldBe 'right
-      bcu.processBlock(block5, block5.header.generationSignature) shouldBe 'right
+      bcu.processBlock(genesisBlock, genesisBlock.header.generationSignature).explicitGet()
+      bcu.processBlock(block1, block1.header.generationSignature).explicitGet()
+      bcu.processBlock(block2, block2.header.generationSignature).explicitGet()
+      bcu.processBlock(block3, block3.header.generationSignature).explicitGet()
+      bcu.processBlock(block4, block4.header.generationSignature).explicitGet()
+      bcu.processBlock(block5, block5.header.generationSignature).explicitGet()
 
       def blockAt(height: Int): Option[Block] =
         bcu.liquidBlockMeta

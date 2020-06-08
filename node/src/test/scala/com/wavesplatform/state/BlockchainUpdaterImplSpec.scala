@@ -103,24 +103,24 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
           (triggersMock.onProcessBlock _)
             .expects(where {
               (block, diff, _, bc) =>
-                bc.height == 0 &&
-                  block.transactionData.length == 1 &&
-                  diff.parentDiff.portfolios.head._2.balance == 0 &&
-                  diff.transactionDiffs.head.portfolios.head._2.balance == ENOUGH_AMT
+              bc.height == 0 &&
+              block.transactionData.length == 1 &&
+              diff.parentDiff.portfolios.head._2.balance == 0 &&
+              diff.transactionDiffs.head.portfolios.head._2.balance == ENOUGH_AMT
             })
             .once()
 
           (triggersMock.onProcessBlock _)
             .expects(where {
               (block, diff, _, bc) =>
-                bc.height == 1 &&
-                  block.transactionData.length == 5 &&
-                  // miner reward, no NG — all txs fees
-                  diff.parentDiff.portfolios.size == 1 &&
-                  diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 5 &&
-                  // first Tx updated balances
-                  diff.transactionDiffs.head.portfolios.head._2.balance == (ENOUGH_AMT / 5) &&
-                  diff.transactionDiffs.head.portfolios.last._2.balance == (-ENOUGH_AMT / 5 - FEE_AMT)
+              bc.height == 1 &&
+              block.transactionData.length == 5 &&
+              // miner reward, no NG — all txs fees
+              diff.parentDiff.portfolios.size == 1 &&
+              diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 5 &&
+              // first Tx updated balances
+              diff.transactionDiffs.head.portfolios.head._2.balance == (ENOUGH_AMT / 5) &&
+              diff.transactionDiffs.head.portfolios.last._2.balance == (-ENOUGH_AMT / 5 - FEE_AMT)
             })
             .once()
 
@@ -139,35 +139,35 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
           (triggersMock.onProcessBlock _)
             .expects(where {
               (block, diff, _, bc) =>
-                bc.height == 0 &&
-                  block.transactionData.length == 1 &&
-                  diff.parentDiff.portfolios.head._2.balance == 0 &&
-                  diff.transactionDiffs.head.portfolios.head._2.balance == ENOUGH_AMT
+              bc.height == 0 &&
+              block.transactionData.length == 1 &&
+              diff.parentDiff.portfolios.head._2.balance == 0 &&
+              diff.transactionDiffs.head.portfolios.head._2.balance == ENOUGH_AMT
             })
             .once()
 
           (triggersMock.onProcessBlock _)
             .expects(where {
               (block, diff, _, bc) =>
-                bc.height == 1 &&
-                  block.transactionData.length == 5 &&
-                  // miner reward, no NG — all txs fees
-                  diff.parentDiff.portfolios.size == 1 &&
-                  diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 5 * 0.4
+              bc.height == 1 &&
+              block.transactionData.length == 5 &&
+              // miner reward, no NG — all txs fees
+              diff.parentDiff.portfolios.size == 1 &&
+              diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 5 * 0.4
             })
             .once()
 
           (triggersMock.onProcessBlock _)
             .expects(where {
               (block, diff, _, bc) =>
-                bc.height == 2 &&
-                  block.transactionData.length == 4 &&
-                  // miner reward, no NG — all txs fees
-                  diff.parentDiff.portfolios.size == 1 &&
-                  diff.parentDiff.portfolios.head._2.balance == (
-                    FEE_AMT * 5 * 0.6     // carry from prev block
-                      + FEE_AMT * 4 * 0.4 // current block reward
-                  )
+              bc.height == 2 &&
+              block.transactionData.length == 4 &&
+              // miner reward, no NG — all txs fees
+              diff.parentDiff.portfolios.size == 1 &&
+              diff.parentDiff.portfolios.head._2.balance == (
+                FEE_AMT * 5 * 0.6     // carry from prev block
+                  + FEE_AMT * 4 * 0.4 // current block reward
+              )
             })
             .once()
         }
@@ -206,39 +206,40 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
             (triggersMock.onProcessBlock _)
               .expects(where {
                 (block, diff, _, bc) =>
-                  bc.height == 0 &&
-                    block.transactionData.length == 1 &&
-                    diff.parentDiff.portfolios.head._2.balance == 0 &&
-                    diff.transactionDiffs.head.portfolios.head._2.balance == ENOUGH_AMT
+                bc.height == 0 &&
+                block.transactionData.length == 1 &&
+                diff.parentDiff.portfolios.head._2.balance == 0 &&
+                diff.transactionDiffs.head.portfolios.head._2.balance == ENOUGH_AMT
               })
               .once()
 
             // microblock 1
             (triggersMock.onProcessMicroBlock _).expects(where {
-                (microBlock, diff, bc, _  ) =>
-                  bc.height == 1 &&
-                    microBlock.transactionData.length == 2 &&
-                    // miner reward, no NG — all txs fees
-                    diff.parentDiff.portfolios.size == 1 &&
-                    diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 2 * 0.4
+                (microBlock, diff, bc, _) =>
+                bc.height == 1 &&
+                microBlock.transactionData.length == 2 &&
+                // miner reward, no NG — all txs fees
+                diff.parentDiff.portfolios.size == 1 &&
+                diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 2 * 0.4
               })
               .once()
 
             // microblock 2
             (triggersMock.onProcessMicroBlock _).expects(where {
                 (microBlock, diff, bc, _) =>
-                  bc.height == 1 &&
-                    microBlock.transactionData.length == 1 &&
-                    // miner reward, no NG — all txs fees
-                    diff.parentDiff.portfolios.size == 1 &&
-                    diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 0.4
+                bc.height == 1 &&
+                microBlock.transactionData.length == 1 &&
+                // miner reward, no NG — all txs fees
+                diff.parentDiff.portfolios.size == 1 &&
+                diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 0.4
               })
               .once()
 
             // rollback microblock
             (triggersMock.onMicroBlockRollback _)
               .expects(where {
-                (toSig, height) => height == 1 && toSig == microBlocks1And2.head.totalResBlockSig
+                (toSig, height) =>
+                height == 1 && toSig == microBlocks1And2.head.totalResBlockSig
               })
               .once()
 
@@ -246,8 +247,8 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
             (triggersMock.onProcessBlock _)
               .expects(where {
                 (block, _, _, bc) =>
-                  bc.height == 1 &&
-                    block.header.reference == microBlocks1And2.head.totalResBlockSig
+                bc.height == 1 &&
+                block.header.reference == microBlocks1And2.head.totalResBlockSig
               })
               .once()
 
@@ -255,7 +256,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
             (triggersMock.onProcessMicroBlock _)
               .expects(where {
                 (microBlock, _, bc, _) =>
-                  bc.height == 2 && microBlock.reference == block2.signature
+                bc.height == 2 && microBlock.reference == block2.signature
               })
               .once()
           }

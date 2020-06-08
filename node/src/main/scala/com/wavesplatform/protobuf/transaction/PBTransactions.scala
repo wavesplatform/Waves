@@ -5,6 +5,7 @@ import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.Attachment.Attachment.{BinaryValue, BoolValue, IntValue, StringValue}
@@ -244,24 +245,25 @@ object PBTransactions {
         )
 
       case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments)) =>
-        import com.wavesplatform.common.utils._
+        import cats.instances.either._
+        import cats.instances.option._
+        import cats.syntax.traverse._
         import com.wavesplatform.lang.v1.Serde
         import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 
         for {
           dApp <- PBRecipients.toAddressOrAlias(dappAddress, chainId)
 
-          desFCOpt = Deser.parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
+          fcOpt <- Deser
+            .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
+            .sequence
+            .left
+            .map(e => GenericError(s"Invalid InvokeScript function call: $e"))
 
-          _ <- Either.cond(
-            desFCOpt.isEmpty || desFCOpt.get.isRight,
-            (),
-            GenericError(s"Invalid InvokeScript function call: ${desFCOpt.get.left.get}")
-          )
-
-          fcOpt = desFCOpt.map(_.explicitGet())
-
-          _ <- Either.cond(fcOpt.isEmpty || fcOpt.exists(_.isInstanceOf[FUNCTION_CALL]), (), GenericError(s"Not a function call: $fcOpt"))
+          _ <- fcOpt match {
+            case None | Some(Terms.FUNCTION_CALL(_, _)) => Right(())
+            case Some(expr)                             => Left(GenericError(s"Not a function call: $expr"))
+          }
 
           tx <- vt.smart.InvokeScriptTransaction.create(
             version.toByte,

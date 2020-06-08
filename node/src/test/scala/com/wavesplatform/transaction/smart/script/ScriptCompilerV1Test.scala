@@ -10,10 +10,10 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.state.diffs._
-import org.scalatest.{Inside, Matchers, PropSpec}
+import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers with Inside {
+class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers with Inside with EitherValues {
   private val estimator = ScriptEstimatorV2
 
   property("compile script with specified version") {
@@ -87,7 +87,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
            |  case _ => false
            |}""".stripMargin,
         estimator
-      ) shouldBe 'right
+      ).explicitGet()
   }
 
   property("account script with 'this' address link") {
@@ -104,7 +104,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
            |  case _ => false
            |}""".stripMargin,
         estimator
-      ) shouldBe 'right
+      ).explicitGet()
   }
 
   property("asset script with 'this' address link") {
@@ -122,7 +122,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
            |  case _ => false
            |}""".stripMargin,
         estimator
-      ) shouldBe 'right
+      ).explicitGet()
   }
 
   property("binary operations priority && ||") {
@@ -181,7 +181,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
         | a > b == true
       """.stripMargin
 
-    ScriptCompiler.compile(script, estimator) shouldBe 'left
+    ScriptCompiler.compile(script, estimator).left.value
   }
 
   property("complexity border") {
@@ -295,7 +295,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
         |  [ ScriptTransfer(this, 1, (if id.size() > 0 then id else unit)) ]
         |}
         |""".stripMargin
-    ScriptCompiler.compile(source, estimator) shouldBe 'right
+    ScriptCompiler.compile(source, estimator).explicitGet()
   }
 
   property("library") {
@@ -311,7 +311,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
         | func sq(a: Int) = a * a
       """.stripMargin
 
-    ScriptCompiler.compile(script, estimator) shouldBe 'right
+    ScriptCompiler.compile(script, estimator).explicitGet()
   }
 
   private val expectedExpr = LET_BLOCK(

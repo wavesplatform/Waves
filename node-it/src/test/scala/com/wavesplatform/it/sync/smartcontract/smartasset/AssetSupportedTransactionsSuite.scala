@@ -189,8 +189,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
         None,
         System.currentTimeMillis + 1.minutes.toMillis
       )
-      .right
-      .get
+      .explicitGet()
 
     val incorrectTx = TransferTransaction
       .selfSigned(
@@ -204,8 +203,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
         None,
         System.currentTimeMillis + 10.minutes.toMillis
       )
-      .right
-      .get
+      .explicitGet()
 
     val dataTx = sender.putData(firstAddress, List(IntegerDataEntry(s"${blackTx.id.value.toString}", 42)), minFee).id
     nodes.waitForHeightAriseAndTxPresent(dataTx)

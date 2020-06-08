@@ -3,10 +3,10 @@ package com.wavesplatform.history
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -102,7 +102,7 @@ class BlockchainUpdaterBadReferencesTest
       case (domain, (genesis, payment, payment2, payment3)) =>
         val block0 = buildBlockOfTxs(randomSig, Seq(genesis, payment))
         val block1 = buildBlockOfTxs(randomSig, Seq(genesis, payment2))
-        domain.blockchainUpdater.processBlock(block0) shouldBe 'right
+        domain.blockchainUpdater.processBlock(block0).explicitGet()
         domain.blockchainUpdater.processBlock(block1) should produce("References incorrect or non-existing block")
     }
   }
@@ -111,8 +111,8 @@ class BlockchainUpdaterBadReferencesTest
     scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) {
       case (domain, (genesis, payment, payment2, payment3)) =>
         val blocks = chainBlocks(Seq(Seq(genesis), Seq(payment), Seq(payment2)))
-        domain.blockchainUpdater.processBlock(blocks.head) shouldBe 'right
-        domain.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
+        domain.blockchainUpdater.processBlock(blocks.head).explicitGet()
+        domain.blockchainUpdater.processBlock(blocks(1)).explicitGet()
         domain.blockchainUpdater.removeAfter(blocks.head.id()).explicitGet()
         val block2 = buildBlockOfTxs(randomSig, Seq(payment3))
         domain.blockchainUpdater.processBlock(block2) should produce("References incorrect or non-existing block")
@@ -125,9 +125,9 @@ class BlockchainUpdaterBadReferencesTest
       case (domain, (genesis, payment, payment2, payment3)) =>
         val blocks   = chainBlocks(Seq(Seq(genesis), Seq(payment), Seq(payment2)))
         val block1v2 = buildBlockOfTxs(blocks(0).id(), Seq(payment3))
-        domain.blockchainUpdater.processBlock(blocks(0)) shouldBe 'right
-        domain.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
-        domain.blockchainUpdater.processBlock(blocks(2)) shouldBe 'right
+        domain.blockchainUpdater.processBlock(blocks(0)).explicitGet()
+        domain.blockchainUpdater.processBlock(blocks(1)).explicitGet()
+        domain.blockchainUpdater.processBlock(blocks(2)).explicitGet()
         domain.blockchainUpdater.processBlock(block1v2) should produce("References incorrect or non-existing block")
     }
   }

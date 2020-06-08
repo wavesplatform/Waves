@@ -634,7 +634,6 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   routePath("/seed") in {
     Get(routePath("/seed")) ~> route ~> check {
       val seed = Base58.tryDecodeWithLimit((responseAs[JsValue] \ "seed").as[String])
-      seed shouldBe 'success
       seed.get.length shouldEqual UtilsApiRoute.DefaultSeedSize
     }
   }
@@ -645,7 +644,6 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     } else {
       Get(routePath(s"/seed/$l")) ~> route ~> check {
         val seed = Base58.tryDecodeWithLimit((responseAs[JsValue] \ "seed").as[String])
-        seed shouldBe 'success
         seed.get.length shouldEqual l
       }
     }

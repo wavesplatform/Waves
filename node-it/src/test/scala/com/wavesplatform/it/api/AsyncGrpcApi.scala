@@ -232,7 +232,7 @@ object AsyncGrpcApi {
         )
       )
 
-      val proofs      = crypto.sign(matcher.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).right.get.bodyBytes())
+      val proofs      = crypto.sign(matcher.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
       val transaction = SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs.arr)))
 
       transactions.broadcast(transaction)

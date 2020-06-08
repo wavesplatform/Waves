@@ -91,7 +91,7 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with WithState wit
           append(Seq(genesis)).explicitGet()
           append(Seq(issueTransaction)).explicitGet()
           append(Seq(setAssetScriptTransaction)).explicitGet()
-          append(Seq(assetTransferTransaction)) shouldBe 'right
+          append(Seq(assetTransferTransaction)).explicitGet()
         }
     }
   }

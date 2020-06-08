@@ -6,7 +6,7 @@ import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.requests.{SignedTransferV1Request, SignedTransferV2Request}
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -20,6 +20,7 @@ import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
+
 class AssetsBroadcastRouteSpec
     extends RouteSpec("/assets/broadcast/")
     with RequestGen
@@ -168,7 +169,15 @@ class AssetsBroadcastRouteSpec
   }
 
   "compatibility" - {
-    val route = AssetsApiRoute(restAPISettings, stub[Wallet], DummyUtxPoolSynchronizer.accepting, stub[Blockchain], stub[Time], stub[CommonAccountsApi], stub[CommonAssetsApi]).route
+    val route = AssetsApiRoute(
+      restAPISettings,
+      stub[Wallet],
+      DummyUtxPoolSynchronizer.accepting,
+      stub[Blockchain],
+      stub[Time],
+      stub[CommonAccountsApi],
+      stub[CommonAssetsApi]
+    ).route
 
     val seed               = "seed".getBytes("UTF-8")
     val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)
@@ -187,8 +196,7 @@ class AssetsBroadcastRouteSpec
           None,
           System.currentTimeMillis()
         )
-        .right
-        .get
+        .explicitGet()
     )
 
     val versionedTransferRequest = createSignedVersionedTransferRequest(

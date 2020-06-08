@@ -31,7 +31,7 @@ import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.{EitherValues, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
@@ -39,7 +39,7 @@ import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 import scala.collection.mutable.ListBuffer
 import scala.util.Try
 
-class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
+class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink with EitherValues {
 
   implicit val version: StdLibVersion = V4
 
@@ -110,7 +110,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
 
   property("return error and log of failed evaluation") {
     forAll(blockBuilder) { block =>
-      val (log, Left(err)) = evalWithLogging(
+      val (log, err) = evalWithLogging(
         pureEvalContext.asInstanceOf[EvaluationContext[Environment, Id]],
         expr = block(
           LET("x", CONST_LONG(3)),
@@ -122,7 +122,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
       )
 
       val expectedError = "A definition of 'z' not found"
-      err shouldBe expectedError
+      err.left.value shouldBe expectedError
       log.isEmpty shouldBe true
     }
 

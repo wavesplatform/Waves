@@ -126,7 +126,7 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
           }
           // once new block is appended, leases become cancelled
           d.blockchainUpdater.processBlock(emptyBlocks.last)
-          d.blockchainUpdater.allActiveLeases shouldBe 'empty
+          d.blockchainUpdater.allActiveLeases shouldBe empty
         }
     }
   }
@@ -147,7 +147,7 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
       withDomain(leasingSettings) { d =>
         blocks.foreach(b => d.blockchainUpdater.processBlock(b).explicitGet())
         // make sure leasing is not cancelled twice
-        d.blockchainUpdater.allActiveLeases shouldBe 'empty
+        d.blockchainUpdater.allActiveLeases shouldBe empty
         ensureNoLeases(d.blockchainUpdater, leaseRecipients(blocks))
       }
     }

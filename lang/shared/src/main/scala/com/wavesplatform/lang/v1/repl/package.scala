@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1
 
 import cats.implicits._
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -21,7 +22,7 @@ package object repl {
   val initialCtx: CTX[Environment] =
     CryptoContext.build(global, version).withEnvironment[Environment] |+|
     PureContext.build(global, version).withEnvironment[Environment]   |+|
-    WavesContext.build(DirectiveSet(version, Account, DApp, Imports(Nil)).right.get)
+    WavesContext.build(DirectiveSet(version, Account, DApp, Imports(Nil)).explicitGet())
 
   def buildEnvironment(settings: Option[NodeConnectionSettings]): Environment[Future] =
     settings.fold(ErrorMessageEnvironment: Environment[Future])(WebEnvironment)

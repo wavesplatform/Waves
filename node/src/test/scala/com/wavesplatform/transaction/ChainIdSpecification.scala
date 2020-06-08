@@ -42,12 +42,12 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
     val protoTx       = PBTransactions.protobuf(tx)
     val recoveredTxEi = PBTransactions.vanilla(PBSignedTransaction.parseFrom(protoTx.toByteArray))
 
-    recoveredTxEi shouldBe 'right
+    recoveredTxEi.explicitGet()
 
-    val recoveredTx = recoveredTxEi.right.get.asInstanceOf[ProvenTransaction]
+    val recoveredTx = recoveredTxEi.explicitGet().asInstanceOf[ProvenTransaction]
 
     recoveredTx shouldBe tx
-    Verifier.verifyAsEllipticCurveSignature(recoveredTx) shouldBe 'right
+    Verifier.verifyAsEllipticCurveSignature(recoveredTx).explicitGet()
   }
 
   property("TransferTransaction validation") {
@@ -80,7 +80,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.right.get
+          ).signWith(sender.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -107,7 +107,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             ts,
             ByteStr.empty,
             otherChainId
-          ).validatedEither.right.map(u => u.copy(signature = crypto.sign(sender.privateKey, u.bodyBytes()))).right.get
+          ).validatedEither.map(u => u.copy(signature = crypto.sign(sender.privateKey, u.bodyBytes()))).explicitGet()
         )
     }
   }
@@ -136,7 +136,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.right.get
+          ).signWith(sender.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -169,7 +169,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.right.get
+          ).signWith(sender.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -200,7 +200,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.right.get
+          ).signWith(sender.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -217,7 +217,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.right.get
+          ).signWith(sender.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -234,7 +234,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.right.get
+          ).signWith(sender.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -256,7 +256,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.right.get
+          ).signWith(sender.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -278,7 +278,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.right.get
+          ).signWith(sender.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -295,7 +295,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.right.get
+          ).signWith(sender.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -314,7 +314,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             None,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.right.get
+          ).signWith(sender.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -333,7 +333,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.right.get
+          ).signWith(sender.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -351,7 +351,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.right.get
+          ).signWith(sender.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -368,7 +368,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.right.get
+          ).signWith(sender.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -386,7 +386,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.right.get
+          ).signWith(sender.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -406,7 +406,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             Waves,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.right.get
+          ).signWith(sender.privateKey).validatedEither.explicitGet()
         )
     }
   }

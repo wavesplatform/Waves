@@ -86,7 +86,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
       master <- accountGen
       ts     <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
-      (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master, reducedFee = true)
+      (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
     } yield (genesis, issueTx, sponsorTx)
 
     forAll(setup) {
@@ -104,13 +104,12 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
       master <- accountGen
       ts     <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, 400000000, ts).explicitGet()
-      (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master, reducedFee = true)
+      (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
       recipient                  <- accountGen
       assetId = issueTx.id()
       assetOverspend = TransferTransaction
         .selfSigned(1.toByte, master, recipient.toAddress, Waves, 1000000, IssuedAsset(assetId), issueTx.quantity + 1, None, ts + 1)
-        .right
-        .get
+        .explicitGet()
       insufficientFee = TransferTransaction
         .selfSigned(
           1.toByte,
@@ -123,13 +122,11 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
           None,
           ts + 2
         )
-        .right
-        .get
+        .explicitGet()
       fee = 3000 * sponsorTx.minSponsoredAssetFee.get
       wavesOverspend = TransferTransaction
         .selfSigned(1.toByte, master, recipient.toAddress, Waves, 1000000, IssuedAsset(assetId), fee, None, ts + 3)
-        .right
-        .get
+        .explicitGet()
     } yield (genesis, issueTx, sponsorTx, assetOverspend, insufficientFee, wavesOverspend)
 
     forAll(setup) {
@@ -175,16 +172,13 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
       assetId = issueTx.id()
       transferAssetTx: TransferTransaction = TransferTransaction
         .selfSigned(1.toByte, master, alice.toAddress, IssuedAsset(assetId), issueTx.quantity, Waves, fee, None, ts + 2)
-        .right
-        .get
+        .explicitGet()
       leasingTx = LeaseTransaction
         .selfSigned(1.toByte, master, bob.toAddress, amount - issueTx.fee - sponsorTx.fee - 2 * fee, fee, ts + 3)
-        .right
-        .get
+        .explicitGet()
       leasingToMasterTx = LeaseTransaction
         .selfSigned(1.toByte, bob, master.toAddress, amount / 2, fee, ts + 3)
-        .right
-        .get
+        .explicitGet()
       insufficientFee = TransferTransaction
         .selfSigned(
           1.toByte,
@@ -197,8 +191,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
           None,
           ts + 4
         )
-        .right
-        .get
+        .explicitGet()
     } yield (genesis, genesis2, issueTx, sponsorTx, transferAssetTx, leasingTx, insufficientFee, leasingToMasterTx)
 
     forAll(setup) {
@@ -225,20 +218,17 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
       assetId = IssuedAsset(issueTx.id())
       senderNotIssuer = SponsorFeeTransaction
         .selfSigned(1.toByte, notSponsor, assetId, None, 1 * Constants.UnitsInWave, ts + 1)
-        .right
-        .get
+        .explicitGet()
       insufficientFee = SponsorFeeTransaction
         .selfSigned(1.toByte, notSponsor, assetId, None, 1 * Constants.UnitsInWave - 1, ts + 1)
-        .right
-        .get
+        .explicitGet()
       insufficientReducedFee = SponsorFeeTransaction
         .selfSigned(1.toByte, notSponsor, assetId, None, (0.001 * Constants.UnitsInWave).toLong - 1, ts + 1)
-        .right
-        .get
+        .explicitGet()
     } yield (Seq(genesis1, genesis2, issueTx, sponsorTx), senderNotIssuer, insufficientFee, insufficientReducedFee)
 
     forAll(setup) {
-      case (preconditions, senderNotIssuer, insufficientFee, insufficientReducedFee) =>
+      case (preconditions, senderNotIssuer, _, insufficientReducedFee) =>
         val setupBlocks = Seq(block(preconditions), block(Seq()))
         assertDiffEi(setupBlocks, block(Seq(senderNotIssuer)), s) { blockDiffEi =>
           blockDiffEi should produce("Asset was issued by other address")
@@ -257,17 +247,15 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
       ts         <- timestampGen
       genesis1: GenesisTransaction = GenesisTransaction.create(master.toAddress, 400000000, ts).explicitGet()
       genesis2: GenesisTransaction = GenesisTransaction.create(notSponsor.toAddress, 400000000, ts).explicitGet()
-      (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master, reducedFee = true)
+      (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
       assetId = IssuedAsset(issueTx.id())
       minFee <- smallFeeGen
       senderNotIssuer = SponsorFeeTransaction
         .selfSigned(1.toByte, notSponsor, assetId, Some(minFee), 1 * Constants.UnitsInWave, ts + 1)
-        .right
-        .get
+        .explicitGet()
       insufficientFee = SponsorFeeTransaction
         .selfSigned(1.toByte, master, assetId, Some(minFee), (0.001 * Constants.UnitsInWave).toLong - 1, ts + 1)
-        .right
-        .get
+        .explicitGet()
     } yield (Seq(genesis1, genesis2, issueTx, sponsorTx), senderNotIssuer, insufficientFee)
 
     forAll(setup) {
@@ -305,16 +293,13 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
       sponsor = SponsorFeeTransaction.selfSigned(1.toByte, master, assetId, Some(100), 100000000, ts + 2).explicitGet()
       assetTransfer = TransferTransaction
         .selfSigned(1.toByte, master, recipient.toAddress, assetId, issue.quantity, Waves, 100000, None, ts + 3)
-        .right
-        .get
+        .explicitGet()
       wavesTransfer = TransferTransaction
         .selfSigned(1.toByte, master, recipient.toAddress, Waves, 99800000, Waves, 100000, None, ts + 4)
-        .right
-        .get
+        .explicitGet()
       backWavesTransfer = TransferTransaction
         .selfSigned(1.toByte, recipient, master.toAddress, Waves, 100000, assetId, 100, None, ts + 5)
-        .right
-        .get
+        .explicitGet()
     } yield (genesis, issue, sponsor, assetTransfer, wavesTransfer, backWavesTransfer)
 
     forAll(setup) {

@@ -19,7 +19,6 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
-import com.wavesplatform.protobuf.api.TransactionsByIdRequest
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
@@ -43,8 +42,7 @@ case class TransactionsApiRoute(
     time: Time
 ) extends ApiRoute
     with BroadcastRoute
-    with AuthRoute
-    with AutoParamsDirective {
+    with AuthRoute {
   import TransactionsApiRoute._
 
   override lazy val route: Route =
@@ -76,11 +74,11 @@ case class TransactionsApiRoute(
   }
 
   def status: Route = path("status") {
-    protobufEntity(TransactionsByIdRequest) { request =>
-      if (request.ids.length > settings.transactionsByAddressLimit)
+    parameter("id".as[String].*) { ids =>
+      if (ids.toSeq.length > settings.transactionsByAddressLimit)
         complete(TooBigArrayAllocation)
       else {
-        request.ids.map(id => ByteStr.decodeBase58(id).toEither.leftMap(_ => id)).toList.separate match {
+        ids.map(id => ByteStr.decodeBase58(id).toEither.leftMap(_ => id)).toList.separate match {
           case (Nil, Nil) => complete(CustomValidationError("Empty request"))
           case (Nil, ids) =>
             val results = ids.toSet.map { id: ByteStr =>
@@ -191,7 +189,11 @@ case class TransactionsApiRoute(
         leaseCancel.json() ++ Json.obj("lease" -> blockchain.transactionInfo(leaseCancel.leaseId).map(_._2.json()).getOrElse[JsValue](JsNull))
 
       case t => t.json()
-    }) ++ (if(bodyBytes) { Json.obj("bodyBytes" -> ("base64:" ++ Base64.encode(tx.bodyBytes()))) } else { Json.obj() })
+    }) ++ (if (bodyBytes) {
+             Json.obj("bodyBytes" -> ("base64:" ++ Base64.encode(tx.bodyBytes())))
+           } else {
+             Json.obj()
+           })
   }
 
   private def applicationStatus(height: Int, succeed: Boolean): JsObject = {
@@ -242,7 +244,7 @@ object TransactionsApiRoute {
   }
 
   object ApplicationStatus {
-    val Succeed             = "succeed"
+    val Succeed               = "succeed"
     val ScriptExecutionFailed = "scriptExecutionFailed"
   }
 
