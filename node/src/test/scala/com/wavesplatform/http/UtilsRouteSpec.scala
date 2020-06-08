@@ -1,7 +1,7 @@
 package com.wavesplatform.http
 
-import cats.implicits._
 import akka.http.scaladsl.testkit.RouteTestTimeout
+import cats.implicits._
 import com.google.protobuf.ByteString
 import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
 import com.wavesplatform.api.http.UtilsApiRoute
@@ -11,7 +11,6 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{V2, V3}
@@ -25,17 +24,17 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.{Schedulers, Time}
 import io.netty.util.HashedWheelTimer
 import org.scalacheck.Gen
+import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json.{JsArray, JsBoolean, JsObject, JsString, JsValue}
+import play.api.libs.json.{JsArray, JsObject, JsString, JsValue}
 
 import scala.concurrent.duration._
-import org.scalamock.scalatest.PathMockFactory
 class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks  with PathMockFactory {
   implicit val routeTestTimeout = RouteTestTimeout(10.seconds)
   implicit val timeout          = routeTestTimeout.duration
