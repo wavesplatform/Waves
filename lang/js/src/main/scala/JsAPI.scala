@@ -256,7 +256,7 @@ object JsAPI {
                 "verifierComplexity"         -> verifierComplexity,
                 "callableComplexities"       -> callableComplexities.mapValues(c => c: Any).toJSDictionary,
                 "userFunctionComplexities"   -> userFunctionComplexities.mapValues(c => c: Any).toJSDictionary,
-                "globalVariableComplexities" -> globalVariableComplexities.mapValues(c => c: Any).toJSDictionary,
+                "globalVariableComplexities" -> globalVariableComplexities.mapValues(c => c: Any).toJSDictionary
               )
               val errorFieldOpt: Seq[(String, Any)] = {
                 Global.checkContract(version, dApp, maxComplexityFunc, annotatedComplexities, estimator)

@@ -8,18 +8,18 @@ import com.wavesplatform.api.http.ApiError.{ScriptCompilerError, TooBigArrayAllo
 import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Time
-import com.wavesplatform.state.Blockchain
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
-import com.wavesplatform.lang.directives.values._
 import monix.execution.Scheduler
 import play.api.libs.json._
 
@@ -95,19 +95,29 @@ case class UtilsApiRoute(
 
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String])) { code =>
-      def stdLib: StdLibVersion = if(blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) { V4 } else { StdLibVersion.VersionDic.default }
+      def stdLib: StdLibVersion =
+        if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {
+          V4
+        } else {
+          StdLibVersion.VersionDic.default
+        }
       executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator, defaultStdLib = stdLib)) { result =>
         complete(
           result
             .fold(
               e => ScriptCompilerError(e), {
-                case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
+                case (
+                    script,
+                    ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity, userFunctionComplexities, globalVariableComplexities)
+                    ) =>
                   Json.obj(
-                    "script"               -> script.bytes().base64,
-                    "complexity"           -> maxComplexity,
-                    "verifierComplexity"   -> verifierComplexity,
-                    "callableComplexities" -> callableComplexities,
-                    "extraFee"             -> FeeValidation.ScriptExtraFee
+                    "script"                     -> script.bytes().base64,
+                    "complexity"                 -> maxComplexity,
+                    "verifierComplexity"         -> verifierComplexity,
+                    "callableComplexities"       -> callableComplexities,
+                    "extraFee"                   -> FeeValidation.ScriptExtraFee,
+                    "userFunctionComplexities"   -> userFunctionComplexities,
+                    "globalVariableComplexities" -> globalVariableComplexities
                   )
               }
             )
@@ -153,14 +163,16 @@ case class UtilsApiRoute(
         complete(
           result.fold(
             e => ScriptCompilerError(e), {
-              case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
+              case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity, userFunctionComplexities, globalVariableComplexities)) =>
                 Json.obj(
                   "script"               -> code,
                   "scriptText"           -> script.expr.toString, // [WAIT] Script.decompile(script),
                   "complexity"           -> maxComplexity,
                   "verifierComplexity"   -> verifierComplexity,
                   "callableComplexities" -> callableComplexities,
-                  "extraFee"             -> FeeValidation.ScriptExtraFee
+                  "extraFee"             -> FeeValidation.ScriptExtraFee,
+                  "userFunctionComplexities"   -> userFunctionComplexities,
+                  "globalVariableComplexities" -> globalVariableComplexities
                 )
             }
           )

@@ -35,7 +35,13 @@ trait Script {
 
 object Script {
 
-  case class ComplexityInfo(verifierComplexity: Long, callableComplexities: Map[String, Long], maxComplexity: Long)
+  case class ComplexityInfo(
+      verifierComplexity: Long,
+      callableComplexities: Map[String, Long],
+      maxComplexity: Long,
+      userFunctionComplexities: Map[String, Long] = Map.empty,
+      globalVariableComplexities: Map[String, Long] = Map.empty
+  )
 
   val checksumLength = 4
 
@@ -77,14 +83,11 @@ object Script {
           .map(complexity => ComplexityInfo(complexity, Map(), complexity))
       case ContractScriptImpl(version, contract @ DApp(_, _, _, verifierFuncOpt)) =>
         for {
-          (maxComplexity, callableComplexities) <- ContractScript.estimateComplexity(
-            version,
-            contract,
-            estimator,
-            useContractVerifierLimit
-          )
+          (maxComplexity, callableComplexities) <- ContractScript.estimateComplexity(version, contract, estimator, useContractVerifierLimit)
+          userFunctionComplexities              <- ContractScript.estimateUserFunctions(version, contract, estimator)
+          globalVariableComplexities            <- ContractScript.estimateGlobalVariables(version, contract, estimator)
           complexityInfo = verifierFuncOpt.fold(
-            ComplexityInfo(0L, callableComplexities, maxComplexity)
+            ComplexityInfo(0L, callableComplexities, maxComplexity, userFunctionComplexities.toMap, globalVariableComplexities.toMap)
           )(
             v => ComplexityInfo(callableComplexities(v.u.name), callableComplexities - v.u.name, maxComplexity)
           )
