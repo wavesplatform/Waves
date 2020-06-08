@@ -313,10 +313,8 @@ object InvokeDiffsCommon {
                     Map(address       -> Portfolio(0, LeaseBalance.empty, Map(a -> amount))) |+|
                       Map(dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount)))
                 )
-                blockchain.assetScript(a) match {
-                  case None                     => nextDiff.asRight[ValidationError]
-                  case Some(_) if !verifyAssets => nextDiff.asRight[ValidationError]
-                  case Some(AssetScriptInfo(script, _)) =>
+                blockchain.assetScript(a).filter(_ => verifyAssets).fold(TracedResult(nextDiff.asRight[ValidationError])) {
+                  case AssetScriptInfo(script, _) =>
                     val assetVerifierDiff =
                       if (blockchain.disallowSelfPayment) nextDiff
                       else
@@ -412,10 +410,8 @@ object InvokeDiffsCommon {
               assetId: ByteStr,
               pseudoTx: PseudoTx
           ): TracedResult[ValidationError, Diff] =
-            blockchain.assetScript(IssuedAsset(assetId)) match {
-              case None                     => actionDiff
-              case Some(_) if !verifyAssets => actionDiff
-              case Some(AssetScriptInfo(script, _)) =>
+            blockchain.assetScript(IssuedAsset(assetId)).filter(_ => verifyAssets).fold(TracedResult(actionDiff)) {
+              case AssetScriptInfo(script, _) =>
                 val assetValidationDiff =
                   for {
                     result          <- actionDiff
