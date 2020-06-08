@@ -46,7 +46,7 @@ class ReissueTransactionDiffTest
         checkFee(bs, txs) {
           case (result, lessResult, moreResult) =>
             result.explicitGet()
-            lessResult.explicitGet()
+            lessResult.left.value
             moreResult.explicitGet()
         }
     }
@@ -78,7 +78,7 @@ class ReissueTransactionDiffTest
         checkFee(bs, txs) {
           case (result, lessResult, moreResult) =>
             result.explicitGet()
-            lessResult.explicitGet()
+            lessResult.left.value
             moreResult.explicitGet()
         }
     }

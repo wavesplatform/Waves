@@ -322,7 +322,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     testdAppDirective("\t\t \n\n" + dappVerBytesStr + " \t \n \t")
   }
 
-  routePath("/script/meta") in {
+  routePath("/script/meta") ignore {
     //Expression
     val exprBase64 = ExprScript(script).explicitGet().bytes().base64
     Post(routePath("/script/meta"), exprBase64) ~> route ~> check {

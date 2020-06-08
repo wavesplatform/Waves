@@ -105,7 +105,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
             FUNCTION_CALL(PureContext.eq.header, List(REF("z"), CONST_LONG(1)))
           )
         )
-      ).explicitGet()
+      ).left.value
 
       val expectedError = "A definition of 'z' not found"
       err shouldBe expectedError

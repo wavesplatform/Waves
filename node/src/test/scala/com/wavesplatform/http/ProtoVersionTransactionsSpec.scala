@@ -83,7 +83,7 @@ class ProtoVersionTransactionsSpec
         responseAs[JsObject] shouldBe aliasTxJson
       }
 
-      (aliasTx.json() \ "chainId").asOpt[Byte] shouldBe aliasTx.chainId
+      (aliasTx.json() \ "chainId").asOpt[Byte].value shouldBe aliasTx.chainId
       decode(base64Tx) shouldBe aliasTx
     }
 
@@ -179,7 +179,7 @@ class ProtoVersionTransactionsSpec
 
       decode(base64Str) shouldBe dataTx
 
-      (dataTx.json() \ "chainId").asOpt[Byte] shouldBe dataTx.chainId
+      (dataTx.json() \ "chainId").asOpt[Byte].value shouldBe dataTx.chainId
 
       dataTx.isProtobufVersion shouldBe true
     }
@@ -238,7 +238,7 @@ class ProtoVersionTransactionsSpec
 
       decode(base64Str) shouldBe invokeScriptTx
 
-      (invokeScriptTx.json() \ "chainId").asOpt[Byte] shouldBe invokeScriptTx.chainId
+      (invokeScriptTx.json() \ "chainId").asOpt[Byte].value shouldBe invokeScriptTx.chainId
 
       invokeScriptTx.isProtobufVersion shouldBe true
     }
@@ -276,8 +276,8 @@ class ProtoVersionTransactionsSpec
       decode(base64LeaseStr) shouldBe leaseTx
       decode(base64CancelLeaseStr) shouldBe leaseCancelTx
 
-      (leaseTx.json() \ "chainId").asOpt[Byte] shouldBe leaseTx.chainId
-      (leaseCancelTx.json() \ "chainId").asOpt[Byte] shouldBe leaseCancelTx.chainId
+      (leaseTx.json() \ "chainId").asOpt[Byte].value shouldBe leaseTx.chainId
+      (leaseCancelTx.json() \ "chainId").asOpt[Byte].value shouldBe leaseCancelTx.chainId
 
       leaseTx.isProtobufVersion shouldBe true
       leaseCancelTx.isProtobufVersion shouldBe true
@@ -304,7 +304,7 @@ class ProtoVersionTransactionsSpec
 
       decode(base64Str) shouldBe transferTx
 
-      (transferTx.json() \ "chainId").asOpt[Byte] shouldBe transferTx.chainId
+      (transferTx.json() \ "chainId").asOpt[Byte].value shouldBe transferTx.chainId
 
       transferTx.isProtobufVersion shouldBe true
     }
@@ -329,7 +329,7 @@ class ProtoVersionTransactionsSpec
 
       decode(base64Str) shouldBe massTransferTx
 
-      (massTransferTx.json() \ "chainId").asOpt[Byte] shouldBe massTransferTx.chainId
+      (massTransferTx.json() \ "chainId").asOpt[Byte].value shouldBe massTransferTx.chainId
 
       massTransferTx.isProtobufVersion shouldBe true
     }
@@ -352,7 +352,7 @@ class ProtoVersionTransactionsSpec
 
       decode(base64Str) shouldBe setScriptTx
 
-      (setScriptTx.json() \ "chainId").asOpt[Byte] shouldBe setScriptTx.chainId
+      (setScriptTx.json() \ "chainId").asOpt[Byte].value shouldBe setScriptTx.chainId
     }
 
     "SetAssetScriptTransaction" in test {
@@ -398,7 +398,7 @@ class ProtoVersionTransactionsSpec
 
       decode(base64Str) shouldBe sponsorshipTx
 
-      (sponsorshipTx.json() \ "chainId").asOpt[Byte] shouldBe sponsorshipTx.chainId
+      (sponsorshipTx.json() \ "chainId").asOpt[Byte].value shouldBe sponsorshipTx.chainId
 
       sponsorshipTx.isProtobufVersion shouldBe true
     }
@@ -426,7 +426,7 @@ class ProtoVersionTransactionsSpec
 
       decode(base64Str) shouldBe updateAssetInfoTx
 
-      (updateAssetInfoTx.json() \ "chainId").asOpt[Byte] shouldBe updateAssetInfoTx.chainId
+      (updateAssetInfoTx.json() \ "chainId").asOpt[Byte].value shouldBe updateAssetInfoTx.chainId
       (updateAssetInfoTx.json() \ "version").as[Byte] shouldBe TxVersion.V1
     }
 

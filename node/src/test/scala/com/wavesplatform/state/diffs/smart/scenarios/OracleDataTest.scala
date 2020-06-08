@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
-import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
@@ -11,8 +10,10 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
+import com.wavesplatform.transaction.TxValidationError.ScriptExecutionError
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Proofs}
@@ -78,7 +79,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with WithState with Tr
           Seq(TestBlock.create(Seq(genesis, genesis2, createAlias, setScript))),
           TestBlock.create(Seq(transferFromScripted)),
           smartEnabledFS
-        )(_ should matchPattern { case Left(_: ScriptExecutionError) => })
+        )(_ should matchPattern { case Left(TransactionValidationError(_: ScriptExecutionError, _)) => })
     }
   }
 }
