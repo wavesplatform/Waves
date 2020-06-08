@@ -48,7 +48,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with WithState with Tr
                                    |   let txHeightId = extract(transactionHeightById(t.id)) > 0
                                    |   txId && txHeightId
                                    | case _ : CreateAliasTransaction => true
-                                   | case other =>
+                                   | case _ =>
                                    |   let oracle = Alias("${alias.name}")
                                    |   let long = extract(getInteger(oracle,"${long.key}")) == ${long.value}
                                    |   let bool = extract(getBoolean(oracle,"${bool.key}")) == ${bool.value}

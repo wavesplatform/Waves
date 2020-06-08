@@ -355,7 +355,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
                    |{-# SCRIPT_TYPE ACCOUNT #-}
                    |
                    |match (tx) {
-                   |case t: InvokeScriptTransaction => false
+                   |case _: InvokeScriptTransaction => false
                    |case _ => true
                    |}
                    |""".stripMargin,

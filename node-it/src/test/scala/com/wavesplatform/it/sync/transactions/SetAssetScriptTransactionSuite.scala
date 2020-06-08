@@ -29,7 +29,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   private val accountB = pkByAddress(secondAddress)
   private val unchangeableScript = ScriptCompiler(
     s"""match tx {
-       |  case s : SetAssetScriptTransaction => false
+       |  case _: SetAssetScriptTransaction => false
        |  case _ => true
        |}
        |""".stripMargin,
@@ -163,7 +163,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     val script2 = ScriptCompiler(
       s"""
            |match tx {
-           |  case s : SetAssetScriptTransaction => true
+           |  case _: SetAssetScriptTransaction => true
            |  case _ => false
            |}
          """.stripMargin,
@@ -345,7 +345,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
             ScriptCompiler(
               s"""|let pkB = base58'${accountB.publicKey}'
                   |match tx {
-                  |  case s : SetAssetScriptTransaction => sigVerify(s.bodyBytes,s.proofs[0],pkB)
+                  |  case s: SetAssetScriptTransaction => sigVerify(s.bodyBytes,s.proofs[0],pkB)
                   |  case _ => true
                   |}
                 """.stripMargin,

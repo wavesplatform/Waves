@@ -53,7 +53,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     val scr = ScriptCompiler(
       s"""
          |match tx {
-         |  case s : SetAssetScriptTransaction => true
+         |  case _ : SetAssetScriptTransaction => true
          |  case t:  TransferTransaction => t.amount <= 99
          |  case _ => false
          |}
@@ -77,7 +77,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     val scr = ScriptCompiler(
       s"""
          |match tx {
-         |  case s : SetAssetScriptTransaction => true
+         |  case _: SetAssetScriptTransaction => true
          |  case t:  TransferTransaction => t.recipient == addressFromPublicKey(base58'${pkByAddress(secondAddress).publicKey}')
          |  case _ => false
          |}
@@ -96,7 +96,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     val scr1 = ScriptCompiler(
       s"""
          |match tx {
-         |  case s : SetAssetScriptTransaction => true
+         |  case _: SetAssetScriptTransaction => true
          |  case t:  TransferTransaction => t.recipient != addressFromPublicKey(base58'${pkByAddress(secondAddress).publicKey}') && t.recipient != addressFromPublicKey(base58'${pkByAddress(
            firstAddress
          ).publicKey}')
@@ -125,7 +125,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     val scr = ScriptCompiler(
       s"""
          |match tx {
-         |  case s : SetAssetScriptTransaction => true
+         |  case _: SetAssetScriptTransaction => true
          |  case t:  TransferTransaction => t.feeAssetId == base58'$feeAsset'
          |  case _ => false
          |}
@@ -166,7 +166,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     val scr = ScriptCompiler(
       s"""
          |match tx {
-         |  case s : SetAssetScriptTransaction => true
+         |  case _: SetAssetScriptTransaction => true
          |  case t:  TransferTransaction => let issuer = extract(addressFromString("${firstAddress}"))
          |  isDefined(getInteger(issuer,toBase58String(t.id))) == true
          |  case _ => false
@@ -223,7 +223,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     val scr = ScriptCompiler(
       s"""
          |match tx {
-         |  case s : SetAssetScriptTransaction => true
+         |  case _ : SetAssetScriptTransaction => true
          |  case b:  BurnTransaction => b.sender == addressFromPublicKey(base58'${pkByAddress(secondAddress).publicKey}')
          |  case _ => false
          |}
@@ -240,7 +240,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     val scr1 = ScriptCompiler(
       s"""
          |match tx {
-         |  case s : SetAssetScriptTransaction => true
+         |  case _: SetAssetScriptTransaction => true
          |  case b:  BurnTransaction => b.sender != addressFromPublicKey(base58'${pkByAddress(secondAddress).publicKey}')
          |  case _ => false
          |}
@@ -261,8 +261,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     val scr = ScriptCompiler(
       s"""
          |match tx {
-         |  case s : SetAssetScriptTransaction => true
-         |  case b:  BurnTransaction => height % 2 == 0
+         |  case _: SetAssetScriptTransaction => true
+         |  case _: BurnTransaction => height % 2 == 0
          |  case _ => false
          |}
          """.stripMargin,
@@ -297,7 +297,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
           ScriptCompiler(
             s"""
                |match tx {
-               |  case b : BurnTransaction => false
+               |  case _: BurnTransaction => false
                |  case _ => true
                |}
          """.stripMargin,
@@ -316,7 +316,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     val scr = ScriptCompiler(
       s"""
          |match tx {
-         |  case s : SetAssetScriptTransaction => true
+         |  case _: SetAssetScriptTransaction => true
          |  case m:  MassTransferTransaction =>
          |  let twoTransfers = size(m.transfers) == 2
          |  let issuerIsRecipient = m.transfers[0].recipient == addressFromString("${firstAddress}")
@@ -342,7 +342,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     val scr = ScriptCompiler(
       s"""
          |match tx {
-         |  case s : SetAssetScriptTransaction => true
+         |  case _: SetAssetScriptTransaction => true
          |  case m:  MassTransferTransaction =>
          |  m.transferCount <= 2
          |  case _ => false
@@ -371,7 +371,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     val scr = ScriptCompiler(
       s"""
          |match tx {
-         |  case s : SetAssetScriptTransaction => true
+         |  case _: SetAssetScriptTransaction => true
          |  case r:  ReissueTransaction => r.sender == addressFromPublicKey(base58'${pkByAddress(secondAddress).publicKey}')
          |  case _ => false
          |}
@@ -405,7 +405,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     val scr = ScriptCompiler(
       s"""
          |match tx {
-         |  case s : SetAssetScriptTransaction => true
+         |  case _: SetAssetScriptTransaction => true
          |  case r:  ReissueTransaction => r.sender == addressFromPublicKey(base58'${pkByAddress(secondAddress).publicKey}')
          |  case _ => false
          |}""".stripMargin,

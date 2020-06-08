@@ -182,8 +182,8 @@ class RollbackSuite
       case tx: TransferTransaction =>
         let oracle = addressFromRecipient(tx.recipient)
         extract(getString(oracle,"oracle")) == "yes"
-      case tx: SetScriptTransaction | DataTransaction => true
-      case other => false
+      case _: SetScriptTransaction | DataTransaction => true
+      case _ => false
     }""".stripMargin
 
     val pkSwapBC1 = KeyPair.fromSeed(sender.seed(firstAddress)).explicitGet()

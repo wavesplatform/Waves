@@ -168,8 +168,8 @@ package object predef {
        |     let str1 = extract(getString(add,"${tx.data(3).key}")) == "${tx.data(3).value}"
        |     long && bool1 && bin && str1
        |
-       |   case a: CreateAliasTransaction => throw("oh no")
-       |   case b: BurnTransaction => throw()
+       |   case _: CreateAliasTransaction => throw("oh no")
+       |   case _: BurnTransaction => throw()
        |   case _ => false
        | }
        |

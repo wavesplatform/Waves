@@ -30,7 +30,7 @@ class TransferByIdTest extends PropSpec with ScalaCheckPropertyChecks with WithS
        |
        |    isDefined(maybeTx)
        |
-       |  case other => false
+       |  case _ => false
        |}
      """.stripMargin
 

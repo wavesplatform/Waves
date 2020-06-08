@@ -45,7 +45,7 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
       ScriptCompiler(
         s"""
            |match tx {
-           |case s : SetAssetScriptTransaction => true
+           |case _: SetAssetScriptTransaction => true
            |case e: ExchangeTransaction => e.sender == addressFromPublicKey(base58'${acc2.publicKey}')
            |case _ => false}""".stripMargin,
         isAssetScript = true,
@@ -73,7 +73,7 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
       ScriptCompiler(
         s"""
            |match tx {
-           |case s : SetAssetScriptTransaction => true
+           |case _: SetAssetScriptTransaction => true
            |case e: ExchangeTransaction => e.sender == addressFromPublicKey(base58'${acc1.publicKey}')
            |case _ => false}""".stripMargin,
         isAssetScript = true,
@@ -110,7 +110,7 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
                                         |let assetA = base58'$assetA'
                                         |let assetB = base58'$assetB'
                                         |match tx {
-                                        |case s : SetAssetScriptTransaction => true
+                                        |case _: SetAssetScriptTransaction => true
                                         |case e: ExchangeTransaction => (e.sellOrder.assetPair.priceAsset == assetA || e.sellOrder.assetPair.amountAsset == assetA) && (e.sellOrder.assetPair.priceAsset == assetB || e.sellOrder.assetPair.amountAsset == assetB)
                                         |case _ => false}""".stripMargin,
         isAssetScript = true,

@@ -81,17 +81,14 @@ final case class CompositeBlockchain(
     case Left(_)                      => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
   }
 
-  override def collectActiveLeases(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] =
-    CompositeBlockchain.collectActiveLeases(inner, maybeDiff)(filter)
-
   override def containsTransaction(tx: Transaction): Boolean = diff.transactions.contains(tx.id()) || inner.containsTransaction(tx)
 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
     diff.orderFills.get(orderId).orEmpty.combine(inner.filledVolumeAndFee(orderId))
 
-  override def balanceOnlySnapshots(address: Address, h: Int, assetId: Asset = Waves): Option[(Int, Long)] = {
+  override def balanceAtHeight(address: Address, h: Int, assetId: Asset = Waves): Option[(Int, Long)] = {
     if (maybeDiff.isEmpty || h < this.height) {
-      inner.balanceOnlySnapshots(address, h, assetId)
+      inner.balanceAtHeight(address, h, assetId)
     } else {
       val balance = this.balance(address, assetId)
       val bs      = height -> balance
@@ -163,23 +160,6 @@ final case class CompositeBlockchain(
 object CompositeBlockchain {
   def apply(blockchain: Blockchain, ngState: NgState): CompositeBlockchain =
     CompositeBlockchain(blockchain, Some(ngState.bestLiquidDiff), Some(ngState.bestLiquidBlock), ngState.carryFee, ngState.reward)
-
-  def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff])(
-      filter: LeaseTransaction => Boolean
-  ): Seq[LeaseTransaction] = {
-    val innerActiveLeases = inner.collectActiveLeases(filter)
-    maybeDiff match {
-      case Some(ng) =>
-        val cancelledInLiquidBlock = ng.leaseState.collect {
-          case (id, false) => id
-        }.toSet
-        val addedInLiquidBlock = ng.transactions.values.collect {
-          case NewTransactionInfo(lt: LeaseTransaction, _, true) if !cancelledInLiquidBlock(lt.id()) => lt
-        }
-        innerActiveLeases.filterNot(lt => cancelledInLiquidBlock(lt.id())) ++ addedInLiquidBlock
-      case _ => innerActiveLeases
-    }
-  }
 
   private def assetDescription(
       asset: IssuedAsset,
@@ -254,5 +234,4 @@ object CompositeBlockchain {
         }
     }
   }
-
 }

@@ -23,6 +23,7 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.{ScorexLogging, _}
@@ -30,6 +31,8 @@ import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb._
 import supertagged.TaggedType
+
+import scala.collection.mutable
 
 package object database extends ScorexLogging {
   def openDB(path: String, recreate: Boolean = false): DB = {
@@ -585,10 +588,40 @@ package object database extends ScorexLogging {
       staticInfo.nft
     )
 
+  def loadActiveLeases(db: DB, fromHeight: Int, toHeight: Int): Seq[LeaseTransaction] = db.withResource { r =>
+    val leaseIds = mutable.Set.empty[ByteStr]
+    val iterator = r.iterator
+
+    @inline
+    def keyInRange(): Boolean = {
+      val actualKey = iterator.peekNext().getKey
+      actualKey.startsWith(KeyTags.LeaseStatus.prefixBytes) && Ints.fromByteArray(actualKey.slice(2, 6)) <= toHeight
+    }
+
+    iterator.seek(KeyTags.LeaseStatus.prefixBytes ++ Ints.toByteArray(fromHeight))
+    while (iterator.hasNext && keyInRange()) {
+      val e       = iterator.next()
+      val leaseId = ByteStr(e.getKey.drop(6))
+      if (Option(e.getValue).exists(_(0) == 1)) leaseIds += leaseId else leaseIds -= leaseId
+    }
+
+    (for {
+      id          <- leaseIds
+      leaseStatus <- fromHistory(r, Keys.leaseStatusHistory(id), Keys.leaseStatus(id))
+      if leaseStatus
+      (h, n) <- r.get(Keys.transactionHNById(TransactionId(id)))
+      tx     <- r.get(Keys.transactionAt(h, n))
+    } yield tx).collect {
+      case (lt: LeaseTransaction, true) => lt
+    }.toSeq
+  }
+
   object AddressId extends TaggedType[Long] {
     def fromByteArray(bs: Array[Byte]): Type = AddressId(Longs.fromByteArray(bs))
   }
+
   type AddressId = AddressId.Type
+
   implicit final class Ops(private val value: AddressId) extends AnyVal {
     def toByteArray: Array[Byte] = Longs.toByteArray(AddressId.raw(value))
   }
