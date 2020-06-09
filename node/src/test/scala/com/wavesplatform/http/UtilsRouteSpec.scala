@@ -35,7 +35,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.{JsArray, JsObject, JsString, JsValue}
 
 import scala.concurrent.duration._
-class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks  with PathMockFactory {
+class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks with PathMockFactory {
   implicit val routeTestTimeout = RouteTestTimeout(10.seconds)
   implicit val timeout          = routeTestTimeout.duration
 
@@ -325,7 +325,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     val exprBase64 = ExprScript(script).explicitGet().bytes().base64
     Post(routePath("/script/meta"), exprBase64) ~> route ~> check {
       val json = responseAs[JsValue]
-      json.toString shouldBe "{}"
+      json("message").as[String] shouldBe "ScriptParseError(Expected DApp)"
     }
 
     //DApp
@@ -345,11 +345,11 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       List(
         CallableFunction(
           CallableAnnotation("func1"),
-          FUNC("anotherFunc", List("a", "b", "c", "d"), CONST_BOOLEAN(true))
+          FUNC("func1", List("a", "b", "c", "d"), CONST_BOOLEAN(true))
         ),
         CallableFunction(
           CallableAnnotation("func2"),
-          FUNC("default", List("x", "y", "z", "w"), CONST_BOOLEAN(false))
+          FUNC("func2", List("x", "y", "z", "w"), CONST_BOOLEAN(false))
         ),
         CallableFunction(
           CallableAnnotation("func3"),
@@ -368,21 +368,27 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       val json = responseAs[JsObject]
       json("version").as[String] shouldBe "1"
       json("isArrayArguments").as[Boolean] shouldBe true
-      json("callableFuncTypes") shouldBe JsArray(Seq(
-        JsArray(Seq(
-          JsObject(Seq("name" -> JsString("a"), "type" -> JsString("Int"))),
-          JsObject(Seq("name" -> JsString("b"), "type" -> JsString("ByteVector"))),
-          JsObject(Seq("name" -> JsString("c"), "type" -> JsString("Boolean"))),
-          JsObject(Seq("name" -> JsString("d"), "type" -> JsString("String")))
-        )),
-        JsArray(Seq(
-          JsObject(Seq("name" -> JsString("x"), "type" -> JsString("String"))),
-          JsObject(Seq("name" -> JsString("y"), "type" -> JsString("Boolean"))),
-          JsObject(Seq("name" -> JsString("z"), "type" -> JsString("ByteVector"))),
-          JsObject(Seq("name" -> JsString("w"), "type" -> JsString("Int")))
-        )),
-        JsArray()
-      ))
+      json("callableFuncTypes") shouldBe JsObject(
+        Seq(
+          "func1" -> JsArray(
+            Seq(
+              JsObject(Seq("name" -> JsString("a"), "type" -> JsString("Int"))),
+              JsObject(Seq("name" -> JsString("b"), "type" -> JsString("ByteVector"))),
+              JsObject(Seq("name" -> JsString("c"), "type" -> JsString("Boolean"))),
+              JsObject(Seq("name" -> JsString("d"), "type" -> JsString("String")))
+            )
+          ),
+          "func2" -> JsArray(
+            Seq(
+              JsObject(Seq("name" -> JsString("x"), "type" -> JsString("String"))),
+              JsObject(Seq("name" -> JsString("y"), "type" -> JsString("Boolean"))),
+              JsObject(Seq("name" -> JsString("z"), "type" -> JsString("ByteVector"))),
+              JsObject(Seq("name" -> JsString("w"), "type" -> JsString("Int")))
+            )
+          ),
+          "default" -> JsArray()
+        )
+      )
     }
 
     //preserves earlier compiled dApp params order
@@ -392,51 +398,67 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       val json = responseAs[JsValue]
       json("version").as[String] shouldBe "1"
       json("isArrayArguments").as[Boolean] shouldBe true
-      json("callableFuncTypes") shouldBe JsArray(Seq(
-        JsArray(Seq(
-          JsObject(Seq("name" -> JsString("owner"), "type" -> JsString("String"))),
-          JsObject(Seq("name" -> JsString("token"), "type" -> JsString("String"))),
-          JsObject(Seq("name" -> JsString("oracle"), "type" -> JsString("String"))),
-          JsObject(Seq("name" -> JsString("maxRate"), "type" -> JsString("Int"))),
-          JsObject(Seq("name" -> JsString("discount"), "type" -> JsString("Int"))),
-          JsObject(Seq("name" -> JsString("grace"), "type" -> JsString("Int"))),
-          JsObject(Seq("name" -> JsString("interest"), "type" -> JsString("Int"))),
-          JsObject(Seq("name" -> JsString("burndown"), "type" -> JsString("Int"))),
-          JsObject(Seq("name" -> JsString("serviceFee"), "type" -> JsString("Int"))),
-          JsObject(Seq("name" -> JsString("lendSize"), "type" -> JsString("Int")))
-        )),
-        JsArray(Seq(
-          JsObject(Seq("name" -> JsString("oracle"), "type" -> JsString("String"))),
-          JsObject(Seq("name" -> JsString("maxRate"), "type" -> JsString("Int"))),
-          JsObject(Seq("name" -> JsString("discount"), "type" -> JsString("Int"))),
-          JsObject(Seq("name" -> JsString("grace"), "type" -> JsString("Int"))),
-          JsObject(Seq("name" -> JsString("interest"), "type" -> JsString("Int"))),
-          JsObject(Seq("name" -> JsString("burndown"), "type" -> JsString("Int"))),
-          JsObject(Seq("name" -> JsString("serviceFee"), "type" -> JsString("Int"))),
-          JsObject(Seq("name" -> JsString("lendSize"), "type" -> JsString("Int")))
-        )),
-        JsArray(),
-        JsArray(),
-        JsArray(Seq(
-          JsObject(Seq("name" -> JsString("address"), "type" -> JsString("String"))),
-        )),
-        JsArray(),
-        JsArray(Seq(
-          JsObject(Seq("name" -> JsString("lender"), "type" -> JsString("String"))),
-        )),
-        JsArray(),
-        JsArray(Seq(
-          JsObject(Seq("name" -> JsString("b"), "type" -> JsString("Boolean"))),
-        )),
-        JsArray(),
-        JsArray(),
-        JsArray(Seq(
-          JsObject(Seq("name" -> JsString("b"), "type" -> JsString("Boolean"))),
-        )),
-        JsArray(Seq(
-          JsObject(Seq("name" -> JsString("b"), "type" -> JsString("Boolean"))),
-        )),
-      ))
+      json("callableFuncTypes") shouldBe JsObject(
+        Seq(
+          "init" -> JsArray(
+            Seq(
+              JsObject(Seq("name" -> JsString("owner"), "type"      -> JsString("String"))),
+              JsObject(Seq("name" -> JsString("token"), "type"      -> JsString("String"))),
+              JsObject(Seq("name" -> JsString("oracle"), "type"     -> JsString("String"))),
+              JsObject(Seq("name" -> JsString("maxRate"), "type"    -> JsString("Int"))),
+              JsObject(Seq("name" -> JsString("discount"), "type"   -> JsString("Int"))),
+              JsObject(Seq("name" -> JsString("grace"), "type"      -> JsString("Int"))),
+              JsObject(Seq("name" -> JsString("interest"), "type"   -> JsString("Int"))),
+              JsObject(Seq("name" -> JsString("burndown"), "type"   -> JsString("Int"))),
+              JsObject(Seq("name" -> JsString("serviceFee"), "type" -> JsString("Int"))),
+              JsObject(Seq("name" -> JsString("lendSize"), "type"   -> JsString("Int")))
+            )
+          ),
+          "updateParams" -> JsArray(
+            Seq(
+              JsObject(Seq("name" -> JsString("oracle"), "type"     -> JsString("String"))),
+              JsObject(Seq("name" -> JsString("maxRate"), "type"    -> JsString("Int"))),
+              JsObject(Seq("name" -> JsString("discount"), "type"   -> JsString("Int"))),
+              JsObject(Seq("name" -> JsString("grace"), "type"      -> JsString("Int"))),
+              JsObject(Seq("name" -> JsString("interest"), "type"   -> JsString("Int"))),
+              JsObject(Seq("name" -> JsString("burndown"), "type"   -> JsString("Int"))),
+              JsObject(Seq("name" -> JsString("serviceFee"), "type" -> JsString("Int"))),
+              JsObject(Seq("name" -> JsString("lendSize"), "type"   -> JsString("Int")))
+            )
+          ),
+          "borrow"  -> JsArray(),
+          "buyBack" -> JsArray(),
+          "closeExpiredFor" -> JsArray(
+            Seq(
+              JsObject(Seq("name" -> JsString("address"), "type" -> JsString("String")))
+            )
+          ),
+          "discard" -> JsArray(),
+          "sendProfit" -> JsArray(
+            Seq(
+              JsObject(Seq("name" -> JsString("lender"), "type" -> JsString("String")))
+            )
+          ),
+          "takeProfit" -> JsArray(),
+          "enableLending" -> JsArray(
+            Seq(
+              JsObject(Seq("name" -> JsString("b"), "type" -> JsString("Boolean")))
+            )
+          ),
+          "depositBtc"  -> JsArray(),
+          "withdrawBtc" -> JsArray(),
+          "enableDepositBtc" -> JsArray(
+            Seq(
+              JsObject(Seq("name" -> JsString("b"), "type" -> JsString("Boolean")))
+            )
+          ),
+          "enableNewLoans" -> JsArray(
+            Seq(
+              JsObject(Seq("name" -> JsString("b"), "type" -> JsString("Boolean")))
+            )
+          )
+        )
+      )
     }
   }
 
@@ -595,9 +617,9 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       r.explicitGet()
     }
 
-    val dAppBase64 = dAppToBase64(dApp)
+    val dAppBase64                = dAppToBase64(dApp)
     val dAppWithoutVerifierBase64 = dAppToBase64(dAppWithoutVerifier)
-    val emptyDAppBase64 = dAppToBase64(emptyDApp)
+    val emptyDAppBase64           = dAppToBase64(emptyDApp)
 
     Post(routePath("/script/estimate"), dAppBase64) ~> route ~> check {
       val json = responseAs[JsValue]
