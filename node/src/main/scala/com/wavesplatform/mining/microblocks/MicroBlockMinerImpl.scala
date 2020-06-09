@@ -4,7 +4,6 @@ import cats.implicits._
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl._
 import com.wavesplatform.mining.{MinerDebugInfo, MiningConstraint, MiningConstraints, MultiDimensionalMiningConstraint}

@@ -4,7 +4,6 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -86,8 +85,6 @@ object ExchangeTransactionDiff {
       sellPriceAssetChange  <- getReceiveAmount(tx.sellOrder, amountDecimals, priceDecimals, tx.amount, tx.price).liftValidationError(tx)
       sellAmountAssetChange <- getSpendAmount(tx.sellOrder, amountDecimals, priceDecimals, tx.amount, tx.price).liftValidationError(tx).map(-_)
       scripts = {
-        import com.wavesplatform.features.FeatureProvider._
-
         val addressScripted = Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
 
         // Don't count before Ride4DApps activation

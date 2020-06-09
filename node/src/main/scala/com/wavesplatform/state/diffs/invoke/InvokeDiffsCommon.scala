@@ -8,7 +8,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures.BlockV5
 import com.wavesplatform.features.EstimatorProvider._
-import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
 import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider._
 import com.wavesplatform.features.ScriptTransferValidationProvider._
 import com.wavesplatform.lang._

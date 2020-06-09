@@ -18,7 +18,6 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Time
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.directives.values._
 import monix.execution.Scheduler
 import play.api.libs.json._

@@ -7,7 +7,6 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.Asset.IssuedAsset

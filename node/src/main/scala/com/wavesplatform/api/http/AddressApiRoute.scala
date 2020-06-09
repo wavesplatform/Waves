@@ -49,7 +49,7 @@ case class AddressApiRoute(
   override lazy val route: Route =
     pathPrefix("addresses") {
       balanceDetails ~ validate ~ seed ~ balanceWithConfirmations ~ balance ~ balances ~ balancesPost ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
-        signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ getDataItem ~ postData ~ scriptInfo ~ scriptMeta
+        signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ postData ~ scriptInfo ~ scriptMeta
     } ~ root ~ create
 
   def scriptInfo: Route = (path("scriptInfo" / AddrSegment) & get) { address =>
@@ -88,16 +88,12 @@ case class AddressApiRoute(
     complete(Json.obj("deleted" -> deleted))
   }
 
-  def sign: Route = {
-    path("sign" / AddrSegment) { address =>
-      signPath(address, encode = true)
-    }
+  def sign: Route = path("sign" / AddrSegment) { address =>
+    signPath(address, encode = true)
   }
 
-  def signText: Route = {
-    path("signText" / AddrSegment) { address =>
-      signPath(address, encode = false)
-    }
+  def signText: Route = path("signText" / AddrSegment) { address =>
+    signPath(address, encode = false)
   }
 
   def verify: Route = path("verify" / AddrSegment) { address =>
@@ -174,10 +170,12 @@ case class AddressApiRoute(
   }
 
   def getData: Route =
-    extractScheduler(
-      implicit sc =>
-        path("data" / AddrSegment) { address =>
-          parameter("matches") { matches =>
+    pathPrefix("data" / AddrSegment) { address =>
+      (path(Segment) & get) { key =>
+        complete(accountDataEntry(address, key))
+      } ~ extractScheduler(
+        implicit sc =>
+          (formField("matches") | parameter("matches")) { matches =>
             complete(
               Try(matches.r)
                 .fold(
@@ -188,18 +186,13 @@ case class AddressApiRoute(
                   _ => accountData(address, matches)
                 )
             )
-          } ~ parameter("id".as[String].*) { keys =>
+          } ~ anyParam("key").filter(_.nonEmpty) { keys =>
             complete(accountDataList(address, keys.toSeq: _*))
           } ~ get {
             complete(accountData(address))
           }
-        }
-    )
-
-  def getDataItem: Route = (path("data" / AddrSegment / Segment) & get) {
-    case (address, key) =>
-      complete(accountDataEntry(address, key))
-  }
+      )
+    }
 
   def root: Route = (path("addresses") & get) {
     complete(wallet.privateKeyAccounts.map(_.toAddress))

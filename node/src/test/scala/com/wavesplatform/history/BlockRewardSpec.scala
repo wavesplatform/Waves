@@ -9,7 +9,6 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.Keys
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint

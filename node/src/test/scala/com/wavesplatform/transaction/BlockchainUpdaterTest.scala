@@ -7,7 +7,6 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatureStatus
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.history
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.state._

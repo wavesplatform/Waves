@@ -48,7 +48,7 @@ class TransactionsRouteSpec
   private val addressTransactions = mock[CommonTransactionsApi]
   private val utxPoolSize         = mockFunction[Int]
 
-  private def mkRoute(blockchain: Blockchain, addressTransactions: CommonTransactionsApi) =
+  private val route =
     seal(
       new TransactionsApiRoute(
         restAPISettings,
@@ -60,8 +60,6 @@ class TransactionsRouteSpec
         new TestTime
       ).route
     )
-
-  private val route = mkRoute(blockchain, addressTransactions)
 
   private val invalidBase58Gen = alphaNumStr.map(_ + "0")
 
@@ -81,7 +79,7 @@ class TransactionsRouteSpec
           )
         } yield (sender.publicKey, tx)
       "TransferTransaction" in forAll(transferTxScenario) {
-        case (sender, transferTx) =>
+        case (_, transferTx) =>
           (addressTransactions.calculateFee _).expects(*).returning(Right((Asset.Waves, 100000L, 0L))).once()
 
           Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
@@ -114,7 +112,7 @@ class TransactionsRouteSpec
           )
         } yield (sender.publicKey, tx)
       "MassTransferTransaction" in forAll(massTransferTxScenario) {
-        case (sender, transferTx) =>
+        case (_, transferTx) =>
           (addressTransactions.calculateFee _).expects(*).returning(Right((Asset.Waves, 200000L, 0L))).once()
 
           Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
@@ -142,7 +140,7 @@ class TransactionsRouteSpec
           )
         } yield (sender.publicKey, tx, IssuedAsset(assetId))
       "without sponsorship" in forAll(transferTxWithAssetFeeScenario) {
-        case (sender, transferTx, _) =>
+        case (_, transferTx, _) =>
           (addressTransactions.calculateFee _).expects(*).returning(Right((Asset.Waves, 100000L, 0L))).once()
 
           Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
@@ -272,8 +270,6 @@ class TransactionsRouteSpec
 
       forAll(txAvailability) {
         case (tx, succeed, height, acceptFailedActivationHeight) =>
-          val blockchain          = mock[Blockchain]
-          val addressTransactions = mock[CommonTransactionsApi]
           val h: Height           = Height(height)
           val info                = if (tx.typeId == InvokeScriptTransaction.typeId) Right((tx.asInstanceOf[InvokeScriptTransaction], None)) else Left(tx)
           (addressTransactions.transactionById _).expects(tx.id()).returning(Some((h, info, succeed))).once()
@@ -282,16 +278,17 @@ class TransactionsRouteSpec
             .returning(Map(BlockchainFeatures.BlockV5.id -> acceptFailedActivationHeight))
             .anyNumberOfTimes()
 
-          Get(routePath(s"/info/${tx.id().toString}")) ~> mkRoute(blockchain, addressTransactions) ~> check {
+          def validateResponse(): Unit = {
             status shouldEqual StatusCodes.OK
 
-            val statusInfo =
-              if (height >= acceptFailedActivationHeight)
-                JsObject(Map("applicationStatus" -> JsString(if (succeed) "succeed" else "scriptExecutionFailed")))
-              else JsObject.empty
-
-            responseAs[JsValue] shouldEqual tx.json() ++ statusInfo + ("height" -> JsNumber(height))
+            val extraFields =
+              if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height))
+                Json.obj("height"    -> height, "applicationStatus" -> JsString(if (succeed) "succeed" else "scriptExecutionFailed"))
+              else Json.obj("height" -> height)
+            responseAs[JsValue] shouldEqual (tx.json() ++ extraFields)
           }
+
+          Get(routePath(s"/info/${tx.id().toString}")) ~> route ~> check(validateResponse())
       }
     }
   }
@@ -317,7 +314,6 @@ class TransactionsRouteSpec
 
       forAll(txAvailability) {
         case (tx, height, acceptFailedActivationHeight, succeed) =>
-          val blockchain = mock[Blockchain]
           (blockchain.transactionInfo _).expects(tx.id()).returning(Some((height, tx, succeed))).anyNumberOfTimes()
           (blockchain.height _).expects().returning(1000).anyNumberOfTimes()
           (blockchain.activatedFeatures _)
@@ -325,7 +321,7 @@ class TransactionsRouteSpec
             .returning(Map(BlockchainFeatures.BlockV5.id -> acceptFailedActivationHeight))
             .anyNumberOfTimes()
 
-          Get(routePath(s"/status?id=${tx.id().toString}&id=${tx.id().toString}")) ~> mkRoute(blockchain, addressTransactions) ~> check {
+          Get(routePath(s"/status?id=${tx.id().toString}&id=${tx.id().toString}")) ~> route ~> check {
             status shouldEqual StatusCodes.OK
             val obj = {
               val common = Json.obj(
@@ -335,12 +331,15 @@ class TransactionsRouteSpec
                 "confirmations" -> JsNumber(1000 - height)
               )
               val applicationStatus =
-                if (height >= acceptFailedActivationHeight)
+                if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height))
                   Json.obj("applicationStatus" -> JsString(if (succeed) "succeed" else "scriptExecutionFailed"))
                 else Json.obj()
               common ++ applicationStatus
             }
             responseAs[JsValue] shouldEqual Json.arr(obj, obj)
+          }
+          Post(routePath("/status"), Json.obj("ids" -> Seq(tx.id().toString, tx.id().toString))) ~> route ~> check {
+            status shouldEqual StatusCodes.OK
           }
       }
     }

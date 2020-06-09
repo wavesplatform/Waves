@@ -7,7 +7,6 @@ import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics.{BlockStats, Instrumented, _}
 import com.wavesplatform.mining.microblocks.MicroBlockMiner
 import com.wavesplatform.network._
