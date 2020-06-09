@@ -32,7 +32,8 @@ class WavesEnvironment(
     blockchain: Blockchain,
     address: Coeval[ByteStr],
     ds: DirectiveSet,
-    override val txId: ByteStr
+    override val txId: ByteStr,
+    override val dAppAlias: Boolean = false
 ) extends Environment[Id] {
   import com.wavesplatform.lang.v1.traits.Environment._
 

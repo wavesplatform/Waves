@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs.invoke
 
 import cats.Id
 import cats.implicits._
-import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
@@ -107,9 +107,10 @@ object InvokeScriptTransactionDiff {
                     Coeval.evalOnce(input),
                     Coeval(blockchain.height),
                     blockchain,
-                    Coeval(ByteStr(tx.dAppAddressOrAlias.bytes)),
+                    Coeval(ByteStr(dAppAddress.bytes)),
                     directives,
-                    tx.id()
+                    tx.id(),
+                    !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, blockchain.height) && tx.dAppAddressOrAlias.isInstanceOf[Alias]
                   )
 
                   //to avoid continuations when evaluating underestimated by EstimatorV2 scripts

@@ -1,7 +1,9 @@
 package com.wavesplatform.it.sync.smartcontract
 
+import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync._
@@ -10,6 +12,7 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxVersion
@@ -18,6 +21,14 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
 class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
+
+  val activationHeight = 2
+  override protected def nodeConfigs : Seq[Config] =
+    NodeConfigs.Builder(NodeConfigs.Default, 1, Seq.empty)
+      .overrideBase(_.quorum(0))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.BlockV5.id, activationHeight)))
+      .withDefault(1)
+      .buildNonConflicting()
 
   private val firstContract  = firstAddress
   private val secondContract = secondAddress
@@ -38,6 +49,11 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         | @Callable(inv)
         | func emptyKey() = {
         |  WriteSet([DataEntry("", "a")])
+        | }
+        |
+        | @Callable(inv)
+        | func baz() = {
+        |  WriteSet([DataEntry("test", this.bytes)])
         | }
         |
         | @Callable(inv)
@@ -76,6 +92,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     val acc0ScriptInfo  = sender.addressScriptInfo(firstContract)
     val acc0ScriptInfo2 = sender.addressScriptInfo(secondContract)
+    sender.createAlias(firstContract, "alias", fee = 1.waves)
 
     acc0ScriptInfo.script.isEmpty shouldBe false
     acc0ScriptInfo.scriptText.isEmpty shouldBe false
@@ -87,6 +104,35 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     sender.transactionInfo[TransactionInfo](setScriptId).script.get.startsWith("base64:") shouldBe true
     sender.transactionInfo[TransactionInfo](setScriptId2).script.get.startsWith("base64:") shouldBe true
   }
+
+  test("disable use this with alias") {
+    assertApiErrorRaised(
+     sender.invokeScript(
+      caller,
+      "alias:I:alias",
+      func = Some("baz"),
+      args = List(),
+      payment = Seq(),
+      fee = 1.waves,
+      waitForTx = true
+     )
+    )
+  }
+
+  test("but enable use this with address") {
+    sender.invokeScript(
+      caller,
+      firstContract,
+      func = Some("baz"),
+      args = List(),
+      payment = Seq(),
+      fee = 1.waves,
+      waitForTx = true
+     )
+    sender.getDataByKey(firstContract, "test") shouldBe BinaryDataEntry("test", ByteStr.decodeBase58(firstContract).get)
+  }
+
+  sender.waitForHeight(activationHeight)
 
   test("contract caller invokes a function on a contract") {
     val arg = ByteStr(Array(42: Byte))
@@ -108,6 +154,36 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
       sender.getDataByKey(contract, "a") shouldBe BinaryDataEntry("a", arg)
       sender.getDataByKey(contract, "sender") shouldBe BinaryDataEntry("sender", ByteStr.decodeBase58(caller).get)
     }
+  }
+
+  test("contract caller invokes a function on a contract by alias") {
+    val arg               = ByteStr(Array(43: Byte))
+
+    val _ = sender.invokeScript(
+      caller,
+      "alias:I:alias",
+      func = Some("foo"),
+      args = List(CONST_BYTESTR(arg).explicitGet()),
+      payment = Seq(),
+      fee = 1.waves,
+      waitForTx = true
+    )
+
+    sender.getDataByKey(firstContract, "a") shouldBe BinaryDataEntry("a", arg)
+    sender.getDataByKey(firstContract, "sender") shouldBe BinaryDataEntry("sender", ByteStr.decodeBase58(caller).get)
+  }
+
+  test("enable use this with address") {
+    sender.invokeScript(
+      caller,
+      firstContract,
+      func = Some("baz"),
+      args = List(),
+      payment = Seq(),
+      fee = 1.waves,
+      waitForTx = true
+     )
+    sender.getDataByKey(firstContract, "test") shouldBe BinaryDataEntry("test", ByteStr.decodeBase58(firstContract).get)
   }
 
   test("contract caller invokes a default function on a contract") {

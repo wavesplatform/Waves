@@ -40,4 +40,5 @@ trait Environment[F[_]] {
   def multiPaymentAllowed: Boolean
   def txId: ByteStr
   def transferTransactionFromProto(b: Array[Byte]): F[Option[Tx.Transfer]]
+  def dAppAlias: Boolean = false
 }

@@ -298,6 +298,10 @@ object Terms {
     }
   }
 
+  case class FAIL(reason: String) extends EVALUATED {
+    def weight: Long = 0
+  }
+
   implicit val orderingConstLong: Ordering[CONST_LONG] =
     (a, b) => a.t compare b.t
 }
