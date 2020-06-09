@@ -13,10 +13,12 @@ import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.BaseSuite
 import com.wavesplatform.it.api.SyncHttpApi._
+import org.scalatest.Ignore
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
+@Ignore
 class ReplTest extends BaseSuite {
   override def nodeConfigs =
     com.wavesplatform.it.NodeConfigs.newBuilder

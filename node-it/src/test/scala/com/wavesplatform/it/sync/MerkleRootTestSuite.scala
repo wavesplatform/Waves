@@ -87,16 +87,16 @@ class MerkleRootTestSuite
     nodes.waitForHeightArise()
     val currentHeight               = nodes.head.height
     val txsBuf                      = collection.mutable.ListBuffer[String]()
-    var merkleProofBefore           = Vector(Vector(""))
-    var merkleProofPostBefore       = Vector(Vector(""))
+    var merkleProofBefore           = Seq(Seq(""))
+    var merkleProofPostBefore       = Seq(Seq(""))
     var blockTransactionsRootBefore = ""
     while (nodes.head.height == currentHeight) {
       val tx = nodes.head.broadcastTransfer(nodes.head.keyPair, nodes.head.address, transferAmount, minFee, None, None, waitForTx = true).id
       if (nodes.head.height == currentHeight) {
         txsBuf += tx
         val txsSeq = txsBuf.toSeq
-        merkleProofBefore = nodes.head.getMerkleProof(txsSeq: _*).map(resp => resp.merkleProof).asInstanceOf[Vector[Vector[String]]]
-        merkleProofPostBefore = nodes.head.getMerkleProofPost(txsSeq: _*).map(resp => resp.merkleProof).asInstanceOf[Vector[Vector[String]]]
+        merkleProofBefore = nodes.head.getMerkleProof(txsSeq: _*).map(resp => resp.merkleProof)
+        merkleProofPostBefore = nodes.head.getMerkleProofPost(txsSeq: _*).map(resp => resp.merkleProof)
         blockTransactionsRootBefore = nodes.head.blockAt(currentHeight).transactionsRoot.get
       }
     }
