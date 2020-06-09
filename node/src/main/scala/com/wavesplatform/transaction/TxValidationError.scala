@@ -52,7 +52,7 @@ object TxValidationError {
     import FailedTransactionError._
 
     def cause: Cause = this match {
-      case e: ScriptExecutionError.ByDAppScript                   => Cause(1, e.error)
+      case e: ScriptExecutionError.FailedByDAppScript             => Cause(1, e.error)
       case e: InsufficientInvokeActionFee                         => Cause(2, e.error)
       case e: ScriptExecutionError.ByAssetScriptInAction          => Cause(3, assetScriptError(e.assetId, Some(e.error)))
       case e: TransactionNotAllowedByScript.ByAssetScriptInAction => Cause(3, assetScriptError(e.assetId, None))
@@ -79,14 +79,16 @@ object TxValidationError {
       case _: ByAssetScript         => true
       case _: ByAssetScriptInAction => true
       case _: ByAccountScript       => false
-      case _: ByDAppScript          => false
+      case _: FailedByDAppScript    => false
+      case _: RejectedByDAppScript  => false
     }
 
     private val target: String = this match {
       case _: ByAssetScript         => "Asset"
       case _: ByAssetScriptInAction => "Asset"
       case _: ByAccountScript       => "Account"
-      case _: ByDAppScript          => "DApp"
+      case _: FailedByDAppScript    => "DApp"
+      case _: RejectedByDAppScript  => "DApp"
     }
 
     override def toString: String = s"ScriptExecutionError(error = $error, type = $target, log =${logToString(log)})"
@@ -97,7 +99,8 @@ object TxValidationError {
       assetId.fold[ScriptExecutionError](ByAccountScript(error, log))(ai => ByAssetScript(error, log, ai))
 
     final case class ByAccountScript(error: String, log: Log[Id])                         extends ScriptExecutionError
-    final case class ByDAppScript(error: String, log: Log[Id] = List.empty)               extends FailedExecutionError
+    final case class RejectedByDAppScript(error: String, log: Log[Id] = List.empty)       extends ScriptExecutionError
+    final case class FailedByDAppScript(error: String, log: Log[Id] = List.empty)         extends FailedExecutionError
     final case class ByAssetScriptInAction(error: String, log: Log[Id], assetId: ByteStr) extends FailedExecutionError
     final case class ByAssetScript(error: String, log: Log[Id], assetId: ByteStr)         extends FailedExecutionError
   }
