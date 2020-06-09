@@ -72,39 +72,42 @@ case class TransactionsApiRoute(
     }
   }
 
+  private def loadTransactionStatus(id: ByteStr): JsObject = {
+    import Status._
+    val statusJson = blockchain.transactionInfo(id) match {
+      case Some((height, _, succeed)) =>
+        Json.obj(
+          "status"        -> Confirmed,
+          "height"        -> height,
+          "confirmations" -> (blockchain.height - height).max(0)
+        ) ++ applicationStatus(height, succeed)
+      case None =>
+        commonApi.unconfirmedTransactionById(id) match {
+          case Some(_) => Json.obj("status" -> Unconfirmed)
+          case None    => Json.obj("status" -> NotFound)
+        }
+    }
+    (statusJson ++ Json.obj("id" -> id.toString))
+  }
+
   def status: Route = pathPrefix("status") {
-    path(Segment) { id =>
-      complete(id)
-    } ~
+    path(TransactionId) { id =>
+      complete(loadTransactionStatus(id))
+    } ~ pathEndOrSingleSlash {
       anyParam("id").filter(_.nonEmpty) { ids =>
         if (ids.toSeq.length > settings.transactionsByAddressLimit)
           complete(TooBigArrayAllocation)
         else {
           ids.map(id => ByteStr.decodeBase58(id).toEither.leftMap(_ => id)).toList.separate match {
             case (Nil, ids) =>
-              val results = ids.toSet.map { id: ByteStr =>
-                import Status._
-                val statusJson = blockchain.transactionInfo(id) match {
-                  case Some((height, _, succeed)) =>
-                    Json.obj(
-                      "status"        -> Confirmed,
-                      "height"        -> height,
-                      "confirmations" -> (blockchain.height - height).max(0)
-                    ) ++ applicationStatus(height, succeed)
-                  case None =>
-                    commonApi.unconfirmedTransactionById(id) match {
-                      case Some(_) => Json.obj("status" -> Unconfirmed)
-                      case None    => Json.obj("status" -> NotFound)
-                    }
-                }
-                id -> (statusJson ++ Json.obj("id" -> id.toString))
-              }.toMap
+              val results = ids.toSet.map((id: ByteStr) => id -> loadTransactionStatus(id)).toMap
               complete(ids.map(id => results(id)))
             case (errors, _) => complete(InvalidIds(errors))
           }
         }
       } ~ pathEndOrSingleSlash {
-      complete(CustomValidationError("Empty request"))
+        complete(CustomValidationError("Empty request"))
+      }
     }
   }
 
