@@ -39,11 +39,9 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynch
     }
   }
 
-  def aliasOfAddress: Route = (get & path("by-address" / Segment)) { addressString =>
-    complete {
-      com.wavesplatform.account.Address
-        .fromString(addressString)
-        .map(acc => blockchain.aliasesOfAddress(acc).map(_.stringRepr).toVector)
+  def aliasOfAddress: Route = (get & path("by-address" / AddrSegment)) { address =>
+    extractScheduler { implicit s =>
+      complete(blockchain.aliasesOfAddress(address).map(aliases => Json.arr(aliases.map(_.stringRepr))).runToFuture)
     }
   }
 }

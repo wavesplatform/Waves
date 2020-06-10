@@ -13,8 +13,8 @@ object Dependencies {
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.9.8"
   private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
 
-  private def catsModule(module: String, version: String = "2.1.0")  = Def.setting("org.typelevel" %%% s"cats-$module"  % version)
-  private def monixModule(module: String) = Def.setting("io.monix"      %%% s"monix-$module" % "3.2.1")
+  private def catsModule(module: String)  = Def.setting("org.typelevel" %%% s"cats-$module"  % "2.0.0")
+  private def monixModule(module: String) = Def.setting("io.monix"      %%% s"monix-$module" % "3.1.0")
 
   private val kindProjector = compilerPlugin("org.spire-math" %% "kind-projector" % "0.9.6")
 
@@ -26,7 +26,7 @@ object Dependencies {
   private val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
   val janino                     = "org.codehaus.janino" % "janino" % "3.0.12"
 
-  private val catsEffect = catsModule("effect", "2.1.3")
+  private val catsEffect = catsModule("effect")
   private val catsCore   = catsModule("core")
   private val shapeless  = Def.setting("com.chuusai" %%% "shapeless" % "2.3.3")
 
