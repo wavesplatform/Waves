@@ -1593,7 +1593,12 @@ class InvokeScriptTransactionDiffTest
            |{-#SCRIPT_TYPE ACCOUNT#-}
            |
            |@Callable(i)
-           |func $funcName() = throw("bad news")
+           |func $funcName() = {
+           |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 10} true
+           |  if (check)
+           |    then throw("bad news")
+           |    else throw("bad news")
+           |}
            |""".stripMargin
       Parser.parseContract(script).get.value
     }

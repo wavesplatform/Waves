@@ -92,7 +92,7 @@ case class AssetsApiRoute(
           }
         } ~ pathPrefix("details") {
           (pathEndOrSingleSlash & parameters(("id".as[String].*, "full".as[Boolean] ? false))) { (ids, full) =>
-            multipleDetailsGet(ids.toSeq, full)
+            multipleDetailsGet(ids.toSeq.reverse, full)
           } ~ (path(AssetId) & parameter("full".as[Boolean] ? false)) { (assetId, full) =>
             singleDetails(assetId, full)
           }

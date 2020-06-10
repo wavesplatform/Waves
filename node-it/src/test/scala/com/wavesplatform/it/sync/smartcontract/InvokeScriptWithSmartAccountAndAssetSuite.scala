@@ -163,7 +163,13 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
           |  let pay = extract(i.payment)
           |  if (pay.assetId == asset2 && pay.amount > 15) then
           |    TransferSet([ScriptTransfer(i.caller, 15, asset1)])
-          |  else throw("need payment in 15+ tokens of asset2 " + toBase58String(asset2))
+          |  else {
+          |    if (${"sigVerify(base58'', base58'', base58'') ||" * 16} true)
+          |    then
+          |       throw("need payment in 15+ tokens of asset2 " + toBase58String(asset2))
+          |    else
+          |       throw("unexpected")
+          |  }
           |}
           |@Callable(i)
           |func payAsset2GetAsset3() = {

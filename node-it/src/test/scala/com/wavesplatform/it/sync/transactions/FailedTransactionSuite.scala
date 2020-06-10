@@ -103,7 +103,14 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
          |@Callable(inv)
          |func canThrow() = {
          |  let action = valueOrElse(getString(this, "crash"), "no")
-         |  if (action == "yes") then throw("Crashed by dApp")
+         |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 10} true
+         |
+         |  if (action == "yes")
+         |  then {
+         |    if (check)
+         |    then throw("Crashed by dApp")
+         |    else throw("Crashed by dApp")
+         |  }
          |  else []
          |}
          |
@@ -111,7 +118,10 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
          |func defineTxHeight(id: ByteVector) = [BooleanEntry(toBase58String(id), transactionHeightById(id).isDefined())]
          |
          |@Callable(inv)
-         |func blockIsEven() = if height % 2 == 0 then [] else throw("block height is odd")
+         |func blockIsEven() =
+         |  if (${"sigVerify(base58'', base58'', base58'') ||" * 8} height % 2 == 0)
+         |  then []
+         |  else throw("block height is odd")
          |
         """.stripMargin
 

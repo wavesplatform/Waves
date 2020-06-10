@@ -103,17 +103,17 @@ object InvokeDiffsCommon {
       .map(dataItemToEntry)
 
     for {
-      _ <- TracedResult(checkDataEntries(tx, dataEntries, version)).leftMap(e => ScriptExecutionError.ByDAppScript(e))
+      _ <- TracedResult(checkDataEntries(tx, dataEntries, version)).leftMap(e => ScriptExecutionError.FailedByDAppScript(e))
       _ <- TracedResult(
         Either.cond(
           actions.length - dataEntries.length <= ContractLimits.MaxCallableActionsAmount,
           (),
-          ScriptExecutionError.ByDAppScript(s"Too many script actions: max: ${ContractLimits.MaxCallableActionsAmount}, actual: ${actions.length}")
+          ScriptExecutionError.FailedByDAppScript(s"Too many script actions: max: ${ContractLimits.MaxCallableActionsAmount}, actual: ${actions.length}")
         )
       )
 
       _ <- TracedResult(checkSelfPayments(dAppAddress, blockchain, tx, version, transferList))
-      _ <- TracedResult(Either.cond(transferList.map(_.amount).forall(_ >= 0), (), ScriptExecutionError.ByDAppScript("Negative amount")))
+      _ <- TracedResult(Either.cond(transferList.map(_.amount).forall(_ >= 0), (), ScriptExecutionError.FailedByDAppScript("Negative amount")))
       _ <- TracedResult(checkOverflow(transferList.map(_.amount)))
 
       assetsComplexity = (tx.checkedAssets.map(_.id) ++ transferList.flatMap(_.assetId))
@@ -236,9 +236,9 @@ object InvokeDiffsCommon {
   ): Either[ScriptExecutionError, Unit] =
     if (blockchain.disallowSelfPayment && version >= V4)
       if (tx.payments.nonEmpty && tx.sender.toAddress == dAppAddress)
-        ScriptExecutionError.ByDAppScript("DApp self-payment is forbidden since V4").asLeft[Unit]
+        ScriptExecutionError.FailedByDAppScript("DApp self-payment is forbidden since V4").asLeft[Unit]
       else if (transfers.exists(_.recipient.bytes == ByteStr(dAppAddress.bytes)))
-        ScriptExecutionError.ByDAppScript("DApp self-transfer is forbidden since V4").asLeft[Unit]
+        ScriptExecutionError.FailedByDAppScript("DApp self-transfer is forbidden since V4").asLeft[Unit]
       else
         ().asRight[ScriptExecutionError]
     else
@@ -247,7 +247,7 @@ object InvokeDiffsCommon {
   private def checkOverflow(dataList: Iterable[Long]): Either[ScriptExecutionError, Unit] = {
     Try(dataList.foldLeft(0L)(Math.addExact))
       .fold(
-        _ => ScriptExecutionError.ByDAppScript("Attempt to transfer unavailable funds in contract payment").asLeft[Unit],
+        _ => ScriptExecutionError.FailedByDAppScript("Attempt to transfer unavailable funds in contract payment").asLeft[Unit],
         _ => ().asRight[ScriptExecutionError]
       )
   }
@@ -354,7 +354,7 @@ object InvokeDiffsCommon {
             } else if (issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
               TracedResult(Left(TooBigArray), List())
             } else if (blockchain.assetDescription(IssuedAsset(issue.id)).isDefined) {
-              TracedResult(Left(ScriptExecutionError.ByDAppScript(s"Asset ${issue.id} is already issued")), List())
+              TracedResult(Left(ScriptExecutionError.FailedByDAppScript(s"Asset ${issue.id} is already issued")), List())
             } else {
               val staticInfo = AssetStaticInfo(TransactionId @@ itx.id(), pk, issue.decimals, blockchain.isNFT(issue))
               val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
@@ -394,7 +394,7 @@ object InvokeDiffsCommon {
                 Either.cond(
                   blockchain.assetDescription(IssuedAsset(sponsorFee.assetId)).exists(_.issuer == pk),
                   (),
-                  ScriptExecutionError.ByDAppScript(s"SponsorFee assetId=${sponsorFee.assetId} was not issued from address of current dApp")
+                  ScriptExecutionError.FailedByDAppScript(s"SponsorFee assetId=${sponsorFee.assetId} was not issued from address of current dApp")
                 )
               )
               _ <- TracedResult(SponsorFeeTxValidator.checkMinSponsoredAssetFee(sponsorFee.minSponsoredAssetFee))
@@ -470,7 +470,7 @@ object InvokeDiffsCommon {
   private def asFailedScriptError(ve: ValidationError): FailedTransactionError =
     ve match {
       case e: FailedTransactionError => e
-      case e: GenericError           => ScriptExecutionError.ByDAppScript(e.err)
-      case e                         => ScriptExecutionError.ByDAppScript(e.toString)
+      case e: GenericError           => ScriptExecutionError.FailedByDAppScript(e.err)
+      case e                         => ScriptExecutionError.FailedByDAppScript(e.toString)
     }
 }

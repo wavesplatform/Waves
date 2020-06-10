@@ -112,7 +112,14 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
          |@Callable(inv)
          |func canThrow() = {
          |  let action = valueOrElse(getString(this, "crash"), "no")
-         |  if (action == "yes") then throw("Crashed by dApp")
+         |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 10} true
+         |
+         |  if (action == "yes")
+         |  then {
+         |    if (check)
+         |    then throw("Crashed by dApp")
+         |    else throw("Crashed by dApp")
+         |  }
          |  else []
          |}
          |
