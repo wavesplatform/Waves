@@ -11,6 +11,10 @@ package object utils {
       case Right(value) => value
     }
 
+    // used for destructuring in for-comprehensions
+    def withFilter(check: B => Boolean): Either[A, B] =
+      ei.filterOrElse(check, throw new MatchError(ei))
+
     def foldToTry: Try[B] = ei.fold(
       left => Failure(makeException(left)),
       right => Success(right)

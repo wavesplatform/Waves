@@ -11,10 +11,12 @@ import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
+import com.wavesplatform.lang.v1.BaseGlobal.DAppInfo
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext, ContractCompiler, ExpressionCompiler}
-import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
@@ -149,12 +151,16 @@ trait BaseGlobal {
       expr: EXPR,
       complexity: Long,
       version: StdLibVersion,
-      isAsset: Boolean
+      isAsset: Boolean,
+      estimator: ScriptEstimator
   ): Either[String, Unit] =
     for {
+      _ <- if (estimator == ScriptEstimatorV2)
+        ExprScript.estimate(expr, version, ScriptEstimatorV1, !isAsset)
+      else
+        Right(())
       _ <- ExprScript.checkComplexity(version, complexity, !isAsset)
-      illegalBlockVersionUsage =
-        LetBlockVersions.contains(version) &&
+      illegalBlockVersionUsage = LetBlockVersions.contains(version) &&
         com.wavesplatform.lang.v1.compiler.containsBlockV2(expr)
       _ <- Either.cond(
         !illegalBlockVersionUsage,
@@ -163,27 +169,47 @@ trait BaseGlobal {
       )
     } yield ()
 
-  type ContractInfo = (Array[Byte], DApp, (String, Long), Map[String, Long])
-
   def compileContract(
       input: String,
       ctx: CompilerContext,
       stdLibVersion: StdLibVersion,
       estimator: ScriptEstimator
-  ): Either[String, ContractInfo] =
+  ): Either[String, DAppInfo] =
     for {
-      dApp                          <- ContractCompiler.compile(input, ctx, stdLibVersion)
-      (maxComplexity, complexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator, includeUserFunctions = true)
-      bytes                         <- serializeContract(dApp, stdLibVersion)
-    } yield (bytes, dApp, maxComplexity, complexities)
+      dApp                                   <- ContractCompiler.compile(input, ctx, stdLibVersion)
+      userFunctionComplexities               <- ContractScript.estimateUserFunctions(stdLibVersion, dApp, estimator)
+      globalVariableComplexities             <- ContractScript.estimateGlobalVariables(stdLibVersion, dApp, estimator)
+      (maxComplexity, annotatedComplexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator)
+      (verifierComplexity, callableComplexities) = dApp.verifierFuncOpt.fold(
+        (0L, annotatedComplexities)
+      )(v => (annotatedComplexities(v.u.name), annotatedComplexities - v.u.name))
+      bytes <- serializeContract(dApp, stdLibVersion)
+    } yield DAppInfo(
+      bytes,
+      dApp,
+      maxComplexity,
+      annotatedComplexities,
+      verifierComplexity,
+      callableComplexities,
+      userFunctionComplexities.toMap,
+      globalVariableComplexities.toMap
+    )
 
   def checkContract(
-    version: StdLibVersion,
-    dApp: DApp,
-    maxComplexity: (String, Long),
-    complexities: Map[String, Long]
+      version: StdLibVersion,
+      dApp: DApp,
+      maxComplexity: (String, Long),
+      complexities: Map[String, Long],
+      estimator: ScriptEstimator
   ): Either[String, Unit] =
-    ContractScript.checkComplexity(version, dApp, maxComplexity, complexities, useReducedVerifierLimit = true)
+    for {
+      _ <-
+        if (estimator == ScriptEstimatorV2)
+          ContractScript.estimateComplexity(version, dApp, ScriptEstimatorV1)
+        else
+          Right(())
+      _ <- ContractScript.checkComplexity(version, dApp, maxComplexity, complexities, useReducedVerifierLimit = true)
+    } yield ()
 
   def decompile(compiledCode: String): Either[ScriptParseError, (String, Dic)] =
     for {
@@ -255,4 +281,15 @@ object BaseGlobal {
   case class RoundHalfEven() extends Rounds
   case class RoundCeiling()  extends Rounds
   case class RoundFloor()    extends Rounds
+
+  case class DAppInfo(
+      bytes: Array[Byte],
+      dApp: DApp,
+      maxComplexity: (String, Long),
+      annotatedComplexities: Map[String, Long],
+      verifierComplexity: Long,
+      callableComplexities: Map[String, Long],
+      userFunctionComplexities: Map[String, Long],
+      globalVariableComplexities: Map[String, Long]
+  )
 }

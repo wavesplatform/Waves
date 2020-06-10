@@ -1,9 +1,13 @@
 package com.wavesplatform.state.diffs.invoke
 
+import cats.Id
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.EstimatorProvider._
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.FunctionCallPolicyProvider._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.contract.DApp
@@ -13,9 +17,11 @@ import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.ContractCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, ScriptResultV3, ScriptResultV4}
+import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal}
+import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.metrics._
@@ -106,20 +112,30 @@ object InvokeScriptTransactionDiff {
                     tx.id()
                   )
 
-                  val evaluate =
-                    if (blockchain.settings.useEvaluatorV2) {
-                      //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
-                      val evaluatorV2Limit =
-                        if (blockchain.estimator.version == 2)
-                          Int.MaxValue
-                        else
-                          ContractLimits.MaxComplexityByVersion(version)
-                      evaluateV2(_, _, _, _, _, evaluatorV2Limit)
-                    } else evaluateV1 _
+                  //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
+                  val fullLimit =
+                    if (blockchain.estimator == ScriptEstimatorV2)
+                      Int.MaxValue
+                    else
+                      ContractLimits.MaxComplexityByVersion(version)
 
-                  Try(evaluate(version, contract, directives, invocation, environment))
-                    .fold(e => Left((e.getMessage, Nil)), identity)
-                    .leftMap { case (error, log) => ScriptExecutionError.ByDAppScript(error, log) }
+                  val failFreeLimit =
+                    if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5))
+                      ContractLimits.FailFreeInvokeComplexity
+                    else
+                      fullLimit
+
+                  for {
+                    (failFreeResult, evaluationCtx, failFreeLog) <-
+                      evaluateV2(version, contract, directives, invocation, environment, failFreeLimit)
+                    (result, log) <-
+                      failFreeResult match {
+                        case IncompleteResult(expr, unusedComplexity) =>
+                          continueEvaluation(version, expr, evaluationCtx, fullLimit - failFreeLimit + unusedComplexity, tx.id())
+                        case _ =>
+                          Right((failFreeResult, Nil))
+                      }
+                  } yield (result, failFreeLog ::: log)
                 })
                 TracedResult(
                   scriptResultE,
@@ -156,21 +172,6 @@ object InvokeScriptTransactionDiff {
     }
   }
 
-  private def evaluateV1(
-      version: StdLibVersion,
-      contract: DApp,
-      directives: DirectiveSet,
-      invocation: ContractEvaluator.Invocation,
-      environment: WavesEnvironment
-  ) = {
-    val ctx =
-      PureContext.build(Global, version).withEnvironment[Environment] |+|
-        CryptoContext.build(Global, version).withEnvironment[Environment] |+|
-        WavesContext.build(directives)
-
-    ContractEvaluator(ctx.evaluationContext(environment), contract, invocation, version)
-  }
-
   private def evaluateV2(
       version: StdLibVersion,
       contract: DApp,
@@ -178,7 +179,7 @@ object InvokeScriptTransactionDiff {
       invocation: ContractEvaluator.Invocation,
       environment: WavesEnvironment,
       limit: Int
-  ) = {
+  ): Either[ScriptExecutionError.RejectedByDAppScript, (ScriptResult, EvaluationContext[Environment, Id], Log[Id])] = {
     val wavesContext = WavesContext.build(directives)
     val ctx =
       PureContext.build(Global, version).withEnvironment[Environment] |+|
@@ -186,8 +187,28 @@ object InvokeScriptTransactionDiff {
         wavesContext.copy(vars = Map())
 
     val freezingLets = wavesContext.evaluationContext(environment).letDefs
-    ContractEvaluator.applyV2(ctx.evaluationContext(environment), freezingLets, contract, invocation, version, limit)
+    val evaluationCtx = ctx.evaluationContext(environment)
+
+    Try(ContractEvaluator.applyV2(evaluationCtx, freezingLets, contract, invocation, version, limit))
+      .fold(
+        e => Left((e.getMessage, Nil)),
+        _.map { case (result, log) => (result, evaluationCtx, log) }
+      )
+      .leftMap {
+        case (error, log) => ScriptExecutionError.RejectedByDAppScript(error, log)
+      }
   }
+
+  private def continueEvaluation(
+    version: StdLibVersion,
+    expr: EXPR,
+    evaluationCtx: EvaluationContext[Environment, Id],
+    limit: Int,
+    transactionId: ByteStr
+  ): Either[ScriptExecutionError.FailedByDAppScript, (ScriptResult, Log[Id])] =
+    Try(ContractEvaluator.applyV2(evaluationCtx, Map[String, LazyVal[Id]](), expr, version, transactionId, limit))
+      .fold(e => Left((e.getMessage, Nil)), identity)
+      .leftMap { case (error, log) => ScriptExecutionError.FailedByDAppScript(error, log) }
 
   private def checkCall(fc: FUNCTION_CALL, blockchain: Blockchain): Either[ExecutionError, Unit] = {
     val (check, expectedTypes) =
