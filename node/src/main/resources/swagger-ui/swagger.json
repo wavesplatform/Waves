@@ -2302,6 +2302,9 @@
         ],
         "summary": "DApp meta",
         "description": "Extract DApp meta from compiled code in Base64 representation",
+        "consumes": [
+          "text/plain"
+        ],
         "produces": [
           "application/json"
         ],
