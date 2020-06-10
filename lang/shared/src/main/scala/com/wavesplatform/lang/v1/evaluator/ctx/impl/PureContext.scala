@@ -185,6 +185,16 @@ object PureContext {
 
   private val plainTypeRegex = "\\w*".r
 
+  lazy val old_isInstanceOf: BaseFunction[NoContext] =
+    NativeFunction("_isInstanceOf", 1, ISINSTANCEOF, BOOLEAN, ("obj", TYPEPARAM('T')), ("of", STRING)) {
+      case CONST_BOOLEAN(_) :: CONST_STRING("Boolean") :: Nil    => Right(TRUE)
+      case CONST_BYTESTR(_) :: CONST_STRING("ByteVector") :: Nil => Right(TRUE)
+      case CONST_STRING(_) :: CONST_STRING("String") :: Nil      => Right(TRUE)
+      case CONST_LONG(_) :: CONST_STRING("Int") :: Nil           => Right(TRUE)
+      case (p: CaseObj) :: CONST_STRING(s) :: Nil                => Right(CONST_BOOLEAN(p.caseType.name == s))
+      case _                                                     => Right(FALSE)
+    }
+
   def _isInstanceOf(compilerContext: => CompilerContext): BaseFunction[NoContext] =
     NativeFunction("_isInstanceOf", 1, ISINSTANCEOF, BOOLEAN, ("obj", TYPEPARAM('T')), ("of", STRING)) {
       case (value: EVALUATED) :: CONST_STRING(expectedType) :: Nil =>
@@ -885,9 +895,13 @@ object PureContext {
     build(math, DirectiveSet(version, Account, Expression).explicitGet())
 
   def build(math: BaseGlobal, directives: DirectiveSet, testCompilerContext: CompilerContext = CompilerContext.empty): CTX[NoContext] = {
-    val updatedCtx = ctx.copy(
-      functions = ctx.functions :+ _isInstanceOf(compilerContext(directives) |+| testCompilerContext)
-    )
+    val isInstanceOf =
+      if (directives.stdLibVersion >= V4)
+        _isInstanceOf(compilerContext(directives) |+| testCompilerContext)
+      else
+        old_isInstanceOf
+
+    val updatedCtx = ctx.copy(functions = ctx.functions :+ isInstanceOf)
 
     val pow: BaseFunction[NoContext] =
       NativeFunction("pow", 100, POW, LONG, ("base", LONG), ("bp", LONG), ("exponent", LONG), ("ep", LONG), ("rp", LONG), ("round", rounds)) {
