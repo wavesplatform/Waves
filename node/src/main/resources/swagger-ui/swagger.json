@@ -547,22 +547,7 @@
           "200": {
             "description": "successful operation",
             "schema": {
-              "type": "object",
-              "required": [
-                "address",
-                "meta"
-              ],
-              "properties": {
-                "address": {
-                  "type": "string"
-                },
-                "meta": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "string"
-                  }
-                }
-              }
+              "$ref": "#/definitions/ScriptMeta"
             }
           }
         }
@@ -2305,6 +2290,37 @@
                   "format": "int64"
                 }
               }
+            }
+          }
+        }
+      }
+    },
+    "/utils/script/meta": {
+      "post": {
+        "tags": [
+          "utils"
+        ],
+        "summary": "DApp meta",
+        "description": "Extract DApp meta from compiled code in Base64 representation",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "code",
+            "description": "A compiled Base64 code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/ScriptMeta"
             }
           }
         }
@@ -4413,6 +4429,42 @@
         "extraFee": {
           "type": "integer",
           "format": "int64"
+        }
+      }
+    },
+    "ScriptMeta": {
+      "type": "object",
+      "required": [
+        "version",
+        "callableFuncTypes"
+      ],
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "isArrayArguments": {
+          "type": "boolean"
+        },
+        "callableFuncTypes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "type"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                }
+              }
+            }
+          }
         }
       }
     },
