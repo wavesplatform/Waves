@@ -27,7 +27,7 @@ object CryptoContext {
   }
 
   private def digestAlgorithmType(v: StdLibVersion) =
-    UNION.create(rsaHashAlgs(v), (if(v > V3) { Some("RsaDigistAlgs") } else { None }))
+    UNION.create(rsaHashAlgs(v), (if(v > V3) { Some("RsaDigestAlgs") } else { None }))
 
   private val rsaHashLib = {
     import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA._

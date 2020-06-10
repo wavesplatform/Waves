@@ -144,7 +144,7 @@ class RSATest extends PropSpec with PropertyChecks with Matchers with BeforeAndA
     }
   }
 
-  property("RsaDigistAlgs disabled in V4") {
+  property("RsaDigestAlgs disabled in V4") {
     forAll(keyPairGenerator, messageGenerator) { (keyPair, message) =>
       val xpub = keyPair.getPublic
       val xprv = keyPair.getPrivate
