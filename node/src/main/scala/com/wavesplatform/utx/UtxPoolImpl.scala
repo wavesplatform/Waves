@@ -489,6 +489,12 @@ class UtxPoolImpl(
     TxCleanup.runCleanupAsync()
   }
 
+  def nextMicroBlockSize(): Option[Int] = {
+    priorityDiffs
+      .synchronized(priorityDiffs.headOption)
+      .map(_.transactions.size)
+  }
+
   override def close(): Unit = {
     import scala.concurrent.duration._
     cleanupScheduler.shutdown()

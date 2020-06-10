@@ -6,8 +6,8 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics._
+import com.wavesplatform.mining._
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl._
-import com.wavesplatform.mining.{MinerDebugInfo, MiningConstraint, MiningConstraints, MultiDimensionalMiningConstraint}
 import com.wavesplatform.network.{MicroBlockInv, _}
 import com.wavesplatform.settings.MinerSettings
 import com.wavesplatform.state.Blockchain
@@ -68,7 +68,15 @@ class MicroBlockMinerImpl(
     val packTask = Task.cancelable[(Option[Seq[Transaction]], MiningConstraint)] { cb =>
       @volatile var cancelled = false
       minerScheduler.execute { () =>
-        val mdConstraint = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
+        val mdConstraint = {
+          val microConstraint =
+            utx
+              .nextMicroBlockSize()
+              .map(_ max settings.maxTransactionsInMicroBlock)
+              .fold(constraints.micro)(OneDimensionalMiningConstraint(_, TxEstimators.one, "MaxTxsInMicroBlock"))
+          MultiDimensionalMiningConstraint(restTotalConstraint, microConstraint)
+        }
+
         val packStrategy =
           if (accumulatedBlock.transactionData.isEmpty) PackStrategy.Limit(settings.microBlockInterval)
           else PackStrategy.Estimate(settings.microBlockInterval)
