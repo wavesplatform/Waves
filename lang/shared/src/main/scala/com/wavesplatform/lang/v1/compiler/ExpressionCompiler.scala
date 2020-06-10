@@ -13,6 +13,7 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
+import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE, PART, Pos}
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser, ParserV2}
 import com.wavesplatform.lang.v1.task.imports._
@@ -701,7 +702,7 @@ object ExpressionCompiler {
             Expressions
               .FUNCTION_CALL(
                 mc.position,
-                PART.VALID(mc.position, PureContext._isInstanceOf.name),
+                PART.VALID(mc.position, "_isInstanceOf"),
                 List(refTmp, Expressions.CONST_STRING(mc.position, PART.VALID(mc.position, matchType)))
               )
 
@@ -717,9 +718,14 @@ object ExpressionCompiler {
       }
     }
 
-    val default: Either[CompilationError, Expressions.EXPR] = Right(
-      Expressions.FUNCTION_CALL(cases.head.position, PART.VALID(cases.head.position, "throw"), List.empty)
-    )
+    val default: Either[CompilationError, Expressions.EXPR] = Right {
+      val pos = cases.head.position
+      Expressions.FUNCTION_CALL(
+        pos,
+        PART.VALID(pos, "throw"),
+        List(Expressions.CONST_STRING(pos, PART.VALID(pos, "Match error")))
+      )
+    }
 
     (cases zip caseTypes).foldRight(default) {
       case ((mc, caseType), furtherEi) =>
@@ -813,4 +819,13 @@ object ExpressionCompiler {
             s"Compilation failed: [${res.errors.map(e => Show[CompilationError].show(e)).mkString("; ")}]"
           )
       )
+
+  def parseType(expectedType: String, ctx: CompilerContext): Either[String, FINAL] = {
+    val union = Parser.unionTypeP.parse(expectedType).get.value
+    handleCompositeType(AnyPos, union, None, None)
+      .run(ctx)
+      .value
+      ._2
+      .leftMap(e => Show[CompilationError].show(e))
+  }
 }

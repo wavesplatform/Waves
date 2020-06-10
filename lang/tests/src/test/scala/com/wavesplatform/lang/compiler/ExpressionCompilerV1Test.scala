@@ -452,12 +452,12 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
            IF(
              IF(
                FUNCTION_CALL(
-                 PureContext._isInstanceOf.header,
+                 FunctionHeader.Native(FunctionIds.ISINSTANCEOF),
                  List(REF("$match0"), CONST_STRING("PointB").explicitGet())
                ),
                TRUE,
                FUNCTION_CALL(
-                 PureContext._isInstanceOf.header,
+                 FunctionHeader.Native(FunctionIds.ISINSTANCEOF),
                  List(REF("$match0"), CONST_STRING("PointA").explicitGet())
                )
              ),

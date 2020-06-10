@@ -80,10 +80,15 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
     val lazyVal       = ContextfulVal.pure[C](pointInstance.orNull)
     val stringToTuple = Map(("p", (pointType, lazyVal)))
+    val directiveSet = DirectiveSet(version, Account, Expression).explicitGet()
+
+    val testCtx =
+      (addCtx.withEnvironment[C] |+| CTX[C](sampleTypes, stringToTuple, Array(f, f2))).compilerContext
+
     val ctx: CTX[C] =
       Monoid.combineAll(
         Seq(
-          PureContext.build(Global, version).withEnvironment[C],
+          PureContext.build(Global, directiveSet, testCompilerContext = testCtx).withEnvironment[C],
           CryptoContext.build(Global, version).withEnvironment[C],
           addCtx.withEnvironment[C],
           CTX[C](sampleTypes, stringToTuple, Array(f, f2)),
@@ -1816,5 +1821,41 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     }
 
     ContractLimits.MinTupleSize to ContractLimits.MaxTupleSize foreach check
+  }
+
+  property("tuple match") {
+    val script =
+      """
+        | match(if true then (1, 2) else (true, "q")) {
+        |   case _: (Boolean, String) => false
+        |   case _: (Int, Int)        => true
+        | }
+      """.stripMargin
+
+    eval(script, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+
+    val script2 =
+      """
+        | let a = if (false) then 1 else ("abc", (1, true))
+        | let b = if (false) then if (false) then (1, "abc") else (true, "abc") else (base58'', true, a)
+        |
+        | let c = match b {
+        |   case _: (Int | Boolean, String)                          => throw("unxpected 1")
+        |   case _: (ByteVector, Boolean, Int)                       => throw("unxpected 2")
+        |   case t3: (ByteVector, Boolean, (String, (Int, Boolean))) => t3._3
+        | }
+        |
+        | let d = match b {
+        |   case _: (Int, String)                                          => throw("unxpected 3")
+        |   case _: (Boolean, String)                                      => throw("unxpected 4")
+        |   case t3: (ByteVector, Boolean, Int | (String, (Int, Boolean))) => t3._3
+        | }
+        |
+        | c == ("abc", (1, true)) &&
+        | d == ("abc", (1, true))
+        |
+      """.stripMargin
+
+    eval(script2, version = V4) shouldBe Right(CONST_BOOLEAN(true))
   }
 }
