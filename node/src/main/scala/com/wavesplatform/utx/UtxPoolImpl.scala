@@ -479,20 +479,24 @@ class UtxPoolImpl(
     TxCleanup.runCleanupAsync()
   }
 
-  def addAndCleanupPriority(discDiffs: Seq[Diff] = Nil): Unit = priorityDiffs.synchronized {
-    discDiffs.filterNot(priorityDiffs.contains).foreach { diff =>
-      diff.transactionsValues.foreach(PoolMetrics.addTransactionPriority(_))
-      priorityDiffs += diff
+  def addAndCleanupPriority(discDiffs: Seq[Diff]): Unit = {
+    if (discDiffs.isEmpty) return
+
+    priorityDiffs.synchronized {
+      discDiffs.filterNot(priorityDiffs.contains).foreach { diff =>
+        diff.transactionsValues.foreach(PoolMetrics.addTransactionPriority(_))
+        priorityDiffs += diff
+      }
+      log.trace(s"Priority pool new diffs: $discDiffs")
+      log.trace(s"Priority pool transactions order: ${priorityTransactionIds.mkString(", ")}")
+      TxCleanup.runCleanupAsync()
     }
-    log.trace(s"Priority pool new diffs: $discDiffs")
-    log.trace(s"Priority pool transactions order: ${priorityTransactionIds.mkString(", ")}")
-    TxCleanup.runCleanupAsync()
   }
 
-  def nextMicroBlockSize(): Option[Int] = {
-    priorityDiffs
-      .synchronized(priorityDiffs.headOption)
-      .map(_.transactions.size)
+  def nextMicroBlockSize(): Option[Int] = priorityDiffs.synchronized {
+    val maybeSize = priorityDiffs.headOption.map(_.transactions.size)
+    log.trace(s"Priority queue size = ${priorityDiffs.size}, next microblock size hint = $maybeSize")
+    maybeSize
   }
 
   override def close(): Unit = {
