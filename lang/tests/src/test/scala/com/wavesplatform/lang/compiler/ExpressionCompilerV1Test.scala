@@ -281,6 +281,16 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
         "while matched are (Boolean|Int, String), (ByteVector, Boolean, Int), (ByteVector, Boolean, (String, Int, Boolean)) " +
         "in 146-359"
     )
+
+    val script5 =
+      """
+        | match(if true then (1, 2) else (true, "q")) {
+        |   case _: (Int, Int) => true
+        |   case _: (Boolean, String) => false
+        | }
+      """.stripMargin
+    val expr5 = Parser.parseExpr(script5).get.value
+    ExpressionCompiler(compilerContextV4, expr5) shouldBe 'right
   }
 
   treeTypeTest("GETTER")(
