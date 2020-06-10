@@ -138,7 +138,7 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
       ignoreSpendableBalanceChanged,
       TestFunctionalitySettings.Stub
     )
-    val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers)
+    val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
     try {
       val (accounts, blocks) = gen(ntpTime).sample.get
 

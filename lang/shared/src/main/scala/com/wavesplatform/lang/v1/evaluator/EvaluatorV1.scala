@@ -133,60 +133,18 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, ?]]) {
       case _: FAILED_EXPR => raiseError("Attempt to evaluate failed expression.")
     }
 
-  def evalExpr(t: EXPR): EvalM[F, C, EVALUATED] =
+  private def evalExpr(t: EXPR): EvalM[F, C, EVALUATED] =
     evalExprWithCtx(t).map(_._2)
 
-  def applyWithLogging[A <: EVALUATED](c: EvaluationContext[C, F], expr: EXPR): (Log[F], F[Either[ExecutionError, A]]) = {
+  def applyWithLogging[A <: EVALUATED](c: EvaluationContext[C, F], expr: EXPR): F[Either[(ExecutionError, Log[F]), (A, Log[F])]] = {
     val log = ListBuffer[LogItem[F]]()
-    val r   = ap[A](c, expr, (str: String) => (v: LetExecResult[F]) => log.append((str, v)))
-    (log.toList, r)
-  }
-
-  def applyWithLogging[A <: EVALUATED](
-    c:    Either[ExecutionError, EvaluationContext[C, F]],
-    expr: EXPR
-  ): (Log[F], F[Either[ExecutionError, A]]) = {
-    val log = ListBuffer[LogItem[F]]()
-    val r = c.flatTraverse(ap[A](_, expr, str => v => log.append((str, v))))
-    (log.toList, r)
+    val lec = LoggedEvaluationContext[C, F]((str: String) => (v: LetExecResult[F]) => log.append((str, v)), c)
+    val r = evalExpr(expr).map(_.asInstanceOf[A]).run(lec).value._2
+    r.map(_.bimap((_, log.toList), (_, log.toList)))
   }
 
   def apply[A <: EVALUATED](c: EvaluationContext[C, F], expr: EXPR): F[Either[ExecutionError, A]] =
-    ap(c, expr, _ => _ => ())
-
-  def evalWithLogging(c: EvaluationContext[C, F], evalC: EvalM[F, C, EVALUATED]): (Log[F], F[Either[ExecutionError, EVALUATED]]) = {
-    val log = ListBuffer[LogItem[F]]()
-    val llc = (str: String) => (v: LetExecResult[F]) => log.append((str, v))
-    val lec = LoggedEvaluationContext(llc, c)
-    val res = evalC.run(lec).value._2
-    (log.toList, res)
-  }
-
-  def evalWithLogging(
-    ctx:   Either[ExecutionError, EvaluationContext[C, F]],
-    evalC: EvalM[F, C, EVALUATED]
-  ): (Log[F], F[Either[ExecutionError, EVALUATED]]) = {
-    val log = ListBuffer[LogItem[F]]()
-    val llc = (str: String) => (v: LetExecResult[F]) => log.append((str, v))
-    val res = ctx
-      .map(LoggedEvaluationContext(llc, _))
-      .flatTraverse(evalC.run(_).value._2)
-
-    (log.toList, res)
-  }
-
-  private def ap[A <: EVALUATED](
-    c: EvaluationContext[C, F],
-    expr: EXPR,
-    llc: LetLogCallback[F]
-  ): F[Either[ExecutionError, A]] = {
-    val lec = LoggedEvaluationContext(llc, c)
-    evalExpr(expr)
-      .map(_.asInstanceOf[A])
-      .run(lec)
-      .value
-      ._2
-  }
+    applyWithLogging[A](c, expr).map(_.bimap(_._1, _._1))
 
   def applyWithCtx(c: EvaluationContext[C, F], expr: EXPR): F[Either[ExecutionError, (EvaluationContext[C, F], EVALUATED)]] =
     evalExprWithCtx(expr)

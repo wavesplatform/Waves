@@ -10,7 +10,6 @@ import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
-import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 
@@ -52,8 +51,9 @@ trait Blockchain {
 
   def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee
 
+  def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)]
+
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
-  def balanceOnlySnapshots(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)]
   def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot]
 
   def accountScript(address: Address): Option[AccountScriptInfo]
@@ -66,8 +66,6 @@ trait Blockchain {
   def leaseBalance(address: Address): LeaseBalance
 
   def balance(address: Address, mayBeAssetId: Asset = Waves): Long
-
-  def collectActiveLeases(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction]
 }
 
 object Blockchain {
@@ -80,7 +78,7 @@ object Blockchain {
         .map(_ - (back - 1).max(0))
         .flatMap(h => blockchain.blockHeader(h).map(_.header))
 
-    def contains(block: Block): Boolean       = blockchain.contains(block.id())
+    def contains(block: Block): Boolean     = blockchain.contains(block.id())
     def contains(blockId: ByteStr): Boolean = blockchain.heightOf(blockId).isDefined
 
     def blockId(atHeight: Int): Option[ByteStr] = blockchain.blockHeader(atHeight).map(_.id())
@@ -110,7 +108,7 @@ object Blockchain {
 
     def balance(address: Address, atHeight: Int, confirmations: Int): Long = {
       val bottomLimit = (atHeight - confirmations + 1).max(1).min(atHeight)
-      val blockId   = blockchain.blockHeader(atHeight).getOrElse(throw new IllegalArgumentException(s"Invalid block height: $atHeight")).id()
+      val blockId     = blockchain.blockHeader(atHeight).getOrElse(throw new IllegalArgumentException(s"Invalid block height: $atHeight")).id()
       val balances    = blockchain.balanceSnapshots(address, bottomLimit, Some(blockId))
       if (balances.isEmpty) 0L else balances.view.map(_.regularBalance).min
     }
@@ -134,8 +132,6 @@ object Blockchain {
 
     def generatingBalance(account: Address, blockId: Option[BlockId] = None): Long =
       GeneratingBalanceProvider.balance(blockchain, account, blockId)
-
-    def allActiveLeases: Seq[LeaseTransaction] = blockchain.collectActiveLeases(_ => true)
 
     def lastBlockReward: Option[Long] = blockchain.blockReward(blockchain.height)
 

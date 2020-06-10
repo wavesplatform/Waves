@@ -10,7 +10,6 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 
@@ -60,7 +59,7 @@ case object EmptyBlockchain extends Blockchain {
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = VolumeAndFee(0, 0)
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
-  override def balanceOnlySnapshots(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = Option.empty
+  override def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = Option.empty
   override def balanceSnapshots(address: Address, from: Int, to: Option[ByteStr]): Seq[BalanceSnapshot]         = Seq.empty
 
   override def accountScript(address: Address): Option[AccountScriptInfo] = None
@@ -74,6 +73,4 @@ case object EmptyBlockchain extends Blockchain {
   override def balance(address: Address, mayBeAssetId: Asset): Long = 0
 
   override def leaseBalance(address: Address): LeaseBalance = LeaseBalance.empty
-
-  override def collectActiveLeases(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = Seq.empty
 }

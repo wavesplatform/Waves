@@ -28,7 +28,7 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import com.wavesplatform.settings.{BlockchainSettings, GenesisSettings, RewardsSettings, TestFunctionalitySettings, TestSettings}
+import com.wavesplatform.settings.{TestFunctionalitySettings, TestSettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.state.diffs.invoke.{InvokeDiffsCommon, InvokeScriptTransactionDiff}
@@ -352,7 +352,7 @@ class InvokeScriptTransactionDiffTest
         )
     }
 
-    compiler.ContractCompiler(ctx.compilerContext, expr, stdLibVersion).right.get
+    compiler.ContractCompiler(ctx.compilerContext, expr, stdLibVersion).explicitGet()
   }
 
   def simplePreconditionsAndSetContract(
@@ -1599,7 +1599,12 @@ class InvokeScriptTransactionDiffTest
            |{-#SCRIPT_TYPE ACCOUNT#-}
            |
            |@Callable(i)
-           |func $funcName() = throw("bad news")
+           |func $funcName() = {
+           |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 10} true
+           |  if (check)
+           |    then throw("bad news")
+           |    else throw("bad news")
+           |}
            |""".stripMargin
       Parser.parseContract(script).get.value
     }
@@ -1652,9 +1657,6 @@ class InvokeScriptTransactionDiffTest
             )
           )
           .anyNumberOfTimes()
-        (blockchain.settings _)
-          .expects()
-          .returning(BlockchainSettings('W', fs, GenesisSettings.MAINNET, RewardsSettings.MAINNET, useEvaluatorV2 = false))
         (blockchain.assetDescription _)
           .expects(*)
           .returning(
@@ -2000,19 +2002,20 @@ class InvokeScriptTransactionDiffTest
              |
              |@Callable(inv)
              |func sameComplexity(i: String) = {
-             | if (i == "throw") then
+             | let check = ${"sigVerify(base58'', base58'', base58'') ||" * 10} true
+             | if (i == "throw" && check) then
              |   throw("Some error")
-             | else if (i == "insufficient fee") then
+             | else if (i == "insufficient fee" && check) then
              |   [ ${(1 to ContractLimits.MaxCallableActionsAmount).map(i => s"""Issue("Asset $i", "", 100, 8, true, unit, $i)""").mkString(",")} ]
-             | else if (i == "negative amount") then
+             | else if (i == "negative amount" && check) then
              |   [ ScriptTransfer(inv.caller, -1, a) ]
-             | else if (i == "overflow amount") then
+             | else if (i == "overflow amount" && check) then
              |   [ ScriptTransfer(inv.caller, ${Long.MaxValue / 2}, a), ScriptTransfer(inv.caller, ${Long.MaxValue / 2 + 1}, a) ]
-             | else if (i == "self payment") then
+             | else if (i == "self payment" && check) then
              |   [ ScriptTransfer(this, 10, unit) ]
-             | else if (i == "max actions") then
+             | else if (i == "max actions" && check) then
              |   [ ${(0 to ContractLimits.MaxCallableActionsAmount).map(_ => "ScriptTransfer(inv.caller, 10, a)").mkString(",")} ]
-             | else if (i == "invalid data entries") then
+             | else if (i == "invalid data entries" && check) then
              |   [ ${(0 to ContractLimits.MaxWriteSetSize).map(x => s"""IntegerEntry("val", $x)""").mkString(",")},ScriptTransfer(inv.caller, 10, a)]
              | else []
              |}

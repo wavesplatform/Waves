@@ -48,6 +48,10 @@ object TxValidationError {
     override def toString: String = s"InvalidSignature(${s.toString + " reason: " + details})"
   }
 
+  sealed trait WithLog extends Product with Serializable {
+    def log: Log[Id]
+  }
+
   /** Errors which can produce failed transaction */
   case class FailedTransactionError private (
       cause: Cause,
@@ -55,7 +59,7 @@ object TxValidationError {
       log: Log[Id],
       error: Option[String],
       assetId: Option[ByteStr]
-  ) extends ValidationError {
+  ) extends ValidationError with WithLog {
     import FailedTransactionError._
 
     def code: Int = cause.code
@@ -111,10 +115,14 @@ object TxValidationError {
     }
   }
 
-  case class ScriptExecutionError(error: String, log: Log[Id], assetId: Option[ByteStr]) extends ValidationError {
+  case class ScriptExecutionError(error: String, log: Log[Id], assetId: Option[ByteStr]) extends ValidationError with WithLog {
     def isAssetScript: Boolean    = assetId.isDefined
     private val target: String    = assetId.fold("Account")(_ => "Asset")
     override def toString: String = s"ScriptExecutionError(error = $error, type = $target, log =${logToString(log)})"
+  }
+
+  object ScriptExecutionError {
+    def dAppExecution(error: String, log: Log[Id]): ScriptExecutionError = ScriptExecutionError(error, log, None)
   }
 
   case class TransactionNotAllowedByScript(log: Log[Id], assetId: Option[ByteStr]) extends ValidationError {
