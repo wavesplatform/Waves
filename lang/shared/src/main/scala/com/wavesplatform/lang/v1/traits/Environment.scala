@@ -20,12 +20,15 @@ object Environment {
     } yield BalanceDetails(available, regular, generating, effective)
 
   type InputEntity = Tx :+: Ord :+: PseudoTx :+: CNil
+
+  case class AssetId(id: Array[Byte])
+  type Tthis = Recipient.Address :+: AssetId :+: CNil
 }
 
 trait Environment[F[_]] {
   def chainId: Byte
   def inputEntity: Environment.InputEntity
-  def tthis: Recipient.Address
+  def tthis: Environment.Tthis
   def height: F[Long]
   def transactionById(id: Array[Byte]): F[Option[Tx]]
   def transferTransactionById(id: Array[Byte]): F[Option[Tx.Transfer]]

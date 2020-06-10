@@ -68,7 +68,7 @@ object Vals {
            (FAIL("Use alias is disabled"): EVALUATED)
              .asRight[ExecutionError]
          } else {
-           (Bindings.senderObject(env.tthis): EVALUATED)
+           (Bindings.senderObject(env.tthis.eliminate(identity, _ => throw new Exception("In the account's script value 'this` must be Address"))): EVALUATED)
              .asRight[ExecutionError]
          }
         }
@@ -79,7 +79,7 @@ object Vals {
       override def apply[F[_]: Monad](env: Environment[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
         Eval.later {
           env
-            .assetInfoById(env.tthis.bytes.arr)
+            .assetInfoById(env.tthis.eliminate(_ => throw new Exception("In the account's script value 'this` must be Address"), _.eliminate(_.id, v => throw new Exception(s"Incorrect value $v for 'this'"))))
             .map(v => buildAssetInfo(v.get, version): EVALUATED)
             .map(_.asRight[ExecutionError])
         }

@@ -61,7 +61,8 @@ object InvokeScriptTransactionDiff {
 
           directives <- TracedResult.wrapE(DirectiveSet(version, Account, DAppType).leftMap(GenericError.apply))
           payments   <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DAppTarget).leftMap(GenericError.apply))
-          input      <- TracedResult.wrapE(buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, None).leftMap(GenericError.apply))
+          tthis = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(dAppAddress.bytes)))
+          input      <- TracedResult.wrapE(buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, tthis).leftMap(GenericError.apply))
 
           invocationComplexity <- TracedResult {
             InvokeDiffsCommon.getInvocationComplexity(blockchain, tx, callableComplexities, dAppAddress)
@@ -107,7 +108,7 @@ object InvokeScriptTransactionDiff {
                     Coeval.evalOnce(input),
                     Coeval(blockchain.height),
                     blockchain,
-                    Coeval(ByteStr(dAppAddress.bytes)),
+                    tthis,
                     directives,
                     tx.id(),
                     !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, blockchain.height) && tx.dAppAddressOrAlias.isInstanceOf[Alias]

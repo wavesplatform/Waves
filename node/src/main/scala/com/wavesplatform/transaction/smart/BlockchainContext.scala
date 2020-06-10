@@ -23,7 +23,7 @@ object BlockchainContext {
             blockchain: Blockchain,
             isTokenContext: Boolean,
             isContract: Boolean,
-            address: Coeval[ByteStr],
+            address: Environment.Tthis,
             txId: ByteStr): Either[ExecutionError, EvaluationContext[Environment, Id]] = {
     DirectiveSet(
       version,
