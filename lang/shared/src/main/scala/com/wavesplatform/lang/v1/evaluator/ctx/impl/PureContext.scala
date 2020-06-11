@@ -25,6 +25,8 @@ import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 
 import scala.annotation.tailrec
+import scala.collection.{immutable, mutable}
+import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import scala.util.{Success, Try}
 
 object PureContext {
@@ -482,35 +484,37 @@ object PureContext {
     }
 
   lazy val splitStr: BaseFunction[NoContext] =
-    NativeFunction("split", 100, SPLIT, listString, ("str", STRING), ("separator", STRING)) {
+    NativeFunction("split", Map(V3 -> 100L, V4 -> 80L), SPLIT, listString, ("str", STRING), ("separator", STRING)) {
       case CONST_STRING(str) :: CONST_STRING(sep) :: Nil =>
-        split(str, sep)
-          .traverse(CONST_STRING(_))
-          .flatMap(s => ARR(s.toIndexedSeq, true))
-      case xs => notImplemented[Id, EVALUATED]("split(str: String, separator: String)", xs)
+          ARR(split(str, sep).toIndexedSeq, limited = true)
+      case xs =>
+        notImplemented[Id, EVALUATED]("split(str: String, separator: String)", xs)
     }
 
-  private def split(str: String, sep: String) =
+  private def split(str: String, sep: String): Iterable[CONST_STRING] = {
     if (str == "") listWithEmptyStr
-    else if (sep == "") 1 to str.length map (i => String.valueOf(str.charAt(i - 1))) toList
-    else splitRec(str, sep).reverse
+    else if (sep == "")
+      (1 to str.length)
+        .map(i => CONST_STRING(String.valueOf(str.charAt(i - 1))).explicitGet())
+    else splitRec(str, sep)
+  }
 
-  private val listWithEmptyStr = List("")
+  private val listWithEmptyStr = List(CONST_STRING("").explicitGet())
 
   @tailrec private def splitRec(
       str: String,
       sep: String,
       offset: Int = 0,
-      splitted: List[String] = Nil
-  ): List[String] = {
+      splitted: ArrayBuffer[CONST_STRING] = ArrayBuffer()
+  ): ArrayBuffer[CONST_STRING] = {
     val index = str.indexOf(sep, offset)
-    if (index == -1) str.substring(offset, str.length) :: splitted
+    if (index == -1) splitted += CONST_STRING(str.substring(offset, str.length)).explicitGet()
     else
       splitRec(
         str,
         sep,
         index + sep.length,
-        str.substring(offset, index) :: splitted
+        splitted += CONST_STRING(str.substring(offset, index)).explicitGet()
       )
   }
 

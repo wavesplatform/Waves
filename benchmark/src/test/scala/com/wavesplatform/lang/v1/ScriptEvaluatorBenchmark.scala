@@ -18,6 +18,7 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.{FROMBASE58, SIGVERIFY, TOBASE58}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 import scorex.crypto.signatures.Curve25519
@@ -30,9 +31,9 @@ object ScriptEvaluatorBenchmark {
   val evaluatorV1: EvaluatorV1[Id, NoContext]           = new EvaluatorV1[Id, NoContext]()
 }
 
-@OutputTimeUnit(TimeUnit.NANOSECONDS)
+@OutputTimeUnit(TimeUnit.MICROSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
-@Threads(4)
+@Threads(1)
 @Fork(1)
 @Warmup(iterations = 20)
 @Measurement(iterations = 10)
@@ -60,6 +61,15 @@ class ScriptEvaluatorBenchmark {
 
   @Benchmark
   def listMedian(st: Median, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.expr))
+
+  @Benchmark
+  def sigVerify32Kb(st: SigVerify32Kb, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.expr))
+
+  @Benchmark
+  def parseIntVal(st: ParseIntVal, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.expr))
+
+  @Benchmark
+  def splitString(st: SplitString, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.expr))
 }
 
 @State(Scope.Benchmark)
@@ -197,6 +207,70 @@ class Median {
     FUNCTION_CALL(
       PureContext.getListMedian,
       List(ARR(listOfLong, false).explicitGet())
+    )
+  }
+}
+
+@State(Scope.Benchmark)
+class SigVerify32Kb {
+  val context: EvaluationContext[NoContext, Id] =
+    Monoid.combine(PureContext.build(Global, V4).evaluationContext, CryptoContext.build(Global, V4).evaluationContext)
+
+
+  val expr: EXPR = {
+    val (privateKey, publicKey) = curve25519.generateKeypair
+    val message                 = randomBytes(32 * 1024 - 1)
+    val signature               = curve25519.sign(privateKey, message)
+
+    FUNCTION_CALL(
+      Native(SIGVERIFY),
+      List(
+        CONST_BYTESTR(ByteStr(message)).explicitGet(),
+        CONST_BYTESTR(ByteStr(signature)).explicitGet(),
+        CONST_BYTESTR(ByteStr(publicKey)).explicitGet()
+      )
+    )
+  }
+}
+
+@State(Scope.Benchmark)
+class SplitString {
+  val context: EvaluationContext[NoContext, Id] =
+    Monoid.combine(
+      PureContext.build(Global, V4).evaluationContext,
+      CryptoContext.build(Global, V4).evaluationContext
+    )
+
+  val expr: EXPR = {
+    val separator = ","
+    val separatedString = List.fill(1000)(Random.nextPrintableChar().toString * 31).mkString(separator)
+
+    FUNCTION_CALL(
+      PureContext.splitStr,
+      List(
+        CONST_STRING(separatedString).explicitGet(),
+        CONST_STRING(separator).explicitGet()
+      )
+    )
+  }
+}
+
+@State(Scope.Benchmark)
+class ParseIntVal {
+  val context: EvaluationContext[NoContext, Id] =
+    Monoid.combine(
+      PureContext.build(Global, V4).evaluationContext,
+      CryptoContext.build(Global, V4).evaluationContext
+    )
+
+  val expr: EXPR = {
+    val numStr = Long.MaxValue.toString
+
+    FUNCTION_CALL(
+      PureContext.parseIntVal,
+      List(
+        CONST_STRING(numStr).explicitGet()
+      )
     )
   }
 }

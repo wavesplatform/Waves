@@ -210,7 +210,7 @@ object Terms {
     override def hashCode(): Int = s.hashCode
   }
   object CONST_STRING {
-    def apply(s: String, reduceLimit: Boolean = true): Either[ExecutionError, EVALUATED] = {
+    def apply(s: String, reduceLimit: Boolean = true): Either[ExecutionError, CONST_STRING] = {
       val limit =
         if (reduceLimit) DataEntryValueMax
         else DataTxMaxBytes
