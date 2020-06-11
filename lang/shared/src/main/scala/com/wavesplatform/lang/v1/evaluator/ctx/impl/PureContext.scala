@@ -25,8 +25,7 @@ import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 
 import scala.annotation.tailrec
-import scala.collection.{immutable, mutable}
-import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+import scala.collection.mutable.ArrayBuffer
 import scala.util.{Success, Try}
 
 object PureContext {
