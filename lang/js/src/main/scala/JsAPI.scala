@@ -2,7 +2,6 @@ import JsApiUtils._
 import cats.kernel.Monoid
 import com.wavesplatform.DocSource
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.contract.meta.RecKeyValueFolder
 import com.wavesplatform.lang.directives.Directive.extractDirectives
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveParser, DirectiveSet}
@@ -275,21 +274,9 @@ object JsAPI {
     Global
       .decompile(input)
       .fold(
-        err => js.Dynamic.literal("error" -> err.m), {
-          case (scriptText, meta) =>
-            jObj(
-              "result" -> scriptText,
-              "meta"   -> metaConverter.foldRoot(meta)
-            )
-        }
+        err        => jObj("error" -> err.m),
+        scriptText => jObj("result" -> scriptText)
       )
-
-  lazy val metaConverter: RecKeyValueFolder[Any, js.Object with js.Dynamic] =
-    RecKeyValueFolder(
-      Any.fromString,
-      _.toJSArray,
-      js.Dynamic.literal.applyDynamic("apply")(_: _*)
-    )
 
   @JSExportTopLevel("nodeVersion")
   def nodeVersion(): js.Dynamic = js.Dynamic.literal("version" -> Version.VersionString)

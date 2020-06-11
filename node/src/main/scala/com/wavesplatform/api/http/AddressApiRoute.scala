@@ -12,7 +12,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.contract.meta.Dic
+import com.wavesplatform.lang.contract.meta.FunctionSignatures
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.network.UtxPoolSynchronizer
@@ -325,10 +325,9 @@ object AddressApiRoute {
     implicit val balanceFormat: Format[Balance] = Json.format
   }
 
-  case class AccountScriptMeta(address: String, meta: Option[Dic])
+  case class AccountScriptMeta(address: String, meta: Option[FunctionSignatures])
 
   object AccountScriptMeta {
-    implicit lazy val dicFormat: Writes[Dic]                             = dic => metaConverter.foldRoot(dic)
     implicit lazy val accountScriptMetaWrites: Writes[AccountScriptMeta] = Json.writes[AccountScriptMeta]
   }
 }
