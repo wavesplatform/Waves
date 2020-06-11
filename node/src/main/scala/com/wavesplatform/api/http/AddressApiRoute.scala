@@ -12,7 +12,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.contract.meta.Dic
+import com.wavesplatform.lang.contract.meta.FunctionSignatures
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.network.UtxPoolSynchronizer
@@ -232,7 +232,7 @@ case class AddressApiRoute(
       val balances = for {
         addressStr <- addresses.toSet[String]
         address    <- Address.fromString(addressStr).toOption
-      } yield blockchain.balanceOnlySnapshots(address, height, assetId).map(addressStr -> _._2).getOrElse(addressStr -> 0L)
+      } yield blockchain.balanceAtHeight(address, height, assetId).fold(addressStr -> 0L)(addressStr -> _._2)
 
       ToResponseMarshallable(balances)
     }
@@ -332,10 +332,9 @@ object AddressApiRoute {
     implicit val balanceFormat: Format[Balance] = Json.format
   }
 
-  case class AccountScriptMeta(address: String, meta: Option[Dic])
+  case class AccountScriptMeta(address: String, meta: Option[FunctionSignatures])
 
   object AccountScriptMeta {
-    implicit lazy val dicFormat: Writes[Dic]                             = metaConverter.foldRoot
     implicit lazy val accountScriptMetaWrites: Writes[AccountScriptMeta] = Json.writes[AccountScriptMeta]
   }
 }

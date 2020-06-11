@@ -42,7 +42,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
       if (enableNg) (enableNG(functionalitySettings), enableNG(wavesSettings)) else (functionalitySettings, wavesSettings)
 
     val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs)
-    val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, triggers)
+    val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, triggers, (_, _) => Seq.empty)
     try {
       val (account, blocks) = gen(ntpTime).sample.get
 
@@ -195,7 +195,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
         val defaultWriter =
           TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, enableNG(functionalitySettings))
-        val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, enableNG(wavesSettings), ntpTime, triggersMock)
+        val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, enableNG(wavesSettings), ntpTime, triggersMock, (_, _) => Seq.empty)
 
         try {
           val (genesis, transfers)       = preconditions(0).sample.get

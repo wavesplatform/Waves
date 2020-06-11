@@ -88,8 +88,6 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
 
   private def mkEmptyBlock(ref: ByteStr): Block = TestBlock.create(ntpNow, ref, Seq.empty)
 
-  private def activeLeaseIds(b: Blockchain): Set[ByteStr] = b.allActiveLeases.map(_.id()).toSet
-
   private def leaseRecipients(blocks: Seq[Block]): Set[AddressOrAlias] =
     blocks
       .flatMap(_.transactionData)
@@ -113,20 +111,24 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
           d.blockchainUpdater.processBlock(genesis).explicitGet()
           ensureNoLeases(d.blockchainUpdater, Set(lessor.toAddress, alias))
           d.blockchainUpdater.processBlock(b).explicitGet()
-          val activeLeases = activeLeaseIds(d.blockchainUpdater)
-          activeLeases.size shouldBe 2
+          val leasesToBeCancelled = b.transactionData.collect { case lt: LeaseTransaction => lt }
+          leasesToBeCancelled.foreach {
+            case lt: LeaseTransaction => d.blockchainUpdater.leaseDetails(lt.id()).map(_.isActive) shouldBe Some(true)
+            case _ =>
+          }
           emptyBlocks.take(2).foreach(b => d.blockchainUpdater.processBlock(b).explicitGet())
           // activation height: leases should still be active
           d.blockchainUpdater.height shouldEqual LeasingExpiryActivationHeight
-          val leasesToBeCancelled = d.blockchainUpdater.allActiveLeases
-          leasesToBeCancelled.map(_.id()).toSet shouldEqual activeLeases
           // balance snapshots, however, already reflect cancelled leases
           for (a <- leasesToBeCancelled.map(lt => d.blockchainUpdater.resolveAlias(lt.recipient).explicitGet())) {
             d.blockchainUpdater.balanceSnapshots(a, 1, d.blockchainUpdater.lastBlockId).last.leaseIn shouldBe 0L
           }
           // once new block is appended, leases become cancelled
           d.blockchainUpdater.processBlock(emptyBlocks.last)
-          d.blockchainUpdater.allActiveLeases shouldBe 'empty
+          leasesToBeCancelled.foreach {
+            case lt: LeaseTransaction => d.blockchainUpdater.leaseDetails(lt.id()).map(_.isActive) shouldBe Some(false)
+            case _ =>
+          }
         }
     }
   }
@@ -147,7 +149,10 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
       withDomain(leasingSettings) { d =>
         blocks.foreach(b => d.blockchainUpdater.processBlock(b).explicitGet())
         // make sure leasing is not cancelled twice
-        d.blockchainUpdater.allActiveLeases shouldBe 'empty
+        for (id <- blocks.flatMap(_.transactionData).collect { case lt: LeaseTransaction => lt.id() }) {
+          d.blockchainUpdater.leaseDetails(id).map(_.isActive) shouldBe Some(false)
+        }
+
         ensureNoLeases(d.blockchainUpdater, leaseRecipients(blocks))
       }
     }

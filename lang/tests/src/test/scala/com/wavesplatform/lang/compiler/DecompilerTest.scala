@@ -548,8 +548,8 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   property("match") {
     val script = """
       match tv {
-        case x : PointA|PointB => 1
-        case x : PointC => 2
+        case x : PointA|PointB => x
+        case x : PointC => x
     }"""
 
     val Right((expr, ty)) = compileExpr(script)
@@ -558,9 +558,9 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
     rev shouldEq """match tv {
     |    case x: PointB|PointA => 
-    |        1
+    |        x
     |    case x: PointC => 
-    |        2
+    |        x
     |    case _ => 
     |        throw()
     |}""".stripMargin
@@ -569,8 +569,8 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   property("match with case without type") {
     val script = """
       match tv {
-        case x : PointA|PointB => 1
-        case x => 2
+        case _: PointA|PointB => 1
+        case _ => 2
     }"""
 
     val Right((expr, ty)) = compileExpr(script)
@@ -578,9 +578,9 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val rev = Decompiler(expr, decompilerContextV3)
 
     rev shouldEq """match tv {
-    |    case x: PointB|PointA => 
+    |    case _: PointB|PointA =>
     |        1
-    |    case x => 
+    |    case _ =>
     |        2
     |}""".stripMargin
   }
@@ -589,7 +589,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val script = """
       match tv {
         case _ : PointA|PointB => 1
-        case x => 2
+        case x => x
     }"""
 
     val Right((expr, ty)) = compileExpr(script)
@@ -600,7 +600,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     |    case _: PointB|PointA => 
     |        1
     |    case x => 
-    |        2
+    |        x
     |}""".stripMargin
   }
 
@@ -869,14 +869,14 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     def script(t: String) = s"""
         | func m (v$t) =
         |   match v {
-        |    case a: UpdateAssetInfoTransaction => nil
-        |    case a: InvokeScriptTransaction => nil
-        |    case a: DataTransaction => nil
-        |    case a: IssueTransaction => nil
-        |    case a: TransferTransaction => nil
-        |    case a: MassTransferTransaction => nil
-        |    case a: Asset => nil
-        |    case a: BlockInfo => nil
+        |    case _: UpdateAssetInfoTransaction => nil
+        |    case _: InvokeScriptTransaction => nil
+        |    case _: DataTransaction => nil
+        |    case _: IssueTransaction => nil
+        |    case _: TransferTransaction => nil
+        |    case _: MassTransferTransaction => nil
+        |    case _: Asset => nil
+        |    case _: BlockInfo => nil
         |    case _ => nil
         |   }
         |""".stripMargin

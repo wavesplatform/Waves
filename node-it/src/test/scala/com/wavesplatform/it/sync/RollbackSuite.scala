@@ -44,16 +44,16 @@ class RollbackSuite
 
     Await.result(processRequests(generateTransfersToRandomAddresses(190, nodeAddresses)), 2.minutes)
 
-    nodes.waitFor[Int]("empty utx")(1.second)(_.utxSize, _.forall(_ == 0))
+    nodes.waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
 
     nodes.waitForHeightArise()
 
-    val stateHeight = sender.height
+    val stateHeight        = sender.height
     val stateAfterFirstTry = nodes.head.debugStateAt(stateHeight)
 
     nodes.rollback(startHeight)
 
-    nodes.waitFor[Int]("empty utx")(1.second)(_.utxSize, _.forall(_ == 0))
+    nodes.waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
 
     nodes.waitForHeightArise()
 
@@ -74,7 +74,7 @@ class RollbackSuite
     val requests = generateTransfersToRandomAddresses(190, nodeAddresses)
     Await.result(processRequests(requests), 2.minutes)
 
-    nodes.waitFor[Int]("empty utx")(1.second)(_.utxSize, _.forall(_ == 0))
+    nodes.waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
 
     nodes.waitForHeightArise()
 
@@ -82,7 +82,7 @@ class RollbackSuite
 
     nodes.rollback(startHeight, returnToUTX = false)
 
-    nodes.waitFor[Int]("empty utx")(1.second)(_.utxSize, _.forall(_ == 0))
+    nodes.waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
 
     nodes.waitForHeightArise()
 
@@ -182,8 +182,8 @@ class RollbackSuite
       case tx: TransferTransaction =>
         let oracle = addressFromRecipient(tx.recipient)
         extract(getString(oracle,"oracle")) == "yes"
-      case tx: SetScriptTransaction | DataTransaction => true
-      case other => false
+      case _: SetScriptTransaction | DataTransaction => true
+      case _ => false
     }""".stripMargin
 
     val pkSwapBC1 = KeyPair.fromSeed(sender.seed(firstAddress)).right.get

@@ -9,6 +9,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.settings.{BlockchainSettings, GenesisSettings, RewardsSettings, TestFunctionalitySettings}
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -34,11 +35,17 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
           (bc.assetDescription _).when(asset).returns(mkAssetDescription(asset.id, tx.sender, 8, None))
           (bc.assetScript _).when(asset).returns(None)
           (bc.activatedFeatures _).when().returns(Map())
+          (bc.settings _).when().returns(BlockchainSettings(
+            addressSchemeCharacter = 'N',
+            functionalitySettings = TestFunctionalitySettings.Enabled,
+            genesisSettings = GenesisSettings.TESTNET,
+            rewardsSettings = RewardsSettings.TESTNET
+          ))
         }
 
       val scriptText =
         """match tx {
-          |  case o: Order => height >= 0
+          |  case _: Order => height >= 0
           |  case _ => true
           |}""".stripMargin
       val (script, complexity) = ScriptCompiler(scriptText, isAssetScript = false, estimator).explicitGet()
@@ -79,6 +86,12 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
   ): ValidationResult[Transaction] = {
 
     val blockchain = stub[Blockchain]
+    (blockchain.settings _).when().returns(BlockchainSettings(
+      addressSchemeCharacter = 'N',
+      functionalitySettings = TestFunctionalitySettings.Enabled,
+      genesisSettings = GenesisSettings.TESTNET,
+      rewardsSettings = RewardsSettings.TESTNET
+    ))
 
     def activate(features: (BlockchainFeature, Int)*): Unit = {
       (blockchain.activatedFeatures _).when().returns(features.map(x => x._1.id -> x._2).toMap).anyNumberOfTimes()

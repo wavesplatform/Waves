@@ -241,7 +241,7 @@ object Importer extends ScorexLogging {
     val (blockchainUpdater, levelDb) =
       StorageFactory(settings, db, time, Observer.empty, blockchainUpdateTriggers)
     val utxPool     = new UtxPoolImpl(time, blockchainUpdater, PublishSubject(), settings.utxSettings, enablePriorityPool = false)
-    val pos         = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
+    val pos         = PoSSelector(blockchainUpdater, settings.synchronizationSettings)
     val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify) _
 
     checkGenesis(settings, blockchainUpdater)

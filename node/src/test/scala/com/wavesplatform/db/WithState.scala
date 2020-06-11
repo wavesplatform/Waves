@@ -6,7 +6,7 @@ import cats.Monoid
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter, TestStorageFactory}
+import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter, TestStorageFactory, loadActiveLeases}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
@@ -165,7 +165,7 @@ trait WithDomain extends WithState { _: Suite =>
 
   def withDomain[A](settings: WavesSettings = defaultDomainSettings)(test: Domain => A): A =
     withLevelDBWriter(settings.blockchainSettings) { blockchain =>
-      val bcu = new BlockchainUpdaterImpl(blockchain, Observer.stopped, settings, ntpTime, ignoreBlockchainUpdateTriggers)
+      val bcu = new BlockchainUpdaterImpl(blockchain, Observer.stopped, settings, ntpTime, ignoreBlockchainUpdateTriggers, loadActiveLeases(db, _, _))
       try test(Domain(db, bcu, blockchain))
       finally bcu.shutdown()
     }

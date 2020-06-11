@@ -19,7 +19,7 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
   val recipient = secondAddress
   val dApp      = thirdAddress
   val scriptText =
-    """
+   s"""
       |{-# STDLIB_VERSION 4 #-}
       |{-# CONTENT_TYPE DAPP #-}
       |{-# SCRIPT_TYPE ACCOUNT #-}

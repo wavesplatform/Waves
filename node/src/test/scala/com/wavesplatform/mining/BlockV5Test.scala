@@ -456,7 +456,7 @@ class BlockV5Test
       f: Blockchain with BlockchainUpdater with NG => Unit
   ): Unit = {
     withLevelDBWriter(settings.blockchainSettings) { blockchain =>
-      val bcu: BlockchainUpdaterImpl = new BlockchainUpdaterImpl(blockchain, Observer.stopped, settings, time, ignoreBlockchainUpdateTriggers) {
+      val bcu: BlockchainUpdaterImpl = new BlockchainUpdaterImpl(blockchain, Observer.stopped, settings, time, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty) {
         override def activatedFeatures: Map[Short, Int] = super.activatedFeatures -- disabledFeatures.get()
       }
       try f(bcu)
@@ -469,7 +469,7 @@ class BlockV5Test
   private def withMiner(blockchain: Blockchain with BlockchainUpdater with NG, time: Time, settings: WavesSettings = testSettings)(
       f: (MinerImpl, Appender, Scheduler) => Unit
   ): Unit = {
-    val pos               = new PoSSelector(blockchain, settings.blockchainSettings, settings.synchronizationSettings)
+    val pos               = PoSSelector(blockchain, settings.synchronizationSettings)
     val allChannels       = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val wallet            = Wallet(WalletSettings(None, Some("123"), None))
     val utxPool           = new UtxPoolImpl(time, blockchain, Observer.stopped, settings.utxSettings, enablePriorityPool = false)

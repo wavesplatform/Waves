@@ -32,7 +32,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
           ScriptCompiler(
             s"""
               |match tx {
-              |  case o: Order => true
+              |  case _: Order => true
               |  case _ => false
               |}""".stripMargin,
             isAssetScript = true,
@@ -65,7 +65,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
             s"""
                 let proof = base58'assetWProofs'
                 match tx {
-                  case tx: SetAssetScriptTransaction | TransferTransaction | ReissueTransaction | BurnTransaction => tx.proofs[0] == proof
+                  case _: SetAssetScriptTransaction | TransferTransaction | ReissueTransaction | BurnTransaction => tx.proofs[0] == proof
                   case _ => false
                 }""".stripMargin,
             false,

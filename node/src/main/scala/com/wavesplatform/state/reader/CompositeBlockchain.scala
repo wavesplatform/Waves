@@ -22,7 +22,8 @@ final case class CompositeBlockchain(
     maybeDiff: Option[Diff] = None,
     newBlock: Option[Block] = None,
     carry: Long = 0,
-    reward: Option[Long] = None
+    reward: Option[Long] = None,
+    hitSource: Option[ByteStr] = None
 ) extends Blockchain {
   override val settings: BlockchainSettings = inner.settings
 
@@ -80,17 +81,14 @@ final case class CompositeBlockchain(
     case Left(_)                      => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
   }
 
-  override def collectActiveLeases(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] =
-    CompositeBlockchain.collectActiveLeases(inner, maybeDiff)(filter)
-
   override def containsTransaction(tx: Transaction): Boolean = diff.transactions.contains(tx.id()) || inner.containsTransaction(tx)
 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
     diff.orderFills.get(orderId).orEmpty.combine(inner.filledVolumeAndFee(orderId))
 
-  override def balanceOnlySnapshots(address: Address, h: Int, assetId: Asset = Waves): Option[(Int, Long)] = {
+  override def balanceAtHeight(address: Address, h: Int, assetId: Asset = Waves): Option[(Int, Long)] = {
     if (maybeDiff.isEmpty || h < this.height) {
-      inner.balanceOnlySnapshots(address, h, assetId)
+      inner.balanceAtHeight(address, h, assetId)
     } else {
       val balance = this.balance(address, assetId)
       val bs      = height -> balance
@@ -156,11 +154,14 @@ final case class CompositeBlockchain(
 
   override def wavesAmount(height: Int): BigInt = inner.wavesAmount(height)
 
-  override def hitSource(height: Int): Option[ByteStr] = inner.hitSource(height)
+  override def hitSource(height: Int): Option[ByteStr] = hitSource.filter(_ => this.height == height) orElse inner.hitSource(height)
 }
 
 object CompositeBlockchain {
-  def assetDescription(
+  def apply(blockchain: Blockchain, ngState: NgState): CompositeBlockchain =
+    CompositeBlockchain(blockchain, Some(ngState.bestLiquidDiff), Some(ngState.bestLiquidBlock), ngState.carryFee, ngState.reward)
+
+  private def assetDescription(
       asset: IssuedAsset,
       diff: Diff,
       innerAssetDescription: => Option[AssetDescription],
@@ -231,26 +232,6 @@ object CompositeBlockchain {
             acc.copy(name = ByteString.copyFromUtf8(ut.name), description = ByteString.copyFromUtf8(ut.description), lastUpdatedAt = Height(height))
           case (acc, _) => acc
         }
-    }
-  }
-
-  def apply(blockchain: Blockchain, ngState: NgState): Blockchain =
-    CompositeBlockchain(blockchain, Some(ngState.bestLiquidDiff), Some(ngState.bestLiquidBlock), ngState.carryFee, ngState.reward)
-
-  def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff])(
-      filter: LeaseTransaction => Boolean
-  ): Seq[LeaseTransaction] = {
-    val innerActiveLeases = inner.collectActiveLeases(filter)
-    maybeDiff match {
-      case Some(ng) =>
-        val cancelledInLiquidBlock = ng.leaseState.collect {
-          case (id, false) => id
-        }.toSet
-        val addedInLiquidBlock = ng.transactions.values.collect {
-          case NewTransactionInfo(lt: LeaseTransaction, _, true) if !cancelledInLiquidBlock(lt.id()) => lt
-        }
-        innerActiveLeases.filterNot(lt => cancelledInLiquidBlock(lt.id())) ++ addedInLiquidBlock
-      case _ => innerActiveLeases
     }
   }
 }

@@ -36,13 +36,15 @@ class ReplTest extends BaseSuite {
     miner.createAlias(miner.address, "aaaa", waitForTx = true)
 
     val failDApp = ScriptCompiler.compile(
-            """
+           s"""
                |{-# STDLIB_VERSION 4 #-}
                |{-# CONTENT_TYPE DAPP #-}
                |{-# SCRIPT_TYPE ACCOUNT #-}
                |
                |@Callable(i)
-               |func default() = throw("")
+               |func default() = {
+               | if (${"sigVerify(base58'', base58'', base58'') ||" * 8} true) then throw("") else throw("")
+               |}
                |""".stripMargin,
             ScriptEstimatorV3
           )

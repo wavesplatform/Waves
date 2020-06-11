@@ -120,7 +120,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
       case (blockchainUpdater, _) =>
         for {
           _ <- Task.unit
-          pos          = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
+          pos          = new PoSSelector(blockchainUpdater, settings.synchronizationSettings)
           utxPool      = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, settings.utxSettings, enablePriorityPool = true)
           scheduler    = Scheduler.singleThread("appender")
           allChannels  = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
@@ -145,7 +145,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
     }
 
   private def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] =
-    miner.invokePrivate(PrivateMethod[Task[Unit]]('generateBlockTask)(account))
+    miner.invokePrivate(PrivateMethod[Task[Unit]]('generateBlockTask)(account, None))
 
   private def forgeBlock(miner: MinerImpl)(account: KeyPair): Either[String, (MiningConstraints, Block, MiningConstraint)] =
     miner.invokePrivate(PrivateMethod[Either[String, (MiningConstraints, Block, MiningConstraint)]]('forgeBlock)(account))

@@ -32,7 +32,7 @@ import com.wavesplatform.history.{History, StorageFactory}
 import com.wavesplatform.http.{DebugApiRoute, NodeApiRoute}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.Metrics
-import com.wavesplatform.mining.{Miner, MinerImpl}
+import com.wavesplatform.mining.{Miner, MinerDebugInfo, MinerImpl}
 import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
@@ -99,14 +99,16 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val microblockSynchronizerScheduler = singleThread("microblock-synchronizer", reporter = log.error("Error in Microblock Synchronizer", _))
   private val scoreObserverScheduler          = singleThread("rx-score-observer", reporter = log.error("Error in Score Observer", _))
   private val historyRepliesScheduler         = fixedPool(poolSize = 2, "history-replier", reporter = log.error("Error in History Replier", _))
-  private val minerScheduler                  = fixedPool(poolSize = 2, "miner-pool", reporter = log.error("Error in Miner", _))
+  private val minerScheduler                  = singleThread("block-miner", reporter = log.error("Error in Miner", _))
 
   private val blockchainUpdatesScheduler = singleThread("blockchain-updates", reporter = log.error("Error on sending blockchain updates", _))
   private val blockchainUpdated          = ConcurrentSubject.publish[BlockchainUpdated](scheduler)
   private val utxEvents                  = ConcurrentSubject.publish[UtxEvent](scheduler)
   private val blockchainUpdateTriggers   = new BlockchainUpdateTriggersImpl(blockchainUpdated)
 
-  private val (blockchainUpdater, levelDB) = StorageFactory(settings, db, time, spendableBalanceChanged, blockchainUpdateTriggers)
+  private[this] var miner: Miner with MinerDebugInfo = Miner.Disabled
+  private val (blockchainUpdater, levelDB) =
+    StorageFactory(settings, db, time, spendableBalanceChanged, blockchainUpdateTriggers, bc => miner.scheduleMining(bc))
 
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
   private var maybeUtx: Option[UtxPool]                                        = None
@@ -163,18 +165,16 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
 
-    val pos = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
+    val pos = PoSSelector(blockchainUpdater, settings.synchronizationSettings)
 
-    val miner =
-      if (settings.minerSettings.enable)
-        new MinerImpl(allChannels, blockchainUpdater, settings, time, utxStorage, wallet, pos, minerScheduler, appenderScheduler)
-      else Miner.Disabled
+    if (settings.minerSettings.enable)
+      miner = new MinerImpl(allChannels, blockchainUpdater, settings, time, utxStorage, wallet, pos, minerScheduler, appenderScheduler)
 
     val processBlock =
-      BlockAppender(blockchainUpdater, time, utxStorage, pos, allChannels, peerDatabase, miner, appenderScheduler) _
+      BlockAppender(blockchainUpdater, time, utxStorage, pos, allChannels, peerDatabase, appenderScheduler) _
 
     val processFork =
-      ExtensionAppender(blockchainUpdater, utxStorage, pos, time, knownInvalidBlocks, peerDatabase, miner, appenderScheduler) _
+      ExtensionAppender(blockchainUpdater, utxStorage, pos, time, knownInvalidBlocks, peerDatabase, appenderScheduler) _
     val processMicroBlock =
       MicroblockAppender(blockchainUpdater, utxStorage, allChannels, peerDatabase, appenderScheduler) _
 
@@ -203,7 +203,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           case Right(discardedBlocks) =>
             allChannels.broadcast(LocalScoreChanged(blockchainUpdater.score))
             if (returnTxsToUtx) utxStorage.addAndCleanup(discardedBlocks.view.flatMap(_._1.transactionData))
-            miner.scheduleMining()
             Right(discardedBlocks)
           case Left(error) => Left(error)
         }
