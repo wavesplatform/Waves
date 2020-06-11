@@ -109,7 +109,6 @@ object UserFunction {
   def withEnvironment[C[_[_]]](name: String, cost: Long, resultType: TYPE, args: (String, TYPE)*)(ev: ContextfulUserFunction[C]): UserFunction[C] =
     UserFunction.withEnvironment(
       name = name,
-      internalName = name,
       DirectiveDictionary[StdLibVersion].all.map(_ -> cost).toMap,
       resultType,
       args: _*

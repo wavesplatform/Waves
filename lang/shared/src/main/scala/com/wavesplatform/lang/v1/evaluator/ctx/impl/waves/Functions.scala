@@ -5,7 +5,7 @@ import cats.{Id, Monad}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ExecutionError
-import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V1, V2, V3, V4}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -201,7 +201,13 @@ object Functions {
   )
 
   val addressFromStringF: BaseFunction[Environment] =
-    UserFunction.withEnvironment("addressFromString", 124, optionAddress, ("@string", STRING)) {
+    UserFunction.withEnvironment(
+      name = "addressFromString",
+      internalName = "addressFromString",
+      Map(V1 -> 124L, V2 -> 124L, V3 -> 124L, V4 -> 14L),
+      optionAddress,
+      ("@string", STRING)
+    ) {
       new ContextfulUserFunction[Environment] {
         override def apply[F[_]: Monad](env: Environment[F]): EXPR =
           LET_BLOCK(
