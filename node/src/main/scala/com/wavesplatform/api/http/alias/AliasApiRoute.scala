@@ -41,7 +41,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynch
 
   def aliasOfAddress: Route = (get & path("by-address" / AddrSegment)) { address =>
     extractScheduler { implicit s =>
-      complete(blockchain.aliasesOfAddress(address).map(aliases => Json.arr(aliases.map(_.stringRepr))).runToFuture)
+      complete(blockchain.aliasesOfAddress(address).map(aliases => Json.toJson(aliases.map(_.stringRepr))).runToFuture)
     }
   }
 }
