@@ -96,11 +96,11 @@ object InvokeDiffsCommon {
     val sponsorFeeList = actionsByType(classOf[SponsorFee]).asInstanceOf[List[SponsorFee]]
 
     val dataEntries = actionsByType
-      .filterKeys(classOf[DataItem[_]].isAssignableFrom)
+      .filterKeys(classOf[DataOp].isAssignableFrom)
       .values
       .flatten
       .toList
-      .asInstanceOf[List[DataItem[_]]]
+      .asInstanceOf[List[DataOp]]
       .map(dataItemToEntry)
 
     for {
