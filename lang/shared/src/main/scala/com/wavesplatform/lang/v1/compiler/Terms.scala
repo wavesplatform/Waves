@@ -9,7 +9,7 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
+import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, CASETYPEREF, LIST, LONG, NOTHING, REAL, STRING, TUPLE}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import monix.eval.Coeval
 
@@ -151,13 +151,16 @@ object Terms {
     def weight: Long
     var wasLogged: Boolean = false
 
+    val getType: REAL // used for _isInstanceOf and therefore for match
+
     override def deepCopy: Eval[EXPR] =
       Eval.now(this)
   }
   case class CONST_LONG(t: Long) extends EVALUATED {
     override def toString: String = t.toString
     override val weight: Long     = 8L
-  }
+    override val getType: REAL = LONG
+}
 
   class CONST_BYTESTR private (val bs: ByteStr) extends EVALUATED {
     override def toString: String = bs.toString
@@ -169,6 +172,8 @@ object Terms {
       }
     }
     override val weight: Long = bs.size
+
+    override val getType: REAL = BYTESTR
 
     override def equals(obj: Any): Boolean =
       obj match {
@@ -200,6 +205,8 @@ object Terms {
     override def toString: String                 = s
     override def prettyString(level: Int): String = "\"" ++ escape(s) ++ "\""
     override val weight: Long                     = s.getBytes.length
+
+    override  val getType: REAL = STRING
 
     override def equals(obj: Any): Boolean =
       obj match {
@@ -249,6 +256,8 @@ object Terms {
   case class CONST_BOOLEAN(b: Boolean) extends EVALUATED {
     override def toString: String = b.toString
     override val weight: Long     = 1L
+
+    override val getType: REAL = BOOLEAN
   }
 
   lazy val TRUE: CONST_BOOLEAN  = CONST_BOOLEAN(true)
@@ -260,6 +269,12 @@ object Terms {
     override def prettyString(depth: Int): String = TermPrinter.indentObjString(this, depth)
 
     override val weight: Long = OBJ_WEIGHT + FIELD_WEIGHT * fields.size + fields.map(_._2.weight).sum
+
+    override val getType: REAL =
+      if (caseType.name == runtimeTupleType.name)
+        TUPLE(fields.toSeq.sortBy(_._1).map(_._2.getType).toList)
+      else
+        caseType
   }
 
   object CaseObj {
@@ -278,6 +293,8 @@ object Terms {
 
     val elementsWeightSum: Long =
       weight - EMPTYARR_WEIGHT - ELEM_WEIGHT * xs.size
+
+    override val getType: REAL = LIST(NOTHING) // currently should not be used
   }
 
   object ARR {
@@ -297,6 +314,8 @@ object Terms {
       ARR(xs, weight, limited)
     }
   }
+
+  val runtimeTupleType: CASETYPEREF = CASETYPEREF("Tuple", Nil)
 
   implicit val orderingConstLong: Ordering[CONST_LONG] =
     (a, b) => a.t compare b.t

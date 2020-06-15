@@ -103,7 +103,7 @@ object Functions {
         LET("@val", GETTER(FUNCTION_CALL(PureContext.getElement, List(REF("@data"), REF("@index"))), "value")),
         IF(
           FUNCTION_CALL(
-            PureContext._isInstanceOf,
+            FunctionHeader.Native(ISINSTANCEOF),
             List(REF("@val"), CONST_STRING(dataType.innerType.name).explicitGet())
           ),
           REF("@val"),
