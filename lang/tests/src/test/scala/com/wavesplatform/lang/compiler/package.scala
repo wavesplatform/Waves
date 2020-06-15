@@ -53,5 +53,5 @@ package object compiler {
   }
 
   val compilerContext = getTestContext(V3).compilerContext
-
+  val compilerContextV4 = getTestContext(V4).compilerContext
 }

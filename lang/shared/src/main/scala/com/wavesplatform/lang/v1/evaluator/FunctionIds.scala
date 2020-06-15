@@ -56,6 +56,8 @@ object FunctionIds {
   val LASTINDEXOFN: Short = 1208
   val MAKESTRING: Short   = 1209
 
+  val CREATE_TUPLE: Short = 1300 // Reserved 22 id for tuple constructors
+
   // Crypto
   val SIGVERIFY: Short = 500
   val KECCAK256: Short = 501

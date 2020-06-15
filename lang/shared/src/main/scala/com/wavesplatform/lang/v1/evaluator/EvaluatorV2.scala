@@ -129,8 +129,11 @@ class EvaluatorV2(
             if (fc.args.forall(_.isInstanceOf[EVALUATED])) {
               fc.function match {
                 case FunctionHeader.Native(_) =>
-                  val NativeFunction(_, costByVersion, _, ev, _) = ctx.ec.functions(fc.function).asInstanceOf[NativeFunction[Environment]]
-                  val cost                                       = costByVersion(stdLibVersion).toInt
+                  val NativeFunction(_, costByVersion, _, ev, _) =
+                    ctx.ec.functions
+                      .getOrElse(fc.function, throw new RuntimeException(s"function '${fc.function}' not found"))
+                      .asInstanceOf[NativeFunction[Environment]]
+                  val cost = costByVersion(stdLibVersion).toInt
                   if (unusedArgsComplexity < cost)
                     Coeval.now(unusedArgsComplexity)
                   else
