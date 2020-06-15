@@ -172,8 +172,7 @@ case class UtilsApiRoute(
   def scriptMeta: Route = path("script" / "meta") {
     (post & entity(as[String])) { code =>
       val result: ToResponseMarshallable = Global
-        .scriptMeta(code) // Does not estimate complexity, therefore it should not hang
-        .map(metaConverter.foldRoot)
+        .dAppFuncTypes(code) // Does not estimate complexity, therefore it should not hang
         .fold(e => e, r => r)
       complete(result)
     }
