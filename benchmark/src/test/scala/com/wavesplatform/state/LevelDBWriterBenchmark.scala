@@ -59,11 +59,6 @@ object LevelDBWriterBenchmark {
   }
 
   @State(Scope.Benchmark)
-  class TransactionByAddressSt extends BaseSt {
-    val txsAddresses: Vector[Address] = load("transactionByAddress", benchSettings.txsAddressesFile)(x => Address.fromString(x).right.get)
-  }
-
-  @State(Scope.Benchmark)
   class BlocksByIdSt extends BaseSt {
     val allBlocks: Vector[ByteStr] = load("blocksById", benchSettings.blocksFile)(x => ByteStr(Base58.tryDecodeWithLimit(x).get))
   }

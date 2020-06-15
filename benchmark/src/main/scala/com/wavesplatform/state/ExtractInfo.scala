@@ -4,27 +4,20 @@ import java.io.{File, PrintWriter}
 import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.block.Block
+import com.wavesplatform.Application
+import com.wavesplatform.account.Alias
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.{DBExt, Keys, LevelDBFactory, LevelDBWriter, loadBlock}
-import com.wavesplatform.lang.v1.traits.DataType
-import com.wavesplatform.settings.{WavesSettings, loadConfig}
-import com.wavesplatform.state.bench.DataTestData
-import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.{Authorized, CreateAliasTransaction, DataTransaction, Transaction}
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.database.{AddressId, DBExt, KeyTags, Keys, LevelDBFactory}
+import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.{DB, Options}
-import scodec.bits.BitVector
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
+import scala.util.Random
 import scala.util.control.NonFatal
 
-/**
-  * Extracts data from the database to use it in RealDbBenchmark.
-  * Requires a separate main file because takes too long time to run.
-  */
 object ExtractInfo extends App with ScorexLogging {
 
   if (args.length < 1) {
@@ -32,15 +25,10 @@ object ExtractInfo extends App with ScorexLogging {
     System.exit(1)
   }
 
-  val benchSettings = Settings.fromConfig(ConfigFactory.load())
-  val wavesSettings = {
-    val config = loadConfig(ConfigFactory.parseFile(new File(args.head)))
-    WavesSettings.fromRootConfig(config)
-  }
-
-  AddressScheme.current = new AddressScheme {
-    override val chainId: Byte = wavesSettings.blockchainSettings.addressSchemeCharacter.toByte
-  }
+  val maybeConfigFile = args.headOption.map(new File(_))
+  val config          = loadConfig(maybeConfigFile.map(ConfigFactory.parseFile))
+  val wavesSettings   = Application.loadApplicationConfig(maybeConfigFile)
+  val benchSettings   = Settings.fromConfig(config)
 
   val db: DB = {
     val dir = new File(wavesSettings.dbSettings.directory)
@@ -49,74 +37,38 @@ object ExtractInfo extends App with ScorexLogging {
   }
 
   try {
-    val state = LevelDBWriter.readOnly(db, wavesSettings)
+    log.info("Collecting aliases")
 
-    def nonEmptyBlockHeights(from: Int): Iterator[Integer] =
-      for {
-        height     <- randomInts(from, state.height)
-        m <- db.get(Keys.blockMetaAt(Height(height.toInt)))
-        if m.transactionCount > 0
-      } yield height
+    val allAliases = Set.newBuilder[String]
+    db.iterateOver(KeyTags.AddressIdOfAlias) { e =>
+      allAliases += Alias.fromBytes(e.getKey.drop(2)).explicitGet().stringRepr
+    }
+    write("all aliases", benchSettings.aliasesFile, takeUniq(1000, allAliases.result().iterator))
 
-    def nonEmptyBlocks(from: Int): Iterator[Block] =
-      nonEmptyBlockHeights(from)
-        .flatMap(h => db.readOnly(ro => loadBlock(Height(h.toInt), ro)))
-
-    val aliasTxs = nonEmptyBlocks(benchSettings.aliasesFromHeight)
-      .flatMap(_.transactionData)
-      .collect {
-        case _: CreateAliasTransaction => true
-      }
-
-    val restTxs = nonEmptyBlocks(benchSettings.restTxsFromHeight)
-      .flatMap(_.transactionData)
-
-    val accounts = for {
-      b <- nonEmptyBlocks(benchSettings.accountsFromHeight)
-      sender <- b.transactionData
-        .collect {
-          case tx: Transaction with Authorized => tx.sender
-        }
-        .take(100)
-    } yield sender.toAddress.stringRepr
+    val maxAddressId = db.get(Keys.lastAddressId).getOrElse(0L).max(100)
+    log.info(s"Collecting addresses, last address ID = $maxAddressId")
+    val accountIds = randomInts(1, maxAddressId)
+    val accounts   = accountIds.map(addressId => db.get(Keys.idToAddress(AddressId(addressId))).stringRepr)
+    log.info("Saving accounts to file")
     write("accounts", benchSettings.accountsFile, takeUniq(1000, accounts))
 
-    val aliasTxIds = aliasTxs.map(_.asInstanceOf[CreateAliasTransaction].alias.stringRepr)
-    write("aliases", benchSettings.aliasesFile, aliasTxIds.take(1000))
-
-    val restTxIds = restTxs.map(_.id().toString)
-    write("rest transactions", benchSettings.restTxsFile, restTxIds.take(10000))
-
-    val assets = nonEmptyBlocks(benchSettings.assetsFromHeight)
-      .flatMap { b =>
-        b.transactionData.collect {
-          case tx: IssueTransaction => tx.assetId
-        }
-      }
-      .map(_.toString)
-
-    write("assets", benchSettings.assetsFile, takeUniq(300, assets))
-
-    val data = for {
-      b <- nonEmptyBlocks(benchSettings.dataFromHeight)
-      test <- b.transactionData
-        .collect {
-          case tx: DataTransaction =>
-            val addr = ByteStr(tx.sender.toAddress.bytes)
-            tx.data.collectFirst {
-              case x: IntegerDataEntry => DataTestData(addr, x.key, DataType.Long)
-              case x: BooleanDataEntry => DataTestData(addr, x.key, DataType.Boolean)
-              case x: BinaryDataEntry  => DataTestData(addr, x.key, DataType.ByteArray)
-              case x: StringDataEntry  => DataTestData(addr, x.key, DataType.String)
-            }
-        }
-        .take(50)
-      r <- test
-    } yield {
-      val x: BitVector = DataTestData.codec.encode(r).require
-      x.toBase64
+    log.info("Collecting transactions")
+    val txCountAtHeight = mutable.Map.empty[Int, Int].withDefault(h => db.get(Keys.blockMetaAt(Height(h))).fold(0)(_.transactionCount))
+    val transactions = randomInts(1, db.get(Keys.height)).flatMap { h =>
+      if (txCountAtHeight(h.toInt) <= 0) None
+      else
+        db.get(Keys.transactionAt(Height(h.toInt), TxNum(Random.nextInt(txCountAtHeight(h.toInt)).toShort))).map(_._1.id().toString)
     }
-    write("data", benchSettings.dataFile, data.take(400))
+
+    write("rest transactions", benchSettings.restTxsFile, takeUniq(10000, transactions))
+
+    log.info("Collecting assets")
+    val allAssetIds = Set.newBuilder[String]
+    db.iterateOver(KeyTags.AssetDetailsHistory) { e =>
+      allAssetIds += ByteStr(e.getKey.drop(2)).toString
+    }
+
+    write("assets", benchSettings.assetsFile, takeUniq(300, allAssetIds.result().iterator))
   } catch {
     case NonFatal(e) => log.error(e.getMessage, e)
   } finally {
@@ -140,11 +92,10 @@ object ExtractInfo extends App with ScorexLogging {
     printWriter.close()
   }
 
-  def randomInts(from: Int, to: Int): Iterator[Integer] =
+  def randomInts(from: Long, to: Long): Iterator[java.lang.Long] =
     ThreadLocalRandom
       .current()
-      .ints(from, to)
+      .longs(from, to)
       .iterator()
       .asScala
-
 }
