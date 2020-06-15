@@ -212,33 +212,46 @@ object ContractCompiler {
       .traverse { func =>
         for {
           funcName <- handleValid(func.f.name)
-          funcArgs <- func.f.args.flatMap(_._2).toList.traverse(resolveGenericType)
+          funcArgs <- func.f.args.map(_._2).toList.flatTraverse(resolveGenericType(func, funcName, _))
           () <- funcArgs
             .map { case (argType, typeParam) => (argType.v, typeParam.map(_.v)) }
             .find(!checkAnnotatedParamType(_))
-            .map(argTypesError(func, funcName, _))
+            .map(t => argTypesError[Unit](func, funcName, typeStr(t)))
             .getOrElse(().pure[CompileM])
         } yield ()
       }
       .map(_ => ())
 
-  private def argTypesError(
+  private def argTypesError[T](
       func: Expressions.ANNOTATEDFUNC,
       funcName: PART.VALID[String],
-      t: (String, Option[String])
-  ): CompileM[Unit] =
-    raiseError[Id, CompilerContext, CompilationError, Unit](
-      WrongArgumentType(func.f.position.start, func.f.position.end, funcName.v, typeStr(t), allowedCallableTypesV4)
+      typeName: String
+  ): CompileM[T] =
+    raiseError[Id, CompilerContext, CompilationError, T](
+      WrongArgumentType(func.f.position.start, func.f.position.end, funcName.v, typeName, allowedCallableTypesV4)
     )
 
   private def typeStr(t: (String, Option[String])) =
     t._2.fold(t._1)(typeParam => s"${t._1}[$typeParam]")
 
-  private def resolveGenericType(t: Type): CompileM[(PART.VALID[String], Option[PART.VALID[String]])] =
-    for {
-      argType   <- handleValid(t._1)
-      typeParam <- t._2.traverse(handleValid)
-    } yield (argType, typeParam)
+  private def resolveGenericType(
+    func: Expressions.ANNOTATEDFUNC,
+    funcName: PART.VALID[String],
+    t: Type
+  ): CompileM[List[(PART.VALID[String], Option[PART.VALID[String]])]] =
+    t match {
+      case Expressions.Single(name, parameter) =>
+        for {
+          argType   <- handleValid(name)
+          typeParam <- parameter.traverse(handleValid)
+        } yield List((argType, typeParam))
+
+      case Expressions.Union(types) =>
+        types.toList.flatTraverse(resolveGenericType(func, funcName, _))
+
+      case Expressions.Tuple(types) =>
+        argTypesError(func, funcName, types.mkString("(", ", ", ")"))
+    }
 
   private def checkAnnotatedParamType(t: (String, Option[String])): Boolean =
     t match {

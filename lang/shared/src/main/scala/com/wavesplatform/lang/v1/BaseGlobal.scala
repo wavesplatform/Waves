@@ -4,7 +4,7 @@ import java.math.RoundingMode
 
 import cats.implicits._
 import com.wavesplatform.lang.ValidationError.ScriptParseError
-import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper, MetaMapperStrategyV1}
+import com.wavesplatform.lang.contract.meta.{FunctionSignatures, MetaMapper, ParsedMeta}
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
 import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, V1, V2, DApp => DAppType}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
@@ -14,6 +14,7 @@ import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.BaseGlobal.DAppInfo
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext, ContractCompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
@@ -211,39 +212,34 @@ trait BaseGlobal {
       _ <- ContractScript.checkComplexity(version, dApp, maxComplexity, complexities, useReducedVerifierLimit = true)
     } yield ()
 
-  def decompile(compiledCode: String): Either[ScriptParseError, (String, Dic)] =
+  def decompile(compiledCode: String): Either[ScriptParseError, String] =
+      Script.fromBase64String(compiledCode.trim)
+        .map(script => Script.decompile(script)._1)
+
+  def dAppFuncTypes(compiledCode: String): Either[ScriptParseError, FunctionSignatures] =
     for {
       script <- Script.fromBase64String(compiledCode.trim)
-      meta   <- scriptMeta(script)
-    } yield (Script.decompile(script)._1, meta)
+      result <- dAppFuncTypes(script)
+    } yield result
 
-  def scriptMeta(compiledCode: String): Either[ScriptParseError, Dic] =
-    for {
-      script <- Script.fromBase64String(compiledCode.trim)
-      meta   <- scriptMeta(script)
-    } yield meta
-
-  def scriptMeta(script: Script): Either[ScriptParseError, Dic] =
-    script match {
-      case ContractScriptImpl(_, dApp) => MetaMapper.dicFromProto(dApp).leftMap(ScriptParseError)
-      case _                           => Right(Dic(Map()))
-    }
-
-  def dAppFuncTypes(script: Script): Either[ScriptParseError, Dic] =
+  def dAppFuncTypes(script: Script): Either[ScriptParseError, FunctionSignatures] =
     script match {
       case ContractScriptImpl(_, dApp) =>
         MetaMapper.dicFromProto(dApp).bimap(ScriptParseError, combineMetaWithDApp(_, dApp))
       case _ => Left(ScriptParseError("Expected DApp"))
     }
 
-  private def combineMetaWithDApp(dic: Dic, dApp: DApp): Dic =
-    dic.m.get(MetaMapperStrategyV1.FieldName).fold(dic) {
-      case Chain(paramTypes) =>
-        val funcsName      = dApp.callableFuncs.map(_.u.name)
-        val paramsWithFunc = Dic((funcsName zip paramTypes).toMap)
-        Dic(dic.m.updated(MetaMapperStrategyV1.FieldName, paramsWithFunc))
-      case _ => Dic(Map())
-    }
+  private def combineMetaWithDApp(meta: ParsedMeta, dApp: DApp): FunctionSignatures = {
+    val argTypesWithFuncName =
+      meta.callableFuncTypes.fold(List.empty[(String, List[(String, FINAL)])])(
+        types =>
+          (types zip dApp.callableFuncs)
+            .map { case (argTypes, func) =>
+              func.u.name -> (func.u.args zip argTypes)
+            }
+      )
+    FunctionSignatures(meta.version, argTypesWithFuncName)
+  }
 
   def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean
 
