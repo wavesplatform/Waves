@@ -173,10 +173,10 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     sender.getDataByKey(firstContract, "sender") shouldBe BinaryDataEntry("sender", ByteStr.decodeBase58(caller).get)
   }
 
-  test("enable use this with address") {
+  test("translate alias to the address") {
     sender.invokeScript(
       caller,
-      firstContract,
+      "alias:I:alias",
       func = Some("baz"),
       args = List(),
       payment = Seq(),
