@@ -253,11 +253,16 @@ class AddressRouteSpec
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3).toString
       (response \ "meta" \ "version").as[String] shouldBe "1"
-      (response \ "meta" \ "callableFuncTypes" \ "call1" \ "a").as[String] shouldBe "Int"
-      (response \ "meta" \ "callableFuncTypes" \ "call1" \ "b").as[String] shouldBe "ByteVector"
-      (response \ "meta" \ "callableFuncTypes" \ "call1" \ "c").as[String] shouldBe "ByteVector|Int"
-      (response \ "meta" \ "callableFuncTypes" \ "call2" \ "d").as[String] shouldBe "String"
-      (response \ "meta" \ "callableFuncTypes" \ "call3").as[JsObject] shouldBe JsObject(Seq())
+      (response \ "meta" \ "isArrayArguments").as[Boolean] shouldBe true
+      (response \ "meta" \ "callableFuncTypes" \ "call1" \ 0 \ "name").as[String] shouldBe "a"
+      (response \ "meta" \ "callableFuncTypes" \ "call1" \ 0 \ "type").as[String] shouldBe "Int"
+      (response \ "meta" \ "callableFuncTypes" \ "call1" \ 1 \ "name").as[String] shouldBe "b"
+      (response \ "meta" \ "callableFuncTypes" \ "call1" \ 1 \ "type").as[String] shouldBe "ByteVector"
+      (response \ "meta" \ "callableFuncTypes" \ "call1" \ 2 \ "name").as[String] shouldBe "c"
+      (response \ "meta" \ "callableFuncTypes" \ "call1" \ 2 \ "type").as[String] shouldBe "ByteVector|Int"
+      (response \ "meta" \ "callableFuncTypes" \ "call2" \ 0 \ "name").as[String] shouldBe "d"
+      (response \ "meta" \ "callableFuncTypes" \ "call2" \ 0 \ "type").as[String] shouldBe "String"
+      (response \ "meta" \ "callableFuncTypes" \ "call3").as[JsArray] shouldBe JsArray()
     }
 
     val contractWithoutMeta = contractWithMeta.copy(meta = DAppMeta())

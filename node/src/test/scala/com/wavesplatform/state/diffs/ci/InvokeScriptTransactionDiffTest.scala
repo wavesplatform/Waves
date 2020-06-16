@@ -27,7 +27,7 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import com.wavesplatform.settings.{BlockchainSettings, GenesisSettings, RewardsSettings, TestFunctionalitySettings, TestSettings}
+import com.wavesplatform.settings.{TestFunctionalitySettings, TestSettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
@@ -349,7 +349,7 @@ class InvokeScriptTransactionDiffTest
         )
     }
 
-    compiler.ContractCompiler(ctx.compilerContext, expr, stdLibVersion).right.get
+    compiler.ContractCompiler(ctx.compilerContext, expr, stdLibVersion).explicitGet()
   }
 
   def simplePreconditionsAndSetContract(
@@ -1595,7 +1595,12 @@ class InvokeScriptTransactionDiffTest
            |{-#SCRIPT_TYPE ACCOUNT#-}
            |
            |@Callable(i)
-           |func $funcName() = throw("bad news")
+           |func $funcName() = {
+           |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 10} true
+           |  if (check)
+           |    then throw("bad news")
+           |    else throw("bad news")
+           |}
            |""".stripMargin
       Parser.parseContract(script).get.value
     }
@@ -1645,9 +1650,6 @@ class InvokeScriptTransactionDiffTest
             )
           )
           .anyNumberOfTimes()
-        (blockchain.settings _)
-          .expects()
-          .returning(BlockchainSettings('W', fs, GenesisSettings.MAINNET, RewardsSettings.MAINNET, useEvaluatorV2 = false))
         (blockchain.assetDescription _)
           .expects(*)
           .returning(

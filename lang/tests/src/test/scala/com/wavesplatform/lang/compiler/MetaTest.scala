@@ -4,10 +4,11 @@ import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.NoShrink
-import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper, Single}
+import com.wavesplatform.lang.contract.meta.{MetaMapper, ParsedMeta}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, V3, V4, DApp => DAppType}
 import com.wavesplatform.lang.v1.compiler
+import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
@@ -15,8 +16,6 @@ import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-
-import scala.collection.immutable.{ListMap, Map}
 
 class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink with Inside {
   property("meta v1 with union type parameters") {
@@ -69,22 +68,24 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
     dApp.meta shouldBe expectedMeta
 
     MetaMapper.dicFromProto(dApp) shouldBe Right(
-      Dic(Map(
-        "version" -> Single("1"),
-        "callableFuncTypes" -> Chain(List(
-          Dic(ListMap(
-            "a" -> Single("Boolean|ByteVector|Int|String"),
-            "b" -> Single("Int"),
-            "c" -> Single("Int|String"),
-            "d" -> Single("Int|String"),
-            "e" -> Single("Boolean|ByteVector|String"),
-            "f" -> Single("ByteVector|Int")
-          )),
-          Dic(Map(
-            "a" -> Single("Boolean|Int")
-          ))
-        ))
-      ))
+      ParsedMeta(
+        version = 1,
+        Some(
+          List(
+            List(
+              UNION(BOOLEAN, BYTESTR, LONG, STRING),
+              LONG,
+              UNION(LONG, STRING),
+              UNION(LONG, STRING),
+              UNION(BOOLEAN, BYTESTR, STRING),
+              UNION(BYTESTR, LONG)
+            ),
+            List(
+              UNION(BOOLEAN, LONG)
+            )
+          )
+        )
+      )
     )
   }
 
@@ -122,10 +123,7 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
     dApp.meta shouldBe expectedMeta
 
     MetaMapper.dicFromProto(dApp) shouldBe Right(
-      Dic(Map(
-        "version" -> Single("1"),
-        "callableFuncTypes" -> Chain(List(Dic(Map())))
-      ))
+      ParsedMeta(version = 1, Some(List(Nil)))
     )
   }
 
@@ -162,20 +160,22 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
 
     dApp.meta shouldBe expectedMeta
     MetaMapper.dicFromProto(dApp) shouldBe Right(
-      Dic(Map(
-        "version" -> Single("2"),
-        "callableFuncTypes" -> Chain(List(
-          Dic(ListMap(
-            "a" -> Single("List[Int]"),
-            "b" -> Single("List[String]"),
-            "c" -> Single("ByteVector"),
-            "d" -> Single("Boolean|Int|String"),
-          )),
-          Dic(Map(
-            "a" -> Single("List[ByteVector]")
-          ))
-        ))
-      ))
+      ParsedMeta(
+        version = 2,
+        Some(
+          List(
+            List(
+              LIST(LONG),
+              LIST(STRING),
+              BYTESTR,
+              UNION(BOOLEAN, LONG, STRING)
+            ),
+            List(
+              LIST(BYTESTR)
+            )
+          )
+        )
+      )
     )
   }
 
@@ -213,10 +213,10 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
     dApp.meta shouldBe expectedMeta
 
     MetaMapper.dicFromProto(dApp) shouldBe Right(
-      Dic(Map(
-        "version" -> Single("2"),
-        "callableFuncTypes" -> Chain(List(Dic(Map())))
-      ))
+      ParsedMeta(
+        version = 2,
+        Some(List(Nil))
+      )
     )
   }
 }

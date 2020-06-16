@@ -1,12 +1,6 @@
 {
   funcs : [
     {
-      name: "_isInstanceOf"
-      params: [ "T", "String" ]
-      doc: "Check value type"
-      paramsDoc: [ "The value", "The type name" ]
-    },
-    {
       name: "Issue"
       params: [ "String", "String", "Int", "Int", "Boolean", "Script|Unit", "Int" ]
       doc: "Issue action detailed constructor"

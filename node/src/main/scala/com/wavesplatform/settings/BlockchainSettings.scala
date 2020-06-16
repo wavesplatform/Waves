@@ -202,8 +202,7 @@ case class BlockchainSettings(
     addressSchemeCharacter: Char,
     functionalitySettings: FunctionalitySettings,
     genesisSettings: GenesisSettings,
-    rewardsSettings: RewardsSettings,
-    useEvaluatorV2: Boolean
+    rewardsSettings: RewardsSettings
 )
 
 object BlockchainType extends Enumeration {
@@ -236,12 +235,12 @@ object BlockchainSettings {
         val rewardsSettings        = config.as[RewardsSettings](s"custom.rewards")
         (addressSchemeCharacter, functionalitySettings, genesisSettings, rewardsSettings)
     }
+
     BlockchainSettings(
       addressSchemeCharacter = addressSchemeCharacter,
       functionalitySettings = functionalitySettings,
       genesisSettings = genesisSettings,
-      rewardsSettings = rewardsSettings,
-      useEvaluatorV2 = false
+      rewardsSettings = rewardsSettings
     )
   }
 }

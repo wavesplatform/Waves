@@ -17,12 +17,12 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
   errorTests(
     "can't define LET with the same name as predefined constant" -> "already defined in the scope" -> BLOCK(
       AnyPos,
-      LET(AnyPos, PART.VALID(AnyPos, "unit"), CONST_LONG(AnyPos, 2), Seq.empty),
+      LET(AnyPos, PART.VALID(AnyPos, "unit"), CONST_LONG(AnyPos, 2)),
       TRUE(AnyPos)
     ),
     "can't define LET with the same name as predefined function" -> "function with this name is already defined" -> BLOCK(
       AnyPos,
-      LET(AnyPos, PART.VALID(AnyPos, "drop"), CONST_LONG(AnyPos, 2), Seq.empty),
+      LET(AnyPos, PART.VALID(AnyPos, "drop"), CONST_LONG(AnyPos, 2)),
       TRUE(AnyPos)
     ),
     "BINARY_OP with wrong types" -> "Can't find a function overload '+'" -> BINARY_OP(
