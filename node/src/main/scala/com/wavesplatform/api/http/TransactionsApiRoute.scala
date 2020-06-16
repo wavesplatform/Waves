@@ -197,7 +197,7 @@ case class TransactionsApiRoute(
   private def applicationStatus(height: Int, succeed: Boolean): JsObject = {
     import ApplicationStatus._
     if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height))
-      JsObject(Map("applicationStatus" -> JsString(if (succeed) Succeed else ScriptExecutionFailed)))
+      JsObject(Map("applicationStatus" -> JsString(if (succeed) Succeeded else ScriptExecutionFailed)))
     else
       JsObject.empty
   }
@@ -242,8 +242,8 @@ object TransactionsApiRoute {
   }
 
   object ApplicationStatus {
-    val Succeed             = "succeed"
-    val ScriptExecutionFailed = "scriptExecutionFailed"
+    val Succeeded             = "succeeded"
+    val ScriptExecutionFailed = "script_execution_failed"
   }
 
   implicit val transactionProofWrites: Writes[TransactionProof] = Writes { mi =>

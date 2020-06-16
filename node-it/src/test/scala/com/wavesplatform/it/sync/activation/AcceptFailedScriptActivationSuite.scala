@@ -121,7 +121,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       val failed = statuses.dropWhile(s => s.applicationStatus.contains("succeed"))
 
       failed.size should be > 0
-      all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
+      all(failed.flatMap(_.applicationStatus)) shouldBe "script_execution_failed"
 
       statuses.foreach { s =>
         (sender.transactionInfo[JsObject](s.id) \ "applicationStatus").asOpt[String] shouldBe s.applicationStatus
@@ -165,7 +165,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
       all(failed.map(_.status)) shouldBe "confirmed"
       all(failed.map(_.applicationStatus)) shouldBe 'defined
-      all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
+      all(failed.flatMap(_.applicationStatus)) shouldBe "script_execution_failed"
     }
 
     check() // liquid
@@ -210,7 +210,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
       all(failed.map(_.status)) shouldBe "confirmed"
       all(failed.map(_.applicationStatus)) shouldBe 'defined
-      all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
+      all(failed.flatMap(_.applicationStatus)) shouldBe "script_execution_failed"
 
       sender.balance(caller).balance shouldBe callerBalance - MaxTxsInMicroBlock * 2 * minInvokeFee
       sender.assetBalance(caller, asset).balance shouldBe callerAssetBalance
@@ -255,7 +255,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
       all(failed.map(_.status)) shouldBe "confirmed"
       all(failed.map(_.applicationStatus)) shouldBe 'defined
-      all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
+      all(failed.flatMap(_.applicationStatus)) shouldBe "script_execution_failed"
     }
 
     check() // liquid
@@ -408,7 +408,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
         100.millis
       )
 
-      status.applicationStatus shouldBe Some("scriptExecutionFailed")
+      status.applicationStatus shouldBe Some("script_execution_failed")
     }
 
     {
@@ -436,7 +436,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
         100.millis
       )
 
-      status.applicationStatus shouldBe Some("scriptExecutionFailed")
+      status.applicationStatus shouldBe Some("script_execution_failed")
     }
 
   }

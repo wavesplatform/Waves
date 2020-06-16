@@ -287,7 +287,7 @@ class TransactionsRouteSpec
 
             val statusInfo =
               if (height >= acceptFailedActivationHeight)
-                JsObject(Map("applicationStatus" -> JsString(if (succeed) "succeed" else "scriptExecutionFailed")))
+                JsObject(Map("applicationStatus" -> JsString(if (succeed) "succeeded" else "script_execution_failed")))
               else JsObject.empty
 
             responseAs[JsValue] shouldEqual tx.json() ++ statusInfo + ("height" -> JsNumber(height))
@@ -336,7 +336,7 @@ class TransactionsRouteSpec
               )
               val applicationStatus =
                 if (height >= acceptFailedActivationHeight)
-                  Json.obj("applicationStatus" -> JsString(if (succeed) "succeed" else "scriptExecutionFailed"))
+                  Json.obj("applicationStatus" -> JsString(if (succeed) "succeeded" else "script_execution_failed"))
                 else Json.obj()
               common ++ applicationStatus
             }

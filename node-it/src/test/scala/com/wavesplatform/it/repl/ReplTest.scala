@@ -92,7 +92,7 @@ class ReplTest extends BaseSuite {
  
     val idFailed = transFailed._1.id
 
-    (miner.rawTransactionInfo(idFailed) \ "applicationStatus").as[String] shouldBe "scriptExecutionFailed"
+    (miner.rawTransactionInfo(idFailed) \ "applicationStatus").as[String] shouldBe "script_execution_failed"
 
     val settings = NodeConnectionSettings(miner.nodeApiEndpoint.toString, 'I'.toByte, issuer)
     val repl = Repl(Some(settings))

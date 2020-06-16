@@ -88,7 +88,7 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
 
     val status = sender.transactionStatus(Seq(tx)).head
     status.status shouldBe "confirmed"
-    status.applicationStatus.get shouldBe "scriptExecutionFailed"
+    status.applicationStatus.get shouldBe "script_execution_failed"
 
     setContracts((None, acc0), (None, acc1), (None, acc2))
   }
@@ -153,7 +153,7 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
         sender.signedBroadcast(exchangeTx(incorrectSmartAssetPair, smartMatcherFee, smartMatcherFee, ntpTime, 3, 2, acc1, acc0, acc2), waitForTx = true).id
       val status = sender.transactionStatus(Seq(tx)).head
       status.status shouldBe "confirmed"
-      status.applicationStatus.get shouldBe "scriptExecutionFailed"
+      status.applicationStatus.get shouldBe "script_execution_failed"
     }
 
   }
