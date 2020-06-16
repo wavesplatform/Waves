@@ -92,7 +92,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     val acc0ScriptInfo  = sender.addressScriptInfo(firstContract)
     val acc0ScriptInfo2 = sender.addressScriptInfo(secondContract)
-    sender.createAlias(firstContract, "alias", fee = 1.waves)
+    sender.createAlias(firstContract, "alias", fee = 1.waves, waitForTx = true)
 
     acc0ScriptInfo.script.isEmpty shouldBe false
     acc0ScriptInfo.scriptText.isEmpty shouldBe false
