@@ -81,7 +81,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         |    "result" : {
         |      "data" : [ {
         |        "key" : "3FVV4W61poEVXEbFfPG1qfJhJxJ7Pk4M2To",
-        |        "value" : "700000000"
+        |        "value" : 700000000
         |      } ],
         |      "transfers" : [ {
         |        "address" : "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
@@ -125,7 +125,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         |    "result" : {
         |      "data" : [ {
         |        "key" : "3FVV4W61poEVXEbFfPG1qfJhJxJ7Pk4M2To",
-        |        "value" : "700000000"
+        |        "value" : 700000000
         |      } ],
         |      "transfers" : [ {
         |        "address" : "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",

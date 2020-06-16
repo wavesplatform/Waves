@@ -43,7 +43,7 @@ object InvokeScriptTransactionDiff {
   private val stats = TxProcessingStats
   import stats.TxTimerExt
 
-  def apply(blockchain: Blockchain, blockTime: Long, skipExecution: Boolean = false)(
+  def apply(blockchain: Blockchain, blockTime: Long, skipExecution: Boolean = false, verifyAssets: Boolean = true)(
       tx: InvokeScriptTransaction
   ): TracedResult[ValidationError, Diff] = {
 
@@ -155,7 +155,8 @@ object InvokeScriptTransactionDiff {
                 verifierComplexity,
                 tx,
                 blockchain,
-                blockTime
+                blockTime,
+                verifyAssets
               )
 
               resultDiff <- scriptResult._1 match {
@@ -182,7 +183,7 @@ object InvokeScriptTransactionDiff {
   ): Either[ScriptExecutionError.RejectedByDAppScript, (ScriptResult, EvaluationContext[Environment, Id], Log[Id])] = {
     val wavesContext = WavesContext.build(directives)
     val ctx =
-      PureContext.build(Global, version).withEnvironment[Environment] |+|
+      PureContext.build(Global, directives).withEnvironment[Environment] |+|
         CryptoContext.build(Global, version).withEnvironment[Environment] |+|
         wavesContext.copy(vars = Map())
 

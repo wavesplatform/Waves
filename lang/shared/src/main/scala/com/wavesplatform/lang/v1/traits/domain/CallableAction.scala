@@ -80,8 +80,11 @@ case class SponsorFee(
     minSponsoredAssetFee: Option[Long]
 ) extends CallableAction
 
-sealed trait DataItem[T] extends CallableAction {
+sealed trait DataOp extends CallableAction {
   val key: String
+}
+
+sealed trait DataItem[T] extends DataOp {
   val value: T
 }
 
@@ -90,5 +93,5 @@ object DataItem {
   case class Bool(k: String, v: Boolean) extends DataItem[Boolean] { val key = k; val value = v    }
   case class Bin(k: String, v: ByteStr)  extends DataItem[ByteStr] { val key = k; val value = v    }
   case class Str(k: String, v: String)   extends DataItem[String]  { val key = k; val value = v    }
-  case class Delete(k: String)           extends DataItem[Null]    { val key = k; val value = null }
+  case class Delete(key: String)         extends DataOp
 }

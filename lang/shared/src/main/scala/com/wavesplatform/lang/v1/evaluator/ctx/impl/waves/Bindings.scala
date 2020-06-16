@@ -270,21 +270,20 @@ object Bindings {
       case Sponsorship(p, assetId, minSponsoredAssetFee) =>
         sponsorshipTransactionObject(proofsEnabled, p, assetId, minSponsoredAssetFee, version)
       case Data(p, data) =>
-        def mapValue(e: Any): (EVALUATED, CASETYPEREF) =
+        def mapValue(e: DataItem[_]): (EVALUATED, CASETYPEREF) =
           e match {
-            case s: String  => (c(s), stringDataEntry)
-            case s: Boolean => (c(s), booleanDataEntry)
-            case s: Long    => (c(s), intDataEntry)
-            case s: ByteStr => (c(s), binaryDataEntry)
-            case _          => ???
+            case DataItem.Str(_,s)   => (c(s), stringDataEntry)
+            case DataItem.Bool(_, s) => (c(s), booleanDataEntry)
+            case DataItem.Lng(_, s)  => (c(s), intDataEntry)
+            case DataItem.Bin(_, s)  => (c(s), binaryDataEntry)
          }
 
-        def mapDataEntry(d: DataItem[_]): EVALUATED =
+        def mapDataEntry(d: DataOp): EVALUATED =
           d match {
             case DataItem.Delete(key) =>
               CaseObj(deleteDataEntry, Map("key" -> CONST_STRING(key).explicitGet()))
-            case writeItem =>
-              val (entryValue, entryType) = mapValue(writeItem.value)
+            case writeItem: DataItem[_] =>
+              val (entryValue, entryType) = mapValue(writeItem)
               val fields = Map("key" -> CONST_STRING(writeItem.key).explicitGet(), "value" -> entryValue)
               if (version >= V4)
                 CaseObj(entryType, fields)
