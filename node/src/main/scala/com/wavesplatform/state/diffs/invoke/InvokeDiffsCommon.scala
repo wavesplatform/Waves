@@ -96,11 +96,11 @@ object InvokeDiffsCommon {
     val sponsorFeeList = actionsByType(classOf[SponsorFee]).asInstanceOf[List[SponsorFee]]
 
     val dataEntries = actionsByType
-      .filterKeys(classOf[DataItem[_]].isAssignableFrom)
+      .filterKeys(classOf[DataOp].isAssignableFrom)
       .values
       .flatten
       .toList
-      .asInstanceOf[List[DataItem[_]]]
+      .asInstanceOf[List[DataOp]]
       .map(dataItemToEntry)
 
     for {
@@ -219,7 +219,7 @@ object InvokeDiffsCommon {
     Diff(tx = tx, portfolios = feePart |+| payablePart)
   }
 
-  private def dataItemToEntry(item: DataItem[_]): DataEntry[_] =
+  private def dataItemToEntry(item: DataOp): DataEntry[_] =
     item match {
       case DataItem.Bool(k, b) => BooleanDataEntry(k, b)
       case DataItem.Str(k, b)  => StringDataEntry(k, b)
@@ -341,7 +341,7 @@ object InvokeDiffsCommon {
             }
           }
 
-          def applyDataItem(item: DataItem[_]): TracedResult[ValidationError, Diff] =
+          def applyDataItem(item: DataOp): TracedResult[ValidationError, Diff] =
             TracedResult.wrapValue(
               Diff.stateOps(accountData = Map(dAppAddress -> AccountDataInfo(Map(item.key -> dataItemToEntry(item)))))
             )
@@ -430,7 +430,7 @@ object InvokeDiffsCommon {
               } else {
                 PublicKey(new Array[Byte](32))
               })
-            case d: DataItem[_] => applyDataItem(d)
+            case d: DataOp      => applyDataItem(d)
             case i: Issue       => applyIssue(tx, pk, i)
             case r: Reissue     => applyReissue(r, pk)
             case b: Burn        => applyBurn(b, pk)

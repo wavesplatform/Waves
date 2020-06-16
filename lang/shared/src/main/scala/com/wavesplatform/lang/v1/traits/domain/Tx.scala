@@ -79,6 +79,6 @@ object Tx {
       extends Tx
   case class Sponsorship(p: Proven, assetId: ByteStr, minSponsoredAssetFee: Option[Long])                                             extends Tx
   case class Exchange(p: Proven, amount: Long, price: Long, buyMatcherFee: Long, sellMatcherFee: Long, buyOrder: Ord, sellOrder: Ord) extends Tx
-  case class Data(p: Proven, data: IndexedSeq[DataItem[_]])                                                                           extends Tx
+  case class Data(p: Proven, data: IndexedSeq[DataOp])                                                                                extends Tx
   case class UpdateAssetInfo(p: Proven, assetId: ByteStr, name: String, description: String)                                          extends Tx
 }
