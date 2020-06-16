@@ -135,7 +135,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
         | (((v, q), (true, v)), q) == (((1, true), (q, q)), v)
       """.stripMargin
     val expr3 = Parser.parseExpr(script3).get.value
-    ExpressionCompiler(compilerContextV4, expr3) shouldBe 'right
+    ExpressionCompiler(compilerContextV4, expr3) shouldBe Symbol("right")
 
     val script4 =
       """
@@ -160,7 +160,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
         | a1 == b1
       """.stripMargin
     val expr = Parser.parseExpr(script).get.value
-    ExpressionCompiler(compilerContextV4, expr) shouldBe 'right
+    ExpressionCompiler(compilerContextV4, expr) shouldBe Symbol("right")
   }
 
   property("function with tuple args") {
@@ -178,7 +178,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
         |
       """.stripMargin
     val expr = Parser.parseExpr(script).get.value
-    ExpressionCompiler(compilerContextV4, expr) shouldBe 'right
+    ExpressionCompiler(compilerContextV4, expr) shouldBe Symbol("right")
 
     val script2 =
       """
@@ -226,7 +226,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
         |
       """.stripMargin
     val expr = Parser.parseExpr(script).get.value
-    ExpressionCompiler(compilerContextV4, expr) shouldBe 'right
+    ExpressionCompiler(compilerContextV4, expr) shouldBe Symbol("right")
 
     val script2 =
       """
@@ -263,7 +263,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
         |
       """.stripMargin
     val expr3 = Parser.parseExpr(script3).get.value
-    ExpressionCompiler(compilerContextV4, expr3) shouldBe 'right
+    ExpressionCompiler(compilerContextV4, expr3) shouldBe Symbol("right")
 
     val script4 =
       """
@@ -292,7 +292,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
         | }
       """.stripMargin
     val expr5 = Parser.parseExpr(script5).get.value
-    ExpressionCompiler(compilerContextV4, expr5) shouldBe 'right
+    ExpressionCompiler(compilerContextV4, expr5) shouldBe Symbol("right")
   }
 
   treeTypeTest("GETTER")(

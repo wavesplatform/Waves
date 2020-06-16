@@ -1783,8 +1783,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("n-size generic tuple") {
-    lazy val getElement: Stream[(String, String)] =
-      Stream(
+    lazy val getElement: LazyList[(String, String)] =
+      LazyList(
         (""""a"""", "String"),
         ("true", "Boolean"),
         ("123", "Int"),

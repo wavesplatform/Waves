@@ -24,7 +24,7 @@ object Parser {
   def notEndOfString[_:P]     = CharPred(_ != '\"')
   def specialSymbols[_:P]     = P("\\" ~~ AnyChar)
   def comment[_:P]: P[Unit]   = P("#" ~~ CharPred(_ != '\n').repX).rep.map(_ => ())
-  def directive[_:P]: P[Unit] = P("{-#" ~ CharPred(el => el != '\n' && el != '#').rep ~ "#-}").rep(sep = comment).map(_ => ())
+  def directive[_:P]: P[Unit] = P("{-#" ~ CharPred(el => el != '\n' && el != '#').rep ~ "#-}").rep(0, comment).map(_ => ())
 
   def unusedText[_:P] = comment ~ directive ~ comment
 
@@ -155,7 +155,7 @@ object Parser {
       }
   }
 
-  def functionCallArgs[_:P]: P[Seq[EXPR]] = comment ~ baseExpr.rep(sep = comment ~ "," ~ comment) ~ comment
+  def functionCallArgs[_:P]: P[Seq[EXPR]] = comment ~ baseExpr.rep(0, comment ~ "," ~ comment) ~ comment
 
   def maybeFunctionCallP[_:P]: P[EXPR] = (Index ~~ lfunP ~~ P("(" ~/ functionCallArgs ~ ")").? ~~ Index).map {
     case (start, REF(_, functionName, _, _), Some(args), accessEnd) => FUNCTION_CALL(Pos(start, accessEnd), functionName, args.toList)
@@ -203,13 +203,13 @@ object Parser {
   case class ListIndex(index: EXPR)                      extends Accessor
 
   def singleTypeP[_:P]: P[Single] = (anyVarName ~~ ("[" ~~ anyVarName ~~ "]").?).map { case (t, param) => Single(t, param) }
-  def unionTypeP[_:P]: P[Union]   = P(singleTypeP | tupleTypeP).rep(min = 1, sep = comment ~ "|" ~ comment).map(Union)
+  def unionTypeP[_:P]: P[Union]   = P(singleTypeP | tupleTypeP).rep(1, comment ~ "|" ~ comment).map(Union)
   def tupleTypeP[_:P]: P[Tuple] =
     ("(" ~
       P(unionTypeP).rep(
-        min = ContractLimits.MinTupleSize,
-        max = ContractLimits.MaxTupleSize,
-        sep = comment ~ "," ~ comment
+        ContractLimits.MinTupleSize,
+        comment ~ "," ~ comment,
+        ContractLimits.MaxTupleSize,
       )
       ~ ")")
       .map(Tuple)
@@ -217,14 +217,14 @@ object Parser {
   def funcP(implicit c: fastparse.P[Any]): P[FUNC] = {
     def funcname(implicit c: fastparse.P[Any])    = anyVarName
     def argWithType(implicit c: fastparse.P[Any]) = anyVarName ~ ":" ~ unionTypeP ~ comment
-    def args(implicit c: fastparse.P[Any])        = "(" ~ comment ~ argWithType.rep(sep = "," ~ comment) ~ ")" ~ comment
+    def args(implicit c: fastparse.P[Any])        = "(" ~ comment ~ argWithType.rep(0, "," ~ comment) ~ ")" ~ comment
     def funcHeader(implicit c: fastparse.P[Any])  = Index ~~ "func" ~ funcname ~ comment ~ args ~ "=" ~ P(singleBaseExpr | ("{" ~ baseExpr ~ "}")) ~~ Index
     funcHeader.map {
       case (start, name, args, expr, end) => FUNC(Pos(start, end), expr, name, args)
     }
   }
 
-  def annotationP[_:P]: P[ANNOTATION] = (Index ~~ "@" ~ anyVarName ~ comment ~ "(" ~ comment ~ anyVarName.rep(sep = ",") ~ comment ~ ")" ~~ Index).map {
+  def annotationP[_:P]: P[ANNOTATION] = (Index ~~ "@" ~ anyVarName ~ comment ~ "(" ~ comment ~ anyVarName.rep(0, ",") ~ comment ~ ")" ~~ Index).map {
     case (start, name: PART[String], args: Seq[PART[String]], end) => ANNOTATION(Pos(start, end), name, args)
   }
 
