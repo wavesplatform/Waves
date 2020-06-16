@@ -93,13 +93,19 @@ object Parser {
     .filter { case (_, x, _) => !keywords.contains(x) }
     .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
 
-  def genericVarName(nameP: P[Unit])(implicit c: fastparse.P[Any]): P[PART[String]] = (Index ~~ nameP.! ~~ Index).map {
-    case (start, x, end) =>
-      if (keywords.contains(x)) PART.INVALID(Pos(start, end), s"keywords are restricted: $x")
-      else PART.VALID(Pos(start, end), x)
+  def genericVarName(namePx: fastparse.P[Any] => P[Unit])(implicit c: fastparse.P[Any]): P[PART[String]] = {
+    def nameP(implicit c: fastparse.P[Any]) = namePx(c)
+    (Index ~~ nameP.! ~~ Index).map {
+      case (start, x, end) =>
+        if (keywords.contains(x)) PART.INVALID(Pos(start, end), s"keywords are restricted: $x")
+        else PART.VALID(Pos(start, end), x)
+    }
   }
 
-  def anyVarName[_:P]: P[PART[String]] = genericVarName(char ~~ (digit | char).repX())
+  def anyVarName(implicit c: fastparse.P[Any]): P[PART[String]] = {
+    def nameP(implicit c: fastparse.P[Any]) : P[Unit] = char ~~ (digit | char).repX()
+    genericVarName(nameP(_))
+  }
 
   def invalid[_:P]: P[INVALID] = {
     import fastparse.NoWhitespace._
@@ -294,7 +300,10 @@ object Parser {
         case (start, e, cases, end) => MATCH(Pos(start, end), e, cases.toList)
       }
 
-  def accessorName[_:P]: P[PART[String]] = genericVarName((char | "_") ~~ (digit | char).repX())
+  def accessorName(implicit c: fastparse.P[Any]): P[PART[String]] = {
+    def nameP(implicit c: fastparse.P[Any]) = (char | "_") ~~ (digit | char).repX()
+    genericVarName(nameP(_))
+  }
 
   def accessP[_:P]: P[(Int, Accessor, Int)] = P(
     (("" ~ comment ~ Index ~ "." ~/ comment ~ (accessorName.map(Getter) ~/ comment ~~ ("(" ~/ comment ~ functionCallArgs ~/ comment ~ ")").?).map {
