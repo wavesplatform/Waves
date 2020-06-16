@@ -113,11 +113,11 @@ object TransactionDiffer {
 
   // diff making related
   private def transactionDiff(
-                               blockchain: Blockchain,
-                               tx: Transaction,
-                               currentBlockTs: Long,
-                               skipFailing: Boolean,
-                               verifyAssets: Boolean
+      blockchain: Blockchain,
+      tx: Transaction,
+      currentBlockTs: Long,
+      skipFailing: Boolean,
+      verifyAssets: Boolean
   ): TracedResult[ValidationError, Diff] =
     stats.transactionDiffValidation.measureForType(tx.typeId) {
       tx match {
@@ -237,7 +237,7 @@ object TransactionDiffer {
     def unapply(result: TracedResult[ValidationError, Diff]): Option[Option[ErrorMessage]] =
       result match {
         case TracedResult(Left(TransactionValidationError(e: FailedTransactionError, tx)), _) => Some(errorMessage(e, tx))
-        case _                                                                           => None
+        case _                                                                                => None
       }
 
     def errorMessage(cf: FailedTransactionError, tx: Transaction): Option[ErrorMessage] =
