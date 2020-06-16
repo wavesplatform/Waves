@@ -821,7 +821,8 @@ object ExpressionCompiler {
       )
 
   def parseType(expectedType: String, ctx: CompilerContext): Either[String, FINAL] = {
-    val union = Parser.unionTypeP.parse(expectedType).get.value
+    import fastparse._
+    val union = parse(expectedType, Parser.unionTypeP(_)).get.value
     handleCompositeType(AnyPos, union, None, None)
       .run(ctx)
       .value

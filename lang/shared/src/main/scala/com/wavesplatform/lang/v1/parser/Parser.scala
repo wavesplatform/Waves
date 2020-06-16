@@ -93,22 +93,17 @@ object Parser {
     .filter { case (_, x, _) => !keywords.contains(x) }
     .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
 
-  def genericVarName(nameP: P[Unit]): P[PART[String]] = (Index ~~ nameP.! ~~ Index).map {
+  def genericVarName(nameP: P[Unit])(implicit c: fastparse.P[Any]): P[PART[String]] = (Index ~~ nameP.! ~~ Index).map {
     case (start, x, end) =>
       if (keywords.contains(x)) PART.INVALID(Pos(start, end), s"keywords are restricted: $x")
       else PART.VALID(Pos(start, end), x)
   }
 
-  val anyVarName: P[PART[String]] = genericVarName(char ~~ (digit | char).repX())
+  def anyVarName[_:P]: P[PART[String]] = genericVarName(char ~~ (digit | char).repX())
 
-  val invalid: P[INVALID] = {
-    val White = WhitespaceApi.Wrapper {
-      import fastparse.all._
-      NoTrace("")
-    }
-
-    import White._
-    P(Index ~~ CharPred(_ != '\n').rep(min = 1) ~~ Index)
+  def invalid[_:P]: P[INVALID] = {
+    import fastparse.NoWhitespace._
+    P(Index ~~ CharPred(_ != '\n').rep(1) ~~ Index)
       .map {
         case (start, end) => INVALID(Pos(start, end), "can't parse the expression")
       }
@@ -120,9 +115,9 @@ object Parser {
     P(Index ~~ (CharIn("+\\-").? ~~ digit.repX(1)).! ~~ ("_" ~~ digit.repX(1).!).repX(0) ~~ Index)
       .map({ case (start, x1, x2, end) => CONST_LONG(Pos(start, end), x2.foldLeft(x1)(_ ++ _).toLong) })
 
-  val trueP: P[TRUE]        = P(Index ~~ "true".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => TRUE(Pos(start, end)) }
-  val falseP: P[FALSE]      = P(Index ~~ "false".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => FALSE(Pos(start, end)) }
-  val curlyBracesP: P[EXPR] = P("{" ~ baseExpr ~ "}")
+  def trueP[_:P]: P[TRUE]        = P(Index ~~ "true".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => TRUE(Pos(start, end)) }
+  def falseP[_:P]: P[FALSE]      = P(Index ~~ "false".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => FALSE(Pos(start, end)) }
+  def curlyBracesP[_:P]: P[EXPR] = P("{" ~ baseExpr ~ "}")
 
   def refP[_:P]: P[REF] = P(correctVarName).map { x =>
     REF(Pos(x.position.start, x.position.end), x)
@@ -180,13 +175,13 @@ object Parser {
       }
   }
 
-  val bracedArgs: P[Seq[EXPR]] =
+  def bracedArgs[_:P]: P[Seq[EXPR]] =
     comment ~ baseExpr.rep(
       sep = comment ~ "," ~ comment,
       max = ContractLimits.MaxTupleSize
     ) ~ comment
 
-  val bracesOrTuple: P[EXPR] = (Index ~~ P("(") ~ bracedArgs ~ P(")") ~~ Index).map {
+  def bracesOrTuple[_:P]: P[EXPR] = (Index ~~ P("(") ~ bracedArgs ~ P(")") ~~ Index).map {
     case (_, Seq(expr), _) => expr
     case (s, elements, f) =>
       FUNCTION_CALL(
@@ -196,7 +191,7 @@ object Parser {
       )
   }
 
-  val extractableAtom: P[EXPR] = P(
+  def extractableAtom[_:P]: P[EXPR] = P(
     curlyBracesP | bracesOrTuple |
       byteVectorP | stringP | numberP | trueP | falseP | list |
       maybeFunctionCallP
@@ -207,9 +202,9 @@ object Parser {
   case class Getter(name: PART[String])                  extends Accessor
   case class ListIndex(index: EXPR)                      extends Accessor
 
-  val singleTypeP: P[Single] = (anyVarName ~~ ("[" ~~ anyVarName ~~ "]").?).map { case (t, param) => Single(t, param) }
-  val unionTypeP: P[Union]   = P(singleTypeP | tupleTypeP).rep(min = 1, sep = comment ~ "|" ~ comment).map(Union)
-  val tupleTypeP: P[Tuple] =
+  def singleTypeP[_:P]: P[Single] = (anyVarName ~~ ("[" ~~ anyVarName ~~ "]").?).map { case (t, param) => Single(t, param) }
+  def unionTypeP[_:P]: P[Union]   = P(singleTypeP | tupleTypeP).rep(min = 1, sep = comment ~ "|" ~ comment).map(Union)
+  def tupleTypeP[_:P]: P[Tuple] =
     ("(" ~
       P(unionTypeP).rep(
         min = ContractLimits.MinTupleSize,
@@ -237,7 +232,7 @@ object Parser {
     case (start, as, f, end) => ANNOTATEDFUNC(Pos(start, end), as, f)
   }
 
-  val matchCaseP: P[MATCH_CASE] = {
+  def matchCaseP(implicit c: fastparse.P[Any]): P[MATCH_CASE] = {
     def checkForGenericAndGetLastPos(t: Type): Either[INVALID, Option[Pos]] =
       t match {
         case Single(name, parameter) =>
@@ -253,8 +248,8 @@ object Parser {
           types.lastOption.flatTraverse(checkForGenericAndGetLastPos)
       }
 
-    val restMatchCaseInvalidP: P[String] = P((!"=>" ~~ AnyChars(1).!).repX.map(_.mkString))
-    val varDefP: P[Option[PART[String]]] = anyVarName.map(Some(_)) | "_".!.map(_ => None)
+    def restMatchCaseInvalidP(implicit c: fastparse.P[Any]): P[String] = P((!P("=>") ~~ AnyChar.!).repX.map(_.mkString))
+    def varDefP(implicit c: fastparse.P[Any]): P[Option[PART[String]]] = anyVarName.map(Some(_)) | P("_").!.map(_ => None)
 
     def typesDefP(implicit c: fastparse.P[Any]) = (
       ":" ~ comment ~
@@ -293,15 +288,15 @@ object Parser {
   }
 
   def matchP[_:P]: P[EXPR] =
-    P(Index ~~ "match" ~~ &(border) ~/ baseExpr ~ "{" ~ comment ~ matchCaseP.rep(sep = comment) ~ comment ~ "}" ~~ Index)
+    P(Index ~~ "match" ~~ &(border) ~/ baseExpr ~ "{" ~ comment ~ matchCaseP.rep(0, comment) ~ comment ~ "}" ~~ Index)
       .map {
         case (start, _, Nil, end)   => INVALID(Pos(start, end), "pattern matching requires case branches")
         case (start, e, cases, end) => MATCH(Pos(start, end), e, cases.toList)
       }
 
-  val accessorName: P[PART[String]] = genericVarName((char | "_") ~~ (digit | char).repX())
+  def accessorName[_:P]: P[PART[String]] = genericVarName((char | "_") ~~ (digit | char).repX())
 
-  val accessP: P[(Int, Accessor, Int)] = P(
+  def accessP[_:P]: P[(Int, Accessor, Int)] = P(
     (("" ~ comment ~ Index ~ "." ~/ comment ~ (accessorName.map(Getter) ~/ comment ~~ ("(" ~/ comment ~ functionCallArgs ~/ comment ~ ")").?).map {
       case ((g @ Getter(name)), args) => args.fold(g: Accessor)(a => Method(name, a))
     }) ~~ Index) | (Index ~~ "[" ~/ baseExpr.map(ListIndex) ~ "]" ~~ Index)
@@ -338,19 +333,19 @@ object Parser {
           }
       }
 
-  private val destructuredTupleValuesP: P[Seq[(Int, Option[PART[String]])]] =
+  private def destructuredTupleValuesP[_:P]: P[Seq[(Int, Option[PART[String]])]] =
     P("(") ~
       (Index ~ anyVarName.?).rep(
-        sep = comment ~ "," ~ comment,
-        min = ContractLimits.MinTupleSize,
-        max = ContractLimits.MaxTupleSize
+        ContractLimits.MinTupleSize,
+        comment ~ "," ~ comment,
+        ContractLimits.MaxTupleSize
       ) ~
       P(")")
 
-  private val letNameP: P[Seq[(Int, Option[PART[String]])]] =
+  private def letNameP[_:P]: P[Seq[(Int, Option[PART[String]])]] =
     (Index ~ anyVarName.?).map(Seq(_))
 
-  val letP: P[Seq[LET]] =
+  def letP[_:P]: P[Seq[LET]] =
     P(Index ~~ "let" ~~ &(CharIn(" \t\n\r")) ~/ comment ~ (destructuredTupleValuesP | letNameP) ~ comment ~ Index ~ ("=" ~/ Index ~ baseExpr.?).? ~~ Index)
       .map {
         case (start, names, valuePos, valueRaw, end) =>
