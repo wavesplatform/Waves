@@ -53,7 +53,7 @@ object Transaction {
   implicit val decoder: Decoder[TransferTransaction] = (c: HCursor) =>
     for {
       applicationStatus <- c.downField("applicationStatus").as[Option[String]]
-      succeed = applicationStatus.fold(true)(_ == "succeed")
+      succeed = applicationStatus.fold(true)(_ == "succeeded")
       version   <- c.downField("version").as[Int]
       height    <- c.downField("height").as[Option[Int]]
       typeId    <- c.downField("type").as[Int]

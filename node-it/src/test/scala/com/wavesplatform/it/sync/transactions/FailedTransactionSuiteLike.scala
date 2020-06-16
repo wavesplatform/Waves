@@ -87,7 +87,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
     def assertInvalidTxs(txs: Seq[String]): Seq[TransactionStatus] = {
       val statuses = sender.transactionStatus(txs).sortWith { case (f, s) => txs.indexOf(f.id) < txs.indexOf(s.id) }
 
-      val invalid = statuses.dropWhile(s => s.applicationStatus.contains("succeed"))
+      val invalid = statuses.dropWhile(s => s.applicationStatus.contains("succeeded"))
       invalid.size should be > 0
 
       invalid.foreach { s =>
