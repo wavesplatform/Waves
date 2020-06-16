@@ -18,11 +18,12 @@ package object repl {
   val internalFuncPrefix: String = "_"
 
   val version = V4
+  val directives: DirectiveSet = DirectiveSet(version, Account, DApp).right.get
 
   val initialCtx: CTX[Environment] =
-    CryptoContext.build(global, version).withEnvironment[Environment] |+|
-    PureContext.build(global, version).withEnvironment[Environment]   |+|
-    WavesContext.build(DirectiveSet(version, Account, DApp, Imports(Nil)).explicitGet())
+    CryptoContext.build(global, version).withEnvironment[Environment]  |+|
+    PureContext.build(global, directives).withEnvironment[Environment] |+|
+    WavesContext.build(directives)
 
   def buildEnvironment(settings: Option[NodeConnectionSettings]): Environment[Future] =
     settings.fold(ErrorMessageEnvironment: Environment[Future])(WebEnvironment)

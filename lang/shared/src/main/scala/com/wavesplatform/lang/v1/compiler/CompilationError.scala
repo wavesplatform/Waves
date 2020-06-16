@@ -42,7 +42,9 @@ object CompilationError {
   }
 
   final case class MatchNotExhaustive(start: Int, end: Int, possible: List[TYPE], matched: List[TYPE]) extends CompilationError {
-    val message = s"Matching not exhaustive: possibleTypes are $possible, while matched are $matched"
+    val message = s"Matching not exhaustive: " +
+      s"possibleTypes are ${possible.mkString(", ")}, " +
+      s"while matched are ${matched.mkString(", ")}"
   }
 
   final case class MultipleDefaultCases(start: Int, end: Int, defaultCasesCount: Int) extends CompilationError {

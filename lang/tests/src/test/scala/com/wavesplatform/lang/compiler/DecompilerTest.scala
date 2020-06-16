@@ -562,7 +562,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     |    case x: PointC => 
     |        x
     |    case _ => 
-    |        throw()
+    |        throw("Match error")
     |}""".stripMargin
   }
 

@@ -103,7 +103,7 @@ trait ScriptGen {
     for {
       name       <- Gen.identifier.filter(!keywords(_))
       (value, _) <- BOOLgen((gas - 3) / 3)
-    } yield LET(AnyPos, PART.VALID(AnyPos, name), value, Seq.empty)
+    } yield LET(AnyPos, PART.VALID(AnyPos, name), value)
 
   def REFgen: Gen[EXPR] =
     Gen.identifier.filter(!keywords(_)).map(PART.VALID[String](AnyPos, _)).map(REF(AnyPos, _))

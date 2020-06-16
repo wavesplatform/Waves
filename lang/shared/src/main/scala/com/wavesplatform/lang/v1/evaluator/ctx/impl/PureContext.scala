@@ -10,12 +10,14 @@ import cats.kernel.Monoid
 import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
-import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ContextfulVal
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
@@ -181,7 +183,9 @@ object PureContext {
       case xs => notImplemented[Id, EVALUATED]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
     }
 
-  lazy val _isInstanceOf: BaseFunction[NoContext] =
+  private val plainTypeRegex = "\\w*".r
+
+  lazy val old_isInstanceOf: BaseFunction[NoContext] =
     NativeFunction("_isInstanceOf", 1, ISINSTANCEOF, BOOLEAN, ("obj", TYPEPARAM('T')), ("of", STRING)) {
       case CONST_BOOLEAN(_) :: CONST_STRING("Boolean") :: Nil    => Right(TRUE)
       case CONST_BYTESTR(_) :: CONST_STRING("ByteVector") :: Nil => Right(TRUE)
@@ -189,6 +193,20 @@ object PureContext {
       case CONST_LONG(_) :: CONST_STRING("Int") :: Nil           => Right(TRUE)
       case (p: CaseObj) :: CONST_STRING(s) :: Nil                => Right(CONST_BOOLEAN(p.caseType.name == s))
       case _                                                     => Right(FALSE)
+    }
+
+  def _isInstanceOf(compilerContext: => CompilerContext): BaseFunction[NoContext] =
+    NativeFunction("_isInstanceOf", 1, ISINSTANCEOF, BOOLEAN, ("obj", TYPEPARAM('T')), ("of", STRING)) {
+      case (value: EVALUATED) :: CONST_STRING(expectedType) :: Nil =>
+        expectedType match {
+          case plainTypeRegex(_) =>
+            Right(CONST_BOOLEAN(value.getType.name == expectedType))
+          case _ =>
+            ExpressionCompiler.parseType(expectedType, compilerContext)
+              .map(parsedType => CONST_BOOLEAN(parsedType equivalent value.getType))
+        }
+      case _ =>
+        Right(FALSE)
     }
 
   lazy val sizeBytes: BaseFunction[NoContext] = NativeFunction("size", 1, SIZE_BYTES, LONG, ("byteVector", BYTESTR)) {
@@ -738,6 +756,25 @@ object PureContext {
       FUNCTION_CALL(User("!="), List(index, unit))
     }
 
+  def createTupleN(resultSize: Int): NativeFunction[NoContext] = {
+    val typeParams =
+      ('A'.toInt until 'A'.toInt + resultSize).map(t => TYPEPARAM(t.toByte)).toList
+
+    NativeFunction(
+      s"_Tuple$resultSize",
+      1,
+      (CREATE_TUPLE + resultSize - 2).toShort,
+      PARAMETERIZEDTUPLE(typeParams),
+      typeParams.mapWithIndex { case (typeParam, i) => (s"element${i + 1}", typeParam) }: _*
+    ) {
+      case elements if elements.length == resultSize =>
+        val fields = elements.mapWithIndex { case (element, i) => (s"_${i + 1}", element) }.toMap
+        Right(CaseObj(runtimeTupleType, fields))
+      case xs =>
+        notImplemented[Id, EVALUATED](typeParams.map(_.char).mkString("(", ", ", ")"), xs)
+    }
+  }
+
   lazy val uMinus: BaseFunction[NoContext] =
     UserFunction("-", Map[StdLibVersion, Long](V1 -> 9, V2 -> 9, V3 -> 1, V4 -> 1), LONG, ("@n", LONG)) {
       FUNCTION_CALL(subLong, List(CONST_LONG(0), REF("@n")))
@@ -782,7 +819,6 @@ object PureContext {
     dropString,
     takeRightString,
     dropRightString,
-    _isInstanceOf,
     isDefined,
     extract,
     throwWithMessage,
@@ -855,7 +891,18 @@ object PureContext {
     functions
   )
 
-  def build(math: BaseGlobal, version: StdLibVersion): CTX[NoContext] = {
+  def build(math: BaseGlobal, version: StdLibVersion): CTX[NoContext] =
+    build(math, DirectiveSet(version, Account, Expression).explicitGet())
+
+  def build(math: BaseGlobal, directives: DirectiveSet, testCompilerContext: CompilerContext = CompilerContext.empty): CTX[NoContext] = {
+    val isInstanceOf =
+      if (directives.stdLibVersion >= V4)
+        _isInstanceOf(compilerContext(directives) |+| testCompilerContext)
+      else
+        old_isInstanceOf
+
+    val updatedCtx = ctx.copy(functions = ctx.functions :+ isInstanceOf)
+
     val pow: BaseFunction[NoContext] =
       NativeFunction("pow", 100, POW, LONG, ("base", LONG), ("bp", LONG), ("exponent", LONG), ("ep", LONG), ("rp", LONG), ("round", rounds)) {
         case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
@@ -891,7 +938,7 @@ object PureContext {
     val fromV3Funcs = Array(
       value,
       valueOrErrorMessage,
-      toUtf8String(version),
+      toUtf8String(directives.stdLibVersion),
       toLong,
       toLongOffset,
       indexOf,
@@ -906,7 +953,7 @@ object PureContext {
     )
 
     val v3Ctx = Monoid.combine(
-      ctx,
+      updatedCtx,
       CTX[NoContext](
         Seq.empty,
         Map(("nil", (LIST(NOTHING), ContextfulVal.pure[NoContext](ARR(IndexedSeq.empty[EVALUATED], EMPTYARR_WEIGHT, limited = false).explicitGet())))),
@@ -915,7 +962,7 @@ object PureContext {
     )
 
     val v4Functions =
-      ctx.functions ++
+      updatedCtx.functions ++
         fromV3Funcs ++
         Array(
           contains,
@@ -929,11 +976,11 @@ object PureContext {
           listContains,
           listMin,
           listMax,
-          makeString
-        )
+          makeString,
+        ) ++ (MinTupleSize to MaxTupleSize).map(i => createTupleN(i))
 
-    version match {
-      case V1 | V2 => ctx
+    directives.stdLibVersion match {
+      case V1 | V2 => updatedCtx
       case V3      => v3Ctx
       case V4      => v3Ctx.copy(functions = v4Functions)
     }

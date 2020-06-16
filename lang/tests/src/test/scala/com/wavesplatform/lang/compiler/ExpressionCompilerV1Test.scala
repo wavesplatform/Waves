@@ -110,6 +110,191 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     ExpressionCompiler(compilerContext, letExpr) shouldBe Symbol("right")
   }
 
+  property("tuple type checks") {
+    val script = """ ("a", true, 123, base58'aaaa')._3 == true  """
+    val expr = Parser.parseExpr(script).get.value
+    ExpressionCompiler(compilerContextV4, expr) should produce("Can't match inferred types of T over Int, Boolean")
+
+    val script2 = """ ("a", true, 123, base58'aaaa') == ("a", true, "b", base58'aaaa') """
+    val expr2 = Parser.parseExpr(script2).get.value
+    ExpressionCompiler(compilerContextV4, expr2) should produce(
+      "Can't match inferred types of T over (String, Boolean, Int, ByteVector), (String, Boolean, String, ByteVector)"
+    )
+
+    val script3 =
+      """
+        | let v = if (true) then 1 else "abc"
+        | let q = if (true) then 1 else if (true) then true else "abc"
+        |
+        | (v, v) == (v, v)     &&
+        | (v, q) == (q, v)     &&
+        | (q, q) == (v, v)     &&
+        | (v, q) == (1, "abc") &&
+        | (v, q) == ("abc", 1) &&
+        | (1, q) == (v, true)  &&
+        | (((v, q), (true, v)), q) == (((1, true), (q, q)), v)
+      """.stripMargin
+    val expr3 = Parser.parseExpr(script3).get.value
+    ExpressionCompiler(compilerContextV4, expr3) shouldBe 'right
+
+    val script4 =
+      """
+        | let v = if (true) then 1 else "abc"
+        | let q = if (true) then 1 else if (true) then true else "abc"
+        |
+        | (((v, q), (true, v)), q) == (((1, true), (v, q)), v)
+      """.stripMargin
+    val expr4 = Parser.parseExpr(script4).get.value
+    ExpressionCompiler(compilerContextV4, expr4) should produce(
+      "Can't match inferred types of T over " +
+        "(((Int|String, Boolean|Int|String), (Boolean, Int|String)), Boolean|Int|String), " +
+        "(((Int, Boolean), (Int|String, Boolean|Int|String)), Int|String) in 102-154"
+    )
+  }
+
+  property("avoid duplicates of internal variable name of tuple destructuring") {
+    val script =
+      """
+        | let (a1, a2, a3) = (1, 2, 3)
+        | let (b1, b2, b3) = (1, 2, 3)
+        | a1 == b1
+      """.stripMargin
+    val expr = Parser.parseExpr(script).get.value
+    ExpressionCompiler(compilerContextV4, expr) shouldBe 'right
+  }
+
+  property("function with tuple args") {
+    val script =
+      """
+        | func f(a: (Int, String), b: (String, Boolean)) =
+        |   a._2 == b._1
+        |
+        | func g(a: (Int, (Int, String, Boolean)), b: ((Boolean, Int)|String, Boolean)) =
+        |   a._2._3 == b._2
+        |
+        | f((1, "abc"), ("abc", true)) &&
+        | g((1, (1, "abc", true)), ("abc", true))
+        |
+        |
+      """.stripMargin
+    val expr = Parser.parseExpr(script).get.value
+    ExpressionCompiler(compilerContextV4, expr) shouldBe 'right
+
+    val script2 =
+      """
+        | func f(a: (Int, String), b: (String, Boolean)) =
+        |   a._2 == b._1
+        |
+        | f((1, "a"), true)
+        |
+      """.stripMargin
+    val expr2 = Parser.parseExpr(script2).get.value
+    ExpressionCompiler(compilerContextV4, expr2) should produce(
+      "Non-matching types: expected: (String, Boolean), actual: Boolean in 69-86"
+    )
+
+    val script3 =
+      """
+        | func f(a: (Int, String, Boolean)|((Int, String), Boolean)) =
+        |   a._1
+        |
+        | f((1, "a"))
+        |
+      """.stripMargin
+    val expr3 = Parser.parseExpr(script3).get.value
+    ExpressionCompiler(compilerContextV4, expr3) should produce(
+      "Non-matching types: expected: ((Int, String), Boolean)|(Int, String, Boolean), actual: (Int, String) in 73-84"
+    )
+  }
+
+  property("tuple match") {
+    val script =
+      """
+        | let a = if (true) then (1, "abc") else ((true, 1), base58'')
+        | let b = match a {
+        |   case t1: (Int, String)                => t1._2
+        |   case t2: ((Boolean, Int), ByteVector) => t2._1
+        | }
+        | let c = match b {
+        |   case _: String         => true
+        |   case _: (Boolean, Int) => true
+        | }
+        | match b {
+        |   case _: (Boolean, Int) => true
+        |   case _                 => true
+        | }
+        |
+      """.stripMargin
+    val expr = Parser.parseExpr(script).get.value
+    ExpressionCompiler(compilerContextV4, expr) shouldBe 'right
+
+    val script2 =
+      """
+        | let a = if (true) then (1, "abc") else ((true, 1), base58'')
+        | let b = match a {
+        |   case t1: (Int, String)              => t1._2
+        |   case t2: (Boolean, Int, ByteVector) => t2._1
+        | }
+        |
+      """.stripMargin
+    val expr2 = Parser.parseExpr(script2).get.value
+    ExpressionCompiler(compilerContextV4, expr2) should produce(
+      "Matching not exhaustive: " +
+        "possibleTypes are (Int, String), ((Boolean, Int), ByteVector), " +
+        "while matched are (Int, String), (Boolean, Int, ByteVector)"
+    )
+
+    val script3 =
+      """
+        | let a = if (true) then 1 else ("abc", (1, true))
+        | let b = if (true) then if (true) then (1, "abc") else (true, "abc") else (base58'', true, a)
+        |
+        | let c = match b {
+        |   case t1: (Int | Boolean, String)                         => t1._1
+        |   case t2: (ByteVector, Boolean, Int)                      => t2._1
+        |   case t3: (ByteVector, Boolean, (String, (Int, Boolean))) => t3._1
+        | }
+        |
+        | match b {
+        |   case t1: (Int, String)                                         => t1._1
+        |   case t2: (Boolean, String)                                     => t2._1
+        |   case t3: (ByteVector, Boolean, Int | (String, (Int, Boolean))) => t3._1
+        | }
+        |
+      """.stripMargin
+    val expr3 = Parser.parseExpr(script3).get.value
+    ExpressionCompiler(compilerContextV4, expr3) shouldBe 'right
+
+    val script4 =
+      """
+        | let a = if (true) then 1 else ("abc", (1, true))
+        | let b = if (true) then if (true) then (1, "abc") else (true, "abc") else (base58'', true, a)
+        | match b {
+        |   case t1: (Int | Boolean, String)                       => t1._1
+        |   case t2: (ByteVector, Boolean, Int)                    => t2._1
+        |   case t3: (ByteVector, Boolean, (String, Int, Boolean)) => t3._1
+        | }
+        |
+      """.stripMargin
+    val expr4 = Parser.parseExpr(script4).get.value
+    ExpressionCompiler(compilerContextV4, expr4) should produce(
+      "Matching not exhaustive: " +
+        "possibleTypes are (Int, String), (Boolean, String), (ByteVector, Boolean, (String, (Int, Boolean))|Int), " +
+        "while matched are (Boolean|Int, String), (ByteVector, Boolean, Int), (ByteVector, Boolean, (String, Int, Boolean)) " +
+        "in 146-359"
+    )
+
+    val script5 =
+      """
+        | match(if true then (1, 2) else (true, "q")) {
+        |   case _: (Int, Int) => true
+        |   case _: (Boolean, String) => false
+        | }
+      """.stripMargin
+    val expr5 = Parser.parseExpr(script5).get.value
+    ExpressionCompiler(compilerContextV4, expr5) shouldBe 'right
+  }
+
   treeTypeTest("GETTER")(
     ctx = CompilerContext(
       predefTypes = Map(pointType.name -> pointType),
@@ -213,8 +398,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
           Expressions.TRUE(AnyPos),
           Expressions.CONST_LONG(AnyPos, 1),
           Expressions.CONST_STRING(AnyPos, Expressions.PART.VALID(AnyPos, ""))
-        ),
-        Seq.empty
+        )
       ),
       Expressions.FUNCTION_CALL(
         AnyPos,
@@ -282,12 +466,12 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
             IF(
               IF(
                 FUNCTION_CALL(
-                  PureContext._isInstanceOf.header,
+                  FunctionHeader.Native(FunctionIds.ISINSTANCEOF),
                   List(REF("$match0"), CONST_STRING("PointB").explicitGet())
                 ),
                 TRUE,
                 FUNCTION_CALL(
-                  PureContext._isInstanceOf.header,
+                  FunctionHeader.Native(FunctionIds.ISINSTANCEOF),
                   List(REF("$match0"), CONST_STRING("PointA").explicitGet())
                 )
               ),
@@ -346,7 +530,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     ctx = compilerContext,
     expr = Expressions.BLOCK(
       AnyPos,
-      Expressions.LET(AnyPos, Expressions.PART.VALID(AnyPos, "foo"), Expressions.TRUE(AnyPos), Seq.empty),
+      Expressions.LET(AnyPos, Expressions.PART.VALID(AnyPos, "foo"), Expressions.TRUE(AnyPos)),
       Expressions.MATCH(
         AnyPos,
         Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
@@ -447,7 +631,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     ctx = compilerContext,
     expr = Expressions.BLOCK(
       AnyPos,
-      Expressions.LET(AnyPos, Expressions.PART.INVALID(Pos(0, 1), "can't parse"), Expressions.TRUE(AnyPos), Seq.empty),
+      Expressions.LET(AnyPos, Expressions.PART.INVALID(Pos(0, 1), "can't parse"), Expressions.TRUE(AnyPos)),
       Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
     ),
     expectedResult = { res: Either[String, (EXPR, TYPE)] =>
