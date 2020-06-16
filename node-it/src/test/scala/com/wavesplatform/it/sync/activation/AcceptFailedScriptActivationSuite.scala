@@ -118,7 +118,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       all(statuses.map(_.status)) shouldBe "confirmed"
       all(statuses.map(_.applicationStatus.isDefined)) shouldBe true
 
-      val failed = statuses.dropWhile(s => s.applicationStatus.contains("succeed"))
+      val failed = statuses.dropWhile(s => s.applicationStatus.contains("succeeded"))
 
       failed.size should be > 0
       all(failed.flatMap(_.applicationStatus)) shouldBe "script_execution_failed"
@@ -139,9 +139,9 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     def check(): Unit = {
       val txInfo = sender.transactionInfo[JsObject](tx)
       (txInfo \ "id").as[String] shouldBe tx
-      (txInfo \ "applicationStatus").as[String] shouldBe "succeed"
+      (txInfo \ "applicationStatus").as[String] shouldBe "succeeded"
 
-      sender.transactionStatus(Seq(tx)).map(_.applicationStatus) shouldBe Seq(Some("succeed"))
+      sender.transactionStatus(Seq(tx)).map(_.applicationStatus) shouldBe Seq(Some("succeeded"))
     }
 
     check() // liquid

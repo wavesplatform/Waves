@@ -58,7 +58,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
         (sender.transactionInfo[JsObject](s.id) \ "applicationStatus").asOpt[String] shouldBe s.applicationStatus
       }
 
-      val failed = statuses.dropWhile(s => s.applicationStatus.contains("succeed"))
+      val failed = statuses.dropWhile(s => s.applicationStatus.contains("succeeded"))
       failed.size should be > 0
 
       all(failed.flatMap(_.applicationStatus)) shouldBe "script_execution_failed"
