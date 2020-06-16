@@ -179,7 +179,7 @@ object InvokeScriptTransactionDiff {
   ): Either[ScriptExecutionError, (ScriptResult, EvaluationContext[Environment, Id], Log[Id])] = {
     val wavesContext = WavesContext.build(directives)
     val ctx =
-      PureContext.build(Global, version).withEnvironment[Environment] |+|
+      PureContext.build(Global, directives).withEnvironment[Environment] |+|
         CryptoContext.build(Global, version).withEnvironment[Environment] |+|
         wavesContext.copy(vars = Map())
 

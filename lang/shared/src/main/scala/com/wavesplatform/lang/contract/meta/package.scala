@@ -17,11 +17,9 @@ package object meta {
 
   object MetaMapperStrategyV1
     extends FunctionTypeMapper(unionTypeMapper, V1)
-    with TypesTree
     with MetaMapperStrategy[V1.Self]
 
   object MetaMapperStrategyV2
     extends FunctionTypeMapper(listTypeMapper, V2)
-    with TypesTree
     with MetaMapperStrategy[V2.Self]
 }
