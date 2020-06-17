@@ -4,13 +4,13 @@ import java.io.File
 
 import com.wavesplatform.Application
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{LevelDBWriter, openDB}
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
-import monix.execution.UncaughtExceptionReporter
-import monix.reactive.Observer
 import org.iq80.leveldb.DB
 import org.openjdk.jmh.annotations.{Param, Scope, State, TearDown}
 
@@ -24,11 +24,9 @@ abstract class DBState extends ScorexLogging {
   lazy val db: DB = openDB(settings.dbSettings.directory)
 
   lazy val levelDBWriter: LevelDBWriter =
-    new LevelDBWriter(
+    LevelDBWriter.readOnly(
       db,
-      Observer.empty(UncaughtExceptionReporter.default),
-      settings.blockchainSettings,
-      settings.dbSettings.copy(maxCacheSize = 1)
+      settings.copy(dbSettings = settings.dbSettings.copy(maxCacheSize = 1))
     )
 
   AddressScheme.current = new AddressScheme { override val chainId: Byte = 'W' }
@@ -38,7 +36,9 @@ abstract class DBState extends ScorexLogging {
     Coeval.raiseError(new NotImplementedError("`tx` is not implemented")),
     Coeval(levelDBWriter.height),
     levelDBWriter,
-    Coeval.raiseError(new NotImplementedError("`this` is not implemented"))
+    Coeval.raiseError(new NotImplementedError("`this` is not implemented")),
+    DirectiveSet.contractDirectiveSet,
+    ByteStr.empty
   )
 
   @TearDown

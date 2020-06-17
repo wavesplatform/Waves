@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{DBExt, Keys}
+import com.wavesplatform.database.{AddressId, DBExt, KeyTags, Keys}
 import com.wavesplatform.lang.v1.traits.DataType
 import com.wavesplatform.lang.v1.traits.DataType.{Boolean, ByteArray, Long}
 import com.wavesplatform.lang.v1.traits.domain.Recipient
@@ -78,7 +78,7 @@ class DBStateBenchmark {
       bh.consume(st.environment.transferTransactionById(st.allTransactions(transactionNr)))
     } else {
       val transactionNr = Random.nextInt(st.transferTransactions.size)
-      bh.consume(st.environment.transferTransactionById(st.transferTransactions(transactionNr)))
+      bh.consume(st.environment.transferTransactionById(st.transferTransactions(transactionNr).arr))
     }
   }
 
@@ -122,7 +122,7 @@ class DBStateBenchmark {
   @Benchmark
   def biggestDataEntries(bh: Blackhole, st: St): Unit = {
     val address = Recipient.Address(
-      Address.fromString("3PFfUN4dRAyMN4nxYayES1CRZHJjS8JVCHf").explicitGet().bytes
+      ByteStr(Address.fromString("3PFfUN4dRAyMN4nxYayES1CRZHJjS8JVCHf").explicitGet().bytes)
     )
     val checkBinaryOrString = Random.nextBoolean()
     if (checkBinaryOrString) {
@@ -137,7 +137,7 @@ object DBStateBenchmark {
   class St extends DBState {
     lazy val allAliases: Vector[Alias] = {
       val builder = Vector.newBuilder[Alias]
-      db.iterateOver(23: Short) { e =>
+      db.iterateOver(KeyTags.AddressIdOfAlias) { e =>
         builder += Alias.fromBytes(e.getKey.drop(2)).explicitGet()
       }
       builder.result()
@@ -145,21 +145,23 @@ object DBStateBenchmark {
 
     lazy val allAssets: Vector[Array[Byte]] = {
       val builder = Vector.newBuilder[Array[Byte]]
-      db.iterateOver(10: Short) { e =>
+      db.iterateOver(KeyTags.AssetDetailsHistory) { e =>
         builder += e.getKey.drop(2)
       }
       builder.result()
     }
 
     lazy val allAddresses: IndexedSeq[Recipient.Address] = {
-      val maxAddressId = db.get(Keys.lastAddressId).getOrElse(BigInt(0L)).max(100)
-      (1 to (maxAddressId.toInt, 100))
-        .map(addressId => Recipient.Address(db.get(Keys.idToAddress(AddressId(BigInt(addressId)))).bytes))
+      val builder = Vector.newBuilder[Recipient.Address]
+      db.iterateOver(KeyTags.AddressId) { entry =>
+        builder += Recipient.Address(ByteStr(entry.getKey.drop(2)))
+      }
+      builder.result()
     }
 
-    lazy val allTransactions: IndexedSeq[ByteStr] = {
+    lazy val allTransactions: IndexedSeq[Array[Byte]] = {
       val txCountAtHeight =
-        Map.empty[Int, Int].withDefault(h => db.get(Keys.blockHeaderAndSizeAt(Height(h))).fold(0)(_._1.transactionCount))
+        Map.empty[Int, Int].withDefault(h => db.get(Keys.blockMetaAt(Height(h))).fold(0)(_.transactionCount))
 
       (1 to (environment.height.toInt, 100))
         .flatMap { h =>
@@ -167,13 +169,13 @@ object DBStateBenchmark {
           if (txCount == 0)
             None
           else
-            db.get(Keys.transactionAt(Height(h), TxNum(Random.nextInt(txCount).toShort))).map(_.id())
+            db.get(Keys.transactionAt(Height(h), TxNum(Random.nextInt(txCount).toShort))).map(_._1.id().arr)
         }
     }
 
     lazy val dataEntries: IndexedSeq[(DataEntry[_], Recipient.Address)] = {
       val txCountAtHeight =
-        Map.empty[Int, Int].withDefault(h => db.get(Keys.blockHeaderAndSizeAt(Height(h))).fold(0)(_._1.transactionCount))
+        Map.empty[Int, Int].withDefault(h => db.get(Keys.blockMetaAt(Height(h))).fold(0)(_.transactionCount))
 
       (1 to (environment.height.toInt, 10))
         .flatMap { h =>
@@ -182,10 +184,10 @@ object DBStateBenchmark {
             None
           else
             db.get(Keys.transactionAt(Height(h), TxNum(Random.nextInt(txCount).toShort)))
-              .collect { case dataTx: DataTransaction if dataTx.data.nonEmpty =>
+              .collect { case (dataTx: DataTransaction, true) if dataTx.data.nonEmpty =>
                 (
                   dataTx.data(Random.nextInt(dataTx.data.length)),
-                  Recipient.Address(dataTx.sender.toAddress.bytes)
+                  Recipient.Address(ByteStr(dataTx.sender.toAddress.bytes))
                 )
               }
         }
@@ -193,7 +195,7 @@ object DBStateBenchmark {
 
     lazy val transferTransactions: IndexedSeq[ByteStr] = {
       val txCountAtHeight =
-        Map.empty[Int, Int].withDefault(h => db.get(Keys.blockHeaderAndSizeAt(Height(h))).fold(0)(_._1.transactionCount))
+        Map.empty[Int, Int].withDefault(h => db.get(Keys.blockMetaAt(Height(h))).fold(0)(_.transactionCount))
 
       (1 to (environment.height.toInt, 100))
         .flatMap { h =>
@@ -202,7 +204,7 @@ object DBStateBenchmark {
             None
           else
             db.get(Keys.transactionAt(Height(h), TxNum(Random.nextInt(txCount).toShort)))
-              .collect { case transferTx: TransferTransaction => transferTx.id() }
+              .collect { case (transferTx: TransferTransaction, true) => transferTx.id() }
         }
     }
 
