@@ -28,9 +28,10 @@ class WavesEnvironment(
     in: Coeval[Environment.InputEntity],
     h: Coeval[Int],
     blockchain: Blockchain,
-    address: Coeval[ByteStr],
+    val tthis: Environment.Tthis,
     ds: DirectiveSet,
-    override val txId: ByteStr
+    override val txId: ByteStr,
+    override val dAppAlias: Boolean = false
 ) extends Environment[Id] {
   import com.wavesplatform.lang.v1.traits.Environment._
 
@@ -43,7 +44,7 @@ class WavesEnvironment(
       .transactionInfo(ByteStr(id))
       .filter(_._3)
       .map(_._2)
-      .map(tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, Some(ByteStr.empty))).explicitGet())
+      .map(tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, tthis)).explicitGet())
 
   override def inputEntity: InputEntity =
     in.value
@@ -116,8 +117,6 @@ class WavesEnvironment(
 
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
     blockchain.transactionInfo(ByteStr(id)).filter(_._3).map(_._1.toLong)
-
-  override def tthis: Address = Recipient.Address(address())
 
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
     for {

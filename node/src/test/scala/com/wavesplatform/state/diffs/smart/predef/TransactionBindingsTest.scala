@@ -676,7 +676,7 @@ class TransactionBindingsTest
         CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
         WavesContext.build(DirectiveSet(V2, Asset, Expression).explicitGet())
 
-    val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(???), directives, ByteStr.empty)
+    val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coproduct[Environment.Tthis](Environment.AssetId(Array())), directives, ByteStr.empty)
     for {
       compileResult <- compiler.ExpressionCompiler(ctx.compilerContext, expr)
       (typedExpr, _) = compileResult
@@ -701,10 +701,10 @@ class TransactionBindingsTest
 
     val env = new WavesEnvironment(
       chainId,
-      Coeval(buildThisValue(t, blockchain, directives, None).explicitGet()),
+      Coeval(buildThisValue(t, blockchain, directives, Coproduct[Environment.Tthis](Environment.AssetId(Array()))).explicitGet()),
       null,
       EmptyBlockchain,
-      Coeval(null),
+      Coproduct[Environment.Tthis](Environment.AssetId(Array())),
       directives,
       ByteStr.empty
     )

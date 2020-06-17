@@ -28,8 +28,7 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
-  private val environment =
-    new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(null), DirectiveSet.contractDirectiveSet, ByteStr.empty)
+  private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, null, DirectiveSet.contractDirectiveSet, ByteStr.empty)
 
   private def estimate(
       expr: Terms.EXPR,

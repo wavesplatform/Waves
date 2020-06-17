@@ -37,7 +37,7 @@ package object utils {
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
     override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails]    = ???
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
-    override def tthis: Recipient.Address                                                                        = ???
+    override def tthis: Environment.Tthis                                                                        = ???
     override def multiPaymentAllowed: Boolean                                                                    = true
     override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
   }
