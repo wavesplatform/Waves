@@ -16,7 +16,6 @@ case class Settings(
 
 object Settings {
   def fromConfig(config: Config): Settings = {
-    implicit val nameMapper: NameMapper = net.ceedubs.ficus.readers.namemappers.HyphenNameMapper
     import net.ceedubs.ficus.readers.ArbitraryTypeReader._
     config.as[Settings]("waves.benchmark.state")
   }
