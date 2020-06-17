@@ -16,12 +16,12 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.NonPositiveAmount
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, Verifier}
-import com.wavesplatform.{TransactionGen, crypto}
+import com.wavesplatform.{EitherMatchers, TransactionGen, crypto}
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.{JsObject, Json}
 
-class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks with Matchers with EitherMatchers with TransactionGen {
 
   val publicKey = "73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK"
 
@@ -37,8 +37,8 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       deser.timestamp shouldEqual transaction.timestamp
       deser.proofs shouldEqual transaction.proofs
       bytes shouldEqual deser.bytes()
-      Verifier.verifyAsEllipticCurveSignature(transaction).explicitGet()
-      Verifier.verifyAsEllipticCurveSignature(deser).explicitGet() // !!!!!!!!!!!!!!!
+      Verifier.verifyAsEllipticCurveSignature(transaction) should beRight
+      Verifier.verifyAsEllipticCurveSignature(deser) should beRight // !!!!!!!!!!!!!!!
     }
   }
 
@@ -218,7 +218,8 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       payment = Some(Seq(Payment(1, Waves))),
       dApp = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,
-      proofs = Proofs(List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").map(s => ByteStr.decodeBase58(s).get))
+      proofs =
+        Proofs(List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").map(s => ByteStr.decodeBase58(s).get))
     )
     req.toTx.explicitGet()
     AddressScheme.current = DefaultAddressScheme
@@ -242,22 +243,24 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
 
   property(s"can call a func with ARR") {
     val pk = PublicKey.fromBase58String(publicKey).explicitGet()
-    InvokeScriptTransaction.create(
-      1.toByte,
-      pk,
-      pk.toAddress,
-      Some(
-        Terms.FUNCTION_CALL(
-          FunctionHeader.User("foo"),
-          List(ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L)), false).explicitGet())
-        )
-      ),
-      Seq(),
-      1,
-      Waves,
-      1,
-      Proofs.empty
-    ).explicitGet()
+    InvokeScriptTransaction
+      .create(
+        1.toByte,
+        pk,
+        pk.toAddress,
+        Some(
+          Terms.FUNCTION_CALL(
+            FunctionHeader.User("foo"),
+            List(ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L)), false).explicitGet())
+          )
+        ),
+        Seq(),
+        1,
+        Waves,
+        1,
+        Proofs.empty
+      )
+      .explicitGet()
   }
 
   property(s"can't call a func with non native(simple) args - CaseObj") {
@@ -314,7 +317,8 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       payment = Some(Seq(Payment(0, Waves))),
       dApp = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,
-      proofs = Proofs(List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").map(s => ByteStr.decodeBase58(s).get))
+      proofs =
+        Proofs(List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").map(s => ByteStr.decodeBase58(s).get))
     )
     req.toTx shouldBe Left(NonPositiveAmount(0, "Waves"))
     AddressScheme.current = DefaultAddressScheme
@@ -336,7 +340,8 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       payment = Some(Seq(Payment(-1, Waves))),
       dApp = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,
-      proofs = Proofs(List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").map(s => ByteStr.decodeBase58(s).get))
+      proofs =
+        Proofs(List("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").map(s => ByteStr.decodeBase58(s).get))
     )
     req.toTx shouldBe Left(NonPositiveAmount(-1, "Waves"))
     AddressScheme.current = DefaultAddressScheme

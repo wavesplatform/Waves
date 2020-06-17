@@ -71,6 +71,7 @@ private object UtxPoolSpecification {
 class UtxPoolSpecification
     extends FreeSpec
     with Matchers
+    with EitherMatchers
     with MockFactory
     with PropertyChecks
     with TransactionGen
@@ -107,7 +108,7 @@ class UtxPoolSpecification
 
     val dbContext            = TempDB(settings.blockchainSettings.functionalitySettings, settings.dbSettings)
     val (bcu, levelDBWriter) = TestStorageFactory(settings, dbContext.db, new TestTime, ignoreSpendableBalanceChanged, ignoreBlockchainUpdateTriggers)
-    bcu.processBlock(Block.genesis(genesisSettings).explicitGet()).explicitGet()
+    bcu.processBlock(Block.genesis(genesisSettings).explicitGet()) should beRight
     bcu
   }
 
@@ -350,7 +351,7 @@ class UtxPoolSpecification
       preconditions = preconditionBlocks(bcu.lastBlockId.get, sender, time)
     } yield {
       // val smartAccountsFs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0))
-      preconditions.foreach(b => bcu.processBlock(b).explicitGet())
+      preconditions.foreach(b => bcu.processBlock(b) should beRight)
       val utx = new UtxPoolImpl(
         time,
         bcu,
@@ -374,14 +375,14 @@ class UtxPoolSpecification
     "does not add new transactions when full" in utxTest(
       UtxSettings(1, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
     ) { (txs, utx, _) =>
-      utx.putIfNew(txs.head).resultE.explicitGet()
+      utx.putIfNew(txs.head).resultE should beRight
       all(txs.tail.map(t => utx.putIfNew(t).resultE)) should produce("pool size limit")
     }
 
     "does not add new transactions when full in bytes" in utxTest(
       UtxSettings(999999, 152, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
     ) { (txs, utx, _) =>
-      utx.putIfNew(txs.head).resultE.explicitGet()
+      utx.putIfNew(txs.head).resultE should beRight
       all(txs.tail.map(t => utx.putIfNew(t).resultE)) should produce("pool bytes size limit")
     }
 
@@ -401,7 +402,7 @@ class UtxPoolSpecification
                 UtxSettings(1, 152, 1, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = allowSkipChecks == 1)
               val utx = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, utxSettings, enablePriorityPool = true)
 
-              utx.putIfNew(headTransaction).resultE.explicitGet()
+              utx.putIfNew(headTransaction).resultE should beRight
               utx.putIfNew(vipTransaction).resultE should matchPattern {
                 case Right(_) if allowSkipChecks == 1 =>
                 case Left(_)                          =>
@@ -420,7 +421,7 @@ class UtxPoolSpecification
 
     "packUnconfirmed result is limited by constraint" in forAll(dualTxGen) {
       case (utx, _, txs, _) =>
-        txs.foreach(tx => utx.putIfNew(tx).resultE.explicitGet())
+        txs.foreach(tx => utx.putIfNew(tx).resultE should beRight)
         utx.all.size shouldEqual txs.size
 
         val maxNumber             = Math.max(utx.all.size / 2, 3)
@@ -433,7 +434,7 @@ class UtxPoolSpecification
 
     "evicts expired transactions when packUnconfirmed is called" in forAll(dualTxGen) {
       case (utx, time, txs, _) =>
-        txs.foreach(tx => utx.putIfNew(tx).resultE.explicitGet())
+        txs.foreach(tx => utx.putIfNew(tx).resultE should beRight)
         utx.all.size shouldEqual txs.size
 
         time.advance(maxAge + 1000.millis)
@@ -445,7 +446,7 @@ class UtxPoolSpecification
 
     "evicts one of mutually invalid transactions when packUnconfirmed is called" in forAll(twoOutOfManyValidPayments) {
       case (utx, time, txs, offset) =>
-        txs.foreach(tx => utx.putIfNew(tx).resultE.explicitGet())
+        txs.foreach(tx => utx.putIfNew(tx).resultE should beRight)
         utx.all.size shouldEqual txs.size
 
         time.advance(offset)
@@ -488,7 +489,7 @@ class UtxPoolSpecification
           }
 
         val (_, block, scripted, unscripted) = generateBlock.sample.get
-        d.blockchainUpdater.processBlock(block).explicitGet()
+        d.blockchainUpdater.processBlock(block) should beRight
 
         val utx = new UtxPoolImpl(
           ntpTime,
@@ -559,7 +560,7 @@ class UtxPoolSpecification
       "takes into account added txs" in forAll(withValidPaymentsNotAdded) {
         case (sender, _, utxPool, txs, _, _) =>
           val emptyPf = utxPool.pessimisticPortfolio(sender.toAddress)
-          txs.foreach(utxPool.putIfNew(_).resultE.explicitGet())
+          txs.foreach(utxPool.putIfNew(_).resultE should beRight)
           utxPool.pessimisticPortfolio(sender.toAddress) should not be emptyPf
       }
 
@@ -587,7 +588,7 @@ class UtxPoolSpecification
         val transferGen = Gen.oneOf(withBlacklistedAndAllowedByRule, massTransferWithBlacklisted(allowRecipients = true))
         forAll(transferGen) {
           case (_, utxPool, txs) =>
-            txs.foreach(utxPool.putIfNew(_).resultE.explicitGet())
+            txs.foreach(utxPool.putIfNew(_).resultE should beRight)
             utxPool.all.size shouldEqual txs.size
         }
       }
@@ -642,7 +643,7 @@ class UtxPoolSpecification
               UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
             val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings, true, nanoTimeSource = () => nanoTimeSource())
 
-            utxPool.putIfNew(transfer).resultE.explicitGet()
+            utxPool.putIfNew(transfer).resultE should beRight
             val (tx, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Limit(100 nanos))
             tx.get should contain(transfer)
         }
@@ -693,8 +694,8 @@ class UtxPoolSpecification
             val tb = TestBlock.create(Nil)
             (blockchain.blockHeader _).when(*).returning(Some(SignedBlockHeader(tb.header, tb.signature)))
 
-            utx.putIfNew(tx1).resultE.explicitGet()
-            rest.foreach(utx.putIfNew(_).resultE.explicitGet())
+            utx.putIfNew(tx1).resultE should beRight
+            rest.foreach(utx.putIfNew(_).resultE should beRight)
             utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited) should matchPattern {
               case (Some(Seq(`tx1`)), _) => // Success
             }
@@ -750,7 +751,7 @@ class UtxPoolSpecification
           val blockchain = createState(scripted.head.sender.toAddress)
           val utx =
             new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, enablePriorityPool = true)
-          utx.putIfNew(tx1).resultE.explicitGet()
+          utx.putIfNew(tx1).resultE should beRight
           val minedTxs = scripted ++ nonScripted
           utx.addAndCleanup(minedTxs)
 
@@ -780,7 +781,7 @@ class UtxPoolSpecification
 
           val expectedTxs2 = expectedTxs1 ++ left.sorted(TransactionsOrdering.InUTXPool)
           utx.removeAll(expectedTxs2)
-          left.foreach(utx.putIfNew(_).resultE.explicitGet())
+          left.foreach(utx.putIfNew(_).resultE should beRight)
           utx.addAndCleanup(expectedTxs1)
           utx.all shouldBe expectedTxs2
           assertPortfolios(utx, expectedTxs2)
@@ -807,7 +808,7 @@ class UtxPoolSpecification
             )
 
           utx.addAndCleanup(nonScripted)
-          nonScripted.foreach(utx.putIfNew(_).resultE.explicitGet())
+          nonScripted.foreach(utx.putIfNew(_).resultE should beRight)
           utx.invokePrivate(nonPriorityTransactions()) shouldBe empty
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(nonScripted)
           utx.invokePrivate(nonPriorityTransactions()) shouldBe empty
@@ -849,7 +850,7 @@ class UtxPoolSpecification
           val utx =
             new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, enablePriorityPool = true)
           utx.addAndCleanup(Seq(tx1))
-          utx.invokePrivate(putNewTx(tx2, false)).resultE.explicitGet()
+          utx.invokePrivate(putNewTx(tx2, false)).resultE should beRight
           utx.invokePrivate(nonPriorityTransactions()) shouldBe Seq(tx2)
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(tx1 :: tx2 :: Nil)
       }
@@ -923,20 +924,20 @@ class UtxPoolSpecification
 
             d.appendBlock(genBlock) shouldBe Some(Nil)
             d.appendBlock(block1) shouldBe Some(Nil)
-            mbs1.foreach(microBlockAppender(_).runSyncUnsafe().explicitGet())
+            mbs1.foreach(microBlockAppender(_).runSyncUnsafe() should beRight)
 
-            mbs2.head.transactionData.foreach(utx.putIfNew(_).resultE.explicitGet())
-            extAppender(Seq(block2)).runSyncUnsafe().explicitGet()
+            mbs2.head.transactionData.foreach(utx.putIfNew(_).resultE should beRight)
+            extAppender(Seq(block2)).runSyncUnsafe() should beRight
             val expectedTxs1 = mbs1.last.transactionData ++ mbs2.head.transactionData.sorted(TransactionsOrdering.InUTXPool)
             utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(expectedTxs1)
 
-            mbs2.foreach(microBlockAppender(_).runSyncUnsafe().explicitGet())
+            mbs2.foreach(microBlockAppender(_).runSyncUnsafe() should beRight)
             utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(mbs1.last.transactionData)
 
-            extAppender(Seq(block3)).runSyncUnsafe().explicitGet()
+            extAppender(Seq(block3)).runSyncUnsafe() should beRight
             utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(mbs1.last.transactionData)
 
-            extAppender(Seq(block4)).runSyncUnsafe().explicitGet()
+            extAppender(Seq(block4)).runSyncUnsafe() should beRight
             val expectedTxs2 = mbs1.flatMap(_.transactionData) ++ mbs2.head.transactionData ++ block3.transactionData
             utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(expectedTxs2)
             utx.close()

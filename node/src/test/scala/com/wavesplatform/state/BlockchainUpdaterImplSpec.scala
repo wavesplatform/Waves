@@ -18,12 +18,20 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Time
-import com.wavesplatform.{NTPTime, RequestGen, WithDB}
+import com.wavesplatform.{EitherMatchers, NTPTime, RequestGen, WithDB}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FreeSpec, Matchers}
 
-class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with RequestGen with NTPTime with DBCacheSettings with MockFactory {
+class BlockchainUpdaterImplSpec
+    extends FreeSpec
+    with Matchers
+    with EitherMatchers
+    with WithDB
+    with RequestGen
+    with NTPTime
+    with DBCacheSettings
+    with MockFactory {
 
   private val FEE_AMT = 1000000L
 
@@ -47,7 +55,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
       val (account, blocks) = gen(ntpTime).sample.get
 
       blocks.foreach { block =>
-        bcu.processBlock(block).explicitGet()
+        bcu.processBlock(block) should beRight
       }
 
       bcu.shutdown()
@@ -102,8 +110,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
         inSequence {
           (triggersMock.onProcessBlock _)
-            .expects(where {
-              (block, diff, _, bc) =>
+            .expects(where { (block, diff, _, bc) =>
               bc.height == 0 &&
               block.transactionData.length == 1 &&
               diff.parentDiff.portfolios.head._2.balance == 0 &&
@@ -112,8 +119,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
             .once()
 
           (triggersMock.onProcessBlock _)
-            .expects(where {
-              (block, diff, _, bc) =>
+            .expects(where { (block, diff, _, bc) =>
               bc.height == 1 &&
               block.transactionData.length == 5 &&
               // miner reward, no NG — all txs fees
@@ -138,8 +144,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
         inSequence {
           (triggersMock.onProcessBlock _)
-            .expects(where {
-              (block, diff, _, bc) =>
+            .expects(where { (block, diff, _, bc) =>
               bc.height == 0 &&
               block.transactionData.length == 1 &&
               diff.parentDiff.portfolios.head._2.balance == 0 &&
@@ -148,8 +153,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
             .once()
 
           (triggersMock.onProcessBlock _)
-            .expects(where {
-              (block, diff, _, bc) =>
+            .expects(where { (block, diff, _, bc) =>
               bc.height == 1 &&
               block.transactionData.length == 5 &&
               // miner reward, no NG — all txs fees
@@ -159,8 +163,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
             .once()
 
           (triggersMock.onProcessBlock _)
-            .expects(where {
-              (block, diff, _, bc) =>
+            .expects(where { (block, diff, _, bc) =>
               bc.height == 2 &&
               block.transactionData.length == 4 &&
               // miner reward, no NG — all txs fees
@@ -195,7 +198,8 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
         val defaultWriter =
           TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, enableNG(functionalitySettings))
-        val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, enableNG(wavesSettings), ntpTime, triggersMock, (_, _) => Seq.empty)
+        val bcu =
+          new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, enableNG(wavesSettings), ntpTime, triggersMock, (_, _) => Seq.empty)
 
         try {
           val (genesis, transfers)       = preconditions(0).sample.get
@@ -205,8 +209,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
           inSequence {
             // genesis
             (triggersMock.onProcessBlock _)
-              .expects(where {
-                (block, diff, _, bc) =>
+              .expects(where { (block, diff, _, bc) =>
                 bc.height == 0 &&
                 block.transactionData.length == 1 &&
                 diff.parentDiff.portfolios.head._2.balance == 0 &&
@@ -215,8 +218,8 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
               .once()
 
             // microblock 1
-            (triggersMock.onProcessMicroBlock _).expects(where {
-                (microBlock, diff, bc, _) =>
+            (triggersMock.onProcessMicroBlock _)
+              .expects(where { (microBlock, diff, bc, _) =>
                 bc.height == 1 &&
                 microBlock.transactionData.length == 2 &&
                 // miner reward, no NG — all txs fees
@@ -226,8 +229,8 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
               .once()
 
             // microblock 2
-            (triggersMock.onProcessMicroBlock _).expects(where {
-                (microBlock, diff, bc, _) =>
+            (triggersMock.onProcessMicroBlock _)
+              .expects(where { (microBlock, diff, bc, _) =>
                 bc.height == 1 &&
                 microBlock.transactionData.length == 1 &&
                 // miner reward, no NG — all txs fees
@@ -238,16 +241,14 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
             // rollback microblock
             (triggersMock.onMicroBlockRollback _)
-              .expects(where {
-                (toSig, height) =>
+              .expects(where { (toSig, height) =>
                 height == 1 && toSig == microBlocks1And2.head.totalResBlockSig
               })
               .once()
 
             // next keyblock
             (triggersMock.onProcessBlock _)
-              .expects(where {
-                (block, _, _, bc) =>
+              .expects(where { (block, _, _, bc) =>
                 bc.height == 1 &&
                 block.header.reference == microBlocks1And2.head.totalResBlockSig
               })
@@ -255,18 +256,17 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
             // microblock 3
             (triggersMock.onProcessMicroBlock _)
-              .expects(where {
-                (microBlock, _, bc, _) =>
+              .expects(where { (microBlock, _, bc, _) =>
                 bc.height == 2 && microBlock.reference == block2.signature
               })
               .once()
           }
 
-          bcu.processBlock(block1).explicitGet()
-          bcu.processMicroBlock(microBlocks1And2.head).explicitGet()
-          bcu.processMicroBlock(microBlocks1And2.last).explicitGet()
-          bcu.processBlock(block2).explicitGet() // this should remove previous microblock
-          bcu.processMicroBlock(microBlock3.head).explicitGet()
+          bcu.processBlock(block1) should beRight
+          bcu.processMicroBlock(microBlocks1And2.head) should beRight
+          bcu.processMicroBlock(microBlocks1And2.last) should beRight
+          bcu.processBlock(block2) should beRight // this should remove previous microblock
+          bcu.processMicroBlock(microBlock3.head) should beRight
           bcu.shutdown()
         } finally {
           bcu.shutdown()
