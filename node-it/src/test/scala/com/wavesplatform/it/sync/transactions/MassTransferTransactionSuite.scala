@@ -10,7 +10,6 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.transfer.Attachment.Bin
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, Transfer}
 import com.wavesplatform.transaction.transfer.TransferTransaction.MaxAttachmentSize
 import com.wavesplatform.transaction.transfer._
@@ -132,7 +131,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite /*with CancelAft
           fee: Long = calcMassTransferFee(1),
           timestamp: Long = System.currentTimeMillis,
           attachment: Array[Byte] = Array.emptyByteArray
-      ) = {
+      ): (SignedMassTransferRequest, Option[ByteStr]) = {
         val txEi = for {
           parsedTransfers <- MassTransferTransaction.parseTransfersList(transfers)
           tx <- MassTransferTransaction.selfSigned(
@@ -142,7 +141,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite /*with CancelAft
             parsedTransfers,
             fee,
             timestamp,
-            Some(Attachment.Bin(attachment))
+            ByteStr(attachment)
           )
         } yield tx
 
@@ -155,17 +154,12 @@ class MassTransferTransactionSuite extends BaseTransactionSuite /*with CancelAft
           transfers,
           fee,
           timestamp,
-          Some(Attachment.Bin(attachment)),
+          ByteStr(attachment),
           signature
         )
 
         (req, idOpt)
       }
-
-      import com.wavesplatform.api.http.requests.proofsWrites
-
-      implicit val w =
-        Json.writes[SignedMassTransferRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt)))
 
       val (balance1, eff1) = miner.accountBalances(firstAddress)
       val invalidTransfers = Seq(
@@ -177,7 +171,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite /*with CancelAft
         (request(transfers = List(Transfer(secondAddress, -1))), "One of the transfers has negative amount"),
         (request(fee = 0), "insufficient fee"),
         (request(fee = 99999), "Fee .* does not exceed minimal value"),
-        (request(attachment = ("a" * (MaxAttachmentSize + 1)).getBytes("UTF-8")), "Too big sequences requested")
+        (request(attachment = ("a" * (MaxAttachmentSize + 1)).getBytes("UTF-8")), "exceeds maximum length")
       )
 
       for (((req, idOpt), diag) <- invalidTransfers) {
@@ -274,8 +268,6 @@ class MassTransferTransactionSuite extends BaseTransactionSuite /*with CancelAft
   }
 
   test("reporting MassTransfer transactions") {
-    implicit val mtFormat: Format[MassTransferRequest] = Json.format[MassTransferRequest]
-
     for (v <- massTransferTxSupportedVersions) {
       val transfers = List(Transfer(firstAddress, 5.waves), Transfer(secondAddress, 2.waves), Transfer(thirdAddress, 3.waves))
       val txId      = sender.massTransfer(firstAddress, transfers, 300000, version = v).id
@@ -339,76 +331,6 @@ class MassTransferTransactionSuite extends BaseTransactionSuite /*with CancelAft
           .getOrElse(fail(s"Can't find a mass transfer transaction $txId"))
 
       assert((recipientTx \ "transfers").as[Seq[Transfer]].size == 2)
-    }
-  }
-
-  test("able to pass typed attachment to transfer transaction V2") {
-    val transfers = List(Transfer(firstAddress, transferAmount))
-    val txWithStringAtt =
-      miner.massTransfer(
-        firstAddress,
-        transfers,
-        calcMassTransferFee(1),
-        version = TxVersion.V2,
-        typedAttachment = Some(Attachment.Str("qwe")),
-        waitForTx = true
-      )
-    val txWithStringAttInfo = sender.transactionInfo[MassTransferTransactionInfo](txWithStringAtt.id)
-    txWithStringAttInfo.typedAttachment shouldBe Some(Attachment.Str("qwe"))
-    txWithStringAtt.typedAttachment shouldBe Some(Attachment.Str("qwe"))
-
-    val txWithBoolAtt =
-      miner.massTransfer(
-        firstAddress,
-        transfers,
-        calcMassTransferFee(1),
-        version = TxVersion.V2,
-        typedAttachment = Some(Attachment.Bool(true)),
-        waitForTx = true
-      )
-    val txWithBoolAttInfo = sender.transactionInfo[MassTransferTransactionInfo](txWithBoolAtt.id)
-    txWithBoolAttInfo.typedAttachment shouldBe Some(Attachment.Bool(true))
-
-    val txWithIntAtt =
-      miner.massTransfer(
-        firstAddress,
-        transfers,
-        calcMassTransferFee(1),
-        version = TxVersion.V2,
-        typedAttachment = Some(Attachment.Num(123)),
-        waitForTx = true
-      )
-    val txWithIntAttInfo = sender.transactionInfo[MassTransferTransactionInfo](txWithIntAtt.id)
-    txWithIntAttInfo.typedAttachment shouldBe Some(Attachment.Num(123))
-
-    val txWithBinaryAtt =
-      miner.massTransfer(
-        firstAddress,
-        transfers,
-        calcMassTransferFee(1),
-        version = TxVersion.V2,
-        typedAttachment = Some(Attachment.Bin(Array[Byte](127.toByte, 0, 1, 1))),
-        waitForTx = true
-      )
-    val txWithBinaryAttInfo = sender.transactionInfo[MassTransferTransactionInfo](txWithBinaryAtt.id)
-    txWithBinaryAttInfo.typedAttachment.get.asInstanceOf[Bin].value shouldBe Attachment.Bin(Array[Byte](127.toByte, 0, 1, 1)).value
-  }
-  test("not able to pass typed attachment to mass transfer transaction V1") {
-    assertApiError(
-      sender.signAndBroadcast(
-        Json.obj(
-          "type"       -> MassTransferTransaction.typeId,
-          "assetId"    -> JsNull,
-          "sender"     -> firstAddress,
-          "fee"        -> calcMassTransferFee(1),
-          "version"    -> 1,
-          "transfers"  -> Json.toJson(List(Transfer(firstAddress, 1000))),
-          "attachment" -> Json.toJson(Attachment.Str("somestring"))
-        )
-      )
-    ) { error =>
-      error.id shouldBe 199
-      error.message shouldBe "Typed attachment not allowed"
     }
   }
 }

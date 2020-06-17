@@ -160,7 +160,7 @@ class LevelDBWriterSpec
 
   def createTransfer(master: KeyPair, recipient: Address, ts: Long): TransferTransaction = {
     TransferTransaction
-      .selfSigned(1.toByte, master, recipient, Waves, ENOUGH_AMT / 10, Waves, 1000000, None, ts)
+      .selfSigned(1.toByte, master, recipient, Waves, ENOUGH_AMT / 10, Waves, 1000000, ByteStr.empty, ts)
       .explicitGet()
   }
 
