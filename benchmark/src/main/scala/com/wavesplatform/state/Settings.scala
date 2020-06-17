@@ -2,7 +2,6 @@ package com.wavesplatform.state
 
 import com.typesafe.config.Config
 import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.NameMapper
 
 case class Settings(
     networkConfigFile: String,
