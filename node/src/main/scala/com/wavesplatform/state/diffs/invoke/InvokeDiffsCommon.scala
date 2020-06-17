@@ -18,6 +18,7 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
 import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.DiffsCommon
@@ -455,7 +456,7 @@ object InvokeDiffsCommon {
         blockchain,
         script,
         isAssetScript = true,
-        scriptContainerAddress = if (blockchain.passCorrectAssetId) assetId else ByteStr(tx.dAppAddressOrAlias.bytes)
+        scriptContainerAddress = if (blockchain.passCorrectAssetId) Coproduct[Environment.Tthis](Environment.AssetId(assetId.arr)) else Coproduct[Environment.Tthis](Environment.AssetId(tx.dAppAddressOrAlias.bytes))
       ) match {
         case (log, Left(error))  => Left(ScriptExecutionError.ByAssetScriptInAction(error, log, assetId))
         case (log, Right(FALSE)) => Left(TransactionNotAllowedByScript.ByAssetScriptInAction(log, assetId))

@@ -315,6 +315,12 @@ object Terms {
     }
   }
 
+  case class FAIL(reason: String) extends EVALUATED {
+    override def toString: String = "Evaluation failed: " ++ reason
+    def weight: Long = 0
+    override val getType: REAL = NOTHING
+  }
+
   val runtimeTupleType: CASETYPEREF = CASETYPEREF("Tuple", Nil)
 
   implicit val orderingConstLong: Ordering[CONST_LONG] =

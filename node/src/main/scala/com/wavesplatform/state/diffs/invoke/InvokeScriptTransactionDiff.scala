@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs.invoke
 
 import cats.Id
 import cats.implicits._
-import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
@@ -61,7 +61,8 @@ object InvokeScriptTransactionDiff {
 
           directives <- TracedResult.wrapE(DirectiveSet(version, Account, DAppType).leftMap(GenericError.apply))
           payments   <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DAppTarget).leftMap(GenericError.apply))
-          input      <- TracedResult.wrapE(buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, None).leftMap(GenericError.apply))
+          tthis = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(dAppAddress.bytes)))
+          input      <- TracedResult.wrapE(buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, tthis).leftMap(GenericError.apply))
 
           invocationComplexity <- TracedResult {
             InvokeDiffsCommon.getInvocationComplexity(blockchain, tx, callableComplexities, dAppAddress)
@@ -102,14 +103,16 @@ object InvokeScriptTransactionDiff {
                     tx.fee,
                     tx.feeAssetId.compatId
                   )
+                  val height = blockchain.height
                   val environment = new WavesEnvironment(
                     AddressScheme.current.chainId,
                     Coeval.evalOnce(input),
-                    Coeval(blockchain.height),
+                    Coeval(height),
                     blockchain,
-                    Coeval(ByteStr(tx.dAppAddressOrAlias.bytes)),
+                    tthis,
                     directives,
-                    tx.id()
+                    tx.id(),
+                    !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height) && tx.dAppAddressOrAlias.isInstanceOf[Alias]
                   )
 
                   //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
