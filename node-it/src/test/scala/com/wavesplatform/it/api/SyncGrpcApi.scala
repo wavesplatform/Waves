@@ -136,7 +136,7 @@ object SyncGrpcApi extends Assertions {
         version: Int = 2,
         assetId: String = "WAVES",
         feeAssetId: String = "WAVES",
-        attachment: Attachment.Attachment = Attachment.Attachment.Empty,
+        attachment: ByteString = ByteString.EMPTY,
         timestamp: Long = System.currentTimeMillis(),
         waitForTx: Boolean = false
     ): PBSignedTransaction = {

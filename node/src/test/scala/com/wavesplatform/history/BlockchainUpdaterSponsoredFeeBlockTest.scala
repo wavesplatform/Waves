@@ -2,6 +2,7 @@ package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.features.BlockchainFeatures
@@ -40,8 +41,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
     (feeAsset, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(alice)
     wavesFee                    = Sponsorship.toWaves(sponsorTx.minSponsoredAssetFee.get, sponsorTx.minSponsoredAssetFee.get)
     genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
-    masterToAlice: TransferTransaction = TransferTransaction
-      .selfSigned(
+    masterToAlice: TransferTransaction = TransferTransaction.selfSigned(
         1.toByte,
         master,
         alice.toAddress,
@@ -49,7 +49,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
         feeAsset.fee + sponsorTx.fee + transferAssetWavesFee + wavesFee,
         Waves,
         transferAssetWavesFee,
-        None,
+        ByteStr.empty,
         ts + 1
       )
       .right
@@ -62,22 +62,19 @@ class BlockchainUpdaterSponsoredFeeBlockTest
         Asset.fromCompatId(Some(feeAsset.id())),
         feeAsset.quantity / 2,
         Waves,
-        transferAssetWavesFee,
-        None,
+        transferAssetWavesFee, ByteStr.empty,
         ts + 2
       )
       .right
       .get
-    bobToMaster: TransferTransaction = TransferTransaction
-      .selfSigned(
+    bobToMaster: TransferTransaction = TransferTransaction.selfSigned(
         1.toByte,
         bob,
         master.toAddress,
         Asset.fromCompatId(Some(feeAsset.id())),
         amtTx,
         Asset.fromCompatId(Some(feeAsset.id())),
-        sponsorTx.minSponsoredAssetFee.get,
-        None,
+        sponsorTx.minSponsoredAssetFee.get, ByteStr.empty,
         ts + 3
       )
       .right
@@ -90,8 +87,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
         Asset.fromCompatId(Some(feeAsset.id())),
         amtTx,
         Asset.fromCompatId(Some(feeAsset.id())),
-        sponsorTx.minSponsoredAssetFee.get,
-        None,
+        sponsorTx.minSponsoredAssetFee.get, ByteStr.empty,
         ts + 4
       )
       .right

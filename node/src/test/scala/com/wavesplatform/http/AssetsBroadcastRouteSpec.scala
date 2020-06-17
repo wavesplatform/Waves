@@ -6,6 +6,7 @@ import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.requests.{SignedTransferV1Request, SignedTransferV2Request}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
@@ -157,7 +158,7 @@ class AssetsBroadcastRouteSpec
         }
         forAll(longAttachment) { a =>
           posting(tr.copy(attachment = Some(a))) should produce(
-            WrongJson(errors = Seq(JsPath \ "attachment" -> Seq(JsonValidationError(s"attachment length ${a.length} exceeds maximum length of 192"))))
+            WrongJson(errors = Seq(JsPath \ "attachment" -> Seq(JsonValidationError(s"Length ${a.length} exceeds maximum length of 192"))))
           )
         }
         forAll(nonPositiveLong) { fee =>
@@ -168,7 +169,15 @@ class AssetsBroadcastRouteSpec
   }
 
   "compatibility" - {
-    val route = AssetsApiRoute(restAPISettings, stub[Wallet], DummyUtxPoolSynchronizer.accepting, stub[Blockchain], stub[Time], stub[CommonAccountsApi], stub[CommonAssetsApi]).route
+    val route = AssetsApiRoute(
+      restAPISettings,
+      stub[Wallet],
+      DummyUtxPoolSynchronizer.accepting,
+      stub[Blockchain],
+      stub[Time],
+      stub[CommonAccountsApi],
+      stub[CommonAssetsApi]
+    ).route
 
     val seed               = "seed".getBytes("UTF-8")
     val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)
@@ -184,7 +193,7 @@ class AssetsBroadcastRouteSpec
           1 * Waves,
           Asset.Waves,
           Waves / 3,
-          None,
+          ByteStr.empty,
           System.currentTimeMillis()
         )
         .right
@@ -200,7 +209,7 @@ class AssetsBroadcastRouteSpec
         amount = 1 * Waves,
         feeAssetId = Asset.Waves,
         fee = Waves / 3,
-        attachment = None,
+        attachment = ByteStr.empty,
         timestamp = System.currentTimeMillis(),
         proofs = Proofs(Seq.empty),
         chainId = receiverPrivateKey.toAddress.chainId
@@ -236,7 +245,7 @@ class AssetsBroadcastRouteSpec
       fee,
       feeAssetId.maybeBase58Repr,
       timestamp,
-      Some(Base58.encode(attachment.toBytesStrict)),
+      Some(Base58.encode(attachment.arr)),
       proofs.toSignature.toString
     )
   }
@@ -251,7 +260,7 @@ class AssetsBroadcastRouteSpec
       feeAssetId.maybeBase58Repr,
       fee,
       timestamp,
-      Some(Base58.encode(attachment.toBytesStrict)),
+      Some(Base58.encode(attachment.arr)),
       proofs.proofs.map(_.toString).toList
     )
   }

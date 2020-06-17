@@ -4,6 +4,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.TestHelpers.enableNG
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.events.BlockchainUpdateTriggers
@@ -59,7 +60,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
   def createTransfer(master: KeyPair, recipient: Address, ts: Long): TransferTransaction = {
     TransferTransaction
-      .selfSigned(1.toByte, master, recipient, Waves, ENOUGH_AMT / 5, Waves, 1000000, None, ts)
+      .selfSigned(1.toByte, master, recipient, Waves, ENOUGH_AMT / 5, Waves, 1000000, ByteStr.empty, ts)
       .explicitGet()
   }
 

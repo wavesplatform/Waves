@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats._
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.{BlockchainFeatures, EstimatorProvider}
@@ -203,8 +204,7 @@ class AssetTransactionsDiffTest
       issue       <- createLegacyIssue(issuer, assetName, description, quantity, decimals, reissuable = true, fee, timestamp)
       assetId = IssuedAsset(issue.assetId)
       attachment <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
-      transfer = TransferTransaction
-        .selfSigned(1.toByte, issuer, holder.toAddress, assetId, quantity - 1, Waves, fee, Some(Attachment.Bin(attachment)), timestamp)
+      transfer = TransferTransaction.selfSigned(1.toByte, issuer, holder.toAddress, assetId, quantity - 1, Waves, fee, ByteStr(attachment), timestamp)
         .explicitGet()
       reissue = ReissueTransaction
         .selfSigned(1.toByte, issuer, assetId, (Long.MaxValue - quantity) + 1, reissuable = true, 1, timestamp)
@@ -267,7 +267,7 @@ class AssetTransactionsDiffTest
       ).signWith(accountA.privateKey)
       assetId = IssuedAsset(issue.id())
       transfer = TransferTransaction
-        .selfSigned(TxVersion.V1, accountA, accountB.toAddress, assetId, issue.quantity, Waves, smallFee, None, timestamp + 2)
+        .selfSigned(TxVersion.V1, accountA, accountB.toAddress, assetId, issue.quantity, Waves, smallFee, ByteStr.empty,  timestamp + 2)
         .explicitGet()
       reissue        = ReissueTransaction.selfSigned(TxVersion.V1, accountA, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
       illegalReissue = ReissueTransaction.selfSigned(TxVersion.V1, accountB, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()

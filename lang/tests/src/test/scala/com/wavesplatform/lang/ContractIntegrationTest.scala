@@ -197,7 +197,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       assetId = None,
       amount = 0,
       recipient = Recipient.Address(ByteStr.empty),
-      attachment = ByteStrValue(ByteStr.empty)
+      attachment = ByteStr.empty
     )
     parseCompileAndVerify(
       """

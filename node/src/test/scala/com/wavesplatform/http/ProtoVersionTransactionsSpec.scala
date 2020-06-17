@@ -22,7 +22,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.transfer.{Attachment, MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxVersion, VersionedTransaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{TestWallet, TransactionGen}
@@ -192,7 +192,9 @@ class ProtoVersionTransactionsSpec
       val sellOrder = Order.sell(Order.V3, seller, account.publicKey, assetPair, Order.MaxAmount / 2, 100, Now, Now + Order.MaxLiveTime, MinFee * 3)
 
       val exchangeTx =
-        ExchangeTransaction.signed(TxVersion.V3, account.privateKey, buyOrder, sellOrder, 100, 100, MinFee * 3, MinFee * 3, MinFee * 3, Now).explicitGet()
+        ExchangeTransaction
+          .signed(TxVersion.V3, account.privateKey, buyOrder, sellOrder, 100, 100, MinFee * 3, MinFee * 3, MinFee * 3, Now)
+          .explicitGet()
       val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(exchangeTx)))
 
       Post(routePath("/broadcast"), exchangeTx.json()) ~> ApiKeyHeader ~> route ~> check {
@@ -257,7 +259,8 @@ class ProtoVersionTransactionsSpec
         responseAs[JsObject] shouldBe leaseTxJson
       }
 
-      val leaseCancelTxUnsigned = LeaseCancelTransaction.create(TxVersion.V3, account.publicKey, leaseTx.id(), MinFee, Now, Proofs.empty).explicitGet()
+      val leaseCancelTxUnsigned =
+        LeaseCancelTransaction.create(TxVersion.V3, account.publicKey, leaseTx.id(), MinFee, Now, Proofs.empty).explicitGet()
 
       val (leaseCancelProofs, leaseCancelTxJson) = Post(routePath("/sign"), leaseCancelTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
         checkProofs(response, leaseCancelTxUnsigned)
@@ -285,10 +288,12 @@ class ProtoVersionTransactionsSpec
     "TransferTransaction" in test {
       val recipient  = accountOrAliasGen.sample.get
       val asset      = IssuedAsset(bytes32gen.map(ByteStr(_)).sample.get)
-      val attachment = Some(Attachment.Bin(genBoundedBytes(0, TransferTransaction.MaxAttachmentSize).sample.get))
+      val attachment = genBoundedBytes(0, TransferTransaction.MaxAttachmentSize).sample.get
 
       val transferTxUnsigned =
-        TransferTransaction.create(TxVersion.V3, account.publicKey, recipient, asset, 100, Asset.Waves, MinFee, attachment, Now, Proofs.empty).explicitGet()
+        TransferTransaction
+          .create(TxVersion.V3, account.publicKey, recipient, asset, 100, Asset.Waves, MinFee, ByteStr(attachment), Now, Proofs.empty)
+          .explicitGet()
 
       val (proofs, transferTxJson) = Post(routePath("/sign"), transferTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
         checkProofs(response, transferTxUnsigned)
@@ -310,10 +315,12 @@ class ProtoVersionTransactionsSpec
 
     "MassTransferTransaction" in test {
       val transfers  = Gen.listOfN(10, accountOrAliasGen).map(accounts => accounts.map(ParsedTransfer(_, 100))).sample.get
-      val attachment = Some(Attachment.Bin(genBoundedBytes(0, TransferTransaction.MaxAttachmentSize).sample.get))
+      val attachment = genBoundedBytes(0, TransferTransaction.MaxAttachmentSize).sample.get
 
       val massTransferTxUnsigned =
-        MassTransferTransaction.create(TxVersion.V2, account.publicKey, Asset.Waves, transfers, MassTransferTxFee, Now, attachment, Proofs.empty).explicitGet()
+        MassTransferTransaction
+          .create(TxVersion.V2, account.publicKey, Asset.Waves, transfers, MassTransferTxFee, Now, ByteStr(attachment), Proofs.empty)
+          .explicitGet()
 
       val (proofs, massTransferTxJson) = Post(routePath("/sign"), massTransferTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
         checkProofs(response, massTransferTxUnsigned)
@@ -336,7 +343,8 @@ class ProtoVersionTransactionsSpec
     "SetScriptTransaction" in test {
       val script = scriptGen.sample.get
 
-      val setScriptTxUnsigned = SetScriptTransaction.create(TxVersion.V2, account.publicKey, Some(script), SetScriptFee, Now, Proofs.empty).explicitGet()
+      val setScriptTxUnsigned =
+        SetScriptTransaction.create(TxVersion.V2, account.publicKey, Some(script), SetScriptFee, Now, Proofs.empty).explicitGet()
 
       val (proofs, setScriptTxJson) = Post(routePath("/sign"), setScriptTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
         checkProofs(response, setScriptTxUnsigned)
