@@ -4,6 +4,7 @@ import java.nio.file.{Files, Paths}
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
@@ -80,7 +81,7 @@ object Preconditions {
             case CreateAccountP(seed, balance, scriptOption) =>
               val acc = GeneratorSettings.toKeyPair(seed)
               val transferTx = TransferTransaction
-                .selfSigned(2.toByte, settings.faucet, acc.toAddress, Waves, balance, Waves, Fee, None, time.correctedTime())
+                .selfSigned(2.toByte, settings.faucet, acc.toAddress, Waves, balance, Waves, Fee, ByteStr.empty, time.correctedTime())
                 .explicitGet()
               val scriptAndTx = scriptOption.map { file =>
                 val scriptText = new String(Files.readAllBytes(Paths.get(file)))
@@ -106,7 +107,7 @@ object Preconditions {
             balance,
             Waves,
             Fee,
-            None,
+            ByteStr.empty,
             time.correctedTime()
           )
           .explicitGet()

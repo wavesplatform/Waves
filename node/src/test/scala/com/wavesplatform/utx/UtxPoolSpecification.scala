@@ -116,8 +116,7 @@ class UtxPoolSpecification
       amount    <- chooseNum(1, (maxAmount * 0.9).toLong)
       recipient <- accountGen
       fee       <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
-    } yield TransferTransaction
-      .selfSigned(1.toByte, sender, recipient.toAddress, Waves, amount, Waves, fee, None, time.getTimestamp())
+    } yield TransferTransaction.selfSigned(1.toByte, sender, recipient.toAddress, Waves, amount, Waves, fee, ByteStr.empty,  time.getTimestamp())
       .explicitGet())
       .label("transferTransaction")
 
@@ -127,7 +126,7 @@ class UtxPoolSpecification
       recipient <- accountGen
       fee       <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
     } yield TransferTransaction
-      .selfSigned(TxVersion.V2, sender, recipient.toAddress, Waves, amount, Waves, fee, None, time.getTimestamp())
+      .selfSigned(TxVersion.V2, sender, recipient.toAddress, Waves, amount, Waves, fee, ByteStr.empty,  time.getTimestamp())
       .explicitGet())
       .label("transferTransactionV2")
 
@@ -135,8 +134,7 @@ class UtxPoolSpecification
     (for {
       amount <- chooseNum(1, (maxAmount * 0.9).toLong)
       fee    <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
-    } yield TransferTransaction
-      .selfSigned(1.toByte, sender, recipient.toAddress, Waves, amount, Waves, fee, None, time.getTimestamp())
+    } yield TransferTransaction.selfSigned(1.toByte, sender, recipient.toAddress, Waves, amount, Waves, fee, ByteStr.empty,  time.getTimestamp())
       .explicitGet())
       .label("transferWithRecipient")
 
@@ -145,7 +143,7 @@ class UtxPoolSpecification
       amount <- chooseNum(1, (maxAmount * 0.9).toLong)
       fee    <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
     } yield TransferTransaction
-      .selfSigned(TxVersion.V2, sender, recipient.toAddress, Waves, amount, Waves, fee, None, time.getTimestamp())
+      .selfSigned(TxVersion.V2, sender, recipient.toAddress, Waves, amount, Waves, fee, ByteStr.empty,  time.getTimestamp())
       .explicitGet())
       .label("transferWithRecipient")
 
@@ -153,8 +151,7 @@ class UtxPoolSpecification
     val amount    = maxAmount / (recipients.size + 1)
     val transfers = recipients.map(r => ParsedTransfer(r.toAddress, amount))
     val minFee    = FeeValidation.FeeConstants(TransferTransaction.typeId) + FeeValidation.FeeConstants(MassTransferTransaction.typeId) * transfers.size
-    val txs = for { fee <- chooseNum(minFee, amount) } yield MassTransferTransaction
-      .selfSigned(1.toByte, sender, Waves, transfers, fee, time.getTimestamp(), None)
+    val txs = for { fee <- chooseNum(minFee, amount) } yield MassTransferTransaction.selfSigned(1.toByte, sender, Waves, transfers, fee, time.getTimestamp(), ByteStr.empty)
       .explicitGet()
     txs.label("transferWithRecipient")
   }
@@ -366,11 +363,11 @@ class UtxPoolSpecification
     }
 
   private def transactionV1Gen(sender: KeyPair, ts: Long, feeAmount: Long): Gen[TransferTransaction] = accountGen.map { recipient =>
-    TransferTransaction.selfSigned(1.toByte, sender, recipient.toAddress, Waves, waves(1), Waves, feeAmount, None, ts).explicitGet()
+    TransferTransaction.selfSigned(1.toByte, sender, recipient.toAddress, Waves, waves(1), Waves, feeAmount, ByteStr.empty,  ts).explicitGet()
   }
 
   private def transactionV2Gen(sender: KeyPair, ts: Long, feeAmount: Long): Gen[TransferTransaction] = accountGen.map { recipient =>
-    TransferTransaction.selfSigned(2.toByte, sender, recipient.toAddress, Waves, waves(1), Waves, feeAmount, None, ts).explicitGet()
+    TransferTransaction.selfSigned(2.toByte, sender, recipient.toAddress, Waves, waves(1), Waves, feeAmount, ByteStr.empty,  ts).explicitGet()
   }
 
   "UTX Pool" - {
@@ -955,8 +952,8 @@ class UtxPoolSpecification
           ts = System.currentTimeMillis()
           fee <- smallFeeGen
           genesis         = GenesisTransaction.create(richAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
-          validTransfer   = TransferTransaction.selfSigned(TxVersion.V1, richAcc, secondAcc.toAddress, Waves, 1, Waves, fee, None, ts).explicitGet()
-          invalidTransfer = TransferTransaction.selfSigned(TxVersion.V1, secondAcc, richAcc.toAddress, Waves, 2, Waves, fee, None, ts).explicitGet()
+          validTransfer   = TransferTransaction.selfSigned(TxVersion.V1, richAcc, secondAcc.toAddress, Waves, 1, Waves, fee, ByteStr.empty,  ts).explicitGet()
+          invalidTransfer = TransferTransaction.selfSigned(TxVersion.V1, secondAcc, richAcc.toAddress, Waves, 2, Waves, fee, ByteStr.empty,  ts).explicitGet()
         } yield (genesis, validTransfer, invalidTransfer)
 
         forAll(preconditions) {

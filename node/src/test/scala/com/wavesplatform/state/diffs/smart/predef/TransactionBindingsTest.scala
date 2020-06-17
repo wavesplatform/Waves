@@ -89,7 +89,7 @@ class TransactionBindingsTest
            |       case a: Address => a.bytes == base58'${t.recipient.cast[Address].fold("")(a => Base58.encode(a.bytes))}'
            |       case a: Alias => a.alias == ${Json.toJson(t.recipient.cast[Alias].map(_.name).getOrElse(""))}
            |      }
-           |    let attachment = t.attachment == base58'${Base58.encode(t.attachment.toBytes)}'
+           |    let attachment = t.attachment == base58'${Base58.encode(t.attachment.arr)}'
            |   ${assertProvenPart("t")} && amount && feeAssetId && assetId && recipient && attachment
            | case _ => throw()
            | }
@@ -478,7 +478,7 @@ class TransactionBindingsTest
                       |      else isDefined(t.assetId) == false
                       |     let transferCount = t.transferCount == ${t.transfers.length}
                       |     let totalAmount = t.totalAmount == ${t.transfers.map(_.amount).sum}
-                      |     let attachment = t.attachment == base58'${Base58.encode(t.attachment.toBytes)}'
+                      |     let attachment = t.attachment == base58'${Base58.encode(t.attachment.arr)}'
                       |     ${t.transfers.indices.map(pg).mkString("\n")}
                       |   ${provenPart(t)}
                       |   $resString && assetId && transferCount && totalAmount && attachment

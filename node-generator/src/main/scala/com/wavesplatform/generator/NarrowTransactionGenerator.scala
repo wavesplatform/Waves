@@ -373,16 +373,9 @@ class NarrowTransactionGenerator(
     generated._1
   }
 
-  private def createAttachment(): Option[Attachment] = {
-    if (random.nextBoolean()) None
-    else if (!settings.protobuf) Some(Attachment.Bin(Array.fill(random.nextInt(100))(random.nextInt().toByte)))
-    else
-      random.nextInt(4) match {
-        case 0 => Some(Attachment.Bin(Array.fill(random.nextInt(100))(random.nextInt().toByte)))
-        case 1 => Some(Attachment.Num(random.nextLong()))
-        case 2 => Some(Attachment.Str(random.nextString(10)))
-        case 3 => Some(Attachment.Bool(random.nextBoolean()))
-      }
+  private def createAttachment(): ByteStr = {
+    if (random.nextBoolean()) ByteStr.empty
+    else ByteStr(Array.fill(random.nextInt(100))(random.nextInt().toByte))
   }
 
   private[this] def logOption[T <: Transaction](txE: Either[ValidationError, T])(implicit m: Manifest[T]): Option[T] = {
@@ -500,7 +493,7 @@ object NarrowTransactionGenerator {
               val account = GeneratorSettings.toKeyPair(s"${UUID.randomUUID().toString}")
 
               val transferTx = TransferTransaction
-                .selfSigned(2.toByte, richAccount, account.toAddress, Waves, balance, Waves, fee, None, time.correctedTime())
+                .selfSigned(2.toByte, richAccount, account.toAddress, Waves, balance, Waves, fee, ByteStr.empty, time.correctedTime())
                 .explicitGet()
 
               val script = ScriptCompiler.compile(new String(Files.readAllBytes(Paths.get(scriptFile))), estimator).explicitGet()._1
@@ -568,7 +561,7 @@ object NarrowTransactionGenerator {
               tradeAsset.quantity / Universe.Accounts.size,
               Waves,
               900000,
-              Some(Attachment.Bin(Array.fill(random.nextInt(100))(random.nextInt().toByte))),
+              ByteStr(Array.fill(random.nextInt(100))(random.nextInt().toByte)),
               System.currentTimeMillis()
             )
             .explicitGet()

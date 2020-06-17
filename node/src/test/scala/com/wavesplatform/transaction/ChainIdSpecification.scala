@@ -8,8 +8,8 @@ import com.wavesplatform.protobuf.transaction.{PBTransactions, SignedTransaction
 import com.wavesplatform.state.StringDataEntry
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, Verifier}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
@@ -61,7 +61,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
           amount,
           Waves,
           fee,
-          None,
+          ByteStr.empty,
           ts,
           Proofs.empty,
           AddressScheme.current.chainId
@@ -76,7 +76,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             amount,
             Waves,
             fee,
-            None,
+            ByteStr.empty,
             ts,
             Proofs.empty,
             otherChainId
@@ -311,7 +311,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             Seq(ParsedTransfer(addressOrAlias, amount)),
             fee,
             ts,
-            None,
+            ByteStr.empty,
             Proofs.empty,
             otherChainId
           ).signWith(sender.privateKey).validatedEither.explicitGet()

@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -89,7 +90,7 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside with With
         amount = 1,
         feeAsset = Waves,
         fee = 10000000,
-        attachment = None,
+        attachment = ByteStr.empty,
         timestamp = 0
       )
       .explicitGet()
@@ -114,7 +115,7 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside with With
         amount = 1,
         feeAsset = Waves,
         fee = 10000000,
-        attachment = None,
+        attachment = ByteStr.empty,
         timestamp = 0
       )
       .explicitGet()

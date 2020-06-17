@@ -25,7 +25,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           125L,
-          None,
+          ByteStr.empty,
           1
         )
         .explicitGet(),
@@ -38,7 +38,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           124L,
-          None,
+          ByteStr.empty,
           2
         )
         .explicitGet(),
@@ -51,7 +51,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           124L,
-          None,
+          ByteStr.empty,
           1
         )
         .explicitGet(),
@@ -64,7 +64,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Asset.fromCompatId(Some(ByteStr.empty)),
           124L,
-          None,
+          ByteStr.empty,
           2
         )
         .explicitGet(),
@@ -77,7 +77,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Asset.fromCompatId(Some(ByteStr.empty)),
           124L,
-          None,
+          ByteStr.empty,
           1
         )
         .explicitGet()
@@ -99,7 +99,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           124L,
-          None,
+          ByteStr.empty,
           1
         )
         .explicitGet(),
@@ -112,7 +112,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           123L,
-          None,
+          ByteStr.empty,
           1
         )
         .explicitGet(),
@@ -125,7 +125,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           123L,
-          None,
+          ByteStr.empty,
           2
         )
         .explicitGet(),
@@ -138,7 +138,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Asset.fromCompatId(Some(ByteStr.empty)),
           124L,
-          None,
+          ByteStr.empty,
           1
         )
         .explicitGet(),
@@ -151,7 +151,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Asset.fromCompatId(Some(ByteStr.empty)),
           124L,
-          None,
+          ByteStr.empty,
           2
         )
         .explicitGet()
@@ -173,7 +173,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           1,
-          None,
+          ByteStr.empty,
           124L
         )
         .explicitGet(),
@@ -186,7 +186,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           1,
-          None,
+          ByteStr.empty,
           123L
         )
         .explicitGet()
@@ -206,7 +206,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           1,
-          None,
+          ByteStr.empty,
           123L
         )
         .explicitGet(),
@@ -219,7 +219,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           1,
-          None,
+          ByteStr.empty,
           124L
         )
         .explicitGet()

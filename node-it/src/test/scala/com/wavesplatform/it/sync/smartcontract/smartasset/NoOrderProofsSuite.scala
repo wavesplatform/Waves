@@ -83,8 +83,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
       IssuedAsset(ByteStr.decodeBase58(assetWProofs).get),
       1,
       Waves,
-      smartMinFee,
-      None,
+      smartMinFee, ByteStr.empty,
       System.currentTimeMillis + 10.minutes.toMillis,
       Proofs(Seq(ByteStr("assetWProofs".getBytes("UTF-8")))),
       AddressScheme.current.chainId

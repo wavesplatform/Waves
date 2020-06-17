@@ -128,8 +128,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
             ts
           ).signWith(richAcc.privateKey)
 
-      val transferWavesTx = TransferTransaction
-        .selfSigned(1.toByte, richAcc, recipientAcc.toAddress, Waves, 10 * Constants.UnitsInWave, Waves, 1 * Constants.UnitsInWave, None, ts)
+      val transferWavesTx = TransferTransaction.selfSigned(1.toByte, richAcc, recipientAcc.toAddress, Waves, 10 * Constants.UnitsInWave, Waves, 1 * Constants.UnitsInWave, ByteStr.empty, ts)
         .explicitGet()
 
       val transferAssetTx = TransferTransaction
@@ -144,8 +143,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
             1 * Constants.UnitsInWave + ScriptExtraFee
           } else {
             1 * Constants.UnitsInWave
-          },
-          None,
+          }, ByteStr.empty,
           ts
         )
         .explicitGet()
@@ -172,16 +170,14 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
           )
         else Seq.empty
 
-      val transferBackTx = TransferTransaction
-        .selfSigned(
+      val transferBackTx = TransferTransaction.selfSigned(
           1.toByte,
           recipientAcc,
           richAcc.toAddress,
           IssuedAsset(issueTx.id()),
           1,
           if (feeInAssets) IssuedAsset(issueTx.id()) else Waves,
-          feeAmount,
-          None,
+          feeAmount, ByteStr.empty,
           ts
         )
         .explicitGet()
@@ -242,7 +238,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
           amount,
           Waves,
           amount,
-          None,
+          ByteStr.empty,
           timestamp,
           Proofs.empty,
           invChainId
@@ -273,7 +269,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
           Seq(ParsedTransfer(invChainAddrOrAlias, amount)),
           amount,
           timestamp,
-          None,
+          ByteStr.empty,
           Proofs.empty,
           invChainId
         ).signWith(master.privateKey),

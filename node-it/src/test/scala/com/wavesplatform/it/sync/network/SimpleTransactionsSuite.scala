@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.AsyncNetworkApi._
@@ -27,8 +28,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers {
   private def node = nodes.head
 
   test("valid tx send by network to node should be in blockchain") {
-    val tx = TransferTransaction
-      .selfSigned(1.toByte, node.keyPair, Address.fromString(node.address).explicitGet(), Waves, 1L, Waves, minFee, None, System.currentTimeMillis())
+    val tx = TransferTransaction.selfSigned(1.toByte, node.keyPair, Address.fromString(node.address).explicitGet(), Waves, 1L, Waves, minFee, ByteStr.empty,  System.currentTimeMillis())
       .explicitGet()
 
     node.sendByNetwork(RawBytes.fromTransaction(tx))
@@ -46,7 +46,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers {
         1L,
         Waves,
         minFee,
-        None,
+        ByteStr.empty,
         System.currentTimeMillis() + (1 days).toMillis
       )
       .explicitGet()

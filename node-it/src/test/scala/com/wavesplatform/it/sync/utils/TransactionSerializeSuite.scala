@@ -2,7 +2,6 @@ package com.wavesplatform.it.sync.utils
 
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -18,7 +17,7 @@ import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import com.wavesplatform.transaction.transfer.{Attachment, MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxVersion}
 import com.wavesplatform.utils._
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -160,32 +159,32 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .explicitGet()
 
   private val issueV1 = IssueTransaction(
-      TxVersion.V1,
-      publicKey,
-      "Gigacoin".utf8Bytes,
-      "Gigacoin".utf8Bytes,
-      someAssetAmount,
-      8.toByte,
-      true,
-      script = None,
-      issueFee,
-      ts,
-      Proofs(ByteStr.decodeBase58("28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ").get)
-    )
+    TxVersion.V1,
+    publicKey,
+    "Gigacoin".utf8Bytes,
+    "Gigacoin".utf8Bytes,
+    someAssetAmount,
+    8.toByte,
+    true,
+    script = None,
+    issueFee,
+    ts,
+    Proofs(ByteStr.decodeBase58("28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ").get)
+  )
 
   private val issueV2 = IssueTransaction(
-      TxVersion.V2,
-      publicKey,
-      "Gigacoin".utf8Bytes,
-      "Gigacoin".utf8Bytes,
-      someAssetAmount,
-      8.toByte,
-      true,
-      None,
-      issueFee,
-      ts,
-      Proofs(Seq(ByteStr.decodeBase58("43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g").get))
-    )
+    TxVersion.V2,
+    publicKey,
+    "Gigacoin".utf8Bytes,
+    "Gigacoin".utf8Bytes,
+    someAssetAmount,
+    8.toByte,
+    true,
+    None,
+    issueFee,
+    ts,
+    Proofs(Seq(ByteStr.decodeBase58("43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g").get))
+  )
 
   private val leasecancelV1 = LeaseCancelTransaction
     .create(
@@ -245,7 +244,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
       transfers,
       2.waves,
       ts,
-      Some(Attachment.Bin(Base58.tryDecodeWithLimit("59QuUcqP6p").get)),
+      ByteStr.decodeBase58("59QuUcqP6p").get,
       Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get))
     )
     .explicitGet()
@@ -298,11 +297,26 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .explicitGet()
 
   private val setscript = SetScriptTransaction
-    .create(1.toByte, publicKey, None, setScriptFee, ts, Proofs(Seq(ByteStr.decodeBase58("tcTr672rQ5gXvcA9xCGtQpkHC8sAY1TDYqDcQG7hQZAeHcvvHFo565VEv1iD1gVa3ZuGjYS7hDpuTnQBfY2dUhY").get)))
+    .create(
+      1.toByte,
+      publicKey,
+      None,
+      setScriptFee,
+      ts,
+      Proofs(Seq(ByteStr.decodeBase58("tcTr672rQ5gXvcA9xCGtQpkHC8sAY1TDYqDcQG7hQZAeHcvvHFo565VEv1iD1gVa3ZuGjYS7hDpuTnQBfY2dUhY").get))
+    )
     .explicitGet()
 
   private val sponsor = SponsorFeeTransaction
-    .create(1.toByte, publicKey, IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get), Some(100000), 1.waves, ts, Proofs(Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get)))
+    .create(
+      1.toByte,
+      publicKey,
+      IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
+      Some(100000),
+      1.waves,
+      ts,
+      Proofs(Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get))
+    )
     .explicitGet()
 
   private val recipient = Address.fromString(sender.address).explicitGet()
@@ -314,7 +328,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     1900000,
     Waves,
     minFee,
-    None,
+    ByteStr.empty,
     ts,
     Proofs(Seq(ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get)),
     recipient.chainId
@@ -328,19 +342,29 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     100000000,
     Waves,
     minFee,
-    None,
+    ByteStr.empty,
     ts,
     Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)),
     recipient.chainId
   )
 
   private val invokeScript = InvokeScriptTransaction
-    .create(1.toByte, PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").explicitGet(), PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet().toAddress, Some(
+    .create(
+      1.toByte,
+      PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").explicitGet(),
+      PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet().toAddress,
+      Some(
         Terms.FUNCTION_CALL(
           function = FunctionHeader.User("testfunc"),
           args = List(TRUE)
         )
-      ), Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))), smartMinFee, Waves, ts, Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)))
+      ),
+      Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))),
+      smartMinFee,
+      Waves,
+      ts,
+      Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))
+    )
     .explicitGet()
 
   forAll(

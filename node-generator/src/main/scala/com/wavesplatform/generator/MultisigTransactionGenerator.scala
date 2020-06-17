@@ -2,6 +2,7 @@ package com.wavesplatform.generator
 
 import cats.Show
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.generator.utils.Gen
@@ -42,7 +43,7 @@ class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settin
         totalAmountOnNewAccount - 2 * enoughFee - i,
         Waves,
         enoughFee,
-        None,
+        ByteStr.empty,
         now + i,
         Proofs.empty,
         owners(1).toAddress.chainId

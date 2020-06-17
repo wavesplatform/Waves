@@ -85,7 +85,8 @@ object InvokeDiffsCommon {
       verifierComplexity: Long,
       tx: InvokeScriptTransaction,
       blockchain: Blockchain,
-      blockTime: Long
+      blockTime: Long,
+      verifyAssets: Boolean
   ): TracedResult[ValidationError, Diff] = {
     val actionsByType  = actions.groupBy(_.getClass).withDefaultValue(Nil)
     val transferList   = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
@@ -95,11 +96,11 @@ object InvokeDiffsCommon {
     val sponsorFeeList = actionsByType(classOf[SponsorFee]).asInstanceOf[List[SponsorFee]]
 
     val dataEntries = actionsByType.view
-      .filterKeys(classOf[DataItem[_]].isAssignableFrom)
+      .filterKeys(classOf[DataOp].isAssignableFrom)
       .values
       .flatten
       .toList
-      .asInstanceOf[List[DataItem[_]]]
+      .asInstanceOf[List[DataOp]]
       .map(dataItemToEntry)
 
     for {
@@ -154,7 +155,8 @@ object InvokeDiffsCommon {
 
       paymentsAndFeeDiff = paymentsPart(tx, dAppAddress, feeInfo._2)
 
-      compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey)(actions, paymentsAndFeeDiff).leftMap(asFailedScriptError)
+      compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey)(actions, paymentsAndFeeDiff, verifyAssets)
+        .leftMap(asFailedScriptError)
 
       transfers = compositeDiff.portfolios |+| feeInfo._2.view.mapValues(_.negate).toMap
 
@@ -218,7 +220,7 @@ object InvokeDiffsCommon {
     Diff(tx = tx, portfolios = feePart |+| payablePart)
   }
 
-  private def dataItemToEntry(item: DataItem[_]): DataEntry[_] =
+  private def dataItemToEntry(item: DataOp): DataEntry[_] =
     item match {
       case DataItem.Bool(k, b) => BooleanDataEntry(k, b)
       case DataItem.Str(k, b)  => StringDataEntry(k, b)
@@ -285,7 +287,8 @@ object InvokeDiffsCommon {
 
   private def foldActions(sblockchain: Blockchain, blockTime: Long, tx: InvokeScriptTransaction, dAppAddress: Address, pk: PublicKey)(
       ps: List[CallableAction],
-      paymentsDiff: Diff
+      paymentsDiff: Diff,
+      verifyAssets: Boolean
   ): TracedResult[ValidationError, Diff] =
     ps.foldLeft(TracedResult(paymentsDiff.asRight[ValidationError])) { (diffAcc, action) =>
       diffAcc match {
@@ -310,9 +313,8 @@ object InvokeDiffsCommon {
                     Map(address       -> Portfolio(0, LeaseBalance.empty, Map(a -> amount))) |+|
                       Map(dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount)))
                 )
-                blockchain.assetScript(a) match {
-                  case None => nextDiff.asRight[ValidationError]
-                  case Some(AssetScriptInfo(script, _)) =>
+                blockchain.assetScript(a).filter(_ => verifyAssets).fold(TracedResult(nextDiff.asRight[ValidationError])) {
+                  case AssetScriptInfo(script, _) =>
                     val assetVerifierDiff =
                       if (blockchain.disallowSelfPayment) nextDiff
                       else
@@ -341,7 +343,7 @@ object InvokeDiffsCommon {
             }
           }
 
-          def applyDataItem(item: DataItem[_]): TracedResult[ValidationError, Diff] =
+          def applyDataItem(item: DataOp): TracedResult[ValidationError, Diff] =
             TracedResult.wrapValue(
               Diff.stateOps(accountData = Map(dAppAddress -> AccountDataInfo(Map(item.key -> dataItemToEntry(item)))))
             )
@@ -408,9 +410,8 @@ object InvokeDiffsCommon {
               assetId: ByteStr,
               pseudoTx: PseudoTx
           ): TracedResult[ValidationError, Diff] =
-            blockchain.assetScript(IssuedAsset(assetId)) match {
-              case None => actionDiff
-              case Some(AssetScriptInfo(script, _)) =>
+            blockchain.assetScript(IssuedAsset(assetId)).filter(_ => verifyAssets).fold(TracedResult(actionDiff)) {
+              case AssetScriptInfo(script, _) =>
                 val assetValidationDiff =
                   for {
                     result          <- actionDiff
@@ -430,7 +431,7 @@ object InvokeDiffsCommon {
               } else {
                 PublicKey(new Array[Byte](32))
               })
-            case d: DataItem[_] => applyDataItem(d)
+            case d: DataOp      => applyDataItem(d)
             case i: Issue       => applyIssue(tx, pk, i)
             case r: Reissue     => applyReissue(r, pk)
             case b: Burn        => applyBurn(b, pk)

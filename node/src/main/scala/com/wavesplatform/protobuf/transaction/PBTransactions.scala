@@ -8,7 +8,6 @@ import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
-import com.wavesplatform.protobuf.transaction.Attachment.Attachment.{BinaryValue, BoolValue, IntValue, StringValue}
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
@@ -126,7 +125,7 @@ object PBTransactions {
             amount.longAmount,
             feeAssetId,
             feeAmount,
-            toVanillaAttachment(attachment),
+            attachment.toByteStr,
             timestamp,
             proofs
           )
@@ -227,7 +226,7 @@ object PBTransactions {
           mt.transfers.flatMap(t => t.getRecipient.toAddressOrAlias(chainId).toOption.map(ParsedTransfer(_, t.amount))).toList,
           feeAmount,
           timestamp,
-          toVanillaAttachment(mt.attachment),
+          mt.attachment.toByteStr,
           proofs,
           chainId
         )
@@ -336,7 +335,7 @@ object PBTransactions {
           amount.longAmount,
           feeAssetId,
           feeAmount,
-          toVanillaAttachment(attachment),
+          attachment.toByteStr,
           timestamp,
           proofs,
           chainId
@@ -449,7 +448,7 @@ object PBTransactions {
           mt.transfers.flatMap(t => t.getRecipient.toAddressOrAlias(chainId).toOption.map(ParsedTransfer(_, t.amount))).toList,
           feeAmount,
           timestamp,
-          toVanillaAttachment(mt.attachment),
+          mt.attachment.toByteStr,
           proofs,
           chainId
         )
@@ -520,7 +519,7 @@ object PBTransactions {
 
       case tx: vt.transfer.TransferTransaction =>
         import tx._
-        val data = TransferTransactionData(Some(recipient), Some((assetId, amount)), toPBAttachment(attachment))
+        val data = TransferTransactionData(Some(recipient), Some((assetId, amount)), attachment.toByteString)
         PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, version, proofs, Data.Transfer(data))
 
       case tx: vt.CreateAliasTransaction =>
@@ -576,7 +575,7 @@ object PBTransactions {
         val data = MassTransferTransactionData(
           PBAmounts.toPBAssetId(assetId),
           transfers.map(pt => MassTransferTransactionData.Transfer(Some(pt.address), pt.amount)),
-          toPBAttachment(attachment)
+          attachment.toByteString
         )
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.MassTransfer(data))
 
@@ -640,30 +639,6 @@ object PBTransactions {
         case EmptyDataEntry(_)          => DataTransactionData.DataEntry.Value.Empty
       }
     )
-  }
-
-  def toVanillaAttachment(attachment: Option[Attachment]): Option[vt.transfer.Attachment] =
-    attachment.flatMap { a =>
-      import Attachment.{Attachment => PBA}
-      a.attachment match {
-        case PBA.IntValue(value)    => Some(vt.transfer.Attachment.Num(value))
-        case PBA.BoolValue(value)   => Some(vt.transfer.Attachment.Bool(value))
-        case PBA.BinaryValue(value) => Some(vt.transfer.Attachment.Bin(value.toByteArray))
-        case PBA.StringValue(value) => Some(vt.transfer.Attachment.Str(value))
-        case _                      => None
-      }
-    }
-
-  def toPBAttachment(attachment: Option[vt.transfer.Attachment]): Option[Attachment] = {
-    import vt.transfer.{Attachment => VA}
-    attachment
-      .map {
-        case VA.Num(value)  => IntValue(value)
-        case VA.Bool(value) => BoolValue(value)
-        case VA.Bin(value)  => BinaryValue(ByteString.copyFrom(value))
-        case VA.Str(value)  => StringValue(value)
-      }
-      .map(Attachment.of)
   }
 
   def toVanillaScript(script: ByteString): Option[com.wavesplatform.lang.script.Script] = {

@@ -156,8 +156,7 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
         amount        <- Gen.choose(1L, initialAmount - Constants.UnitsInWave)
         master2sender <- transferGeneratorPV2(1, master, sender.toAddress, amount)
         fee           <- Gen.choose(1, master2sender.amount - 1)
-        sender2recipient = TransferTransaction
-          .selfSigned(2.toByte, sender, recipient.toAddress, Waves, master2sender.amount - fee, Waves, fee, None, 2)
+        sender2recipient = TransferTransaction.selfSigned(2.toByte, sender, recipient.toAddress, Waves, master2sender.amount - fee, Waves, fee, ByteStr.empty, 2)
           .explicitGet()
       } yield (sender, recipient, master2sender, sender2recipient)
     } {

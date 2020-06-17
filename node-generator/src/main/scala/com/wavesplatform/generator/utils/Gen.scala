@@ -3,6 +3,7 @@ package com.wavesplatform.generator.utils
 import java.util.concurrent.ThreadLocalRandom
 
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.utils.Implicits._
 import com.wavesplatform.lang.script.Script
@@ -123,7 +124,7 @@ object Gen {
       .zipWithIndex
       .map {
         case (((src, dst), fee), i) =>
-          TransferTransaction.selfSigned(2.toByte, src, dst, Waves, fee, Waves, fee, None, now + i)
+          TransferTransaction.selfSigned(2.toByte, src, dst, Waves, fee, Waves, fee, ByteStr.empty, now + i)
       }
       .collect { case Right(x) => x }
   }
@@ -138,7 +139,7 @@ object Gen {
         case ((sender, count), i) =>
           val transfers = List.tabulate(count)(_ => ParsedTransfer(recipientGen.next(), amountGen.next()))
           val fee       = 100000 + count * 50000
-          MassTransferTransaction.selfSigned(1.toByte, sender, Waves, transfers, fee, now + i, None)
+          MassTransferTransaction.selfSigned(1.toByte, sender, Waves, transfers, fee, now + i, ByteStr.empty)
       }
       .collect { case Right(tx) => tx }
   }

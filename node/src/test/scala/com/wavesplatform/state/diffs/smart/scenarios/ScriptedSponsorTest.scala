@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
@@ -125,7 +126,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
           ENOUGH_FEE * 3,
           Waves,
           ENOUGH_FEE,
-          None,
+          ByteStr.empty,
           System.currentTimeMillis() + 4
         )
         .explicitGet()
@@ -141,7 +142,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
           1,
           IssuedAsset(issueTx.id()),
           ENOUGH_FEE,
-          None,
+          ByteStr.empty,
           System.currentTimeMillis() + 8
         )
         .explicitGet()
@@ -184,7 +185,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
           ENOUGH_FEE * 3,
           Waves,
           ENOUGH_FEE,
-          None,
+          ByteStr.empty,
           System.currentTimeMillis() + 4
         )
         .explicitGet()
@@ -200,7 +201,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
           1,
           IssuedAsset(issueTx.id()),
           ENOUGH_FEE,
-          None,
+          ByteStr.empty,
           System.currentTimeMillis() + 8
         )
         .explicitGet()
