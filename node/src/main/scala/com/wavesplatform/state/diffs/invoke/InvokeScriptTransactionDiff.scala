@@ -103,15 +103,16 @@ object InvokeScriptTransactionDiff {
                     tx.fee,
                     tx.feeAssetId.compatId
                   )
+                  val height = blockchain.height
                   val environment = new WavesEnvironment(
                     AddressScheme.current.chainId,
                     Coeval.evalOnce(input),
-                    Coeval(blockchain.height),
+                    Coeval(height),
                     blockchain,
                     tthis,
                     directives,
                     tx.id(),
-                    !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, blockchain.height) && tx.dAppAddressOrAlias.isInstanceOf[Alias]
+                    !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height) && tx.dAppAddressOrAlias.isInstanceOf[Alias]
                   )
 
                   //to avoid continuations when evaluating underestimated by EstimatorV2 scripts

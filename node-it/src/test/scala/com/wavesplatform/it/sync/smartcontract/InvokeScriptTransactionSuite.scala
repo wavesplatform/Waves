@@ -19,14 +19,18 @@ import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
+import scala.concurrent.duration._
 
 class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  val activationHeight = 2
+  val activationHeight = 8
   override protected def nodeConfigs : Seq[Config] =
     NodeConfigs.Builder(NodeConfigs.Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.BlockV5.id, activationHeight)))
+      .overrideBase(_.preactivatedFeatures(
+        (BlockchainFeatures.Ride4DApps.id, 0),
+        (BlockchainFeatures.BlockV5.id, activationHeight)
+      ))
       .withDefault(1)
       .buildNonConflicting()
 
@@ -68,27 +72,10 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         |
         |
         """.stripMargin
-    val scriptTextV4 =
-      """
-        |{-# STDLIB_VERSION 4 #-}
-        |{-# CONTENT_TYPE DAPP #-}
-        |
-        | @Callable(inv)
-        |func foo() = [IntegerEntry("", 1)]
-        |
-        | @Callable(inv)
-        |func bar() = [IntegerEntry("", 2)]
-        |
-        |@Callable(inv)
-        | func biz() = [IntegerEntry("numb", 1)]
-        |
-        """.stripMargin
     val script  = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
-    val script2 = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3).explicitGet()._1.bytes().base64
     sender.transfer(firstAddress, thirdContract, 10.waves, minFee, waitForTx = true)
     val setScriptId  = sender.setScript(firstContract, Some(script), setScriptFee, waitForTx = true).id
     val setScriptId2 = sender.setScript(secondContract, Some(script), setScriptFee, waitForTx = true).id
-    sender.setScript(thirdContract, Some(script2), setScriptFee, waitForTx = true).id
 
     val acc0ScriptInfo  = sender.addressScriptInfo(firstContract)
     val acc0ScriptInfo2 = sender.addressScriptInfo(secondContract)
@@ -132,7 +119,27 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     sender.getDataByKey(firstContract, "test") shouldBe BinaryDataEntry("test", ByteStr.decodeBase58(firstContract).get)
   }
 
-  sender.waitForHeight(activationHeight)
+  test("Wait for activation") {
+    val scriptTextV4 =
+      """
+        |{-# STDLIB_VERSION 4 #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |
+        | @Callable(inv)
+        |func foo() = [IntegerEntry("", 1)]
+        |
+        | @Callable(inv)
+        |func bar() = [IntegerEntry("", 2)]
+        |
+        |@Callable(inv)
+        | func biz() = [IntegerEntry("numb", 1)]
+        |
+        """.stripMargin
+    val script2 = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3).explicitGet()._1.bytes().base64
+    sender.waitForHeight(activationHeight, 13.minute)
+    val setScriptId3 = sender.setScript(thirdContract, Some(script2), setScriptFee, waitForTx = true).id
+    sender.transactionInfo[TransactionInfo](setScriptId3).script.get.startsWith("base64:") shouldBe true
+  }
 
   test("contract caller invokes a function on a contract") {
     val arg = ByteStr(Array(42: Byte))

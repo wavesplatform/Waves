@@ -316,6 +316,7 @@ object Terms {
   }
 
   case class FAIL(reason: String) extends EVALUATED {
+    override def toString: String = "Evaluation failed: " ++ reason
     def weight: Long = 0
     override val getType: REAL = NOTHING
   }
