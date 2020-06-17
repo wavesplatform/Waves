@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{AddressId, DBExt, KeyTags, Keys}
+import com.wavesplatform.database.{DBExt, KeyTags, Keys}
 import com.wavesplatform.lang.v1.traits.DataType
 import com.wavesplatform.lang.v1.traits.DataType.{Boolean, ByteArray, Long}
 import com.wavesplatform.lang.v1.traits.domain.Recipient
@@ -106,8 +106,9 @@ class DBStateBenchmark {
       val addressNr = Random.nextInt(st.allAddresses.size)
       bh.consume(st.environment.data(st.allAddresses(addressNr), "unexisting_key", Long))
     } else {
-      val transactionNr        = Random.nextInt(st.dataEntries.size)
-      val (dataEntry, address) = st.dataEntries(transactionNr)
+      val transactionNr = Random.nextInt(st.dataEntries.size)
+      val dataEntry     = st.dataEntries(transactionNr)._1
+      val address       = st.dataEntries(transactionNr)._2
       val t =
         dataEntry.`type` match {
           case "string"  => DataType.String
