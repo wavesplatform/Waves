@@ -88,6 +88,6 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
 
   override def transferTransactionFromProto(b: Array[Byte]): Future[Option[Tx.Transfer]] = ???
 
-  private def getEntity[F[_]: Functor: ResponseWrapper, A <% B: Decoder, B](url: String): Future[F[B]] =
+  private def getEntity[F[_]: Functor: ResponseWrapper, A : Decoder, B](url: String)(implicit ev: A => B): Future[F[B]] =
     client.get[F, A](url).map(_.map(r => r))
 }

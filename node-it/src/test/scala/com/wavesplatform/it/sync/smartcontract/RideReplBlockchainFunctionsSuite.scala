@@ -15,12 +15,13 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEn
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import org.scalatest.Assertion
+import org.scalatest.{Assertion, Ignore}
 import org.scalatest.EitherValues._
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
+@Ignore
 class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
 
   override protected def nodeConfigs: Seq[Config] =

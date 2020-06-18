@@ -173,7 +173,7 @@ object Verifier extends ScorexLogging {
         .accountScript(order.sender.toAddress)
         .map { asi =>
           if (order.version != 1) {
-            stats.orderValidation.measure(verifyOrder(blockchain, asi.script, order))
+            stats.orderValidation.withoutTags().measure(verifyOrder(blockchain, asi.script, order))
           } else {
             Left(GenericError("Can't process order with signature from scripted account"))
           }

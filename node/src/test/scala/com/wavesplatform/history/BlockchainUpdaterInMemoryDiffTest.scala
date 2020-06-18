@@ -1,6 +1,6 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.{EitherMatchers, TransactionGen}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.diffs._
@@ -16,6 +16,7 @@ class BlockchainUpdaterInMemoryDiffTest
     with PropertyChecks
     with DomainScenarioDrivenPropertyCheck
     with Matchers
+    with EitherMatchers
     with TransactionGen {
   val preconditionsAndPayments: Gen[(GenesisTransaction, TransferTransaction, TransferTransaction)] = for {
     master    <- accountGen
@@ -36,13 +37,13 @@ class BlockchainUpdaterInMemoryDiffTest
             Seq(payment1))
         val blockTriggersCompaction = buildBlockOfTxs(blocksWithoutCompaction.last.id(), Seq(payment2))
 
-        blocksWithoutCompaction.foreach(b => domain.blockchainUpdater.processBlock(b).explicitGet())
+        blocksWithoutCompaction.foreach(b => domain.blockchainUpdater.processBlock(b) should beRight)
         val mastersBalanceAfterPayment1 = domain.balance(genesis.recipient)
         mastersBalanceAfterPayment1 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee)
 
         domain.blockchainUpdater.height shouldBe MaxTransactionsPerBlockDiff * 2 + 1
 
-        domain.blockchainUpdater.processBlock(blockTriggersCompaction).explicitGet()
+        domain.blockchainUpdater.processBlock(blockTriggersCompaction) should beRight
 
         domain.blockchainUpdater.height shouldBe MaxTransactionsPerBlockDiff * 2 + 2
 
@@ -59,15 +60,15 @@ class BlockchainUpdaterInMemoryDiffTest
         val emptyBlock              = buildBlockOfTxs(payment1Block.id(), Seq.empty)
         val blockTriggersCompaction = buildBlockOfTxs(payment1Block.id(), Seq(payment2))
 
-        firstBlocks.foreach(b => domain.blockchainUpdater.processBlock(b).explicitGet())
-        domain.blockchainUpdater.processBlock(payment1Block).explicitGet()
-        domain.blockchainUpdater.processBlock(emptyBlock).explicitGet()
+        firstBlocks.foreach(b => domain.blockchainUpdater.processBlock(b) should beRight)
+        domain.blockchainUpdater.processBlock(payment1Block) should beRight
+        domain.blockchainUpdater.processBlock(emptyBlock) should beRight
         val mastersBalanceAfterPayment1 = domain.blockchainUpdater.balance(genesis.recipient)
         mastersBalanceAfterPayment1 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee)
 
         // discard liquid block
         domain.blockchainUpdater.removeAfter(payment1Block.id())
-        domain.blockchainUpdater.processBlock(blockTriggersCompaction).explicitGet()
+        domain.blockchainUpdater.processBlock(blockTriggersCompaction) should beRight
 
         domain.blockchainUpdater.height shouldBe MaxTransactionsPerBlockDiff * 2 + 1
 

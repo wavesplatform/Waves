@@ -7,7 +7,6 @@ import cats.syntax.either._
 import cats.syntax.functor._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.features.BlockchainFeatures.BlockV5
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt

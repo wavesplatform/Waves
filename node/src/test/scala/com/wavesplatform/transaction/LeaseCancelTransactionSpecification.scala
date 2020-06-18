@@ -80,8 +80,7 @@ class LeaseCancelTransactionSpecification extends PropSpec with PropertyChecks w
         1526646300260L,
         Proofs(ByteStr.decodeBase58("4T76AXcksn2ixhyMNu4m9UyY54M3HDTw5E2HqUsGV4phogs2vpgBcN5oncu4sbW4U3KU197yfHMxrc3kZ7e6zHG3").get)
       )
-      .right
-      .get
+      .explicitGet()
 
     js shouldEqual tx.json()
   }

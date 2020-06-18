@@ -7,7 +7,6 @@ import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics.{BlockStats, Instrumented, _}
 import com.wavesplatform.mining.microblocks.MicroBlockMiner
 import com.wavesplatform.network._
@@ -314,8 +313,8 @@ class MinerImpl(
 
   //noinspection TypeAnnotation,ScalaStyle
   private[this] object metrics {
-    val blockBuildTimeStats      = Kamon.timer("miner.pack-and-forge-block-time")
-    val microBlockBuildTimeStats = Kamon.timer("miner.forge-microblock-time")
+    val blockBuildTimeStats      = Kamon.timer("miner.pack-and-forge-block-time").withoutTags()
+    val microBlockBuildTimeStats = Kamon.timer("miner.forge-microblock-time").withoutTags()
   }
 }
 

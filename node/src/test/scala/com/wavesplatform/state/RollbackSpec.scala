@@ -75,7 +75,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             )
             .explicitGet()
         )
-      case _ => List(TransferTransaction.selfSigned(1.toByte, sender, recipient, Waves, amount, Waves, 1000, ByteStr.empty, nextTs).right.get)
+      case _ => List(TransferTransaction.selfSigned(1.toByte, sender, recipient, Waves, amount, Waves, 1000, ByteStr.empty, nextTs).explicitGet())
     }
   }
 
@@ -219,7 +219,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.blockchainUpdater.leaseBalance(recipient.toAddress).in shouldEqual leaseAmount
 
           d.removeAfter(genesisBlockId)
-          d.blockchainUpdater.leaseDetails(lt.id()) shouldBe 'empty
+          d.blockchainUpdater.leaseDetails(lt.id()) shouldBe empty
           d.blockchainUpdater.leaseBalance(sender.toAddress).out shouldEqual 0
           d.blockchainUpdater.leaseBalance(recipient.toAddress).in shouldEqual 0
         }
@@ -278,7 +278,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           val issueTransaction =
             IssueTransaction(TxVersion.V1, sender.publicKey, name.utf8Bytes, description.utf8Bytes, 2000, 8.toByte, reissuable = true, script = None, 1, nextTs)
               .signWith(sender.privateKey)
-          d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) shouldBe 'empty
+          d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) shouldBe empty
 
           d.appendBlock(
             TestBlock.create(
@@ -316,7 +316,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           )
 
           d.removeAfter(genesisBlockId)
-          d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) shouldBe 'empty
+          d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) shouldBe empty
         }
     }
 
@@ -359,7 +359,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.blockchainUpdater.accountData(sender.toAddress, dataEntry.key) should contain(dataEntry)
 
           d.removeAfter(genesisBlockId)
-          d.blockchainUpdater.accountData(sender.toAddress, dataEntry.key) shouldBe 'empty
+          d.blockchainUpdater.accountData(sender.toAddress, dataEntry.key) shouldBe empty
         }
     }
 
@@ -432,7 +432,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
       def getAsset(d: Domain, txId: ByteStr): IssuedAsset = {
         val sr = d.blockchainUpdater.bestLiquidDiff.get.scriptResults(txId)
-        sr.error shouldBe 'empty
+        sr.error shouldBe empty
         IssuedAsset(sr.issues.head.id)
       }
 
@@ -617,7 +617,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           val script = ExprScript(TRUE).explicitGet()
 
           val genesisBlockId = d.lastBlockId
-          d.blockchainUpdater.accountScript(sender.toAddress) shouldBe 'empty
+          d.blockchainUpdater.accountScript(sender.toAddress) shouldBe empty
           d.appendBlock(
             TestBlock.create(
               nextTs,
@@ -638,19 +638,19 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             )
           )
 
-          d.blockchainUpdater.accountScript(sender.toAddress) shouldBe 'empty
+          d.blockchainUpdater.accountScript(sender.toAddress) shouldBe empty
 
           d.removeAfter(blockWithScriptId)
           d.blockchainUpdater.accountScript(sender.toAddress) should contain(AccountScriptInfo(sender.publicKey, script, 1))
 
           d.removeAfter(genesisBlockId)
-          d.blockchainUpdater.accountScript(sender.toAddress) shouldBe 'empty
+          d.blockchainUpdater.accountScript(sender.toAddress) shouldBe empty
         }
     }
 
     def createSettings(preActivatedFeatures: (BlockchainFeature, Int)*): WavesSettings = {
       val tfs = TestFunctionalitySettings.Enabled.copy(
-        preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }(collection.breakOut),
+        preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }.toMap,
         blocksForFeatureActivation = 1,
         featureCheckBlocksPeriod = 1
       )
@@ -807,7 +807,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             )
             throw new Exception("Duplicate transaction wasn't checked")
           } catch {
-            case e: Throwable => Assertions.assert(e.getMessage().contains("AlreadyInTheState"))
+            case e: Throwable => Assertions.assert(e.getMessage.contains("AlreadyInTheState"))
           }
         }
     }
@@ -859,6 +859,6 @@ object RollbackSpec {
           )
         )
     }
-    ContractScript(V4, compiler.ContractCompiler(ctx.compilerContext, expr, stdLibVersion).right.get).right.get
+    ContractScript(V4, compiler.ContractCompiler(ctx.compilerContext, expr, stdLibVersion).explicitGet()).explicitGet()
   }
 }

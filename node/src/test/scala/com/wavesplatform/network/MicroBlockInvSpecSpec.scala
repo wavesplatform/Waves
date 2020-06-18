@@ -1,14 +1,14 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto._
+import com.wavesplatform.{EitherMatchers, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class MicroBlockInvSpecSpec extends FreeSpec with Matchers with PropertyChecks with Eventually with TransactionGen {
+class MicroBlockInvSpecSpec extends FreeSpec with Matchers with EitherMatchers with PropertyChecks with Eventually with TransactionGen {
 
   private val microBlockInvGen: Gen[MicroBlockInv] = for {
     acc          <- accountGen
@@ -20,9 +20,9 @@ class MicroBlockInvSpecSpec extends FreeSpec with Matchers with PropertyChecks w
     import MicroBlockInvSpec._
 
     "deserializeData(serializedData(data)) == data" in forAll(microBlockInvGen) { inv =>
-      inv.signaturesValid() shouldBe 'right
+      inv.signaturesValid() should beRight
       val restoredInv = deserializeData(serializeData(inv)).get
-      restoredInv.signaturesValid() shouldBe 'right
+      restoredInv.signaturesValid() should beRight
 
       restoredInv shouldBe inv
     }

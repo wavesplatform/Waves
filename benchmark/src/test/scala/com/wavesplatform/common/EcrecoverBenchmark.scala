@@ -7,7 +7,7 @@ import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
-import scorex.crypto.encode.Base16
+import scorex.util.encode.Base16
 import scorex.crypto.hash.Keccak256
 import scorex.crypto.signatures.{Curve25519, Signature}
 
@@ -37,7 +37,7 @@ object EcrecoverBenchmark {
   class EcrecoverSt1 {
     val signature = Base16.decode(
       "848ffb6a07e7ce335a2bfe373f1c17573eac320f658ea8cf07426544f2203e9d52dbba4584b0b6c0ed5333d84074002878082aa938fdf68c43367946b2f615d01b"
-    )
+    ).get
     val message     = "i am the owner"
     val prefix      = "\u0019Ethereum Signed Message:\n" + message.length
     val messageHash = Keccak256.hash((prefix + message).getBytes)
@@ -47,7 +47,7 @@ object EcrecoverBenchmark {
   class EcrecoverSt2 {
     val signature = Base16.decode(
       "3b163bbd90556272b57c35d1185b46824f8e16ca229bdb36f8dfd5eaaee9420723ef7bc3a6c0236568217aa990617cf292b1bef1e7d1d936fb2faef3d846c5751b"
-    )
+    ).get
     val message     = "what's up jim"
     val prefix      = "\u0019Ethereum Signed Message:\n" + message.length
     val messageHash = Keccak256.hash((prefix + message).getBytes)

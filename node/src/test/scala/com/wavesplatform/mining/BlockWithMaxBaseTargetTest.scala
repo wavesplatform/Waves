@@ -63,7 +63,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
             }
           })
 
-          val forgeBlock = PrivateMethod[MinerImpl]('forgeBlock)
+          val forgeBlock = PrivateMethod[MinerImpl](Symbol("forgeBlock"))
           try {
             miner invokePrivate forgeBlock(account)
           } catch {
