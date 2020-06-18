@@ -22,10 +22,10 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.{EitherValues, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDomain {
+class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDomain with EitherValues {
   property("reissue and burn actions result state") {
     forAll(paymentPreconditions(feeMultiplier = 0)) {
       case (genesis, setScript, invoke, issue, master, reissueAmount, burnAmount) =>
@@ -103,7 +103,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           Seq(TestBlock.create(genesis :+ setScript :+ issue)),
           TestBlock.create(Seq(invoke)),
           features
-        )(_ shouldBe 'right)
+        )(_.explicitGet())
     }
   }
 
@@ -149,11 +149,11 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           features
         ) { r =>
           r.trace.size shouldBe 4
-          r.trace.head.asInstanceOf[InvokeScriptTrace].resultE shouldBe 'right
+          r.trace.head.asInstanceOf[InvokeScriptTrace].resultE.explicitGet()
 
           val assetTrace = r.trace.tail.asInstanceOf[List[AssetVerifierTrace]]
           assetTrace.take(2).foreach(_.errorO shouldBe None)
-          assetTrace.last.errorO.get shouldBe r.resultE.left.get.asInstanceOf[TransactionValidationError].cause
+          assetTrace.last.errorO.get shouldBe r.resultE.left.value.asInstanceOf[TransactionValidationError].cause
         }
     }
   }
@@ -480,7 +480,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           features
         ) {
           case (diff, blockchain) =>
-            val asset = diff.issuedAssets.head._1
+            val asset            = diff.issuedAssets.head._1
             val sponsorshipValue = minSponsoredAssetFee.getOrElse(0L)
             diff.sponsorship shouldBe Map(asset -> SponsorshipValue(sponsorshipValue))
             blockchain.assetDescription(asset).map(_.sponsorship) shouldBe Some(sponsorshipValue)

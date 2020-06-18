@@ -7,13 +7,13 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, Transaction}
 import play.api.libs.json._
 
+import scala.collection.mutable
 import scala.collection.mutable.LinkedHashMap
 
 case class LeaseBalance(in: Long, out: Long)
@@ -160,7 +160,7 @@ case class Diff(
     scriptResults: Map[ByteStr, InvokeScriptResult]
 ) {
   def bindTransaction(tx: Transaction): Diff =
-    copy(transactions = transactions + Diff.toDiffTxData(tx, portfolios, accountData))
+    copy(transactions = transactions.concat(Map(Diff.toDiffTxData(tx, portfolios, accountData))))
 }
 
 object Diff {
@@ -179,7 +179,7 @@ object Diff {
       scriptsRun: Int = 0
   ): Diff =
     Diff(
-      transactions = LinkedHashMap(),
+      transactions = mutable.LinkedHashMap(),
       portfolios = portfolios,
       issuedAssets = issuedAssets,
       updatedAssets = updatedAssets,

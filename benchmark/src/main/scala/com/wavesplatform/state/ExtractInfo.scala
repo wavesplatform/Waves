@@ -17,7 +17,7 @@ import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.{DB, Options}
 import scodec.bits.BitVector
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 import scala.util.control.NonFatal
 
@@ -133,10 +133,10 @@ object ExtractInfo extends App with ScorexLogging {
     r
   }
 
-  def write(label: String, absolutePath: String, data: TraversableOnce[String]): Unit = {
+  def write(label: String, absolutePath: String, data: IterableOnce[String]): Unit = {
     log.info(s"Writing $label to '$absolutePath'")
     val printWriter = new PrintWriter(absolutePath)
-    data.foreach(printWriter.println)
+    data.iterator.foreach(printWriter.println)
     printWriter.close()
   }
 

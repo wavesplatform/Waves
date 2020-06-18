@@ -50,7 +50,7 @@ class AssetsApiGrpcImpl(assetsApi: CommonAssetsApi, accountsApi: CommonAccountsA
       d.description.toStringUtf8,
       d.decimals,
       d.reissuable,
-      d.totalVolume.longValue(),
+      d.totalVolume.longValue,
       d.script.map {
         case AssetScriptInfo(script, complexity) =>
           ScriptData(

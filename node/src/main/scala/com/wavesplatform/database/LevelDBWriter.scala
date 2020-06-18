@@ -35,7 +35,7 @@ import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import scala.util.Try
 import scala.util.control.NonFatal
@@ -106,7 +106,7 @@ object LevelDBWriter extends ScorexLogging {
       }
     }
 
-    recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
+    recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty).toSeq
   }
 
   def apply(db: DB, spendableBalanceChanged: Observer[(Address, Asset)], settings: WavesSettings): LevelDBWriter with AutoCloseable = {
@@ -332,16 +332,16 @@ abstract class LevelDBWriter private[database] (
     }
 
     for ((addressId, nftIds) <- updatedNftLists.asMap().asScala) {
-      val kCount           = Keys.nftCount(AddressId(addressId))
+      val kCount           = Keys.nftCount(AddressId(addressId.toLong))
       val previousNftCount = rw.get(kCount)
       rw.put(kCount, previousNftCount + nftIds.size())
       for ((id, idx) <- nftIds.asScala.zipWithIndex) {
-        rw.put(Keys.nftAt(AddressId(addressId), idx, id), Some(()))
+        rw.put(Keys.nftAt(AddressId(addressId.toLong), idx, id), Some(()))
       }
     }
 
     changedAssetBalances.asMap().forEach { (asset, addresses) =>
-      rw.put(Keys.changedBalances(height, asset), addresses.asScala.map(AddressId(_)).toSeq)
+      rw.put(Keys.changedBalances(height, asset), addresses.asScala.map(id => AddressId(id.toLong)).toSeq)
     }
   }
 
@@ -512,7 +512,7 @@ abstract class LevelDBWriter private[database] (
           approvedFeaturesCache = newlyApprovedFeatures ++ rw.get(Keys.approvedFeatures)
           rw.put(Keys.approvedFeatures, approvedFeaturesCache)
 
-          val featuresToSave = newlyApprovedFeatures.mapValues(_ + activationWindowSize) ++ rw.get(Keys.activatedFeatures)
+          val featuresToSave = (newlyApprovedFeatures.view.mapValues(_ + activationWindowSize) ++ rw.get(Keys.activatedFeatures)).toMap
 
           activatedFeaturesCache = featuresToSave ++ settings.functionalitySettings.preActivatedFeatures
           rw.put(Keys.activatedFeatures, featuresToSave)
@@ -867,11 +867,13 @@ abstract class LevelDBWriter private[database] (
       .flatMap { h =>
         val height = Height(h)
         db.get(Keys.blockMetaAt(height))
-          .map(_.header.featureVotes.toSeq)
+          .map(_.header.featureVotes)
           .getOrElse(Seq.empty)
       }
       .groupBy(identity)
+      .view
       .mapValues(_.size)
+      .toMap
   }
 
   override def blockRewardVotes(height: Int): Seq[Long] = readOnly { db =>

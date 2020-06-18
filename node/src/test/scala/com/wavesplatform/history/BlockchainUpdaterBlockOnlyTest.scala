@@ -1,17 +1,23 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.history.Domain.BlockchainUpdaterExt
+import com.wavesplatform.{EitherMatchers, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
+class BlockchainUpdaterBlockOnlyTest
+    extends PropSpec
+    with PropertyChecks
+    with DomainScenarioDrivenPropertyCheck
+    with Matchers
+    with EitherMatchers
+    with TransactionGen {
 
   def preconditionsAndPayments(paymentsAmt: Int): Gen[(GenesisTransaction, Seq[TransferTransaction])] =
     for {
@@ -27,7 +33,7 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
     scenario(preconditionsAndPayments(1)) {
       case (domain, (genesis, payments)) =>
         val blocks = chainBlocks(Seq(Seq(genesis), Seq(payments.head)))
-        all(blocks.map(block => domain.blockchainUpdater.processBlock(block))) shouldBe 'right
+        blocks.map(block => domain.blockchainUpdater.processBlock(block) should beRight)
     }
   }
 
@@ -35,15 +41,15 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
     assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
     scenario(preconditionsAndPayments(2)) {
       case (domain, (genesis, payments)) =>
-        val blocks = chainBlocks(Seq(Seq(genesis), Seq(payments(0)), Seq(payments(1))))
-        domain.blockchainUpdater.processBlock(blocks.head) shouldBe 'right
+        val blocks = chainBlocks(Seq(Seq(genesis), Seq(payments.head), Seq(payments(1))))
+        domain.blockchainUpdater.processBlock(blocks.head) should beRight
         domain.blockchainUpdater.height shouldBe 1
-        domain.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
+        domain.blockchainUpdater.processBlock(blocks(1)) should beRight
         domain.blockchainUpdater.height shouldBe 2
-        domain.blockchainUpdater.removeAfter(blocks.head.id()) shouldBe 'right
+        domain.blockchainUpdater.removeAfter(blocks.head.id()) should beRight
         domain.blockchainUpdater.height shouldBe 1
-        domain.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
-        domain.blockchainUpdater.processBlock(blocks(2)) shouldBe 'right
+        domain.blockchainUpdater.processBlock(blocks(1)) should beRight
+        domain.blockchainUpdater.processBlock(blocks(2)) should beRight
     }
   }
 
@@ -52,7 +58,7 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
     scenario(preconditionsAndPayments(1)) {
       case (domain, (genesis, payment)) =>
         val blocks = chainBlocks(Seq(Seq(genesis), payment))
-        domain.blockchainUpdater.processBlock(blocks.head) shouldBe 'right
+        domain.blockchainUpdater.processBlock(blocks.head) should beRight
         domain.blockchainUpdater.processBlock(spoilSignature(blocks.last)) should produce("invalid signature")
     }
   }
@@ -62,9 +68,9 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
     scenario(preconditionsAndPayments(1)) {
       case (domain, (genesis, payment)) =>
         val blocks = chainBlocks(Seq(Seq(genesis), payment))
-        domain.blockchainUpdater.processBlock(blocks.head) shouldBe 'right
-        domain.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
-        domain.blockchainUpdater.removeAfter(blocks.head.id()) shouldBe 'right
+        domain.blockchainUpdater.processBlock(blocks.head) should beRight
+        domain.blockchainUpdater.processBlock(blocks(1)) should beRight
+        domain.blockchainUpdater.removeAfter(blocks.head.id()) should beRight
         domain.blockchainUpdater.processBlock(spoilSignature(blocks(1))) should produce("invalid signature")
     }
   }
@@ -75,9 +81,9 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
       case (domain, (genesis, payments)) =>
         val blocks = chainBlocks(Seq(genesis) +: payments.map(Seq(_)))
         blocks.foreach { b =>
-          domain.blockchainUpdater.processBlock(b) shouldBe 'right
+          domain.blockchainUpdater.processBlock(b) should beRight
         }
-        domain.blockchainUpdater.removeAfter(blocks.head.id()) shouldBe 'right
+        domain.blockchainUpdater.removeAfter(blocks.head.id()) should beRight
     }
   }
 }

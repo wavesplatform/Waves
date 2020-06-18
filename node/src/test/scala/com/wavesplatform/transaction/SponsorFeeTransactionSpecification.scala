@@ -97,8 +97,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
         1520945679531L,
         Proofs(Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get))
       )
-      .right
-      .get
+      .explicitGet()
     js shouldEqual tx.json()
   }
 
@@ -145,7 +144,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
     js shouldEqual tx.json()
     js shouldEqual tx1.json()
   }
-  val invalidFee =
+  private val invalidFee =
     Table(
       "fee",
       -1 * Constants.UnitsInWave,
@@ -277,7 +276,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
         }
 
         assertDiffEi(Seq(b0), b2, BlockV5Settings) { ei =>
-          ei shouldBe 'right
+          ei.explicitGet()
         }
     }
   }

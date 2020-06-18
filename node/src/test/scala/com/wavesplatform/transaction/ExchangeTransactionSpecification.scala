@@ -15,7 +15,6 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 
 import scala.math.pow
-import scala.util.Success
 
 class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen with NTPTime with NoShrink {
   val versionsGen: Gen[(Byte, Byte, Byte)] = Gen.oneOf(
@@ -111,7 +110,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         |""".stripMargin
     )
 
-    val Success(tx) = ExchangeTransaction.serializer.parseBytes(bytes)
+    val tx = ExchangeTransaction.serializer.parseBytes(bytes).get
     tx.json() shouldBe json
     assert(crypto.verify(tx.sellOrder.signature, tx.sellOrder.bodyBytes(), tx.sellOrder.sender), "sellOrder signature should be valid")
     assert(crypto.verify(tx.buyOrder.signature, tx.buyOrder.bodyBytes(), tx.buyOrder.sender), "buyOrder signature should be valid")
@@ -181,7 +180,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         |""".stripMargin
     )
 
-    val Success(tx) = ExchangeTransaction.serializer.parseBytes(bytes)
+    val tx = ExchangeTransaction.serializer.parseBytes(bytes).get
     tx.json() shouldBe json
     assert(crypto.verify(tx.sellOrder.signature, tx.sellOrder.bodyBytes(), tx.sellOrder.sender), "sellOrder signature should be valid")
     assert(crypto.verify(tx.buyOrder.signature, tx.buyOrder.bodyBytes(), tx.buyOrder.sender), "buyOrder signature should be valid")

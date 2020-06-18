@@ -14,6 +14,7 @@ object TransactionsOrdering {
       (byFee.toDouble / size.toDouble, byFee, byTimestamp)
     }
     override def compare(first: Transaction, second: Transaction): Int = {
+      import Ordering.Double.TotalOrdering
       implicitly[Ordering[(Double, Long, Long)]].compare(orderBy(first), orderBy(second))
     }
   }

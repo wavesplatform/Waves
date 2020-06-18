@@ -91,7 +91,7 @@ class Worker(
         validChannel <- validateChannel(channel)
         _            <- logInfo(s"Sending initial transactions to $validChannel")
         cntToSend    <- calcAndSaveCntToSend(state)
-        _            <- Task.deferFuture(networkSender.send(validChannel, txs.take(cntToSend).toStream: _*))
+        _            <- Task.deferFuture(networkSender.send(validChannel, txs.take(cntToSend): _*))
         r <- if (cntToSend >= txs.size) sleepOrWaitEmptyUtx(settings.tailInitialDelay) *> writeTailInitial(validChannel, state)
         else sleep(settings.delay) *> Task.defer(writeInitial(channel, state, txs.drop(cntToSend)))
       } yield r
@@ -114,7 +114,7 @@ class Worker(
         validChannel <- validateChannel(channel)
         _            <- logInfo(s"Sending tail initial transactions to $validChannel")
         cntToSend    <- calcAndSaveCntToSend(state)
-        _            <- Task.deferFuture(networkSender.send(validChannel, txs.take(cntToSend).toStream: _*))
+        _            <- Task.deferFuture(networkSender.send(validChannel, txs.take(cntToSend): _*))
         r <- if (cntToSend >= txs.size) sleepOrWaitEmptyUtx(settings.initialDelay) *> Task.now(validChannel)
         else sleep(settings.delay) *> Task.defer(writeTailInitial(validChannel, state, txs.drop(cntToSend)))
       } yield r
@@ -128,7 +128,7 @@ class Worker(
         validChannel <- validateChannel(channel)
         cntToSend    <- calcAndSaveCntToSend(state)
         _            <- logInfo(s"Sending $cntToSend transactions to $validChannel")
-        txs          <- Task(transactionSource.take(cntToSend).toStream)
+        txs          <- Task(transactionSource.take(cntToSend).to(LazyList))
         _            <- txs.headOption.fold(Task.unit)(tx => logInfo(s"Head transaction id: ${tx.id()}"))
         _            <- Task.deferFuture(networkSender.send(validChannel, txs: _*))
         _            <- sleep(settings.delay)

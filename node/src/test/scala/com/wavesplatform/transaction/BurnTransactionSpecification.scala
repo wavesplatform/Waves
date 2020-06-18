@@ -76,8 +76,7 @@ class BurnTransactionSpecification extends PropSpec with PropertyChecks with Mat
         1526287561757L,
         Proofs(ByteStr.decodeBase58("uapJcAJQryBhWThU43rYgMNmvdT7kY747vx5BBgxr2KvaeTRx8Vsuh4yu1JxBymU9LnAoo1zjQcPrWSuhi6dVPE").get)
       )
-      .right
-      .get
+      .explicitGet()
     js shouldEqual tx.json()
   }
 
@@ -110,8 +109,7 @@ class BurnTransactionSpecification extends PropSpec with PropertyChecks with Mat
         1526287561757L,
         Proofs(Seq(ByteStr.decodeBase58("3NcEv6tcVMuXkTJwiqW4J3GMCTe8iSLY7neEfNZonp59eTQEZXYPQWs565CRUctDrvcbtmsRgWvnN7BnFZ1AVZ1H").get))
       )
-      .right
-      .get
+      .explicitGet()
 
     js shouldEqual tx.json()
   }

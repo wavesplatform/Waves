@@ -31,12 +31,19 @@ import com.wavesplatform.transaction.transfer.{MassTransferTransaction, Transfer
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TestValues, TransactionGen, crypto}
 import org.scalacheck.Gen
-import org.scalatest.{Inside, PropSpec}
+import org.scalatest.{EitherValues, Inside, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.util.Random
 
-class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with TransactionGen with Inside with NoShrink with WithDomain {
+class ExchangeTransactionDiffTest
+    extends PropSpec
+    with PropertyChecks
+    with TransactionGen
+    with Inside
+    with NoShrink
+    with WithDomain
+    with EitherValues {
 
   private def wavesPortfolio(amt: Long) = Portfolio.waves(amt)
 
@@ -118,7 +125,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Tran
           TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
           fsWithOrderFeature
         ) {
-          case (blockDiff, state) =>
+          case (blockDiff, _) =>
             val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
             totalPortfolioDiff.balance shouldBe 0
             totalPortfolioDiff.effectiveBalance shouldBe 0
@@ -164,13 +171,14 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Tran
           TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
           fsWithOrderFeature
         ) {
-          case (blockDiff, state) =>
+          case (blockDiff, _) =>
             val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
             totalPortfolioDiff.balance shouldBe 0
             totalPortfolioDiff.effectiveBalance shouldBe 0
             totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
-            val matcherPortfolio = Monoid.combineAll(blockDiff.portfolios.filterKeys(_.stringRepr == exchange.sender.toAddress.stringRepr).values)
+            val matcherPortfolio =
+              Monoid.combineAll(blockDiff.portfolios.view.filterKeys(_.stringRepr == exchange.sender.toAddress.stringRepr).values)
 
             val restoredMatcherPortfolio =
               Monoid.combineAll(
@@ -223,18 +231,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Tran
 
   property("Preserves assets invariant (matcher's fee in separately issued asset), stores match info, rewards matcher (Orders V3 are used)") {
 
-    val preconditionsAndExchange: Gen[
-      (
-          GenesisTransaction,
-          GenesisTransaction,
-          GenesisTransaction,
-          IssueTransaction,
-          IssueTransaction,
-          IssueTransaction,
-          IssueTransaction,
-          ExchangeTransaction
-      )
-    ] = for {
+    val preconditionsAndExchange = for {
       buyer   <- accountGen
       seller  <- accountGen
       matcher <- accountGen
@@ -246,7 +243,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Tran
       issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
       issue3: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1).retryUntil(_.script.isEmpty)
       issue4: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1).retryUntil(_.script.isEmpty)
-      maybeAsset1              <- (Gen.option(issue1.id())).map(Asset.fromCompatId)
+      maybeAsset1              <- Gen.option(issue1.id()).map(Asset.fromCompatId)
       maybeAsset2              <- (Gen.option(issue2.id()) suchThat (x => x != maybeAsset1.compatId)).map(Asset.fromCompatId)
       buyMatcherFeeAssetId  = IssuedAsset(issue3.id())
       sellMatcherFeeAssetId = IssuedAsset(issue4.id())
@@ -269,13 +266,14 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Tran
           TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
           fsWithOrderFeature
         ) {
-          case (blockDiff, state) =>
+          case (blockDiff, _) =>
             val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
             totalPortfolioDiff.balance shouldBe 0
             totalPortfolioDiff.effectiveBalance shouldBe 0
             totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
-            val matcherPortfolio = Monoid.combineAll(blockDiff.portfolios.filterKeys(_.stringRepr == exchange.sender.toAddress.stringRepr).values)
+            val matcherPortfolio =
+              Monoid.combineAll(blockDiff.portfolios.view.filterKeys(_.stringRepr == exchange.sender.toAddress.stringRepr).values)
 
             val restoredMatcherPortfolio =
               Monoid.combineAll(
@@ -330,18 +328,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Tran
 
   property("Validation fails when balance of asset issued separately (asset is not in the pair) is less than fee in that asset (Orders V3 are used)") {
 
-    val preconditionsAndExchange: Gen[
-      (
-          GenesisTransaction,
-          GenesisTransaction,
-          GenesisTransaction,
-          IssueTransaction,
-          IssueTransaction,
-          IssueTransaction,
-          IssueTransaction,
-          ExchangeTransaction
-      )
-    ] = for {
+    val preconditionsAndExchange = for {
       buyer   <- accountGen
       seller  <- accountGen
       matcher <- accountGen
@@ -665,7 +652,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Tran
     }
   }
 
-  val fsV2 = createSettings(
+  private val fsV2 = createSettings(
     BlockchainFeatures.SmartAccounts       -> 0,
     BlockchainFeatures.SmartAccountTrading -> 0,
     BlockchainFeatures.SmartAssets         -> 0,
@@ -677,7 +664,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Tran
   private def createSettings(preActivatedFeatures: (BlockchainFeature, Int)*): FunctionalitySettings =
     TestFunctionalitySettings.Enabled
       .copy(
-        preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }(collection.breakOut),
+        preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }.toMap,
         blocksForFeatureActivation = 1,
         featureCheckBlocksPeriod = 1
       )
@@ -707,7 +694,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Tran
         val blockWithEnoughFeeETx = TestBlock.create(Seq(exchangeWithEnoughFee))
 
         assertLeft(preconBlocks, blockWithSmallFeeETx, fsV2)("does not exceed minimal value of")
-        assertDiffEi(preconBlocks, blockWithEnoughFeeETx, fsV2)(_ shouldBe 'right)
+        assertDiffEi(preconBlocks, blockWithEnoughFeeETx, fsV2)(_.explicitGet())
     }
   }
 
@@ -883,7 +870,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Tran
       val test = TestBlock.create(Seq(exchangeTx))
       if (o1.version == 2 && o2.version == 2) {
         assertDiffEi(pretest, test, fs) { diff =>
-          diff shouldBe 'right
+          diff.explicitGet()
         }
       } else {
         assertLeft(pretest, test, fs)("Can't process order with signature from scripted account")
@@ -1006,11 +993,10 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Tran
         ttx4 = TransferTransaction
           .selfSigned(TxVersion.V3, MATCHER, buyer.toAddress, IssuedAsset(itx2.assetId), ENOUGH_AMT / 2, Waves, fee, ByteStr.empty, itx2.timestamp + 1)
           .explicitGet()
-        assets        = Seq(IssuedAsset(itx1.assetId), IssuedAsset(itx2.assetId), Waves)
-        assetsDecimal = Map(IssuedAsset(itx1.assetId) -> itx1.decimals, IssuedAsset(itx2.assetId) -> itx2.decimals, Waves -> 8.toByte)
+        assets = Seq(IssuedAsset(itx1.assetId), IssuedAsset(itx2.assetId), Waves)
         amountAsset <- Gen.oneOf(assets)
         priceAsset  <- Gen.oneOf(assets).filter(_ != amountAsset)
-        tx     <- exchangeGeneratorP(buyer, seller, amountAsset, priceAsset, fixedMatcher = Some(MATCHER))
+        tx          <- exchangeGeneratorP(buyer, seller, amountAsset, priceAsset, fixedMatcher = Some(MATCHER))
         fixed = tx
           .copy(
             version = TxVersion.V3,
@@ -1085,7 +1071,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Tran
     forAll(scenario) {
       case (exchange, (buyerBalance, sellerBalance, matcherBalance), genesisTxs) =>
         assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(exchange), Block.ProtoBlockVersion), fsWithOrderFeature) { ei =>
-          ei shouldBe 'left
+          ei.left.value
         }
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(exchange), Block.ProtoBlockVersion), fsWithBlockV5) {
           case (diff, state) =>
@@ -1117,16 +1103,16 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Tran
 
   property("Counts exchange fee asset complexity") {
     def test(tradeableAssetIssue: IssueTransaction, feeAssetIssue: IssueTransaction, complexity: Long): Unit = {
-      val order1              = TxHelpers.orderV3(OrderType.BUY, IssuedAsset(tradeableAssetIssue.assetId), IssuedAsset(feeAssetIssue.assetId))
-      val order2              = TxHelpers.orderV3(OrderType.SELL, IssuedAsset(tradeableAssetIssue.assetId), IssuedAsset(feeAssetIssue.assetId))
-      val exchange            = TxHelpers.exchange(order1, order2)
+      val order1   = TxHelpers.orderV3(OrderType.BUY, IssuedAsset(tradeableAssetIssue.assetId), IssuedAsset(feeAssetIssue.assetId))
+      val order2   = TxHelpers.orderV3(OrderType.SELL, IssuedAsset(tradeableAssetIssue.assetId), IssuedAsset(feeAssetIssue.assetId))
+      val exchange = TxHelpers.exchange(order1, order2)
 
       withDomain(
         domainSettingsWithFS(
           TestFunctionalitySettings.withFeatures(BlockchainFeatures.SmartAssets, BlockchainFeatures.SmartAccountTrading, BlockchainFeatures.OrderV3)
         )
       ) { d =>
-        d.appendBlock(Seq(tradeableAssetIssue, feeAssetIssue).distinct:_*)
+        d.appendBlock(Seq(tradeableAssetIssue, feeAssetIssue).distinct: _*)
         val newBlock = d.createBlock(2.toByte, Seq(exchange))
         val diff     = BlockDiffer.fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited).explicitGet()
         diff.diff.scriptsComplexity shouldBe complexity
@@ -1247,12 +1233,12 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Tran
       case (_: Order, _: Order) | (_: Order, _: Order) =>
         val isBuyerReceiveAmountGreaterThanFee =
           if (ex.buyOrder.assetPair.amountAsset == ex.buyOrder.matcherFeeAssetId) {
-            ExchangeTransactionDiff.getReceiveAmount(ex.buyOrder, 8, 8, ex.amount, ex.price).right.get > ex.buyMatcherFee
+            ExchangeTransactionDiff.getReceiveAmount(ex.buyOrder, 8, 8, ex.amount, ex.price).explicitGet() > ex.buyMatcherFee
           } else true
 
         val isSellerReceiveAmountGreaterThanFee =
           if (ex.sellOrder.assetPair.amountAsset == ex.sellOrder.matcherFeeAssetId) {
-            ExchangeTransactionDiff.getReceiveAmount(ex.sellOrder, 8, 8, ex.amount, ex.price).right.get > ex.sellMatcherFee
+            ExchangeTransactionDiff.getReceiveAmount(ex.sellOrder, 8, 8, ex.amount, ex.price).explicitGet() > ex.sellMatcherFee
           } else true
 
         isBuyerReceiveAmountGreaterThanFee && isSellerReceiveAmountGreaterThanFee

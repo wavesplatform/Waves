@@ -105,8 +105,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
         Proofs(Seq(ByteStr("assetWProofs".getBytes("UTF-8")))),
         AddressScheme.current.chainId
       )
-      .right
-      .get
+      .explicitGet()
 
     assertBadRequestAndMessage(
       sender.signedBroadcast(incorrectBrTx.json()),

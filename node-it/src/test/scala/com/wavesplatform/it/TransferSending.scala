@@ -131,8 +131,7 @@ trait TransferSending extends ScorexLogging {
                   else ByteStr.empty,
                 timestamp = start + i
               )
-              .right
-              .get
+              .explicitGet()
           )
       }
       .grouped(requests.size / nodes.size + 1)

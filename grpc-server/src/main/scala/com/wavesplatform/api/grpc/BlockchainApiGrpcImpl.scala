@@ -2,7 +2,6 @@ package com.wavesplatform.api.grpc
 
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.settings.FeaturesSettings
 import com.wavesplatform.state.Blockchain

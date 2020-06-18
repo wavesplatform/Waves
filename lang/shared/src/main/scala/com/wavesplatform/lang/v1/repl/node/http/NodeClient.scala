@@ -11,7 +11,6 @@ import io.circe.parser.decode
 
 import scala.concurrent.ExecutionContext.Implicits.{global => g}
 import scala.concurrent.Future
-import scala.language.higherKinds
 
 private[node] case class NodeClient(baseUrl: String) {
   def get[F[_] : Functor : ResponseWrapper, R: Decoder](path: String): Future[F[R]] =

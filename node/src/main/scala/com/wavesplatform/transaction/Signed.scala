@@ -33,12 +33,9 @@ object Signed {
     Await.result(
       Task
         .parTraverse(ss)(s => s.signaturesValidMemoized)
-        .map { l =>
-          l.find(_.isLeft) match {
-            case Some(e) => Left(e.left.get)
-            case None    => Right(ss)
-          }
-        }
+        .map(
+          _.collectFirst { case Left(v) => Left(v) }.getOrElse(Right(ss))
+        )
         .runAsyncLogErr,
       Duration.Inf
     )

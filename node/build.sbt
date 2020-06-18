@@ -4,14 +4,12 @@ import com.typesafe.sbt.packager.Keys.executableScriptName
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbtassembly.MergeStrategy
 
-addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.1" cross CrossVersion.full)
-
 enablePlugins(RunApplicationSettings, JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning, VersionObject)
 
 resolvers ++= Seq(
   Resolver.bintrayRepo("ethereum", "maven"),
   Resolver.bintrayRepo("dnvriend", "maven"),
-  Resolver.sbtPluginRepo("releases"),
+  Resolver.sbtPluginRepo("releases")
 )
 
 libraryDependencies ++= Dependencies.node.value
@@ -25,7 +23,8 @@ inConfig(Compile)(
     PB.deleteTargetDirectory := false,
     packageDoc / publishArtifact := false,
     packageSrc / publishArtifact := false
-  ))
+  )
+)
 
 val aopMerge: MergeStrategy = new MergeStrategy {
   import scala.xml._
@@ -54,11 +53,13 @@ inTask(assembly)(
     test := {},
     assemblyJarName := s"waves-all-${version.value}.jar",
     assemblyMergeStrategy := {
+      case "module-info.class"                                  => MergeStrategy.discard
       case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.concat
       case PathList("META-INF", "aop.xml")                      => aopMerge
       case other                                                => (assemblyMergeStrategy in assembly).value(other)
     }
-  ))
+  )
+)
 
 scriptClasspath += "*" // adds "$lib_dir/*" to app_classpath in the executable file
 // Logback creates a "waves.directory_UNDEFINED" without this option.
@@ -100,14 +101,16 @@ inConfig(Universal)(
       // JVM default charset for proper and deterministic getBytes behaviour
       "-J-Dfile.encoding=UTF-8"
     )
-  ))
+  )
+)
 
 inConfig(Linux)(
   Seq(
     maintainer := "wavesplatform.com",
     packageSummary := "Waves node",
     packageDescription := "Waves node"
-  ))
+  )
+)
 
 inConfig(Debian)(
   Seq(
@@ -135,14 +138,15 @@ inConfig(Debian)(
         |    /sbin/init --version | grep upstart >/dev/null 2>&1
         |}
         |""".stripMargin
-  ) ++ nameFix)
+  ) ++ nameFix
+)
 
 V.scalaPackage := "com.wavesplatform"
 
 // Hack for https://youtrack.jetbrains.com/issue/SCL-15210
 
 moduleName := s"waves${network.value.packageSuffix}" // waves-*.jar instead of node-*.jar
-executableScriptName := moduleName.value // bin/waves instead of bin/node
+executableScriptName := moduleName.value             // bin/waves instead of bin/node
 
 // Variable options are used in different tasks and configs, so we will specify all of them
 val nameFix = Seq(

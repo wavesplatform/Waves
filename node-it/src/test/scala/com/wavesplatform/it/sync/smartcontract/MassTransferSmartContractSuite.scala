@@ -71,8 +71,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
     val transfers =
       MassTransferTransaction
         .parseTransfersList(List(Transfer(thirdAddress, 4 * transferAmount), Transfer(secondAddress, 4 * transferAmount)))
-        .right
-        .get
+        .explicitGet()
 
     val unsigned =
       MassTransferTransaction.create(1.toByte, notMiner.publicKey, Waves, transfers, calcMassTransferFee(2) + smartFee, currTime, ByteStr.empty,  Proofs.empty)

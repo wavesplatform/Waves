@@ -64,7 +64,7 @@ object Transaction {
       version.toByte,
       senderPublicKey,
       proofs,
-      bodyBytes,
+      ByteString(),
       succeed
     )
 }

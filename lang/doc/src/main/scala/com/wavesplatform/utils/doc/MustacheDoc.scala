@@ -2,7 +2,7 @@ package com.wavesplatform.utils.doc
 
 import com.wavesplatform.lang.v1.compiler.Types._
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 abstract class TypeDoc {
   val name: String

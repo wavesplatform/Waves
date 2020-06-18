@@ -418,8 +418,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   ): Gen[ReissueTransaction] = {
     for {
       tx <- Gen.oneOf(
-        ReissueTransaction.selfSigned(1.toByte, reissuer, assetId, quantity, reissuable, fee, timestamp).right.get,
-        ReissueTransaction.selfSigned(2.toByte, reissuer, assetId, quantity, reissuable, fee, timestamp).right.get
+        ReissueTransaction.selfSigned(1.toByte, reissuer, assetId, quantity, reissuable, fee, timestamp).explicitGet(),
+        ReissueTransaction.selfSigned(2.toByte, reissuer, assetId, quantity, reissuable, fee, timestamp).explicitGet()
       )
     } yield tx
   }
@@ -702,8 +702,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       val matcher    = fixedMatcher.getOrElse(genMatcher)
       val o1         = Order.buy(1: Byte, buyer, matcher.publicKey, assetPair, amount1, price, timestamp, expiration, matcherFee)
       val o2         = Order.sell(1: Byte, seller, matcher.publicKey, assetPair, amount2, price, timestamp, expiration, matcherFee)
-      val buyFee     = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
-      val sellFee    = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
+      val buyFee     = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue
+      val sellFee    = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue
       val trans =
         ExchangeTransaction(1.toByte, o1, o2, matchedAmount, price, buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100, Proofs.empty, chainId)
           .signWith(matcher.privateKey)
@@ -747,8 +747,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       mkO2 <- Gen.oneOf(orderVersions.map(mkSellOrder).toSeq)
     } yield {
 
-      val buyFee  = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
-      val sellFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
+      val buyFee  = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue
+      val sellFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue
 
       val o1 = mkO1(buyer, matcher.publicKey, assetPair, amount1, price, timestamp, expiration, matcherFee)
       val o2 = mkO2(seller, matcher.publicKey, assetPair, amount2, price, timestamp, expiration, matcherFee)

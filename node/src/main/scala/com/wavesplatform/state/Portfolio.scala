@@ -63,10 +63,10 @@ object Portfolio {
     )
 
     def multiply(f: Fraction): Portfolio =
-      Portfolio(f(self.balance), LeaseBalance.empty, self.assets.mapValues(f.apply))
+      Portfolio(f(self.balance), LeaseBalance.empty, self.assets.view.mapValues(f.apply).toMap)
 
     def minus(other: Portfolio): Portfolio =
-      Portfolio(self.balance - other.balance, LeaseBalance.empty, Monoid.combine(self.assets, other.assets.mapValues(-_)))
+      Portfolio(self.balance - other.balance, LeaseBalance.empty, Monoid.combine(self.assets, other.assets.view.mapValues(-_).toMap))
 
     def negate: Portfolio = Portfolio.empty minus self
 
@@ -83,7 +83,7 @@ object Portfolio {
   }
 
   implicit val assetMapReads: Reads[Map[IssuedAsset, Long]] = Reads {
-    case JsObject(fields) => {
+    case JsObject(fields) =>
       val keyReads = implicitly[Reads[Long]]
       val valueReads: String => JsResult[IssuedAsset] = (s: String) =>
         Base58
@@ -94,6 +94,7 @@ object Portfolio {
           )
 
       type Errors = Seq[(JsPath, Seq[JsonValidationError])]
+
       def locate(e: Errors, key: String) = e.map {
         case (p, valerr) => (JsPath \ key) ++ p -> valerr
       }
@@ -114,7 +115,6 @@ object Portfolio {
             }
         }
         .fold(JsError.apply, res => JsSuccess(res))
-    }
 
     case _ => JsError("error.expected.jsobject")
   }

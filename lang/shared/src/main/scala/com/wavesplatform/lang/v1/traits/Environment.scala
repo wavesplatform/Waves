@@ -4,8 +4,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.traits.domain._
 import shapeless._
 
-import scala.language.higherKinds
-
 object Environment {
   import io.circe.{Decoder, HCursor}
 

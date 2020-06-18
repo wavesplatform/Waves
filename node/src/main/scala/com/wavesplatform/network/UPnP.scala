@@ -6,7 +6,7 @@ import com.wavesplatform.settings.UPnPSettings
 import com.wavesplatform.utils.ScorexLogging
 import org.bitlet.weupnp.{GatewayDevice, GatewayDiscover}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.util.Try
 
 class UPnP(settings: UPnPSettings) extends ScorexLogging {

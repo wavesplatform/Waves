@@ -25,6 +25,7 @@ class BlockchainUpdaterNFTTest
     with PropertyChecks
     with DomainScenarioDrivenPropertyCheck
     with Matchers
+    with EitherMatchers
     with TransactionGen
     with BlocksTransactionsHelpers
     with NoShrink {
@@ -33,18 +34,18 @@ class BlockchainUpdaterNFTTest
     forAll(Preconditions.nftTransfer()) {
       case (issue, Seq(firstAccount, secondAccount), Seq(genesisBlock, issueBlock, keyBlock, postBlock), Seq(microBlock)) =>
         withDomain(settingsWithFeatures(BlockchainFeatures.NG, BlockchainFeatures.ReduceNFTFee)) { d =>
-          d.blockchainUpdater.processBlock(genesisBlock) shouldBe 'right
-          d.blockchainUpdater.processBlock(issueBlock) shouldBe 'right
-          d.blockchainUpdater.processBlock(keyBlock) shouldBe 'right
+          d.blockchainUpdater.processBlock(genesisBlock) should beRight
+          d.blockchainUpdater.processBlock(issueBlock) should beRight
+          d.blockchainUpdater.processBlock(keyBlock) should beRight
 
           d.nftList(firstAccount).map(_._1.id) shouldBe Seq(issue.id())
           d.nftList(secondAccount) shouldBe Nil
 
-          d.blockchainUpdater.processMicroBlock(microBlock) shouldBe 'right
+          d.blockchainUpdater.processMicroBlock(microBlock) should beRight
           d.nftList(firstAccount) shouldBe Nil
           d.nftList(secondAccount).map(_._1.id) shouldBe Seq(issue.id())
 
-          d.blockchainUpdater.processBlock(postBlock) shouldBe 'right
+          d.blockchainUpdater.processBlock(postBlock) should beRight
           d.nftList(firstAccount) shouldBe Nil
           d.nftList(secondAccount).map(_._1.id) shouldBe Seq(issue.id())
         }
@@ -62,18 +63,18 @@ class BlockchainUpdaterNFTTest
             BlockchainFeatures.Ride4DApps
           )
         ) { d =>
-          d.blockchainUpdater.processBlock(genesisBlock) shouldBe 'right
-          d.blockchainUpdater.processBlock(issueBlock) shouldBe 'right
-          d.blockchainUpdater.processBlock(keyBlock) shouldBe 'right
+          d.blockchainUpdater.processBlock(genesisBlock) should beRight
+          d.blockchainUpdater.processBlock(issueBlock) should beRight
+          d.blockchainUpdater.processBlock(keyBlock) should beRight
 
           d.nftList(firstAccount).map(_._1.id) shouldBe Seq(issue.id())
           d.nftList(secondAccount) shouldBe Nil
 
-          d.blockchainUpdater.processMicroBlock(microBlock) shouldBe 'right
+          d.blockchainUpdater.processMicroBlock(microBlock) should beRight
           d.nftList(firstAccount) shouldBe Nil
           d.nftList(secondAccount).map(_._1.id) shouldBe Seq(issue.id())
 
-          d.blockchainUpdater.processBlock(postBlock) shouldBe 'right
+          d.blockchainUpdater.processBlock(postBlock) should beRight
           d.nftList(firstAccount) shouldBe Nil
           d.nftList(secondAccount).map(_._1.id) shouldBe Seq(issue.id())
         }

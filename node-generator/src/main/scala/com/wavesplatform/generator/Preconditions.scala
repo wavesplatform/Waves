@@ -19,7 +19,7 @@ import com.wavesplatform.utils.Time
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 
-import scala.collection.generic.CanBuildFrom
+import scala.collection.Factory
 
 object Preconditions {
   private[this] val Fee = 1500000L
@@ -84,9 +84,9 @@ object Preconditions {
                 .selfSigned(2.toByte, settings.faucet, acc.toAddress, Waves, balance, Waves, Fee, ByteStr.empty, time.correctedTime())
                 .explicitGet()
               val scriptAndTx = scriptOption.map { file =>
-                val scriptText         = new String(Files.readAllBytes(Paths.get(file)))
-                val Right((script, _)) = ScriptCompiler.compile(scriptText, estimator)
-                val Right(tx)          = SetScriptTransaction.selfSigned(1.toByte, acc, Some(script), Fee, time.correctedTime())
+                val scriptText = new String(Files.readAllBytes(Paths.get(file)))
+                val script     = ScriptCompiler.compile(scriptText, estimator).explicitGet()._1
+                val tx         = SetScriptTransaction.selfSigned(1.toByte, acc, Some(script), Fee, time.correctedTime()).explicitGet()
                 (script, tx)
               }
 
@@ -170,19 +170,19 @@ object Preconditions {
       config.as[List[CreateAccountP]](s"$path.accounts")(
         traversableReader(
           accountSectionReader,
-          implicitly[CanBuildFrom[Nothing, CreateAccountP, List[CreateAccountP]]]
+          implicitly[Factory[CreateAccountP, List[CreateAccountP]]]
         )
       )
     val assets = config.as[List[IssueP]](s"$path.assets")(
       traversableReader(
         assetSectionReader,
-        implicitly[CanBuildFrom[Nothing, IssueP, List[IssueP]]]
+        implicitly[Factory[IssueP, List[IssueP]]]
       )
     )
     val leases = config.as[List[LeaseP]](s"$path.leases")(
       traversableReader(
         leasingSectionReader,
-        implicitly[CanBuildFrom[Nothing, LeaseP, List[LeaseP]]]
+        implicitly[Factory[LeaseP, List[LeaseP]]]
       )
     )
 
