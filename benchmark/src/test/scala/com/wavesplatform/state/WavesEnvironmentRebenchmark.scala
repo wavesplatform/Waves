@@ -22,8 +22,8 @@ import scala.util.Random
 @Fork(1)
 @Warmup(iterations = 100)
 @Measurement(iterations = 100)
-class DBStateBenchmark {
-  import DBStateBenchmark._
+class WavesEnvironmentRebenchmark {
+  import WavesEnvironmentRebenchmark._
 
   @Benchmark
   def resolveAlias(bh: Blackhole, st: St): Unit = {
@@ -134,7 +134,7 @@ class DBStateBenchmark {
   }
 }
 
-object DBStateBenchmark {
+object WavesEnvironmentRebenchmark {
   class St extends DBState {
     lazy val allAliases: Vector[Alias] = {
       val builder = Vector.newBuilder[Alias]
