@@ -108,7 +108,7 @@ object Serde {
           .flatMap {
             case (header, argc) =>
               if (argc <= (bb.limit() - bb.position()) && argc >= 0) {
-                val args: List[Coeval[EXPR]] = (1 to argc).map(_ => desAux(bb, allowObjects))(collection.breakOut)
+                val args: List[Coeval[EXPR]] = (1 to argc).map(_ => desAux(bb, allowObjects)).toList
                 args.sequence[Coeval, EXPR].map(FUNCTION_CALL(header, _))
               } else {
                 tooBigArray(bb)
@@ -120,7 +120,7 @@ object Serde {
           .flatMap(
             argsCount =>
               if (argsCount <= (bb.limit() - bb.position()) && argsCount >= 0)
-                (1 to argsCount).toStream
+                (1 to argsCount).to(LazyList)
                   .traverse(_ => evaluatedOnly(desAux(bb, allowObjects)))
                   .map(elements => ARR(elements.toIndexedSeq, limited = false).explicitGet())
               else
@@ -129,7 +129,7 @@ object Serde {
       case E_CASE_OBJ if allowObjects =>
         for {
           (typeName, fieldsNumber) <- Coeval((bb.getString, bb.getInt))
-          fields <- (1 to fieldsNumber).toStream
+          fields <- (1 to fieldsNumber).to(LazyList)
             .traverse(
               _ =>
                 for {

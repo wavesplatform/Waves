@@ -20,6 +20,7 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
+import com.wavesplatform.state.DataEntry.Format
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EmptyDataEntry, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
@@ -348,7 +349,6 @@ object AsyncHttpApi extends Assertions {
         assetId: Option[String] = None,
         feeAssetId: Option[String] = None,
         version: TxVersion = TxVersion.V2,
-        typedAttachment: Option[Attachment] = None,
         attachment: Option[String] = None
     ): Future[Transaction] = {
       signAndBroadcast(
@@ -365,13 +365,7 @@ object AsyncHttpApi extends Assertions {
           "feeAssetId" -> {
             if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull
           },
-          "attachment" -> {
-            if (attachment.isDefined || typedAttachment.isDefined) {
-              if (attachment.isDefined) {
-                attachment.get
-              } else Json.toJson(typedAttachment.get)
-            } else JsNull
-          }
+          "attachment" -> JsString(attachment.getOrElse(""))
         )
       )
     }
@@ -631,7 +625,7 @@ object AsyncHttpApi extends Assertions {
     def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
       postJson(
         "/assets/transfer",
-        TransferRequest(Some(1.toByte), Some(sourceAddress), None, recipient, None, amount, None, fee, None, None, None, None)
+        TransferRequest(Some(1.toByte), Some(sourceAddress), None, recipient, None, amount, None, fee)
       ).as[Transaction]
 
     def massTransfer(
@@ -639,26 +633,19 @@ object AsyncHttpApi extends Assertions {
         transfers: List[Transfer],
         fee: Long,
         version: TxVersion = TxVersion.V2,
-        typedAttachment: Option[Attachment] = None,
         attachment: Option[String] = None,
         assetId: Option[String] = None,
         amountsAsStrings: Boolean = false
     ): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
-          "type"      -> MassTransferTransaction.typeId,
-          "assetId"   -> { if (assetId.isDefined) JsString(assetId.get) else JsNull },
-          "sender"    -> sourceAddress,
-          "fee"       -> fee,
-          "version"   -> version,
-          "transfers" -> Json.toJson(transfers),
-          "attachment" -> {
-            if (attachment.isDefined || typedAttachment.isDefined) {
-              if (attachment.isDefined) {
-                attachment.get
-              } else Json.toJson(typedAttachment.get)
-            } else JsNull
-          }
+          "type"       -> MassTransferTransaction.typeId,
+          "assetId"    -> { if (assetId.isDefined) JsString(assetId.get) else JsNull },
+          "sender"     -> sourceAddress,
+          "fee"        -> fee,
+          "version"    -> version,
+          "transfers"  -> Json.toJson(transfers),
+          "attachment" -> JsString(attachment.getOrElse(""))
         ),
         amountsAsStrings
       )
@@ -695,12 +682,17 @@ object AsyncHttpApi extends Assertions {
       signedBroadcast(tx.json())
     }
 
-    def removeData(sourceAddress: String, data: Seq[String], fee: Long, version: Byte = 2): Future[Transaction] = {
+    def removeData(sourceAddress: String, data: Seq[String], fee: Long, version: Byte = 2): Future[Transaction] =
       signAndBroadcast(
         Json
-          .obj("type" -> DataTransaction.typeId, "sender" -> sourceAddress, "fee" -> fee, "version" -> version, "data" -> data.map(EmptyDataEntry(_)))
+          .obj(
+            "type"    -> DataTransaction.typeId,
+            "sender"  -> sourceAddress,
+            "fee"     -> fee,
+            "version" -> version,
+            "data"    -> data.map(e => Json.toJson[DataEntry[_]](EmptyDataEntry(e)))
+          )
       )
-    }
 
     def getData(address: String, amountsAsStrings: Boolean = false): Future[List[DataEntry[_]]] =
       get(s"/addresses/data/$address", amountsAsStrings).as[List[DataEntry[_]]](amountsAsStrings)
@@ -810,7 +802,7 @@ object AsyncHttpApi extends Assertions {
         chainId = AddressScheme.current.chainId
       ).signWith(matcher.privateKey)
 
-      val json = if (validate) tx.validatedEither.right.get.json() else tx.json()
+      val json = if (validate) tx.validatedEither.explicitGet().json() else tx.json()
       signedBroadcast(json, amountsAsStrings)
     }
 

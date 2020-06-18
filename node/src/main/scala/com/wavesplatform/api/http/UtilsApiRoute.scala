@@ -18,7 +18,6 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Time
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.directives.values._
 import monix.execution.Scheduler
 import play.api.libs.json._
@@ -74,7 +73,7 @@ case class UtilsApiRoute(
   // Deprecated
   def compile: Route = path("script" / "compile") {
     (post & entity(as[String])) { code =>
-      parameter('assetScript.as[Boolean] ? false) { isAssetScript =>
+      parameter("assetScript".as[Boolean] ? false) { isAssetScript =>
         executeLimited(ScriptCompiler(code, isAssetScript, estimator)) { result =>
           complete(
             result.fold(

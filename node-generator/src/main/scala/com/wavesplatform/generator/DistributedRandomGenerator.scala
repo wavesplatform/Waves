@@ -14,7 +14,7 @@ object DistributedRandomGenerator {
   }
 
   private class MultipleOutcomes[T](outcomes: TreeMap[Double, T], total: Double) extends DistributedRandomGenerator[T] {
-    override def getRandom: T = outcomes.from(Random.nextDouble() * total).head._2
+    override def getRandom: T = outcomes.rangeFrom(Random.nextDouble() * total).head._2
   }
 
   def apply[T](probabilities: Map[T, Double]): DistributedRandomGenerator[T] = {
@@ -23,6 +23,7 @@ object DistributedRandomGenerator {
       case 0 => throw new IllegalArgumentException("empty probability list")
       case 1 => new SingleOutcome[T](filteredProbabilities.head._1)
       case _ =>
+        import Ordering.Double.TotalOrdering
         val (treeMap, total) = filteredProbabilities.foldLeft((TreeMap.empty[Double, T], 0d)) {
           case ((tm, acc), (v, p)) => (tm + ((acc + p) -> v), acc + p)
         }

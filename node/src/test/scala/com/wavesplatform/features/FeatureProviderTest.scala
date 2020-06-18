@@ -1,7 +1,6 @@
 package com.wavesplatform.features
 
 import com.wavesplatform.block.Block
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, RewardsSettings}
 import com.wavesplatform.state.Blockchain
 import org.scalacheck.Gen

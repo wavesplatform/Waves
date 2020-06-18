@@ -7,7 +7,6 @@ import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftI
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{DBExt, KeyTags, Keys}
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height}

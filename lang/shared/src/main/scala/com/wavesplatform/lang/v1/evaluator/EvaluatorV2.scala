@@ -109,7 +109,7 @@ class EvaluatorV2(
       case fc: FUNCTION_CALL =>
         val evaluatedArgs =
           Coeval.defer {
-            fc.args.indices.toStream
+            fc.args.indices.to(LazyList)
               .foldM(limit) {
                 case (unused, argIndex) =>
                   if (unused < 0) throw new Error("Unused < 0")

@@ -239,7 +239,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
         "type"    -> DataTransaction.typeId,
         "version" -> 1,
         "sender"  -> firstAddress,
-        "data" -> List(
+        "data" -> List[DataEntry[_]](
           IntegerDataEntry("int", 923275292849183L),
           BooleanDataEntry("bool", value = true),
           BinaryDataEntry("blob", ByteStr(Array.tabulate(445)(_.toByte))),

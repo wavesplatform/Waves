@@ -13,7 +13,7 @@ object TxProcessingStats {
         .converterTo(CaseFormat.LOWER_HYPHEN)
         .convert(name.replace("Transaction", ""))
 
-    Constants.TransactionNames.mapValues(timerName)
+    Constants.TransactionNames.view.mapValues(timerName).toMap
   }
 
   object TxTimer extends TaggedType[Metric.Timer]

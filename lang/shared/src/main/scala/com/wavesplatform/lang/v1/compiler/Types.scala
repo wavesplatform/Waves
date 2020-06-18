@@ -20,7 +20,7 @@ object Types {
   case class PARAMETERIZEDLIST(t: TYPE)          extends PARAMETERIZED with SINGLE { override def toString: String = s"List[$t]" }
   case class PARAMETERIZEDUNION(l: List[SINGLE]) extends PARAMETERIZED             { override def toString: String = l.mkString("|")}
   case class PARAMETERIZEDTUPLE(t: List[TYPE])   extends PARAMETERIZED             { override def toString: String = t.mkString("(", ", ", ")") }
-  case object NOTHING                            extends FINAL { override val name = "Nothing"; override val typeList = List() }
+  case object NOTHING                            extends REAL { override val name = "Nothing"; override val typeList = List() }
   case object LONG                               extends REAL { override val name = "Int"; override val typeList = List(this) }
   case object BYTESTR                            extends REAL { override val name = "ByteVector"; override val typeList = List(this) }
   case object BOOLEAN                            extends REAL { override val name = "Boolean"; override val typeList = List(this) }

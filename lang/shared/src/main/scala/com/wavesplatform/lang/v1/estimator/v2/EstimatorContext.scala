@@ -18,9 +18,9 @@ private[v2] object EstimatorContext {
   type EvalM[A] = TaskM[EstimatorContext, ExecutionError, A]
 
   object Lenses {
-    val lets: Lens[EstimatorContext, Map[String, (Boolean, EvalM[Long])]] = lens[EstimatorContext] >> 'letDefs
-    val userFuncs: Lens[EstimatorContext, Map[FunctionHeader, FUNC]]      = lens[EstimatorContext] >> 'userFuncs
-    val predefFuncs: Lens[EstimatorContext, Map[FunctionHeader, Long]]    = lens[EstimatorContext] >> 'predefFuncs
-    val overlappedRefs: Lens[EstimatorContext, Map[String, (Boolean, EvalM[Long])]] = lens[EstimatorContext] >> 'overlappedRefs
+    val lets: Lens[EstimatorContext, Map[String, (Boolean, EvalM[Long])]] = lens[EstimatorContext] >> Symbol("letDefs")
+    val userFuncs: Lens[EstimatorContext, Map[FunctionHeader, FUNC]]      = lens[EstimatorContext] >> Symbol("userFuncs")
+    val predefFuncs: Lens[EstimatorContext, Map[FunctionHeader, Long]]    = lens[EstimatorContext] >> Symbol("predefFuncs")
+    val overlappedRefs: Lens[EstimatorContext, Map[String, (Boolean, EvalM[Long])]] = lens[EstimatorContext] >> Symbol("overlappedRefs")
   }
 }

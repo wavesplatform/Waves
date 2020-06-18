@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.transactions
 
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, StateCheckFailed}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
@@ -89,7 +90,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
         error.id shouldBe StateCheckFailed.Id
         error.statusCode shouldBe StateCheckFailed.Code.intValue
         error.message should include("Assets should be issued before they can be traded")
-        (error.json \ "tx").asOpt[JsObject] shouldBe 'defined
+        (error.json \ "tx").asOpt[JsObject] shouldBe defined
       }
     }
   }
@@ -178,8 +179,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
             fee = matcherFee,
             timestamp = ntpTime.correctedTime()
           )
-          .right
-          .get
+          .explicitGet()
 
       sender.postJson("/transactions/broadcast", tx.json())
 
@@ -238,8 +238,10 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     val nftWavesPair      = AssetPair.createAssetPair(nftAsset, "WAVES").get
     val nftOtherAssetPair = AssetPair.createAssetPair(nftAsset, dec6AssetId).get
 
-    val sellNftForWaves = Order.sell(4.toByte, seller, matcher.publicKey, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves)
-    val buyNftForWaves  = Order.buy(4.toByte, buyer, matcher.publicKey, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves)
+    val sellNftForWaves =
+      Order.sell(4.toByte, seller, matcher.publicKey, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves)
+    val buyNftForWaves =
+      Order.buy(4.toByte, buyer, matcher.publicKey, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves)
 
     val sellNftForOtherAsset =
       Order.sell(4.toByte, buyer, matcher.publicKey, nftOtherAssetPair, amount, nftForAssetPrice, ts, expirationTimestamp, matcherFee, Waves)
@@ -263,8 +265,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
           fee = matcherFee,
           timestamp = ntpTime.correctedTime()
         )
-        .right
-        .get
+        .explicitGet()
 
     sender.signedBroadcast(tx.json(), waitForTx = true)
 
@@ -290,8 +291,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
           fee = matcherFee,
           timestamp = ntpTime.correctedTime()
         )
-        .right
-        .get
+        .explicitGet()
 
     sender.signedBroadcast(tx2.json(), waitForTx = true)
 

@@ -3,7 +3,7 @@ package com.wavesplatform.settings
 import java.io.File
 import java.net.{InetSocketAddress, URI}
 
-import com.typesafe.config.{Config, ConfigException}
+import com.typesafe.config.Config
 import com.wavesplatform.network.TrafficLogger
 import com.wavesplatform.utils._
 import net.ceedubs.ficus.Ficus._
@@ -45,12 +45,6 @@ object NetworkSettings {
     (cfg: Config, path: String) => fromConfig(cfg.getConfig(path))
 
   private[this] def fromConfig(config: Config): NetworkSettings = {
-    implicit val _: ValueReader[Byte] = { (cfg: Config, path: String) =>
-      val x = cfg.getInt(path)
-      if (x.isValidByte) x.toByte
-      else throw new ConfigException.WrongType(config.origin(), s"$path has an invalid value: '$x' expected to be a byte")
-    }
-
     val file        = config.getAs[File]("file")
     val bindAddress = new InetSocketAddress(config.as[String]("bind-address"), config.as[Int]("port"))
     val nonce       = config.getOrElse("nonce", randomNonce)

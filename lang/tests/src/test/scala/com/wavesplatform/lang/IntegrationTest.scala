@@ -29,7 +29,7 @@ import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import org.web3j.crypto.Keys
-import scorex.crypto.encode.Base16
+import scorex.util.encode.Base16
 import scorex.crypto.hash.Keccak256
 
 import scala.util.{Random, Try}
@@ -963,7 +963,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("parseIntValue fail when string starts with non-digit") {
     val src =
       """ "x42".parseIntValue() """
-    eval[EVALUATED](src) shouldBe 'left
+    eval[EVALUATED](src) shouldBe Symbol("left")
   }
 
   property("parseInt fail when string ends with non-digit") {
@@ -975,7 +975,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("parseIntValue fail when string ends with non-digit") {
     val src =
       """ "42x".parseIntValue() """
-    eval[EVALUATED](src) shouldBe 'left
+    eval[EVALUATED](src) shouldBe Symbol("left")
   }
 
   property("parseInt fail when string is empty") {
@@ -987,7 +987,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("parseIntValue fail when string is empty") {
     val src =
       """ "".parseIntValue() """
-    eval[EVALUATED](src) shouldBe 'left
+    eval[EVALUATED](src) shouldBe Symbol("left")
   }
 
   property("matching case with non-existing type") {
@@ -1077,10 +1077,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED]("pow(0, 1, 3456, 3, 2, UP)", None) shouldBe Right(CONST_LONG(0))
     eval[EVALUATED]("pow(20, 1, -1, 0, 4, DOWN)", None) shouldBe Right(CONST_LONG(5000))
     eval[EVALUATED]("pow(-20, 1, -1, 0, 4, DOWN)", None) shouldBe Right(CONST_LONG(-5000))
-    eval[EVALUATED]("pow(0, 1, -1, 0, 4, DOWN)", None) shouldBe 'left
+    eval[EVALUATED]("pow(0, 1, -1, 0, 4, DOWN)", None) shouldBe Symbol("left")
     eval[EVALUATED]("log(16, 0, 2, 0, 0, CEILING)", None) shouldBe Right(CONST_LONG(4))
-    eval[EVALUATED]("log(16, 0, -2, 0, 0, CEILING)", None) shouldBe 'left
-    eval[EVALUATED]("log(-16, 0, 2, 0, 0, CEILING)", None) shouldBe 'left
+    eval[EVALUATED]("log(16, 0, -2, 0, 0, CEILING)", None) shouldBe Symbol("left")
+    eval[EVALUATED]("log(-16, 0, 2, 0, 0, CEILING)", None) shouldBe Symbol("left")
   }
 
   property("math functions scale limits") {
@@ -1105,7 +1105,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("HalfUp type have no constructor") {
-    eval("pow(10, 0, -8, 0, 8, HalfUp())") shouldBe 'Left
+    eval("pow(10, 0, -8, 0, 8, HalfUp())") shouldBe Symbol("Left")
   }
 
   property("concat empty list") {
@@ -1740,7 +1740,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val message1 = "what's up jim"
     val expectedAddress1 = "85db9634489b76e238368e4a075cc6e5a56a714c"
 
-    Keys.getAddress(recoverPublicKey(message1, signature1)) shouldBe Base16.decode(expectedAddress1)
+    Keys.getAddress(recoverPublicKey(message1, signature1)) shouldBe Base16.decode(expectedAddress1).get
 
     //source: https://etherscan.io/verifySig/2007
     val signature2 =
@@ -1750,7 +1750,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val message2 = "i am the owner"
     val expectedAddress2 = "73f32c743e5928ff800ab8b05a52c73cd485f9c3"
 
-    Keys.getAddress(recoverPublicKey(message2, signature2)) shouldBe Base16.decode(expectedAddress2)
+    Keys.getAddress(recoverPublicKey(message2, signature2)) shouldBe Base16.decode(expectedAddress2).get
   }
 
   property("ecrecover negative cases") {
@@ -1783,8 +1783,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("n-size generic tuple") {
-    lazy val getElement: Stream[(String, String)] =
-      Stream(
+    lazy val getElement: LazyList[(String, String)] =
+      LazyList(
         (""""a"""", "String"),
         ("true", "Boolean"),
         ("123", "Int"),

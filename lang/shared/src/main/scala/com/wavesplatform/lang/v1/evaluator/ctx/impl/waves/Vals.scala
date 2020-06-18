@@ -4,8 +4,8 @@ import cats.implicits._
 import cats.{Eval, Monad}
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, EVALUATED}
-import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, LONG, UNION}
+import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ContextfulVal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{buildAssetInfo, ordType, orderObject, transactionObject}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
@@ -64,8 +64,13 @@ object Vals {
     new ContextfulVal.Lifted[Environment] {
       override def liftF[F[_]: Monad](env: Environment[F]): Eval[Either[ExecutionError, EVALUATED]] =
         Eval.later {
-          (Bindings.senderObject(env.tthis): EVALUATED)
-            .asRight[ExecutionError]
+         if(env.dAppAlias) {
+           (FAIL("Use alias is disabled"): EVALUATED)
+             .asRight[ExecutionError]
+         } else {
+           (Bindings.senderObject(env.tthis.eliminate(identity, _ => throw new Exception("In the account's script value 'this` must be Address"))): EVALUATED)
+             .asRight[ExecutionError]
+         }
         }
     }
 
@@ -74,7 +79,7 @@ object Vals {
       override def apply[F[_]: Monad](env: Environment[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
         Eval.later {
           env
-            .assetInfoById(env.tthis.bytes.arr)
+            .assetInfoById(env.tthis.eliminate(_ => throw new Exception("In the account's script value 'this` must be Address"), _.eliminate(_.id, v => throw new Exception(s"Incorrect value $v for 'this'"))))
             .map(v => buildAssetInfo(v.get, version): EVALUATED)
             .map(_.asRight[ExecutionError])
         }

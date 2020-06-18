@@ -21,8 +21,10 @@ import play.api.libs.json._
 import scala.util.control.Exception.nonFatalCatch
 import scala.util.control.NoStackTrace
 
-case class PlayJsonException(cause: Option[Throwable] = None, errors: Seq[(JsPath, Seq[JsonValidationError])] = Seq.empty)
-    extends IllegalArgumentException
+case class PlayJsonException(
+    cause: Option[Throwable] = None,
+    errors: scala.collection.Seq[(JsPath, scala.collection.Seq[JsonValidationError])] = Seq.empty
+) extends IllegalArgumentException
     with NoStackTrace
 
 trait ApiMarshallers {
@@ -120,14 +122,14 @@ trait ApiMarshallers {
       .withContentType(ContentType(CustomJson.jsonWithNumbersAsStrings))
       .withFramingRenderer(Flow[ByteString].intersperse(ByteString(prefix), ByteString(delimiter), ByteString(suffix)))
 
-  private def selectMarshallingForContentType[T](marshallings: Seq[Marshalling[T]], contentType: ContentType): Option[() ⇒ T] = {
+  private def selectMarshallingForContentType[T](marshallings: Seq[Marshalling[T]], contentType: ContentType): Option[() => T] = {
     contentType match {
-      case _: ContentType.Binary | _: ContentType.WithFixedCharset | _: ContentType.WithMissingCharset ⇒
-        marshallings collectFirst { case Marshalling.WithFixedContentType(`contentType`, marshal) ⇒ marshal }
-      case ContentType.WithCharset(mediaType, charset) ⇒
+      case _: ContentType.Binary | _: ContentType.WithFixedCharset | _: ContentType.WithMissingCharset =>
+        marshallings collectFirst { case Marshalling.WithFixedContentType(`contentType`, marshal) => marshal }
+      case ContentType.WithCharset(mediaType, charset) =>
         marshallings collectFirst {
-          case Marshalling.WithFixedContentType(`contentType`, marshal) ⇒ marshal
-          case Marshalling.WithOpenCharset(`mediaType`, marshal)        ⇒ () ⇒ marshal(charset)
+          case Marshalling.WithFixedContentType(`contentType`, marshal) => marshal
+          case Marshalling.WithOpenCharset(`mediaType`, marshal)        => () => marshal(charset)
         }
     }
   }
@@ -143,10 +145,10 @@ trait ApiMarshallers {
         Marshalling.WithFixedContentType(
           contentType,
           () => {
-            val bestMarshallingPerElement = availableMarshallingsPerElement map { marshallings ⇒
+            val bestMarshallingPerElement = availableMarshallingsPerElement map { marshallings =>
               selectMarshallingForContentType(marshallings, contentType)
                 .orElse {
-                  marshallings collectFirst { case Marshalling.Opaque(marshal) ⇒ marshal }
+                  marshallings collectFirst { case Marshalling.Opaque(marshal) => marshal }
                 }
                 .getOrElse(throw new NoStrictlyCompatibleElementMarshallingAvailableException[JsValue](contentType, marshallings))
             }

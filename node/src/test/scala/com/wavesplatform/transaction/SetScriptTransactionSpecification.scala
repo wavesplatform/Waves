@@ -56,8 +56,7 @@ class SetScriptTransactionSpecification extends GenericTransactionSpecification[
             1526983936610L,
             Proofs(Seq(ByteStr.decodeBase58("tcTr672rQ5gXvcA9xCGtQpkHC8sAY1TDYqDcQG7hQZAeHcvvHFo565VEv1iD1gVa3ZuGjYS7hDpuTnQBfY2dUhY").get))
           )
-          .right
-          .get
+          .explicitGet()
       )
     )
 

@@ -5,7 +5,6 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.ComplexityCheckPolicyProvider._
 import com.wavesplatform.features.EstimatorProvider._
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
