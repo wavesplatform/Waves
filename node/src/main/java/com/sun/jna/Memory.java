@@ -22,14 +22,12 @@
  */
 package com.sun.jna;
 
-import com.google.common.collect.MapMaker;
+import com.romix.scala.collection.concurrent.TrieMap;
 
-import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.LinkedList;
-import java.util.concurrent.ConcurrentMap;
 
 /**
  * A <code>Pointer</code> to memory obtained from the native heap via a
@@ -57,7 +55,7 @@ public class Memory extends Pointer {
      * Keep track of all allocated memory so we can dispose of it before unloading.
      */
 
-    private static final ConcurrentMap<Memory, Reference<Memory>> allocatedMemory = new MapMaker().concurrencyLevel(Runtime.getRuntime().availableProcessors()).weakKeys().makeMap();
+    private static final TrieMap<WeakReference<Memory>, Void> allocatedMemory = new TrieMap<>();
 
     private static final WeakMemoryHolder buffers = new WeakMemoryHolder();
 
@@ -74,9 +72,10 @@ public class Memory extends Pointer {
      */
     public static void disposeAll() {
         // use a copy since dispose() modifies the map
-        Collection<Memory> refs = new LinkedList<Memory>(allocatedMemory.keySet());
-        for (Memory r : refs) {
-            r.dispose();
+        Collection<WeakReference<Memory>> refs = new LinkedList<>(allocatedMemory.keySet());
+        for (WeakReference<Memory> r : refs) {
+            final Memory mem = r.get();
+            if (mem != null) mem.dispose();
         }
     }
 
@@ -129,7 +128,7 @@ public class Memory extends Pointer {
         if (peer == 0)
             throw new OutOfMemoryError("Cannot allocate " + size + " bytes");
 
-        allocatedMemory.put(this, new WeakReference<Memory>(this));
+        allocatedMemory.put(weakReference, null);
     }
 
     protected Memory() {
@@ -211,7 +210,7 @@ public class Memory extends Pointer {
         try {
             free(peer);
         } finally {
-            allocatedMemory.remove(this);
+            allocatedMemory.remove(this.weakReference);
             peer = 0;
         }
     }
