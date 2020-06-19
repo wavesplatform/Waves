@@ -10,6 +10,7 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.PureFunctionsRebenchmark._
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -286,12 +287,12 @@ object PureFunctionsRebenchmark {
 
   @State(Scope.Benchmark)
   class DropBytes {
-    val bytes = ByteStr(Array.fill[Byte](32766)(-127))
+    val bytes = ByteStr(Array.fill[Byte](Terms.DataTxMaxProtoBytes)(-127))
     val expr: EXPR =
       FUNCTION_CALL(
         Native(FunctionIds.DROP_BYTES),
         List(
-          CONST_BYTESTR(bytes).explicitGet(),
+          CONST_BYTESTR(bytes, CONST_BYTESTR.NoLimit).explicitGet(),
           CONST_LONG(1)
         )
       )
@@ -393,12 +394,13 @@ object PureFunctionsRebenchmark {
 
   @State(Scope.Benchmark)
   class ToUtf8String {
-    val string = Random.nextPrintableChar().toString * 32767
+    val bytes = new Array[Byte](Terms.DataTxMaxProtoBytes)
+    Random.nextBytes(bytes)
     val expr: EXPR =
       FUNCTION_CALL(
         Native(FunctionIds.UTF8STRING),
         List(
-          CONST_STRING(string).explicitGet()
+          CONST_BYTESTR(ByteStr(bytes), CONST_BYTESTR.NoLimit).explicitGet()
         )
       )
   }
