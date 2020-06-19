@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.annotation.tailrec
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 class NFTIterator(addressId: AddressId, maybeAfter: Option[IssuedAsset], resource: DBResource)
     extends AbstractIterator[(IssuedAsset, Long)]

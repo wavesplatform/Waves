@@ -9,7 +9,7 @@ import io.netty.util.concurrent.GlobalEventExecutor
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FreeSpec, Matchers}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.util.Random
 
 class ChannelGroupExtSpec extends FreeSpec with Matchers with MockFactory {

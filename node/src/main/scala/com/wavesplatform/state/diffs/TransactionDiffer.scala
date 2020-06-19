@@ -8,7 +8,6 @@ import cats.syntax.functor._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures.BlockV5
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
@@ -62,8 +61,8 @@ object TransactionDiffer {
     val result = for {
       _               <- validateCommon(blockchain, tx, prevBlockTimestamp, currentBlockTimestamp, verify).traced
       _               <- validateFunds(blockchain, tx).traced
-      _               <- verifyTransaction(blockchain, tx, verify)
-      transactionDiff <- transactionDiff(blockchain, tx, currentBlockTimestamp, skipFailing)
+      verifierDiff    <- verifierDiff(blockchain, tx, verify)
+      transactionDiff <- transactionDiff(blockchain, tx, verifierDiff, currentBlockTimestamp, skipFailing, verifyAssets)
       _               <- validateBalance(blockchain, tx.typeId, transactionDiff).traced
       diff            <- assetsVerifierDiff(blockchain, tx, verifyAssets, transactionDiff)
     } yield diff
@@ -108,8 +107,9 @@ object TransactionDiffer {
         }
       } yield ()
 
-  private def verifyTransaction(blockchain: Blockchain, tx: Transaction, verify: Boolean): TracedResult[ValidationError, Unit] =
-    if (verify) Verifier(blockchain)(tx).as(()) else Right(()).traced
+  private def verifierDiff(blockchain: Blockchain, tx: Transaction, verify: Boolean): TracedResult[ValidationError, Diff] =
+    if (verify) Verifier(blockchain)(tx).as(Diff.empty.copy(scriptsComplexity = DiffsCommon.getAccountsComplexity(blockchain, tx)))
+    else Right(Diff.empty).traced
 
   private def assetsVerifierDiff(blockchain: Blockchain, tx: Transaction, verify: Boolean, initDiff: Diff): TracedResult[ValidationError, Diff] = {
     val diff = if (verify) {
@@ -120,7 +120,7 @@ object TransactionDiffer {
           FailedTransactionError.notAllowedByAsset(spentComplexity, log, assetId)
         case (_, ve) => ve
       }
-    } else Diff.empty.copy(scriptsComplexity = DiffsCommon.getAssetsComplexity(blockchain, tx)).asRight[ValidationError].traced
+    } else Diff.empty.asRight[ValidationError].traced
 
     diff.map(Monoid.combine(initDiff, _)).leftMap {
       case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity)
@@ -134,15 +134,16 @@ object TransactionDiffer {
   private def transactionDiff(
       blockchain: Blockchain,
       tx: Transaction,
+      initDiff: Diff,
       currentBlockTs: Long,
-      skipFailing: Boolean
+      skipFailing: Boolean,
+      verifyAssets: Boolean
   ): TracedResult[ValidationError, Diff] = {
-    val alreadySpentComplexity = DiffsCommon.getAccountsComplexity(blockchain, tx)
     val diff = stats.transactionDiffValidation.measureForType(tx.typeId) {
       tx match {
         case gtx: GenesisTransaction           => GenesisTransactionDiff(blockchain.height)(gtx).traced
         case ptx: PaymentTransaction           => PaymentTransactionDiff(blockchain)(ptx).traced
-        case ci: InvokeScriptTransaction       => InvokeScriptTransactionDiff(blockchain, currentBlockTs, skipExecution = skipFailing)(ci)
+        case ci: InvokeScriptTransaction       => InvokeScriptTransactionDiff(blockchain, currentBlockTs, skipFailing, verifyAssets)(ci)
         case etx: ExchangeTransaction          => ExchangeTransactionDiff(blockchain)(etx).traced
         case itx: IssueTransaction             => AssetTransactionsDiff.issue(blockchain)(itx).traced
         case rtx: ReissueTransaction           => AssetTransactionsDiff.reissue(blockchain, currentBlockTs)(rtx).traced
@@ -160,10 +161,11 @@ object TransactionDiffer {
         case _                                 => UnsupportedTransactionType.asLeft.traced
       }
     }
+
     diff
-      .map(d => d.copy(scriptsComplexity = d.scriptsComplexity + alreadySpentComplexity))
+      .map(d => Monoid.combine(initDiff, d))
       .leftMap {
-        case fte: FailedTransactionError => fte.addComplexity(alreadySpentComplexity)
+        case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity)
         case ve                          => ve
       }
   }

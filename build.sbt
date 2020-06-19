@@ -8,7 +8,6 @@
 
 import sbt.Keys._
 import sbt._
-import sbt.internal.inc.ReflectUtilities
 import sbtcrossproject.CrossPlugin.autoImport.{CrossType, crossProject}
 
 val langPublishSettings = Seq(
@@ -100,12 +99,13 @@ lazy val root = (project in file("."))
     node,
     `node-it`,
     `node-generator`,
-    benchmark
+    benchmark,
+    `blockchain-updates`
   )
 
 inScope(Global)(
   Seq(
-    scalaVersion := "2.12.9",
+    scalaVersion := "2.13.1",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
     V.fallback := (1, 2, 5),
@@ -121,7 +121,6 @@ inScope(Global)(
       "-language:postfixOps",
       "-Ywarn-unused:-implicits",
       "-Xlint",
-      "-Ypartial-unification",
       "-opt:l:inline",
       "-opt-inline-from:**"
     ),
@@ -156,19 +155,10 @@ inScope(Global)(
 git.useGitDescribe := true
 git.uncommittedSignifier := Some("DIRTY")
 
-// root project settings
-// https://stackoverflow.com/a/48592704/4050580
-def allProjects: List[ProjectReference] = ReflectUtilities.allVals[Project](this).values.toList map { p =>
-  p: ProjectReference
-}
-
-lazy val cleanAll = taskKey[Unit]("Clean all projects")
-cleanAll := clean.all(ScopeFilter(inProjects(allProjects: _*), inConfigurations(Compile))).value
-
 lazy val packageAll = taskKey[Unit]("Package all artifacts")
 packageAll := Def
   .sequential(
-    root / cleanAll,
+    root / clean,
     Def.task {
       (node / assembly).value
       (node / Debian / packageBin).value
@@ -179,21 +169,21 @@ packageAll := Def
   .value
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
-checkPRRaw := {
-  try {
-    cleanAll.value // Hack to run clean before all tasks
-  } finally {
-    test.all(ScopeFilter(inProjects(langTests, node), inConfigurations(Test))).value
+checkPRRaw := Def.sequential(
+  clean,
+  Def.task {
+    (Test / compile).value
+    (langTests / Test / test).value
     (langJS / Compile / fastOptJS).value
-    compile.all(ScopeFilter(inProjects(`node-generator`, benchmark, `node-it`, `blockchain-updates`), inConfigurations(Test))).value
+    (node / Test / test).value
   }
-}
+).value
 
 def checkPR: Command = Command.command("checkPR") { state =>
   val updatedState = Project
     .extract(state)
     .appendWithoutSession(Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings")), state)
-  Project.extract(updatedState).runTask(root / checkPRRaw, updatedState)
+  Project.extract(updatedState).runTask(checkPRRaw, updatedState)
   state
 }
 

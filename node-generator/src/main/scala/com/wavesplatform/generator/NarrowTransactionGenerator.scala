@@ -49,8 +49,7 @@ class NarrowTransactionGenerator(
     if (settings.protobuf) (v + 1).toByte
     else v
 
-  override def next(): Iterator[Transaction] =
-    generate(settings.transactions).toIterator
+  override def next(): Iterator[Transaction] = generate(settings.transactions).iterator
 
   private[this] def generate(n: Int): Seq[Transaction] = {
     val now = System.currentTimeMillis()
@@ -350,7 +349,7 @@ class NarrowTransactionGenerator(
             ).logNone("There is no issued smart assets, may be you need to increase issue transaction's probability or pre-configure them")
         }
 
-        (tx.map(tx => allTxsWithValid :+ tx).getOrElse(allTxsWithValid), tx match {
+        (tx.fold(allTxsWithValid)(tx => allTxsWithValid :+ tx), tx match {
           case Some(tx: IssueTransaction) => validIssueTxs :+ tx
           case _                          => validIssueTxs
         }, tx match {
@@ -369,21 +368,14 @@ class NarrowTransactionGenerator(
 
     Universe.Leases = generated._4
 
-    log.trace(s"Distribution:\n${generated._1.groupBy(_.getClass).mapValues(_.size).mkString("\t", "\n\t", "")}")
+    log.trace(s"Distribution:\n${generated._1.groupBy(_.getClass).view.mapValues(_.size).mkString("\t", "\n\t", "")}")
 
     generated._1
   }
 
-  private def createAttachment(): Option[Attachment] = {
-    if (random.nextBoolean()) None
-    else if (!settings.protobuf) Some(Attachment.Bin(Array.fill(random.nextInt(100))(random.nextInt().toByte)))
-    else
-      random.nextInt(4) match {
-        case 0 => Some(Attachment.Bin(Array.fill(random.nextInt(100))(random.nextInt().toByte)))
-        case 1 => Some(Attachment.Num(random.nextLong()))
-        case 2 => Some(Attachment.Str(random.nextString(10)))
-        case 3 => Some(Attachment.Bool(random.nextBoolean()))
-      }
+  private def createAttachment(): ByteStr = {
+    if (random.nextBoolean()) ByteStr.empty
+    else ByteStr(Array.fill(random.nextInt(100))(random.nextInt().toByte))
   }
 
   private[this] def logOption[T <: Transaction](txE: Either[ValidationError, T])(implicit m: Manifest[T]): Option[T] = {
@@ -501,10 +493,10 @@ object NarrowTransactionGenerator {
               val account = GeneratorSettings.toKeyPair(s"${UUID.randomUUID().toString}")
 
               val transferTx = TransferTransaction
-                .selfSigned(2.toByte, richAccount, account.toAddress, Waves, balance, Waves, fee, None, time.correctedTime())
+                .selfSigned(2.toByte, richAccount, account.toAddress, Waves, balance, Waves, fee, ByteStr.empty, time.correctedTime())
                 .explicitGet()
 
-              val Right((script, _)) = ScriptCompiler.compile(new String(Files.readAllBytes(Paths.get(scriptFile))), estimator)
+              val script = ScriptCompiler.compile(new String(Files.readAllBytes(Paths.get(scriptFile))), estimator).explicitGet()._1
               val scriptTx           = SetScriptTransaction.selfSigned(TxVersion.V1, account, Some(script), fee, time.correctedTime()).explicitGet()
 
               (initTxs :+ transferTx, tailInitTxs :+ scriptTx, accounts :+ account)
@@ -517,7 +509,7 @@ object NarrowTransactionGenerator {
                 import assetsSettings._
 
                 val issuer             = randomFrom(accounts).get
-                val Right((script, _)) = ScriptCompiler.compile(new String(Files.readAllBytes(Paths.get(scriptFile))), estimator)
+                val script = ScriptCompiler.compile(new String(Files.readAllBytes(Paths.get(scriptFile))), estimator).explicitGet()._1
 
                 val tx = IssueTransaction
                   .selfSigned(
@@ -556,8 +548,7 @@ object NarrowTransactionGenerator {
           timestamp = System.currentTimeMillis(),
           script = None
         )
-        .right
-        .get
+        .explicitGet()
 
       val tradeAssetDistribution: Seq[Transaction] = {
         (Universe.Accounts.map(_.keyPair).toSet - trader).toSeq.map(acc => {
@@ -570,11 +561,10 @@ object NarrowTransactionGenerator {
               tradeAsset.quantity / Universe.Accounts.size,
               Waves,
               900000,
-              Some(Attachment.Bin(Array.fill(random.nextInt(100))(random.nextInt().toByte))),
+              ByteStr(Array.fill(random.nextInt(100))(random.nextInt().toByte)),
               System.currentTimeMillis()
             )
-            .right
-            .get
+            .explicitGet()
         })
       }
 

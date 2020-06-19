@@ -7,11 +7,11 @@ import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Parser, ParserV2}
 import com.wavesplatform.lang.v1.testing.ScriptGenParser
-import fastparse.core.Parsed.Success
+import fastparse.Parsed.Success
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import scorex.crypto.encode.{Base58 => ScorexBase58}
+import scorex.util.encode.{Base58 => ScorexBase58}
 
 class ParserV2ScriptTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
 
@@ -1266,11 +1266,11 @@ class ParserV2ScriptTest extends PropSpec with PropertyChecks with Matchers with
     }
     val script = s"$manyLets\n$lastStmt"
 
-    Parser.parseExpr(script) shouldBe an[Success[_, _, _]]
+    Parser.parseExpr(script) shouldBe an[Success[_]]
   }
 
   property("underscore") {
     val script = "groth16Verify_15inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')"
-    Parser.parseExpr(script) shouldBe an[Success[_, _, _]]
+    Parser.parseExpr(script) shouldBe an[Success[_]]
   }
 }

@@ -312,12 +312,12 @@ object ContractCompiler {
 
   def compile(input: String, ctx: CompilerContext, version: StdLibVersion): Either[String, DApp] = {
     Parser.parseContract(input) match {
-      case fastparse.core.Parsed.Success(xs, _) =>
+      case fastparse.Parsed.Success(xs, _) =>
         ContractCompiler(ctx, xs, version) match {
           case Left(err) => Left(err.toString)
           case Right(c)  => Right(c)
         }
-      case f @ fastparse.core.Parsed.Failure(_, _, _) => Left(f.toString)
+      case f @ fastparse.Parsed.Failure(_, _, _) => Left(f.toString)
     }
   }
 

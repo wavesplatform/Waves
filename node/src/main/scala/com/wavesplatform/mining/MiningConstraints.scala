@@ -3,7 +3,6 @@ package com.wavesplatform.mining
 import cats.data.NonEmptyList
 import com.wavesplatform.block.Block
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.MinerSettings
 import com.wavesplatform.state.Blockchain
 

@@ -70,7 +70,7 @@ object ApiError {
     override val message = "Error is unknown"
   }
 
-  final case class WrongJson(cause: Option[Throwable] = None, errors: Seq[(JsPath, Seq[JsonValidationError])] = Seq.empty) extends ApiError {
+  final case class WrongJson(cause: Option[Throwable] = None, errors: scala.collection.Seq[(JsPath, scala.collection.Seq[JsonValidationError])] = Seq.empty) extends ApiError {
     override val id              = WrongJson.Id
     override val code            = StatusCodes.BadRequest
     override val message: String = WrongJson.Message

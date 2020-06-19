@@ -17,7 +17,7 @@ package object repl {
   val internalFuncPrefix: String = "_"
 
   val version = V4
-  val directives: DirectiveSet = DirectiveSet(version, Account, DApp).right.get
+  val directives: DirectiveSet = DirectiveSet(version, Account, DApp).getOrElse(???)
 
   val initialCtx: CTX[Environment] =
     CryptoContext.build(global, version).withEnvironment[Environment]  |+|

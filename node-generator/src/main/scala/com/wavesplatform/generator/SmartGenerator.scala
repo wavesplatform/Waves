@@ -7,9 +7,9 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.utils.Gen
+import com.wavesplatform.generator.utils.Implicits.DoubleExt
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.generator.utils.Implicits.DoubleExt
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -22,9 +22,7 @@ class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[KeyPai
   private def r                                   = ThreadLocalRandom.current
   private def randomFrom[T](c: Seq[T]): Option[T] = if (c.nonEmpty) Some(c(r.nextInt(c.size))) else None
 
-  override def next(): Iterator[Transaction] = {
-    generate(settings).toIterator
-  }
+  override def next(): Iterator[Transaction] = generate(settings).iterator
 
   private def generate(settings: SmartGenerator.Settings): Seq[Transaction] = {
     val bank = randomFrom(accounts).get
@@ -43,7 +41,7 @@ class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[KeyPai
     val now = System.currentTimeMillis()
     val txs = Range(0, settings.transfers).map { i =>
       TransferTransaction
-        .selfSigned(2.toByte, bank, bank.toAddress, Waves, 1.waves - 2 * fee, Waves, fee, None, now + i)
+        .selfSigned(2.toByte, bank, bank.toAddress, Waves, 1.waves - 2 * fee, Waves, fee, ByteStr.empty, now + i)
         .explicitGet()
     }
 

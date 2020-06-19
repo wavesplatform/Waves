@@ -2,7 +2,6 @@ package com.wavesplatform.features.api
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.api.http.ApiRoute
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.settings.{FeaturesSettings, RestAPISettings}
 import com.wavesplatform.state.Blockchain

@@ -146,7 +146,7 @@ object WavesEnvironmentBenchmark {
         Coeval.raiseError(new NotImplementedError("`tx` is not implemented")),
         Coeval(state.height),
         state,
-        Coeval.raiseError(new NotImplementedError("`this` is not implemented")),
+        null,
         DirectiveSet.contractDirectiveSet,
         ByteStr.empty
       )

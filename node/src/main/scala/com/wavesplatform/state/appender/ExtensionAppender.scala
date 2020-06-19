@@ -41,7 +41,7 @@ object ExtensionAppender extends ScorexLogging {
             val forkApplicationResultEi = Coeval {
               extension.view
                 .map { b =>
-                  b -> validateAndAppendBlock(blockchainUpdater, utxStorage, pos, time)(b).right
+                  b -> validateAndAppendBlock(blockchainUpdater, utxStorage, pos, time)(b)
                     .map {
                       _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
                     }

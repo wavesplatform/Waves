@@ -15,7 +15,7 @@ class WavesSettingsSpecification extends FlatSpec with Matchers {
     )
   }
 
-  def testConfig(configName: String)(additionalChecks: WavesSettings => Unit = _ => ()) {
+  def testConfig(configName: String)(additionalChecks: WavesSettings => Unit = _ => ()): Unit = {
     "WavesSettings" should s"read values from default config with $configName overrides" in {
       val settings = config(configName)
 

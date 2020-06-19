@@ -75,8 +75,8 @@ object JsAPI {
           "name"       -> f.name,
           "doc"        -> funcDoc,
           "resultType" -> typeRepr(f.signature.result),
-          "args" -> (f.args, f.signature.args, paramsDoc).zipped.toList.map { arg =>
-            js.Dynamic.literal("name" -> arg._1, "type" -> typeRepr(arg._2._2), "doc" -> arg._3)
+          "args" -> (f.args zip f.signature.args zip paramsDoc).map { arg =>
+            js.Dynamic.literal("name" -> arg._1._1, "type" -> typeRepr(arg._1._2._2), "doc" -> arg._2)
           }.toJSArray
         )
       })
@@ -172,7 +172,7 @@ object JsAPI {
               js.Dynamic.literal(
                 "result"           -> Global.toBuffer(bytes),
                 "complexity"       -> complexityWithMap._1,
-                "complexityByFunc" -> complexityWithMap._2.mapValues(c => c: Any).toJSDictionary,
+                "complexityByFunc" -> complexityWithMap._2.view.mapValues(c => c: Any).toMap.toJSDictionary,
                 "dAppAst"          -> dAppToJs(exprDApp),
                 "errorList"        -> compErrorList.map(compilationErrToJs).toJSArray
               )
@@ -253,9 +253,9 @@ object JsAPI {
                 "ast"                        -> toJs(dApp),
                 "complexity"                 -> maxComplexity,
                 "verifierComplexity"         -> verifierComplexity,
-                "callableComplexities"       -> callableComplexities.mapValues(c => c: Any).toJSDictionary,
-                "userFunctionComplexities"   -> userFunctionComplexities.mapValues(c => c: Any).toJSDictionary,
-                "globalVariableComplexities" -> globalVariableComplexities.mapValues(c => c: Any).toJSDictionary,
+                "callableComplexities"       -> callableComplexities.view.mapValues(c => c: Any).toMap.toJSDictionary,
+                "userFunctionComplexities"   -> userFunctionComplexities.view.mapValues(c => c: Any).toMap.toJSDictionary,
+                "globalVariableComplexities" -> globalVariableComplexities.view.mapValues(c => c: Any).toMap.toJSDictionary,
               )
               val errorFieldOpt: Seq[(String, Any)] = {
                 Global.checkContract(version, dApp, maxComplexityFunc, annotatedComplexities, estimator)

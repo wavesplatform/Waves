@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
 class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite with CancelAfterFailure {
-  val estimator = ScriptEstimatorV2
+  private val estimator = ScriptEstimatorV2
 
   private val dApp        = firstAddress
   private val caller      = secondAddress
@@ -292,7 +292,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
       .id
     nodes.waitForHeightAriseAndTxPresent(invokeScriptTxId)
 
-    sender.debugStateChanges(invokeScriptTxId).stateChanges.get.error shouldBe 'empty
+    sender.debugStateChanges(invokeScriptTxId).stateChanges.get.error shouldBe empty
   }
 
   test("can't invoke with insufficient payment for @Verifier") {

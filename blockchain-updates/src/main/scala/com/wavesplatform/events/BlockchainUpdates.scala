@@ -28,7 +28,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   private[this] var maybeProducer: Option[KafkaProducer[Int, BlockchainUpdated]] = None
 
   private def getLastHeight(timeout: Duration = 10.seconds): Int = {
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
 
     val props = createProperties(settings)
     props.put(ConsumerConfig.GROUP_ID_CONFIG, "admin")

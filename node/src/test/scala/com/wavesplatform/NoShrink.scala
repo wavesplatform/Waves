@@ -1,7 +1,5 @@
 package com.wavesplatform
 
-import org.scalacheck.Shrink
+import org.scalacheck.ShrinkLowPriority
 
-trait NoShrink {
-  implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
-}
+trait NoShrink extends ShrinkLowPriority

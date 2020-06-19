@@ -30,12 +30,12 @@ import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, ContractLimits, FunctionHeader}
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.{EitherValues, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
-class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
+class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink with EitherValues {
 
   implicit val version: StdLibVersion = V4
 
@@ -96,7 +96,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
 
   property("return error and log of failed evaluation") {
     forAll(blockBuilder) { block =>
-      val Left((err, log)) = evalWithLogging(
+      val (err, log) = evalWithLogging(
         pureEvalContext.asInstanceOf[EvaluationContext[Environment, Id]],
         expr = block(
           LET("x", CONST_LONG(3)),
@@ -105,7 +105,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
             FUNCTION_CALL(PureContext.eq.header, List(REF("z"), CONST_LONG(1)))
           )
         )
-      )
+      ).left.value
 
       val expectedError = "A definition of 'z' not found"
       err shouldBe expectedError
@@ -772,7 +772,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
       val bodyBytes = ("m" * ((16 << i) * 1024)).getBytes("UTF-8")
 
       val r = hashTest(bodyBytes, h, i.toShort)
-      r shouldBe 'Right
+      r shouldBe Symbol("Right")
     }
   }
 
@@ -786,7 +786,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
       val bodyBytes = ("m" * ((16 << i) * 1024 + 1)).getBytes("UTF-8")
 
       val r = hashTest(bodyBytes, h, i.toShort)
-      r shouldBe 'Left
+      r shouldBe Symbol("Left")
     }
   }
 
@@ -849,7 +849,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
     )
 
     com.wavesplatform.lang.v1.parser.Parser.parseExpr(script) match {
-      case fastparse.core.Parsed.Success(xs, _) =>
+      case fastparse.Parsed.Success(xs, _) =>
         evalPure[EVALUATED](
           context.evaluationContext[Id],
           ExpressionCompiler
@@ -857,7 +857,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
             .explicitGet()
             ._1
         )
-      case fastparse.core.Parsed.Failure(_, index, _) => Left(s"Parse error at $index")
+      case fastparse.Parsed.Failure(_, index, _) => Left(s"Parse error at $index")
     }
   }
 
@@ -899,14 +899,14 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
   }
 
   property("recCmp fail by cmp") {
-    recCmp(5)() shouldBe 'Left
+    recCmp(5)() shouldBe Symbol("Left")
   }
 
   property("recData fail by ARR") {
     val cnt           = 8
     val result = recCmp(cnt)(gen => gen("x") ++ s"x${cnt + 1}.size() == 3")
 
-    result shouldBe 'Left
+    result shouldBe Symbol("Left")
   }
 
   property("recData use uncomparable data") {
@@ -945,7 +945,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
     eval[CONST_BOOLEAN](
       defaultFullContext.evaluationContext(environment),
       FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, term))
-    ) shouldBe 'Left
+    ) shouldBe Symbol("Left")
   }
 
   property("recursive caseobject compare with unit") {

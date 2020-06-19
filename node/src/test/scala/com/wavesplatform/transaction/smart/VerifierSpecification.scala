@@ -56,7 +56,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
 
       (bc.height _).when().returns(0)
 
-      verify(bc, tx) shouldBe 'right
+      verify(bc, tx).explicitGet()
     }
   }
 
@@ -67,12 +67,31 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
 
       setFeeAssetScriptsAndVerify(Some(invalidScript -> comp), None)(tx) should produce("ScriptExecutionError") // buy order:  matcherFeeAsset has invalid script
       setFeeAssetScriptsAndVerify(None, Some((falseScript, 1)))(tx) should produce("TransactionNotAllowedByScript") // sell order: matcherFeeAsset script gives false as a result
-      setFeeAssetScriptsAndVerify(None, None)(tx) shouldBe 'right
+      setFeeAssetScriptsAndVerify(None, None)(tx).explicitGet()
     }
   }
 
-  private def mkAssetDescription(assetId: ByteStr, matcherAccount: PublicKey, decimals: Int, scriptOption: Option[(Script, Long)]): Option[AssetDescription] =
-    Some(AssetDescription(assetId, matcherAccount, ByteString.EMPTY, ByteString.EMPTY, decimals, reissuable = false, BigInt(0), Height(0), scriptOption.map(AssetScriptInfo.tupled), 0, decimals == 0))
+  private def mkAssetDescription(
+      assetId: ByteStr,
+      matcherAccount: PublicKey,
+      decimals: Int,
+      scriptOption: Option[(Script, Long)]
+  ): Option[AssetDescription] =
+    Some(
+      AssetDescription(
+        assetId,
+        matcherAccount,
+        ByteString.EMPTY,
+        ByteString.EMPTY,
+        decimals,
+        reissuable = false,
+        BigInt(0),
+        Height(0),
+        scriptOption.map(AssetScriptInfo.tupled),
+        0,
+        decimals == 0
+      )
+    )
 
   private val exchangeTransactionV2Gen: Gen[ExchangeTransaction] = for {
     sender1: KeyPair <- accountGen

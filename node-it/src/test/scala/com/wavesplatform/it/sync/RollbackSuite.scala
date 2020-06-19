@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
-
+import com.wavesplatform.common.utils.EitherExt2
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Random
@@ -150,7 +150,7 @@ class RollbackSuite
 
     val sponsorAssetId =
       sender
-        .issue(sender.address, "SponsoredAsset", "For test usage", sponsorAssetTotal, decimals = 2, reissuable = false, fee = issueFee)
+        .issue(sender.address, "SponsoredAsset", "For test usage", sponsorAssetTotal, reissuable = false, fee = issueFee)
         .id
     nodes.waitForHeightAriseAndTxPresent(sponsorAssetId)
 
@@ -186,12 +186,11 @@ class RollbackSuite
       case _ => false
     }""".stripMargin
 
-    val pkSwapBC1 = KeyPair.fromSeed(sender.seed(firstAddress)).right.get
-    val script    = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).right.get._1
+    val pkSwapBC1 = KeyPair.fromSeed(sender.seed(firstAddress)).explicitGet()
+    val script    = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
     val sc1SetTx = SetScriptTransaction
       .selfSigned(1.toByte, sender = pkSwapBC1, script = Some(script), fee = setScriptFee, timestamp = System.currentTimeMillis())
-      .right
-      .get
+      .explicitGet()
 
     val setScriptId = sender.signedBroadcast(sc1SetTx.json()).id
     nodes.waitForHeightAriseAndTxPresent(setScriptId)

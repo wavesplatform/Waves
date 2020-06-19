@@ -12,8 +12,8 @@ class OneDimensionalMiningConstraintSuite extends FreeSpec with Matchers with Pr
   "OneDimensionalMiningConstraint" - {
     "should be full if the limit is 0, but not overfilled" in {
       val tank = createConstConstraint(0, 1, "const")
-      tank shouldBe 'full
-      tank should not be 'overfilled
+      tank.isFull shouldBe true
+      tank.isOverfilled shouldBe false
     }
 
     "put(transaction)" - tests { (maxTxs, txs) =>
@@ -30,8 +30,8 @@ class OneDimensionalMiningConstraintSuite extends FreeSpec with Matchers with Pr
     } yield toConstraint(maxTxs, txs)
 
     "multiple items don't reach the limit" in forAll(dontReachLimitGen) { updatedConstraint =>
-      updatedConstraint should not be 'full
-      updatedConstraint should not be 'overfilled
+      updatedConstraint.isFull shouldBe false
+      updatedConstraint.isOverfilled shouldBe false
     }
 
     val reachSoftLimitGen: Gen[MiningConstraint] = for {
@@ -40,8 +40,8 @@ class OneDimensionalMiningConstraintSuite extends FreeSpec with Matchers with Pr
     } yield toConstraint(maxTxs, txs)
 
     "multiple items reach the limit softly" in forAll(reachSoftLimitGen) { updatedConstraint =>
-      updatedConstraint shouldBe 'full
-      updatedConstraint should not be 'overfilled
+      updatedConstraint.isFull shouldBe true
+      updatedConstraint.isOverfilled shouldBe false
     }
 
     val reachHardLimitGen: Gen[MiningConstraint] = for {
@@ -51,8 +51,8 @@ class OneDimensionalMiningConstraintSuite extends FreeSpec with Matchers with Pr
     } yield toConstraint(maxTxs, txs)
 
     "multiple items reach the limit with gap" in forAll(reachHardLimitGen) { updatedConstraint =>
-      updatedConstraint shouldBe 'full
-      updatedConstraint shouldBe 'overfilled
+      updatedConstraint.isFull shouldBe true
+      updatedConstraint.isOverfilled shouldBe true
     }
   }
 }

@@ -232,7 +232,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("contract compiles fails when incorrect return type") {
@@ -277,7 +277,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("contract compiles fails if has more than one verifier function") {
@@ -387,7 +387,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("contract functions could return parent type values") {
@@ -415,7 +415,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("wavesBalanceV4 have type BalanceDetails") {
@@ -468,7 +468,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V4) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V4) shouldBe Symbol("right")
   }
 
   property("assetBalanceV4 allow issued assets only") {
@@ -517,7 +517,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("contract compilation fails if functions has the same name") {
@@ -605,7 +605,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("contract compiles if declaration vars and func args has the same name") {
@@ -624,7 +624,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("contract compiles if it use invoke script fields: payment, feeAssetId") {
@@ -649,7 +649,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("matching case with non-existing type should produce error message with suitable types") {
@@ -754,7 +754,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("compiler error if user function defined below usage") {
@@ -826,7 +826,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("compiler error if annotated func has argument of not native type") {
@@ -862,7 +862,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("list as @Callable argument forbidden in V3") {
@@ -898,7 +898,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V4) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V4) shouldBe Symbol("right")
   }
 
   property("@Callable V4 result type") {
@@ -929,7 +929,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       PureContext.build(Global, V4).withEnvironment[Environment] |+|
       WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
 
-    compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe 'right
+    compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe Symbol("right")
   }
 
   property("Asset has no name") {
@@ -977,7 +977,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V4) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V4) shouldBe Symbol("right")
   }
 
 

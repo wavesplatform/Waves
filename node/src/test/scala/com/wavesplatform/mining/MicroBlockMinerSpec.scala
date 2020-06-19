@@ -39,7 +39,7 @@ class MicroBlockMinerSpec extends FlatSpec with Matchers with PrivateMethodTeste
         scheduler,
         scheduler
       )
-      val generateOneMicroBlockTask = PrivateMethod[Task[MicroBlockMiningResult]]('generateOneMicroBlockTask)
+      val generateOneMicroBlockTask = PrivateMethod[Task[MicroBlockMiningResult]](Symbol("generateOneMicroBlockTask"))
 
       def generateBlocks(
           block: Block,
@@ -58,7 +58,7 @@ class MicroBlockMinerSpec extends FlatSpec with Matchers with PrivateMethodTeste
         val tx = CreateAliasTransaction
           .selfSigned(TxVersion.V1, acc, Alias.create("test" + Random.nextInt()).explicitGet(), TestValues.fee, TestValues.timestamp)
           .explicitGet()
-        utxPool.putIfNew(tx).resultE shouldBe 'right
+        utxPool.putIfNew(tx).resultE.explicitGet()
         val result = task.runSyncUnsafe()
         result match {
           case res @ MicroBlockMinerImpl.Success(b, totalConstraint) =>

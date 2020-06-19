@@ -115,7 +115,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
         }
 
         assertDiffEi(Seq(block(Seq(genesis))), block(Seq(tx)), settingsActivated) { blockDiffEi =>
-          blockDiffEi shouldBe 'right
+          blockDiffEi.explicitGet()
         }
     }
   }
@@ -271,7 +271,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
       forAll(preconditionsAndSetCustomContract(script)) {
         case (genesis, setScript) =>
           assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), settings) {
-            case (blockDiff, newState) =>
+            case (_, newState) =>
               newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
           }
       }

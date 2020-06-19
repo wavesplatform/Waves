@@ -21,7 +21,7 @@ import io.netty.util.concurrent.DefaultThreadFactory
 import monix.reactive.Observable
 import org.influxdb.dto.Point
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
 import scala.util.Random
 
@@ -175,7 +175,7 @@ object NetworkServer extends ScorexLogging {
       if (thisConnFuture.isSuccess) {
         log.trace(formatOutgoingChannelEvent(thisConnFuture.channel(), "Connection established"))
         peerDatabase.touch(remoteAddress)
-        thisConnFuture.channel().closeFuture().addListener(handleOutgoingChannelClosed(remoteAddress))
+        thisConnFuture.channel().closeFuture().addListener(f => handleOutgoingChannelClosed(remoteAddress)(f))
       } else if (thisConnFuture.cause() != null) {
         peerDatabase.suspendAndClose(thisConnFuture.channel())
         outgoingChannels.remove(remoteAddress, thisConnFuture.channel())
@@ -200,7 +200,7 @@ object NetworkServer extends ScorexLogging {
           val newConnFuture = bootstrap.connect(remoteAddress)
 
           log.trace(s"${id(newConnFuture.channel())} Connecting to $remoteAddress")
-          newConnFuture.addListener(handleConnectionAttempt(remoteAddress)).channel()
+          newConnFuture.addListener(f => handleConnectionAttempt(remoteAddress)(f)).channel()
         }
       )
 
@@ -210,7 +210,6 @@ object NetworkServer extends ScorexLogging {
       log.trace(s"Next connection attempt in $delay")
 
       workerGroup.schedule(delay) {
-        import scala.collection.JavaConverters._
         val outgoing = outgoingChannels.keySet.iterator().asScala.toVector
 
         def outgoingStr = outgoing.map(_.toString).sorted.mkString("[", ", ", "]")
