@@ -160,8 +160,7 @@ object Dependencies {
       nettyModule("handler"),
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test,
-      ("org.iq80.leveldb" % "leveldb" % "0.12").exclude("com.google.guava", "guava") % Test,
-      "com.github.romix" % "java-concurrent-hash-trie-map" % "0.2.23"
+      ("org.iq80.leveldb" % "leveldb" % "0.12").exclude("com.google.guava", "guava") % Test
     ) ++ protobuf.value ++ test ++ console ++ logDeps ++ levelDBJNA
   )
 

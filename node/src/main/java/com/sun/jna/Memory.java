@@ -22,12 +22,7 @@
  */
 package com.sun.jna;
 
-import com.romix.scala.collection.concurrent.TrieMap;
-
-import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
-import java.util.Collection;
-import java.util.LinkedList;
 
 /**
  * A <code>Pointer</code> to memory obtained from the native heap via a
@@ -55,8 +50,6 @@ public class Memory extends Pointer {
      * Keep track of all allocated memory so we can dispose of it before unloading.
      */
 
-    private static final TrieMap<WeakReference<Memory>, Void> allocatedMemory = new TrieMap<>();
-
     private static final WeakMemoryHolder buffers = new WeakMemoryHolder();
 
     /**
@@ -71,15 +64,9 @@ public class Memory extends Pointer {
      * Dispose of all allocated memory.
      */
     public static void disposeAll() {
-        // use a copy since dispose() modifies the map
-        Collection<WeakReference<Memory>> refs = new LinkedList<>(allocatedMemory.keySet());
-        for (WeakReference<Memory> r : refs) {
-            final Memory mem = r.get();
-            if (mem != null) mem.dispose();
-        }
+        // Ignore
     }
 
-    private final WeakReference<Memory> weakReference = new WeakReference<>(this);
     protected long size; // Size of the malloc'ed space
 
     /**
@@ -127,8 +114,6 @@ public class Memory extends Pointer {
         peer = malloc(size);
         if (peer == 0)
             throw new OutOfMemoryError("Cannot allocate " + size + " bytes");
-
-        allocatedMemory.put(weakReference, null);
     }
 
     protected Memory() {
@@ -210,7 +195,6 @@ public class Memory extends Pointer {
         try {
             free(peer);
         } finally {
-            allocatedMemory.remove(this.weakReference);
             peer = 0;
         }
     }
