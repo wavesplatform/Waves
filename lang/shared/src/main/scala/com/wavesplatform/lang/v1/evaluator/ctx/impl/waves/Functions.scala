@@ -476,7 +476,7 @@ object Functions {
       getBooleanByIndexF(v),
       getBinaryByIndexF(v),
       getStringByIndexF(v),
-      addressFromStringF
+      addressFromStringF(v)
     ).map(withExtract)
 
   def txByIdF(proofsEnabled: Boolean, version: StdLibVersion): BaseFunction[Environment] =
