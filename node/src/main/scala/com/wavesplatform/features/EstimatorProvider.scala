@@ -1,7 +1,6 @@
 package com.wavesplatform.features
 
 import com.wavesplatform.features.BlockchainFeatures.{BlockReward, BlockV5}
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}

@@ -10,10 +10,10 @@ import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.{NoShrink, crypto}
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.{Inside, Matchers, PropSpec}
+import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class ScriptReaderTest extends PropSpec with PropertyChecks with Matchers with TypedScriptGen with Inside with NoShrink {
+class ScriptReaderTest extends PropSpec with PropertyChecks with Matchers with TypedScriptGen with Inside with NoShrink with EitherValues {
   val checksumLength = 4
 
   property("should parse all bytes for V1") {
@@ -42,10 +42,10 @@ class ScriptReaderTest extends PropSpec with PropertyChecks with Matchers with T
           ScriptEstimatorV2
         )
       }
-    scriptEthList.foreach(_ shouldBe 'right)
+    scriptEthList.foreach(_.explicitGet())
 
     scriptEthList.foreach { scriptEth =>
-      ScriptReader.fromBytes(scriptEth.explicitGet()._1.bytes().arr) shouldBe 'right
+      ScriptReader.fromBytes(scriptEth.explicitGet()._1.bytes().arr).explicitGet()
     }
   }
 
@@ -53,7 +53,7 @@ class ScriptReaderTest extends PropSpec with PropertyChecks with Matchers with T
     import ScriptReaderTest._
 
     forAll(invalidPrefixV0Length) { scBytes =>
-      ScriptReader.fromBytes(scBytes) shouldBe 'left
+      ScriptReader.fromBytes(scBytes).left.value
     }
   }
 
@@ -61,7 +61,7 @@ class ScriptReaderTest extends PropSpec with PropertyChecks with Matchers with T
     import ScriptReaderTest._
 
     forAll(Gen.oneOf(invalidPrefixV0, invalidPrefix)) { scBytes =>
-      ScriptReader.fromBytes(scBytes) shouldBe 'left
+      ScriptReader.fromBytes(scBytes).left.value
     }
   }
 }

@@ -165,10 +165,10 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
   }
 
   "forbid CaseObj" in {
-    Try(Serde.serialize(caseObj)).toEither shouldBe 'left
+    Try(Serde.serialize(caseObj)).toEither shouldBe Symbol("left")
 
     val objectBytes = Serde.serialize(caseObj, allowObjects = true)
-    Serde.deserialize(objectBytes) shouldBe 'left
+    Serde.deserialize(objectBytes) shouldBe Symbol("left")
   }
 
   def measureTime[A](f: => A): (A, Long) = {

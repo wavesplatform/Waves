@@ -43,8 +43,7 @@ class NgState(
           Monoid.combine(d, ld)
       }
 
-  def microBlockIds: Seq[BlockId] =
-    microBlocks.map(_.totalBlockId)
+  def microBlockIds: Seq[BlockId] = microBlocks.map(_.totalBlockId).toSeq
 
   def diffFor(totalResBlockRef: BlockId): (Diff, Long, Long) = {
     val (diff, carry, totalFee) =
@@ -68,7 +67,7 @@ class NgState(
   }
 
   def bestLiquidBlockId: BlockId =
-    microBlocks.headOption.map(_.totalBlockId).getOrElse(base.id())
+    microBlocks.headOption.fold(base.id())(_.totalBlockId)
 
   def lastMicroBlock: Option[MicroBlock] =
     microBlocks.headOption.map(_.microBlock)
@@ -116,8 +115,7 @@ class NgState(
   def bestLastBlockInfo(maxTimeStamp: Long): BlockMinerInfo = {
     val blockId = microBlocks
       .find(mi => microDiffs(mi.totalBlockId).timestamp <= maxTimeStamp)
-      .map(_.totalBlockId)
-      .getOrElse(base.id())
+      .fold(base.id())(_.totalBlockId)
 
     BlockMinerInfo(base.header.baseTarget, base.header.generationSignature, base.header.timestamp, blockId)
   }
@@ -158,7 +156,7 @@ class NgState(
         val microBlocksAsc = microBlocks.reverse
 
         if (base.id() == blockId) {
-          Some((base, microBlocksAsc.map(_.microBlock)))
+          Some((base, microBlocksAsc.map(_.microBlock).toSeq))
         } else if (!microBlocksAsc.exists(_.idEquals(blockId))) None
         else {
           val (accumulatedTxs, maybeFound) = microBlocksAsc.foldLeft((Vector.empty[Transaction], Option.empty[(ByteStr, DiscardedMicroBlocks)])) {

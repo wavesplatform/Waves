@@ -814,7 +814,7 @@ object PureContext {
       ("element", TYPEPARAM('T'))
     ) {
       case ARR(list) :: element :: Nil =>
-        genericListIndexOf(element, list.lastIndexOf, list.lastIndexWhere)
+        genericListIndexOf(element, list.lastIndexOf(_), list.lastIndexWhere)
       case xs =>
         notImplemented[Id, EVALUATED]("lastIndexOf(list: List[T], element: T)", xs)
     }
@@ -1016,7 +1016,7 @@ object PureContext {
               || rp > 8) {
             Left("pow: scale out of range 0-8")
           } else {
-            math.pow(b, bp, e, ep, rp, roundMode(round)).right.map(CONST_LONG)
+            math.pow(b, bp, e, ep, rp, roundMode(round)).map(CONST_LONG)
           }
         case xs => notImplemented[Id, EVALUATED]("pow(base: Int, bp: Int, exponent: Int, ep: Int, rp: Int, round: Rounds)", xs)
       }
@@ -1032,7 +1032,7 @@ object PureContext {
               || rp > 8) {
             Left("log: scale out of range 0-8")
           } else {
-            math.log(b, bp, e, ep, rp, roundMode(round)).right.map(CONST_LONG)
+            math.log(b, bp, e, ep, rp, roundMode(round)).map(CONST_LONG)
           }
         case xs => notImplemented[Id, EVALUATED]("log(exponent: Int, ep: Int, base: Int, bp: Int, rp: Int, round: Rounds)", xs)
       }

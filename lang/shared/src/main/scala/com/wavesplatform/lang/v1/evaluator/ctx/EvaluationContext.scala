@@ -18,9 +18,9 @@ case class LoggedEvaluationContext[C[_[_]], F[_]](l: LetLogCallback[F], ec: Eval
 
 object LoggedEvaluationContext {
   class Lenses[F[_], C[_[_]]] {
-    val types: Lens[LoggedEvaluationContext[C, F], Map[String, FINAL]]                   = lens[LoggedEvaluationContext[C, F]] >> 'ec >> 'typeDefs
-    val lets: Lens[LoggedEvaluationContext[C, F], Map[String, LazyVal[F]]]               = lens[LoggedEvaluationContext[C, F]] >> 'ec >> 'letDefs
-    val funcs: Lens[LoggedEvaluationContext[C, F], Map[FunctionHeader, BaseFunction[C]]] = lens[LoggedEvaluationContext[C, F]] >> 'ec >> 'functions
+    val types: Lens[LoggedEvaluationContext[C, F], Map[String, FINAL]]                   = lens[LoggedEvaluationContext[C, F]] >> Symbol("ec") >> Symbol("typeDefs")
+    val lets: Lens[LoggedEvaluationContext[C, F], Map[String, LazyVal[F]]]               = lens[LoggedEvaluationContext[C, F]] >> Symbol("ec") >> Symbol("letDefs")
+    val funcs: Lens[LoggedEvaluationContext[C, F], Map[FunctionHeader, BaseFunction[C]]] = lens[LoggedEvaluationContext[C, F]] >> Symbol("ec") >> Symbol("functions")
   }
 }
 

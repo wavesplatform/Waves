@@ -122,7 +122,7 @@ object Tasks {
          |   private val regex = "\\\\[(.+?)\\\\]\\\\(.+?\\\\)".r
          |
          |   lazy val varData  = $vars ++ $varsV3 ++ $varsV4
-         |   lazy val funcData = $funcs ++ (categorizedfuncDataV3 ++ categorizedfuncDataV4).mapValues(v => (regex.replaceAllIn(v._1, _.group(1)), v._2))
+         |   lazy val funcData = $funcs ++ (categorizedfuncDataV3 ++ categorizedfuncDataV4).view.mapValues(v => (regex.replaceAllIn(v._1, _.group(1)), v._2))
          |   lazy val categorizedfuncDataV3 = $funcsV3
          |   lazy val categorizedfuncDataV4 = $funcsV4
          | }

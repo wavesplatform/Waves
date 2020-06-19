@@ -164,7 +164,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       failed.size shouldBe MaxTxsInMicroBlock * 2
 
       all(failed.map(_.status)) shouldBe "confirmed"
-      all(failed.map(_.applicationStatus)) shouldBe 'defined
+      all(failed.map(_.applicationStatus)) shouldBe defined
       all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
     }
 
@@ -209,7 +209,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       failed.size shouldBe MaxTxsInMicroBlock * 2
 
       all(failed.map(_.status)) shouldBe "confirmed"
-      all(failed.map(_.applicationStatus)) shouldBe 'defined
+      all(failed.map(_.applicationStatus)) shouldBe defined
       all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
 
       sender.balance(caller).balance shouldBe callerBalance - MaxTxsInMicroBlock * 2 * minInvokeFee
@@ -254,7 +254,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       failed.size shouldBe MaxTxsInMicroBlock * 2
 
       all(failed.map(_.status)) shouldBe "confirmed"
-      all(failed.map(_.applicationStatus)) shouldBe 'defined
+      all(failed.map(_.applicationStatus)) shouldBe defined
       all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
     }
 

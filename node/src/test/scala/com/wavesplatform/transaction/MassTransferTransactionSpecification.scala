@@ -3,7 +3,7 @@ package com.wavesplatform.transaction
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.diffs.ProduceError._
-import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer, Transfer}
@@ -85,7 +85,7 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
     import MassTransferTransaction.create
 
     forAll(massTransferGen) {
-      case MassTransferTransaction(_, sender, assetId, transfers, fee, timestamp, attachment, proofs,_ ) =>
+      case MassTransferTransaction(_, sender, assetId, transfers, fee, timestamp, attachment, proofs, _) =>
         val tooManyTransfers   = List.fill(MaxTransferCount + 1)(ParsedTransfer(sender.toAddress, 1L))
         val tooManyTransfersEi = create(1.toByte, sender, assetId, tooManyTransfers, fee, timestamp, attachment, proofs)
         tooManyTransfersEi shouldBe Left(GenericError(s"Number of transfers ${tooManyTransfers.length} is greater than $MaxTransferCount"))
@@ -103,8 +103,8 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
         val feeOverflowEi = create(1.toByte, sender, assetId, feeOverflow, oneHalf, timestamp, attachment, proofs)
         feeOverflowEi shouldBe Left(TxValidationError.OverflowError)
 
-        val longAttachment   = Attachment.Bin(Array.fill(TransferTransaction.MaxAttachmentSize + 1)(1: Byte))
-        val longAttachmentEi = create(1.toByte, sender, assetId, transfers, fee, timestamp, Some(longAttachment), proofs)
+        val longAttachment   = ByteStr(Array.fill(TransferTransaction.MaxAttachmentSize + 1)(1: Byte))
+        val longAttachmentEi = create(1.toByte, sender, assetId, transfers, fee, timestamp, longAttachment, proofs)
         longAttachmentEi shouldBe Left(TxValidationError.TooBigArray)
 
         val noFeeEi = create(1.toByte, sender, assetId, feeOverflow, 0, timestamp, attachment, proofs)
@@ -114,10 +114,10 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
         negativeFeeEi shouldBe Left(TxValidationError.InsufficientFee())
 
         val differentChainIds = Seq(ParsedTransfer(sender.toAddress, 100), ParsedTransfer(sender.toAddress('?'.toByte), 100))
-        val invalidChainIdEi = create(1.toByte, sender, assetId, differentChainIds, 100, timestamp, attachment, proofs)
+        val invalidChainIdEi  = create(1.toByte, sender, assetId, differentChainIds, 100, timestamp, attachment, proofs)
         invalidChainIdEi should produce("One of chain ids not match")
 
-        val otherChainIds = Seq(ParsedTransfer(sender.toAddress('?'.toByte), 100), ParsedTransfer(sender.toAddress('?'.toByte), 100))
+        val otherChainIds         = Seq(ParsedTransfer(sender.toAddress('?'.toByte), 100), ParsedTransfer(sender.toAddress('?'.toByte), 100))
         val invalidOtherChainIdEi = create(1.toByte, sender, assetId, otherChainIds, 100, timestamp, attachment, proofs)
         invalidOtherChainIdEi should produce("One of chain ids not match")
     }
@@ -156,8 +156,7 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
       .parseTransfersList(
         List(Transfer("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", 100000000L), Transfer("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", 200000000L))
       )
-      .right
-      .get
+      .explicitGet()
 
     val tx = MassTransferTransaction
       .create(
@@ -167,11 +166,10 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
         transfers,
         200000,
         1518091313964L,
-        Some(Attachment.Bin(Base58.tryDecodeWithLimit("59QuUcqP6p").get)),
+        ByteStr.decodeBase58("59QuUcqP6p").get,
         Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get))
       )
-      .right
-      .get
+      .explicitGet()
 
     js shouldEqual tx.json()
   }

@@ -2,7 +2,6 @@ package com.wavesplatform.api.http
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.TxValidationError.GenericError

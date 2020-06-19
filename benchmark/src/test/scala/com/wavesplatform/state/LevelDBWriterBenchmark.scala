@@ -8,7 +8,7 @@ import com.wavesplatform.account._
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.database
 import com.wavesplatform.database.{DBExt, Keys, LevelDBFactory, LevelDBWriter}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
@@ -56,6 +56,11 @@ object LevelDBWriterBenchmark {
   @State(Scope.Benchmark)
   class TransactionByIdSt extends BaseSt {
     val allTxs: Vector[ByteStr] = load("transactionById", benchSettings.restTxsFile)(x => ByteStr(Base58.tryDecodeWithLimit(x).get))
+  }
+
+  @State(Scope.Benchmark)
+  class TransactionByAddressSt extends BaseSt {
+    val txsAddresses: Vector[Address] = load("transactionByAddress", benchSettings.txsAddressesFile)(x => Address.fromString(x).explicitGet())
   }
 
   @State(Scope.Benchmark)

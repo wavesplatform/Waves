@@ -39,6 +39,6 @@ class ContractCompilerWithParserV2Test extends PropSpec with PropertyChecks with
 
     val result = compile(script)
 
-    result shouldBe 'right
+    result shouldBe Symbol("right")
   }
 }

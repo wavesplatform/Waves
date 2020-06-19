@@ -84,7 +84,7 @@ package object http {
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "feeAssetId").read[Asset] and
       (JsPath \ "fee").read[Long] and
-      (JsPath \ "attachment").readNullable[Attachment] and
+      (JsPath \ "attachment").readWithDefault(ByteStr.empty) and
       (JsPath \ "proofs").readNullable[Proofs] and
       (JsPath \ "signature").readNullable[ByteStr]
   ) { (version, sender, recipient, asset, amount, timestamp, feeAsset, fee, attachment, proofs, signature) =>

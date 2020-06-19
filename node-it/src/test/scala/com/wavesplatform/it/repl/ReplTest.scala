@@ -1,22 +1,27 @@
 package com.wavesplatform.it.repl
 
-import com.wavesplatform.common.utils._
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.state._
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils._
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.it.BaseSuite
+import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.util._
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
-import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.BaseSuite
 import com.wavesplatform.it.api.SyncHttpApi._
+import org.scalatest.Ignore
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
+@Ignore
 class ReplTest extends BaseSuite {
   override def nodeConfigs =
     com.wavesplatform.it.NodeConfigs.newBuilder
@@ -118,7 +123,7 @@ class ReplTest extends BaseSuite {
           |	version = ${trans.version.get}
           |	id = base58'${trans.id}'
           |	senderPublicKey = base58'[$Base58Alphabet]+'
-          |	attachment = Unit
+          |	attachment = base58''
           |	sender = Address\\(
           |		bytes = base58'${trans.sender.get}'
           |	\\)

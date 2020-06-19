@@ -37,7 +37,7 @@ trait WithBlockchain extends BeforeAndAfterEach with BeforeAndAfterAll with NTPT
     super.beforeAll()
   }
 
-  override def afterAll() {
+  override def afterAll(): Unit = {
     bcu.shutdown()
     db.close()
     TestHelpers.deleteRecursively(path)

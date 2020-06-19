@@ -291,7 +291,7 @@ object Terms {
   abstract case class ARR private (xs: IndexedSeq[EVALUATED]) extends EVALUATED {
     override def toString: String = TermPrinter.string(this)
 
-    val elementsWeightSum: Long =
+    lazy val elementsWeightSum: Long =
       weight - EMPTYARR_WEIGHT - ELEM_WEIGHT * xs.size
 
     override val getType: REAL = LIST(NOTHING) // currently should not be used
@@ -304,8 +304,8 @@ object Terms {
       } else {
         Either.cond(
           mweight <= MaxWeight,
-          new { override val weight: Long = mweight } with ARR(xs),
-          s"The list is too heavy. Actual weight: ${mweight}, limit: ${MaxWeight}"
+          new ARR(xs) { override val weight: Long = mweight },
+          s"The list is too heavy. Actual weight: $mweight, limit: $MaxWeight"
         )
       }
 
@@ -313,6 +313,12 @@ object Terms {
       val weight = EMPTYARR_WEIGHT + ELEM_WEIGHT * xs.size + xs.map(_.weight).sum
       ARR(xs, weight, limited)
     }
+  }
+
+  case class FAIL(reason: String) extends EVALUATED {
+    override def toString: String = "Evaluation failed: " ++ reason
+    def weight: Long = 0
+    override val getType: REAL = NOTHING
   }
 
   val runtimeTupleType: CASETYPEREF = CASETYPEREF("Tuple", Nil)

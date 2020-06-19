@@ -1,6 +1,5 @@
 package com.wavesplatform.features
 
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.state.Blockchain
 
 object ScriptTransferValidationProvider {

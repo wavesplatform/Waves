@@ -4,9 +4,7 @@ import com.wavesplatform.common.utils.{Base58, FastBase58, StdBase58}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import scorex.crypto.encode.{Base58 => ScorexBase58}
-
-import scala.util.Success
+import scorex.util.encode.{Base58 => ScorexBase58}
 
 class Base58Test extends PropSpec with PropertyChecks with Matchers {
   import org.scalacheck.Shrink
@@ -63,8 +61,8 @@ class Base58Test extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("handles zeroes at start") {
-    val encodedString  = "11WH5tQgZH6Djm7RS2guC"
-    val Success(bytes) = ScorexBase58.decode(encodedString)
+    val encodedString = "11WH5tQgZH6Djm7RS2guC"
+    val bytes         = ScorexBase58.decode(encodedString).get
 
     val stdStr  = StdBase58.encode(bytes)
     val fastStr = FastBase58.encode(bytes)
