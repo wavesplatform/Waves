@@ -117,17 +117,18 @@ object Functions {
   def getBinaryByIndexF(v: StdLibVersion): BaseFunction[Environment]  = getDataByIndexF("getBinary", DataType.ByteArray, v)
   def getStringByIndexF(v: StdLibVersion): BaseFunction[Environment]  = getDataByIndexF("getString", DataType.String, v)
 
-  private def secureHashExpr(xs: EXPR): EXPR = FUNCTION_CALL(
-    FunctionHeader.Native(KECCAK256_LIM),
-    List(
-      FUNCTION_CALL(
-        FunctionHeader.Native(BLAKE256_LIM),
-        List(xs)
+  private def secureHashExpr(xs: EXPR, version: StdLibVersion): EXPR =
+    FUNCTION_CALL(
+      FunctionHeader.Native(if (version >= V4) KECCAK256_LIM else KECCAK256),
+      List(
+        FUNCTION_CALL(
+          FunctionHeader.Native(if (version >= V4) BLAKE256_LIM else BLAKE256),
+          List(xs)
+        )
       )
     )
-  )
 
-  val addressFromPublicKeyF: BaseFunction[Environment] =
+  def addressFromPublicKeyF(version: StdLibVersion): BaseFunction[Environment] =
     UserFunction.withEnvironment[Environment](
       name = "addressFromPublicKey",
       internalName = "addressFromPublicKey",
@@ -151,7 +152,7 @@ object Functions {
                       FUNCTION_CALL(
                         PureContext.takeBytes,
                         List(
-                          secureHashExpr(REF("@publicKey")),
+                          secureHashExpr(REF("@publicKey"), version),
                           CONST_LONG(EnvironmentFunctions.HashLength)
                         )
                       )
@@ -166,7 +167,7 @@ object Functions {
                     FUNCTION_CALL(
                       PureContext.takeBytes,
                       List(
-                        secureHashExpr(REF("@afpk_withoutChecksum")),
+                        secureHashExpr(REF("@afpk_withoutChecksum"), version),
                         CONST_LONG(EnvironmentFunctions.ChecksumLength)
                       )
                     )
@@ -190,7 +191,7 @@ object Functions {
     str
   )
 
-  private def verifyAddressChecksumExpr(addressBytes: EXPR): EXPR = FUNCTION_CALL(
+  private def verifyAddressChecksumExpr(addressBytes: EXPR, version: StdLibVersion): EXPR = FUNCTION_CALL(
     PureContext.eq,
     List(
       // actual checksum
@@ -199,14 +200,17 @@ object Functions {
       FUNCTION_CALL(
         PureContext.takeBytes,
         List(
-          secureHashExpr(FUNCTION_CALL(PureContext.dropRightBytes, List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength)))),
+          secureHashExpr(
+            FUNCTION_CALL(PureContext.dropRightBytes, List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength))),
+            version
+          ),
           CONST_LONG(EnvironmentFunctions.ChecksumLength)
         )
       )
     )
   )
 
-  val addressFromStringF: BaseFunction[Environment] =
+  def addressFromStringF(version: StdLibVersion): BaseFunction[Environment] =
     UserFunction.withEnvironment("addressFromString", 124, optionAddress, ("@string", STRING)) {
       new ContextfulUserFunction[Environment] {
         override def apply[F[_]: Monad](env: Environment[F]): EXPR =
@@ -248,7 +252,7 @@ object Functions {
                     )
                   ),
                   IF(
-                    verifyAddressChecksumExpr(REF("@afs_addrBytes")),
+                    verifyAddressChecksumExpr(REF("@afs_addrBytes"), version),
                     FUNCTION_CALL(FunctionHeader.User("Address"), List(REF("@afs_addrBytes"))),
                     REF("unit")
                   ),

@@ -21,8 +21,6 @@ object WavesContext {
       getBooleanFromStateF,
       getBinaryFromStateF,
       getStringFromStateF,
-      addressFromPublicKeyF,
-      addressFromStringF,
       addressFromRecipientF,
       )
   private val balanceV123Functions =
@@ -94,6 +92,8 @@ object WavesContext {
         getBooleanByIndexF(version),
         getBinaryByIndexF(version),
         getStringByIndexF(version),
+        addressFromPublicKeyF(version),
+        addressFromStringF(version),
       )
 
     val versionSpecificFuncs =
