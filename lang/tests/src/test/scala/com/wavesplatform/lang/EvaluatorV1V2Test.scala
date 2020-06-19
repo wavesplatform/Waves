@@ -25,21 +25,17 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, EnvironmentFunctions, PureContext, _}
-import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1, FunctionIds, Log}
-import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1, EvaluatorV2, Log, LogItem}
+import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1, EvaluatorV2, FunctionIds, Log}
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
+import com.wavesplatform.lang.v1.{CTX, ContractLimits, FunctionHeader}
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.{EitherValues, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
-import scala.collection.mutable.ListBuffer
-import scala.util.Try
-
-class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
+class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink with EitherValues {
 
   implicit val version: StdLibVersion = V4
 
@@ -68,15 +64,8 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
   private def evalV1[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] =
     defaultEvaluator[T](context, expr)
 
-  private def evalV2[T <: EVALUATED](context: LoggedEvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] = {
-    val evaluatorV2 = new EvaluatorV2(context, implicitly[StdLibVersion])
-    Try(evaluatorV2(expr, Int.MaxValue))
-      .toEither
-      .bimap(_.getMessage, _._1.asInstanceOf[T])
-  }
-
   private def evalV2[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] =
-    evalV2[T](LoggedEvaluationContext[Environment, Id](_ => _ => (), context), expr)
+    EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion]).bimap(_._1, _._1.asInstanceOf[T])
 
   private def eval[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] = {
     val evaluatorV1Result = evalV1[T](context, expr)
@@ -89,14 +78,11 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
   private def evalPure[T <: EVALUATED](context: EvaluationContext[NoContext, Id] = pureEvalContext, expr: EXPR): Either[ExecutionError, T] =
     eval[T](context.asInstanceOf[EvaluationContext[Environment, Id]], expr)
 
-  private def evalWithLogging(context: EvaluationContext[Environment, Id], expr: EXPR): (Log[Id], Either[ExecutionError, EVALUATED]) = {
+  private def evalWithLogging(context: EvaluationContext[Environment, Id], expr: EXPR): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] = {
     val evaluatorV1Result = defaultEvaluator.applyWithLogging[EVALUATED](context, expr)
+    val evaluatorV2Result = EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion])
 
-    val evaluatorV2Log = ListBuffer[LogItem[Id]]()
-    val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => evaluatorV2Log.append((name, value)), context)
-    val evaluatorV2Result = evalV2[EVALUATED](loggedCtx, expr)
-
-    (evaluatorV2Log.toList, evaluatorV2Result) shouldBe evaluatorV1Result
+    evaluatorV2Result shouldBe evaluatorV1Result
     evaluatorV1Result
   }
 
@@ -110,7 +96,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
 
   property("return error and log of failed evaluation") {
     forAll(blockBuilder) { block =>
-      val (log, Left(err)) = evalWithLogging(
+      val (err, log) = evalWithLogging(
         pureEvalContext.asInstanceOf[EvaluationContext[Environment, Id]],
         expr = block(
           LET("x", CONST_LONG(3)),
@@ -119,7 +105,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
             FUNCTION_CALL(PureContext.eq.header, List(REF("z"), CONST_LONG(1)))
           )
         )
-      )
+      ).left.value
 
       val expectedError = "A definition of 'z' not found"
       err shouldBe expectedError
@@ -428,16 +414,16 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
 
     val bodyBytes = "message".getBytes("UTF-8")
 
-    val (log, result) = multiSig(
+    val (result, log) = multiSig(
       bodyBytes,
       senderPublicKey,
       bobPublicKey,
       bobPublicKey,
       Curve25519.sign(alicePrivateKey, bodyBytes),
       Curve25519.sign(bobPrivateKey, bodyBytes)
-    )
+    ).explicitGet()
 
-    result shouldBe Right(false)
+    result shouldBe false
 
     //it false, because script fails on Alice's signature check, and bobSigned is not evaluated
     log.find(_._1 == "bobSigned") shouldBe None
@@ -786,7 +772,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
       val bodyBytes = ("m" * ((16 << i) * 1024)).getBytes("UTF-8")
 
       val r = hashTest(bodyBytes, h, i.toShort)
-      r shouldBe 'Right
+      r shouldBe Symbol("Right")
     }
   }
 
@@ -800,7 +786,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
       val bodyBytes = ("m" * ((16 << i) * 1024 + 1)).getBytes("UTF-8")
 
       val r = hashTest(bodyBytes, h, i.toShort)
-      r shouldBe 'Left
+      r shouldBe Symbol("Left")
     }
   }
 
@@ -863,7 +849,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
     )
 
     com.wavesplatform.lang.v1.parser.Parser.parseExpr(script) match {
-      case fastparse.core.Parsed.Success(xs, _) =>
+      case fastparse.Parsed.Success(xs, _) =>
         evalPure[EVALUATED](
           context.evaluationContext[Id],
           ExpressionCompiler
@@ -871,13 +857,13 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
             .explicitGet()
             ._1
         )
-      case fastparse.core.Parsed.Failure(_, index, _) => Left(s"Parse error at $index")
+      case fastparse.Parsed.Failure(_, index, _) => Left(s"Parse error at $index")
     }
   }
 
   private def recCmp(cnt: Int)(
       f: ((String => String) => String) = (gen => gen("x") ++ gen("y") ++ s"x${cnt + 1} == y${cnt + 1}")
-  ): (Log[Id], Either[ExecutionError, Boolean]) = {
+  ): Either[(ExecutionError, Log[Id]), (Boolean, Log[Id])] = {
     val context = Monoid.combineAll(
       Seq(
         pureContext,
@@ -891,22 +877,21 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
     }
     val script = f(gen)
 
-    val r = evalWithLogging(
+    evalWithLogging(
       context.evaluationContext(Common.emptyBlockchainEnvironment()),
       ExpressionCompiler
         .compile(script, context.compilerContext)
         .explicitGet()
-    )
-    (r._1, r._2.map {
-      case CONST_BOOLEAN(b) => b
-      case _                => ???
-    })
+    ).map {
+      case (CONST_BOOLEAN(b), log) => (b, log)
+      case _                       => ???
+    }
   }
 
   property("recCmp") {
-    val (log, result) = recCmp(4)()
+    val (result, log) = recCmp(4)().explicitGet()
 
-    result shouldBe Right(true)
+    result shouldBe true
 
     //it false, because script fails on Alice's signature check, and bobSigned is not evaluated
     log.find(_._1 == "bobSigned") shouldBe None
@@ -914,22 +899,20 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
   }
 
   property("recCmp fail by cmp") {
-    val (_, result) = recCmp(5)()
-
-    result shouldBe 'Left
+    recCmp(5)() shouldBe Symbol("Left")
   }
 
   property("recData fail by ARR") {
     val cnt           = 8
-    val (_, result) = recCmp(cnt)(gen => gen("x") ++ s"x${cnt + 1}.size() == 3")
+    val result = recCmp(cnt)(gen => gen("x") ++ s"x${cnt + 1}.size() == 3")
 
-    result shouldBe 'Left
+    result shouldBe Symbol("Left")
   }
 
   property("recData use uncomparable data") {
-    val cnt           = 7
-    val (_, result) = recCmp(cnt)(gen => gen("x") ++ s"x${cnt + 1}[1].size() == 3")
-    result shouldBe Right(true)
+    val cnt         = 7
+    val (result, _) = recCmp(cnt)(gen => gen("x") ++ s"x${cnt + 1}[1].size() == 3").explicitGet()
+    result shouldBe true
   }
 
   property("List weight correct") {
@@ -962,7 +945,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
     eval[CONST_BOOLEAN](
       defaultFullContext.evaluationContext(environment),
       FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, term))
-    ) shouldBe 'Left
+    ) shouldBe Symbol("Left")
   }
 
   property("recursive caseobject compare with unit") {
@@ -982,7 +965,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
       bobPK: PublicKey,
       aliceProof: Signature,
       bobProof: Signature
-  ): (Log[Id], Either[ExecutionError, Boolean]) = {
+  ): Either[(ExecutionError, Log[Id]), (Boolean, Log[Id])] = {
     val txType = CASETYPEREF(
       "Transaction",
       List(
@@ -1025,16 +1008,15 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
          |aliceSigned && bobSigned
    """.stripMargin
 
-    val r = evalWithLogging(
+    evalWithLogging(
       context.evaluationContext[Id](Common.emptyBlockchainEnvironment()),
       ExpressionCompiler
         .compile(script, context.compilerContext)
         .explicitGet()
-    )
-    (r._1, r._2.map {
-      case CONST_BOOLEAN(b) => b
-      case _                => ???
-    })
+    ).map {
+      case (CONST_BOOLEAN(b), log) => (b, log)
+      case _                       => ???
+    }
   }
 
   property("checking a hash of some message by crypto function invoking") {
@@ -1196,10 +1178,20 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
     val v3Ctx = defaultFullContext(V3).evaluationContext(emptyBlockchainEnvironment())
     val v4Ctx = defaultFullContext(V4).evaluationContext(emptyBlockchainEnvironment())
 
-    defaultEvaluator[EVALUATED](v3Ctx, script(string32Kb)) shouldBe CONST_BYTESTR(bytes(string32Kb))
-    defaultEvaluator[EVALUATED](v4Ctx, script(string32Kb)) shouldBe CONST_BYTESTR(bytes(string32Kb))
+    eval[EVALUATED](v3Ctx, script(string32Kb)) shouldBe CONST_BYTESTR(bytes(string32Kb))
+    eval[EVALUATED](v4Ctx, script(string32Kb)) shouldBe CONST_BYTESTR(bytes(string32Kb))
 
-    defaultEvaluator[EVALUATED](v3Ctx, script(string32Kb + "aa")) shouldBe CONST_BYTESTR(bytes(string32Kb + "aa"))
-    defaultEvaluator[EVALUATED](v4Ctx, script(string32Kb + "aa")) shouldBe Left("Base16 decode input length=32770 should not exceed 32768")
+    eval[EVALUATED](v3Ctx, script(string32Kb + "aa")) shouldBe CONST_BYTESTR(bytes(string32Kb + "aa"))
+    eval[EVALUATED](v4Ctx, script(string32Kb + "aa")) shouldBe Left("Base16 decode input length=32770 should not exceed 32768")
+  }
+
+  property("tuple size limit") {
+    def createTuple(size: Int) =
+      FUNCTION_CALL(Native((CREATE_TUPLE - 2 + size).toShort), List.fill(size)(CONST_LONG(1)))
+
+    val v4Ctx = defaultFullContext(V4).evaluationContext(emptyBlockchainEnvironment())
+
+    eval[CaseObj](v4Ctx, createTuple(ContractLimits.MaxTupleSize)).explicitGet().fields.size shouldBe ContractLimits.MaxTupleSize
+    eval[CaseObj](v4Ctx, createTuple(ContractLimits.MaxTupleSize + 1)) should produce("not found")
   }
 }

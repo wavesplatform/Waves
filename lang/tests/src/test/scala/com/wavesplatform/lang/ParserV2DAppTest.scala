@@ -17,7 +17,7 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
   }
 
   private def cleanOffsets(l: LET): LET =
-    l.copy(Pos(0, 0), name = cleanOffsets(l.name), value = cleanOffsets(l.value), types = l.types.map(cleanOffsets(_)))
+    l.copy(Pos(0, 0), name = cleanOffsets(l.name), value = cleanOffsets(l.value))  // , types = l.types.map(cleanOffsets(_))
 
   private def cleanOffsets[T](p: PART[T]): PART[T] = p match {
     case PART.VALID(_, x)   => PART.VALID(AnyPos, x)
@@ -305,7 +305,7 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
         |
         |@Callable(i) func f() = []
         |""".stripMargin
-    ParserV2.parseDAPP(code) shouldBe 'right
+    ParserV2.parseDAPP(code) shouldBe Symbol("right")
   }
 
   property("FOLD expr") {
@@ -322,7 +322,7 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
         |
         |@Callable(i) func delete(k: String) = [DeleteEntry(k)]
         |""".stripMargin
-    ParserV2.parseDAPP(code) shouldBe 'right
+    ParserV2.parseDAPP(code) shouldBe Symbol("right")
   }
 
 }

@@ -14,7 +14,6 @@ import com.wavesplatform.database.openDB
 import com.wavesplatform.events.{BlockchainUpdateTriggersImpl, BlockchainUpdated, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
@@ -194,9 +193,9 @@ object Importer extends ScorexLogging {
               BlockchainFeatures.BlockV5,
               blockchainUpdater.height + 1
             )
-            val Success(block) =
-              if (importOptions.format == Formats.Binary && !blockV5) Block.parseBytes(buffer)
-              else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(buffer)), unsafe = true)
+            val block =
+              (if (importOptions.format == Formats.Binary && !blockV5) Block.parseBytes(buffer)
+               else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(buffer)), unsafe = true)).get
 
             if (blockchainUpdater.lastBlockId.contains(block.header.reference)) {
               Await.result(appendBlock(block).runAsyncLogErr, Duration.Inf) match {

@@ -5,7 +5,6 @@ import cats.kernel.Monoid
 import cats.syntax.either.catsSyntaxEitherId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.state._

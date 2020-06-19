@@ -12,7 +12,6 @@ import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, FINAL, LONG, STRING}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
@@ -26,10 +25,11 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Issue
+import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import org.web3j.crypto.Keys
-import scorex.crypto.encode.Base16
+import scorex.util.encode.Base16
 import scorex.crypto.hash.Keccak256
 
 import scala.util.{Random, Try}
@@ -80,10 +80,15 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
     val lazyVal       = ContextfulVal.pure[C](pointInstance.orNull)
     val stringToTuple = Map(("p", (pointType, lazyVal)))
+    val directiveSet = DirectiveSet(version, Account, Expression).explicitGet()
+
+    val testCtx =
+      (addCtx.withEnvironment[C] |+| CTX[C](sampleTypes, stringToTuple, Array(f, f2))).compilerContext
+
     val ctx: CTX[C] =
       Monoid.combineAll(
         Seq(
-          PureContext.build(Global, version).withEnvironment[C],
+          PureContext.build(Global, directiveSet, testCompilerContext = testCtx).withEnvironment[C],
           CryptoContext.build(Global, version).withEnvironment[C],
           addCtx.withEnvironment[C],
           CTX[C](sampleTypes, stringToTuple, Array(f, f2)),
@@ -958,7 +963,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("parseIntValue fail when string starts with non-digit") {
     val src =
       """ "x42".parseIntValue() """
-    eval[EVALUATED](src) shouldBe 'left
+    eval[EVALUATED](src) shouldBe Symbol("left")
   }
 
   property("parseInt fail when string ends with non-digit") {
@@ -970,7 +975,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("parseIntValue fail when string ends with non-digit") {
     val src =
       """ "42x".parseIntValue() """
-    eval[EVALUATED](src) shouldBe 'left
+    eval[EVALUATED](src) shouldBe Symbol("left")
   }
 
   property("parseInt fail when string is empty") {
@@ -982,7 +987,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("parseIntValue fail when string is empty") {
     val src =
       """ "".parseIntValue() """
-    eval[EVALUATED](src) shouldBe 'left
+    eval[EVALUATED](src) shouldBe Symbol("left")
   }
 
   property("matching case with non-existing type") {
@@ -1072,10 +1077,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED]("pow(0, 1, 3456, 3, 2, UP)", None) shouldBe Right(CONST_LONG(0))
     eval[EVALUATED]("pow(20, 1, -1, 0, 4, DOWN)", None) shouldBe Right(CONST_LONG(5000))
     eval[EVALUATED]("pow(-20, 1, -1, 0, 4, DOWN)", None) shouldBe Right(CONST_LONG(-5000))
-    eval[EVALUATED]("pow(0, 1, -1, 0, 4, DOWN)", None) shouldBe 'left
+    eval[EVALUATED]("pow(0, 1, -1, 0, 4, DOWN)", None) shouldBe Symbol("left")
     eval[EVALUATED]("log(16, 0, 2, 0, 0, CEILING)", None) shouldBe Right(CONST_LONG(4))
-    eval[EVALUATED]("log(16, 0, -2, 0, 0, CEILING)", None) shouldBe 'left
-    eval[EVALUATED]("log(-16, 0, 2, 0, 0, CEILING)", None) shouldBe 'left
+    eval[EVALUATED]("log(16, 0, -2, 0, 0, CEILING)", None) shouldBe Symbol("left")
+    eval[EVALUATED]("log(-16, 0, 2, 0, 0, CEILING)", None) shouldBe Symbol("left")
   }
 
   property("math functions scale limits") {
@@ -1100,7 +1105,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("HalfUp type have no constructor") {
-    eval("pow(10, 0, -8, 0, 8, HalfUp())") shouldBe 'Left
+    eval("pow(10, 0, -8, 0, 8, HalfUp())") shouldBe Symbol("Left")
   }
 
   property("concat empty list") {
@@ -1306,7 +1311,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       ctxt = ctx,
       version = V4,
       env = utils.environment
-    ) should produce("non-existing type")
+    ) should produce("Undefined type")
   }
 
   property("List[Int] median - 100 elements") {
@@ -1735,7 +1740,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val message1 = "what's up jim"
     val expectedAddress1 = "85db9634489b76e238368e4a075cc6e5a56a714c"
 
-    Keys.getAddress(recoverPublicKey(message1, signature1)) shouldBe Base16.decode(expectedAddress1)
+    Keys.getAddress(recoverPublicKey(message1, signature1)) shouldBe Base16.decode(expectedAddress1).get
 
     //source: https://etherscan.io/verifySig/2007
     val signature2 =
@@ -1745,7 +1750,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val message2 = "i am the owner"
     val expectedAddress2 = "73f32c743e5928ff800ab8b05a52c73cd485f9c3"
 
-    Keys.getAddress(recoverPublicKey(message2, signature2)) shouldBe Base16.decode(expectedAddress2)
+    Keys.getAddress(recoverPublicKey(message2, signature2)) shouldBe Base16.decode(expectedAddress2).get
   }
 
   property("ecrecover negative cases") {
@@ -1775,5 +1780,82 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[CONST_STRING](script2, version = V4).explicitGet().s.length shouldBe 32767
 
     eval(""" [].makeString(", ") """, version = V3) should produce("Can't find a function 'makeString'")
+  }
+
+  property("n-size generic tuple") {
+    lazy val getElement: LazyList[(String, String)] =
+      LazyList(
+        (""""a"""", "String"),
+        ("true", "Boolean"),
+        ("123", "Int"),
+        ("base58'aaaa'", "ByteVector"),
+        ("unit", "Unit")
+      ) #::: getElement
+
+   /*  Example for size = 2
+    *
+    *  let a = (true, 123)
+    *  func f(x: (Boolean, Int)) == x
+    *
+    *  let (a1, a2) = a
+    *  a._1 == true && a1 == true && a._2 == 123 && a2 == 123 &&
+    *  a == (true, 123) &&
+    *  f(a) == a
+    */
+    def check(size: Int) = {
+      val valueDefinition = (1 to size).map(i => getElement(i)._1).mkString("(", ", ", ")")
+      val typeDefinition  = (1 to size).map(i => getElement(i)._2).mkString("(", ", ", ")")
+      val script =
+        s"""
+           | let a = $valueDefinition
+           | func f(x: $typeDefinition) = x
+           |
+           | let ${(1 to size).map(i => s"a$i").mkString("(", ", ", ")")} = a
+           | ${(1 to size).map(i => s"a._$i == ${getElement(i)._1} && a$i == ${getElement(i)._1} &&").mkString(" ")}
+           | a == $valueDefinition &&
+           | f(a) == a
+         """.stripMargin
+
+      eval(script, version = V3) should produce(s"Can't find a function '_Tuple$size'")
+      eval(script, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    }
+
+    ContractLimits.MinTupleSize to ContractLimits.MaxTupleSize foreach check
+  }
+
+  property("tuple match") {
+    val script =
+      """
+        | match(if true then (1, 2) else (true, "q")) {
+        |   case _: (Boolean, String) => false
+        |   case _: (Int, Int)        => true
+        | }
+      """.stripMargin
+
+    eval(script, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+
+    val script2 =
+      """
+        | let a = if (false) then 1 else ("abc", (1, true))
+        | let b = if (false) then if (false) then (1, "abc") else (true, "abc") else (base58'', true, a)
+        |
+        | let c = match b {
+        |   case _: (Int | Boolean, String)                          => throw("unxpected 1")
+        |   case _: (ByteVector, Boolean, Int)                       => throw("unxpected 2")
+        |   case t3: (ByteVector, Boolean, (String, (Int, Boolean))) => t3._3
+        | }
+        |
+        | let d = match b {
+        |   case _: (Int, String)                                          => throw("unxpected 3")
+        |   case _: (Boolean, String)                                      => throw("unxpected 4")
+        |   case t3: (ByteVector, Boolean, Int | (String, (Int, Boolean))) => t3._3
+        | }
+        |
+        | c == ("abc", (1, true)) &&
+        | d == ("abc", (1, true))
+        |
+      """.stripMargin
+
+    eval(script2, version = V4) shouldBe Right(CONST_BOOLEAN(true))
   }
 }

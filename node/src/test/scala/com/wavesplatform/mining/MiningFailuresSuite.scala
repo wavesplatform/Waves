@@ -55,7 +55,17 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
       val wallet      = Wallet(WalletSettings(None, Some("123"), None))
       val utxPool     = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, wavesSettings.utxSettings)
       val pos         = PoSSelector(blockchainUpdater, wavesSettings.synchronizationSettings)
-      new MinerImpl(allChannels, blockchainUpdater, wavesSettings.copy(blockchainSettings = blockchainSettings), ntpTime, utxPool, wallet, pos, scheduler, scheduler)
+      new MinerImpl(
+        allChannels,
+        blockchainUpdater,
+        wavesSettings.copy(blockchainSettings = blockchainSettings),
+        ntpTime,
+        utxPool,
+        wallet,
+        pos,
+        scheduler,
+        scheduler
+      )
     }
 
     val genesis = TestBlock.create(System.currentTimeMillis(), Nil)
@@ -99,5 +109,5 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
   }
 
   private[this] def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] =
-    miner.invokePrivate(PrivateMethod[Task[Unit]]('generateBlockTask)(account, None))
+    miner.invokePrivate(PrivateMethod[Task[Unit]](Symbol("generateBlockTask"))(account, None))
 }

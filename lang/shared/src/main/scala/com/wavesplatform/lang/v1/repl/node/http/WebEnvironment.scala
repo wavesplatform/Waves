@@ -14,6 +14,7 @@ import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAsse
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import io.circe.Decoder
 import io.circe.generic.auto._
+import shapeless.Coproduct
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -24,7 +25,7 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
   import mappings._
 
   override implicit def chainId: Byte = settings.chainId
-  override def tthis: Address         = Address(ByteStr.decodeBase58(settings.address).get)
+  override def tthis: Environment.Tthis = Coproduct[Environment.Tthis](Address(ByteStr.decodeBase58(settings.address).get))
 
   override def height: Future[Long] =
     getEntity[Id, HeightResponse, Long]("/blocks/height")
@@ -87,6 +88,6 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
 
   override def transferTransactionFromProto(b: Array[Byte]): Future[Option[Tx.Transfer]] = ???
 
-  private def getEntity[F[_]: Functor: ResponseWrapper, A <% B: Decoder, B](url: String): Future[F[B]] =
+  private def getEntity[F[_]: Functor: ResponseWrapper, A : Decoder, B](url: String)(implicit ev: A => B): Future[F[B]] =
     client.get[F, A](url).map(_.map(r => r))
 }

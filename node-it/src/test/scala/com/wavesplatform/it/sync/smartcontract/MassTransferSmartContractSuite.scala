@@ -71,12 +71,10 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
     val transfers =
       MassTransferTransaction
         .parseTransfersList(List(Transfer(thirdAddress, 4 * transferAmount), Transfer(secondAddress, 4 * transferAmount)))
-        .right
-        .get
+        .explicitGet()
 
     val unsigned =
-      MassTransferTransaction
-        .create(1.toByte, notMiner.publicKey, Waves, transfers, calcMassTransferFee(2) + smartFee, currTime, None, Proofs.empty)
+      MassTransferTransaction.create(1.toByte, notMiner.publicKey, Waves, transfers, calcMassTransferFee(2) + smartFee, currTime, ByteStr.empty,  Proofs.empty)
         .explicitGet()
 
     val accountSig = crypto.sign(notMiner.keyPair.privateKey, unsigned.bodyBytes())
@@ -90,8 +88,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
       MassTransferTransaction.parseTransfersList(List(Transfer(firstAddress, transferAmount), Transfer(fourthAddress, transferAmount))).explicitGet()
 
     val unsignedToGov =
-      MassTransferTransaction
-        .create(1.toByte, notMiner.publicKey, Waves, transfersToGov, calcMassTransferFee(2) + smartFee, currTime, None, Proofs.empty)
+      MassTransferTransaction.create(1.toByte, notMiner.publicKey, Waves, transfersToGov, calcMassTransferFee(2) + smartFee, currTime, ByteStr.empty,  Proofs.empty)
         .explicitGet()
     val accountSigToGovFail = crypto.sign(notMiner.keyPair.privateKey, unsignedToGov.bodyBytes())
     val signedToGovFail     = unsignedToGov.copy(1.toByte, proofs = Proofs(Seq(accountSigToGovFail)))
@@ -106,7 +103,7 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
     val unsignedToGovSecond =
       MassTransferTransaction
-        .create(1.toByte, notMiner.publicKey, Waves, transfersToGov, calcMassTransferFee(2) + smartFee, System.currentTimeMillis(), None, Proofs.empty)
+        .create(1.toByte, notMiner.publicKey, Waves, transfersToGov, calcMassTransferFee(2) + smartFee, System.currentTimeMillis(), ByteStr.empty,  Proofs.empty)
         .explicitGet()
 
     val accountSigToGov = crypto.sign(notMiner.keyPair.privateKey, unsignedToGovSecond.bodyBytes())

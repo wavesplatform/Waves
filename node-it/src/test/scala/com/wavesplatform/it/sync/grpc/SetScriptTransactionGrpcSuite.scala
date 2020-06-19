@@ -77,7 +77,7 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
           TransferTransactionData.of(
             recipient = Some(Recipient().withPublicKeyHash(thirdAddress)),
             amount = Some(Amount.of(ByteString.EMPTY, transferAmount)),
-            None
+            ByteString.EMPTY
           )
         )
       )

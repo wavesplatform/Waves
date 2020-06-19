@@ -6,8 +6,8 @@ import com.google.common.base.Charsets
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.ByteStr._
-import org.joda.time.Duration
-import org.joda.time.format.PeriodFormat
+import com.wavesplatform.common.utils.Base58
+import org.apache.commons.lang3.time.DurationFormatUtils
 import play.api.libs.json._
 
 import scala.annotation.tailrec
@@ -47,10 +47,8 @@ package object utils extends ScorexLogging {
     f"${bytes / divisor}%.1f $unitString"
   }
 
-  def humanReadableDuration(duration: Long): String = {
-    val d = new Duration(duration)
-    PeriodFormat.getDefault.print(d.toPeriod)
-  }
+  def humanReadableDuration(duration: Long): String =
+    DurationFormatUtils.formatDurationHMS(duration)
 
   implicit class Tap[A](a: A) {
     def tap(g: A => Unit): A = {
@@ -71,8 +69,9 @@ package object utils extends ScorexLogging {
     override def reads(json: JsValue): JsResult[ByteStr] = json match {
       case JsString(v) if v.startsWith("base64:") =>
         decodeBase64(v.substring(7)).fold(e => JsError(s"Error parsing base64: ${e.getMessage}"), b => JsSuccess(b))
-      case JsString(v) => decodeBase58(v).fold(e => JsError(s"Error parsing base58: ${e.getMessage}"), b => JsSuccess(b))
-      case _           => JsError("Expected JsString")
+      case JsString(v) if v.length > Base58.defaultDecodeLimit => JsError(s"Length ${v.length} exceeds maximum length of 192")
+      case JsString(v)                                         => decodeBase58(v).fold(e => JsError(s"Error parsing base58: ${e.getMessage}"), b => JsSuccess(b))
+      case _                                                   => JsError("Expected JsString")
     }
   }
 

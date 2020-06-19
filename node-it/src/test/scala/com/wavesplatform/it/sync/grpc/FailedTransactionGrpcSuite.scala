@@ -112,7 +112,14 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
          |@Callable(inv)
          |func canThrow() = {
          |  let action = valueOrElse(getString(this, "crash"), "no")
-         |  if (action == "yes") then throw("Crashed by dApp")
+         |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 10} true
+         |
+         |  if (action == "yes")
+         |  then {
+         |    if (check)
+         |    then throw("Crashed by dApp")
+         |    else throw("Crashed by dApp")
+         |  }
          |  else []
          |}
          |
@@ -304,6 +311,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
             case i if i % 4 == 3 => "s"  -> StringDataEntry("s", i.toString)
           }
           .toMap
+          .view
           .mapValues(PBTransactions.toPBDataEntry)
       initialEntries.map(entry => entry.key -> entry).toMap.foreach {
         case (key, initial) =>
@@ -315,7 +323,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
           sc.issues.size shouldBe 0
           sc.reissues.size shouldBe 0
           sc.burns.size shouldBe 0
-          sc.error shouldBe 'defined
+          sc.error shouldBe defined
           sc.error.get.code shouldBe 3
           sc.error.get.text should include("Transaction is not allowed by script of the asset")
       }
@@ -509,7 +517,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
 
   def overflowBlock(): Unit = {
     val entries = List.tabulate(4)(n => PBTransactions.toPBDataEntry(BinaryDataEntry("test" + n, ByteStr(Array.fill(32767)(n.toByte)))))
-    val fee = calcDataFee(entries)
+    val fee     = calcDataFee(entries)
     waitForHeightArise()
     for (_ <- 1 to 8) sender.putData(sender.keyPair, entries, fee)
     waitForEmptyUtx()

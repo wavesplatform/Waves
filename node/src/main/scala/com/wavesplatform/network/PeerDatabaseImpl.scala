@@ -10,7 +10,7 @@ import com.wavesplatform.utils.{JsonFileStorage, ScorexLogging}
 import io.netty.channel.Channel
 import io.netty.channel.socket.nio.NioSocketChannel
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.collection._
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Random
@@ -112,9 +112,9 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
   override def suspendedHosts: immutable.Set[InetAddress] = suspension.asMap().asScala.keys.toSet
 
   override def detailedBlacklist: immutable.Map[InetAddress, (Long, String)] =
-    blacklist.asMap().asScala.mapValues(_.toLong).map { case ((h, t)) => h -> ((t, Option(reasons(h)).getOrElse(""))) }.toMap
+    blacklist.asMap().asScala.view.mapValues(_.toLong).map { case ((h, t)) => h -> ((t, Option(reasons(h)).getOrElse(""))) }.toMap
 
-  override def detailedSuspended: immutable.Map[InetAddress, Long] = suspension.asMap().asScala.mapValues(_.toLong).toMap
+  override def detailedSuspended: immutable.Map[InetAddress, Long] = suspension.asMap().asScala.view.mapValues(_.toLong).toMap
 
   override def randomPeer(excluded: immutable.Set[InetSocketAddress]): Option[InetSocketAddress] = unverifiedPeers.synchronized {
     def excludeAddress(isa: InetSocketAddress): Boolean = {

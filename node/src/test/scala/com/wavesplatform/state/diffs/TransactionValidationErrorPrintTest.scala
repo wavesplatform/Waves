@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -9,14 +10,16 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils.compilerContext
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxValidationError.ScriptExecutionError
 import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.transaction.{GenesisTransaction, TxValidationError, TxVersion}
 import com.wavesplatform.utils._
-import org.scalatest.{Inside, PropSpec}
+import org.scalatest.{EitherValues, Inside, PropSpec}
 
-class TransactionValidationErrorPrintTest extends PropSpec with Inside with WithState {
+class TransactionValidationErrorPrintTest extends PropSpec with Inside with WithState with EitherValues {
   property("output transaction error should be easy to read") {
     val assetScript =
       s"""
@@ -87,7 +90,7 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside with With
         amount = 1,
         feeAsset = Waves,
         fee = 10000000,
-        attachment = None,
+        attachment = ByteStr.empty,
         timestamp = 0
       )
       .explicitGet()
@@ -112,7 +115,7 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside with With
         amount = 1,
         feeAsset = Waves,
         fee = 10000000,
-        attachment = None,
+        attachment = ByteStr.empty,
         timestamp = 0
       )
       .explicitGet()
@@ -121,80 +124,64 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside with With
       Seq(TestBlock.create(Seq(genesis1, genesis2, issueTransaction, preTransferTransaction, preSetAssetScriptTransaction))),
       TestBlock.create(Seq(transferTransaction))
     ) { error =>
-      val expected = //regex because of changeable proof
-        """Left\(TransactionValidationError\(cause = ScriptExecutionError\(error = Recipient address error:3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs, type = Asset, log =
-            |	\$match0 = TransferTransaction\(
-            |		recipient = Address\(
-            |			bytes = base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
-            |		\)
-            |		timestamp = 0
-            |		bodyBytes = base58'ZFDBCm7WGpX1zYwdAbbbk2XHyDz2urZGfPHjeiPWuGuemeYUAswXmdLfPhXamrydNQwFDR9QKFELsMaZDwneo16LGifGX71dUtdqfRtzzr3KvjVYD1uysyghj3KfWNDSriC3E1vKR6SWa91rqdzXhynrNZXHu9EJpud'
-            |		assetId = base58'6Jro1D97trbypmc4HDckkiy2qYtU2JoU7ZUjtwEPi32o'
-            |		feeAssetId = Unit
-            |		amount = 1
-            |		version = 2
-            |		id = base58'FsqB36ighMWLbGS1te7gh9DRFbrCRVjvumgSKwdYAwxi'
-            |		senderPublicKey = base58'EbxDdqXBhj3TEd1UFoi1UE1vm1k7gM9EMYAuLr62iaZF'
-            |		attachment = base58''
-            |		sender = Address\(
-            |			bytes = base58'3Mrt6Y1QweDrKRRNuhhHGdHpu2kXLXq2QK5'
-            |		\)
-            |		fee = 10000000
-            |	\)
-            |	big = base64'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-            |	@xs = base58'11111112'
-            |	@number = 1
-            |	@xs = base58'11111112W'
-            |	@number = 1
-            |	NETWORKBYTE = base58'2W'
-            |	t = TransferTransaction\(
-            |		recipient = Address\(
-            |			bytes = base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
-            |		\)
-            |		timestamp = 0
-            |		bodyBytes = base58'ZFDBCm7WGpX1zYwdAbbbk2XHyDz2urZGfPHjeiPWuGuemeYUAswXmdLfPhXamrydNQwFDR9QKFELsMaZDwneo16LGifGX71dUtdqfRtzzr3KvjVYD1uysyghj3KfWNDSriC3E1vKR6SWa91rqdzXhynrNZXHu9EJpud'
-            |		assetId = base58'6Jro1D97trbypmc4HDckkiy2qYtU2JoU7ZUjtwEPi32o'
-            |		feeAssetId = Unit
-            |		amount = 1
-            |		version = 2
-            |		id = base58'FsqB36ighMWLbGS1te7gh9DRFbrCRVjvumgSKwdYAwxi'
-            |		senderPublicKey = base58'EbxDdqXBhj3TEd1UFoi1UE1vm1k7gM9EMYAuLr62iaZF'
-            |		attachment = base58''
-            |		sender = Address\(
-            |			bytes = base58'3Mrt6Y1QweDrKRRNuhhHGdHpu2kXLXq2QK5'
-            |		\)
-            |		fee = 10000000
-            |	\)
-            |	recipientPublicKeyAndSignature = base58''
-            |	recipientPublicKey = base58''
-            |	recipientPublicKeyHash = base58'3aDy5kHaDeXWfQwMrBCRvd6r7gzg'
-            |	rpkWithVersionAndByte = base58'N8tNz9vAHAwFpa4A8Rgk45q8tNjeC'
-            |	checksum = base58'2U8tZq'
-            |	recipientAddressFromPublicKey = base58'3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs'
-            |	recipientAddressFromTx = base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
-            |	@a = base58'3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs'
-            |	@b = base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
-            |	@p = false
-            |	recipientAddressStr = "3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs"
-            |\),
-            |tx = \{
-            |  "senderPublicKey" : "EbxDdqXBhj3TEd1UFoi1UE1vm1k7gM9EMYAuLr62iaZF",
-            |  "amount" : 1,
-            |  "fee" : 10000000,
-            |  "type" : 4,
-            |  "version" : 2,
-            |  "attachment" : "",
-            |  "sender" : "3Mrt6Y1QweDrKRRNuhhHGdHpu2kXLXq2QK5",
-            |  "feeAssetId" : null,
-            |  "proofs" : \[ "\w+" ],
-            |  "assetId" : "6Jro1D97trbypmc4HDckkiy2qYtU2JoU7ZUjtwEPi32o",
-            |  "recipient" : "3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu",
-            |  "feeAsset" : null,
-            |  "id" : "FsqB36ighMWLbGS1te7gh9DRFbrCRVjvumgSKwdYAwxi",
-            |  "timestamp" : 0
-            |}\)\)""".stripMargin.r
-
-      error.toString should fullyMatch regex expected
+      inside(error) {
+        case Left(TransactionValidationError(see: ScriptExecutionError, _)) =>
+          val expected = //regex because of changeable proof
+            """
+             |	\$match0 = TransferTransaction\(
+             |		recipient = Address\(
+             |			bytes = base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
+             |		\)
+             |		timestamp = 0
+             |		bodyBytes = base58'ZFDBCm7WGpX1zYwdAbbbk2XHyDz2urZGfPHjeiPWuGuemeYUAswXmdLfPhXamrydNQwFDR9QKFELsMaZDwneo16LGifGX71dUtdqfRtzzr3KvjVYD1uysyghj3KfWNDSriC3E1vKR6SWa91rqdzXhynrNZXHu9EJpud'
+             |		assetId = base58'6Jro1D97trbypmc4HDckkiy2qYtU2JoU7ZUjtwEPi32o'
+             |		feeAssetId = Unit
+             |		amount = 1
+             |		version = 2
+             |		id = base58'FsqB36ighMWLbGS1te7gh9DRFbrCRVjvumgSKwdYAwxi'
+             |		senderPublicKey = base58'EbxDdqXBhj3TEd1UFoi1UE1vm1k7gM9EMYAuLr62iaZF'
+             |		attachment = base58''
+             |		sender = Address\(
+             |			bytes = base58'3Mrt6Y1QweDrKRRNuhhHGdHpu2kXLXq2QK5'
+             |		\)
+             |		fee = 10000000
+             |	\)
+             |	big = base64'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+             |	@xs = base58'11111112'
+             |	@number = 1
+             |	@xs = base58'11111112W'
+             |	@number = 1
+             |	NETWORKBYTE = base58'2W'
+             |	t = TransferTransaction\(
+             |		recipient = Address\(
+             |			bytes = base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
+             |		\)
+             |		timestamp = 0
+             |		bodyBytes = base58'ZFDBCm7WGpX1zYwdAbbbk2XHyDz2urZGfPHjeiPWuGuemeYUAswXmdLfPhXamrydNQwFDR9QKFELsMaZDwneo16LGifGX71dUtdqfRtzzr3KvjVYD1uysyghj3KfWNDSriC3E1vKR6SWa91rqdzXhynrNZXHu9EJpud'
+             |		assetId = base58'6Jro1D97trbypmc4HDckkiy2qYtU2JoU7ZUjtwEPi32o'
+             |		feeAssetId = Unit
+             |		amount = 1
+             |		version = 2
+             |		id = base58'FsqB36ighMWLbGS1te7gh9DRFbrCRVjvumgSKwdYAwxi'
+             |		senderPublicKey = base58'EbxDdqXBhj3TEd1UFoi1UE1vm1k7gM9EMYAuLr62iaZF'
+             |		attachment = base58''
+             |		sender = Address\(
+             |			bytes = base58'3Mrt6Y1QweDrKRRNuhhHGdHpu2kXLXq2QK5'
+             |		\)
+             |		fee = 10000000
+             |	\)
+             |	recipientPublicKeyAndSignature = base58''
+             |	recipientPublicKey = base58''
+             |	recipientPublicKeyHash = base58'3aDy5kHaDeXWfQwMrBCRvd6r7gzg'
+             |	rpkWithVersionAndByte = base58'N8tNz9vAHAwFpa4A8Rgk45q8tNjeC'
+             |	checksum = base58'2U8tZq'
+             |	recipientAddressFromPublicKey = base58'3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs'
+             |	recipientAddressFromTx = base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
+             |	@p = false
+             |	recipientAddressStr = "3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs"
+             |""".stripMargin.r
+          TxValidationError.logToString(see.log) should fullyMatch regex expected
+      }
     }
   }
 }

@@ -38,7 +38,7 @@ import monix.reactive.Observer
 import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 import scala.util.{Left, Right}
 
@@ -171,7 +171,7 @@ class UtxPoolImpl(
     tracedIsNew
   }
 
-  override def removeAll(txs: Traversable[Transaction]): Unit = {
+  override def removeAll(txs: Iterable[Transaction]): Unit = {
     val ids = txs.map(_.id()).toSet
     removeIds(ids)
   }
@@ -474,7 +474,7 @@ class UtxPoolImpl(
   }
 
   /** DOES NOT verify transactions */
-  def addAndCleanup(transactions: Seq[Transaction]): Unit = {
+  def addAndCleanup(transactions: Iterable[Transaction]): Unit = {
     transactions.foreach(addTransaction(_, verify = false))
     TxCleanup.runCleanupAsync()
   }
@@ -525,15 +525,15 @@ class UtxPoolImpl(
     private[this] val priorityBytesStats =
       Kamon.rangeSampler("utx.priority-pool-bytes", MeasurementUnit.information.bytes, SampleInterval).withoutTags()
 
-    val putTimeStats    = Kamon.timer("utx.put-if-new")
+    val putTimeStats    = Kamon.timer("utx.put-if-new").withoutTags()
     val putRequestStats = Kamon.counter("utx.put-if-new.requests").withoutTags()
-    val packTimeStats   = Kamon.timer("utx.pack-unconfirmed")
+    val packTimeStats   = Kamon.timer("utx.pack-unconfirmed").withoutTags()
 
-    val checkIsMostProfitable = Kamon.timer("utx.check.is-most-profitable")
-    val checkAlias            = Kamon.timer("utx.check.alias")
-    val checkCanReissue       = Kamon.timer("utx.check.can-reissue")
-    val checkNotBlacklisted   = Kamon.timer("utx.check.not-blacklisted")
-    val checkScripted         = Kamon.timer("utx.check.scripted")
+    val checkIsMostProfitable = Kamon.timer("utx.check.is-most-profitable").withoutTags()
+    val checkAlias            = Kamon.timer("utx.check.alias").withoutTags()
+    val checkCanReissue       = Kamon.timer("utx.check.can-reissue").withoutTags()
+    val checkNotBlacklisted   = Kamon.timer("utx.check.not-blacklisted").withoutTags()
+    val checkScripted         = Kamon.timer("utx.check.scripted").withoutTags()
 
     def addTransaction(tx: Transaction): Unit = {
       sizeStats.increment()
@@ -589,8 +589,6 @@ object UtxPoolImpl {
         case (addr, p) => p.assetIds.foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
       }
     }
-
-    def contains(txId: ByteStr): Boolean = transactionPortfolios.containsKey(txId)
 
     def getAggregated(accountAddr: Address): Portfolio = {
       val portfolios = for {

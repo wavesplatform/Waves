@@ -9,6 +9,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.settings.{BlockchainSettings, GenesisSettings, RewardsSettings, TestFunctionalitySettings}
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -34,6 +35,12 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
           (bc.assetDescription _).when(asset).returns(mkAssetDescription(asset.id, tx.sender, 8, None))
           (bc.assetScript _).when(asset).returns(None)
           (bc.activatedFeatures _).when().returns(Map())
+          (bc.settings _).when().returns(BlockchainSettings(
+            addressSchemeCharacter = 'N',
+            functionalitySettings = TestFunctionalitySettings.Enabled,
+            genesisSettings = GenesisSettings.TESTNET,
+            rewardsSettings = RewardsSettings.TESTNET
+          ))
         }
 
       val scriptText =
@@ -49,7 +56,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
 
       (bc.height _).when().returns(0)
 
-      Verifier(bc)(tx).flatMap(tx => Verifier.assets(bc)(tx)).resultE shouldBe 'right
+      Verifier(bc)(tx).flatMap(tx => Verifier.assets(bc)(tx)).resultE.explicitGet()
     }
   }
 
@@ -60,12 +67,31 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
 
       setFeeAssetScriptsAndVerify(Some(invalidScript -> comp), None)(tx) should produce("ScriptExecutionError") // buy order:  matcherFeeAsset has invalid script
       setFeeAssetScriptsAndVerify(None, Some((falseScript, 1)))(tx) should produce("TransactionNotAllowedByScript") // sell order: matcherFeeAsset script gives false as a result
-      setFeeAssetScriptsAndVerify(None, None)(tx) shouldBe 'right
+      setFeeAssetScriptsAndVerify(None, None)(tx).explicitGet()
     }
   }
 
-  private def mkAssetDescription(assetId: ByteStr, matcherAccount: PublicKey, decimals: Int, scriptOption: Option[(Script, Long)]): Option[AssetDescription] =
-    Some(AssetDescription(assetId, matcherAccount, ByteString.EMPTY, ByteString.EMPTY, decimals, reissuable = false, BigInt(0), Height(0), scriptOption.map(AssetScriptInfo.tupled), 0, decimals == 0))
+  private def mkAssetDescription(
+      assetId: ByteStr,
+      matcherAccount: PublicKey,
+      decimals: Int,
+      scriptOption: Option[(Script, Long)]
+  ): Option[AssetDescription] =
+    Some(
+      AssetDescription(
+        assetId,
+        matcherAccount,
+        ByteString.EMPTY,
+        ByteString.EMPTY,
+        decimals,
+        reissuable = false,
+        BigInt(0),
+        Height(0),
+        scriptOption.map(AssetScriptInfo.tupled),
+        0,
+        decimals == 0
+      )
+    )
 
   private val exchangeTransactionV2Gen: Gen[ExchangeTransaction] = for {
     sender1: KeyPair <- accountGen
@@ -79,6 +105,12 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
   ): ValidationResult[Transaction] = {
 
     val blockchain = stub[Blockchain]
+    (blockchain.settings _).when().returns(BlockchainSettings(
+      addressSchemeCharacter = 'N',
+      functionalitySettings = TestFunctionalitySettings.Enabled,
+      genesisSettings = GenesisSettings.TESTNET,
+      rewardsSettings = RewardsSettings.TESTNET
+    ))
 
     def activate(features: (BlockchainFeature, Int)*): Unit = {
       (blockchain.activatedFeatures _).when().returns(features.map(x => x._1.id -> x._2).toMap).anyNumberOfTimes()

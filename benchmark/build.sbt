@@ -1,6 +1,6 @@
 enablePlugins(JmhPlugin)
 
-libraryDependencies += "org.scodec" %% "scodec-core" % "1.10.3"
+libraryDependencies += "org.scodec" %% "scodec-core" % "1.11.7"
 
 inTask(Compile / run)(
   Seq(

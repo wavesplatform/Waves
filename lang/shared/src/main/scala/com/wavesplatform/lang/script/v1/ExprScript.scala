@@ -75,7 +75,6 @@ object ExprScript {
     override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(com.wavesplatform.lang.v1.compiler.containsBlockV2(expr))
     override val containsArray: Boolean           = com.wavesplatform.lang.v1.compiler.containsArray(expr)
   }
-
 }
 
 trait ExprScript extends Script {

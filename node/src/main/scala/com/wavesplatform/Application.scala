@@ -8,7 +8,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.stream.ActorMaterializer
 import cats.instances.all._
 import cats.syntax.option._
 import com.typesafe.config._
@@ -50,6 +49,7 @@ import io.netty.util.HashedWheelTimer
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
 import monix.eval.{Coeval, Task}
+import monix.execution.UncaughtExceptionReporter
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
@@ -88,7 +88,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
 
   // This handler is needed in case Fatal exception is thrown inside the task
-  private def stopOnAppendError(cause: Throwable): Unit = {
+
+  private val stopOnAppendError = UncaughtExceptionReporter { cause =>
     log.error("Error in Appender", cause)
     forceStopApplication(FatalDBError)
   }
@@ -125,8 +126,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   def run(): Unit = {
     // initialization
-    implicit val as: ActorSystem                 = actorSystem
-    implicit val materializer: ActorMaterializer = ActorMaterializer()
+    implicit val as: ActorSystem = actorSystem
 
     if (wallet.privateKeyAccounts.isEmpty)
       wallet.generateNewAccounts(1)
@@ -279,7 +279,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       case (c, b) =>
         processFork(c, b.blocks).doOnFinish {
           case None    => Task.now(())
-          case Some(e) => Task(stopOnAppendError(e))
+          case Some(e) => Task(stopOnAppendError.reportFailure(e))
         }
     }
 
@@ -296,7 +296,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       .mapEval(processBlock.tupled)
 
     Observable(microBlockSink, blockSink).merge
-      .onErrorHandle(stopOnAppendError)
+      .onErrorHandle(stopOnAppendError.reportFailure)
       .subscribe()
 
     miner.scheduleMining()
@@ -484,7 +484,7 @@ object Application {
     // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
     //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
     Kamon.reconfigure(config)
-    sys.addShutdownHook { () =>
+    sys.addShutdownHook {
       Try(Await.result(Kamon.stopModules(), 30 seconds))
       Metrics.shutdown()
     }

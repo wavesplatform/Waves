@@ -4,7 +4,7 @@ import cats.implicits._
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
-import com.wavesplatform.lang.directives.values.{StdLibVersion, _}
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven}
 import com.wavesplatform.lang.v1.traits.domain._
@@ -92,7 +92,7 @@ object RealTransactionWrapper {
             transferCount = ms.transfers.length,
             totalAmount = ms.transfers.map(_.amount).sum,
             transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.domain.Tx.TransferItem(r.address, r.amount)).toIndexedSeq,
-            attachment = convertAttachment(ms.attachment, stdLibVersion)
+            attachment = ms.attachment
           )
           .asRight
       case ss: SetScriptTransaction      => Tx.SetScript(proven(ss), ss.script.map(_.bytes())).asRight
@@ -137,17 +137,7 @@ object RealTransactionWrapper {
       assetId = t.assetId.compatId,
       amount = t.amount,
       recipient = t.recipient,
-      attachment = convertAttachment(t.attachment, version)
+      attachment = t.attachment
     )
 
-  private def convertAttachment(attachment: Option[Attachment], version: StdLibVersion): TransferAttachment = version match {
-    case V1 | V2 | V3 => ByteStrValue(ByteStr(attachment.toBytes))
-    case V4 =>
-      attachment.fold[TransferAttachment](EmptyAttachment) {
-        case Attachment.Num(value)  => IntValue(value)
-        case Attachment.Bool(value) => BooleanValue(value)
-        case Attachment.Bin(value)  => ByteStrValue(ByteStr(value))
-        case Attachment.Str(value)  => StringValue(value)
-      }
-  }
 }

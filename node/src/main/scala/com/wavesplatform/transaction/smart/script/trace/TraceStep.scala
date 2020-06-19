@@ -87,7 +87,7 @@ case class InvokeScriptTrace(
             case reissue: Reissue        => reissueJson(reissue) + ("type"   -> JsString("reissue"))
             case burn: Burn              => burnJson(burn) + ("type"         -> JsString("burn"))
             case sponsorFee: SponsorFee  => sponsorFeeJson(sponsorFee) + ("type" -> JsString("sponsorFee"))
-            case item: DataItem[_]       => dataItemJson(item) + ("type"     -> JsString("dataItem"))
+            case item: DataOp            => dataItemJson(item) + ("type"     -> JsString("dataItem"))
           }
         )
       case i: IncompleteResult =>
@@ -104,10 +104,16 @@ case class InvokeScriptTrace(
       })
     )
 
-  private def dataItemJson(item: DataItem[_]) =
+  private def dataItemJson(item: DataOp) =
     Json.obj(
       "key"   -> item.key,
-      "value" -> Option(item.value).map(_.toString).getOrElse("null").toString
+      "value" -> (item match {
+        case DataItem.Lng(_, v) => Json.toJson(v)
+        case DataItem.Bool(_, v) => Json.toJson(v)
+        case DataItem.Bin(_, v) => Json.toJson(v.toString)
+        case DataItem.Str(_, v) => Json.toJson(v)
+        case DataItem.Delete(_) => JsNull
+      })
     )
 
   private def issueJson(issue: Issue) =

@@ -63,6 +63,6 @@ object MicroblockAppender extends ScorexLogging {
   }
 
   private[this] object metrics {
-    val microblockProcessingTimeStats = Kamon.timer("microblock-appender.processing-time")
+    val microblockProcessingTimeStats = Kamon.timer("microblock-appender.processing-time").withoutTags()
   }
 }

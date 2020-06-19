@@ -103,7 +103,14 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
          |@Callable(inv)
          |func canThrow() = {
          |  let action = valueOrElse(getString(this, "crash"), "no")
-         |  if (action == "yes") then throw("Crashed by dApp")
+         |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 10} true
+         |
+         |  if (action == "yes")
+         |  then {
+         |    if (check)
+         |    then throw("Crashed by dApp")
+         |    else throw("Crashed by dApp")
+         |  }
          |  else []
          |}
          |
@@ -111,7 +118,10 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
          |func defineTxHeight(id: ByteVector) = [BooleanEntry(toBase58String(id), transactionHeightById(id).isDefined())]
          |
          |@Callable(inv)
-         |func blockIsEven() = if height % 2 == 0 then [] else throw("block height is odd")
+         |func blockIsEven() =
+         |  if (${"sigVerify(base58'', base58'', base58'') ||" * 8} height % 2 == 0)
+         |  then []
+         |  else throw("block height is odd")
          |
         """.stripMargin
 
@@ -434,7 +444,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     waitForTxs(init)
 
     val Precondition(amountAsset, priceAsset, buyFeeAsset, sellFeeAsset) =
-      exchangePreconditions(Some(ScriptCompiler.compile("true", ScriptEstimatorV3).right.get._1.bytes().base64))
+      exchangePreconditions(Some(ScriptCompiler.compile("true", ScriptEstimatorV3).explicitGet()._1.bytes().base64))
 
     val assetPair      = AssetPair.createAssetPair(amountAsset, priceAsset).get
     val fee            = 0.003.waves + 4 * smartFee
@@ -494,7 +504,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
   test("ExchangeTransaction: transactionHeightById and transactionById returns only succeed transactions") {
     val Precondition(amountAsset, priceAsset, buyFeeAsset, sellFeeAsset) =
-      exchangePreconditions(Some(ScriptCompiler.compile("true", ScriptEstimatorV3).right.get._1.bytes().base64))
+      exchangePreconditions(Some(ScriptCompiler.compile("true", ScriptEstimatorV3).explicitGet()._1.bytes().base64))
 
     val assetPair      = AssetPair.createAssetPair(amountAsset, priceAsset).get
     val fee            = 0.003.waves + 4 * smartFee
@@ -578,11 +588,11 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     )
 
   private def checkStateChange(info: DebugStateChanges, code: Int, text: String, strict: Boolean = false): Unit = {
-    info.stateChanges shouldBe 'defined
+    info.stateChanges shouldBe defined
     info.stateChanges.get.issues.size shouldBe 0
     info.stateChanges.get.reissues.size shouldBe 0
     info.stateChanges.get.burns.size shouldBe 0
-    info.stateChanges.get.error shouldBe 'defined
+    info.stateChanges.get.error shouldBe defined
     info.stateChanges.get.error.get.code shouldBe code
     if (strict)
       info.stateChanges.get.error.get.text shouldBe text

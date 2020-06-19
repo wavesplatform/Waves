@@ -3,6 +3,7 @@ package com.wavesplatform.transaction
 import com.google.common.primitives.Ints
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.Asset.Waves
@@ -24,7 +25,7 @@ object TxHelpers {
     GenesisTransaction.create(address, amount, timestamp).explicitGet()
 
   def transfer(from: KeyPair, to: AddressOrAlias, amount: Long = TestValues.OneWaves, asset: Asset = Waves): TransferTransaction =
-    TransferTransaction.selfSigned(TxVersion.V1, from, to, asset, amount, Waves, TestValues.fee, None, timestamp).explicitGet()
+    TransferTransaction.selfSigned(TxVersion.V1, from, to, asset, amount, Waves, TestValues.fee, ByteStr.empty, timestamp).explicitGet()
 
   def issue(amount: Long = TestValues.ThousandWaves, script: Script = null): IssueTransaction =
     IssueTransaction
