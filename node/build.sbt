@@ -54,6 +54,7 @@ inTask(assembly)(
     assemblyMergeStrategy := {
       case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.concat
       case PathList("META-INF", "aop.xml")                      => aopMerge
+      case PathList("com", "sun", "jna", _*)                    => MergeStrategy.first
       case other                                                => (assemblyMergeStrategy in assembly).value(other)
     }
   ))
