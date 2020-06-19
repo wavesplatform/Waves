@@ -97,11 +97,11 @@ lazy val it = project
     description := "Hack for near future to support builds in TeamCity for old and new branches both",
     concurrentRestrictions := {
       val threadNumber = Option(System.getenv("SBT_THREAD_NUMBER")).fold(1)(_.toInt)
+      sLog.value.info(s"Running forked tests in $threadNumber threads")
       Seq(Tags.limit(Tags.ForkedTestGroup, threadNumber))
     },
     Test / test := Def
       .sequential(
-        root / packageAll,
         `node-it` / Docker / docker,
         `node-it` / Test / test
       )

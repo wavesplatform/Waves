@@ -35,9 +35,6 @@ object ItTestPlugin extends AutoPlugin {
           Tests.Argument(TestFrameworks.ScalaTest, args: _*)
         },
         parallelExecution in Test := true,
-        tags in test += Tags.ForkedTestGroup      -> 1,
-        tags in testOnly += Tags.ForkedTestGroup  -> 1,
-        tags in testQuick += Tags.ForkedTestGroup -> 1,
         testGrouping := {
           // ffs, sbt!
           // https://github.com/sbt/sbt/issues/3266
