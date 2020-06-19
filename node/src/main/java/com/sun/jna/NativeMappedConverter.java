@@ -47,6 +47,8 @@ public class NativeMappedConverter implements TypeConverter {
             if (nmc1 == null) {
                 nmc = new NativeMappedConverter(cls);
                 converters.put(cls, new SoftReference<>(nmc));
+            } else {
+                nmc = nmc1;
             }
         }
         return nmc;
