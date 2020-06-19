@@ -295,7 +295,7 @@ object PureContext {
   lazy val dropRightBytes: BaseFunction[NoContext] =
     UserFunction(
       "dropRight", "dropRightBytes",
-      Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 6L),
+      Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 6L),
       BYTESTR,
       ("@xs", BYTESTR), ("@number", LONG)
     ) {
@@ -317,7 +317,7 @@ object PureContext {
   lazy val takeRightBytes: BaseFunction[NoContext] =
     UserFunction(
       "takeRight", "takeRightBytes",
-      Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 6L),
+      Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 6L),
       BYTESTR,
       ("@xs", BYTESTR), ("@number", LONG)
     ) {
