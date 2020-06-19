@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.api.http.assets
 
 import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.Proofs
 import org.scalatest.{FunSuite, Matchers}
@@ -101,7 +101,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     val tx = req.toTx.explicitGet()
     tx.sender.toString shouldBe "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5"
     tx.timestamp shouldBe 1479462208828L
-    tx.attachment.toBytes shouldBe Base58.tryDecodeWithLimit("A").get
+    tx.attachment shouldBe ByteStr.decodeBase58("A").get
     tx.assetId.maybeBase58Repr.get shouldBe "GAXAj8T4pSjunDqpz6Q3bit4fJJN9PD4t8AK8JZVSa5u"
     tx.amount shouldBe 100000
     tx.fee shouldBe 100000
@@ -137,7 +137,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     val tx = req.toTx.explicitGet()
     tx.sender.toString shouldBe "FJuErRxhV9JaFUwcYLabFK5ENvDRfyJbRz8FeVfYpBLn"
     tx.timestamp shouldBe 1489054107569L
-    tx.attachment.toBytes shouldBe Base58.tryDecodeWithLimit("2Kk7Zsr1e9jsqSBM5hpF").get
+    tx.attachment shouldBe ByteStr.decodeBase58("2Kk7Zsr1e9jsqSBM5hpF").get
     tx.assetId.maybeBase58Repr.get shouldBe "6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL"
     tx.feeAssetId.maybeBase58Repr.get shouldBe "6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL"
     tx.amount shouldBe 1000
@@ -223,7 +223,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
   "minSponsoredAssetFee": null
  }"""
 
-    val req = Json.parse(js1).validate[SignedSponsorFeeRequest].get.toTx.right.get
+    val req = Json.parse(js1).validate[SignedSponsorFeeRequest].get.toTx.explicitGet()
     req.proofs shouldBe Proofs(
       Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get)
     )
@@ -231,7 +231,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     req.minSponsoredAssetFee shouldBe Some(100000)
 
     for (js <- Seq(js2, js3, js4)) {
-      val req = Json.parse(js).validate[SignedSponsorFeeRequest].get.toTx.right.get
+      val req = Json.parse(js).validate[SignedSponsorFeeRequest].get.toTx.explicitGet()
       Proofs(Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get))
       req.fee shouldBe 100000000L
       req.minSponsoredAssetFee shouldBe None

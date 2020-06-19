@@ -5,6 +5,7 @@ import java.io.ByteArrayOutputStream
 import com.google.protobuf.{ByteString, CodedOutputStream, WireFormat}
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.mining.MiningConstraints
 import com.wavesplatform.protobuf.block._
 import com.wavesplatform.protobuf.transaction._
@@ -60,8 +61,7 @@ class BasicMessagesRepoSpec extends FreeSpec with Matchers with TransactionGen {
             1L,
             0L
           )
-          .right
-          .get
+          .explicitGet()
       )
       .serializedSize
 

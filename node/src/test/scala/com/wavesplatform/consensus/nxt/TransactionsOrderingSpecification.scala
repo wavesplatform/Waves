@@ -25,11 +25,10 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           125L,
-          None,
+          ByteStr.empty,
           1
         )
-        .right
-        .get,
+        .explicitGet(),
       TransferTransaction
         .selfSigned(
           1.toByte,
@@ -39,11 +38,10 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           124L,
-          None,
+          ByteStr.empty,
           2
         )
-        .right
-        .get,
+        .explicitGet(),
       TransferTransaction
         .selfSigned(
           1.toByte,
@@ -53,11 +51,10 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           124L,
-          None,
+          ByteStr.empty,
           1
         )
-        .right
-        .get,
+        .explicitGet(),
       TransferTransaction
         .selfSigned(
           1.toByte,
@@ -67,11 +64,10 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Asset.fromCompatId(Some(ByteStr.empty)),
           124L,
-          None,
+          ByteStr.empty,
           2
         )
-        .right
-        .get,
+        .explicitGet(),
       TransferTransaction
         .selfSigned(
           1.toByte,
@@ -81,11 +77,10 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Asset.fromCompatId(Some(ByteStr.empty)),
           124L,
-          None,
+          ByteStr.empty,
           1
         )
-        .right
-        .get
+        .explicitGet()
     )
 
     val sorted = Random.shuffle(correctSeq).sorted(TransactionsOrdering.InBlock)
@@ -104,11 +99,10 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           124L,
-          None,
+          ByteStr.empty,
           1
         )
-        .right
-        .get,
+        .explicitGet(),
       TransferTransaction
         .selfSigned(
           1.toByte,
@@ -118,11 +112,10 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           123L,
-          None,
+          ByteStr.empty,
           1
         )
-        .right
-        .get,
+        .explicitGet(),
       TransferTransaction
         .selfSigned(
           1.toByte,
@@ -132,11 +125,10 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           123L,
-          None,
+          ByteStr.empty,
           2
         )
-        .right
-        .get,
+        .explicitGet(),
       TransferTransaction
         .selfSigned(
           1.toByte,
@@ -146,11 +138,10 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Asset.fromCompatId(Some(ByteStr.empty)),
           124L,
-          None,
+          ByteStr.empty,
           1
         )
-        .right
-        .get,
+        .explicitGet(),
       TransferTransaction
         .selfSigned(
           1.toByte,
@@ -160,11 +151,10 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Asset.fromCompatId(Some(ByteStr.empty)),
           124L,
-          None,
+          ByteStr.empty,
           2
         )
-        .right
-        .get
+        .explicitGet()
     )
 
     val sorted = Random.shuffle(correctSeq).sorted(TransactionsOrdering.InUTXPool)
@@ -183,11 +173,10 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           1,
-          None,
+          ByteStr.empty,
           124L
         )
-        .right
-        .get,
+        .explicitGet(),
       TransferTransaction
         .selfSigned(
           1.toByte,
@@ -197,11 +186,10 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           1,
-          None,
+          ByteStr.empty,
           123L
         )
-        .right
-        .get
+        .explicitGet()
     )
 
     Random.shuffle(correctSeq).sorted(TransactionsOrdering.InBlock) shouldBe correctSeq
@@ -218,11 +206,10 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           1,
-          None,
+          ByteStr.empty,
           123L
         )
-        .right
-        .get,
+        .explicitGet(),
       TransferTransaction
         .selfSigned(
           1.toByte,
@@ -232,11 +219,10 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           1,
-          None,
+          ByteStr.empty,
           124L
         )
-        .right
-        .get
+        .explicitGet()
     )
     Random.shuffle(correctSeq).sorted(TransactionsOrdering.InUTXPool) shouldBe correctSeq
   }

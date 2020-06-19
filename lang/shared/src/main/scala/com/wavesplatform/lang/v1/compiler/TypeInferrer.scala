@@ -13,7 +13,7 @@ object TypeInferrer {
       case Some(left) => left.asInstanceOf[Left[String, Nothing]]
       case None =>
         val matchResults: Map[TYPEPARAM, Seq[MatchResult]] = matching.flatMap(_.explicitGet()).groupBy(_.name)
-        val resolved = matchResults.mapValues {
+        val resolved = matchResults.view.mapValues {
           case h :: Nil => Right(h.tpe)
           case matchResults @ (h :: t) =>
             val commonType = t.map(_.tpe).toVector.foldLeft(h.tpe)(findCommonType(_, _))
@@ -34,12 +34,12 @@ object TypeInferrer {
         resolved.find(_._2.isLeft) match {
           case Some((_, left)) => left.asInstanceOf[Left[String, Nothing]]
           case None =>
-            Right(resolved.mapValues { t =>
+            Right((resolved.mapValues { t =>
               t.explicitGet() match {
                 case UNION(x :: Nil, _) => x
                 case x                  => x
               }
-            })
+            }).toMap)
         }
     }
   }

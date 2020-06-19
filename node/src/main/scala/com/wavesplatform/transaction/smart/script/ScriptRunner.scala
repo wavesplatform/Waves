@@ -28,7 +28,7 @@ object ScriptRunner {
       blockchain: Blockchain,
       script: Script,
       isAssetScript: Boolean,
-      scriptContainerAddress: ByteStr
+      scriptContainerAddress: Environment.Tthis
   ): (Log[Id], Either[ExecutionError, EVALUATED]) = {
 
     def evalVerifier(
@@ -38,7 +38,7 @@ object ScriptRunner {
       val txId = in.eliminate(_.id(), _ => ByteStr.empty)
       val eval = for {
         ds <- DirectiveSet(script.stdLibVersion, if (isAssetScript) Asset else Account, Expression).leftMap((_, Nil))
-        mi <- buildThisValue(in, blockchain, ds, Some(scriptContainerAddress)).leftMap((_, Nil))
+        mi <- buildThisValue(in, blockchain, ds, scriptContainerAddress).leftMap((_, Nil))
         ctx <- BlockchainContext
           .build(
             script.stdLibVersion,
@@ -48,7 +48,7 @@ object ScriptRunner {
             blockchain,
             isAssetScript,
             isContract,
-            Coeval(scriptContainerAddress),
+            scriptContainerAddress,
             txId
           )
           .leftMap((_, Nil))

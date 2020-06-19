@@ -552,7 +552,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         case x : PointC => x
     }"""
 
-    val Right((expr, ty)) = compileExpr(script)
+    val expr = compileExpr(script).explicitGet()._1
 
     val rev = Decompiler(expr, decompilerContextV3)
 
@@ -573,7 +573,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         case _ => 2
     }"""
 
-    val Right((expr, ty)) = compileExpr(script)
+    val expr = compileExpr(script).explicitGet()._1
 
     val rev = Decompiler(expr, decompilerContextV3)
 
@@ -592,7 +592,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         case x => x
     }"""
 
-    val Right((expr, ty)) = compileExpr(script)
+    val expr = compileExpr(script).explicitGet()._1
 
     val rev = Decompiler(expr, decompilerContextV3)
 
@@ -605,22 +605,22 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("multiple value list") {
-    val script           = """["a", "b", "c", "d"]"""
-    val Right((expr, _)) = compileExpr(script)
+    val script = """["a", "b", "c", "d"]"""
+    val expr   = compileExpr(script).explicitGet()._1
     Decompiler(expr, decompilerContextV3) shouldEq script
   }
 
   property("concat with nil is hidden") {
-    val expected          = """["a", "b"]"""
-    val Right((expr1, _)) = compileExpr(""""a"::"b"::nil""")
-    val Right((expr2, _)) = compileExpr("""cons("a", cons("b", nil))""")
+    val expected = """["a", "b"]"""
+    val expr1    = compileExpr(""""a"::"b"::nil""").explicitGet()._1
+    val expr2    = compileExpr("""cons("a", cons("b", nil))""").explicitGet()._1
     Decompiler(expr1, decompilerContextV3) shouldEq expected
     Decompiler(expr2, decompilerContextV3) shouldEq expected
   }
 
   property("single value list") {
-    val script           = """["a"]"""
-    val Right((expr, _)) = compileExpr(script)
+    val script = """["a"]"""
+    val expr   = compileExpr(script).explicitGet()._1
     Decompiler(expr, decompilerContextV3) shouldEq script
   }
 
@@ -628,13 +628,13 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val script =
       """let list = ["b", "c", "d"]
         |"a" :: list""".stripMargin
-    val Right((expr, _)) = compileExpr(script)
+    val expr = compileExpr(script).explicitGet()._1
     Decompiler(expr, decompilerContextV3) shouldEq script
   }
 
   property("extracted functions") {
-    val script           = """addressFromStringValue("abcd")"""
-    val Right((expr, _)) = compileExpr(script)
+    val script = """addressFromStringValue("abcd")"""
+    val expr   = compileExpr(script).explicitGet()._1
     Decompiler(expr, decompilerContextV3) shouldEq script
   }
 
@@ -642,11 +642,11 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val script =
       """let arr = [1, 2, 3]
         |arr[1]""".stripMargin
-    val Right((expr, _)) = compileExpr(script)
-    val Right((expr2, _)) = compileExpr(
+    val expr = compileExpr(script).explicitGet()._1
+    val expr2 = compileExpr(
       """let arr = [1, 2, 3]
         |arr.getElement(1)""".stripMargin
-    )
+    ).explicitGet()._1
     Decompiler(expr, decompilerContextV3) shouldEq script
     Decompiler(expr2, decompilerContextV3) shouldEq script
   }
@@ -662,7 +662,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |let intV = getIntegerValue(this, "key")
         |let strV = getStringValue(this, "key")
         |boo""".stripMargin
-    val Right((expr, _)) = compileExpr(script)
+    val expr = compileExpr(script).explicitGet()._1
     Decompiler(expr, decompilerContextV3) shouldEq script
   }
 
@@ -678,7 +678,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |let intV = getIntegerValue(list, "k3")
         |let strV = getStringValue(list, "k4")
         |boo""".stripMargin
-    val Right((expr, _)) = compileExpr(script)
+    val expr = compileExpr(script).explicitGet()._1
     Decompiler(expr, decompilerContextV3) shouldEq script
   }
 
@@ -694,17 +694,16 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |let intV = getIntegerValue(list, 2)
         |let strV = getStringValue(list, 3)
         |boo""".stripMargin
-    val Right((expr, _)) = compileExpr(script)
+    val expr = compileExpr(script).explicitGet()._1
     Decompiler(expr, decompilerContextV3) shouldEq script
   }
 
   property("V3 - checkMerkleProof") {
     val script =
       "checkMerkleProof(base58'',base58'',base58'')"
-    val Right((expr, _)) = compileExpr(script, v=V3)
+    val expr = compileExpr(script, v = V3).explicitGet()._1
     Decompiler(expr, decompilerContextV3) shouldEq script
   }
-
 
   property("list func params") {
     val script =
@@ -712,7 +711,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         | func f(a: List[String], b: String) = a[0] + b
         | f(["a", "b"], "c")
       """.stripMargin
-    val Right((expr, _)) = compileExpr(script)
+    val expr = compileExpr(script).explicitGet()._1
     Decompiler(expr, decompilerContextV3) shouldEq
       """func f (a,b) = (a[0] + b)
         |
@@ -720,41 +719,41 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("V4 - contains") {
-    val script           = """"abc".contains("b")"""
-    val Right((expr, _)) = compileExpr(script, V4)
-    val res              = Decompiler(expr, decompilerContextV4)
+    val script = """"abc".contains("b")"""
+    val expr   = compileExpr(script, V4).explicitGet()._1
+    val res    = Decompiler(expr, decompilerContextV4)
     res shouldEq """contains("abc", "b")"""
   }
 
   property("V4 - valueOrElse") {
-    val script           = """let a = 1
+    val script = """let a = 1
                              |let b = 2
                              |a.valueOrElse(b)""".stripMargin
-    val Right((expr, _)) = compileExpr(script, V4)
-    val res              = Decompiler(expr, decompilerContextV4)
+    val expr   = compileExpr(script, V4).explicitGet()._1
+    val res    = Decompiler(expr, decompilerContextV4)
     res shouldEq """let a = 1
                    |let b = 2
                    |valueOrElse(a, b)""".stripMargin
   }
 
   property("V4 - listAppend (:+)") {
-    val script           = """[1, 2, 3] :+ 4"""
-    val Right((expr, _)) = compileExpr(script, V4)
-    val res              = Decompiler(expr, decompilerContextV4)
+    val script = """[1, 2, 3] :+ 4"""
+    val expr   = compileExpr(script, V4).explicitGet()._1
+    val res    = Decompiler(expr, decompilerContextV4)
     res shouldEq """([1, 2, 3] :+ 4)"""
   }
 
   property("V4 - listConcat (++)") {
-    val script           = """[1, 2, 3] ++ [4, 5, 42]"""
-    val Right((expr, _)) = compileExpr(script, V4)
-    val res              = Decompiler(expr, decompilerContextV4)
+    val script = """[1, 2, 3] ++ [4, 5, 42]"""
+    val expr   = compileExpr(script, V4).explicitGet()._1
+    val res    = Decompiler(expr, decompilerContextV4)
     res shouldEq """([1, 2, 3] ++ [4, 5, 42])"""
   }
 
   property("V4 - median") {
-    val script           = """median([1, 2, 3]) + [1, 2, 3].median()"""
-    val Right((expr, _)) = compileExpr(script, V4)
-    val res              = Decompiler(expr, decompilerContextV4)
+    val script = """median([1, 2, 3]) + [1, 2, 3].median()"""
+    val expr   = compileExpr(script, V4).explicitGet()._1
+    val res    = Decompiler(expr, decompilerContextV4)
     res shouldEq """(median([1, 2, 3]) + median([1, 2, 3]))"""
   }
 
@@ -791,13 +790,13 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
       )
 
-    val Right(dApp) = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4)
-    val res         = Decompiler(dApp, decompilerContextV4)
+    val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4).explicitGet()
+    val res  = Decompiler(dApp, decompilerContextV4)
     res shouldEq script
   }
 
   property("V4 - new functions") {
-    val sizes = Seq(16, 32, 64, 128)
+    val sizes  = Seq(16, 32, 64, 128)
     val hashes = Seq("blake2b", "keccak", "sha")
     val prefix =
       """
@@ -811,10 +810,10 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |   let v1 = transferTransactionFromProto(base58'')
         |   let v2 = groth16Verify(base58'', base58'', base58'')
         |   let v3 = createMerkleRoot(nil, base58'', 0)
-        |   let v4 = [${(for {s <- sizes; h <- hashes} yield h ++ "256_" ++ s.toString ++ "Kb(base58'')").mkString(", ")}]
-        |   let v5 = [${(for {s <- sizes} yield "sigVerify_" ++ s.toString ++ "Kb(base58'', base58'', base58'')").mkString(", ")}]
-        |   let v6 = [${(for {s <- sizes} yield "rsaVerify_" ++ s.toString ++ "Kb(SHA256, base58'', base58'', base58'')").mkString(", ")}]
-        |   let v7 = [${(for {s <- 1 to 15} yield "groth16Verify_" ++ s.toString ++ "inputs( base58'', base58'', base58'')").mkString(", ")}]
+        |   let v4 = [${(for { s <- sizes; h <- hashes } yield h ++ "256_" ++ s.toString ++ "Kb(base58'')").mkString(", ")}]
+        |   let v5 = [${(for { s <- sizes } yield "sigVerify_" ++ s.toString ++ "Kb(base58'', base58'', base58'')").mkString(", ")}]
+        |   let v6 = [${(for { s <- sizes } yield "rsaVerify_" ++ s.toString ++ "Kb(SHA256, base58'', base58'', base58'')").mkString(", ")}]
+        |   let v7 = [${(for { s <- 1 to 15 } yield "groth16Verify_" ++ s.toString ++ "inputs( base58'', base58'', base58'')").mkString(", ")}]
         |   let v8 = value(1)
         |   let v9 = valueOrErrorMessage(1,"")
         |   let v10 = toUtf8String(base58'')
@@ -846,14 +845,16 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val parsedExpr = Parser.parseContract(prefix ++ script).get.value
 
     val ctx =
-      Monoid.combineAll( Seq(
-        PureContext.build(Global, V4).withEnvironment[Environment],
-        CryptoContext.build(Global, V4).withEnvironment[Environment],
-        WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
-      ))
+      Monoid.combineAll(
+        Seq(
+          PureContext.build(Global, V4).withEnvironment[Environment],
+          CryptoContext.build(Global, V4).withEnvironment[Environment],
+          WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
+        )
+      )
 
-    val Right(dApp) = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4)
-    val res         = Decompiler(dApp, ctx.decompilerContext)
+    val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4).explicitGet()
+    val res  = Decompiler(dApp, ctx.decompilerContext)
     res shouldEq script
   }
 
@@ -864,7 +865,8 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         | {-#CONTENT_TYPE    DAPP #-}
         |""".stripMargin
 
-    val types = ": UpdateAssetInfoTransaction | InvokeScriptTransaction | DataTransaction | IssueTransaction | TransferTransaction | MassTransferTransaction | Asset | BlockInfo"
+    val types =
+      ": UpdateAssetInfoTransaction | InvokeScriptTransaction | DataTransaction | IssueTransaction | TransferTransaction | MassTransferTransaction | Asset | BlockInfo"
 
     def script(t: String) = s"""
         | func m (v$t) =
@@ -884,15 +886,17 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val parsedExpr = Parser.parseContract(prefix ++ script(types)).get.value
 
     val ctx =
-      Monoid.combineAll( Seq(
-        PureContext.build(Global, V4).withEnvironment[Environment],
-        CryptoContext.build(Global, V4).withEnvironment[Environment],
-        WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
-      ))
+      Monoid.combineAll(
+        Seq(
+          PureContext.build(Global, V4).withEnvironment[Environment],
+          CryptoContext.build(Global, V4).withEnvironment[Environment],
+          WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
+        )
+      )
 
-    val Right(dApp) = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4)
-    val res         = Decompiler(dApp, ctx.decompilerContext)
+    val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4).explicitGet()
+    val res  = Decompiler(dApp, ctx.decompilerContext)
     res shouldEq script("")
   }
- 
+
 }

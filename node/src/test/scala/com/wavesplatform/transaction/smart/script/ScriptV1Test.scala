@@ -18,7 +18,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
 
   property("ScriptV1.apply should permit BOOLEAN scripts") {
     forAll(BOOLEANgen(10)) { expr =>
-      ExprScript(expr) shouldBe 'right
+      ExprScript(expr).explicitGet()
     }
   }
 
@@ -43,7 +43,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
         args = List(r, CONST_LONG(i))
       )
     }
-    val expr = (1 to 9).foldLeft[EXPR](CONST_LONG(0)) { (r, i) =>
+    val expr = (1 to 9).foldLeft[EXPR](CONST_LONG(0)) { (r, _) =>
       FUNCTION_CALL(
         function = PureContext.eq.header,
         args = List(r, bigSum)
@@ -64,7 +64,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
       }
       .reduceLeft[EXPR](IF(_, _, FALSE))
 
-    ExprScript(expr) shouldBe 'right
+    ExprScript(expr).explicitGet()
   }
 
   property("Expression block version check - successful on very deep expressions(stack overflow check)") {

@@ -572,7 +572,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
                  | }
                  |
                  | let checkAmount     = transfer.amount == ${transferTx.amount}
-                 | let checkAttachment = transfer.attachment == base64'${Base64.encode(transferTx.attachment.toBytes)}'
+                 | let checkAttachment = transfer.attachment == base64'${Base64.encode(transferTx.attachment.arr)}'
                  |
                  | let checkAssetId = match transfer.assetId {
                  |    case _: Unit => true

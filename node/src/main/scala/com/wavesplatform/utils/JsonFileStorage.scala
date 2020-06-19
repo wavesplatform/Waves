@@ -5,7 +5,7 @@ import java.io.{File, PrintWriter}
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 import play.api.libs.json.{Json, Reads, Writes}
-import scorex.crypto.encode.{Base64 => ScorexBase64}
+import java.util.Base64
 
 import scala.io.Source
 import scala.util.control.NonFatal
@@ -69,7 +69,7 @@ object JsonFileStorage {
     try {
       val cipher: Cipher = Cipher.getInstance(Algorithm)
       cipher.init(Cipher.ENCRYPT_MODE, key)
-      ScorexBase64.encode(cipher.doFinal(value.utf8Bytes))
+      new String(Base64.getEncoder.encode(cipher.doFinal(value.utf8Bytes)))
     } catch {
       case NonFatal(e) =>
         throw new RuntimeException("File storage encrypt error", e)
@@ -80,7 +80,7 @@ object JsonFileStorage {
     try {
       val cipher: Cipher = Cipher.getInstance(Algorithm)
       cipher.init(Cipher.DECRYPT_MODE, key)
-      new String(cipher.doFinal(ScorexBase64.decode(encryptedValue)))
+      new String(cipher.doFinal(Base64.getDecoder.decode(encryptedValue)))
     } catch {
       case NonFatal(e) =>
         throw new RuntimeException("File storage decrypt error", e)

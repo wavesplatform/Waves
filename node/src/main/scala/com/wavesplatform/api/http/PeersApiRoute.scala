@@ -10,7 +10,7 @@ import com.wavesplatform.settings.RestAPISettings
 import io.netty.channel.Channel
 import play.api.libs.json._
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 case class PeersApiRoute(
     settings: RestAPISettings,

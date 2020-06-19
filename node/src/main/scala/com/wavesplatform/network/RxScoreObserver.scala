@@ -11,7 +11,7 @@ import monix.eval.Coeval
 import monix.execution.Scheduler
 import monix.reactive.Observable
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.duration.FiniteDuration
 
 object RxScoreObserver extends ScorexLogging {

@@ -7,7 +7,6 @@ import cats.syntax.semigroup._
 import com.google.common.base.Utf8
 import com.google.protobuf.ByteString
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.traits.domain.{Burn, Reissue, SponsorFee}
 import com.wavesplatform.state._

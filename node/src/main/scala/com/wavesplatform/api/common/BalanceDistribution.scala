@@ -11,7 +11,7 @@ import monix.reactive.Observable
 import org.iq80.leveldb.DB
 
 import scala.annotation.tailrec
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 trait BalanceDistribution {
   import BalanceDistribution._

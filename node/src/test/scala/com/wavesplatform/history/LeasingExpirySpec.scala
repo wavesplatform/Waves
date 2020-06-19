@@ -6,20 +6,27 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{Constants, FunctionalitySettings}
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{Blockchain, LeaseBalance}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.{NoShrink, TransactionGen}
-import com.wavesplatform.history.Domain.BlockchainUpdaterExt
+import com.wavesplatform.{EitherMatchers, NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalactic.source.Position
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with WithDomain with Matchers with TransactionGen with NoShrink {
+class LeasingExpirySpec
+    extends FreeSpec
+    with ScalaCheckPropertyChecks
+    with WithDomain
+    with Matchers
+    with EitherMatchers
+    with TransactionGen
+    with NoShrink {
   private val LeasingExpiryActivationHeight = 4
   private val LeasingValidity               = 2
 
@@ -31,7 +38,7 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
         doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
         leaseExpiration = LeasingValidity,
         preActivatedFeatures = Map(
-          BlockchainFeatures.SmartAccounts.id -> 0,
+          BlockchainFeatures.SmartAccounts.id   -> 0,
           BlockchainFeatures.LeaseExpiration.id -> LeasingExpiryActivationHeight
         )
       )
@@ -108,15 +115,15 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
     "expired leases are cancelled" in forAll(simpleScenario) {
       case (lessor, alias, genesis, b, emptyBlocks) =>
         withDomain(leasingSettings) { d =>
-          d.blockchainUpdater.processBlock(genesis).explicitGet()
+          d.blockchainUpdater.processBlock(genesis) should beRight
           ensureNoLeases(d.blockchainUpdater, Set(lessor.toAddress, alias))
-          d.blockchainUpdater.processBlock(b).explicitGet()
+          d.blockchainUpdater.processBlock(b) should beRight
           val leasesToBeCancelled = b.transactionData.collect { case lt: LeaseTransaction => lt }
           leasesToBeCancelled.foreach {
             case lt: LeaseTransaction => d.blockchainUpdater.leaseDetails(lt.id()).map(_.isActive) shouldBe Some(true)
-            case _ =>
+            case _                    =>
           }
-          emptyBlocks.take(2).foreach(b => d.blockchainUpdater.processBlock(b).explicitGet())
+          emptyBlocks.take(2).foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
           // activation height: leases should still be active
           d.blockchainUpdater.height shouldEqual LeasingExpiryActivationHeight
           // balance snapshots, however, already reflect cancelled leases
@@ -127,7 +134,7 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
           d.blockchainUpdater.processBlock(emptyBlocks.last)
           leasesToBeCancelled.foreach {
             case lt: LeaseTransaction => d.blockchainUpdater.leaseDetails(lt.id()).map(_.isActive) shouldBe Some(false)
-            case _ =>
+            case _                    =>
           }
         }
     }
@@ -147,7 +154,7 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
 
     "is accepted in a block where lease is cancelled" in forAll(validCancel) { blocks =>
       withDomain(leasingSettings) { d =>
-        blocks.foreach(b => d.blockchainUpdater.processBlock(b).explicitGet())
+        blocks.foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
         // make sure leasing is not cancelled twice
         for (id <- blocks.flatMap(_.transactionData).collect { case lt: LeaseTransaction => lt.id() }) {
           d.blockchainUpdater.leaseDetails(id).map(_.isActive) shouldBe Some(false)
@@ -170,7 +177,7 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
 
     "is rejected after lease is cancelled" in forAll(invalidCancel) { blocks =>
       withDomain(leasingSettings) { d =>
-        blocks.take(4).foreach(b => d.blockchainUpdater.processBlock(b).explicitGet())
+        blocks.take(4).foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
         d.blockchainUpdater.processBlock(blocks.last) should produce("Cannot cancel already cancelled lease")
       }
     }
@@ -198,11 +205,11 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
         withDomain(leasingSettings) {
           case Domain(_, blockchainUpdater, _) =>
             // blocks before activation
-            blocks.slice(0, 3).foreach(b => blockchainUpdater.processBlock(b).explicitGet())
+            blocks.slice(0, 3).foreach(b => blockchainUpdater.processBlock(b) should beRight)
             ensureEffectiveBalance(blockchainUpdater, alias, 0L)
 
             // block at activation height with lease
-            blockchainUpdater.processBlock(blocks(3)).explicitGet()
+            blockchainUpdater.processBlock(blocks(3)) should beRight
             ensureEffectiveBalance(blockchainUpdater, alias, amount)
 
             // block after activation and before cancellation, including new lease
@@ -241,23 +248,23 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
         withDomain(leasingSettings) {
           case Domain(_, blockchainUpdater, _) =>
             // blocks before activation
-            blocks.slice(0, 3).foreach(b => blockchainUpdater.processBlock(b).explicitGet())
+            blocks.slice(0, 3).foreach(b => blockchainUpdater.processBlock(b) should beRight)
             ensureEffectiveBalance(blockchainUpdater, miner, 0L)
             ensureNoLeases(blockchainUpdater, Set(lessor.toAddress, miner.toAddress))
 
             // effective balance reflects new leases
-            blockchainUpdater.processBlock(blocks(3)).explicitGet()
+            blockchainUpdater.processBlock(blocks(3)) should beRight
             ensureEffectiveBalance(blockchainUpdater, miner, amount)
 
             // blocks after activation and before cancellation
-            blockchainUpdater.processBlock(blocks(4)).explicitGet()
+            blockchainUpdater.processBlock(blocks(4)) should beRight
 
             // effective balance reflects cancelled and new leases
-            blockchainUpdater.processBlock(blocks(5)).explicitGet()
+            blockchainUpdater.processBlock(blocks(5)) should beRight
             ensureEffectiveBalance(blockchainUpdater, miner, amount)
 
             // effective balance not changed
-            blockchainUpdater.processBlock(blocks(6)).explicitGet()
+            blockchainUpdater.processBlock(blocks(6)) should beRight
             ensureEffectiveBalance(blockchainUpdater, miner, amount)
         }
     }
@@ -278,19 +285,19 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
         withDomain(leasingSettings) {
           case Domain(_, blockchainUpdater, _) =>
             // blocks before activation
-            blocks.slice(0, 3).foreach(b => blockchainUpdater.processBlock(b).explicitGet())
+            blocks.slice(0, 3).foreach(b => blockchainUpdater.processBlock(b) should beRight)
             ensureEffectiveBalance(blockchainUpdater, miner, 0L)
 
             // effective balance reflects new leases
-            blockchainUpdater.processBlock(blocks(3)).explicitGet()
+            blockchainUpdater.processBlock(blocks(3)) should beRight
             ensureEffectiveBalance(blockchainUpdater, miner, amount)
 
             // blocks after activation and before cancellation
-            blockchainUpdater.processBlock(blocks(4)).explicitGet()
+            blockchainUpdater.processBlock(blocks(4)) should beRight
 
             // miner allowed to generate block at cancellation height
             ensureEffectiveBalance(blockchainUpdater, miner, amount)
-            blockchainUpdater.processBlock(blocks(5)).explicitGet()
+            blockchainUpdater.processBlock(blocks(5)) should beRight
 
             // miner not allowed to generate block after cancellation
             ensureEffectiveBalance(blockchainUpdater, miner, 0L)

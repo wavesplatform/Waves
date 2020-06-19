@@ -7,7 +7,7 @@ import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.directives.values.{Account, Expression, StdLibVersion}
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL, UNION}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 object DocExport {
   def main(args: Array[String]) {

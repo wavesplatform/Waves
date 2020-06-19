@@ -5,10 +5,8 @@ import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.MultiPaymentPolicyProvider._
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
 import com.wavesplatform.lang.v1.traits.domain._
@@ -30,9 +28,10 @@ class WavesEnvironment(
     in: Coeval[Environment.InputEntity],
     h: Coeval[Int],
     blockchain: Blockchain,
-    address: Coeval[ByteStr],
+    val tthis: Environment.Tthis,
     ds: DirectiveSet,
-    override val txId: ByteStr
+    override val txId: ByteStr,
+    override val dAppAlias: Boolean = false
 ) extends Environment[Id] {
   import com.wavesplatform.lang.v1.traits.Environment._
 
@@ -45,7 +44,7 @@ class WavesEnvironment(
       .transactionInfo(ByteStr(id))
       .filter(_._3)
       .map(_._2)
-      .map(tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, Some(ByteStr.empty))).explicitGet())
+      .map(tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, tthis)).explicitGet())
 
   override def inputEntity: InputEntity =
     in.value
@@ -83,10 +82,9 @@ class WavesEnvironment(
   override def resolveAlias(name: String): Either[String, Recipient.Address] =
     blockchain
       .resolveAlias(com.wavesplatform.account.Alias.create(name).explicitGet())
+      .map(a => Recipient.Address(ByteStr(a.bytes)))
       .left
       .map(_.toString)
-      .right
-      .map(a => Recipient.Address(ByteStr(a.bytes)))
 
   override def chainId: Byte = nByte
 
@@ -116,11 +114,9 @@ class WavesEnvironment(
       portfolio.effectiveBalance
     )).left.map(_.toString)
   }
- 
+
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
     blockchain.transactionInfo(ByteStr(id)).filter(_._3).map(_._1.toLong)
-
-  override def tthis: Address = Recipient.Address(address())
 
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
     for {
@@ -128,8 +124,8 @@ class WavesEnvironment(
     } yield {
       ScriptAssetInfo(
         id = ByteStr(id),
-        name = assetDesc.name.toStringUtf8(),
-        description = assetDesc.description.toStringUtf8(),
+        name = assetDesc.name.toStringUtf8,
+        description = assetDesc.description.toStringUtf8,
         quantity = assetDesc.totalVolume.toLong,
         decimals = assetDesc.decimals,
         issuer = Address(ByteStr(assetDesc.issuer.toAddress.bytes)),

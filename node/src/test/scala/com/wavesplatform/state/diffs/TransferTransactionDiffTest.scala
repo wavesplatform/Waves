@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats.implicits._
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
@@ -77,8 +78,7 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with With
       genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       issue: IssueTransaction <- issueReissueBurnGeneratorP(Long.MaxValue, master).map(_._1)
       asset = IssuedAsset(issue.id())
-      transfer = TransferTransaction
-        .selfSigned(1.toByte, master, recepient.toAddress, asset, Long.MaxValue, Waves, 100000, None, ts)
+      transfer = TransferTransaction.selfSigned(1.toByte, master, recepient.toAddress, asset, Long.MaxValue, Waves, 100000, ByteStr.empty,  ts)
         .explicitGet()
     } yield (genesis, issue, transfer)
 
