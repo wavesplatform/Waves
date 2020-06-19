@@ -109,9 +109,9 @@ object ExtensionPackaging extends AutoPlugin {
   def makeJarName(org: String, name: String, revision: String, artifactName: String, artifactClassifier: Option[String]): String =
     org + "." +
       name + "-" +
-      Option(artifactName.replace(name, "")).filterNot(_.isEmpty).map(_ + "-").getOrElse("") +
+      Option(artifactName.replace(name, "")).filterNot(_.isEmpty).fold("")(_ + "-") +
       revision +
-      artifactClassifier.filterNot(_.isEmpty).map("-" + _).getOrElse("") +
+      artifactClassifier.filterNot(_.isEmpty).fold("")("-" + _) +
       ".jar"
 
   // Determines a nicer filename for an attributed jar file, using the
@@ -133,10 +133,10 @@ object ExtensionPackaging extends AutoPlugin {
     build.classpathTransitive.getOrElse(thisProject, Nil)
 
   private def isRuntimeArtifact(dep: Attributed[File]): Boolean =
-    dep.get(sbt.Keys.artifact.key).map(a => a.`type` == "jar" || a.`type` == "bundle").getOrElse {
+    dep.get(sbt.Keys.artifact.key).fold {
       val name = dep.data.getName
       !(name.endsWith(".jar") || name.endsWith("-sources.jar") || name.endsWith("-javadoc.jar"))
-    }
+    }(a => a.`type` == "jar" || a.`type` == "bundle")
 
   private def findProvidedArtifacts: Def.Initialize[Task[Classpath]] =
     Def

@@ -9,13 +9,15 @@ extensionClasses += "com.wavesplatform.events.BlockchainUpdates"
 inConfig(Compile)(
   Seq(
     PB.protoSources in Compile := Seq(PB.externalIncludePath.value),
-    includeFilter in PB.generate := new SimpleFileFilter((f: File) => f.getName.endsWith(".proto") && f.getParent.replace('\\', '/').endsWith("waves/events")),
+    includeFilter in PB.generate := { (f: File) =>
+      f.getName.endsWith(".proto") && f.getParent.replace('\\', '/').endsWith("waves/events")
+    },
     PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value
-  ))
+  )
+)
 
 enablePlugins(RunApplicationSettings, WavesExtensionDockerPlugin, ExtensionPackaging)
 
-docker := docker.dependsOn(LocalProject("node-it") / docker).value
 inTask(docker)(
   Seq(
     imageNames := Seq(ImageName("com.wavesplatform/blockchain-updates")),
@@ -23,4 +25,5 @@ inTask(docker)(
     additionalFiles ++= Seq(
       (LocalProject("blockchain-updates") / Universal / stage).value
     )
-  ))
+  )
+)

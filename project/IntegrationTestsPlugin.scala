@@ -6,7 +6,7 @@ import sbt.Tests.Group
 import sbt._
 
 // Separate projects for integration tests because of IDEA: https://youtrack.jetbrains.com/issue/SCL-14363#focus=streamItem-27-3061842.0-0
-object ItTestPlugin extends AutoPlugin {
+object IntegrationTestsPlugin extends AutoPlugin {
 
   object autoImport extends ItKeys
   import autoImport._
@@ -31,10 +31,9 @@ object ItTestPlugin extends AutoPlugin {
            * F - show full stack traces
            * W - without color
            */
-          val args        = Seq("-fFW", (logDirectory.value / "summary.log").toString) ++ excludeTags
+          val args = Seq("-fFW", (logDirectory.value / "summary.log").toString) ++ excludeTags
           Tests.Argument(TestFrameworks.ScalaTest, args: _*)
         },
-        parallelExecution in Test := true,
         testGrouping := {
           // ffs, sbt!
           // https://github.com/sbt/sbt/issues/3266
@@ -46,26 +45,30 @@ object ItTestPlugin extends AutoPlugin {
           for {
             group <- testGrouping.value
             suite <- group.tests
-          } yield
-            Group(
-              suite.name,
-              Seq(suite),
-              Tests.SubProcess(
-                ForkOptions(
-                  javaHome = javaHomeValue,
-                  outputStrategy = outputStrategy.value,
-                  bootJars = Vector.empty[java.io.File],
-                  workingDirectory = Option(baseDirectory.value),
-                  runJVMOptions = Vector(
-                    "-Dwaves.it.logging.appender=FILE",
-                    s"-Dwaves.it.logging.dir=${logDirectoryValue / suite.name.replaceAll("""(\w)\w*\.""", "$1.")}" // foo.bar.Baz -> f.b.Baz
-                  ) ++ javaOptionsValue,
-                  connectInput = false,
-                  envVars = envVarsValue
-                ))
+          } yield Group(
+            suite.name,
+            Seq(suite),
+            Tests.SubProcess(
+              ForkOptions(
+                javaHome = javaHomeValue,
+                outputStrategy = outputStrategy.value,
+                bootJars = Vector.empty[java.io.File],
+                workingDirectory = Option(baseDirectory.value),
+                runJVMOptions = Vector(
+                  "-Dwaves.it.logging.appender=FILE",
+                  s"-Dwaves.it.logging.dir=${logDirectoryValue / suite.name.replaceAll("""(\w)\w*\.""", "$1.")}" // foo.bar.Baz -> f.b.Baz
+                ) ++ javaOptionsValue,
+                connectInput = false,
+                envVars = envVarsValue
+              )
             )
+          )
         }
-      ))
+      )
+    ) ++ inScope(Global)(
+      concurrentRestrictions := Seq(Tags.limit(Tags.ForkedTestGroup, 16))
+    )
+
 }
 
 trait ItKeys {

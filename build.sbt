@@ -90,23 +90,7 @@ lazy val `node-it`        = project.dependsOn(node, `node-testkit`, `grpc-server
 lazy val `node-generator` = project.dependsOn(node, `node-testkit`, `node`)
 lazy val benchmark        = project.dependsOn(node, `node-testkit` % "test", `lang-testkit` % "test")
 
-lazy val `blockchain-updates` = project.dependsOn(node % "compile;test->test;runtime->provided")
-
-lazy val it = project
-  .settings(
-    description := "Hack for near future to support builds in TeamCity for old and new branches both",
-    concurrentRestrictions := {
-      val threadNumber = Option(System.getenv("SBT_THREAD_NUMBER")).fold(1)(_.toInt)
-      sLog.value.info(s"Running forked tests in $threadNumber threads")
-      Seq(Tags.limit(Tags.ForkedTestGroup, threadNumber))
-    },
-    Test / test := Def
-      .sequential(
-        `node-it` / Docker / docker,
-        `node-it` / Test / test
-      )
-      .value
-  )
+lazy val `blockchain-updates` = project.dependsOn(node % "compile;runtime->provided", `node-testkit` % "test")
 
 lazy val root = (project in file("."))
   .aggregate(
@@ -122,6 +106,9 @@ lazy val root = (project in file("."))
     benchmark,
     `blockchain-updates`
   )
+
+// this a hack to support both `node-it/test` and `it/test` commands
+lazy val it = project.aggregate(`node-it`)
 
 inScope(Global)(
   Seq(
