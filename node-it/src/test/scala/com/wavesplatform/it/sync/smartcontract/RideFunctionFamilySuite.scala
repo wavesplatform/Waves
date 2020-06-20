@@ -57,18 +57,18 @@ class RideFunctionFamilySuite extends BaseTransactionSuite with CancelAfterFailu
    )(f).stripMargin
 
 
-  test("function family in asset sript") {
+  test("function family in asset script") {
     val CompiledScript(scr, complexity, _) = sender.scriptCompile(ffAssetScript(4))
     val EstimatedScript(_, _, ecomplexity, _) = sender.scriptEstimate(scr)
     ecomplexity shouldBe complexity
-    ecomplexity shouldBe 1035
+    ecomplexity shouldBe 1019
 
     val DecompiledScript(dec) = sender.scriptDecompile(scr)
     List("sigVerify_16Kb(a, a, a)", "rsaVerify_32Kb(SHA3512, a, a, a)", "blake2b256_64Kb(a)", "keccak256_128Kb(a)", "sha256(a)").forall(dec.contains) shouldBe true
     dec.contains("Native") shouldBe false
   }
 
-  test("function family in asset sript V3") {
+  test("function family in asset script V3") {
     assertApiError(sender.scriptCompile(ffAssetScript(3))) { error =>
       error.statusCode shouldBe 400
       error.id shouldBe ScriptCompilerError.Id
