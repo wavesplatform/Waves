@@ -194,7 +194,7 @@ class UtxPoolImpl(
       }
       if (!fullyReset) {
         log.warn(s"Priority $diff is partially reset")
-        val txsToAdd = diff.transactions.filterKeys(!removed(_)).values.map(_.transaction)
+        val txsToAdd = diff.transactions.view.filterKeys(!removed(_)).values.map(_.transaction)
         txsToAdd.foreach(addTransaction(_, verify = false))
       }
     }
