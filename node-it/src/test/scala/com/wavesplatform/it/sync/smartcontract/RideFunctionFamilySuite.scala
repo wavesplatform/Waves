@@ -87,7 +87,7 @@ class RideFunctionFamilySuite extends BaseTransactionSuite with CancelAfterFailu
       val CompiledScript(scr, complexity, _) = sender.scriptCompile(ffDApp(4)(hash))
       val EstimatedScript(_, _, ecomplexity, _) = sender.scriptEstimate(scr)
       ecomplexity shouldBe complexity
-      ecomplexity shouldBe 438
+      ecomplexity shouldBe 405
       val DecompiledScript(dec) = sender.scriptDecompile(scr)
       names.forall(dec.contains) shouldBe true
       dec.contains("Native") shouldBe false
@@ -96,7 +96,7 @@ class RideFunctionFamilySuite extends BaseTransactionSuite with CancelAfterFailu
 
   test("function family (verify)") {
     for(((f, names), c) <- List(
-         "sig" -> List("sigVerify(a, a, a)", "sigVerify_16Kb(a, a, a)", "sigVerify_32Kb(a, a, a)", "sigVerify_64Kb(a, a, a)", "sigVerify_128Kb(a, a, a)") -> 712,
+         "sig" -> List("sigVerify(a, a, a)", "sigVerify_16Kb(a, a, a)", "sigVerify_32Kb(a, a, a)", "sigVerify_64Kb(a, a, a)", "sigVerify_128Kb(a, a, a)") -> 711,
          "rsa" -> List("rsaVerify(NOALG, a, a, a)", "rsaVerify_32Kb(SHA256, a, a, a)", "rsaVerify_64Kb(SHA3256, a, a, a)", "rsaVerify_128Kb(NOALG, a, a, a)") -> 2945,
          "rsa16" -> List("rsaVerify_16Kb(MD5, a, a, a)", "rsaVerify_32Kb(SHA256, a, a, a)", "rsaVerify_64Kb(SHA3256, a, a, a)", "rsaVerify_128Kb(NOALG, a, a, a)") -> 2445
     )) {
