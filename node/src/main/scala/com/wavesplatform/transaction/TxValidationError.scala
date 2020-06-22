@@ -53,7 +53,7 @@ object TxValidationError {
   }
 
   /** Errors which can produce failed transaction */
-  case class FailedTransactionError private (
+  case class FailedTransactionError(
       cause: Cause,
       spentComplexity: Long,
       log: Log[Id],

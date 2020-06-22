@@ -30,22 +30,12 @@ object DiffsCommon {
       case _ => 0L
     }
 
-  def getAccountsComplexity(blockchain: Blockchain, tx: Transaction): Long = {
-    tx match {
-      case ptx: ProvenTransaction =>
-        val additionalAccounts = ptx match {
-          case etx: ExchangeTransaction => Seq(etx.buyOrder.senderPublicKey.toAddress, etx.sellOrder.senderPublicKey.toAddress)
-          case _                        => Seq.empty
-        }
-
-        (ptx.sender.toAddress +: additionalAccounts)
-          .flatMap(blockchain.accountScript)
-          .map(_.verifierComplexity)
-          .sum
-      case _ => 0L
-    }
-
-  }
+  def getAccountsComplexity(blockchain: Blockchain, tx: Transaction): Long =
+    (tx match {
+      case etx: ExchangeTransaction => Seq(etx.sender, etx.buyOrder.senderPublicKey, etx.sellOrder.senderPublicKey)
+      case ptx: ProvenTransaction   => Seq(ptx.sender)
+      case _                        => Seq.empty
+    }).flatMap(pk => blockchain.accountScript(pk.toAddress).map(_.verifierComplexity)).sum
 
   def countVerifierComplexity(
       script: Option[Script],
