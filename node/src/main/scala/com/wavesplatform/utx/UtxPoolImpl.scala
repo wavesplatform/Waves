@@ -38,8 +38,8 @@ import monix.reactive.Observer
 import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
-import scala.jdk.CollectionConverters._
 import scala.collection.mutable
+import scala.jdk.CollectionConverters._
 import scala.util.{Left, Right}
 
 //noinspection ScalaStyle
@@ -480,22 +480,18 @@ class UtxPoolImpl(
   }
 
   def addAndCleanupPriority(discDiffs: Seq[Diff]): Unit = {
-    if (discDiffs.isEmpty) return
-
-    priorityDiffs.synchronized {
+    if (discDiffs.nonEmpty) priorityDiffs.synchronized {
       discDiffs.filterNot(priorityDiffs.contains).foreach { diff =>
         diff.transactionsValues.foreach(PoolMetrics.addTransactionPriority(_))
         priorityDiffs += diff
       }
-      log.trace(s"Priority pool new diffs: $discDiffs")
       log.trace(s"Priority pool transactions order: ${priorityTransactionIds.mkString(", ")}")
-      TxCleanup.runCleanupAsync()
     }
+    TxCleanup.runCleanupAsync()
   }
 
   def nextMicroBlockSize(): Option[Int] = priorityDiffs.synchronized {
     val maybeSize = priorityDiffs.headOption.map(_.transactions.size)
-    log.trace(s"Priority queue size = ${priorityDiffs.size}, next microblock size hint = $maybeSize")
     maybeSize
   }
 
