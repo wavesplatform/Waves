@@ -36,7 +36,7 @@ class ReplEngine[F[_] : Monad] {
   private def parse(expr: String): Either[String, EXPR] =
     Parser.parseExprOrDecl(expr)
       .fold(
-        { case (_, _, err) => Left(err.traced.toString) },
+        { case (_, _, err) => Left(err.trace().toString) },
         { case (result, _) => Right(result) }
       )
 
@@ -88,12 +88,12 @@ class ReplEngine[F[_] : Monad] {
 
     val mappedFuncs =
       for {
-        (name, overloads) <- funcs
+        (name, overloads) <- funcs.toSeq.sortBy(_._1)
         signature         <- overloads
       } yield DeclPrinter.declaredFuncStr(name, signature)
 
     val mappedLets =
-      lets.map { case (name, t) => DeclPrinter.declaredLetStr(name, t) }
+      lets.toSeq.sortBy(_._1).map { case (name, t) => DeclPrinter.declaredLetStr(name, t) }
 
     val evalStr =
       resultO.fold("") { case (name, t, result) => s"$name: $t = ${result.prettyString(0)}" }

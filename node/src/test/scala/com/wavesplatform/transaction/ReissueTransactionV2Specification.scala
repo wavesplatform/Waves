@@ -74,8 +74,7 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
             1526287561757L,
             Proofs(Seq(ByteStr.decodeBase58("4DFEtUwJ9gjMQMuEXipv2qK7rnhhWEBqzpC3ZQesW1Kh8D822t62e3cRGWNU3N21r7huWnaty95wj2tZxYSvCfro").get))
           )
-          .right
-          .get
+          .explicitGet()
       )
     )
 

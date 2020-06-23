@@ -3,7 +3,6 @@ package com.wavesplatform.serialization
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Shorts}
-import scorex.crypto.hash.Digest32
 
 object Deser {
 
@@ -100,17 +99,5 @@ object Deser {
     require(bs.length.isValidShort, s"Attempting to serialize array with size, but the size(${bs.length}) exceeds MaxShort(${Short.MaxValue})")
     val countBytes = Shorts.toByteArray(bs.length.toShort)
     Bytes.concat(Seq(countBytes) ++ bs.map(serializeArrayWithLength): _*)
-  }
-
-  def serializeMerkleRootHash(d: Digest32): Array[Byte] = {
-    if (d.isEmpty) Array(0: Byte)
-    else (1: Byte) +: d
-  }
-
-  def parseMerkleRootHash(bytes: Array[Byte], position: Int): (Digest32, Int) = {
-    if (bytes.slice(position, position + 1).head == (1: Byte)) {
-      val b = bytes.slice(position + 1, position + 1 + 32)
-      (Digest32 @@ b, position + 1 + 32)
-    } else (Digest32 @@ Array.emptyByteArray, position + 1)
   }
 }

@@ -1,6 +1,6 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.{EitherMatchers, TransactionGen}
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -19,6 +19,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest
     with PropertyChecks
     with DomainScenarioDrivenPropertyCheck
     with Matchers
+    with EitherMatchers
     with TransactionGen {
 
   type Setup = (GenesisTransaction, TransferTransaction, TransferTransaction, TransferTransaction)
@@ -39,7 +40,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest
     scenario(preconditionsAndPayments) {
       case (domain, (genesis, masterToAlice, aliceToBob, aliceToBob2)) =>
         val blocks = chainBlocks(Seq(Seq(genesis), Seq(masterToAlice), Seq(aliceToBob), Seq(aliceToBob2)))
-        blocks.init.foreach(block => domain.blockchainUpdater.processBlock(block).explicitGet())
+        blocks.init.foreach(block => domain.blockchainUpdater.processBlock(block) should beRight)
         domain.blockchainUpdater.processBlock(blocks.last) should produce("unavailable funds")
 
         effBalance(genesis.recipient, domain) > 0 shouldBe true
@@ -52,9 +53,9 @@ class BlockchainUpdaterMicroblockSunnyDayTest
     scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) {
       case (domain, (genesis, masterToAlice, aliceToBob, aliceToBob2)) =>
         val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(masterToAlice, aliceToBob, aliceToBob2).map(Seq(_)))
-        domain.blockchainUpdater.processBlock(block).explicitGet()
-        domain.blockchainUpdater.processMicroBlock(microBlocks(0)).explicitGet()
-        domain.blockchainUpdater.processMicroBlock(microBlocks(1)).explicitGet()
+        domain.blockchainUpdater.processBlock(block) should beRight
+        domain.blockchainUpdater.processMicroBlock(microBlocks(0)) should beRight
+        domain.blockchainUpdater.processMicroBlock(microBlocks(1)) should beRight
         domain.blockchainUpdater.processMicroBlock(microBlocks(2)) should produce("unavailable funds")
 
         effBalance(genesis.recipient, domain) > 0 shouldBe true
@@ -67,9 +68,9 @@ class BlockchainUpdaterMicroblockSunnyDayTest
     scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) {
       case (domain, (genesis, masterToAlice, aliceToBob, aliceToBob2)) =>
         val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(masterToAlice, aliceToBob, aliceToBob2).map(Seq(_)))
-        domain.blockchainUpdater.processBlock(block).explicitGet()
-        domain.blockchainUpdater.processMicroBlock(microBlocks(0)).explicitGet()
-        domain.blockchainUpdater.processMicroBlock(microBlocks(1)).explicitGet()
+        domain.blockchainUpdater.processBlock(block) should beRight
+        domain.blockchainUpdater.processMicroBlock(microBlocks(0)) should beRight
+        domain.blockchainUpdater.processMicroBlock(microBlocks(1)) should beRight
         domain.blockchainUpdater.processMicroBlock(microBlocks(2)) should produce("unavailable funds")
 
         effBalance(genesis.recipient, domain) should be > 0L
@@ -83,10 +84,10 @@ class BlockchainUpdaterMicroblockSunnyDayTest
       case (domain, (genesis, masterToAlice, aliceToBob, aliceToBob2)) =>
         val (block0, microBlocks0) = chainBaseAndMicro(randomSig, genesis, Seq(masterToAlice, aliceToBob).map(Seq(_)))
         val block1                 = buildBlockOfTxs(microBlocks0.head.totalResBlockSig, Seq(aliceToBob2))
-        domain.blockchainUpdater.processBlock(block0).explicitGet()
-        domain.blockchainUpdater.processMicroBlock(microBlocks0(0)).explicitGet()
-        domain.blockchainUpdater.processMicroBlock(microBlocks0(1)).explicitGet()
-        domain.blockchainUpdater.processBlock(block1) shouldBe 'right
+        domain.blockchainUpdater.processBlock(block0) should beRight
+        domain.blockchainUpdater.processMicroBlock(microBlocks0(0)) should beRight
+        domain.blockchainUpdater.processMicroBlock(microBlocks0(1)) should beRight
+        domain.blockchainUpdater.processBlock(block1) should beRight
 
         effBalance(genesis.recipient, domain) > 0 shouldBe true
         effBalance(masterToAlice.recipient, domain) > 0 shouldBe true
@@ -100,10 +101,10 @@ class BlockchainUpdaterMicroblockSunnyDayTest
         val block0                 = buildBlockOfTxs(randomSig, Seq(genesis))
         val (block1, microBlocks1) = chainBaseAndMicro(block0.id(), masterToAlice, Seq(Seq(aliceToBob)))
         val block2                 = buildBlockOfTxs(block1.id(), Seq(aliceToBob2))
-        domain.blockchainUpdater.processBlock(block0).explicitGet()
-        domain.blockchainUpdater.processBlock(block1).explicitGet()
-        domain.blockchainUpdater.processMicroBlock(microBlocks1.head).explicitGet()
-        domain.blockchainUpdater.processBlock(block2) shouldBe 'right
+        domain.blockchainUpdater.processBlock(block0) should beRight
+        domain.blockchainUpdater.processBlock(block1) should beRight
+        domain.blockchainUpdater.processMicroBlock(microBlocks1.head) should beRight
+        domain.blockchainUpdater.processBlock(block2) should beRight
 
         effBalance(genesis.recipient, domain) > 0 shouldBe true
         effBalance(masterToAlice.recipient, domain) shouldBe 0
@@ -117,10 +118,10 @@ class BlockchainUpdaterMicroblockSunnyDayTest
         val block0                 = buildBlockOfTxs(randomSig, Seq(genesis))
         val (block1, microBlocks1) = chainBaseAndMicro(block0.id(), masterToAlice, Seq(Seq(aliceToBob)))
         val block2                 = buildBlockOfTxs(block0.id(), Seq(aliceToBob2), masterToAlice.timestamp)
-        domain.blockchainUpdater.processBlock(block0).explicitGet()
-        domain.blockchainUpdater.processBlock(block1).explicitGet()
-        domain.blockchainUpdater.processMicroBlock(microBlocks1(0)).explicitGet()
-        domain.blockchainUpdater.processBlock(block2).explicitGet() // silently discards worse version
+        domain.blockchainUpdater.processBlock(block0) should beRight
+        domain.blockchainUpdater.processBlock(block1) should beRight
+        domain.blockchainUpdater.processMicroBlock(microBlocks1(0)) should beRight
+        domain.blockchainUpdater.processBlock(block2) should beRight // silently discards worse version
 
         effBalance(genesis.recipient, domain) > 0 shouldBe true
         effBalance(masterToAlice.recipient, domain) shouldBe 1
@@ -135,10 +136,10 @@ class BlockchainUpdaterMicroblockSunnyDayTest
         val (block1, microBlocks1) = chainBaseAndMicro(block0.id(), masterToAlice, Seq(Seq(aliceToBob)))
         val otherSigner            = KeyPair(ByteStr(Array.fill(KeyLength)(1: Byte)))
         val block2                 = customBuildBlockOfTxs(block0.id(), Seq(masterToAlice, aliceToBob2), otherSigner, 1, masterToAlice.timestamp, DefaultBaseTarget / 2)
-        domain.blockchainUpdater.processBlock(block0).explicitGet()
-        domain.blockchainUpdater.processBlock(block1).explicitGet()
-        domain.blockchainUpdater.processMicroBlock(microBlocks1(0)).explicitGet()
-        domain.blockchainUpdater.processBlock(block2) shouldBe 'right
+        domain.blockchainUpdater.processBlock(block0) should beRight
+        domain.blockchainUpdater.processBlock(block1) should beRight
+        domain.blockchainUpdater.processMicroBlock(microBlocks1(0)) should beRight
+        domain.blockchainUpdater.processBlock(block2) should beRight
 
         effBalance(genesis.recipient, domain) > 0 shouldBe true
         effBalance(masterToAlice.recipient, domain) shouldBe 1
@@ -156,11 +157,11 @@ class BlockchainUpdaterMicroblockSunnyDayTest
           val (block1a, microBlocks1a) = chainBaseAndMicro(block0a.id(), Seq(masterToAlice), Seq(Seq(aliceToBob)), miner, 3: Byte, ts)
           val block2a                  = customBuildBlockOfTxs(block1a.id(), Seq(aliceToBob2), miner, 3: Byte, ts)
           val block3a                  = customBuildBlockOfTxs(block2a.id(), Seq.empty, miner, 3: Byte, ts)
-          da.blockchainUpdater.processBlock(block0a).explicitGet()
-          da.blockchainUpdater.processBlock(block1a).explicitGet()
-          da.blockchainUpdater.processMicroBlock(microBlocks1a(0)).explicitGet()
-          da.blockchainUpdater.processBlock(block2a).explicitGet()
-          da.blockchainUpdater.processBlock(block3a).explicitGet()
+          da.blockchainUpdater.processBlock(block0a) should beRight
+          da.blockchainUpdater.processBlock(block1a) should beRight
+          da.blockchainUpdater.processMicroBlock(microBlocks1a(0)) should beRight
+          da.blockchainUpdater.processBlock(block2a) should beRight
+          da.blockchainUpdater.processBlock(block3a) should beRight
 
           da.balance(miner.toAddress)
         }
@@ -170,10 +171,10 @@ class BlockchainUpdaterMicroblockSunnyDayTest
           val block1b = customBuildBlockOfTxs(block0b.id(), Seq(masterToAlice), miner, 3: Byte, ts)
           val block2b = customBuildBlockOfTxs(block1b.id(), Seq(aliceToBob2), miner, 3: Byte, ts)
           val block3b = customBuildBlockOfTxs(block2b.id(), Seq.empty, miner, 3: Byte, ts)
-          db.blockchainUpdater.processBlock(block0b).explicitGet()
-          db.blockchainUpdater.processBlock(block1b).explicitGet()
-          db.blockchainUpdater.processBlock(block2b).explicitGet()
-          db.blockchainUpdater.processBlock(block3b).explicitGet()
+          db.blockchainUpdater.processBlock(block0b) should beRight
+          db.blockchainUpdater.processBlock(block1b) should beRight
+          db.blockchainUpdater.processBlock(block2b) should beRight
+          db.blockchainUpdater.processBlock(block3b) should beRight
 
           db.balance(miner.toAddress)
         }

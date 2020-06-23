@@ -4,8 +4,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.traits.domain._
 import shapeless._
 
-import scala.language.higherKinds
-
 object Environment {
   import io.circe.{Decoder, HCursor}
 
@@ -20,12 +18,15 @@ object Environment {
     } yield BalanceDetails(available, regular, generating, effective)
 
   type InputEntity = Tx :+: Ord :+: PseudoTx :+: CNil
+
+  case class AssetId(id: Array[Byte])
+  type Tthis = Recipient.Address :+: AssetId :+: CNil
 }
 
 trait Environment[F[_]] {
   def chainId: Byte
   def inputEntity: Environment.InputEntity
-  def tthis: Recipient.Address
+  def tthis: Environment.Tthis
   def height: F[Long]
   def transactionById(id: Array[Byte]): F[Option[Tx]]
   def transferTransactionById(id: Array[Byte]): F[Option[Tx.Transfer]]
@@ -40,4 +41,5 @@ trait Environment[F[_]] {
   def multiPaymentAllowed: Boolean
   def txId: ByteStr
   def transferTransactionFromProto(b: Array[Byte]): F[Option[Tx.Transfer]]
+  def dAppAlias: Boolean = false
 }

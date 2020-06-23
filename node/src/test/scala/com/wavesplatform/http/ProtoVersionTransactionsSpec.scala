@@ -22,13 +22,13 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.transfer.{Attachment, MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxVersion, VersionedTransaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{TestWallet, TransactionGen}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers
+import org.scalatest.{Matchers, OptionValues}
 import play.api.libs.json._
 
 class ProtoVersionTransactionsSpec
@@ -37,6 +37,7 @@ class ProtoVersionTransactionsSpec
     with MockFactory
     with TransactionGen
     with Matchers
+    with OptionValues
     with TestWallet {
   import com.wavesplatform.http.ApiMarshallers._
 
@@ -82,7 +83,7 @@ class ProtoVersionTransactionsSpec
         responseAs[JsObject] shouldBe aliasTxJson
       }
 
-      (aliasTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+      (aliasTx.json() \ "chainId").asOpt[Byte].value shouldBe aliasTx.chainId
       decode(base64Tx) shouldBe aliasTx
     }
 
@@ -151,9 +152,9 @@ class ProtoVersionTransactionsSpec
       decode(base64reissueStr) shouldBe reissueTx
       decode(base64BurnStr) shouldBe burnTx
 
-      (issueTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
-      (reissueTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
-      (burnTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+      (issueTx.json() \ "chainId").asOpt[Byte].value shouldBe issueTx.chainId
+      (reissueTx.json() \ "chainId").asOpt[Byte].value shouldBe reissueTx.chainId
+      (burnTx.json() \ "chainId").asOpt[Byte].value shouldBe burnTx.chainId
 
       issueTx.isProtobufVersion shouldBe true
       reissueTx.isProtobufVersion shouldBe true
@@ -178,7 +179,7 @@ class ProtoVersionTransactionsSpec
 
       decode(base64Str) shouldBe dataTx
 
-      (dataTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+      (dataTx.json() \ "chainId").asOpt[Byte].value shouldBe dataTx.chainId
 
       dataTx.isProtobufVersion shouldBe true
     }
@@ -192,7 +193,9 @@ class ProtoVersionTransactionsSpec
       val sellOrder = Order.sell(Order.V3, seller, account.publicKey, assetPair, Order.MaxAmount / 2, 100, Now, Now + Order.MaxLiveTime, MinFee * 3)
 
       val exchangeTx =
-        ExchangeTransaction.signed(TxVersion.V3, account.privateKey, buyOrder, sellOrder, 100, 100, MinFee * 3, MinFee * 3, MinFee * 3, Now).explicitGet()
+        ExchangeTransaction
+          .signed(TxVersion.V3, account.privateKey, buyOrder, sellOrder, 100, 100, MinFee * 3, MinFee * 3, MinFee * 3, Now)
+          .explicitGet()
       val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(exchangeTx)))
 
       Post(routePath("/broadcast"), exchangeTx.json()) ~> ApiKeyHeader ~> route ~> check {
@@ -201,7 +204,7 @@ class ProtoVersionTransactionsSpec
 
       decode(base64Str) shouldBe exchangeTx
 
-      (exchangeTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+      (exchangeTx.json() \ "chainId").asOpt[Byte].value shouldBe exchangeTx.chainId
 
       exchangeTx.isProtobufVersion shouldBe true
     }
@@ -237,7 +240,7 @@ class ProtoVersionTransactionsSpec
 
       decode(base64Str) shouldBe invokeScriptTx
 
-      (invokeScriptTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+      (invokeScriptTx.json() \ "chainId").asOpt[Byte].value shouldBe invokeScriptTx.chainId
 
       invokeScriptTx.isProtobufVersion shouldBe true
     }
@@ -257,7 +260,8 @@ class ProtoVersionTransactionsSpec
         responseAs[JsObject] shouldBe leaseTxJson
       }
 
-      val leaseCancelTxUnsigned = LeaseCancelTransaction.create(TxVersion.V3, account.publicKey, leaseTx.id(), MinFee, Now, Proofs.empty).explicitGet()
+      val leaseCancelTxUnsigned =
+        LeaseCancelTransaction.create(TxVersion.V3, account.publicKey, leaseTx.id(), MinFee, Now, Proofs.empty).explicitGet()
 
       val (leaseCancelProofs, leaseCancelTxJson) = Post(routePath("/sign"), leaseCancelTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
         checkProofs(response, leaseCancelTxUnsigned)
@@ -275,8 +279,8 @@ class ProtoVersionTransactionsSpec
       decode(base64LeaseStr) shouldBe leaseTx
       decode(base64CancelLeaseStr) shouldBe leaseCancelTx
 
-      (leaseTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
-      (leaseCancelTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+      (leaseTx.json() \ "chainId").asOpt[Byte].value shouldBe leaseTx.chainId
+      (leaseCancelTx.json() \ "chainId").asOpt[Byte].value shouldBe leaseCancelTx.chainId
 
       leaseTx.isProtobufVersion shouldBe true
       leaseCancelTx.isProtobufVersion shouldBe true
@@ -285,10 +289,12 @@ class ProtoVersionTransactionsSpec
     "TransferTransaction" in test {
       val recipient  = accountOrAliasGen.sample.get
       val asset      = IssuedAsset(bytes32gen.map(ByteStr(_)).sample.get)
-      val attachment = Some(Attachment.Bin(genBoundedBytes(0, TransferTransaction.MaxAttachmentSize).sample.get))
+      val attachment = genBoundedBytes(0, TransferTransaction.MaxAttachmentSize).sample.get
 
       val transferTxUnsigned =
-        TransferTransaction.create(TxVersion.V3, account.publicKey, recipient, asset, 100, Asset.Waves, MinFee, attachment, Now, Proofs.empty).explicitGet()
+        TransferTransaction
+          .create(TxVersion.V3, account.publicKey, recipient, asset, 100, Asset.Waves, MinFee, ByteStr(attachment), Now, Proofs.empty)
+          .explicitGet()
 
       val (proofs, transferTxJson) = Post(routePath("/sign"), transferTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
         checkProofs(response, transferTxUnsigned)
@@ -303,17 +309,19 @@ class ProtoVersionTransactionsSpec
 
       decode(base64Str) shouldBe transferTx
 
-      (transferTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+      (transferTx.json() \ "chainId").asOpt[Byte].value shouldBe transferTx.chainId
 
       transferTx.isProtobufVersion shouldBe true
     }
 
     "MassTransferTransaction" in test {
       val transfers  = Gen.listOfN(10, accountOrAliasGen).map(accounts => accounts.map(ParsedTransfer(_, 100))).sample.get
-      val attachment = Some(Attachment.Bin(genBoundedBytes(0, TransferTransaction.MaxAttachmentSize).sample.get))
+      val attachment = genBoundedBytes(0, TransferTransaction.MaxAttachmentSize).sample.get
 
       val massTransferTxUnsigned =
-        MassTransferTransaction.create(TxVersion.V2, account.publicKey, Asset.Waves, transfers, MassTransferTxFee, Now, attachment, Proofs.empty).explicitGet()
+        MassTransferTransaction
+          .create(TxVersion.V2, account.publicKey, Asset.Waves, transfers, MassTransferTxFee, Now, ByteStr(attachment), Proofs.empty)
+          .explicitGet()
 
       val (proofs, massTransferTxJson) = Post(routePath("/sign"), massTransferTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
         checkProofs(response, massTransferTxUnsigned)
@@ -328,7 +336,7 @@ class ProtoVersionTransactionsSpec
 
       decode(base64Str) shouldBe massTransferTx
 
-      (massTransferTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+      (massTransferTx.json() \ "chainId").asOpt[Byte].value shouldBe massTransferTx.chainId
 
       massTransferTx.isProtobufVersion shouldBe true
     }
@@ -336,7 +344,8 @@ class ProtoVersionTransactionsSpec
     "SetScriptTransaction" in test {
       val script = scriptGen.sample.get
 
-      val setScriptTxUnsigned = SetScriptTransaction.create(TxVersion.V2, account.publicKey, Some(script), SetScriptFee, Now, Proofs.empty).explicitGet()
+      val setScriptTxUnsigned =
+        SetScriptTransaction.create(TxVersion.V2, account.publicKey, Some(script), SetScriptFee, Now, Proofs.empty).explicitGet()
 
       val (proofs, setScriptTxJson) = Post(routePath("/sign"), setScriptTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
         checkProofs(response, setScriptTxUnsigned)
@@ -351,7 +360,7 @@ class ProtoVersionTransactionsSpec
 
       decode(base64Str) shouldBe setScriptTx
 
-      (setScriptTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+      (setScriptTx.json() \ "chainId").asOpt[Byte].value shouldBe setScriptTx.chainId
     }
 
     "SetAssetScriptTransaction" in test {
@@ -397,7 +406,7 @@ class ProtoVersionTransactionsSpec
 
       decode(base64Str) shouldBe sponsorshipTx
 
-      (sponsorshipTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+      (sponsorshipTx.json() \ "chainId").asOpt[Byte].value shouldBe sponsorshipTx.chainId
 
       sponsorshipTx.isProtobufVersion shouldBe true
     }
@@ -425,7 +434,7 @@ class ProtoVersionTransactionsSpec
 
       decode(base64Str) shouldBe updateAssetInfoTx
 
-      (updateAssetInfoTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+      (updateAssetInfoTx.json() \ "chainId").asOpt[Byte].value shouldBe updateAssetInfoTx.chainId
       (updateAssetInfoTx.json() \ "version").as[Byte] shouldBe TxVersion.V1
     }
 
@@ -433,7 +442,7 @@ class ProtoVersionTransactionsSpec
       response.status shouldBe StatusCodes.OK
 
       (responseAs[JsObject] \ "version").as[Byte] shouldBe tx.version
-      (responseAs[JsObject] \ "senderPublicKey").asOpt[String] shouldBe 'defined
+      (responseAs[JsObject] \ "senderPublicKey").asOpt[String].value should not be empty
 
       val json   = responseAs[JsObject]
       val proofs = (json \ "proofs").as[Proofs]

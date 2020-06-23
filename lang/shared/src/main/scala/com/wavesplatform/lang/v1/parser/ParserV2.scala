@@ -225,7 +225,7 @@ class ParserV2(val input: ParserInput) extends Parser {
   }
 
   def parseLet(startPos: Int, name: PART[String], value: EXPR, endPos: Int): LET = {
-    LET(Pos(startPos, endPos), name, value, Seq.empty)
+    LET(Pos(startPos, endPos), name, value)
   }
 
   def parseFoldExpr(startPos: Int, limitNumStr: String, list: EXPR, acc: EXPR, f: EXPR, endPos: Int): EXPR = {

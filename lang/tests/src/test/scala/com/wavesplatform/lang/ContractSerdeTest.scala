@@ -19,8 +19,7 @@ class ContractSerdeTest extends FreeSpec with PropertyChecks with Matchers with 
     val bytes = ContractSerDe.serialize(c)
     val conEi = bytes.flatMap(ContractSerDe.deserialize)
 
-    conEi shouldBe 'right
-    conEi.right.get shouldBe c
+    conEi shouldBe Right(c)
   }
 
   "roundtrip" - {

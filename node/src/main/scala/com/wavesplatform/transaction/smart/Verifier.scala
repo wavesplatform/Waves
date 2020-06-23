@@ -10,6 +10,8 @@ import com.wavesplatform.lang.v1.compiler.TermPrinter
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
+import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -56,18 +58,13 @@ object Verifier extends ScorexLogging {
   }
 
   def assets(blockchain: Blockchain)(tx: Transaction): TracedResult[ValidationError, Transaction] = {
-    val additionalAssets = tx match {
-      case etx: ExchangeTransaction => Seq(etx.buyOrder.matcherFeeAssetId, etx.sellOrder.matcherFeeAssetId)
-      case _                        => Seq.empty
-    }
-
-    (tx.checkedAssets ++ additionalAssets)
+    tx.checkedAssets
       .flatMap {
         case asset: IssuedAsset => blockchain.assetDescription(asset).flatMap(_.script).map(script => (script, asset))
         case _                  => None
       }
       .foldRight(TracedResult(tx.asRight[ValidationError])) {
-        case (((script, _), id), txr) =>
+        case ((AssetScriptInfo(script, _), id), txr) =>
           txr.flatMap { tx =>
             stats.assetScriptExecution
               .measureForType(tx.typeId)(verifyTx(blockchain, script, tx, Some(id.id)))
@@ -97,7 +94,7 @@ object Verifier extends ScorexLogging {
     val senderAddress = transaction.asInstanceOf[Authorized].sender.toAddress
 
     val txE = Try {
-      val containerAddress = assetIdOpt.getOrElse(ByteStr(senderAddress.bytes))
+      val containerAddress = assetIdOpt.fold(Coproduct[Environment.Tthis](Recipient.Address(ByteStr(senderAddress.bytes))))(v => Coproduct[Environment.Tthis](Environment.AssetId(v.arr)))
       val eval             = ScriptRunner(Coproduct[TxOrd](transaction), blockchain, script, isAsset, containerAddress)
       val scriptResult = eval match {
         case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, assetIdOpt))
@@ -133,7 +130,7 @@ object Verifier extends ScorexLogging {
     for {
       result <- Try {
         val eval =
-          ScriptRunner(Coproduct[ScriptRunner.TxOrd](order), blockchain, script, isAssetScript = false, ByteStr(order.sender.toAddress.bytes))
+          ScriptRunner(Coproduct[ScriptRunner.TxOrd](order), blockchain, script, isAssetScript = false, Coproduct[Environment.Tthis](Recipient.Address(ByteStr(order.sender.toAddress.bytes))))
         val scriptResult = eval match {
           case (log, Left(execError)) => Left(ScriptExecutionError.ByAccountScript(execError, log))
           case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript.ByAccountScript(log))
@@ -176,7 +173,7 @@ object Verifier extends ScorexLogging {
         .accountScript(order.sender.toAddress)
         .map { asi =>
           if (order.version != 1) {
-            stats.orderValidation.measure(verifyOrder(blockchain, asi.script, order))
+            stats.orderValidation.withoutTags().measure(verifyOrder(blockchain, asi.script, order))
           } else {
             Left(GenericError("Can't process order with signature from scripted account"))
           }

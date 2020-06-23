@@ -14,7 +14,6 @@ import com.wavesplatform.transaction.DataTransaction
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
-import scorex.crypto.encode.Base64
 
 class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFailure with NTPTime {
   private val estimator = ScriptEstimatorV2
@@ -31,7 +30,7 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
     super.beforeAll()
     val entry1 = IntegerDataEntry("int", 24)
     val entry2 = BooleanDataEntry("bool", value = true)
-    val entry3 = BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=")))
+    val entry3 = BinaryDataEntry("blob", ByteStr.decodeBase64("YWxpY2U=").get)
     val entry4 = StringDataEntry("str", "test")
 
     dtx = DataTransaction.selfSigned(1.toByte, acc0, List(entry1, entry2, entry3, entry4), minFee, ntpTime.correctedTime()).explicitGet()
@@ -46,7 +45,7 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
       ScriptCompiler(
         s"""
            |match tx {
-           |case s : SetAssetScriptTransaction => true
+           |case _: SetAssetScriptTransaction => true
            |case e: ExchangeTransaction => e.sender == addressFromPublicKey(base58'${acc2.publicKey}')
            |case _ => false}""".stripMargin,
         isAssetScript = true,
@@ -74,7 +73,7 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
       ScriptCompiler(
         s"""
            |match tx {
-           |case s : SetAssetScriptTransaction => true
+           |case _: SetAssetScriptTransaction => true
            |case e: ExchangeTransaction => e.sender == addressFromPublicKey(base58'${acc1.publicKey}')
            |case _ => false}""".stripMargin,
         isAssetScript = true,
@@ -111,7 +110,7 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
                                         |let assetA = base58'$assetA'
                                         |let assetB = base58'$assetB'
                                         |match tx {
-                                        |case s : SetAssetScriptTransaction => true
+                                        |case _: SetAssetScriptTransaction => true
                                         |case e: ExchangeTransaction => (e.sellOrder.assetPair.priceAsset == assetA || e.sellOrder.assetPair.amountAsset == assetA) && (e.sellOrder.assetPair.priceAsset == assetB || e.sellOrder.assetPair.amountAsset == assetB)
                                         |case _ => false}""".stripMargin,
         isAssetScript = true,

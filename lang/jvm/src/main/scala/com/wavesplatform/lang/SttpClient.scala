@@ -28,6 +28,7 @@ class SttpClient {
       else "http://"
 
     sttp.get(uri"${urlPrefix + url}")
+      .header("user-agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36")
       .send()
       .map(r => NodeResponse(r.code, r.body.fold(identity, identity)))
   }

@@ -78,7 +78,7 @@ package object crypto {
 
   def isWeakPublicKey(publicKey: Array[Byte]): Boolean =
     BlacklistedKeys.exists { wk =>
-      publicKey.view.init == wk.view.init &&
+      publicKey.view.init.iterator.sameElements(wk.view.init) &&
       (publicKey.last == wk.last || (publicKey.last & 0xff) == wk.last + 0x80)
     }
 }

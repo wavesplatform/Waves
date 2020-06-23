@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
@@ -40,7 +41,7 @@ class BigLetChain extends BaseTransactionSuite with CancelAfterFailure {
     val scriptSetBroadcast = sender.signedBroadcast(scriptSet.explicitGet().json.value)
     nodes.waitForHeightAriseAndTxPresent(scriptSetBroadcast.id)
 
-    val transfer = TransferTransaction.selfSigned(2.toByte, pkNewAddress, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, None, System.currentTimeMillis())
+    val transfer = TransferTransaction.selfSigned(2.toByte, pkNewAddress, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, ByteStr.empty,  System.currentTimeMillis())
     val transferBroadcast = sender.signedBroadcast(transfer.explicitGet().json.value)
     nodes.waitForHeightAriseAndTxPresent(transferBroadcast.id)
   }

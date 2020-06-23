@@ -8,17 +8,17 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.settings.{BlockchainSettings, SynchronizationSettings}
+import com.wavesplatform.settings.SynchronizationSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.{BaseTargetReachedMaximum, ScorexLogging, forceStopApplication}
 
 import scala.concurrent.duration.FiniteDuration
 
-class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings, syncSettings: SynchronizationSettings) extends ScorexLogging {
+case class PoSSelector(blockchain: Blockchain, syncSettings: SynchronizationSettings) extends ScorexLogging {
   import PoSCalculator._
+  import blockchain.{settings => blockchainSettings}
 
   protected def posCalculator(height: Int): PoSCalculator =
     if (fairPosActivated(height))

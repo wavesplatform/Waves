@@ -7,7 +7,6 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
-import com.wavesplatform.mining.Miner
 import com.wavesplatform.network._
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.BlockchainUpdater
@@ -49,7 +48,6 @@ object BlockAppender extends ScorexLogging {
       pos: PoSSelector,
       allChannels: ChannelGroup,
       peerDatabase: PeerDatabase,
-      miner: Miner,
       scheduler: Scheduler
   )(ch: Channel, newBlock: Block): Task[Unit] = {
     import metrics._
@@ -74,9 +72,7 @@ object BlockAppender extends ScorexLogging {
         span.markNtp("block.applied")
         span.finish()
         BlockStats.applied(newBlock, BlockStats.Source.Broadcast, blockchainUpdater.height)
-
         if (newBlock.transactionData.isEmpty) allChannels.broadcast(BlockForged(newBlock), Some(ch)) // Key block
-        miner.scheduleMining()
 
       case Left(is: InvalidSignature) =>
         peerDatabase.blacklistAndClose(ch, s"Could not append $newBlock: $is")

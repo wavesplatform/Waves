@@ -8,7 +8,7 @@ import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{EitherMatchers, NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -18,6 +18,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
     with PropertyChecks
     with DomainScenarioDrivenPropertyCheck
     with Matchers
+    with EitherMatchers
     with TransactionGen
     with NoShrink {
 
@@ -31,11 +32,11 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
         val finalMinerBalances = rest.map {
           case (bmb: BlockAndMicroblockSequence, last: Block) =>
             withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
-              d.blockchainUpdater.processBlock(gen).explicitGet()
+              d.blockchainUpdater.processBlock(gen) should beRight
               bmb.foreach {
                 case (b, mbs) =>
-                  d.blockchainUpdater.processBlock(b).explicitGet()
-                  mbs.foreach(mb => d.blockchainUpdater.processMicroBlock(mb).explicitGet())
+                  d.blockchainUpdater.processBlock(b) should beRight
+                  mbs.foreach(mb => d.blockchainUpdater.processMicroBlock(mb) should beRight)
               }
               d.blockchainUpdater.processBlock(last)
               d.balance(last.header.generator.toAddress)
@@ -60,10 +61,10 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
         val genBlock       = buildBlockOfTxs(randomSig, Seq(genesis))
         val (base, micros) = chainBaseAndMicro(genBlock.id(), Seq.empty, Seq(Seq(payment)), miner, 3, ts)
         val emptyBlock     = customBuildBlockOfTxs(micros.last.totalResBlockSig, Seq.empty, miner, 3, ts)
-        domain.blockchainUpdater.processBlock(genBlock).explicitGet()
-        domain.blockchainUpdater.processBlock(base).explicitGet()
-        domain.blockchainUpdater.processMicroBlock(micros.head).explicitGet()
-        domain.blockchainUpdater.processBlock(emptyBlock).explicitGet()
+        domain.blockchainUpdater.processBlock(genBlock) should beRight
+        domain.blockchainUpdater.processBlock(base) should beRight
+        domain.blockchainUpdater.processMicroBlock(micros.head) should beRight
+        domain.blockchainUpdater.processBlock(emptyBlock) should beRight
 
         domain.balance(miner.toAddress) shouldBe payment.fee
         domain.balance(genesis.recipient) shouldBe (genesis.amount - payment.fee)
@@ -91,10 +92,10 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
         val genBlock       = buildBlockOfTxs(randomSig, Seq(genesis))
         val (base, micros) = chainBaseAndMicro(genBlock.id(), Seq.empty, microBlockTxs, miner, 3, ts)
         val emptyBlock     = customBuildBlockOfTxs(micros.last.totalResBlockSig, Seq.empty, miner, 3, ts)
-        domain.blockchainUpdater.processBlock(genBlock).explicitGet()
-        domain.blockchainUpdater.processBlock(base).explicitGet()
-        micros.foreach(domain.blockchainUpdater.processMicroBlock(_).explicitGet())
-        domain.blockchainUpdater.processBlock(emptyBlock).explicitGet()
+        domain.blockchainUpdater.processBlock(genBlock) should beRight
+        domain.blockchainUpdater.processBlock(base) should beRight
+        micros.foreach(domain.blockchainUpdater.processMicroBlock(_) should beRight)
+        domain.blockchainUpdater.processBlock(emptyBlock) should beRight
 
         domain.levelDBWriter.lastBlock.get.transactionData shouldBe microBlockTxs.flatten
     }

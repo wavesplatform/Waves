@@ -29,7 +29,7 @@ class CommonScriptEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV
         CONST_LONG(1)
       )
     )
-    estimate(functionCosts(V3), expr) shouldBe 'left
+    estimate(functionCosts(V3), expr) shouldBe Symbol("left")
   }
 
   property("func decl overlapping inside let") {

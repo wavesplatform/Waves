@@ -7,16 +7,15 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatureStatus
-import com.wavesplatform.features.FeatureProvider._
-import com.wavesplatform.history
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.state._
+import com.wavesplatform.{EitherMatchers, history}
 import org.scalatest.words.ShouldVerb
 import org.scalatest.{FreeSpec, Matchers}
 
 import scala.util.Try
 
-class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with ShouldVerb with WithDomain {
+class BlockchainUpdaterTest extends FreeSpec with Matchers with EitherMatchers with HistoryTest with ShouldVerb with WithDomain {
 
   private val ApprovalPeriod = 100
 
@@ -89,7 +88,7 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
     b.featureStatus(2, 1) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 until ApprovalPeriod).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq(1))).explicitGet()
+      b.processBlock(getNextTestBlockWithVotes(b, Seq(1))) should beRight
     }
 
     b.height shouldBe ApprovalPeriod
@@ -103,7 +102,7 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
     b.featureStatus(2, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 to ApprovalPeriod + 1).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq(2))).explicitGet()
+      b.processBlock(getNextTestBlockWithVotes(b, Seq(2))) should beRight
     }
 
     b.height shouldBe 2 * ApprovalPeriod
@@ -116,7 +115,7 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
     b.featureStatus(1, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Approved
     b.featureStatus(2, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
 
-    b.processBlock(getNextTestBlockWithVotes(b, Seq.empty)).explicitGet()
+    b.processBlock(getNextTestBlockWithVotes(b, Seq.empty)) should beRight
 
     b.height shouldBe 2 * ApprovalPeriod
     b.featureStatus(1, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Activated
@@ -145,13 +144,13 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
     b.featureActivationHeight(1) shouldBe None
 
     (1 until ApprovalPeriod).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq(1))).explicitGet()
+      b.processBlock(getNextTestBlockWithVotes(b, Seq(1))) should beRight
     }
 
     b.featureActivationHeight(1) shouldBe Some(ApprovalPeriod * 2)
 
     (1 to ApprovalPeriod).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq(1))).explicitGet()
+      b.processBlock(getNextTestBlockWithVotes(b, Seq(1))) should beRight
     }
 
     b.featureActivationHeight(1) shouldBe Some(ApprovalPeriod * 2)
@@ -165,17 +164,17 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
     b.featureStatus(1, 1) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 until ApprovalPeriod).foreach { i =>
-      b.processBlock(getNextTestBlockWithVotes(b, if (i % 2 == 0) Seq(1) else Seq())).explicitGet()
+      b.processBlock(getNextTestBlockWithVotes(b, if (i % 2 == 0) Seq(1) else Seq())) should beRight
     }
     b.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 to ApprovalPeriod).foreach { i =>
-      b.processBlock(getNextTestBlockWithVotes(b, if (i % 10 == 0) Seq() else Seq(1))).explicitGet()
+      b.processBlock(getNextTestBlockWithVotes(b, if (i % 10 == 0) Seq() else Seq(1))) should beRight
     }
     b.featureStatus(1, ApprovalPeriod * 2) shouldBe BlockchainFeatureStatus.Approved
 
     (1 to ApprovalPeriod).foreach { i =>
-      b.processBlock(getNextTestBlock(b)).explicitGet()
+      b.processBlock(getNextTestBlock(b)) should beRight
     }
     b.featureStatus(1, ApprovalPeriod * 3) shouldBe BlockchainFeatureStatus.Activated
   }
@@ -225,7 +224,7 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
     b.processBlock(genesisBlock)
 
     (1 to ApprovalPeriod * 2 - 2).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq(-1))).explicitGet()
+      b.processBlock(getNextTestBlockWithVotes(b, Seq(-1))) should beRight
     }
 
     Try(b.processBlock(getNextTestBlockWithVotes(b, Seq(-1)))).recover {
@@ -242,11 +241,11 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
     b.processBlock(genesisBlock)
 
     (1 until ApprovalPeriod * 2 - 1).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq(1))).explicitGet()
+      b.processBlock(getNextTestBlockWithVotes(b, Seq(1))) should beRight
     }
 
     b.featureStatus(1, b.height) should be(BlockchainFeatureStatus.Approved)
-    b.processBlock(getNextTestBlockWithVotes(b, Seq(1))).explicitGet()
+    b.processBlock(getNextTestBlockWithVotes(b, Seq(1))) should beRight
     b.featureStatus(1, b.height) should be(BlockchainFeatureStatus.Activated)
   }
 
@@ -256,37 +255,37 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
     b.processBlock(genesisBlock)
     // Start from 1 because of the genesis block
     (1 until ApprovalPeriod - 1).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq(1))).explicitGet()
+      b.processBlock(getNextTestBlockWithVotes(b, Seq(1))) should beRight
     }
 
     b.featureStatus(1, b.height) should be(BlockchainFeatureStatus.Undefined)
-    b.processBlock(getNextTestBlockWithVotes(b, Seq(1))).explicitGet()
+    b.processBlock(getNextTestBlockWithVotes(b, Seq(1))) should beRight
     b.featureStatus(1, b.height) should be(BlockchainFeatureStatus.Approved)
 
     (0 until ApprovalPeriod - 1).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq())).explicitGet()
+      b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
     }
 
     b.featureStatus(1, b.height) should be(BlockchainFeatureStatus.Approved)
-    b.processBlock(getNextTestBlockWithVotes(b, Seq())).explicitGet()
+    b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
     b.featureStatus(1, b.height) should be(BlockchainFeatureStatus.Activated)
 
     (0 until ApprovalPeriod * 2).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq())).explicitGet()
+      b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
     }
 
     (0 until ApprovalPeriod - 1).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq(2))).explicitGet()
+      b.processBlock(getNextTestBlockWithVotes(b, Seq(2))) should beRight
     }
     b.featureStatus(2, b.height) should be(BlockchainFeatureStatus.Undefined)
-    b.processBlock(getNextTestBlockWithVotes(b, Seq(2))).explicitGet()
+    b.processBlock(getNextTestBlockWithVotes(b, Seq(2))) should beRight
     b.featureStatus(2, b.height) should be(BlockchainFeatureStatus.Approved)
 
     (0 until ApprovalPeriod - 1).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq())).explicitGet()
+      b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
     }
     b.featureStatus(2, b.height) should be(BlockchainFeatureStatus.Approved)
-    b.processBlock(getNextTestBlockWithVotes(b, Seq())).explicitGet()
+    b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
     b.featureStatus(2, b.height) should be(BlockchainFeatureStatus.Activated)
   }
 
@@ -296,27 +295,27 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
     b.processBlock(genesisBlock)
     // Start from 1 because of the genesis block
     (1 until ApprovalPeriod * 2 - 1).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq(1))).explicitGet()
+      b.processBlock(getNextTestBlockWithVotes(b, Seq(1))) should beRight
     }
 
     b.featureStatus(1, b.height) should be(BlockchainFeatureStatus.Approved)
-    b.processBlock(getNextTestBlockWithVotes(b, Seq(1))).explicitGet()
+    b.processBlock(getNextTestBlockWithVotes(b, Seq(1))) should beRight
     b.featureStatus(1, b.height) should be(BlockchainFeatureStatus.Activated)
 
     // 200 blocks passed
     (0 until ApprovalPeriod - 1).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq(2))).explicitGet()
+      b.processBlock(getNextTestBlockWithVotes(b, Seq(2))) should beRight
     }
     b.featureStatus(2, b.height) should be(BlockchainFeatureStatus.Undefined)
-    b.processBlock(getNextTestBlockWithVotes(b, Seq(2))).explicitGet()
+    b.processBlock(getNextTestBlockWithVotes(b, Seq(2))) should beRight
     b.featureStatus(2, b.height) should be(BlockchainFeatureStatus.Approved)
 
     // 300 blocks passed, the activation period should be doubled now
     (0 until ApprovalPeriod - 1).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq())).explicitGet()
+      b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
     }
     b.featureStatus(2, b.height) should be(BlockchainFeatureStatus.Approved)
-    b.processBlock(getNextTestBlockWithVotes(b, Seq())).explicitGet()
+    b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
     b.featureStatus(2, b.height) should be(BlockchainFeatureStatus.Activated)
   }
 
@@ -326,37 +325,37 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
     b.processBlock(genesisBlock)
     // Start from 1 because of the genesis block
     (1 until ApprovalPeriod - 1).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq(1))).explicitGet()
+      b.processBlock(getNextTestBlockWithVotes(b, Seq(1))) should beRight
     }
 
     b.featureStatus(1, b.height) should be(BlockchainFeatureStatus.Undefined)
-    b.processBlock(getNextTestBlockWithVotes(b, Seq(1))).explicitGet()
+    b.processBlock(getNextTestBlockWithVotes(b, Seq(1))) should beRight
     b.featureStatus(1, b.height) should be(BlockchainFeatureStatus.Approved)
 
     (0 until ApprovalPeriod - 1).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq())).explicitGet()
+      b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
     }
 
     b.featureStatus(1, b.height) should be(BlockchainFeatureStatus.Approved)
-    b.processBlock(getNextTestBlockWithVotes(b, Seq())).explicitGet()
+    b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
     b.featureStatus(1, b.height) should be(BlockchainFeatureStatus.Activated)
 
     (0 until ApprovalPeriod * 2).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq())).explicitGet()
+      b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
     }
 
     (0 until ApprovalPeriod * 2 - 1).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq(2))).explicitGet()
+      b.processBlock(getNextTestBlockWithVotes(b, Seq(2))) should beRight
     }
     b.featureStatus(2, b.height) should be(BlockchainFeatureStatus.Undefined)
-    b.processBlock(getNextTestBlockWithVotes(b, Seq(2))).explicitGet()
+    b.processBlock(getNextTestBlockWithVotes(b, Seq(2))) should beRight
     b.featureStatus(2, b.height) should be(BlockchainFeatureStatus.Approved)
 
     (0 until ApprovalPeriod * 2 - 1).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq())).explicitGet()
+      b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
     }
     b.featureStatus(2, b.height) should be(BlockchainFeatureStatus.Approved)
-    b.processBlock(getNextTestBlockWithVotes(b, Seq())).explicitGet()
+    b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
     b.featureStatus(2, b.height) should be(BlockchainFeatureStatus.Activated)
   }
 }

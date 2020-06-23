@@ -108,7 +108,7 @@ object AsyncGrpcApi {
         version: Int = 2,
         assetId: String = "WAVES",
         feeAssetId: String = "WAVES",
-        attachment: Attachment.Attachment = Attachment.Attachment.Empty,
+        attachment: ByteString = ByteString.EMPTY,
         timestamp: Long = System.currentTimeMillis
     ): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
@@ -121,7 +121,7 @@ object AsyncGrpcApi {
           TransferTransactionData.of(
             Some(recipient),
             Some(Amount.of(if (assetId == "WAVES") ByteString.EMPTY else ByteString.copyFrom(Base58.decode(assetId)), amount)),
-            Some(Attachment(attachment))
+            attachment
           )
         )
       )
@@ -232,7 +232,7 @@ object AsyncGrpcApi {
         )
       )
 
-      val proofs      = crypto.sign(matcher.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).right.get.bodyBytes())
+      val proofs      = crypto.sign(matcher.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
       val transaction = SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs.arr)))
 
       transactions.broadcast(transaction)
@@ -370,7 +370,7 @@ object AsyncGrpcApi {
           MassTransferTransactionData.of(
             if (assetId.isDefined) ByteString.copyFrom(Base58.decode(assetId.get)) else ByteString.EMPTY,
             transfers,
-            if (attachment.isEmpty) None else Some(Attachment.of(Attachment.Attachment.BinaryValue(attachment)))
+            attachment
           )
         )
       )

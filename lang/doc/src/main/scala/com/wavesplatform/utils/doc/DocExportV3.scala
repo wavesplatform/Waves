@@ -9,7 +9,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, Expression, V3}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 object DocExportV3 {
   def main(args: Array[String]): Unit = {

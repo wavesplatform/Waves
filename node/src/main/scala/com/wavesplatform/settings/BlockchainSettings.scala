@@ -63,7 +63,6 @@ case class FunctionalitySettings(
     featureCheckBlocksPeriod: Int,
     blocksForFeatureActivation: Int,
     generationBalanceDepthFrom50To1000AfterHeight: Int = 0,
-    resetEffectiveBalancesAtHeight: Int = 0,
     blockVersion3AfterHeight: Int = 0,
     preActivatedFeatures: Map[Short, Int] = Map.empty,
     doubleFeaturesPeriodsAfterHeight: Int,
@@ -112,7 +111,6 @@ object FunctionalitySettings {
     blocksForFeatureActivation = 4000,
     generationBalanceDepthFrom50To1000AfterHeight = 232000,
     lastTimeBasedForkParameter = 1530161445559L,
-    resetEffectiveBalancesAtHeight = 462000,
     blockVersion3AfterHeight = 795000,
     doubleFeaturesPeriodsAfterHeight = 810000,
     estimatorPreCheckHeight = 1847610
@@ -121,7 +119,6 @@ object FunctionalitySettings {
   val TESTNET = apply(
     featureCheckBlocksPeriod = 3000,
     blocksForFeatureActivation = 2700,
-    resetEffectiveBalancesAtHeight = 51500,
     blockVersion3AfterHeight = 161700,
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
     lastTimeBasedForkParameter = 1492560000000L,
@@ -205,8 +202,7 @@ case class BlockchainSettings(
     addressSchemeCharacter: Char,
     functionalitySettings: FunctionalitySettings,
     genesisSettings: GenesisSettings,
-    rewardsSettings: RewardsSettings,
-    useEvaluatorV2: Boolean
+    rewardsSettings: RewardsSettings
 )
 
 object BlockchainType extends Enumeration {
@@ -239,12 +235,12 @@ object BlockchainSettings {
         val rewardsSettings        = config.as[RewardsSettings](s"custom.rewards")
         (addressSchemeCharacter, functionalitySettings, genesisSettings, rewardsSettings)
     }
+
     BlockchainSettings(
       addressSchemeCharacter = addressSchemeCharacter,
       functionalitySettings = functionalitySettings,
       genesisSettings = genesisSettings,
-      rewardsSettings = rewardsSettings,
-      useEvaluatorV2 = false
+      rewardsSettings = rewardsSettings
     )
   }
 }

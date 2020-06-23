@@ -5,7 +5,6 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.crypto._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
@@ -19,8 +18,7 @@ package object history {
     addressSchemeCharacter = 'N',
     functionalitySettings = TestFunctionalitySettings.Enabled,
     genesisSettings = GenesisSettings.TESTNET,
-    rewardsSettings = RewardsSettings.TESTNET,
-    useEvaluatorV2 = false
+    rewardsSettings = RewardsSettings.TESTNET
   )
 
   val config   = ConfigFactory.load()
@@ -42,7 +40,7 @@ package object history {
     featuresSettings = settings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
   )
 
-  val defaultSigner          = KeyPair(ByteStr(new Array[Byte](KeyLength)))
+  val defaultSigner          = TestValues.keyPair
   val generationSignature    = ByteStr(new Array[Byte](Block.GenerationSignatureLength))
   val generationVRFSignature = ByteStr(new Array[Byte](Block.GenerationVRFSignatureLength))
 

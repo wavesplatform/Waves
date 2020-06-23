@@ -16,14 +16,8 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       tx.feeAssetId.map(_.byteStr),
       tx.assetId.map(_.byteStr),
       tx.amount,
-      Address(tx.recipient.byteStr),
-      (tx.attachment match {
-        case ANothing => EmptyAttachment
-        case AStr(v) => StringValue(v)
-        case ABoolean(v) => BooleanValue(v)
-        case ABytes(v) => ByteStrValue(v.byteStr)
-        case AInt(v) => IntValue(v)
-      })
+      tx.recipient,
+      tx.attachment.byteStr
     )
 
   def toRideModelO(tx: TransferTransaction): Option[Transfer] =
@@ -58,13 +52,13 @@ private[node] class ChainDependentMapper(chainId: Byte) {
 
   def toRideModel(b: BlockInfoResponse): BlockInfo =
     BlockInfo(
-      b.timestamp,
-      b.height,
-      b.`nxt-consensus`.`base-target`,
-      b.`nxt-consensus`.`generation-signature`.byteStr,
-      pkToAddress(b.generator),
-      b.generator.byteStr,
-      b.VRF.map(_.byteStr)
+      timestamp = b.timestamp,
+      height = b.height,
+      baseTarget = b.`nxt-consensus`.`base-target`,
+      generationSignature = b.`nxt-consensus`.`generation-signature`.byteStr,
+      generator = b.generator.byteStr,
+      generatorPublicKey = b.generatorPublicKey.byteStr,
+      vrf = b.VRF.map(_.byteStr)
     )
 
 

@@ -4,7 +4,6 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import com.wavesplatform.transaction.transfer.Attachment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import io.grpc.{Metadata, Status => GrpcStatus}
 import play.api.libs.json._
@@ -121,7 +120,6 @@ class Transaction(val _type: Int,
                   val  name: Option[String],
                   val  amount: Option[Long],
                   val  description: Option[String],
-                  val  typedAttachment: Option[Attachment],
                   val  attachment: Option[String],
                   val  price: Option[Long],
                   val  sellMatcherFee: Option[Long],
@@ -156,7 +154,6 @@ object Transaction {
                   name: Option[String],
                   amount: Option[Long],
                   description: Option[String],
-                  typedAttachment: Option[Attachment],
                   attachment: Option[String],
                   price: Option[Long],
                   sellMatcherFee: Option[Long],
@@ -180,7 +177,6 @@ object Transaction {
                   name,
                   amount,
                   description,
-                  typedAttachment,
                   attachment,
                   price,
                   sellMatcherFee,
@@ -209,14 +205,8 @@ object Transaction {
         name <- (jsv \ "name").validateOpt[String]
         amount <- (jsv \ "amount").validateOpt[Long]
         description <- (jsv \ "description").validateOpt[String]
-        typedAttachment <- version match {
-          case Some(v) if v > 2 && _type == 4 => (jsv \ "attachment").validateOpt[Attachment]
-          case Some(v) if v > 1 && _type == 11 => (jsv \ "attachment").validateOpt[Attachment]
-          case _ => JsSuccess(None)
-        }
         attachment <- version match {
-          case Some(v) if v < 3 && _type == 4 => (jsv \ "attachment").validateOpt[String]
-          case Some(v) if v < 2 && _type == 11 => (jsv \ "attachment").validateOpt[String]
+          case Some(v) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
           case _ => JsSuccess(None)
         }
         price <- (jsv \ "price").validateOpt[Long]
@@ -243,7 +233,6 @@ object Transaction {
           name,
           amount,
           description,
-          typedAttachment,
           attachment,
           price,
           sellMatcherFee,
@@ -503,8 +492,8 @@ case class TransferTransactionInfo(
                             height: Int,
                             recipient: Option[String],
                             version: Option[Byte],
-                            typedAttachment: Option[Attachment],
                             attachment: Option[String],
+                            proofs: Option[Seq[String]]
                           )
 object TransferTransactionInfo {
   implicit val transactionFormat: Format[TransferTransactionInfo] = Format(
@@ -521,16 +510,11 @@ object TransferTransactionInfo {
         recipient <- (jsv \ "recipient").validateOpt[String]
         version <- (jsv \ "version").validateOpt[Byte]
         chainId <- (jsv \ "chainId").validateOpt[Byte]
-        typedAttachment <- version match {
-          case Some(v) if v > 2 && _type == 4 => (jsv \ "attachment").validateOpt[Attachment]
-          case Some(v) if v > 1 && _type == 11 => (jsv \ "attachment").validateOpt[Attachment]
-          case _ => JsSuccess(None)
-        }
         attachment <- version match {
-          case Some(v) if v < 3 && _type == 4 => (jsv \ "attachment").validateOpt[String]
-          case Some(v) if v < 2 && _type == 11 => (jsv \ "attachment").validateOpt[String]
+          case Some(v) if _type == 4  || _type == 11 => (jsv \ "attachment").validateOpt[String]
           case _ => JsSuccess(None)
         }
+        proofs <- (jsv \ "proofs").validateOpt[Seq[String]]
       }
         yield TransferTransactionInfo(
           _type,
@@ -543,8 +527,8 @@ object TransferTransactionInfo {
           height,
           recipient,
           version,
-          typedAttachment,
-          attachment
+          attachment,
+          proofs
         )),
     Json.writes[TransferTransactionInfo]
   )
@@ -561,7 +545,6 @@ case class MassTransferTransactionInfo(
                                 height: Int,
                                 recipient: Option[String],
                                 version: Option[Byte],
-                                typedAttachment: Option[Attachment],
                                 attachment: Option[String],
                                 transfers: Option[Seq[Transfer]],
                                 totalAmount: Option[Long]
@@ -580,14 +563,8 @@ object MassTransferTransactionInfo {
         recipient <- (jsv \ "recipient").validateOpt[String]
         version <- (jsv \ "version").validateOpt[Byte]
         chainId <- (jsv \ "chainId").validateOpt[Byte]
-        typedAttachment <- version match {
-          case Some(v) if v > 2 && _type == 4 => (jsv \ "attachment").validateOpt[Attachment]
-          case Some(v) if v > 1 && _type == 11 => (jsv \ "attachment").validateOpt[Attachment]
-          case _ => JsSuccess(None)
-        }
         attachment <- version match {
-          case Some(v) if v < 3 && _type == 4 => (jsv \ "attachment").validateOpt[String]
-          case Some(v) if v < 2 && _type == 11 => (jsv \ "attachment").validateOpt[String]
+          case Some(v) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
           case _ => JsSuccess(None)
         }
         transfers <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
@@ -604,7 +581,6 @@ object MassTransferTransactionInfo {
           height,
           recipient,
           version,
-          typedAttachment,
           attachment,
           transfers,
           totalAmount

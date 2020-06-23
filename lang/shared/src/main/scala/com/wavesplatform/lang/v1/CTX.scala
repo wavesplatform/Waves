@@ -30,7 +30,7 @@ case class CTX[C[_[_]]](
     EvaluationContext(
       env,
       typeDefs,
-      vars.mapValues(v => LazyVal.fromEval(v._2(env))),
+      vars.view.mapValues(v => LazyVal.fromEval(v._2(env))).toMap,
       functions.map(f => f.header -> f).toMap
     )
   }
@@ -43,7 +43,7 @@ case class CTX[C[_[_]]](
 
   lazy val compilerContext: CompilerContext = CompilerContext(
     typeDefs,
-    vars.mapValues(v => VariableInfo(AnyPos, v._1)),
+    vars.view.mapValues(v => VariableInfo(AnyPos, v._1)).toMap,
     functions.groupBy(_.name).map { case (k, v) => k -> FunctionInfo(AnyPos, v.map(_.signature).toList) }
   )
 
@@ -57,12 +57,12 @@ case class CTX[C[_[_]]](
 
   lazy val decompilerContext: DecompilerContext = DecompilerContext(
     opCodes = compilerContext.functionDefs
-      .mapValues(_.fSigList.map(_.header).filter(_.isInstanceOf[Native]).map(_.asInstanceOf[Native].name))
+      .view.mapValues(_.fSigList.map(_.header).filter(_.isInstanceOf[Native]).map(_.asInstanceOf[Native].name))
       .toList
       .flatMap { case (name, codes) => codes.map((_, name)) }
       .toMap,
     binaryOps = compilerContext.functionDefs
-      .filterKeys(opsNames(_))
+      .view.filterKeys(opsNames(_))
       .mapValues(
         _.fSigList.map(_.header)
           .filter(_.isInstanceOf[Native])

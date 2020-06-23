@@ -23,7 +23,7 @@ class SmartNoSmartBenchmark {
   def smartExchangeTX_test(st: ExchangeTransactionSt, bh: Blackhole): Unit = {
     import st._
     val exchangeTransaction = ExchangeTransaction.create(TxVersion.V2, buy, sell, 2, 5000000000L, 1, 1, 1, 1526992336241L, proofs)
-    bh.consume(exchangeTransaction.right.get)
+    bh.consume(exchangeTransaction.explicitGet())
   }
 
   @Benchmark

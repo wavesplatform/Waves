@@ -22,7 +22,7 @@ import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.utils._
 import io.grpc.Status.Code
@@ -391,7 +391,7 @@ object SyncHttpApi extends Assertions {
         fee: Long = minFee,
         assetId: Option[String] = None,
         feeAssetId: Option[String] = None,
-        attachment: Option[Attachment] = None,
+        attachment: ByteStr = ByteStr.empty,
         version: Byte = TxVersion.V2,
         waitForTx: Boolean = false
     ): Transaction = {
@@ -456,12 +456,11 @@ object SyncHttpApi extends Assertions {
         assetId: Option[String] = None,
         feeAssetId: Option[String] = None,
         version: Byte = TxVersion.V2,
-        typedAttachment: Option[Attachment] = None,
         attachment: Option[String] = None,
         waitForTx: Boolean = false
     ): Transaction = {
       maybeWaitForTransaction(
-        sync(async(n).transfer(sourceAddress, recipient, amount, fee, assetId, feeAssetId, version, typedAttachment, attachment)),
+        sync(async(n).transfer(sourceAddress, recipient, amount, fee, assetId, feeAssetId, version, attachment)),
         waitForTx
       )
     }
@@ -471,14 +470,13 @@ object SyncHttpApi extends Assertions {
         transfers: List[Transfer],
         fee: Long,
         version: TxVersion = TxVersion.V2,
-        typedAttachment: Option[Attachment] = None,
         attachment: Option[String] = None,
         assetId: Option[String] = None,
         waitForTx: Boolean = false,
         amountsAsStrings: Boolean = false
     ): Transaction = {
       maybeWaitForTransaction(
-        sync(async(n).massTransfer(sourceAddress, transfers, fee, version, typedAttachment, attachment, assetId, amountsAsStrings)),
+        sync(async(n).massTransfer(sourceAddress, transfers, fee, version, attachment, assetId, amountsAsStrings)),
         waitForTx
       )
     }
@@ -786,7 +784,7 @@ object SyncHttpApi extends Assertions {
     ): Boolean =
       sync(async(nodes).waitForSameBlockHeadersAt(height, retryInterval), conditionAwaitTime)
 
-    def waitFor[A](desc: String)(retryInterval: FiniteDuration)(request: Node => A, cond: Iterable[A] => Boolean): Boolean =
+    def waitFor[A](desc: String, retryInterval: FiniteDuration = 1.second)(request: Node => A)(cond: Iterable[A] => Boolean): Boolean =
       sync(
         async(nodes).waitFor(desc)(retryInterval)((n: Node) => Future(request(n))(scala.concurrent.ExecutionContext.Implicits.global), cond),
         ConditionAwaitTime

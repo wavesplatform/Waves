@@ -65,7 +65,7 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
       case (genesis, setDApp, ci, activation) =>
         assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), features(activation)) { r =>
           if (activation) r should produce("AccountBalanceError")
-          else r shouldBe 'right
+          else r.explicitGet()
         }
     }
   }

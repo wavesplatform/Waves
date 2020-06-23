@@ -12,7 +12,7 @@ object ErrorMessageEnvironment extends Environment[Future] {
   override def chainId: Byte                                                                                           = 0
   override def height: Future[Long]                                                                                    = unavailable
   override def inputEntity: InputEntity                                                                                = unavailable
-  override def tthis: Recipient.Address                                                                                = unavailable
+  override def tthis: Environment.Tthis                                                                                = unavailable
   override def transactionById(id: Array[Byte]): Future[Option[Tx]]                                                    = unavailable
   override def transferTransactionById(id: Array[Byte]): Future[Option[Tx.Transfer]]                                   = unavailable
   override def transactionHeightById(id: Array[Byte]): Future[Option[Long]]                                            = unavailable

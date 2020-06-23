@@ -13,14 +13,12 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |  data-directory = "/waves/data"
         |  blockchain {
         |    type = CUSTOM
-        |    use-evaluator-v2 = true
         |    custom {
         |      address-scheme-character = "C"
         |      functionality {
         |        feature-check-blocks-period = 10000
         |        blocks-for-feature-activation = 9000
         |        generation-balance-depth-from-50-to-1000-after-height = 4
-        |        reset-effective-balances-at-height = 15
         |        block-version-3-after-height = 18
         |        pre-activated-features {
         |          19 = 100
@@ -58,7 +56,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.featureCheckBlocksPeriod should be(10000)
     settings.functionalitySettings.blocksForFeatureActivation should be(9000)
     settings.functionalitySettings.generationBalanceDepthFrom50To1000AfterHeight should be(4)
-    settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(15)
     settings.functionalitySettings.blockVersion3AfterHeight should be(18)
     settings.functionalitySettings.preActivatedFeatures should be(Map(19 -> 100, 20 -> 200))
     settings.functionalitySettings.doubleFeaturesPeriodsAfterHeight should be(21)
@@ -77,7 +74,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.genesisSettings.transactions should be(
       Seq(GenesisTransactionSettings("BASE58ADDRESS1", 50000000000001L), GenesisTransactionSettings("BASE58ADDRESS2", 49999999999999L))
     )
-    settings.useEvaluatorV2 shouldBe false
   }
 
   it should "read testnet settings" in {
@@ -92,7 +88,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
 
     settings.addressSchemeCharacter should be('T')
     settings.functionalitySettings.generationBalanceDepthFrom50To1000AfterHeight should be(0)
-    settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(51500)
     settings.functionalitySettings.blockVersion3AfterHeight should be(161700)
     settings.functionalitySettings.maxTransactionTimeBackOffset should be(120.minutes)
     settings.functionalitySettings.maxTransactionTimeForwardOffset should be(90.minutes)
@@ -116,7 +111,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         GenesisTransactionSettings("3N18z4B8kyyQ96PhN5eyhCAbg4j49CgwZJx", 9000000000000000L)
       )
     )
-    settings.useEvaluatorV2 shouldBe false
   }
 
   it should "read mainnet settings" in {
@@ -131,7 +125,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
 
     settings.addressSchemeCharacter should be('W')
     settings.functionalitySettings.generationBalanceDepthFrom50To1000AfterHeight should be(232000L)
-    settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(462000)
     settings.functionalitySettings.maxTransactionTimeBackOffset should be(120.minutes)
     settings.functionalitySettings.maxTransactionTimeForwardOffset should be(90.minutes)
     settings.rewardsSettings.initial should be(600000000)
@@ -154,6 +147,5 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         GenesisTransactionSettings("3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6J", 100000000L)
       )
     )
-    settings.useEvaluatorV2 shouldBe false
   }
 }

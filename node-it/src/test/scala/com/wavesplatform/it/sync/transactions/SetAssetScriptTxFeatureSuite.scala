@@ -67,7 +67,7 @@ class SetAssetScriptTxFeatureSuite extends BaseTransactionSuite {
       .compile(
         s"""
            |match tx {
-           |  case s : SetAssetScriptTransaction => true
+           |  case _: SetAssetScriptTransaction => true
            |  case _ => false
            |}""".stripMargin,
         ScriptEstimatorV2

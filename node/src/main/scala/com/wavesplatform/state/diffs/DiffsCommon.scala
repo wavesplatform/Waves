@@ -5,7 +5,6 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.ComplexityCheckPolicyProvider._
 import com.wavesplatform.features.EstimatorProvider._
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
@@ -23,7 +22,7 @@ object DiffsCommon {
   def getScriptsComplexity(blockchain: Blockchain, tx: ProvenTransaction): Long = {
     val assetsComplexity = tx.checkedAssets.toList
       .flatMap(blockchain.assetScript)
-      .map(_._2)
+      .map(_.complexity)
 
     val accountComplexity = blockchain
       .accountScript(tx.sender.toAddress)

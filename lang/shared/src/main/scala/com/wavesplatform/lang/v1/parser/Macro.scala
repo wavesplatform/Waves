@@ -19,7 +19,7 @@ object Macro {
     implicit def ref(v: String): REF             = REF(pos, "$" + v + id)
     implicit def long(l: Long): CONST_LONG       = CONST_LONG(pos, l)
 
-    def let(name: String, value: EXPR)              = LET(pos, "$" + name + id, value, Nil)
+    def let(name: String, value: EXPR)              = LET(pos, "$" + name + id, value)
     def block(decl: Declaration, expr: EXPR)        = BLOCK(pos, decl, expr)
     def call(func: PART[String], args: List[EXPR])  = FUNCTION_CALL(pos, func, args)
 

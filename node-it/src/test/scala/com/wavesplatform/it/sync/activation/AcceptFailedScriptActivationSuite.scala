@@ -9,6 +9,7 @@ import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionStatus
 import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.transactions.OverflowBlock
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{NTPTime, NodeConfigs}
@@ -22,7 +23,7 @@ import play.api.libs.json.JsObject
 
 import scala.concurrent.duration._
 
-class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTime {
+class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTime with OverflowBlock {
   import AcceptFailedScriptActivationSuite._
 
   private val (dApp, dAppKP)               = (firstAddress, pkByAddress(firstAddress))
@@ -49,7 +50,10 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
          |
          |@Callable(i)
          |func error() = {
-         |  throw("Error in DApp")
+         |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 20} true
+         |  if (check)
+         |    then throw("Error in DApp")
+         |    else throw("Error in DApp")
          |}
          |
          |@Callable(i)
@@ -63,22 +67,18 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
   }
 
   test("reject failed transaction before activation height") {
+    overflowBlock()
+    sender.setAssetScript(asset, dApp, priorityFee, assetScript(false))
     val txs =
       (1 to MaxTxsInMicroBlock * 2).map { _ =>
         sender.invokeScript(caller, dApp, Some("transfer"), fee = minInvokeFee)._1.id
       }
-
-    sender.setAssetScript(asset, dApp, priorityFee, assetScript(false), waitForTx = true)
-
     sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
 
     def check(): Unit = {
-      val statuses = sender.transactionStatus(txs).sortWith { case (f, s) => txs.indexOf(f.status) < txs.indexOf(s.status) }
-      val failed   = statuses.dropWhile(s => s.status == "confirmed")
-
-      failed.size should be > 0
-      all(failed.map(_.status)) shouldBe "not_found"
-      all(failed.map(_.applicationStatus)) shouldBe None
+      val statuses = sender.transactionStatus(txs)
+      all(statuses.map(_.status)) shouldBe "not_found"
+      all(statuses.map(_.applicationStatus)) shouldBe None
     }
 
     check() // liquid
@@ -104,13 +104,12 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     sender.waitForHeight(ActivationHeight)
 
     sender.setAssetScript(asset, dApp, setAssetScriptFee + smartFee, assetScript(true), waitForTx = true)
-
+    overflowBlock()
+    sender.setAssetScript(asset, dApp, priorityFee, assetScript(false), waitForTx = true)
     val txs =
       (1 to MaxTxsInMicroBlock * 2).map { _ =>
         sender.invokeScript(caller, dApp, Some("transfer"), fee = minInvokeFee)._1.id
       }
-
-    sender.setAssetScript(asset, dApp, priorityFee, assetScript(false), waitForTx = true)
 
     sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
 
@@ -165,7 +164,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       failed.size shouldBe MaxTxsInMicroBlock * 2
 
       all(failed.map(_.status)) shouldBe "confirmed"
-      all(failed.map(_.applicationStatus)) shouldBe 'defined
+      all(failed.map(_.applicationStatus)) shouldBe defined
       all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
     }
 
@@ -210,7 +209,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       failed.size shouldBe MaxTxsInMicroBlock * 2
 
       all(failed.map(_.status)) shouldBe "confirmed"
-      all(failed.map(_.applicationStatus)) shouldBe 'defined
+      all(failed.map(_.applicationStatus)) shouldBe defined
       all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
 
       sender.balance(caller).balance shouldBe callerBalance - MaxTxsInMicroBlock * 2 * minInvokeFee
@@ -255,7 +254,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       failed.size shouldBe MaxTxsInMicroBlock * 2
 
       all(failed.map(_.status)) shouldBe "confirmed"
-      all(failed.map(_.applicationStatus)) shouldBe 'defined
+      all(failed.map(_.applicationStatus)) shouldBe defined
       all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
     }
 
@@ -459,7 +458,7 @@ object AcceptFailedScriptActivationSuite {
     mkScript(
       s"""
        |match tx {
-       |  case tx: SetAssetScriptTransaction => true
+       |  case _: SetAssetScriptTransaction => true
        |  case _ => $result
        |}
        |""".stripMargin

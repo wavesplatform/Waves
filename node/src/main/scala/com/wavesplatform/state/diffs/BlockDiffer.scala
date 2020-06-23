@@ -5,11 +5,10 @@ import cats.kernel.Monoid
 import cats.syntax.either.catsSyntaxEitherId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.state._
-import com.wavesplatform.state.patch.{CancelAllLeases, CancelInvalidLeaseIn, CancelLeaseOverflow}
+import com.wavesplatform.state.patch._
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{ActivationError, _}
@@ -169,7 +168,6 @@ object BlockDiffer extends ScorexLogging {
               // if NG is activated, just give them their 40%
               val minerPortfolio = if (!hasNg) Portfolio.empty else Portfolio.build(feeAsset, feeAmount).multiply(CurrentBlockFeePart)
 
-
               // carry is 60% of waves fees the next miner will get. obviously carry fee only makes sense when both
               // NG and sponsorship is active. also if sponsorship is active, feeAsset can only be Waves
               val carry = if (hasNg && hasSponsorship) feeAmount - currentBlockFee else 0
@@ -190,32 +188,15 @@ object BlockDiffer extends ScorexLogging {
           }
       }
       .map { result =>
-        final case class Patch(predicate: Blockchain => Boolean, patch: Blockchain => Diff)
-        def applyAll(patches: Patch*) = patches.foldLeft((result.diff, result.detailedDiff.parentDiff)) {
-          case (r @ (previousDiff, previousPatchDiff), p) =>
-            val currentBlockchain = CompositeBlockchain(blockchain, Some(previousDiff))
-            if (p.predicate(currentBlockchain)) {
-              val patchDiff = p.patch(currentBlockchain)
+        def applyAll(patches: DiffPatchFactory*): (Diff, Diff) = patches.foldLeft((result.diff, result.detailedDiff.parentDiff)) {
+          case (prevResult @ (previousDiff, previousPatchDiff), p) =>
+            if (p.isApplicable(blockchain)) {
+              val patchDiff = p()
               (Monoid.combine(previousDiff, patchDiff), Monoid.combine(previousPatchDiff, patchDiff))
-            } else {
-              r
-            }
+            } else prevResult
         }
 
-        val (diffWithPatches, patchDiff) = applyAll(
-          Patch(
-            _ => currentBlockHeight == blockchain.settings.functionalitySettings.resetEffectiveBalancesAtHeight,
-            CancelAllLeases(_)
-          ),
-          Patch(
-            _ => currentBlockHeight == blockchain.settings.functionalitySettings.blockVersion3AfterHeight,
-            CancelLeaseOverflow(_)
-          ),
-          Patch(
-            _.featureActivationHeight(BlockchainFeatures.DataTransaction.id).contains(currentBlockHeight),
-            CancelInvalidLeaseIn(_)
-          )
-        )
+        val (diffWithPatches, patchDiff) = applyAll(CancelAllLeases, CancelLeaseOverflow, CancelInvalidLeaseIn)
         result.copy(diff = diffWithPatches, detailedDiff = result.detailedDiff.copy(parentDiff = patchDiff))
       }
   }

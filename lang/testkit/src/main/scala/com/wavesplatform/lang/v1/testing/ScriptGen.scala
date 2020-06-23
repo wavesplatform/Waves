@@ -1,13 +1,13 @@
 package com.wavesplatform.lang.v1.testing
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.Parser.keywords
 import org.scalacheck._
-import scorex.crypto.encode.Base58
 
 import scala.reflect.ClassTag
 
@@ -103,7 +103,7 @@ trait ScriptGen {
     for {
       name       <- Gen.identifier.filter(!keywords(_))
       (value, _) <- BOOLgen((gas - 3) / 3)
-    } yield LET(AnyPos, PART.VALID(AnyPos, name), value, Seq.empty)
+    } yield LET(AnyPos, PART.VALID(AnyPos, name), value)
 
   def REFgen: Gen[EXPR] =
     Gen.identifier.filter(!keywords(_)).map(PART.VALID[String](AnyPos, _)).map(REF(AnyPos, _))

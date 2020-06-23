@@ -59,6 +59,7 @@ class DocExportTest extends PropSpec with PropertyChecks with Matchers {
 
   def funcDoc(ctx: CTX[Environment], ver: StdLibVersion): Array[(Option[(String, List[String])], String)] =
     ctx.functions
+      .filterNot(_.name.startsWith("_"))
       .map(f => (f.name, f.signature.args.map(_._2.toString).toList))
       .map(k => (DocSource.funcData.get((k._1, k._2, ver.value.asInstanceOf[Int])), k._1))
 }
