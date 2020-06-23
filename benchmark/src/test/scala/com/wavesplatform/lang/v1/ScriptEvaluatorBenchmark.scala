@@ -59,7 +59,7 @@ class ScriptEvaluatorBenchmark {
 
   @Benchmark
   def listMedianRandomElements(st: Median, bh: Blackhole): Unit =
-    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.randomElements))
+    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.randomElements(Random.nextInt(10000))))
 
   @Benchmark
   def listMedianSortedElements(st: Median, bh: Blackhole): Unit =
@@ -203,14 +203,15 @@ class Concat {
 class Median {
   val context: EvaluationContext[NoContext, Id] = PureContext.build(Global, V4).evaluationContext
 
-  val randomElements: EXPR = {
-    val listOfLong = (1 to 1000).map(_ => CONST_LONG(Random.nextLong()))
+  val randomElements: Array[EXPR] =
+    (1 to 10000).map { _ =>
+      val listOfLong = (1 to 1000).map(_ => CONST_LONG(Random.nextLong()))
 
-    FUNCTION_CALL(
-      Native(FunctionIds.MEDIAN_LIST),
-      List(ARR(listOfLong, limited = true).explicitGet())
-    )
-  }
+      FUNCTION_CALL(
+        Native(FunctionIds.MEDIAN_LIST),
+        List(ARR(listOfLong, limited = true).explicitGet())
+      )
+    }.toArray
 
   val sortedElements: EXPR = {
     val listOfLong = (1 to 1000).map(_ => CONST_LONG(Random.nextLong())).sorted
