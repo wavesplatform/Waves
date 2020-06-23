@@ -1858,4 +1858,19 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
     eval(script2, version = V4) shouldBe Right(CONST_BOOLEAN(true))
   }
+
+  property("lists of complex types") {
+    val script =
+      """
+        | func f(a: List[Int | (Int, Int)], b: List[List[List[(Int, Int)]]]) = {
+        |  match a[0] {
+        |   case x: (Int, Int) => x._1 * x._2 + (b[0][0][0]._1)
+        |   case y: Int        => y - b[0][0][0]._2
+        |  }
+        | }
+        | f([1], [[[(2,3)]]]) + f([(4,5)], [[[(6,7)]]])
+      """.stripMargin
+
+    eval(script, version = V4) shouldBe Right(CONST_LONG(24L))
+  }
 }

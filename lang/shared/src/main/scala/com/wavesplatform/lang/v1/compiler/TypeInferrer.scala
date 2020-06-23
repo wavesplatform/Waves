@@ -102,6 +102,13 @@ object TypeInferrer {
             case many => Left(s"Can't resolve correct type for parameterized $placeholder, actual: $argType")
           }
 
+      case (_:REAL, UNION(types, _))      => types.foldLeft(Right(None):Either[String, Option[MatchResult]]) {
+        (acc, t) => for {
+          a <- acc
+          b <- matchTypes(t, placeholder, knownTypes)
+        } yield b
+      }
+
       case (LIST(tp), LIST(t))            => matchTypes(t, tp, knownTypes)
       case (TUPLE(types1), TUPLE(types2)) => matchTupleTypes(err, types1, types2, knownTypes)
       case (placeholder: FINAL, _) =>
