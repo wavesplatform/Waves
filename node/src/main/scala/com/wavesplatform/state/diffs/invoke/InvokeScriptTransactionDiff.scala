@@ -185,7 +185,7 @@ object InvokeScriptTransactionDiff {
   ): Either[ScriptExecutionError.RejectedByDAppScript, (ScriptResult, EvaluationContext[Environment, Id], Log[Id])] = {
     val wavesContext = WavesContext.build(directives)
     val ctx =
-      PureContext.build(Global, directives).withEnvironment[Environment] |+|
+      PureContext.build(Global, version).withEnvironment[Environment] |+|
         CryptoContext.build(Global, version).withEnvironment[Environment] |+|
         wavesContext.copy(vars = Map())
 

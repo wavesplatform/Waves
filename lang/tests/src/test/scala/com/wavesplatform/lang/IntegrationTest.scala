@@ -88,7 +88,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val ctx: CTX[C] =
       Monoid.combineAll(
         Seq(
-          PureContext.build(Global, directiveSet, testCompilerContext = testCtx).withEnvironment[C],
+          PureContext.build(Global, version).withEnvironment[C],
           CryptoContext.build(Global, version).withEnvironment[C],
           addCtx.withEnvironment[C],
           CTX[C](sampleTypes, stringToTuple, Array(f, f2)),
