@@ -215,26 +215,6 @@ object ExpressionCompiler {
         }
     }
 
-  private def genericFlat(
-      pos: Pos,
-      typeDefs: Map[String, FINAL],
-      definedTypes: List[(String, Option[String])],
-      expectedTypes: List[String],
-      varName: Option[String]
-  ): Either[CompilationError, List[FINAL]] = {
-    def f(t: String) = flatSingle(pos, typeDefs, definedTypes.map(_.toString), expectedTypes, varName, t)
-    definedTypes.flatTraverse {
-      case (typeName, typeParamO) =>
-        typeParamO.fold(f(typeName))(
-          paramName =>
-            for {
-              typeConstr <- findGenericType(pos, typeName)
-              typeParam  <- f(paramName)
-            } yield List(typeConstr(UNION.reduce(UNION.create(typeParam))))
-        )
-    }
-  }
-
   private def findGenericType(p: Pos, t: String): Either[CompilationError, FINAL => FINAL] =
     t match {
       case "List" => Right(LIST)
@@ -773,10 +753,14 @@ object ExpressionCompiler {
           handledName <- handlePart(name)
           handledParameter <- parameter.traverse(handlePart)
           expectedTypes = expectedType.fold(ctx.predefTypes.keys.toList)(_.typeList.map(_.name))
-          foundType <- liftEither[Id, CompilerContext, CompilationError, List[FINAL]](
-            genericFlat(pos, ctx.predefTypes, List((handledName, handledParameter)), expectedTypes, varName)
-          )
-        } yield UNION.reduce(UNION.create(foundType))
+          parameter <- handledParameter.traverse(handleCompositeType(pos, _, expectedType, varName))
+          t <- liftEither[Id, CompilerContext, CompilationError, FINAL](parameter.fold(flatSingle(pos, ctx.predefTypes, List(), expectedTypes, varName, handledName).map(v => UNION.reduce(UNION.create(v, None)))) {
+            p =>
+              for {
+                typeConstr <- findGenericType(pos, handledName)
+              } yield typeConstr(p)
+          })
+        } yield t
       case Expressions.Union(types) =>
         types.toList
           .traverse(handleCompositeType(pos, _, expectedType, varName))

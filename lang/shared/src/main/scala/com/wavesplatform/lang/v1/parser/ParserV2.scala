@@ -218,9 +218,13 @@ class ParserV2(val input: ParserInput) extends Parser {
   def parseFunc(startPos: Int, name: PART[String], argAndTypesList: Seq[IdAndTypes], expr: EXPR, endPos: Int): FUNC = {
     FUNC(
       Pos(startPos, endPos),
+      expr,
       name,
-      argAndTypesList.map(el => (el.id, el.types)): FuncArgs,
-      expr
+      argAndTypesList.map(el => (el.id, Union(el.types.map {
+        case (name, None) => Single(name, None)
+        case (name, Some(PART.INVALID(p, m))) => Single(name, Some(PART.INVALID(p, m)))
+        case (name, Some(a@PART.VALID(p, _))) => Single(name, Some(PART.VALID(p, Single(a, None))))
+      })))
     )
   }
 

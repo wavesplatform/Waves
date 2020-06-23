@@ -231,14 +231,14 @@ object ContractCompiler {
       WrongArgumentType(func.f.position.start, func.f.position.end, funcName.v, typeName, allowedCallableTypesV4)
     )
 
-  private def typeStr(t: (String, Option[String])) =
+  private def typeStr(t: (String, Option[Type])) =
     t._2.fold(t._1)(typeParam => s"${t._1}[$typeParam]")
 
   private def resolveGenericType(
     func: Expressions.ANNOTATEDFUNC,
     funcName: PART.VALID[String],
     t: Type
-  ): CompileM[List[(PART.VALID[String], Option[PART.VALID[String]])]] =
+  ): CompileM[List[(PART.VALID[String], Option[PART.VALID[Type]])]] =
     t match {
       case Expressions.Single(name, parameter) =>
         for {
@@ -253,10 +253,11 @@ object ContractCompiler {
         argTypesError(func, funcName, types.mkString("(", ", ", ")"))
     }
 
-  private def checkAnnotatedParamType(t: (String, Option[String])): Boolean =
+  private def checkAnnotatedParamType(t: (String, Option[Type])): Boolean =
     t match {
-      case (singleType, None)             => primitiveCallableTypes.contains(singleType)
-      case (genericType, Some(typeParam)) => primitiveCallableTypes.contains(typeParam) && genericType == "List"
+      case (singleType, None) => primitiveCallableTypes.contains(singleType)
+      case (genericType, Some(Expressions.Single(PART.VALID(_, tp), None))) => primitiveCallableTypes.contains(tp) && genericType == "List"
+      case _ => false
     }
 
   val primitiveCallableTypes: Set[String] =
