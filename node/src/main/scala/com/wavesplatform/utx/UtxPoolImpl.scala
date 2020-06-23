@@ -172,6 +172,7 @@ class UtxPoolImpl(
   }
 
   override def removeAll(txs: Iterable[Transaction]): Unit = {
+    if (txs.isEmpty) return
     val ids = txs.map(_.id()).toSet
     removeIds(ids)
   }
@@ -193,8 +194,12 @@ class UtxPoolImpl(
         factRemoved += tx
       }
       if (!fullyReset) {
-        log.warn(s"Priority $diff is partially reset")
         val txsToAdd = diff.transactions.view.filterKeys(!removed(_)).values.map(_.transaction)
+        log.warn {
+          val added   = txsToAdd.map(_.id())
+          val removedIds = diff.transactions.keySet.intersect(removed)
+          s"Resetting diff ${diff.hashString} partially: removed = [${removedIds.mkString(", ")}], resorted = [${added.mkString(", ")}]"
+        }
         txsToAdd.foreach(addTransaction(_, verify = false))
       }
     }
@@ -424,6 +429,7 @@ class UtxPoolImpl(
         s"of which ${packResult.transactions.fold(0)(_.size)} were packed, ${transactions.size() + priorityTransactions.size} transactions remaining"
     )
 
+    if (packResult.removedTransactions.nonEmpty) log.trace(s"Removing invalid transactions: ${packResult.removedTransactions.mkString(", ")}")
     removeIds(packResult.removedTransactions)
     packResult.transactions.map(_.reverse) -> packResult.constraint
   }
@@ -484,6 +490,10 @@ class UtxPoolImpl(
       discDiffs.filterNot(priorityDiffs.contains).foreach { diff =>
         diff.transactionsValues.foreach(PoolMetrics.addTransactionPriority(_))
         priorityDiffs += diff
+        log.trace {
+          val ids = diff.transactions.keys
+          s"Priority diff ${diff.hashString} added: ${ids.mkString(", ")}"
+        }
       }
       log.trace(s"Priority pool transactions order: ${priorityTransactionIds.mkString(", ")}")
     }
