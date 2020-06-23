@@ -1044,7 +1044,7 @@ class ExchangeTransactionDiffTest
         throwingScript = ExprScript(FUNCTION_CALL(Native(THROW), Nil)).explicitGet()
         quantity <- matcherAmountGen
         iTx = IssueTransaction
-          .selfSigned(TxVersion.V2, seller, "Asset", "", quantity, 8, false, Some(throwingScript), fee, ntpTime.getTimestamp() + 1)
+          .selfSigned(TxVersion.V2, seller, "Asset", "", quantity, 8, reissuable = false, Some(throwingScript), fee, ntpTime.getTimestamp() + 1)
           .explicitGet()
         asset = IssuedAsset(iTx.assetId)
         eTx <- exchangeGeneratorP(buyer, seller, asset, Waves, fixedMatcher = Some(MATCHER))
@@ -1066,10 +1066,10 @@ class ExchangeTransactionDiffTest
         buyerBalance   = Map(Waves -> ENOUGH_AMT, asset         -> 0L)
         sellerBalance  = Map(Waves -> (ENOUGH_AMT - fee), asset -> iTx.quantity)
         matcherBalance = Map(Waves -> ENOUGH_AMT, asset         -> 0L)
-      } yield (eTx, (buyerBalance, sellerBalance, matcherBalance), Seq(gTx1, gTx2, gTx3, iTx))
+      } yield (eTx, (buyerBalance, sellerBalance, matcherBalance), Seq(gTx1, gTx2, gTx3, iTx), throwingScript)
 
     forAll(scenario) {
-      case (exchange, (buyerBalance, sellerBalance, matcherBalance), genesisTxs) =>
+      case (exchange, (buyerBalance, sellerBalance, matcherBalance), genesisTxs, throwingScript) =>
         assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(exchange), Block.ProtoBlockVersion), fsWithOrderFeature) { ei =>
           ei.left.value
         }
@@ -1079,6 +1079,8 @@ class ExchangeTransactionDiffTest
             diff.portfolios(exchange.sender.toAddress).balance shouldBe -exchange.fee
             diff.portfolios.get(exchange.buyOrder.sender.toAddress) shouldBe None
             diff.portfolios.get(exchange.sellOrder.sender.toAddress) shouldBe None
+
+            diff.scriptsComplexity shouldBe DiffsCommon.countVerifierComplexity(Some(throwingScript), state, isAsset = true).explicitGet().get._2
 
             buyerBalance.foreach {
               case (asset, balance) =>
@@ -1098,6 +1100,101 @@ class ExchangeTransactionDiffTest
 
             state.transactionInfo(exchange.id()).map(r => r._2 -> r._3) shouldBe Some((exchange, false))
         }
+    }
+  }
+
+  property("Counts complexity correctly for failed transactions") {
+    def test(
+        priceAssetIssue: IssueTransaction,
+        amountAssetIssue: IssueTransaction,
+        order1FeeAssetIssue: IssueTransaction,
+        order2FeeAssetIssue: IssueTransaction,
+        complexity: Long
+    ): Unit = {
+      val order1 = TxHelpers.orderV3(
+        OrderType.BUY,
+        IssuedAsset(amountAssetIssue.assetId),
+        IssuedAsset(priceAssetIssue.assetId),
+        IssuedAsset(order1FeeAssetIssue.assetId)
+      )
+      val order2 = TxHelpers.orderV3(
+        OrderType.SELL,
+        IssuedAsset(amountAssetIssue.assetId),
+        IssuedAsset(priceAssetIssue.assetId),
+        IssuedAsset(order2FeeAssetIssue.assetId)
+      )
+      val exchange = TxHelpers.exchange(order1, order2)
+
+      withDomain(
+        domainSettingsWithFS(
+          TestFunctionalitySettings.withFeatures(
+            BlockchainFeatures.SmartAssets,
+            BlockchainFeatures.SmartAccountTrading,
+            BlockchainFeatures.OrderV3,
+            BlockchainFeatures.BlockV5
+          )
+        )
+      ) { d =>
+        d.appendBlock(Seq(amountAssetIssue, priceAssetIssue, order1FeeAssetIssue, order2FeeAssetIssue).distinct: _*)
+        val newBlock = d.createBlock(2.toByte, Seq(exchange))
+        val diff     = BlockDiffer.fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited).explicitGet()
+        diff.diff.scriptsComplexity shouldBe complexity
+      }
+    }
+
+    withClue("price asset fails") {
+      val priceAssetIssue     = TxHelpers.issue(script = TestValues.rejectAssetScript)
+      val amountAssetIssue    = TxHelpers.issue(script = TestValues.assetScript)
+      val order1FeeAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
+      val order2FeeAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
+
+      test(priceAssetIssue, amountAssetIssue, order1FeeAssetIssue, order2FeeAssetIssue, TestValues.rejectAssetScriptComplexity)
+
+    }
+
+    withClue("amount asset fails") {
+      val priceAssetIssue     = TxHelpers.issue(script = TestValues.assetScript)
+      val amountAssetIssue    = TxHelpers.issue(script = TestValues.rejectAssetScript)
+      val order1FeeAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
+      val order2FeeAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
+
+      test(
+        priceAssetIssue,
+        amountAssetIssue,
+        order1FeeAssetIssue,
+        order2FeeAssetIssue,
+        TestValues.assetScriptComplexity + TestValues.rejectAssetScriptComplexity
+      )
+    }
+
+    withClue("order1 matcher fee asset fails") {
+      val priceAssetIssue     = TxHelpers.issue(script = TestValues.assetScript)
+      val amountAssetIssue    = TxHelpers.issue(script = TestValues.assetScript)
+      val order1FeeAssetIssue = TxHelpers.issue(script = TestValues.rejectAssetScript)
+      val order2FeeAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
+
+      test(
+        priceAssetIssue,
+        amountAssetIssue,
+        order1FeeAssetIssue,
+        order2FeeAssetIssue,
+        2 * TestValues.assetScriptComplexity + TestValues.rejectAssetScriptComplexity
+      )
+    }
+
+    withClue("order2 matcher fee asset fails") {
+      val priceAssetIssue     = TxHelpers.issue(script = TestValues.assetScript)
+      val amountAssetIssue    = TxHelpers.issue(script = TestValues.assetScript)
+      val order1FeeAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
+      val order2FeeAssetIssue = TxHelpers.issue(script = TestValues.rejectAssetScript)
+
+      test(
+        priceAssetIssue,
+        amountAssetIssue,
+        order1FeeAssetIssue,
+        order2FeeAssetIssue,
+        3 * TestValues.assetScriptComplexity + TestValues.rejectAssetScriptComplexity
+      )
     }
   }
 
