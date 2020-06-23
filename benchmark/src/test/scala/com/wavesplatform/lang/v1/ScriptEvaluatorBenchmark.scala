@@ -59,6 +59,15 @@ class ScriptEvaluatorBenchmark {
 
   @Benchmark
   def listMedian(st: Median, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.expr))
+
+  @Benchmark
+  def listMedian2(st: Median, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.expr2))
+
+  @Benchmark
+  def listMedian3(st: Median, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.expr3))
+
+  @Benchmark
+  def listMedian4(st: Median, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.expr4))
 }
 
 @State(Scope.Benchmark)
@@ -192,6 +201,33 @@ class Median {
 
   val expr: EXPR = {
     val listOfLong = (1 to 1000).map(_ => CONST_LONG(Random.nextLong()))
+
+    FUNCTION_CALL(
+      Native(FunctionIds.MEDIAN_LIST),
+      List(ARR(listOfLong, limited = true).explicitGet())
+    )
+  }
+
+  val expr2: EXPR = {
+    val listOfLong = (1 to 1000).map(_ => CONST_LONG(Random.nextLong())).sorted
+
+    FUNCTION_CALL(
+      Native(FunctionIds.MEDIAN_LIST),
+      List(ARR(listOfLong, limited = true).explicitGet())
+    )
+  }
+
+  val expr3: EXPR = {
+    val listOfLong = (1 to 1000).map(_ => CONST_LONG(Random.nextLong())).sorted.reverse
+
+    FUNCTION_CALL(
+      Native(FunctionIds.MEDIAN_LIST),
+      List(ARR(listOfLong, limited = true).explicitGet())
+    )
+  }
+
+  val expr4: EXPR = {
+    val listOfLong = (1 to 1000).map(_ => CONST_LONG(Long.MinValue))
 
     FUNCTION_CALL(
       Native(FunctionIds.MEDIAN_LIST),
