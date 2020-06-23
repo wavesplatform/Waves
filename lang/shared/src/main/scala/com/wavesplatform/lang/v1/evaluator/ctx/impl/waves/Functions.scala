@@ -334,7 +334,7 @@ object Functions {
   val assetBalanceV4F: BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "assetBalance",
-      100,
+      15,
       ACCOUNTASSETONLYBALANCE,
       LONG,
       ("addressOrAlias", addressOrAliasType),
