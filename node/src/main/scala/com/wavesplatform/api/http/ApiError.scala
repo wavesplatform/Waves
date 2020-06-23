@@ -305,7 +305,7 @@ object ApiError {
     val Id = 112
   }
 
-  final case class NegativeMinFee(msg: String) extends ApiError { // not tested
+  final case class NegativeMinFee(msg: String) extends ApiError {
     override val id: Int          = NegativeMinFee.Id
     override val message: String  = s"negative fee per: $msg"
     override val code: StatusCode = StatusCodes.BadRequest
