@@ -58,16 +58,20 @@ class ScriptEvaluatorBenchmark {
   def bytesConcat(st: Concat, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.bytes))
 
   @Benchmark
-  def listMedian(st: Median, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.expr))
+  def listMedianRandomElements(st: Median, bh: Blackhole): Unit =
+    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.randomElements))
 
   @Benchmark
-  def listMedian2(st: Median, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.expr2))
+  def listMedianSortedElements(st: Median, bh: Blackhole): Unit =
+    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.sortedElements))
 
   @Benchmark
-  def listMedian3(st: Median, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.expr3))
+  def listMedianSortedReverseElements(st: Median, bh: Blackhole): Unit =
+    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.sortedReverseElements))
 
   @Benchmark
-  def listMedian4(st: Median, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.expr4))
+  def listMedianEqualElements(st: Median, bh: Blackhole): Unit =
+    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.equalElements))
 }
 
 @State(Scope.Benchmark)
@@ -199,7 +203,7 @@ class Concat {
 class Median {
   val context: EvaluationContext[NoContext, Id] = PureContext.build(Global, V4).evaluationContext
 
-  val expr: EXPR = {
+  val randomElements: EXPR = {
     val listOfLong = (1 to 1000).map(_ => CONST_LONG(Random.nextLong()))
 
     FUNCTION_CALL(
@@ -208,7 +212,7 @@ class Median {
     )
   }
 
-  val expr2: EXPR = {
+  val sortedElements: EXPR = {
     val listOfLong = (1 to 1000).map(_ => CONST_LONG(Random.nextLong())).sorted
 
     FUNCTION_CALL(
@@ -217,7 +221,7 @@ class Median {
     )
   }
 
-  val expr3: EXPR = {
+  val sortedReverseElements: EXPR = {
     val listOfLong = (1 to 1000).map(_ => CONST_LONG(Random.nextLong())).sorted.reverse
 
     FUNCTION_CALL(
@@ -226,7 +230,7 @@ class Median {
     )
   }
 
-  val expr4: EXPR = {
+  val equalElements: EXPR = {
     val listOfLong = (1 to 1000).map(_ => CONST_LONG(Long.MinValue))
 
     FUNCTION_CALL(
