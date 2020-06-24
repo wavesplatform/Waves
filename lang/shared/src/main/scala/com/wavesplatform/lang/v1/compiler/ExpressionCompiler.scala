@@ -198,7 +198,6 @@ object ExpressionCompiler {
   private def flatSingle(
       pos: Pos,
       typeDefs: Map[String, FINAL],
-      definedTypesStr: List[String],
       expectedTypes: List[String],
       varName: Option[String],
       typeName: String
@@ -208,10 +207,7 @@ object ExpressionCompiler {
       case Some(realType)             => Right(List(realType))
       case None =>
         Left {
-          val messageTypes =
-            if (expectedTypes.nonEmpty) expectedTypes
-            else definedTypesStr
-          TypeNotFound(pos.start, pos.end, typeName, messageTypes, varName)
+          TypeNotFound(pos.start, pos.end, typeName, expectedTypes, varName)
         }
     }
 
@@ -754,7 +750,7 @@ object ExpressionCompiler {
           handledParameter <- parameter.traverse(handlePart)
           expectedTypes = expectedType.fold(ctx.predefTypes.keys.toList)(_.typeList.map(_.name))
           parameter <- handledParameter.traverse(handleCompositeType(pos, _, expectedType, varName))
-          t <- liftEither[Id, CompilerContext, CompilationError, FINAL](parameter.fold(flatSingle(pos, ctx.predefTypes, List(), expectedTypes, varName, handledName).map(v => UNION.reduce(UNION.create(v, None)))) {
+          t <- liftEither[Id, CompilerContext, CompilationError, FINAL](parameter.fold(flatSingle(pos, ctx.predefTypes, expectedTypes, varName, handledName).map(v => UNION.reduce(UNION.create(v, None)))) {
             p =>
               for {
                 typeConstr <- findGenericType(pos, handledName)
