@@ -24,7 +24,7 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
 
   test("prerequisite: set contract and issue asset") {
     val source =
-      """
+     s"""
       |{-# STDLIB_VERSION 4 #-}
       |{-# CONTENT_TYPE DAPP #-}
       |{-# SCRIPT_TYPE ACCOUNT #-}
@@ -47,9 +47,15 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
       |
       |@Callable(inv)
       |func f(toAlias: String) = {
-      | let pmt = inv.payments[0]
-      | #avoidbugcomment
-      | [ScriptTransfer(Alias(toAlias), pmt.amount, pmt.assetId)]
+      | if (${"sigVerify(base58'', base58'', base58'') ||" * 8} true)
+      |  then {
+      |    let pmt = inv.payments[0]
+      |    #avoidbugcomment
+      |    [ScriptTransfer(Alias(toAlias), pmt.amount, pmt.assetId)]
+      |  }
+      |  else {
+      |    throw("unexpected")
+      |  }
       |}
       """.stripMargin
     val script = ScriptCompiler.compile(source, ScriptEstimatorV2).explicitGet()._1.bytes().base64
@@ -91,7 +97,7 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
         waitForTx = true
       )._1.id
 
-    sender.debugStateChanges(tx1).stateChanges.get.errorMessage.get.text should include(s"Alias 'alias:I:$alias")
+    sender.debugStateChanges(tx1).stateChanges.get.error.get.text should include(s"Alias 'alias:I:$alias")
 
     val tx2 = sender
       .invokeScript(
@@ -103,7 +109,7 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
         waitForTx = true
       )._1.id
 
-    sender.debugStateChanges(tx2).stateChanges.get.errorMessage.get.text should include("Alias should contain only following characters")
+    sender.debugStateChanges(tx2).stateChanges.get.error.get.text should include("Alias should contain only following characters")
   }
 
   test("can invoke with no payments") {

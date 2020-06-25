@@ -232,7 +232,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("contract compiles fails when incorrect return type") {
@@ -277,7 +277,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("contract compiles fails if has more than one verifier function") {
@@ -387,7 +387,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("contract functions could return parent type values") {
@@ -415,7 +415,109 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
+  }
+
+  property("wavesBalanceV4 have type BalanceDetails") {
+    val ctx = Monoid
+      .combineAll(
+        Seq(
+          PureContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
+          CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
+          WavesContext.build(
+            DirectiveSet(V4, Account, DAppType).explicitGet()
+          )
+        ))
+      .compilerContext
+    val expr = {
+      val script =
+        """
+          | @Callable(i)
+          | func bar() = {
+          |   [ScriptTransfer(i.caller, wavesBalance(this), base58'somestr')]
+          | }
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr, V4) should produce("Non-matching types: expected: Int, actual: BalanceDetails")
+  }
+
+  property("wavesBalanceV4 have type BalanceDetails with fields") {
+    val ctx = Monoid
+      .combineAll(
+        Seq(
+          PureContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
+          CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
+          WavesContext.build(
+            DirectiveSet(V4, Account, DAppType).explicitGet()
+          )
+        ))
+      .compilerContext
+    val expr = {
+      val script =
+        """
+          | @Callable(i)
+          | func bar() = {
+          |   [
+          |     ScriptTransfer(i.caller, wavesBalance(this).available, base58'somestr'),
+          |     ScriptTransfer(i.caller, wavesBalance(this).regular, base58'somestr'),
+          |     ScriptTransfer(i.caller, wavesBalance(this).generating, base58'somestr'),
+          |     ScriptTransfer(i.caller, wavesBalance(this).effective, base58'somestr')
+          |   ]
+          | }
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr, V4) shouldBe Symbol("right")
+  }
+
+  property("assetBalanceV4 allow issued assets only") {
+    val ctx = Monoid
+      .combineAll(
+        Seq(
+          PureContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
+          CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
+          WavesContext.build(
+            DirectiveSet(V4, Account, DAppType).explicitGet()
+          )
+        ))
+      .compilerContext
+    val expr = {
+      val script =
+        """
+          | @Callable(i)
+          | func bar() = {
+          |   [ScriptTransfer(i.caller, assetBalance(this, unit), base58'somestr')]
+          | }
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr, V4) should produce("Non-matching types: expected: ByteVector, actual: Unit")
+  }
+
+  property("assetBalanceV3 allow issued assets and waves") {
+    val ctx = Monoid
+      .combineAll(
+        Seq(
+          PureContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
+          CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
+          WavesContext.build(
+            DirectiveSet(V3, Account, DAppType).explicitGet()
+          )
+        ))
+      .compilerContext
+    val expr = {
+      val script =
+        """
+          | @Callable(i)
+          | func bar() = {
+          |   TransferSet([ScriptTransfer(i.caller, assetBalance(this, unit), base58'somestr'),
+          |                ScriptTransfer(i.caller, assetBalance(this, base58'asset'), base58'somestr')])
+          | }
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("contract compilation fails if functions has the same name") {
@@ -503,7 +605,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("contract compiles if declaration vars and func args has the same name") {
@@ -522,7 +624,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("contract compiles if it use invoke script fields: payment, feeAssetId") {
@@ -547,7 +649,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("matching case with non-existing type should produce error message with suitable types") {
@@ -652,7 +754,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("compiler error if user function defined below usage") {
@@ -692,7 +794,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract compilation fails if function name length is longer than 255 bytes") {
-    val longName = "a" * (ContractLimits.MaxAnnotatedFunctionNameInBytes + 1)
+    val longName = "a" * (ContractLimits.MaxDeclarationNameInBytes + 1)
     val ctx      = Monoid.combine(compilerContext, cmpCtx)
     val expr = {
       val script =
@@ -706,11 +808,11 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) should produce("must be less than")
+    compiler.ContractCompiler(ctx, expr, V3) should produce(s"Function '$longName' size = 256 bytes exceeds 255")
   }
 
   property("contract compiles if function name length is equal to 255 bytes") {
-    val longName = "a" * ContractLimits.MaxAnnotatedFunctionNameInBytes
+    val longName = "a" * ContractLimits.MaxDeclarationNameInBytes
     val ctx      = Monoid.combine(compilerContext, cmpCtx)
     val expr = {
       val script =
@@ -724,7 +826,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("compiler error if annotated func has argument of not native type") {
@@ -760,7 +862,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe Symbol("right")
   }
 
   property("list as @Callable argument forbidden in V3") {
@@ -796,7 +898,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V4) shouldBe 'right
+    compiler.ContractCompiler(ctx, expr, V4) shouldBe Symbol("right")
   }
 
   property("@Callable V4 result type") {
@@ -817,7 +919,8 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |     ScriptTransfer(i.caller, 1, base58''),
           |     Issue("name", "description", 1000, 4, true, unit, 0),
           |     Reissue(base58'', false, 1),
-          |     Burn(base58'', 1)
+          |     Burn(base58'', 1),
+          |     SponsorFee(base58'', 1)
           |   ]
         """.stripMargin
       Parser.parseContract(script).get.value
@@ -826,6 +929,56 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       PureContext.build(Global, V4).withEnvironment[Environment] |+|
       WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
 
-    compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe 'right
+    compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe Symbol("right")
   }
+
+  property("Asset has no name") {
+    val ctx = Monoid
+      .combineAll(
+        Seq(
+          PureContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
+          CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
+          WavesContext.build(
+            DirectiveSet(V3, Account, DAppType).explicitGet()
+          )
+        ))
+      .compilerContext
+    val expr = {
+      val script =
+        """
+          |
+          |@Verifier(tx)
+          |func verify() = assetInfo(base58'').value().name == "qqqq"
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr, V3) should produce("Undefined field `name` of variable of type `Asset`")
+  }
+
+  property("Asset has some name") {
+    val ctx = Monoid
+      .combineAll(
+        Seq(
+          PureContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
+          CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
+          WavesContext.build(
+            DirectiveSet(V4, Account, DAppType).explicitGet()
+          )
+        ))
+      .compilerContext
+    val expr = {
+      val script =
+        """
+          |
+          |@Verifier(tx)
+          |func verify() = assetInfo(base58'').value().name == "qqqq"
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr, V4) shouldBe Symbol("right")
+  }
+
+
 }

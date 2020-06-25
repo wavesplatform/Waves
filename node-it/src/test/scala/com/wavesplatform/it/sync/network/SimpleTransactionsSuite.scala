@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.AsyncNetworkApi._
@@ -16,7 +17,6 @@ import com.wavesplatform.transaction.transfer._
 import org.scalatest._
 
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers {
   override protected def nodeConfigs: Seq[Config] =
@@ -28,10 +28,8 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers {
   private def node = nodes.head
 
   test("valid tx send by network to node should be in blockchain") {
-    val tx = TransferTransaction
-      .selfSigned(1.toByte, node.keyPair, Address.fromString(node.address).explicitGet(), Waves, 1L, Waves, minFee, None, System.currentTimeMillis())
-      .right
-      .get
+    val tx = TransferTransaction.selfSigned(1.toByte, node.keyPair, Address.fromString(node.address).explicitGet(), Waves, 1L, Waves, minFee, ByteStr.empty,  System.currentTimeMillis())
+      .explicitGet()
 
     node.sendByNetwork(RawBytes.fromTransaction(tx))
     node.waitForTransaction(tx.id().toString)
@@ -40,9 +38,18 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers {
 
   test("invalid tx send by network to node should be not in UTX or blockchain") {
     val tx = TransferTransaction
-      .selfSigned(1.toByte, node.keyPair, Address.fromString(node.address).explicitGet(), Waves, 1L, Waves, minFee, None, System.currentTimeMillis() + (1 days).toMillis)
-      .right
-      .get
+      .selfSigned(
+        1.toByte,
+        node.keyPair,
+        Address.fromString(node.address).explicitGet(),
+        Waves,
+        1L,
+        Waves,
+        minFee,
+        ByteStr.empty,
+        System.currentTimeMillis() + (1 days).toMillis
+      )
+      .explicitGet()
 
     node.sendByNetwork(RawBytes.fromTransaction(tx))
     val maxHeight = nodes.map(_.height).max

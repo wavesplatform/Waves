@@ -96,8 +96,7 @@ trait IntegrationSuiteWithThreeAddresses
     }
     val setScriptTransaction = SetScriptTransaction
       .selfSigned(1.toByte, acc, script, 0.014.waves, System.currentTimeMillis())
-      .right
-      .get
+      .explicitGet()
     sender
       .signedBroadcast(setScriptTransaction.json(), waitForTx = true)
       .id

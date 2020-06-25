@@ -16,10 +16,8 @@ import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
-import com.wavesplatform.protobuf.api.TransactionsByIdRequest
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
@@ -43,8 +41,7 @@ case class TransactionsApiRoute(
     time: Time
 ) extends ApiRoute
     with BroadcastRoute
-    with AuthRoute
-    with AutoParamsDirective {
+    with AuthRoute {
   import TransactionsApiRoute._
 
   override lazy val route: Route =
@@ -53,7 +50,7 @@ case class TransactionsApiRoute(
     }
 
   def addressLimit: Route = {
-    (get & path("address" / AddrSegment / "limit" / IntNumber) & parameter('after.?)) { (address, limit, maybeAfter) =>
+    (get & path("address" / AddrSegment / "limit" / IntNumber) & parameter("after".?)) { (address, limit, maybeAfter) =>
       val after =
         maybeAfter.map(s => ByteStr.decodeBase58(s).getOrElse(throw ApiException(CustomValidationError(s"Unable to decode transaction id $s"))))
       if (limit > settings.transactionsByAddressLimit) throw ApiException(TooBigArrayAllocation)
@@ -75,34 +72,41 @@ case class TransactionsApiRoute(
     }
   }
 
-  def status: Route = path("status") {
-    protobufEntity(TransactionsByIdRequest) { request =>
-      if (request.ids.length > settings.transactionsByAddressLimit)
-        complete(TooBigArrayAllocation)
-      else {
-        request.ids.map(id => ByteStr.decodeBase58(id).toEither.leftMap(_ => id)).toList.separate match {
-          case (Nil, Nil) => complete(CustomValidationError("Empty request"))
-          case (Nil, ids) =>
-            val results = ids.toSet.map { id: ByteStr =>
-              import Status._
-              val statusJson = blockchain.transactionInfo(id) match {
-                case Some((height, _, succeed)) =>
-                  Json.obj(
-                    "status"        -> Confirmed,
-                    "height"        -> height,
-                    "confirmations" -> (blockchain.height - height).max(0)
-                  ) ++ applicationStatus(height, succeed)
-                case None =>
-                  commonApi.unconfirmedTransactionById(id) match {
-                    case Some(_) => Json.obj("status" -> Unconfirmed)
-                    case None    => Json.obj("status" -> NotFound)
-                  }
-              }
-              id -> (statusJson ++ Json.obj("id" -> id.toString))
-            }.toMap
-            complete(ids.map(id => results(id)))
-          case (errors, _) => complete(InvalidIds(errors))
+  private def loadTransactionStatus(id: ByteStr): JsObject = {
+    import Status._
+    val statusJson = blockchain.transactionInfo(id) match {
+      case Some((height, _, succeed)) =>
+        Json.obj(
+          "status"        -> Confirmed,
+          "height"        -> height,
+          "confirmations" -> (blockchain.height - height).max(0)
+        ) ++ applicationStatus(height, succeed)
+      case None =>
+        commonApi.unconfirmedTransactionById(id) match {
+          case Some(_) => Json.obj("status" -> Unconfirmed)
+          case None    => Json.obj("status" -> NotFound)
         }
+    }
+    (statusJson ++ Json.obj("id" -> id.toString))
+  }
+
+  def status: Route = pathPrefix("status") {
+    path(TransactionId) { id =>
+      complete(loadTransactionStatus(id))
+    } ~ pathEndOrSingleSlash {
+      anyParam("id").filter(_.nonEmpty) { ids =>
+        if (ids.toSeq.length > settings.transactionsByAddressLimit)
+          complete(TooBigArrayAllocation)
+        else {
+          ids.map(id => ByteStr.decodeBase58(id).toEither.leftMap(_ => id)).toList.separate match {
+            case (Nil, ids) =>
+              val results = ids.toSet.map((id: ByteStr) => id -> loadTransactionStatus(id)).toMap
+              complete(ids.map(id => results(id)))
+            case (errors, _) => complete(InvalidIds(errors))
+          }
+        }
+      } ~ pathEndOrSingleSlash {
+        complete(CustomValidationError("Empty request"))
       }
     }
   }
@@ -160,12 +164,12 @@ case class TransactionsApiRoute(
   def signedBroadcast: Route = path("broadcast")(broadcast[JsValue](TransactionFactory.fromSignedRequest))
 
   def merkleProof: Route = path("merkleProof") {
-    (get & parameters('id.*))(ids => complete(merkleProof(ids.toList.reverse))) ~
+    (get & parameters("id".as[String].*))(ids => complete(merkleProof(ids.toList.reverse))) ~
       jsonPost[JsObject](
         jsv =>
           (jsv \ "ids").validate[List[String]] match {
             case JsSuccess(ids, _) => merkleProof(ids)
-            case JsError(err)      => WrongJson(errors = err)
+            case JsError(err)      => WrongJson(errors = err.toSeq)
           }
       )
   }
@@ -180,24 +184,21 @@ case class TransactionsApiRoute(
       case _ => InvalidSignature
     }
 
-  private def txToExtendedJson(tx: Transaction): JsObject = {
-    import com.wavesplatform.transaction.lease.LeaseTransaction
-    tx match {
-      case lease: LeaseTransaction =>
-        import com.wavesplatform.api.http.TransactionsApiRoute.LeaseStatus._
-        lease.json() ++ Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) Active else Canceled))
+  private def txToExtendedJson(tx: Transaction): JsObject = tx match {
+    case lease: LeaseTransaction =>
+      import com.wavesplatform.api.http.TransactionsApiRoute.LeaseStatus._
+      lease.json() ++ Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) Active else Canceled))
 
-      case leaseCancel: LeaseCancelTransaction =>
-        leaseCancel.json() ++ Json.obj("lease" -> blockchain.transactionInfo(leaseCancel.leaseId).map(_._2.json()).getOrElse[JsValue](JsNull))
+    case leaseCancel: LeaseCancelTransaction =>
+      leaseCancel.json() ++ Json.obj("lease" -> blockchain.transactionInfo(leaseCancel.leaseId).map(_._2.json()).getOrElse[JsValue](JsNull))
 
-      case t => t.json()
-    }
+    case t => t.json()
   }
 
   private def applicationStatus(height: Int, succeed: Boolean): JsObject = {
     import ApplicationStatus._
     if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height))
-      JsObject(Map("applicationStatus" -> JsString(if (succeed) Succeed else ScriptExecutionFailed)))
+      JsObject(Map("applicationStatus" -> JsString(if (succeed) Succeeded else ScriptExecutionFailed)))
     else
       JsObject.empty
   }
@@ -242,8 +243,8 @@ object TransactionsApiRoute {
   }
 
   object ApplicationStatus {
-    val Succeed             = "succeed"
-    val ScriptExecutionFailed = "scriptExecutionFailed"
+    val Succeeded             = "succeeded"
+    val ScriptExecutionFailed = "script_execution_failed"
   }
 
   implicit val transactionProofWrites: Writes[TransactionProof] = Writes { mi =>

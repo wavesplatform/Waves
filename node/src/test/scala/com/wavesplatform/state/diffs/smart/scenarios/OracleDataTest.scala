@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
-import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
@@ -11,19 +10,21 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
+import com.wavesplatform.transaction.TxValidationError.ScriptExecutionError
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Proofs}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.PropSpec
+import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class OracleDataTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
+class OracleDataTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink with Matchers {
   val preconditions
-    : Gen[(GenesisTransaction, GenesisTransaction, CreateAliasTransaction, SetScriptTransaction, DataTransaction, TransferTransaction)] =
+      : Gen[(GenesisTransaction, GenesisTransaction, CreateAliasTransaction, SetScriptTransaction, DataTransaction, TransferTransaction)] =
     for {
       master <- accountGen
       oracle <- accountGen
@@ -48,7 +49,7 @@ class OracleDataTest extends PropSpec with PropertyChecks with WithState with Tr
                                    |   let txHeightId = extract(transactionHeightById(t.id)) > 0
                                    |   txId && txHeightId
                                    | case _ : CreateAliasTransaction => true
-                                   | case other =>
+                                   | case _ =>
                                    |   let oracle = Alias("${alias.name}")
                                    |   let long = extract(getInteger(oracle,"${long.key}")) == ${long.value}
                                    |   let bool = extract(getBoolean(oracle,"${bool.key}")) == ${bool.value}
@@ -69,12 +70,16 @@ class OracleDataTest extends PropSpec with PropertyChecks with WithState with Tr
   property("simple oracle value required to transfer") {
     forAll(preconditions) {
       case (genesis, genesis2, createAlias, setScript, dataTransaction, transferFromScripted) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, genesis2, createAlias, setScript, dataTransaction))),
-                           TestBlock.create(Seq(transferFromScripted)),
-                           smartEnabledFS) { case _ => () }
-        assertDiffEi(Seq(TestBlock.create(Seq(genesis, genesis2, createAlias, setScript))),
-                     TestBlock.create(Seq(transferFromScripted)),
-                     smartEnabledFS)(totalDiffEi => totalDiffEi shouldBe Left(_: ScriptExecutionError))
+        assertDiffAndState(
+          Seq(TestBlock.create(Seq(genesis, genesis2, createAlias, setScript, dataTransaction))),
+          TestBlock.create(Seq(transferFromScripted)),
+          smartEnabledFS
+        ) { case _ => () }
+        assertDiffEi(
+          Seq(TestBlock.create(Seq(genesis, genesis2, createAlias, setScript))),
+          TestBlock.create(Seq(transferFromScripted)),
+          smartEnabledFS
+        )(_ should matchPattern { case Left(TransactionValidationError(_: ScriptExecutionError, _)) => })
     }
   }
 }

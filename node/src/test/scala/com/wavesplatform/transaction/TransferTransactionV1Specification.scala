@@ -6,7 +6,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer._
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -95,7 +94,7 @@ class TransferTransactionV1Specification extends PropSpec with PropertyChecks wi
       1900000,
       Waves,
       100000,
-      Some(Attachment.Bin(Base58.tryDecodeWithLimit("4t2Xazb2SX").get)),
+      ByteStr.decodeBase58("4t2Xazb2SX").get,
       1526552510868L,
       Proofs(Seq(ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get)),
       recipient.chainId
@@ -110,22 +109,5 @@ class TransferTransactionV1Specification extends PropSpec with PropertyChecks wi
     } yield TransferTransaction.selfSigned(1.toByte, sender, recipient, Waves, amount, Waves, feeAmount, attachment, timestamp) should produce(
       "insufficient fee"
     )
-  }
-
-  property("not able to pass typed attachment for transactions V1") {
-    val recipient = Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet()
-    TransferTransaction(
-      1.toByte,
-      PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-      Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet(),
-      Waves,
-      100000000,
-      Waves,
-      100000000,
-      Some(Attachment.Str("somestring")),
-      1526641218066L,
-      Proofs.empty,
-      recipient.chainId
-    ).validatedEither shouldBe Left(GenericError("Typed attachment not allowed"))
   }
 }

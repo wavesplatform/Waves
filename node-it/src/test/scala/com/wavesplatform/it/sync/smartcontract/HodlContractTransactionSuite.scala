@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract
 
+import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
@@ -127,11 +128,14 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
       func = Some("withdraw"),
       args = List(CONST_LONG(1.51.waves)),
       payment = Seq(),
-      fee = 1.waves,
-      waitForTx = true
+      fee = 1.waves
     )._1.id
-
-    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("Not enough balance")
+    sender.waitForHeight(sender.height + 1)
+    sender.transactionStatus(Seq(tx)).head.status shouldBe "not_found"
+    assertApiErrorRaised(
+      sender.debugStateChanges(tx).stateChanges,
+      StatusCodes.NotFound.intValue
+    )
   }
 
   test("caller can withdraw less than he owns") {
@@ -158,7 +162,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
     val stateChangesData = stateChangesInfo.get.data.head
     stateChangesInfo.get.data.length shouldBe 1
     stateChangesData.`type` shouldBe "integer"
-    stateChangesData.value shouldBe 0.01.waves
+    stateChangesData.value.asInstanceOf[Long] shouldBe 0.01.waves
 
     val stateChangesTransfers = stateChangesInfo.get.transfers.head
     stateChangesInfo.get.transfers.length shouldBe 1

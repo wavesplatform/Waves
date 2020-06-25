@@ -6,6 +6,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.grpc.{ApplicationStatus, TransactionsByIdRequest, TransactionStatus => PBTransactionStatus}
 import com.wavesplatform.api.http.ApiError.TransactionDoesNotExist
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.TransactionStatus
 import com.wavesplatform.it.{Node, NodeConfigs}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
@@ -29,12 +30,13 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
     * @param pt priority transaction sender
     * @param checker transactions checker (will be executed twice - immediately after emptying the utx pool and then after height arising)
     */
-  def sendTxsAndThenPriorityTx[S](t: Int => T, pt: () => T)(
+  def sendPriorityTxAndThenOtherTxs[S](t: Int => T, pt: () => T)(
       checker: (Seq[T], T) => Seq[S]
   ): Seq[S] = {
     val maxTxsInMicroBlock = sender.config.getInt("waves.miner.max-transactions-in-micro-block")
-    val txs                = (1 to maxTxsInMicroBlock * 2).map(i => t(i))
     val priorityTx         = pt()
+    // waitForEmptyUtx()
+    val txs                = (1 to maxTxsInMicroBlock * 2).map(i => t(i))
     waitForEmptyUtx()
 
     checker(txs, priorityTx) // liquid
@@ -57,12 +59,12 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
         (sender.transactionInfo[JsObject](s.id) \ "applicationStatus").asOpt[String] shouldBe s.applicationStatus
       }
 
-      val failed = statuses.dropWhile(s => s.applicationStatus.contains("succeed"))
+      val failed = statuses.dropWhile(s => s.applicationStatus.contains("succeeded"))
       failed.size should be > 0
 
-      all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
+      all(failed.flatMap(_.applicationStatus)) shouldBe "script_execution_failed"
 
-      val failedIdsByHeight = failed.groupBy(_.height.get).mapValues(_.map(_.id))
+      val failedIdsByHeight = failed.groupBy(_.height.get).view.mapValues(_.map(_.id))
 
       failedIdsByHeight.foreach {
         case (h, ids) =>
@@ -86,7 +88,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
     def assertInvalidTxs(txs: Seq[String]): Seq[TransactionStatus] = {
       val statuses = sender.transactionStatus(txs).sortWith { case (f, s) => txs.indexOf(f.id) < txs.indexOf(s.id) }
 
-      val invalid = statuses.dropWhile(s => s.applicationStatus.contains("succeed"))
+      val invalid = statuses.dropWhile(s => s.applicationStatus.contains("succeeded"))
       invalid.size should be > 0
 
       invalid.foreach { s =>
@@ -110,14 +112,13 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
               .compile(
                 s"""
                    |match tx {
-                   |  case tx: SetAssetScriptTransaction => true
+                   |  case _: SetAssetScriptTransaction => true
                    |  case _ => $result
                    |}
                    |""".stripMargin,
                 ScriptEstimatorV3
               )
-              .right
-              .get
+              .explicitGet()
               ._1
               .bytes()
               .base64
@@ -127,7 +128,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
         .id
     }
 
-    def updateAccountScript(result: Option[Boolean], account: String, fee: Long): String = {
+    def updateAccountScript(result: Option[Boolean], account: String, fee: Long, waitForTx: Boolean = true): String = {
       sender
         .setScript(
           account,
@@ -140,21 +141,20 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                    |{-# SCRIPT_TYPE ACCOUNT #-}
                    |
                    |match (tx) {
-                   |  case t: SetScriptTransaction => true
+                   |  case _: SetScriptTransaction => true
                    |  case _ => $r
                    |}
                    |""".stripMargin,
                 ScriptEstimatorV3
               )
-              .right
-              .get
+              .explicitGet()
               ._1
               .bytes()
               .base64
 
           },
           fee = fee,
-          waitForTx = true
+          waitForTx = waitForTx
         )
         .id
     }
@@ -179,7 +179,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
       failed.size should be > 0
       all(failed.map(_.applicationStatus)) shouldBe ApplicationStatus.SCRIPT_EXECUTION_FAILED
 
-      val failedIdsByHeight = failed.groupBy(_.height.toInt).mapValues(_.map(_.id))
+      val failedIdsByHeight = failed.groupBy(_.height.toInt).view.mapValues(_.map(_.id))
 
       failedIdsByHeight.foreach {
         case (h, ids) =>
@@ -215,7 +215,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
               .compile(
                 s"""
                    |match tx {
-                   |  case tx: SetAssetScriptTransaction => true
+                   |  case _: SetAssetScriptTransaction => true
                    |  case _ => $result
                    |}
                    |""".stripMargin,
@@ -229,7 +229,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
         )
     }
 
-    def updateAccountScript(result: Option[Boolean], account: KeyPair, fee: Long): PBSignedTransaction = {
+    def updateAccountScript(result: Option[Boolean], account: KeyPair, fee: Long, waitForTx: Boolean = true): PBSignedTransaction = {
       sender
         .setScript(
           account,
@@ -243,7 +243,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                    |{-# SCRIPT_TYPE ACCOUNT #-}
                    |
                    |match (tx) {
-                   |  case t: SetScriptTransaction => true
+                   |  case _: SetScriptTransaction => true
                    |  case _ => $r
                    |}
                    |""".stripMargin,
@@ -253,8 +253,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                 .map(_._1)
             }
           ),
-          fee = fee,
-          waitForTx = true
+          fee = fee
         )
     }
   }
@@ -296,12 +295,12 @@ object FailedTransactionSuiteLike {
         fee,
         ts
       )
-      .right
-      .get
+      .explicitGet()
   }
 
   val configForMinMicroblockAge: Config = ConfigFactory.parseString(s"""
      |waves.miner.min-micro-block-age = 7
+     |waves.miner.max-transactions-in-micro-block = 1
      |""".stripMargin)
 
   val Configs: Seq[Config] =

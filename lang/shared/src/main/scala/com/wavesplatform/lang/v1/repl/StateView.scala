@@ -21,5 +21,5 @@ case class StateView(ctx: CompilerContext) {
       .map { case (name, info) => (name, DeclPrinter.letStr(name, info.vType)) }
 
   private lazy val types: Map[String, String] =
-    ctx.predefTypes.mapValues(DeclPrinter.typeStr)
+    ctx.predefTypes.view.mapValues(DeclPrinter.typeStr).toMap
 }

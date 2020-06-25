@@ -56,7 +56,7 @@ object  TransactionFactory {
         transfers,
         request.fee,
         request.timestamp.getOrElse(time.getTimestamp()),
-        request.attachment,
+        request.attachment.getOrElse(ByteStr.empty),
         signer.privateKey
       )
     } yield tx
@@ -71,7 +71,7 @@ object  TransactionFactory {
         transfers,
         request.fee,
         0,
-        request.attachment,
+        request.attachment.getOrElse(ByteStr.empty),
         Proofs.empty
       )
     } yield tx
@@ -314,7 +314,6 @@ object  TransactionFactory {
       assetId <- ByteStr
         .decodeBase58(request.assetId)
         .toEither
-        .right
         .map(IssuedAsset)
         .left
         .map(_ => GenericError(s"Wrong Base58 string: ${request.assetId}"))
@@ -334,7 +333,6 @@ object  TransactionFactory {
       assetId <- ByteStr
         .decodeBase58(request.assetId)
         .toEither
-        .right
         .map(IssuedAsset)
         .left
         .map(_ => GenericError(s"Wrong Base58 string: ${request.assetId}"))

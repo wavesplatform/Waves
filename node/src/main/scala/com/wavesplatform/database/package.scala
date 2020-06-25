@@ -23,13 +23,16 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.{ScorexLogging, _}
-import io.estatico.newtype.macros.newtype
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb._
+import supertagged.TaggedType
+
+import scala.collection.mutable
 
 package object database extends ScorexLogging {
   def openDB(path: String, recreate: Boolean = false): DB = {
@@ -105,6 +108,19 @@ package object database extends ScorexLogging {
 
   def writeAddressIds(values: Seq[AddressId]): Array[Byte] =
     values.foldLeft(ByteBuffer.allocate(values.length * java.lang.Long.BYTES)) { case (buf, aid) => buf.putLong(aid.toLong) }.array()
+
+  def readAssetIds(data: Array[Byte]): Seq[ByteStr] = Option(data).fold(Seq.empty[ByteStr]) { d =>
+    require(d.length % transaction.AssetIdLength == 0, s"Invalid data length: ${d.length}")
+    val buffer = ByteBuffer.wrap(d)
+    Seq.fill(d.length / transaction.AssetIdLength) {
+      val idBytes = new Array[Byte](transaction.AssetIdLength)
+      buffer.get(idBytes)
+      ByteStr(idBytes)
+    }
+  }
+
+  def writeAssetIds(values: Seq[ByteStr]): Array[Byte] =
+    values.foldLeft(ByteBuffer.allocate(values.length * transaction.AssetIdLength)) { case (buf, ai) => buf.put(ai.arr) }.array()
 
   def readTxIds(data: Array[Byte]): List[ByteStr] = Option(data).fold(List.empty[ByteStr]) { d =>
     val b   = ByteBuffer.wrap(d)
@@ -443,11 +459,11 @@ package object database extends ScorexLogging {
   def createBlock(header: BlockHeader, signature: ByteStr, txs: Seq[Transaction]): Either[TxValidationError.GenericError, Block] =
     Validators.validateBlock(Block(header, signature, txs))
 
-  def writeAssetScript(script: (Script, Long)): Array[Byte] =
-    Longs.toByteArray(script._2) ++ script._1.bytes().arr
+  def writeAssetScript(script: AssetScriptInfo): Array[Byte] =
+    Longs.toByteArray(script.complexity) ++ script.script.bytes().arr
 
-  def readAssetScript(b: Array[Byte]): (Script, Long) =
-    ScriptReader.fromBytes(b.drop(8)).explicitGet() -> Longs.fromByteArray(b)
+  def readAssetScript(b: Array[Byte]): AssetScriptInfo =
+    AssetScriptInfo(ScriptReader.fromBytes(b.drop(8)).explicitGet(), Longs.fromByteArray(b))
 
   def writeAccountScriptInfo(scriptInfo: AccountScriptInfo): Array[Byte] =
     pb.AccountScriptInfo.toByteArray(
@@ -572,12 +588,42 @@ package object database extends ScorexLogging {
       staticInfo.nft
     )
 
-  @newtype case class AddressId(toLong: Long) {
-    def toByteArray: Array[Byte] = toLong.toByteArray
+  def loadActiveLeases(db: DB, fromHeight: Int, toHeight: Int): Seq[LeaseTransaction] = db.withResource { r =>
+    val leaseIds = mutable.Set.empty[ByteStr]
+    val iterator = r.iterator
+
+    @inline
+    def keyInRange(): Boolean = {
+      val actualKey = iterator.peekNext().getKey
+      actualKey.startsWith(KeyTags.LeaseStatus.prefixBytes) && Ints.fromByteArray(actualKey.slice(2, 6)) <= toHeight
+    }
+
+    iterator.seek(KeyTags.LeaseStatus.prefixBytes ++ Ints.toByteArray(fromHeight))
+    while (iterator.hasNext && keyInRange()) {
+      val e       = iterator.next()
+      val leaseId = ByteStr(e.getKey.drop(6))
+      if (Option(e.getValue).exists(_(0) == 1)) leaseIds += leaseId else leaseIds -= leaseId
+    }
+
+    (for {
+      id          <- leaseIds
+      leaseStatus <- fromHistory(r, Keys.leaseStatusHistory(id), Keys.leaseStatus(id))
+      if leaseStatus
+      (h, n) <- r.get(Keys.transactionHNById(TransactionId(id)))
+      tx     <- r.get(Keys.transactionAt(h, n))
+    } yield tx).collect {
+      case (lt: LeaseTransaction, true) => lt
+    }.toSeq
   }
 
-  object AddressId {
-    def fromByteArray(bs: Array[Byte]): AddressId = AddressId(Longs.fromByteArray(bs))
+  object AddressId extends TaggedType[Long] {
+    def fromByteArray(bs: Array[Byte]): Type = AddressId(Longs.fromByteArray(bs))
+  }
+
+  type AddressId = AddressId.Type
+
+  implicit final class Ops(private val value: AddressId) extends AnyVal {
+    def toByteArray: Array[Byte] = Longs.toByteArray(AddressId.raw(value))
   }
 
   implicit class LongExt(val l: Long) extends AnyVal {

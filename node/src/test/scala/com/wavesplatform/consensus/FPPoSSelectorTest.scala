@@ -18,7 +18,7 @@ import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
 import com.wavesplatform.utils.Time
-import com.wavesplatform.{TestHelpers, TransactionGen, WithDB, crypto}
+import com.wavesplatform.{EitherMatchers, TestHelpers, TransactionGen, WithDB, crypto}
 import org.iq80.leveldb.Options
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{FreeSpec, Matchers}
@@ -27,7 +27,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import scala.concurrent.duration._
 import scala.util.Random
 
-class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with TransactionGen with DBCacheSettings with ScalaCheckPropertyChecks {
+class FPPoSSelectorTest extends FreeSpec with Matchers with EitherMatchers with WithDB with TransactionGen with DBCacheSettings with ScalaCheckPropertyChecks {
   import FPPoSSelectorTest._
 
   private val generationSignatureMethods = Table(
@@ -99,9 +99,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
             val lastBlock    = blockchain.lastBlockHeader.get
             val block        = forgeBlock(miner, blockchain, pos, blockVersion)()
 
-            pos
-              .validateBlockDelay(height, block.header, lastBlock.header, minerBalance)
-              .explicitGet()
+            pos.validateBlockDelay(height, block.header, lastBlock.header, minerBalance) should beRight
         }
     }
 
@@ -257,13 +255,14 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
     )
     val settings0 = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
-    val bcu       = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers)
-    val pos       = new PoSSelector(bcu, settings.blockchainSettings, settings.synchronizationSettings)
+    val bcu =
+      new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
+    val pos = PoSSelector(bcu, settings.synchronizationSettings)
     try {
       val (accounts, blocks) = gen(ntpTime).sample.get
 
       blocks.foreach { block =>
-        bcu.processBlock(block, block.header.generationSignature.take(Block.HitSourceLength)).explicitGet()
+        bcu.processBlock(block, block.header.generationSignature.take(Block.HitSourceLength)) should beRight
       }
 
       f(Env(pos, bcu, accounts, blocks))
@@ -422,7 +421,7 @@ object FPPoSSelectorTest {
         } yield (acc, GenesisTransaction.create(acc.toAddress, balance, ts + i).explicitGet())
       }
       .map { txs =>
-        val lastTxTimestamp = txs.lastOption.map(_._2.timestamp) getOrElse ts
+        val lastTxTimestamp = txs.lastOption.fold(ts)(_._2.timestamp)
         val genesisBlock    = TestBlock.create(lastTxTimestamp + 1, txs.map(_._2))
 
         val chain = (1 to blockCount foldLeft List(genesisBlock)) { (blocks, d) =>

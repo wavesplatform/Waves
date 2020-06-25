@@ -49,7 +49,7 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
           if (activation) r should produce("AccountBalanceError")
           else
             r should produce(
-              s"Fee in WAVES for InvokeScriptTransaction (1 in WAVES) with 0 total scripts invoked does not exceed minimal value of $InvokeFee WAVES"
+              s"Fee in WAVES for InvokeScriptTransaction (1 in WAVES) does not exceed minimal value of $InvokeFee WAVES"
             )
         }
     }
@@ -65,7 +65,7 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
       case (genesis, setDApp, ci, activation) =>
         assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), features(activation)) { r =>
           if (activation) r should produce("AccountBalanceError")
-          else r shouldBe 'right
+          else r.explicitGet()
         }
     }
   }

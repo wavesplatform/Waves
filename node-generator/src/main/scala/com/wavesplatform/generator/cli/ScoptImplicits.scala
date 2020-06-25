@@ -14,7 +14,7 @@ trait ScoptImplicits {
   implicit val modeRead: Read[Mode.Value] = Read.reads(Mode withName _.toUpperCase)
 
   implicit val finiteDurationRead: Read[FiniteDuration] = Read.durationRead.map { x =>
-    if (x.isFinite()) FiniteDuration(x.length, x.unit)
+    if (x.isFinite) FiniteDuration(x.length, x.unit)
     else throw new IllegalArgumentException(s"Duration '$x' expected to be finite")
   }
 }

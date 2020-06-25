@@ -16,6 +16,9 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Time
+import com.wavesplatform.state.Blockchain
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.directives.values._
 import monix.execution.Scheduler
 import play.api.libs.json._
 
@@ -23,7 +26,8 @@ case class UtilsApiRoute(
     timeService: Time,
     settings: RestAPISettings,
     estimator: ScriptEstimator,
-    limitedScheduler: Scheduler
+    limitedScheduler: Scheduler,
+    blockchain: Blockchain
 ) extends ApiRoute
     with AuthRoute
     with TimeLimitedRoute {
@@ -69,7 +73,7 @@ case class UtilsApiRoute(
   // Deprecated
   def compile: Route = path("script" / "compile") {
     (post & entity(as[String])) { code =>
-      parameter('assetScript.as[Boolean] ? false) { isAssetScript =>
+      parameter("assetScript".as[Boolean] ? false) { isAssetScript =>
         executeLimited(ScriptCompiler(code, isAssetScript, estimator)) { result =>
           complete(
             result.fold(
@@ -90,7 +94,8 @@ case class UtilsApiRoute(
 
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String])) { code =>
-      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator)) { result =>
+      def stdLib: StdLibVersion = if(blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) { V4 } else { StdLibVersion.VersionDic.default }
+      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator, defaultStdLib = stdLib)) { result =>
         complete(
           result
             .fold(
@@ -166,8 +171,7 @@ case class UtilsApiRoute(
   def scriptMeta: Route = path("script" / "meta") {
     (post & entity(as[String])) { code =>
       val result: ToResponseMarshallable = Global
-        .scriptMeta(code) // Does not estimate complexity, therefore it should not hang
-        .map(metaConverter.foldRoot)
+        .dAppFuncTypes(code) // Does not estimate complexity, therefore it should not hang
         .fold(e => e, r => r)
       complete(result)
     }

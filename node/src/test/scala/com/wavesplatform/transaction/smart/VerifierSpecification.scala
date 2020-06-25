@@ -9,8 +9,9 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.settings.{BlockchainSettings, GenesisSettings, RewardsSettings, TestFunctionalitySettings}
 import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, Height}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.Verifier.ValidationResult
@@ -34,11 +35,17 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
           (bc.assetDescription _).when(asset).returns(mkAssetDescription(asset.id, tx.sender, 8, None))
           (bc.assetScript _).when(asset).returns(None)
           (bc.activatedFeatures _).when().returns(Map())
+          (bc.settings _).when().returns(BlockchainSettings(
+            addressSchemeCharacter = 'N',
+            functionalitySettings = TestFunctionalitySettings.Enabled,
+            genesisSettings = GenesisSettings.TESTNET,
+            rewardsSettings = RewardsSettings.TESTNET
+          ))
         }
 
       val scriptText =
         """match tx {
-          |  case o: Order => height >= 0
+          |  case _: Order => height >= 0
           |  case _ => true
           |}""".stripMargin
       val (script, complexity) = ScriptCompiler(scriptText, isAssetScript = false, estimator).explicitGet()
@@ -49,7 +56,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
 
       (bc.height _).when().returns(0)
 
-      Verifier(bc)(tx).flatMap(tx => Verifier.assets(bc)(tx)).resultE shouldBe 'right
+      verify(bc, tx).explicitGet()
     }
   }
 
@@ -60,12 +67,31 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
 
       setFeeAssetScriptsAndVerify(Some(invalidScript -> comp), None)(tx) should produce("ScriptExecutionError") // buy order:  matcherFeeAsset has invalid script
       setFeeAssetScriptsAndVerify(None, Some((falseScript, 1)))(tx) should produce("TransactionNotAllowedByScript") // sell order: matcherFeeAsset script gives false as a result
-      setFeeAssetScriptsAndVerify(None, None)(tx) shouldBe 'right
+      setFeeAssetScriptsAndVerify(None, None)(tx).explicitGet()
     }
   }
 
-  private def mkAssetDescription(assetId: ByteStr, matcherAccount: PublicKey, decimals: Int, scriptOption: Option[(Script, Long)]): Option[AssetDescription] =
-    Some(AssetDescription(assetId, matcherAccount, ByteString.EMPTY, ByteString.EMPTY, decimals, reissuable = false, BigInt(0), Height(0), scriptOption, 0, decimals == 0))
+  private def mkAssetDescription(
+      assetId: ByteStr,
+      matcherAccount: PublicKey,
+      decimals: Int,
+      scriptOption: Option[(Script, Long)]
+  ): Option[AssetDescription] =
+    Some(
+      AssetDescription(
+        assetId,
+        matcherAccount,
+        ByteString.EMPTY,
+        ByteString.EMPTY,
+        decimals,
+        reissuable = false,
+        BigInt(0),
+        Height(0),
+        scriptOption.map(AssetScriptInfo.tupled),
+        0,
+        decimals == 0
+      )
+    )
 
   private val exchangeTransactionV2Gen: Gen[ExchangeTransaction] = for {
     sender1: KeyPair <- accountGen
@@ -79,6 +105,12 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
   ): ValidationResult[Transaction] = {
 
     val blockchain = stub[Blockchain]
+    (blockchain.settings _).when().returns(BlockchainSettings(
+      addressSchemeCharacter = 'N',
+      functionalitySettings = TestFunctionalitySettings.Enabled,
+      genesisSettings = GenesisSettings.TESTNET,
+      rewardsSettings = RewardsSettings.TESTNET
+    ))
 
     def activate(features: (BlockchainFeature, Int)*): Unit = {
       (blockchain.activatedFeatures _).when().returns(features.map(x => x._1.id -> x._2).toMap).anyNumberOfTimes()
@@ -89,7 +121,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
     def prepareAssets(assetsAndScripts: (Asset, Option[(Script, Long)])*): Unit = assetsAndScripts foreach {
       case (asset: IssuedAsset, scriptOption) =>
         (blockchain.assetDescription _).when(asset).returns(mkAssetDescription(asset.id, tx.sender, 8, scriptOption))
-        (blockchain.assetScript _).when(asset).returns(scriptOption)
+        (blockchain.assetScript _).when(asset).returns(scriptOption.map(AssetScriptInfo.tupled))
       case _ =>
     }
 
@@ -106,6 +138,13 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
 
     (blockchain.height _).when().returns(0)
 
-    Verifier(blockchain)(tx).flatMap(tx => Verifier.assets(blockchain)(tx)).resultE
+    verify(blockchain, tx)
   }
+
+  def verify(blockchain: Blockchain, tx: Transaction): ValidationResult[Transaction] =
+    (for {
+      _ <- Verifier(blockchain)(tx)
+      _ <- Verifier.assets(blockchain)(tx).leftMap { case (_, ve) => ve }
+    } yield tx).resultE
+
 }

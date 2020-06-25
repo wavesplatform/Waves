@@ -168,4 +168,74 @@ class ContractScriptComplexityTest(estimator: ScriptEstimator) extends PropSpec 
 
     ContractScript.estimateComplexity(V3, contract, estimator) shouldBe Right((68, Map("first" -> 68, "default" -> 30, "second" -> 51)))
   }
+
+  property("estimate contract script with user functions") {
+    val contract = DApp(
+      DAppMeta(),
+      List(
+        LET("y", FUNCTION_CALL(sumString.header, List(CONST_STRING("a").explicitGet(), CONST_STRING("b").explicitGet()))),
+        LET("z", FUNCTION_CALL(sumString.header, List(CONST_STRING("c").explicitGet(), CONST_STRING("d").explicitGet()))),
+        Terms.FUNC(
+          "g",
+          List("arg1", "arg2"),
+          LET_BLOCK(
+            LET("x", FUNCTION_CALL(sumString.header, List(REF("y"), REF("z")))),
+            REF("x")
+          )
+        ),
+        LET("w", CONST_LONG(1)),
+        Terms.FUNC(
+          "f",
+          List(),
+          LET_BLOCK(
+            LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), REF("w")))),
+            REF("x")
+          )
+        )
+      ),
+      List(
+        CallableFunction(
+          CallableAnnotation(""),
+          Terms.FUNC(
+            "first",
+            List("arg1", "arg2"),
+            LET_BLOCK(
+              LET("x", FUNCTION_CALL(sumLong.header, List(REF("y"), REF("z")))),
+              REF("x")
+            )
+          )
+        ),
+        CallableFunction(
+          CallableAnnotation(""),
+          Terms.FUNC(
+            "default",
+            List(),
+            LET_BLOCK(
+              LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)))),
+              REF("x")
+            )
+          )
+        )
+      ),
+      Some(
+        VerifierFunction(
+          VerifierAnnotation(""),
+          Terms.FUNC(
+            "second",
+            List("arg1", "arg2"),
+            LET_BLOCK(
+              LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(3), CONST_LONG(0)))),
+              LET_BLOCK(
+                LET("y", FUNCTION_CALL(sumLong.header, List(REF("x"), CONST_LONG(1)))),
+                REF("y")
+              )
+            )
+          )
+        )
+      )
+    )
+
+    ContractScript.estimateUserFunctions(V3, contract, estimator) shouldBe Right(List("g" -> 87, "f" -> 42))
+    ContractScript.estimateGlobalVariables(V3, contract, estimator) shouldBe Right(List("y" -> 44, "z" -> 44, "w" -> 33))
+  }
 }

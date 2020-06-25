@@ -11,12 +11,12 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBByteStringOps
 import com.wavesplatform.settings.{Constants, WavesSettings}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{Blockchain, Diff}
+import com.wavesplatform.state.{Blockchain, Diff, NewTransactionInfo}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{BlockchainUpdater, DataTransaction, GenesisTransaction, Transaction}
-import com.wavesplatform.{BlockGen, TestHelpers, crypto}
+import com.wavesplatform.{BlockGen, TestHelpers, crypto, state}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -32,7 +32,10 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
   private val initialAmount: Long = WAVES_AMOUNT / 2
   private val genesis = TestBlock.create(
     0,
-    Seq(GenesisTransaction.create(master.toAddress, initialAmount, 0).explicitGet(), GenesisTransaction.create(rich.toAddress, initialAmount, 0).explicitGet()),
+    Seq(
+      GenesisTransaction.create(master.toAddress, initialAmount, 0).explicitGet(),
+      GenesisTransaction.create(rich.toAddress, initialAmount, 0).explicitGet()
+    ),
     master
   )
   override protected def initBlockchain(blockchainUpdater: Blockchain with BlockchainUpdater): Unit = {
@@ -153,8 +156,7 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
         amount        <- Gen.choose(1L, initialAmount - Constants.UnitsInWave)
         master2sender <- transferGeneratorPV2(1, master, sender.toAddress, amount)
         fee           <- Gen.choose(1, master2sender.amount - 1)
-        sender2recipient = TransferTransaction
-          .selfSigned(2.toByte, sender, recipient.toAddress, Waves, master2sender.amount - fee, Waves, fee, None, 2)
+        sender2recipient = TransferTransaction.selfSigned(2.toByte, sender, recipient.toAddress, Waves, master2sender.amount - fee, Waves, fee, ByteStr.empty, 2)
           .explicitGet()
       } yield (sender, recipient, master2sender, sender2recipient)
     } {
@@ -184,7 +186,7 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
           decimals shouldBe tx.decimals
           reissuable shouldBe tx.reissuable
           volume.toLong shouldBe tx.quantity
-          script.map(_._1) shouldBe tx.script
+          script.map(_.script) shouldBe tx.script
           nft shouldBe isNFT(tx)
           sponsorship shouldBe None
           assetExistedBefore shouldBe false
@@ -237,8 +239,13 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
             val scriptUpd = upds.last.assets.head
 
             scriptUpd shouldBe issueUpd.copy(
-              script =
-                setAssetScript.script.map(s => s -> Script.estimate(s, EstimatorProvider.EstimatorBlockchainExt(blockchain).estimator, useContractVerifierLimit = false).explicitGet()),
+              script = setAssetScript.script.map(
+                s =>
+                  state.AssetScriptInfo(
+                    s,
+                    Script.estimate(s, EstimatorProvider.EstimatorBlockchainExt(blockchain).estimator, useContractVerifierLimit = false).explicitGet()
+                  )
+              ),
               assetExistedBefore = !issueUpd.assetExistedBefore
             )
           }
@@ -279,7 +286,7 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
           // merge issue/reissue diffs as if they were produced by a single invoke
           val invokeTxDiff = assetsDummyBlockDiff.transactionDiffs
             .foldLeft(Diff.empty)(Diff.diffMonoid.combine)
-            .copy(transactions = Map((invoke.id(), (invoke, Set(master.toAddress), true))))
+            .copy(transactions = Map(invoke.id() -> NewTransactionInfo(invoke, Set(master.toAddress), true)))
           val invokeBlockDetailedDiff = assetsDummyBlockDiff.copy(transactionDiffs = Seq(invokeTxDiff))
 
           produceEvent(_.onProcessBlock(invokeBlock, invokeBlockDetailedDiff, None, blockchain)) match {

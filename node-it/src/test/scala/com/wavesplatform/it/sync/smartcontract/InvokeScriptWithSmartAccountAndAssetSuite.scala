@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
 class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite with CancelAfterFailure {
-  val estimator = ScriptEstimatorV2
+  private val estimator = ScriptEstimatorV2
 
   private val dApp        = firstAddress
   private val caller      = secondAddress
@@ -78,7 +78,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
            |{-# STDLIB_VERSION 3 #-}
            |match tx {
            |  case tx:InvokeScriptTransaction => extract(tx.payment).amount > 10
-           |  case tx:TransferTransaction => true
+           |  case _:TransferTransaction => true
            |  case _ => false
            |}""".stripMargin,
               estimator
@@ -163,7 +163,13 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
           |  let pay = extract(i.payment)
           |  if (pay.assetId == asset2 && pay.amount > 15) then
           |    TransferSet([ScriptTransfer(i.caller, 15, asset1)])
-          |  else throw("need payment in 15+ tokens of asset2 " + toBase58String(asset2))
+          |  else {
+          |    if (${"sigVerify(base58'', base58'', base58'') ||" * 16} true)
+          |    then
+          |       throw("need payment in 15+ tokens of asset2 " + toBase58String(asset2))
+          |    else
+          |       throw("unexpected")
+          |  }
           |}
           |@Callable(i)
           |func payAsset2GetAsset3() = {
@@ -270,7 +276,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
       ._1
       .id
 
-    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include(
+    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include(
       "with 12 total scripts invoked does not exceed minimal value of 5300000"
     )
 
@@ -286,7 +292,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
       .id
     nodes.waitForHeightAriseAndTxPresent(invokeScriptTxId)
 
-    sender.debugStateChanges(invokeScriptTxId).stateChanges.get.errorMessage shouldBe 'empty
+    sender.debugStateChanges(invokeScriptTxId).stateChanges.get.error shouldBe empty
   }
 
   test("can't invoke with insufficient payment for @Verifier") {
@@ -339,7 +345,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
       )
       ._1
       .id
-    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include(
+    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include(
       "with 2 total scripts invoked does not exceed minimal value of 1300000"
     )
   }
@@ -375,7 +381,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
       )
       ._1
       .id
-    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("Transaction is not allowed by token-script")
+    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include("Transaction is not allowed by script of the asset")
   }
 
   test("can't invoke a function with payment less than dApp script's limit") {
@@ -392,7 +398,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
       )
       ._1
       .id
-    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include(s"need payment in 15+ tokens of asset2 $asset2")
+    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include(s"need payment in 15+ tokens of asset2 $asset2")
   }
 
   test("can't invoke a function with payment less than asset script's limit") {
@@ -409,12 +415,12 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
       )
       ._1
       .id
-    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("Transaction is not allowed by token-script")
+    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include("Transaction is not allowed by script of the asset")
   }
 
   test("can't invoke a function that transfers less than asset script's limit") {
     val tx = sender.invokeScript(caller, dApp, Some("get10ofAsset1"), fee = smartMinFee + smartFee, waitForTx = true)._1.id
-    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("Transaction is not allowed by token-script")
+    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include("Transaction is not allowed by script of the asset")
   }
 
 }

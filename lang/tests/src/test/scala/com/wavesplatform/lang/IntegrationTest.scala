@@ -1,6 +1,9 @@
 package com.wavesplatform.lang
 
+import java.nio.charset.StandardCharsets
+
 import cats.Id
+import cats.implicits._
 import cats.kernel.Monoid
 import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.state.ByteStr
@@ -9,27 +12,29 @@ import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, FINAL, LONG, STRING}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, _}
-import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1}
+import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV2}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Issue
-import org.scalatest.{Matchers, PropSpec}
+import com.wavesplatform.lang.v1.{CTX, ContractLimits}
+import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import org.web3j.crypto.Keys
+import scorex.util.encode.Base16
+import scorex.crypto.hash.Keccak256
 
-import scala.util.Random
+import scala.util.{Random, Try}
 
-class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink {
+class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
   private def eval[T <: EVALUATED](
       code: String,
       pointInstance: Option[CaseObj] = None,
@@ -53,32 +58,37 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       NativeFunction(
         "fn1",
         1,
-        91:Short,
+        91: Short,
         pointType,
-        ("value", pointType),
+        ("value", pointType)
       ) {
         case _ :: Nil => throw new Exception("test exception")
-        case xs => notImplemented[Id, EVALUATED]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
+        case xs       => notImplemented[Id, EVALUATED]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
       }
- 
+
     val f2: BaseFunction[C] =
       NativeFunction(
         "fn2",
         1,
-        92:Short,
+        92: Short,
         pointType,
-        ("value", pointType),
+        ("value", pointType)
       ) {
         case _ :: Nil => throw new SecurityException("test exception")
-        case xs => notImplemented[Id, EVALUATED]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
+        case xs       => notImplemented[Id, EVALUATED]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
       }
 
     val lazyVal       = ContextfulVal.pure[C](pointInstance.orNull)
     val stringToTuple = Map(("p", (pointType, lazyVal)))
+    val directiveSet = DirectiveSet(version, Account, Expression).explicitGet()
+
+    val testCtx =
+      (addCtx.withEnvironment[C] |+| CTX[C](sampleTypes, stringToTuple, Array(f, f2))).compilerContext
+
     val ctx: CTX[C] =
       Monoid.combineAll(
         Seq(
-          PureContext.build(Global, version).withEnvironment[C],
+          PureContext.build(Global, directiveSet, testCompilerContext = testCtx).withEnvironment[C],
           CryptoContext.build(Global, version).withEnvironment[C],
           addCtx.withEnvironment[C],
           CTX[C](sampleTypes, stringToTuple, Array(f, f2)),
@@ -87,7 +97,13 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       )
 
     val typed = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => new EvaluatorV1[Id, C]().apply(ctx.evaluationContext(env), v._1))
+    val loggedCtx = LoggedEvaluationContext[C, Id](_ => _ => (), ctx.evaluationContext(env))
+      .asInstanceOf[LoggedEvaluationContext[Environment, Id]]
+    typed.flatMap(v =>
+      Try(new EvaluatorV2(loggedCtx, version).apply(v._1, Int.MaxValue)._1.asInstanceOf[T])
+        .toEither
+        .leftMap(_.getMessage)
+    )
   }
 
   property("simple let") {
@@ -104,7 +120,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val src =
       """
         |match p {
-        |  case pa: PointA => let x = 3
+        |  case _: PointA => let x = 3
         |  case _ => throw()
         |}
       """.stripMargin
@@ -114,29 +130,33 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("Exception handling") {
     val sampleScript =
       """match fn1(p) {
-        |  case pa: PointA => 0
-        |  case pa: PointB => 1
-        |  case pa: PointC => 2
+        |  case _: PointA => 0
+        |  case _: PointB => 1
+        |  case _: PointC => 2
         |}""".stripMargin
-    eval[EVALUATED](sampleScript, Some(pointAInstance)) should produce("An error during run <fn1(value: PointA|PointB|PointC): PointA|PointB|PointC>: class java.lang.Exception test exception")
+    eval[EVALUATED](sampleScript, Some(pointAInstance)) should produce(
+      "An error during run <fn1(value: PointA|PointB|PointC): PointA|PointB|PointC>: class java.lang.Exception test exception"
+    )
   }
 
   property("Security Exception handling") {
     val sampleScript =
       """match fn2(p) {
-        |  case pa: PointA => 0
-        |  case pa: PointB => 1
-        |  case pa: PointC => 2
+        |  case _: PointA => 0
+        |  case _: PointB => 1
+        |  case _: PointC => 2
         |}""".stripMargin
-    eval[EVALUATED](sampleScript, Some(pointAInstance)) should produce("An access to <fn2(value: PointA|PointB|PointC): PointA|PointB|PointC> is denied")
+    eval[EVALUATED](sampleScript, Some(pointAInstance)) should produce(
+      "An access to <fn2(value: PointA|PointB|PointC): PointA|PointB|PointC> is denied"
+    )
   }
 
   property("patternMatching") {
     val sampleScript =
       """match p {
-        |  case pa: PointA => 0
-        |  case pa: PointB => 1
-        |  case pa: PointC => 2
+        |  case _: PointA => 0
+        |  case _: PointB => 1
+        |  case _: PointC => 2
         |}""".stripMargin
     eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
     eval[EVALUATED](sampleScript, Some(pointBInstance)) shouldBe evaluated(1)
@@ -145,8 +165,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("patternMatching with named union types") {
     val sampleScript =
       """match p {
-        |  case pa: PointA => 0
-        |  case pa: PointBC => 1
+        |  case _: PointA => 0
+        |  case _: PointBC => 1
         |}""".stripMargin
     eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
     eval[EVALUATED](sampleScript, Some(pointBInstance)) shouldBe evaluated(1)
@@ -309,7 +329,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |
         |match a {
         | case x: Int => x
-        | case y: String => 2
+        | case _: String => 2
         |}""".stripMargin) shouldBe evaluated(1)
   }
 
@@ -322,7 +342,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |      case pc: PointC => pc.YB
         |    }
         |  }
-        |  case other => throw()
+        |  case _ => throw()
         |}""".stripMargin
     eval[EVALUATED](sampleScript, Some(pointBInstance)) shouldBe evaluated(3)
     eval[EVALUATED](sampleScript, Some(pointCInstance)) shouldBe evaluated(42)
@@ -332,7 +352,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val sampleScript =
       """match (p.YB) {
         | case l: Int => l
-        | case u: Unit => 1
+        | case _: Unit => 1
         | }
       """.stripMargin
     eval[EVALUATED](sampleScript, Some(pointCInstance), CorD) shouldBe evaluated(42)
@@ -348,9 +368,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val script =
       """
         |let result = match p {
-        |  case a: PointA => 0
-        |  case b: PointB => throw()
-        |  case c: PointC => throw("arrgh")
+        |  case _: PointA => 0
+        |  case _: PointB => throw()
+        |  case _: PointC => throw("arrgh")
         |}
         |result
       """.stripMargin
@@ -522,7 +542,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
               "value" -> CONST_STRING("2").explicitGet()
             )
           )
-        ), false
+        ),
+        false
       ).explicitGet
     )
   }
@@ -599,7 +620,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     for (i <- 65528 to 65535) array(i) = 1
     val src =
       s""" arr.toInt(65528) """
-    val arrVal = ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(array)).explicitGet())
+    val arrVal = ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(array), limit = CONST_BYTESTR.DataTxSize).explicitGet())
     eval[EVALUATED](
       src,
       ctxt = CTX[NoContext](
@@ -840,7 +861,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         IndexedSeq(
           CONST_STRING("q:we").explicitGet(),
           CONST_STRING("q;we:x;q.we").explicitGet()
-        ), false
+        ),
+        false
       ).explicitGet
     )
   }
@@ -855,7 +877,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
           CONST_STRING("str2").explicitGet(),
           CONST_STRING("str3").explicitGet(),
           CONST_STRING("str4").explicitGet()
-        ), false
+        ),
+        false
       ).explicitGet
     )
   }
@@ -869,7 +892,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
           CONST_STRING("str1").explicitGet(),
           CONST_STRING("str2").explicitGet(),
           CONST_STRING("").explicitGet()
-        ), false
+        ),
+        false
       ).explicitGet
     )
   }
@@ -884,7 +908,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
           CONST_STRING("").explicitGet(),
           CONST_STRING("str2").explicitGet(),
           CONST_STRING("str3").explicitGet()
-        ), false
+        ),
+        false
       ).explicitGet
     )
   }
@@ -938,7 +963,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("parseIntValue fail when string starts with non-digit") {
     val src =
       """ "x42".parseIntValue() """
-    eval[EVALUATED](src) shouldBe 'left
+    eval[EVALUATED](src) shouldBe Symbol("left")
   }
 
   property("parseInt fail when string ends with non-digit") {
@@ -950,7 +975,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("parseIntValue fail when string ends with non-digit") {
     val src =
       """ "42x".parseIntValue() """
-    eval[EVALUATED](src) shouldBe 'left
+    eval[EVALUATED](src) shouldBe Symbol("left")
   }
 
   property("parseInt fail when string is empty") {
@@ -962,7 +987,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("parseIntValue fail when string is empty") {
     val src =
       """ "".parseIntValue() """
-    eval[EVALUATED](src) shouldBe 'left
+    eval[EVALUATED](src) shouldBe Symbol("left")
   }
 
   property("matching case with non-existing type") {
@@ -1052,10 +1077,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED]("pow(0, 1, 3456, 3, 2, UP)", None) shouldBe Right(CONST_LONG(0))
     eval[EVALUATED]("pow(20, 1, -1, 0, 4, DOWN)", None) shouldBe Right(CONST_LONG(5000))
     eval[EVALUATED]("pow(-20, 1, -1, 0, 4, DOWN)", None) shouldBe Right(CONST_LONG(-5000))
-    eval[EVALUATED]("pow(0, 1, -1, 0, 4, DOWN)", None) shouldBe 'left
+    eval[EVALUATED]("pow(0, 1, -1, 0, 4, DOWN)", None) shouldBe Symbol("left")
     eval[EVALUATED]("log(16, 0, 2, 0, 0, CEILING)", None) shouldBe Right(CONST_LONG(4))
-    eval[EVALUATED]("log(16, 0, -2, 0, 0, CEILING)", None) shouldBe 'left
-    eval[EVALUATED]("log(-16, 0, 2, 0, 0, CEILING)", None) shouldBe 'left
+    eval[EVALUATED]("log(16, 0, -2, 0, 0, CEILING)", None) shouldBe Symbol("left")
+    eval[EVALUATED]("log(-16, 0, 2, 0, 0, CEILING)", None) shouldBe Symbol("left")
   }
 
   property("math functions scale limits") {
@@ -1079,9 +1104,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval("let r = if true then HALFUP else HALFDOWN ; match r { case _:HalfUp => 1 case _ => 0 }") shouldBe Right(CONST_LONG(1))
   }
 
-
   property("HalfUp type have no constructor") {
-    eval("pow(10, 0, -8, 0, 8, HalfUp())") shouldBe 'Left
+    eval("pow(10, 0, -8, 0, 8, HalfUp())") shouldBe Symbol("Left")
   }
 
   property("concat empty list") {
@@ -1103,10 +1127,10 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          | let n = "qqq" :: l
          | match n[1] {
          |   case i: Int => i == 1
-         |   case s: String => false
+         |   case _: String => false
          | } &&
          | match n[0] {
-         |   case i: Int => false
+         |   case _: Int => false
          |   case s: String => s == "qqq"
          | }
       """.stripMargin
@@ -1287,7 +1311,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       ctxt = ctx,
       version = V4,
       env = utils.environment
-    ) should produce("non-existing type")
+    ) should produce("Undefined type")
   }
 
   property("List[Int] median - 100 elements") {
@@ -1358,25 +1382,22 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   val grothsFail = Seq(
-       (0, """
+    (0, """
             |let vk = base64'lp7+dPDIOfm77haSFnvr33VwYH/KbIalfOJPRvBLzqlHD8BxunNebMr6Gr6S+u+nh7yLzdqr7HHQNOpZI8mdj/7lR0IBqB9zvRfyTr+guUG22kZo4y2KINDp272xGglKEeTglTxyDUriZJNF/+T6F8w70MR/rV+flvuo6EJ0+HA+A2ZnBbTjOIl9wjisBV+0iISo2JdNY1vPXlpwhlL2fVpW/WlREkF0bKlBadDIbNJBgM4niJGuEZDru3wqrGueETKHPv7hQ8em+p6vQolp7c0iknjXrGnvlpf4QtUtpg3z/D+snWjRPbVqRgKXWtihuIvPFaM6dt7HZEbkeMnXWwSINeYC/j3lqYnce8Jq+XkuF42stVNiooI+TuXECnFdFi9Ib25b9wtyz3H/oKg48He1ftntj5uIRCOBvzkFHGUF6Ty214v3JYvXJjdS4uS2jekplZYoV0aXEnYEOIvfF7d4xay3qkx2NspooM4HeZpiHknIWkUVhGVJBzBDLjLB'
             |let proof = base64'jiGBK+TGHfH8Oadexhdet7ExyIWibSmamWQvffZkyl3WnMoVbTQ3lOks4Mca3sU5qgcaLyQQ1FjFW4g6vtoMapZ43hTGKaWO7bQHsOCvdwHCdwJDulVH16cMTyS9F0BfBJxa88F+JKZc4qMTJjQhspmq755SrKhN9Jf+7uPUhgB4hJTSrmlOkTatgW+/HAf5kZKhv2oRK5p5kS4sU48oqlG1azhMtcHEXDQdcwf9ANel4Z9cb+MQyp2RzI/3hlIx'
             |let inputs = base64''
             """.stripMargin),
- 
-        (1, """
+    (1, """
             |let vk = base64'lp7+dPDIOfm77haSFnvr33VwYH/KbIalfOJPRvBLzqlHD8BxunNebMr6Gr6S+u+nh7yLzdqr7HHQNOpZI8mdj/7lR0IBqB9zvRfyTr+guUG22kZo4y2KINDp272xGglKEeTglTxyDUriZJNF/+T6F8w70MR/rV+flvuo6EJ0+HA+A2ZnBbTjOIl9wjisBV+0iISo2JdNY1vPXlpwhlL2fVpW/WlREkF0bKlBadDIbNJBgM4niJGuEZDru3wqrGueETKHPv7hQ8em+p6vQolp7c0iknjXrGnvlpf4QtUtpg3z/D+snWjRPbVqRgKXWtihuIvPFaM6dt7HZEbkeMnXWwSINeYC/j3lqYnce8Jq+XkuF42stVNiooI+TuXECnFdFi9Ib25b9wtyz3H/oKg48He1ftntj5uIRCOBvzkFHGUF6Ty214v3JYvXJjdS4uS2jekplZYoV0aXEnYEOIvfF7d4xay3qkx2NspooM4HeZpiHknIWkUVhGVJBzBDLjLBjiGBK+TGHfH8Oadexhdet7ExyIWibSmamWQvffZkyl3WnMoVbTQ3lOks4Mca3sU5'
             |let proof = base64'hp1iMepdu0rKoBh0NXcw9F9hkiggDIkRNINq2rlvUypPiSmp8U8tDSMeG0YVSovFteecr3THhBJj0qNeEe9jA2Ci64fKG9WT1heMYzEAQKebOErYXYCm9d72n97mYn1XBq+g1Y730XEDv4BIDI1hBDntJcgcj/cSvcILB1+60axJvtyMyuizxUr1JUBUq9njtmJ9m8zK6QZLNqMiKh0f2jokQb5mVhu6v5guW3KIjwQc/oFK/l5ehKAOPKUUggNh'
             |let inputs = base64'c9BSUPtO0xjPxWVNkEMfXe7O4UZKpaH/nLIyQJj7iA4='
             """.stripMargin),
- 
-        (15, """
+    (15, """
             |let vk = base64'lp7+dPDIOfm77haSFnvr33VwYH/KbIalfOJPRvBLzqlHD8BxunNebMr6Gr6S+u+nh7yLzdqr7HHQNOpZI8mdj/7lR0IBqB9zvRfyTr+guUG22kZo4y2KINDp272xGglKEeTglTxyDUriZJNF/+T6F8w70MR/rV+flvuo6EJ0+HA+A2ZnBbTjOIl9wjisBV+0iISo2JdNY1vPXlpwhlL2fVpW/WlREkF0bKlBadDIbNJBgM4niJGuEZDru3wqrGueETKHPv7hQ8em+p6vQolp7c0iknjXrGnvlpf4QtUtpg3z/D+snWjRPbVqRgKXWtihuIvPFaM6dt7HZEbkeMnXWwSINeYC/j3lqYnce8Jq+XkuF42stVNiooI+TuXECnFdFi9Ib25b9wtyz3H/oKg48He1ftntj5uIRCOBvzkFHGUF6Ty214v3JYvXJjdS4uS2jekplZYoV0aXEnYEOIvfF7d4xay3qkx2NspooM4HeZpiHknIWkUVhGVJBzBDLjLBjiGBK+TGHfH8Oadexhdet7ExyIWibSmamWQvffZkyl3WnMoVbTQ3lOks4Mca3sU5hp1iMepdu0rKoBh0NXcw9F9hkiggDIkRNINq2rlvUypPiSmp8U8tDSMeG0YVSovFlA4DsjBwntJH45NgNbY/Rbu/hfe7QskTkBiTo2A+kmYSH75Uvf2UAXwBAT1PoE0sqtYndF2Kbthl6GylV3j9NIKtIzHd/GwleExuM7KlI1H22P78br5zmh8D7V1aFcxPpftQhjch4abXuxEP4ahgfNmthdhoSvQykLhjbmG9BrvwmyaDRd/sHCTeSXmLqIybrd6tA8ZLJq2DLzKJEOlmfM9aIihLe/FLndfnTSkNK2et4o8vM3YjAmgOnrAo7JIpl0Zot59NUiTdx5j27IV+8siRWRRz9U3vtvz421qgPE5kn6YrJSVnYKCoWeB3FNfph1V+Mh894o3SLdj9n7ogflH/sfXisYj5vleSNldJi/67TKM4BgI1aaGdXuTteHqKti66rXQ+9a9d+SmwKgnRUpjVu1tkrWZCSFbVuugZYEZ9BZjhVCSY636wBuG6KFv7sDKiiZ0vXRqpUjUCOFMfkTG9nJdoOtatjliAef7+DTX3tUTl1mVdNczmAnEgeiZJq3mMKxcbKicOXQscqU/Jgd1+Y2bsyQsDIgwN/k23y7jAuaEhIPlMeLzL84Jkl5N8sbAIh35qXZz7tesyYdt8FuJX6GCu6qXKOFs8aFn8RV2x9Ba8z5iHBCwS7QOCmZnakywU/Lb2kFEaqsA2K8W/3ZDw2tW5mNQqLlH/MRoGp4SMLs6a0CKO2Ph0532oePpDlgQoF1kX9pyf9UBQaNIfrkXDGQGS/r2y6LZTdPivYs6l9r6ARUxisRRzqbe8WvxVoPaJvr8Xg/dqQWz2lYgtCdiGWbjvNUhDYpKdzR+8v8IRerYlH6L8RppDRhiCzQTU'
             |let proof = base64'pNeWbxzzJPMsPpuXBXWZgtLic1s0KL8UeLDGBhEjygrv8m1eMM12pzd+r/scvBEHrnEoQHanlNTlWPywaXaFtB5Hd5RMrnbfLbpe16tvtlH2SRbJbGXSpib5uiuSa6z1ExLtXs9nNWiu10eupG6Pq4SNOacCEVvUgSzCzhyLIlz62gq4DlBBWKmEFI7KiFs7kr2EPBjj2m83dbA/GGVgoYYjgBmFX6/srvLADxerZTKG2moOQrmAx9GJ99nwhRbW'
             |let inputs = base64'I8C5RcBDPi2n4omt9oOV2rZk9T9xlSV8PQvLeVHjGb00fCVz7AHOIjLJ03ZCTLQwEKkAk9tQWJ6gFTBnG2+0DDHlXcVkwpMafcpS2diKFe0T4fRb0t9mxNzOFiRVcJoeMU1zb/rE4dIMm9rbEPSDnVSOd8tHNnJDkT+/NcNsQ2w0UEVJJRAEnC7G0Y3522RlDLxpTZ6w0U/9V0pLNkFgDCkFBKvpaEfPDJjoEVyCUWDC1ts9LIR43xh3ZZBdcO/HATHoLzxM3Ef11qF+riV7WDPEJfK11u8WGazzCAFhsx0aKkkbnKl7LnypBzwRvrG2JxdLI/oXL0eoIw9woVjqrg6elHudnHDXezDVXjRWMPaU+L3tOW9aqN+OdP4AhtpgT2CoRCjrOIU3MCFqsrCK9bh33PW1gtNeHC78mIetQM5LWZHtw4KNwafTrQ+GCKPelJhiC2x7ygBtat5rtBsJAVF5wjssLPZx/7fqNqifXB7WyMV7J1M8LBQVXj5kLoS9bpmNHlERRSadC0DEUbY9xhIG2xo7R88R0sq04a299MFv8XJNd+IdueYiMiGF5broHD4UUhPxRBlBO3lOfDTPnRSUGS3Sr6GxwCjKO3MObz/6RNxCk9SnQ4NccD17hS/m'
             """.stripMargin),
- 
-        (16, """
+    (16, """
             |let vk = base64'lp7+dPDIOfm77haSFnvr33VwYH/KbIalfOJPRvBLzqlHD8BxunNebMr6Gr6S+u+nh7yLzdqr7HHQNOpZI8mdj/7lR0IBqB9zvRfyTr+guUG22kZo4y2KINDp272xGglKEeTglTxyDUriZJNF/+T6F8w70MR/rV+flvuo6EJ0+HA+A2ZnBbTjOIl9wjisBV+0iISo2JdNY1vPXlpwhlL2fVpW/WlREkF0bKlBadDIbNJBgM4niJGuEZDru3wqrGueETKHPv7hQ8em+p6vQolp7c0iknjXrGnvlpf4QtUtpg3z/D+snWjRPbVqRgKXWtihuIvPFaM6dt7HZEbkeMnXWwSINeYC/j3lqYnce8Jq+XkuF42stVNiooI+TuXECnFdFi9Ib25b9wtyz3H/oKg48He1ftntj5uIRCOBvzkFHGUF6Ty214v3JYvXJjdS4uS2jekplZYoV0aXEnYEOIvfF7d4xay3qkx2NspooM4HeZpiHknIWkUVhGVJBzBDLjLBjiGBK+TGHfH8Oadexhdet7ExyIWibSmamWQvffZkyl3WnMoVbTQ3lOks4Mca3sU5hp1iMepdu0rKoBh0NXcw9F9hkiggDIkRNINq2rlvUypPiSmp8U8tDSMeG0YVSovFlA4DsjBwntJH45NgNbY/Rbu/hfe7QskTkBiTo2A+kmYSH75Uvf2UAXwBAT1PoE0sqtYndF2Kbthl6GylV3j9NIKtIzHd/GwleExuM7KlI1H22P78br5zmh8D7V1aFcxPpftQhjch4abXuxEP4ahgfNmthdhoSvQykLhjbmG9BrvwmyaDRd/sHCTeSXmLqIybrd6tA8ZLJq2DLzKJEOlmfM9aIihLe/FLndfnTSkNK2et4o8vM3YjAmgOnrAo7JIpl0Zot59NUiTdx5j27IV+8siRWRRz9U3vtvz421qgPE5kn6YrJSVnYKCoWeB3FNfph1V+Mh894o3SLdj9n7ogflH/sfXisYj5vleSNldJi/67TKM4BgI1aaGdXuTteHqKti66rXQ+9a9d+SmwKgnRUpjVu1tkrWZCSFbVuugZYEZ9BZjhVCSY636wBuG6KFv7sDKiiZ0vXRqpUjUCOFMfkTG9nJdoOtatjliAef7+DTX3tUTl1mVdNczmAnEgeiZJq3mMKxcbKicOXQscqU/Jgd1+Y2bsyQsDIgwN/k23y7jAuaEhIPlMeLzL84Jkl5N8sbAIh35qXZz7tesyYdt8FuJX6GCu6qXKOFs8aFn8RV2x9Ba8z5iHBCwS7QOCmZnakywU/Lb2kFEaqsA2K8W/3ZDw2tW5mNQqLlH/MRoGp4SMLs6a0CKO2Ph0532oePpDlgQoF1kX9pyf9UBQaNIfrkXDGQGS/r2y6LZTdPivYs6l9r6ARUxisRRzqbe8WvxVoPaJvr8Xg/dqQWz2lYgtCdiGWbjvNUhDYpKdzR+8v8IRerYlH6L8RppDRhiCzQTUpNeWbxzzJPMsPpuXBXWZgtLic1s0KL8UeLDGBhEjygrv8m1eMM12pzd+r/scvBEH'
             |let proof = base64'iw5yhCCarVRq/h0Klq4tHNdF1j7PxaDn0AfHTxc2hb//Acav53QStwQShQ0BpQJ7sdchkTTJLkhM13+JpPY/I2WIc6DMZdRzw3pRjLSdMUmce7LYbBJOI+/IyuLZH5IXA7sX4r+xrPssIaMiKR3twmmReN9NrSoovLepDsNmzDVraO71B4rkx7uPXvkqvt3Zkr2EPBjj2m83dbA/GGVgoYYjgBmFX6/srvLADxerZTKG2moOQrmAx9GJ99nwhRbW'
             |let inputs = base64'I8C5RcBDPi2n4omt9oOV2rZk9T9xlSV8PQvLeVHjGb00fCVz7AHOIjLJ03ZCTLQwEKkAk9tQWJ6gFTBnG2+0DDHlXcVkwpMafcpS2diKFe0T4fRb0t9mxNzOFiRVcJoeMU1zb/rE4dIMm9rbEPSDnVSOd8tHNnJDkT+/NcNsQ2w0UEVJJRAEnC7G0Y3522RlDLxpTZ6w0U/9V0pLNkFgDCkFBKvpaEfPDJjoEVyCUWDC1ts9LIR43xh3ZZBdcO/HATHoLzxM3Ef11qF+riV7WDPEJfK11u8WGazzCAFhsx0aKkkbnKl7LnypBzwRvrG2JxdLI/oXL0eoIw9woVjqrg6elHudnHDXezDVXjRWMPaU+L3tOW9aqN+OdP4AhtpgT2CoRCjrOIU3MCFqsrCK9bh33PW1gtNeHC78mIetQM5LWZHtw4KNwafTrQ+GCKPelJhiC2x7ygBtat5rtBsJAVF5wjssLPZx/7fqNqifXB7WyMV7J1M8LBQVXj5kLoS9bpmNHlERRSadC0DEUbY9xhIG2xo7R88R0sq04a299MFv8XJNd+IdueYiMiGF5broHD4UUhPxRBlBO3lOfDTPnRSUGS3Sr6GxwCjKO3MObz/6RNxCk9SnQ4NccD17hS/mEFt8d4ERZOfmuvD3A0RCPCnx3Fr6rHdm6j+cfn/NM6o='
@@ -1384,9 +1405,17 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   )
 
   property("groth16Verify_*inputs (false)") {
-    for((ii, lets) <- grothsFail) {
-      val i = if(ii == 0) { 1 } else { ii }
-      val src = lets ++ (if(i != 16) { s"groth16Verify_${i}inputs(vk, proof, inputs)" } else { "groth16Verify(vk, proof, inputs)" })
+    for ((ii, lets) <- grothsFail) {
+      val i = if (ii == 0) {
+        1
+      } else {
+        ii
+      }
+      val src = lets ++ (if (i != 16) {
+                           s"groth16Verify_${i}inputs(vk, proof, inputs)"
+                         } else {
+                           "groth16Verify(vk, proof, inputs)"
+                         })
       eval(src, version = V4) shouldBe Right(CONST_BOOLEAN(false))
     }
   }
@@ -1397,101 +1426,133 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
           |let proof = base64'sStVLdyxqInmv76iaNnRFB464lGq48iVeqYWSi2linE9DST0fTNhxSnvSXAoPpt8tFsanj5vPafC+ij/Fh98dOUlMbO42bf280pOZ4lm+zr63AWUpOOIugST+S6pq9zeB0OHp2NY8XFmriOEKhxeabhuV89ljqCDjlhXBeNZwM5zti4zg89Hd8TbKcw46jAsjIJe2Siw3Th7ELQQKR5ucX50f0GISmnOSceePPdvjbGJ8fSFOnSmSp8dK7uyehrU'
           |let inputs = base64''
           |""".stripMargin),
- 
     (1, """
           |let vk = base64'mY//hEITCBCZUJUN/wsOlw1iUSSOESL6PFSbN1abGK80t5jPNICNlPuSorio4mmWpf+4uOyv3gPZe54SYGM4pfhteqJpwFQxdlpwXWyYxMTNaSLDj8VtSn/EJaSu+P6nFmWsda3mTYUPYMZzWE4hMqpDgFPcJhw3prArMThDPbR3Hx7E6NRAAR0LqcrdtsbDqu2T0tto1rpnFILdvHL4PqEUfTmF2mkM+DKj7lKwvvZUbukqBwLrnnbdfyqZJryzGAMIa2JvMEMYszGsYyiPXZvYx6Luk54oWOlOrwEKrCY4NMPwch6DbFq6KpnNSQwOpgRYCz7wpjk57X+NGJmo85tYKc+TNa1rT4/DxG9v6SHkpXmmPeHhzIIW8MOdkFjxB5o6Qn8Fa0c6Tt6br2gzkrGr1eK5/+RiIgEzVhcRrqdY/p7PLmKXqawrEvIv9QZ3ijytPNwinlC8XdRLO/YvP33PjcI9WSMcHV6POP9KPMo1rngaIPMegKgAvTEouNFKp4v3wAXRXX5xEjwXAmM5wyB/SAOaPPCK/emls9kqolHsaj7nuTTbrvSV8bqzUwzQ'
           |let proof = base64'g53N8ecorvG2sDgNv8D7quVhKMIIpdP9Bqk/8gmV5cJ5Rhk9gKvb4F0ll8J/ZZJVqa27OyciJwx6lym6QpVK9q1ASrqio7rD5POMDGm64Iay/ixXXn+//F+uKgDXADj9AySri2J1j3qEkqqe3kxKthw94DzAfUBPncHfTPazVtE48AfzB1KWZA7Vf/x/3phYs4ckcP7ZrdVViJVLbUgFy543dpKfEH2MD30ZLLYRhw8SatRCyIJuTZcMlluEKG+d'
           |let inputs = base64'aZ8tqrOeEJKt4AMqiRF/WJhIKTDC0HeDTgiJVLZ8OEs='
           |""".stripMargin),
- 
     (15, """
           |let vk = base64'tRpqHB4HADuHAUvHTcrzxmq1awdwEBA0GOJfebYTODyUqXBQ7FkYrz1oDvPyx5Z3sUmODSJXAQmAFBVnS2t+Xzf5ZCr1gCtMiJVjQ48/nob/SkrS4cTHHjbKIVS9cdD/BG/VDrZvBt/dPqXmdUFyFuTTMrViagR57YRrDmm1qm5LQ/A8VwUBdiArwgRQXH9jsYhgVmfcRAjJytrbYeR6ck4ZfmGr6x6akKiBLY4B1l9LaHTyz/6KSM5t8atpuR3HBJZfbBm2/K8nnYTl+mAU/EnIN3YQdUd65Hsd4Gtf6VT2qfz6hcrSgHutxR1usIL2kyU9X4Kqjx6I6zYwVbn7PWbiy3OtY277z4ggIqW6AuDgzUeIyG9a4stMeQ07mOV/Ef4faj+eh4GJRKjJm7aUTYJCSAGY6klOXNoEzB54XF4EY5pkMPfW73SmxJi9B0aHkZWDy2tzUlwvxZ/BfsDkUZnt6mI+qdDOtTG6JFItSQZotYGDBm6zPczwo3ZAGpr8gibTE6DjT7GGNDEl26jgAJ3aAdBrf7Yb0vWEYizOJK4SO/Ud+4/WxXDby7xbwlFYkgEtYbMO6PXozhRqDiotJ0CfdSExNHA9A37mR/bpNOKyhArfyvSBIJnUQgOw5wMBq+GOP5n78E99a5rY4FXGUmM3LGdp/CvkGITYf04SWHkZAEueYH96Ys5jrHlIZQA2k9j02Ji+SL82DJFH8LDh77fgh9zh0wAjCAqY7/r72434RDA97bfEZJavRmAENsgflsSVb8d9rQMBpWl3Xkb8mNlUOSf+LAXeXYQR42Z4yuUjwAUvk//+imuhsWF8ZCMkpb9wQ/6crVH4E5E3f6If/Mt/DcenWlPNtvu2CJFatc8q31aSdnWhMN8U65SX3DBouDc8EXDFd5twy4VWMS5lhY6VbU/lS8T8oyhr+NIpstsKUmSh0EM1rGyUh2PNgIYzoeBznHWagp2WO3nIbNYIcXEROBT8QpqA4Dqzxv665jwajGXmAawRvdZqzLqvCkeujekplZYoV0aXEnYEOIvfF7d4xay3qkx2NspooM4HeZpiHknIWkUVhGVJBzBDLjLBjiGBK+TGHfH8Oadexhdet7ExyIWibSmamWQvffZkyl3WnMoVbTQ3lOks4Mca3sU5hp1iMepdu0rKoBh0NXcw9F9hkiggDIkRNINq2rlvUypPiSmp8U8tDSMeG0YVSovFlA4DsjBwntJH45NgNbY/Rbu/hfe7QskTkBiTo2A+kmYSH75Uvf2UAXwBAT1PoE0sqtYndF2Kbthl6GylV3j9NIKtIzHd/GwleExuM7KlI1H22P78br5zmh8D7V1aFcxPpftQhjch4abXuxEP4ahgfNmthdhoSvQykLhjbmG9BrvwmyaDRd/sHCTeSXmLqIybrd6tA8ZLJq2DLzKJEOlmfM9aIihLe/FLndfnTSkNK2et4o8vM3YjAmgOnrAo7JIp'
           |let proof = base64'lgFU4Jyo9GdHL7w31u3zXc8RQRnHVarZWNfd0lD45GvvQtwrZ1Y1OKB4T29a79UagPHOdk1S0k0hYAYQyyNAfRUzde1HP8R+2dms75gGZEnx2tXexEN+BVjRJfC8PR1lFJa6xvsEx5uSrOZzKmoMfCwcA55SMT5jFo4+KyWg2wP5OnFPx7XTdEKvf5YhpY0krQKiq3OUu79EwjNF1xV1+iLxx2KEIyK7RSYxO1BHrKOGOEzxSUK00MA+YVHe+DvW'
           |let inputs = base64'aZ8tqrOeEJKt4AMqiRF/WJhIKTDC0HeDTgiJVLZ8OEtiLNj7hflFeVnNXPguxyoqkI/V7pGJtXBpH5N+RswQNA0b23aM33aH0HKHOWoGY/T/L7TQzYFGJ3vTLiXDFZg1OVqkGOMvqAgonOrHGi6IgcALyUMyCKlL5BQY23SeILJpYKolybJNwJfbjxpg0Oz+D2fr7r9XL1GMvgblu52bVQT1fR8uCRJfSsgA2OGw6k/MpKDCfMcjbR8jnZa8ROEvF4cohm7iV1788Vp2/2bdcEZRQSoaGV8pOmA9EkqzJVRABjkDso40fnQcm2IzjBUOsX+uFExVan56/vl9VZVwB0wnee3Uxiredn0kOayiPB16yimxXCDet+M+0UKjmIlmXYpkrCDrH0dn53w+U3OHqMQxPDnUpYBxadM1eI8xWFFxzaLkvega0q0DmEquyY02yiTqo+7Q4qaJVTLgu6/8ekzPxGKRi845NL8gRgaTtM3kidDzIQpyODZD0yeEZDY1M+3sUKHcVkhoxTQBTMyKJPc+M5DeBL3uaWMrvxuL6q8+X0xeBt+9kguPUNtIYqUgPAaXvM2i041bWHTJ0dZLyDJVOyzGaXRaF4mNkAuh4Et6Zw5PuOpMM2mI1oFKEZj7'
           |""".stripMargin),
- 
-   (16, """
+    (16, """
           |let vk = base64'kY4NWaOoYItWtLKVQnxDh+XTsa0Yev5Ae3Q9vlQSKp6+IUtwS7GH5ZrZefmBEwWEqvAtYaSs5qW3riOiiRFoLp7MThW4vCEhK0j8BZY5ZM/tnjB7mrLB59kGvzpW8PM/AoQRIWzyvO3Dxxfyj/UQcQRw+KakVRvrFca3Vy2K5cFwxYHwl6PFDM+OmGrlgOCoqZtY1SLOd+ovmFOODKiHBZzDZhC/lRfjKVy4LzI7AXDuFn4tlWoT7IsJyy6lYNaWFfLjYZPAsrv1gXJ1NYat5B6E0Pnz5C67u2Uigmlol2D91re3oAqIo+r8kiyFKOSBooG0cMN47zQor6qj0owuxJjn5Ymrcd/FCQ1ud4cKoUlNaGWIekSjxJEB87elMy5oEUlUzVI9ObMm+2SE3Udgws7pkMM8fgQUQUqUVyc7sNCE9m/hQzlwtbXrNSS5Pb+6ow7aHMOavjVyaXiS0f6b1pwJpS1yT+K85UA1CLqqxCaEw5+8WAjMzBOrKmxBUpYApI4FBAIa/SjeU/wYnljUUMTMfnBfCQ8MS01hFSQZSoPx1do8Zxn5Y3NPgpaomXDfpyVK9Q0U0NkqQqPsk+T+AroxQGxq9f/HOX5I5ZibF27dZ32tCbTKo22GgspqtAv2iv06PubySY5lRIEYlCjr5j8Ahl9gFvN+22cIh1iGiuwByhPjGDgP5h78xZXCBoJekEYPcI2C0LtBch5pZC/JpS1kF9lBLndodhIlutEr3mkKohR+D/czN/FTdxU2b82QqfZOHc+6rv2biEXy8AdoAMykj1dsIw7/d5M8XcgPiUzNko4H6p02Rt2R01MOYboTogaQH8lyU6o8c+iORRGEoZDTq4htC+Qa7AXTodvSmG33IrwJVGOKDMtvWI1VYdhWs32SB0W1d+BrFb0ObBGsz+Un7P+V8qerCMqu906BkbjdWmsKbKQBFC8/YDTdSi92rIq1ISUQWn88AgW/q+u6KPxybU5EZgbA+EZwCDB6MyBNhHcrAvVFeX+kj1RY1Gx1kzCE3ldsT37sCbayFtyMMbL6gDQCoTadJX/jhs9wgp0dZujwOk0Wefhgy1BUHXl/q+2nXAKPvKmli6Wo7/pYr/q13Gcsj7Z7WSKVn4Fm4XfkJD62q6paCxO51BlJQEcnpNPKS7+zjhmQlTRiEryD8ve7KQzk20eb4TgIMR1hI5pnQmjGeT56xZySp2nDnYDsqsnXB5uQY8lyf6IYC/PHzEb3rSx91k0ZEu5w5IMrVK8otNzZHrUuM0aPdImpLQJ4qEgvmezORpcUCq4SRp9bGl3/yzXE5tWZgn3Q6kXyjFMhu+foTYy1NV+HJbJI1nYMjeTr3f+RxSphIYWyMZ7sD3RgDzRk5iQqD1J+8rdOIZliObfrmWaro/BBxNvd1fPAlFEPiDegBcDaVWHS2A1FPIC9d+DU05vizrBfli6su9rCvSBNVnoDSBF2zeU+2NjXj7ycHYxCuZgl8dBu8FZjvjlDUZCqfdq3PszQeo2X55trDJEHeVWaRoIcgiG2hfTN'
           |let proof = base64'jqPSA/XKqZDJnRSmM0sJxbrFv7GUcA45QMysIx1xTsI3+2iysF5Tr68565ZuO65qjo2lklZpQo+wtyKSA/56EaKOJZCZhSvDdBEdvVYJCjmWusuK5qav7xZO0w5W1qRiEgIdcGUz5V7JHqfRf4xI6/uUD846alyzzNjxQtKErqJbRw6yyBO6j6box363pinjiMTzU4w/qltzFuOEpKxy/H3vyH8RcsF24Ou/Rb6vfR7cSLtLwCsf/BMtPcsQfdRK'
           |let inputs = base64'aZ8tqrOeEJKt4AMqiRF/WJhIKTDC0HeDTgiJVLZ8OEtiLNj7hflFeVnNXPguxyoqkI/V7pGJtXBpH5N+RswQNA0b23aM33aH0HKHOWoGY/T/L7TQzYFGJ3vTLiXDFZg1OVqkGOMvqAgonOrHGi6IgcALyUMyCKlL5BQY23SeILJpYKolybJNwJfbjxpg0Oz+D2fr7r9XL1GMvgblu52bVQT1fR8uCRJfSsgA2OGw6k/MpKDCfMcjbR8jnZa8ROEvF4cohm7iV1788Vp2/2bdcEZRQSoaGV8pOmA9EkqzJVRABjkDso40fnQcm2IzjBUOsX+uFExVan56/vl9VZVwB0wnee3Uxiredn0kOayiPB16yimxXCDet+M+0UKjmIlmXYpkrCDrH0dn53w+U3OHqMQxPDnUpYBxadM1eI8xWFFxzaLkvega0q0DmEquyY02yiTqo+7Q4qaJVTLgu6/8ekzPxGKRi845NL8gRgaTtM3kidDzIQpyODZD0yeEZDY1M+3sUKHcVkhoxTQBTMyKJPc+M5DeBL3uaWMrvxuL6q8+X0xeBt+9kguPUNtIYqUgPAaXvM2i041bWHTJ0dZLyDJVOyzGaXRaF4mNkAuh4Et6Zw5PuOpMM2mI1oFKEZj7Xqf/yAmy/Le3GfJnMg5vNgE7QxmVsjuKUP28iN8rdi4='
           |""".stripMargin),
- 
-   (17, """
+    (17, """
           |let vk = base64'pQUlLSBu9HmVa9hB0rEu1weeBv2RKQQ8yCHpwXTHeSkcQqmSOuzednF8o0+MdyNuhKgxmPN2c94UBtlYc0kZS6CwyMEEV/nVGSjajEZPdnpbK7fEcPd0hWNcOxKWq8qBBPfT69Ore74buf8C26ZTyKnjgMsGCvoDAMOsA07DjjQ1nIkkwIGFFUT3iMO83TdEpWgV/2z7WT9axNH/QFPOjXvwQJFnC7hLxHnX6pgKOdAaioKdi6FX3Y2SwWEO3UuxFd3KwsrZ2+mma/W3KP/cPpSzqyHa5VaJwOCw6vSM4wHSGKmDF4TSrrnMxzIYiTbTlrwLi5GjMxD6BKzMMN9+7xFuO7txLCEIhGrIMFIvqTw1QFAO4rmAgyG+ljlYTfWHAkzqvImL1o8dMHhGOTsMLLMg39KsZVqalZwwL3ckpdAf81OJJeWCpCuaSgSXnWhJmHxQuA9zUhrmlR1wHO9eegHh/p01osP0xU03rY1oGonOZ28acYG6MSOfZBkKT+NoqOcEWtL4RCP6t7BWXHgIUmlhCEj/pwNVx92Vc3ZzE8zMh3U196ICHzTSZz0rMwJkmT0l1m7QdvBpqUeqCxyXgY+6afqsdAdGjZeuUOPB2RDam3Cm2j2Z5VygvdIBI12qlIoEBhnrhCxx6TN+ywilfI2aBjzTtn0rCe7IA9sYtcYn3XSooU7TBNB39O8cbGgnmGYQygxBsQ/Emj2KDCqQ4A1MRnSe3q6tQhjToqDjHRXEKzlWka/4+hWNnJpicq/LmT3jxCH9/yre8qFUXy+Hq2ycitjv3rogw+hyXlK3pIoQmDskJnqBk3hxisj3QQrQiv06PubySY5lRIEYlCjr5j8Ahl9gFvN+22cIh1iGiuwByhPjGDgP5h78xZXCBoJekEYPcI2C0LtBch5pZC/JpS1kF9lBLndodhIlutEr3mkKohR+D/czN/FTdxU2b82QqfZOHc+6rv2biEXy8AdoAMykj1dsIw7/d5M8XcgPiUzNko4H6p02Rt2R01MOYboTogaQH8lyU6o8c+iORRGEoZDTq4htC+Qa7AXTodvSmG33IrwJVGOKDMtvWI1VYdhWs32SB0W1d+BrFb0ObBGsz+Un7P+V8qerCMqu906BkbjdWmsKbKQBFC8/YDTdSi92rIq1ISUQWn88AgW/q+u6KPxybU5EZgbA+EZwCDB6MyBNhHcrAvVFeX+kj1RY1Gx1kzCE3ldsT37sCbayFtyMMbL6gDQCoTadJX/jhs9wgp0dZujwOk0Wefhgy1BUHXl/q+2nXAKPvKmli6Wo7/pYr/q13Gcsj7Z7WSKVn4Fm4XfkJD62q6paCxO51BlJQEcnpNPKS7+zjhmQlTRiEryD8ve7KQzk20eb4TgIMR1hI5pnQmjGeT56xZySp2nDnYDsqsnXB5uQY8lyf6IYC/PHzEb3rSx91k0ZEu5w5IMrVK8otNzZHrUuM0aPdImpLQJ4qEgvmezORpcUCq4SRp9bGl3/yzXE5tWZgn3Q6kXyjFMhu+foTYy1NV+HJbJI1nYMjeTr3f+RxSphIYWyMZ7sD3RgDzRk5iQqD1J+8rdOIZliObfrmWaro/BBxNvd1fPA'
           |let proof = base64'qV2FNaBFqWeL6n9q9OUbCSTcIQvwO0vfaA/f/SxEtLSIaOGIOx8r+WVGFdxmC6i3oOaoEkJWvML7PpKBDtqiK7pKDIaMV5PkV/kQl6UgxZv9OInTwpVPtYcgeeTokG/eBi1qKzJwDoEHVqKeLqrLXJHXhBVQLdoIUOeKj8YMkagVniO9EtK0fW0/9QnRIxXoilxSj5HBEpYwFBitJXRk1ftFGWZFxJXU5PXdRmC+pomyo5Scx+UJQ2NLRWHjKlV0'
           |let inputs = base64'aZ8tqrOeEJKt4AMqiRF/WJhIKTDC0HeDTgiJVLZ8OEtiLNj7hflFeVnNXPguxyoqkI/V7pGJtXBpH5N+RswQNA0b23aM33aH0HKHOWoGY/T/L7TQzYFGJ3vTLiXDFZg1OVqkGOMvqAgonOrHGi6IgcALyUMyCKlL5BQY23SeILJpYKolybJNwJfbjxpg0Oz+D2fr7r9XL1GMvgblu52bVQT1fR8uCRJfSsgA2OGw6k/MpKDCfMcjbR8jnZa8ROEvF4cohm7iV1788Vp2/2bdcEZRQSoaGV8pOmA9EkqzJVRABjkDso40fnQcm2IzjBUOsX+uFExVan56/vl9VZVwB0wnee3Uxiredn0kOayiPB16yimxXCDet+M+0UKjmIlmXYpkrCDrH0dn53w+U3OHqMQxPDnUpYBxadM1eI8xWFFxzaLkvega0q0DmEquyY02yiTqo+7Q4qaJVTLgu6/8ekzPxGKRi845NL8gRgaTtM3kidDzIQpyODZD0yeEZDY1M+3sUKHcVkhoxTQBTMyKJPc+M5DeBL3uaWMrvxuL6q8+X0xeBt+9kguPUNtIYqUgPAaXvM2i041bWHTJ0dZLyDJVOyzGaXRaF4mNkAuh4Et6Zw5PuOpMM2mI1oFKEZj7Xqf/yAmy/Le3GfJnMg5vNgE7QxmVsjuKUP28iN8rdi4bUp7c0KJpqLXE6evfRrdZBDRYp+rmOLLDg55ggNuwog=='
           |""".stripMargin)
-    )
+  )
 
   property("groth16Verify_*inputs") {
-    for((ii, lets) <- grothsOk if (ii <= 16)) {
-      val i = if(ii == 0) { 1 } else { ii }
-      val src = lets ++ (if(i != 16) { s"groth16Verify_${i}inputs(vk, proof, inputs)" } else { "groth16Verify(vk, proof, inputs)" })
+    for ((ii, lets) <- grothsOk if (ii <= 16)) {
+      val i = if (ii == 0) {
+        1
+      } else {
+        ii
+      }
+      val src = lets ++ (if (i != 16) {
+                           s"groth16Verify_${i}inputs(vk, proof, inputs)"
+                         } else {
+                           "groth16Verify(vk, proof, inputs)"
+                         })
       eval(src, version = V4) shouldBe Right(CONST_BOOLEAN(true))
     }
   }
 
   property("groth16Verify_*inputs fail if too many inputs") {
-    for((i, lets) <- grothsFail ++ grothsOk if (i>1)) {
-      val src = lets ++ (if(i <= 16) { s"groth16Verify_${i-1}inputs(vk, proof, inputs)" } else { "groth16Verify(vk, proof, inputs)" })
-      eval(src, version = V4) shouldBe Left(s"Invalid inputs size ${i*32} bytes, must be not greater than ${i*32-32} bytes")
+    for ((i, lets) <- grothsFail ++ grothsOk if (i > 1)) {
+      val src = lets ++ (if (i <= 16) {
+                           s"groth16Verify_${i - 1}inputs(vk, proof, inputs)"
+                         } else {
+                           "groth16Verify(vk, proof, inputs)"
+                         })
+      eval(src, version = V4) shouldBe Left(s"Invalid inputs size ${i * 32} bytes, must be not greater than ${i * 32 - 32} bytes")
     }
   }
 
   property("groth16Verify_*inputs with invalid vk size") {
     for {
       ii <- 0 to 16
-      n <- Seq(0, (8+ii)*48+1, (8+ii)*48-1)
-      }{
+      n  <- Seq(0, (8 + ii) * 48 + 1, (8 + ii) * 48 - 1)
+    } {
       val lets = s"""
-          |let vk = base16'${"AA"*n}'
+          |let vk = base16'${"AA" * n}'
           |let proof = base64'g53N8ecorvG2sDgNv8D7quVhKMIIpdP9Bqk/8gmV5cJ5Rhk9gKvb4F0ll8J/ZZJVqa27OyciJwx6lym6QpVK9q1ASrqio7rD5POMDGm64Iay/ixXXn+//F+uKgDXADj9AySri2J1j3qEkqqe3kxKthw94DzAfUBPncHfTPazVtE48AfzB1KWZA7Vf/x/3phYs4ckcP7ZrdVViJVLbUgFy543dpKfEH2MD30ZLLYRhw8SatRCyIJuTZcMlluEKG+d'
-          |let inputs = base16'${"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"*ii}'
+          |let inputs = base16'${"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" * ii}'
           |""".stripMargin
-      val i = if(ii == 0) { 1 } else { ii }
-      val src = lets ++ (if(i != 16) { s"groth16Verify_${i}inputs(vk, proof, inputs)" } else { "groth16Verify(vk, proof, inputs)" })
-      eval(src, version = V4) shouldBe Left(s"Invalid vk size ${n} bytes, must be equal to ${(8 + ii)*48} bytes for ${ii} inputs")
+      val i = if (ii == 0) {
+        1
+      } else {
+        ii
+      }
+      val src = lets ++ (if (i != 16) {
+                           s"groth16Verify_${i}inputs(vk, proof, inputs)"
+                         } else {
+                           "groth16Verify(vk, proof, inputs)"
+                         })
+      eval(src, version = V4) shouldBe Left(s"Invalid vk size ${n} bytes, must be equal to ${(8 + ii) * 48} bytes for ${ii} inputs")
     }
   }
 
   property("groth16Verify_*inputs with invalid proof size") {
-    val lets = """
+    val lets =
+      """
           |let vk = base64'mY//hEITCBCZUJUN/wsOlw1iUSSOESL6PFSbN1abGK80t5jPNICNlPuSorio4mmWpf+4uOyv3gPZe54SYGM4pfhteqJpwFQxdlpwXWyYxMTNaSLDj8VtSn/EJaSu+P6nFmWsda3mTYUPYMZzWE4hMqpDgFPcJhw3prArMThDPbR3Hx7E6NRAAR0LqcrdtsbDqu2T0tto1rpnFILdvHL4PqEUfTmF2mkM+DKj7lKwvvZUbukqBwLrnnbdfyqZJryzGAMIa2JvMEMYszGsYyiPXZvYx6Luk54oWOlOrwEKrCY4NMPwch6DbFq6KpnNSQwOpgRYCz7wpjk57X+NGJmo85tYKc+TNa1rT4/DxG9v6SHkpXmmPeHhzIIW8MOdkFjxB5o6Qn8Fa0c6Tt6br2gzkrGr1eK5/+RiIgEzVhcRrqdY/p7PLmKXqawrEvIv9QZ3ijytPNwinlC8XdRLO/YvP33PjcI9WSMcHV6POP9KPMo1rngaIPMegKgAvTEouNFKp4v3wAXRXX5xEjwXAmM5wyB/SAOaPPCK/emls9kqolHsaj7nuTTbrvSV8bqzUwzQ'
           |let proof = base64'g53N8ecorvG2sDgNv8D7quVhKMIIpdP9Bqk/8gmV5cJ5Rhk9gKvb4F0ll8J/ZZJVqa27OyciJwx6lym6QpVK9q1ASrqio7rD5POMDGm64Iay/ixXXn+//F+uKgDXADj9AySri2J1j3qEkqqe3kxKthw94DzAfUBPncHfTPazVtE48AfzB1KWZA7Vf/x/3phYs4ckcP7ZrdVViJVLbUgFy543dpKfEH2MD30ZLLYRhw8SatRCyIJuTZcMlluEKG+d' + base16'00'
           |let inputs = base64'aZ8tqrOeEJKt4AMqiRF/WJhIKTDC0HeDTgiJVLZ8OEs='
           |""".stripMargin
-    for(ii <- 0 to 16) {
-      val i = if(ii == 0) { 1 } else { ii }
-      val src = lets ++ (if(i != 16) { s"groth16Verify_${i}inputs(vk, proof, inputs)" } else { "groth16Verify(vk, proof, inputs)" })
+    for (ii <- 0 to 16) {
+      val i = if (ii == 0) {
+        1
+      } else {
+        ii
+      }
+      val src = lets ++ (if (i != 16) {
+                           s"groth16Verify_${i}inputs(vk, proof, inputs)"
+                         } else {
+                           "groth16Verify(vk, proof, inputs)"
+                         })
       eval(src, version = V4) shouldBe Left("Invalid proof size 193 bytes, must be equal to 192 bytes")
     }
   }
 
   property("groth16Verify_*inputs with invalid inputs size") {
-    val lets = """
+    val lets =
+      """
           |let vk = base64'mY//hEITCBCZUJUN/wsOlw1iUSSOESL6PFSbN1abGK80t5jPNICNlPuSorio4mmWpf+4uOyv3gPZe54SYGM4pfhteqJpwFQxdlpwXWyYxMTNaSLDj8VtSn/EJaSu+P6nFmWsda3mTYUPYMZzWE4hMqpDgFPcJhw3prArMThDPbR3Hx7E6NRAAR0LqcrdtsbDqu2T0tto1rpnFILdvHL4PqEUfTmF2mkM+DKj7lKwvvZUbukqBwLrnnbdfyqZJryzGAMIa2JvMEMYszGsYyiPXZvYx6Luk54oWOlOrwEKrCY4NMPwch6DbFq6KpnNSQwOpgRYCz7wpjk57X+NGJmo85tYKc+TNa1rT4/DxG9v6SHkpXmmPeHhzIIW8MOdkFjxB5o6Qn8Fa0c6Tt6br2gzkrGr1eK5/+RiIgEzVhcRrqdY/p7PLmKXqawrEvIv9QZ3ijytPNwinlC8XdRLO/YvP33PjcI9WSMcHV6POP9KPMo1rngaIPMegKgAvTEouNFKp4v3wAXRXX5xEjwXAmM5wyB/SAOaPPCK/emls9kqolHsaj7nuTTbrvSV8bqzUwzQ'
           |let proof = base64'g53N8ecorvG2sDgNv8D7quVhKMIIpdP9Bqk/8gmV5cJ5Rhk9gKvb4F0ll8J/ZZJVqa27OyciJwx6lym6QpVK9q1ASrqio7rD5POMDGm64Iay/ixXXn+//F+uKgDXADj9AySri2J1j3qEkqqe3kxKthw94DzAfUBPncHfTPazVtE48AfzB1KWZA7Vf/x/3phYs4ckcP7ZrdVViJVLbUgFy543dpKfEH2MD30ZLLYRhw8SatRCyIJuTZcMlluEKG+d'
           |let inputs = base64'aZ8tqrOeEJKt4AMqiRF/WJhIKTDC0HeDTgiJVLZ8OEs=' + base16'00'
           |""".stripMargin
-    for(ii <- 2 to 16) {
-      val i = if(ii == 0) { 1 } else { ii }
-      val src = lets ++ (if(i != 16) { s"groth16Verify_${i}inputs(vk, proof, inputs)" } else { "groth16Verify(vk, proof, inputs)" })
+    for (ii <- 2 to 16) {
+      val i = if (ii == 0) {
+        1
+      } else {
+        ii
+      }
+      val src = lets ++ (if (i != 16) {
+                           s"groth16Verify_${i}inputs(vk, proof, inputs)"
+                         } else {
+                           "groth16Verify(vk, proof, inputs)"
+                         })
       eval(src, version = V4) shouldBe Left("Invalid inputs size 33 bytes, must be a multiple of 32 bytes")
     }
   }
 
-
-
   property("calculateAssetId") {
-    val decimals = 100
-    val description = "description"
+    val decimals     = 100
+    val description  = "description"
     val isReissuable = true
-    val name = "name"
-    val quantity = 1234567
-    val nonce = 1
-    val issue = Issue.create(compiledScript = None, decimals, description, isReissuable, name, quantity, nonce, ByteStr.empty)
+    val name         = "name"
+    val quantity     = 1234567
+    val nonce        = 1
+    val issue        = Issue.create(compiledScript = None, decimals, description, isReissuable, name, quantity, nonce, ByteStr.empty)
     val script =
-     s"""
+      s"""
         | let issue = Issue("$name", "$description", $quantity, $decimals, $isReissuable, unit, $nonce)
         | calculateAssetId(issue)
       """.stripMargin
@@ -1502,8 +1563,21 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       CONST_BYTESTR(issue.id)
   }
 
+  property("different Issue action constructors") {
+    val script =
+     """
+       | Issue("name", "description", 1234567, 100, true) ==
+       | Issue("name", "description", 1234567, 100, true, unit, 0)
+     """.stripMargin
+
+    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+
+    genericEval[Environment, EVALUATED](script, ctxt = ctx, version = V4, env = utils.environment) shouldBe
+      Right(CONST_BOOLEAN(true))
+  }
+
   property("toBase16String limit 8Kb from V4") {
-    val base16String8Kb = "fedcba9876543210" * 1024
+    val base16String8Kb              = "fedcba9876543210" * 1024
     def script(base16String: String) = s"toBase16String(base16'$base16String')"
 
     eval(script(base16String8Kb), version = V3) shouldBe CONST_STRING(base16String8Kb)
@@ -1513,24 +1587,275 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(script(base16String8Kb + "aa"), version = V4) shouldBe Left("Base16 encode input length=8193 should not exceed 8192")
   }
 
-  private def bytes(base16String: String) = ByteStr(BaseEncoding.base16().decode(base16String.toUpperCase))
-
-  property("fromBase16String limit 32768 digits from V4") {
-    val string32Kb = "fedcba9876543210" * (32 * 1024 / 16)
-    def script(base16String: String) = s"""fromBase16String("$base16String")"""
-
-
-    eval(script(string32Kb), version = V3) shouldBe CONST_BYTESTR(bytes(string32Kb))
-    eval(script(string32Kb), version = V4) shouldBe CONST_BYTESTR(bytes(string32Kb))
-
-    eval(script(string32Kb + "aa"), version = V3) shouldBe CONST_BYTESTR(bytes(string32Kb + "aa"))
-    eval(script(string32Kb + "aa"), version = V4) shouldBe Left("Base16 decode input length=32770 should not exceed 32768")
-  }
-
   property("fromBase16String supports mixed case input") {
-    val value = "fedcba9876543210FEDCBA9876543210"
+    def bytes(base16String: String) = ByteStr(BaseEncoding.base16().decode(base16String.toUpperCase))
+
+    val value  = "fedcba9876543210FEDCBA9876543210"
     val script = s"""fromBase16String("$value")"""
 
     eval(script) shouldBe CONST_BYTESTR(bytes(value.toUpperCase))
+  }
+
+  property("string limit") {
+    val almostMaxString               = "a" * (Terms.DataEntryValueMax - 1)
+    val maxBytes                      = ("a" * Terms.DataEntryValueMax).getBytes(StandardCharsets.UTF_8)
+    val constructingTooBigString      = s""" "$almostMaxString" + "aa" """
+    val constructingMaxStringAndBytes = s""" ("$almostMaxString" + "a").toBytes() """
+
+    eval(constructingMaxStringAndBytes, version = V3) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
+    eval(constructingMaxStringAndBytes, version = V4) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
+
+    eval(constructingTooBigString, version = V3) should produce("String length = 32768 exceeds 32767")
+    eval(constructingTooBigString, version = V4) should produce("String length = 32768 exceeds 32767")
+  }
+
+  property("bytes limit") {
+    val bytes = ByteStr(("a" * (Terms.DataEntryValueMax / 4)).getBytes(StandardCharsets.UTF_8))
+    val constructingMaxBytes =
+      s""" base64'${bytes.base64Raw}' +
+         | base64'${bytes.base64Raw}' +
+         | base64'${bytes.base64Raw}' +
+         | base64'${bytes.base64Raw}' +
+         | base58'aaa'
+       """.stripMargin
+    val constructingTooBigBytes = constructingMaxBytes + "+ base58'a'"
+
+    inside(eval[EVALUATED](constructingMaxBytes, version = V3)) {
+      case Right(CONST_BYTESTR(bytes)) => bytes.size shouldBe Terms.DataEntryValueMax
+    }
+
+    inside(eval[EVALUATED](constructingMaxBytes, version = V4)) {
+      case Right(CONST_BYTESTR(bytes)) => bytes.size shouldBe Terms.DataEntryValueMax
+    }
+
+    eval(constructingTooBigBytes, version = V3) should produce("ByteVector size = 32768 bytes exceeds 32767")
+    eval(constructingTooBigBytes, version = V4) should produce("ByteVector size = 32768 bytes exceeds 32767")
+  }
+
+  property("list indexOf") {
+    eval(""" ["a","b","c","d"].indexOf("a") """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" ["a","b","c","d","a"].indexOf("a") """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" ["a","b","c","d"].indexOf("d") """, version = V4) shouldBe Right(CONST_LONG(3))
+    eval(""" [-1,2,3,4].indexOf(-1) """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" [-1,2,3,4].indexOf(4) """, version = V4) shouldBe Right(CONST_LONG(3))
+    eval(""" [true, false].indexOf(true) """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" [true, false].indexOf(false) """, version = V4) shouldBe Right(CONST_LONG(1))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].indexOf(base58'a') """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].indexOf(base58'd') """, version = V4) shouldBe Right(CONST_LONG(3))
+    eval(""" ["a","b","c","d"].indexOf("e") """, version = V4) shouldBe Right(unit)
+
+    eval(""" [true, false].indexOf(0) """, version = V4) should produce("Can't find a function overload")
+    eval(""" [true, false].indexOf() """, version = V4) should produce("Can't find a function overload")
+    eval(""" ["a","b","c","d"].indexOf("a") """, version = V3) should produce("Can't find a function overload 'indexOf'")
+  }
+
+  property("list lastIndexOf") {
+    eval(""" ["a","b","a","c","d"].lastIndexOf("a") """, version = V4) shouldBe Right(CONST_LONG(2))
+    eval(""" ["d","a","b","c","d"].lastIndexOf("d") """, version = V4) shouldBe Right(CONST_LONG(4))
+    eval(""" [-1,2,3,4,-1].lastIndexOf(-1) """, version = V4) shouldBe Right(CONST_LONG(4))
+    eval(""" [4,-1,2,3].lastIndexOf(4) """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" [true, false].lastIndexOf(true) """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval(""" [true, false].lastIndexOf(false) """, version = V4) shouldBe Right(CONST_LONG(1))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].lastIndexOf(base58'a') """, version = V4) shouldBe Right(CONST_LONG(0))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].lastIndexOf(base58'd') """, version = V4) shouldBe Right(CONST_LONG(3))
+    eval(""" ["a","b","c","d"].lastIndexOf("e") """, version = V4) shouldBe Right(unit)
+
+    eval(""" [true, false].lastIndexOf(0) """, version = V4) should produce("Can't find a function overload")
+    eval(""" [true, false].lastIndexOf() """, version = V4) should produce("Can't find a function overload")
+    eval(""" ["a","b","c","d"].lastIndexOf("a") """, version = V3) should produce("Can't find a function overload 'lastIndexOf'")
+  }
+
+  property("list indexOf compare Limits") {
+    val maxCmpWeightElement          = "a" * ContractLimits.MaxCmpWeight.toInt
+    val maxSizeElementToFound        = "a" * Short.MaxValue
+    val listWithMaxCmpWeightElements = List.fill(20)("b" * ContractLimits.MaxCmpWeight.toInt).map(s => s""""$s"""").mkString("[", ",", "]")
+    val listWithMaxSizeElements      = List.fill(2)("b" * Short.MaxValue).map(s => s""""$s"""").mkString("[", ",", "]")
+
+    val tooHeavyCmpElement         = maxCmpWeightElement + "a"
+    val listWithTooHeavyCmpElement = s""" ("$tooHeavyCmpElement" :: $listWithMaxCmpWeightElements) """
+
+    for (func <- Seq("indexOf", "lastIndexOf")) {
+      eval(s""" $listWithMaxSizeElements.$func("$maxCmpWeightElement") """, version = V4) shouldBe Right(unit)
+      eval(s""" $listWithMaxCmpWeightElements.$func("$maxSizeElementToFound") """, version = V4) shouldBe Right(unit)
+
+      eval(s""" $listWithMaxSizeElements.$func("$tooHeavyCmpElement") """, version = V4) should produce("are too heavy to compare")
+      eval(s""" $listWithTooHeavyCmpElement.$func("$maxSizeElementToFound") """, version = V4) should produce("are too heavy to compare")
+    }
+  }
+
+  property("list contains") {
+    eval(""" ["a","b","c","d"].containsElement("a") """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" ["a","b","c","d"].containsElement("d") """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" [-1,2,3,4].containsElement(-1) """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" [-1,2,3,4].containsElement(4) """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" [true, false].containsElement(true) """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" [true, false].containsElement(false) """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].containsElement(base58'a') """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval("""  [base58'a', base58'b', base58'c', base58'd'].containsElement(base58'd') """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" ["a","b","c","d"].containsElement("e") """, version = V4) shouldBe Right(CONST_BOOLEAN(false))
+
+    eval(""" [true, false].containsElement(0) """, version = V4) should produce("Can't match inferred types")
+    eval(""" [true, false].containsElement() """, version = V4) should produce("Function 'containsElement' requires 2 arguments")
+    eval(""" ["a","b","c","d"].containsElement("a") """, version = V3) should produce("Can't find a function 'containsElement'")
+  }
+
+  property("list min") {
+    eval(""" [1, 2, 3, 4].min() """, version = V4) shouldBe Right(CONST_LONG(1))
+    eval(""" [-1, 2, 3, 4].min() """, version = V4) shouldBe Right(CONST_LONG(-1))
+    eval(""" [-1, -2, -3, -4].min() """, version = V4) shouldBe Right(CONST_LONG(-4))
+    eval(""" [1, 1, 2, 2].min() """, version = V4) shouldBe Right(CONST_LONG(1))
+    eval(""" [2].min() """, version = V4) shouldBe Right(CONST_LONG(2))
+
+    eval(""" [].min() """, version = V4) should produce("Can't find min for empty list")
+    eval(""" [1, 2].min() """, version = V3) should produce("Can't find a function 'min'")
+  }
+
+  property("list max") {
+    eval(""" [1, 2, 3, 4].max() """, version = V4) shouldBe Right(CONST_LONG(4))
+    eval(""" [-1, 2, 3, 4].max() """, version = V4) shouldBe Right(CONST_LONG(4))
+    eval(""" [-1, -2, -3, -4].max() """, version = V4) shouldBe Right(CONST_LONG(-1))
+    eval(""" [1, 1, 2, 2].max() """, version = V4) shouldBe Right(CONST_LONG(2))
+    eval(""" [2].max() """, version = V4) shouldBe Right(CONST_LONG(2))
+
+    eval(""" [].max() """, version = V4) should produce("Can't find max for empty list")
+    eval(""" [1, 2].max() """, version = V3) should produce("Can't find a function 'max'")
+  }
+
+  property("ecrecover positive cases") {
+    def hash(message: String): String = {
+      val prefix = "\u0019Ethereum Signed Message:\n" + message.length
+      Base16.encode(Keccak256.hash((prefix + message).getBytes))
+    }
+
+    def recoverPublicKey(message: String, signature: String): Array[Byte] = {
+      val script = s"ecrecover(base16'${hash(message)}', base16'$signature')"
+      eval[CONST_BYTESTR](script, version = V4).explicitGet().bs.arr
+    }
+
+    //source: https://etherscan.io/verifySig/2006
+    val signature1 =
+      "3b163bbd90556272b57c35d1185b46824f8e16ca229bdb3" +
+      "6f8dfd5eaaee9420723ef7bc3a6c0236568217aa990617c" +
+      "f292b1bef1e7d1d936fb2faef3d846c5751b"
+    val message1 = "what's up jim"
+    val expectedAddress1 = "85db9634489b76e238368e4a075cc6e5a56a714c"
+
+    Keys.getAddress(recoverPublicKey(message1, signature1)) shouldBe Base16.decode(expectedAddress1).get
+
+    //source: https://etherscan.io/verifySig/2007
+    val signature2 =
+      "848ffb6a07e7ce335a2bfe373f1c17573eac320f658ea8" +
+      "cf07426544f2203e9d52dbba4584b0b6c0ed5333d84074" +
+      "002878082aa938fdf68c43367946b2f615d01b"
+    val message2 = "i am the owner"
+    val expectedAddress2 = "73f32c743e5928ff800ab8b05a52c73cd485f9c3"
+
+    Keys.getAddress(recoverPublicKey(message2, signature2)) shouldBe Base16.decode(expectedAddress2).get
+  }
+
+  property("ecrecover negative cases") {
+    eval[CONST_BYTESTR](s"ecrecover(base16'aaaa', base16'bbbb')", version = V3) should
+      produce("Can't find a function 'ecrecover'")
+
+    eval[CONST_BYTESTR](s"ecrecover(base16'${"a" * 60}', base16'bbbb')", version = V4) should
+      produce("Invalid message hash size 30 bytes, must be equal to 32 bytes")
+
+    eval[CONST_BYTESTR](s"ecrecover(base16'${"a" * 64}', base16'${"a" * 132}')", version = V4) should
+      produce("Invalid signature size 66 bytes, must be equal to 65 bytes")
+
+    eval[CONST_BYTESTR](s"ecrecover(base16'${"a" * 64}', base16'${"a" * 130}')", version = V4) should
+      produce("Header byte out of range: 197")
+  }
+
+  property("makeString") {
+    eval(""" ["cat", "dog", "pig"].makeString(", ") """, version = V4) shouldBe CONST_STRING("cat, dog, pig")
+    eval(""" [].makeString(", ") """, version = V4) shouldBe CONST_STRING("")
+    eval(""" ["abc"].makeString(", ") == "abc" """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+
+    val script = s""" [${s""" "${"a" * 1000}", """ * 32} "${"a" * 704}"].makeString(", ") """
+    eval(script, version = V4) should produce("Constructing string size = 32768 bytes will exceed 32767")
+    // 1000 * 32 + 704 + 2 * 32 = 32768
+
+    val script2 = s""" [${s""" "${"a" * 1000}", """ * 32} "${"a" * 703}"].makeString(", ") """
+    eval[CONST_STRING](script2, version = V4).explicitGet().s.length shouldBe 32767
+
+    eval(""" [].makeString(", ") """, version = V3) should produce("Can't find a function 'makeString'")
+  }
+
+  property("n-size generic tuple") {
+    lazy val getElement: LazyList[(String, String)] =
+      LazyList(
+        (""""a"""", "String"),
+        ("true", "Boolean"),
+        ("123", "Int"),
+        ("base58'aaaa'", "ByteVector"),
+        ("unit", "Unit")
+      ) #::: getElement
+
+   /*  Example for size = 2
+    *
+    *  let a = (true, 123)
+    *  func f(x: (Boolean, Int)) == x
+    *
+    *  let (a1, a2) = a
+    *  a._1 == true && a1 == true && a._2 == 123 && a2 == 123 &&
+    *  a == (true, 123) &&
+    *  f(a) == a
+    */
+    def check(size: Int) = {
+      val valueDefinition = (1 to size).map(i => getElement(i)._1).mkString("(", ", ", ")")
+      val typeDefinition  = (1 to size).map(i => getElement(i)._2).mkString("(", ", ", ")")
+      val script =
+        s"""
+           | let a = $valueDefinition
+           | func f(x: $typeDefinition) = x
+           |
+           | let ${(1 to size).map(i => s"a$i").mkString("(", ", ", ")")} = a
+           | ${(1 to size).map(i => s"a._$i == ${getElement(i)._1} && a$i == ${getElement(i)._1} &&").mkString(" ")}
+           | a == $valueDefinition &&
+           | f(a) == a
+         """.stripMargin
+
+      eval(script, version = V3) should produce(s"Can't find a function '_Tuple$size'")
+      eval(script, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    }
+
+    ContractLimits.MinTupleSize to ContractLimits.MaxTupleSize foreach check
+  }
+
+  property("tuple match") {
+    val script =
+      """
+        | match(if true then (1, 2) else (true, "q")) {
+        |   case _: (Boolean, String) => false
+        |   case _: (Int, Int)        => true
+        | }
+      """.stripMargin
+
+    eval(script, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+
+    val script2 =
+      """
+        | let a = if (false) then 1 else ("abc", (1, true))
+        | let b = if (false) then if (false) then (1, "abc") else (true, "abc") else (base58'', true, a)
+        |
+        | let c = match b {
+        |   case _: (Int | Boolean, String)                          => throw("unxpected 1")
+        |   case _: (ByteVector, Boolean, Int)                       => throw("unxpected 2")
+        |   case t3: (ByteVector, Boolean, (String, (Int, Boolean))) => t3._3
+        | }
+        |
+        | let d = match b {
+        |   case _: (Int, String)                                          => throw("unxpected 3")
+        |   case _: (Boolean, String)                                      => throw("unxpected 4")
+        |   case t3: (ByteVector, Boolean, Int | (String, (Int, Boolean))) => t3._3
+        | }
+        |
+        | c == ("abc", (1, true)) &&
+        | d == ("abc", (1, true))
+        |
+      """.stripMargin
+
+    eval(script2, version = V4) shouldBe Right(CONST_BOOLEAN(true))
   }
 }

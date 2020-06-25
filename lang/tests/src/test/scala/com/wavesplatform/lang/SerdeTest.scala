@@ -1,12 +1,15 @@
 package com.wavesplatform.lang
 
+import java.nio.charset.StandardCharsets
+
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.testing.ScriptGen
@@ -15,12 +18,24 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{Assertion, FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
+import scala.util.Try
+
 class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
+  private val caseObj = CaseObj(
+    CASETYPEREF("Object type", Nil),
+    Map(
+      "field1" -> CONST_BYTESTR(ByteStr.fromBytes(1, 2, 3)).explicitGet(),
+      "field2" -> CONST_STRING("str").explicitGet(),
+      "field3" -> CONST_LONG(5),
+      "field4" -> CONST_BOOLEAN(true)
+    )
+  )
+
   "roundtrip" - {
-    "CONST_LONG"    in roundTripTest(CONST_LONG(1))
+    "CONST_LONG" in roundTripTest(CONST_LONG(1))
     "CONST_BYTESTR" in roundTripTest(CONST_BYTESTR(ByteStr.fromBytes(1)).explicitGet())
-    "CONST_STRING"  in roundTripTest(CONST_STRING("foo").explicitGet())
+    "CONST_STRING" in roundTripTest(CONST_STRING("foo").explicitGet())
 
     "IF" in roundTripTest(IF(TRUE, CONST_LONG(0), CONST_LONG(1)))
 
@@ -74,6 +89,10 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
       )
     }
 
+    "CaseObj if allowed" - {
+      "simple" in roundTripTest(caseObj, allowObjects = true)
+    }
+
     "general" in forAll(BOOLgen(10)) {
       case (untypedExpr, _) => roundTripTest(untypedExpr)
     }
@@ -125,6 +144,33 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
     measureBase64Deser("AgQAAAABYgEAAAAEAAAAAAkAAAAAAAACCQAB9wAAAAEFAAAAAWIJAAH3AP8AAQUAAAABYpURGZc=")
   }
 
+  "too big string" in {
+    val maxString = "a" * Terms.DataEntryValueMax
+    val expr1     = Serde.serialize(CONST_STRING(maxString, reduceLimit = false).explicitGet())
+    Serde.deserialize(expr1).map(_._1) shouldBe CONST_STRING(maxString)
+
+    val tooBigString = maxString + "a"
+    val expr2        = Serde.serialize(CONST_STRING(tooBigString, reduceLimit = false).explicitGet())
+    Serde.deserialize(expr2) should produce("String size=32768 exceeds 32767 bytes")
+  }
+
+  "too big bytes" in {
+    val maxBytes = ("a" * Terms.DataEntryValueMax).getBytes(StandardCharsets.UTF_8)
+    val expr1    = Serde.serialize(CONST_BYTESTR(ByteStr(maxBytes)).explicitGet())
+    Serde.deserialize(expr1).map(_._1) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
+
+    val tooBigBytes = maxBytes :+ (1: Byte)
+    val expr2       = Serde.serialize(CONST_BYTESTR(ByteStr(tooBigBytes), limit = CONST_BYTESTR.DataTxSize).explicitGet())
+    Serde.deserialize(expr2) should produce("ByteStr size=32768 exceeds 32767 bytes")
+  }
+
+  "forbid CaseObj" in {
+    Try(Serde.serialize(caseObj)).toEither shouldBe Symbol("left")
+
+    val objectBytes = Serde.serialize(caseObj, allowObjects = true)
+    Serde.deserialize(objectBytes) shouldBe Symbol("left")
+  }
+
   def measureTime[A](f: => A): (A, Long) = {
     val start  = System.currentTimeMillis()
     val result = f
@@ -136,11 +182,11 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
     roundTripTest(typedExpr)
   }
 
-  private def roundTripTest(typedExpr: EXPR): Assertion = {
-    val encoded = Serde.serialize(typedExpr)
+  private def roundTripTest(typedExpr: EXPR, allowObjects: Boolean = false): Assertion = {
+    val encoded = Serde.serialize(typedExpr, allowObjects)
     encoded.nonEmpty shouldBe true
 
-    val decoded = Serde.deserialize(encoded).map(_._1).explicitGet()
+    val decoded = Serde.deserialize(encoded, all = true, allowObjects).map(_._1).explicitGet()
     withClue(s"encoded bytes: [${encoded.mkString(", ")}]") {
       decoded shouldEqual typedExpr
     }

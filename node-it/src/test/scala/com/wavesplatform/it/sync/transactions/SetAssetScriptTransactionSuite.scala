@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.transactions
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, Mistiming, StateCheckFailed, WrongJson}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{script, someAssetAmount, _}
@@ -16,7 +16,6 @@ import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import play.api.libs.json._
-import scorex.crypto.encode.Base58
 
 import scala.concurrent.duration._
 import scala.util.Random
@@ -30,7 +29,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   private val accountB = pkByAddress(secondAddress)
   private val unchangeableScript = ScriptCompiler(
     s"""match tx {
-       |  case s : SetAssetScriptTransaction => false
+       |  case _: SetAssetScriptTransaction => false
        |  case _ => true
        |}
        |""".stripMargin,
@@ -164,7 +163,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     val script2 = ScriptCompiler(
       s"""
            |match tx {
-           |  case s : SetAssetScriptTransaction => true
+           |  case _: SetAssetScriptTransaction => true
            |  case _ => false
            |}
          """.stripMargin,
@@ -221,8 +220,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       ): SetAssetScriptTransaction =
         SetAssetScriptTransaction
           .signed(version = v, sender.keyPair.publicKey, assetId, Some(script), fee, timestamp, sender.keyPair.privateKey)
-          .right
-          .get
+          .explicitGet()
 
       val (balance, eff) = miner.accountBalances(firstAddress)
 
@@ -347,7 +345,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
             ScriptCompiler(
               s"""|let pkB = base58'${accountB.publicKey}'
                   |match tx {
-                  |  case s : SetAssetScriptTransaction => sigVerify(s.bodyBytes,s.proofs[0],pkB)
+                  |  case s: SetAssetScriptTransaction => sigVerify(s.bodyBytes,s.proofs[0],pkB)
                   |  case _ => true
                   |}
                 """.stripMargin,
@@ -358,8 +356,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
           setScriptFee + smartFee,
           System.currentTimeMillis()
         )
-        .right
-        .get
+        .explicitGet()
 
       val setScriptId = sender
         .signedBroadcast(setScriptTransaction.json())

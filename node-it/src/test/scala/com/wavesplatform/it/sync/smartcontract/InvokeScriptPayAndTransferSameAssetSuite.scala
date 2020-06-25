@@ -33,7 +33,7 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
     val script = Some(ScriptCompiler.compile("true", estimator).explicitGet()._1.bytes.value.base64)
     smartAssetId = sender.issue(caller, "Smart", "s", assetQuantity, 0, script = script).id
 
-    val scriptText  = "match tx {case t:TransferTransaction => false case _ => true}"
+    val scriptText  = "match tx {case _:TransferTransaction => false case _ => true}"
     val smartScript = Some(ScriptCompiler.compile(scriptText, estimator).explicitGet()._1.bytes.value.base64)
     rejAssetId = sender.issue(caller, "Reject", "r", assetQuantity, 0, script = smartScript, waitForTx = true).id
   }
@@ -106,7 +106,7 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
     val fee           = smartMinFee + smartFee * 2
 
     val tx = invoke("resendPayment", paymentAmount, issued(rejAssetId), fee)
-    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include regex "token-script"
+    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include regex "Transaction is not allowed by script of the asset"
 
   }
 

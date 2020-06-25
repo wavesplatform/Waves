@@ -22,7 +22,7 @@ import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.utils._
 import io.grpc.Status.Code
@@ -391,7 +391,7 @@ object SyncHttpApi extends Assertions {
         fee: Long = minFee,
         assetId: Option[String] = None,
         feeAssetId: Option[String] = None,
-        attachment: Option[Attachment] = None,
+        attachment: ByteStr = ByteStr.empty,
         version: Byte = TxVersion.V2,
         waitForTx: Boolean = false
     ): Transaction = {
@@ -456,12 +456,11 @@ object SyncHttpApi extends Assertions {
         assetId: Option[String] = None,
         feeAssetId: Option[String] = None,
         version: Byte = TxVersion.V2,
-        typedAttachment: Option[Attachment] = None,
         attachment: Option[String] = None,
         waitForTx: Boolean = false
     ): Transaction = {
       maybeWaitForTransaction(
-        sync(async(n).transfer(sourceAddress, recipient, amount, fee, assetId, feeAssetId, version, typedAttachment, attachment)),
+        sync(async(n).transfer(sourceAddress, recipient, amount, fee, assetId, feeAssetId, version, attachment)),
         waitForTx
       )
     }
@@ -471,14 +470,13 @@ object SyncHttpApi extends Assertions {
         transfers: List[Transfer],
         fee: Long,
         version: TxVersion = TxVersion.V2,
-        typedAttachment: Option[Attachment] = None,
         attachment: Option[String] = None,
         assetId: Option[String] = None,
         waitForTx: Boolean = false,
         amountsAsStrings: Boolean = false
     ): Transaction = {
       maybeWaitForTransaction(
-        sync(async(n).massTransfer(sourceAddress, transfers, fee, version, typedAttachment, attachment, assetId, amountsAsStrings)),
+        sync(async(n).massTransfer(sourceAddress, transfers, fee, version, attachment, assetId, amountsAsStrings)),
         waitForTx
       )
     }
@@ -626,6 +624,9 @@ object SyncHttpApi extends Assertions {
     def blacklist(address: InetSocketAddress): Unit =
       sync(async(n).blacklist(address))
 
+    def clearBlacklist(): Unit =
+      sync(async(n).clearBlacklist())
+
     def debugMinerInfo(): Seq[State] =
       sync(async(n).debugMinerInfo())
 
@@ -649,10 +650,6 @@ object SyncHttpApi extends Assertions {
 
     def blockHeadersSeq(fromHeight: Int, toHeight: Int, amountsAsStrings: Boolean = false): Seq[BlockHeader] =
       sync(async(n).blockHeadersSeq(fromHeight, toHeight, amountsAsStrings))
-
-    def blockGenerationSignature(signature: String): GenerationSignatureResponse = sync(async(n).blockGenerationSignature(signature))
-
-    def lastBlockGenerationSignature: String = sync(async(n).lastBlockGenerationSignature)
 
     def generatingBalance(address: String, amountsAsStrings: Boolean = false): GeneratingBalance =
       sync(async(n).generatingBalance(address, amountsAsStrings))
@@ -787,19 +784,36 @@ object SyncHttpApi extends Assertions {
     ): Boolean =
       sync(async(nodes).waitForSameBlockHeadersAt(height, retryInterval), conditionAwaitTime)
 
-    def waitFor[A](desc: String)(retryInterval: FiniteDuration)(request: Node => A, cond: Iterable[A] => Boolean): Boolean =
+    def waitFor[A](desc: String, retryInterval: FiniteDuration = 1.second)(request: Node => A)(cond: Iterable[A] => Boolean): Boolean =
       sync(
         async(nodes).waitFor(desc)(retryInterval)((n: Node) => Future(request(n))(scala.concurrent.ExecutionContext.Implicits.global), cond),
         ConditionAwaitTime
       )
 
-    def rollback(height: Int, returnToUTX: Boolean = true): Unit = {
+    def rollbackWithoutBlacklisting(height: Int, returnToUTX: Boolean = true): Unit = {
       sync(
         Future.traverse(nodes) { node =>
           com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi(node).rollback(height, returnToUTX)
         },
         ConditionAwaitTime
       )
+    }
+
+    def rollback(height: Int, returnToUTX: Boolean = true): Unit = {
+      val combinations = nodes.combinations(2).toSeq
+      nodes.combinations(2).foreach {
+        case Seq(n1, n2) =>
+          n1.blacklist(n2.networkAddress)
+          n2.blacklist(n1.networkAddress)
+      }
+
+      nodes.rollbackWithoutBlacklisting(height, returnToUTX)
+      nodes.foreach(_.clearBlacklist())
+
+      combinations.foreach {
+        case Seq(n1, n2) =>
+          n1.connect(n2.networkAddress)
+      }
     }
 
     def rollbackToBlockId(id: String): Unit = {

@@ -1,10 +1,16 @@
 {
   funcs : [
     {
-      name: "_isInstanceOf"
-      params: [ "T", "String" ]
-      doc: "Check value type"
-      paramsDoc: [ "The value", "The type name" ]
+      name: "Issue"
+      params: [ "String", "String", "Int", "Int", "Boolean", "Script|Unit", "Int" ]
+      doc: "Issue action detailed constructor"
+      paramsDoc: [ "Token name", "Token description", "Amount of the token", "Number of digits in decimal part", "Reissue ability flag", "Smart asset script (optional)", "Sequential number"]
+    },
+    {
+      name: "Issue"
+      params: [ "String", "String", "Int", "Int", "Boolean" ]
+      doc: "Issue action simplified constructor"
+      paramsDoc: [ "Token name", "Token description", "Amount of the token", "Number of digits in decimal part", "Reissue ability flag" ]
     }
   ]
 }

@@ -65,8 +65,7 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with WithState with 
         Waves,
         amount,
         Waves,
-        fee,
-        None,
+        fee, ByteStr.empty,
         timestamp,
         proofs = Proofs.empty,
         recipient.toAddress.chainId

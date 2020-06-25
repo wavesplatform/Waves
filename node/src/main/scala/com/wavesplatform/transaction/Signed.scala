@@ -30,16 +30,15 @@ object Signed {
   }
 
   def validateOrdered[S <: Signed](ss: Seq[S]): E[Seq[S]] =
-    Await.result(Task
-                   .wander(ss)(s => s.signaturesValidMemoized)
-                   .map { l =>
-                     l.find(_.isLeft) match {
-                       case Some(e) => Left(e.left.get)
-                       case None    => Right(ss)
-                     }
-                   }
-                   .runAsyncLogErr,
-                 Duration.Inf)
+    Await.result(
+      Task
+        .parTraverse(ss)(s => s.signaturesValidMemoized)
+        .map(
+          _.collectFirst { case Left(v) => Left(v) }.getOrElse(Right(ss))
+        )
+        .runAsyncLogErr,
+      Duration.Inf
+    )
 
   private def validateTask[S <: Signed](signedEntity: S): Task[E[S]] =
     Task {
@@ -53,7 +52,7 @@ object Signed {
         Task.now(Right(signedEntity))
       } else {
         Task
-          .wanderUnordered(signedEntity.signedDescendants())(s => s.signaturesValidMemoized)
+          .parTraverseUnordered(signedEntity.signedDescendants())(s => s.signaturesValidMemoized)
           .map(_.sequence.map(_ => signedEntity))
       }
     }.flatten

@@ -601,7 +601,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
     method match {
       case CallableMethod =>
         val id = f
-        sender.stateChanges(id)._2.errorMessage.get.text should include(msg)
+        sender.stateChanges(id)._2.error.get.text should include(msg)
       case TransactionMethod =>
         assertGrpcError(f, msg)
     }
