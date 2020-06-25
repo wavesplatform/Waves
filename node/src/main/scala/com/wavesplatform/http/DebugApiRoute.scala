@@ -71,8 +71,8 @@ case class DebugApiRoute(
 
   override val settings: RestAPISettings = ws.restAPISettings
   override lazy val route: Route = pathPrefix("debug") {
-    stateChanges ~ balanceHistory ~ withAuth {
-      state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ configInfo ~ print ~ validate
+    stateChanges ~ balanceHistory ~ validate ~ withAuth {
+      state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ configInfo ~ print
     }
   }
 
@@ -228,7 +228,7 @@ case class DebugApiRoute(
       val timeSpent = (System.nanoTime - t0) * 1e-6
       val response = Json.obj(
         "valid"          -> tracedDiff.resultE.isRight,
-        "validationTime" -> timeSpent,
+        "validationTime" -> timeSpent.toLong,
         "trace"          -> tracedDiff.trace.map(_.loggedJson)
       )
       tracedDiff.resultE.fold(

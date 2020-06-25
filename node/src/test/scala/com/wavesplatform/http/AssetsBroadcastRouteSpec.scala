@@ -16,7 +16,7 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction}
 import com.wavesplatform.utils.{Time, _}
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{NoShrink, RequestGen}
+import com.wavesplatform.{NoShrink, RequestGen, TestValues}
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -191,9 +191,9 @@ class AssetsBroadcastRouteSpec
           senderPrivateKey,
           receiverPrivateKey.toAddress,
           Asset.Waves,
-          1 * Waves,
+          TestValues.OneWaves,
           Asset.Waves,
-          Waves / 3,
+          TestValues.OneWaves / 3,
           ByteStr.empty,
           System.currentTimeMillis()
         )
@@ -206,9 +206,9 @@ class AssetsBroadcastRouteSpec
         sender = senderPrivateKey.publicKey,
         recipient = receiverPrivateKey.toAddress,
         assetId = Asset.Waves,
-        amount = 1 * Waves,
+        amount = TestValues.OneWaves,
         feeAssetId = Asset.Waves,
-        fee = Waves / 3,
+        fee = TestValues.OneWaves / 3,
         attachment = ByteStr.empty,
         timestamp = System.currentTimeMillis(),
         proofs = Proofs(Seq.empty),
