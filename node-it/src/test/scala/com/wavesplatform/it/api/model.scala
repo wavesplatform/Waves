@@ -110,87 +110,95 @@ object AssetInfo {
   implicit val AssetInfoFormat: Format[AssetInfo] = Json.format
 }
 
-class Transaction(val _type: Int,
-                  val  id: String,
-                  val  chainId: Option[Byte],
-                  val  fee: Long,
-                  val  timestamp: Long,
-                  val  sender: Option[String],
-                  val  version: Option[Byte],
-                  val  name: Option[String],
-                  val  amount: Option[Long],
-                  val  description: Option[String],
-                  val  attachment: Option[String],
-                  val  price: Option[Long],
-                  val  sellMatcherFee: Option[Long],
-                  val  buyMatcherFee: Option[Long],
-                  val  sellOrderMatcherFee: Option[Long],
-                  val  buyOrderMatcherFee: Option[Long],
-                  val  data: Option[Seq[DataEntry[_]]],
-                  val  minSponsoredAssetFee: Option[Long],
-                  val  transfers: Option[Seq[Transfer]],
-                  val  totalAmount: Option[Long],
-                  val  senderPublicKey: Option[String],
-                  val  recipient: Option[String],
-                  val  proofs: Option[Seq[String]]
-                      ) {
-                        import Transaction._
-                        override def toString = Json.toJson(this).toString
-                        override def equals(x: Any) = {
-                          x match {
-                            case t: Transaction => id == t.id
-                            case _ => false
-                          }
-                        }
-                      }
+//noinspection ScalaStyle
+class Transaction(
+    val _type: Int,
+    val  id: String,
+    val  chainId: Option[Byte],
+    val  fee: Long,
+    val  timestamp: Long,
+    val  sender: Option[String],
+    val  version: Option[Byte],
+    val  name: Option[String],
+    val  amount: Option[Long],
+    val  description: Option[String],
+    val  attachment: Option[String],
+    val  price: Option[Long],
+    val  sellMatcherFee: Option[Long],
+    val  buyMatcherFee: Option[Long],
+    val  sellOrderMatcherFee: Option[Long],
+    val  buyOrderMatcherFee: Option[Long],
+    val  data: Option[Seq[DataEntry[_]]],
+    val  minSponsoredAssetFee: Option[Long],
+    val  transfers: Option[Seq[Transfer]],
+    val  totalAmount: Option[Long],
+    val  senderPublicKey: Option[String],
+    val  recipient: Option[String],
+    val  proofs: Option[Seq[String]],
+    val applicationStatus: Option[String]
+  ) {
+    import Transaction._
+    override def toString: String = Json.toJson(this).toString
+    override def equals(x: Any): Boolean = {
+      x match {
+        case t: Transaction => id == t.id
+        case _ => false
+      }
+    }
+  }
+//noinspection ScalaStyle
 object Transaction {
-  def apply(_type: Int,
-                  id: String,
-                  chainId: Option[Byte],
-                  fee: Long,
-                  timestamp: Long,
-                  sender: Option[String],
-                  version: Option[Byte],
-                  name: Option[String],
-                  amount: Option[Long],
-                  description: Option[String],
-                  attachment: Option[String],
-                  price: Option[Long],
-                  sellMatcherFee: Option[Long],
-                  buyMatcherFee: Option[Long],
-                  sellOrderMatcherFee: Option[Long],
-                  buyOrderMatcherFee: Option[Long],
-                  data: Option[Seq[DataEntry[_]]],
-                  minSponsoredAssetFee: Option[Long],
-                  transfers: Option[Seq[Transfer]],
-                  totalAmount: Option[Long],
-                  senderPublicKey: Option[String],
-                  recipient: Option[String],
-                  proofs: Option[Seq[String]]
-                      ) : Transaction = new Transaction(_type,
-                  id,
-                  chainId,
-                  fee,
-                  timestamp,
-                  sender,
-                  version,
-                  name,
-                  amount,
-                  description,
-                  attachment,
-                  price,
-                  sellMatcherFee,
-                  buyMatcherFee,
-                  sellOrderMatcherFee,
-                  buyOrderMatcherFee,
-                  data,
-                  minSponsoredAssetFee,
-                  transfers,
-                  totalAmount,
-                  senderPublicKey,
-                  recipient,
-                  proofs: Option[Seq[String]]
-                      )
+  def apply(
+      _type: Int,
+      id: String,
+      chainId: Option[Byte],
+      fee: Long,
+      timestamp: Long,
+      sender: Option[String],
+      version: Option[Byte],
+      name: Option[String],
+      amount: Option[Long],
+      description: Option[String],
+      attachment: Option[String],
+      price: Option[Long],
+      sellMatcherFee: Option[Long],
+      buyMatcherFee: Option[Long],
+      sellOrderMatcherFee: Option[Long],
+      buyOrderMatcherFee: Option[Long],
+      data: Option[Seq[DataEntry[_]]],
+      minSponsoredAssetFee: Option[Long],
+      transfers: Option[Seq[Transfer]],
+      totalAmount: Option[Long],
+      senderPublicKey: Option[String],
+      recipient: Option[String],
+      proofs: Option[Seq[String]],
+      applicationStatus: Option[String]
+  ) : Transaction = new Transaction(
+    _type,
+    id,
+    chainId,
+    fee,
+    timestamp,
+    sender,
+    version,
+    name,
+    amount,
+    description,
+    attachment,
+    price,
+    sellMatcherFee,
+    buyMatcherFee,
+    sellOrderMatcherFee,
+    buyOrderMatcherFee,
+    data,
+    minSponsoredAssetFee,
+    transfers,
+    totalAmount,
+    senderPublicKey,
+    recipient,
+    proofs,
+    applicationStatus
+  )
 
   implicit val transactionFormat: Format[Transaction] = Format(
     Reads(jsv =>
@@ -221,6 +229,7 @@ object Transaction {
         senderPublicKey <- (jsv \ "senderPublicKey").validateOpt[String]
         recipient <- (jsv \ "recipient").validateOpt[String]
         proofs <- (jsv \ "proofs").validateOpt[Seq[String]]
+        applicationStatus <- (jsv \ "applicationStatus").validateOpt[String]
       }
         yield new Transaction(
           _type,
@@ -245,7 +254,8 @@ object Transaction {
           totalAmount,
           senderPublicKey,
           recipient,
-          proofs
+          proofs,
+          applicationStatus
         )),
     Writes { t =>
       Json.obj(
@@ -430,7 +440,8 @@ case class DebugStateChanges(
     minSponsoredAssetFee: Option[Long],
     recipient: Option[String],
     script: Option[String],
-    stateChanges: Option[StateChangesDetails]
+    stateChanges: Option[StateChangesDetails],
+    applicationStatus: Option[String]
 ) extends TxInfo
 object DebugStateChanges {
   implicit val debugStateChanges: Reads[DebugStateChanges] =
@@ -446,6 +457,7 @@ object DebugStateChanges {
         recipient <- (jsv \ "recipient").validateOpt[String]
         script <- (jsv \ "script").validateOpt[String]
         stateChanges <- (jsv \ "stateChanges").validateOpt[StateChangesDetails]
+        applicationStatus <- (jsv \ "applicationStatus").validateOpt[String]
       }
         yield DebugStateChanges(
           _type,
@@ -457,7 +469,8 @@ object DebugStateChanges {
           minSponsoredAssetFee,
           recipient,
           script,
-          stateChanges
+          stateChanges,
+          applicationStatus
         )
     )
 }
