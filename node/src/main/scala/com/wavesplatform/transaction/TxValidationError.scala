@@ -44,8 +44,8 @@ object TxValidationError {
     def apply(ex: Throwable): GenericError = new GenericError(ex.getMessage)
   }
 
-  case class InvalidSignature(s: Signed, details: Option[InvalidSignature] = None) extends ValidationError {
-    override def toString: String = s"InvalidSignature(${s.toString + " reason: " + details})"
+  case class InvalidSignature(entity: Signed, details: Option[InvalidSignature] = None) extends ValidationError {
+    override def toString: String = s"InvalidSignature(${entity.toString + " reason: " + details})"
   }
 
   sealed trait WithLog extends Product with Serializable {
