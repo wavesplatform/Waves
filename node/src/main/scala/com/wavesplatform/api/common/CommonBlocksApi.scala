@@ -13,13 +13,13 @@ trait CommonBlocksApi {
 
   def currentHeight: Int
 
-  def block(blockId: BlockId): Option[(BlockMeta, Seq[Transaction])]
+  def block(blockId: BlockId): Option[(BlockMeta, Seq[(Transaction, Boolean)])]
 
-  def blockAtHeight(height: Int): Option[(BlockMeta, Seq[Transaction])]
+  def blockAtHeight(height: Int): Option[(BlockMeta, Seq[(Transaction, Boolean)])]
 
-  def blocksRange(fromHeight: Int, toHeight: Int): Observable[(BlockMeta, Seq[Transaction])]
+  def blocksRange(fromHeight: Int, toHeight: Int): Observable[(BlockMeta, Seq[(Transaction, Boolean)])]
 
-  def blocksRange(fromHeight: Int, toHeight: Int, generatorAddress: Address): Observable[(BlockMeta, Seq[Transaction])]
+  def blocksRange(fromHeight: Int, toHeight: Int, generatorAddress: Address): Observable[(BlockMeta, Seq[(Transaction, Boolean)])]
 
   def meta(id: ByteStr): Option[BlockMeta]
 
@@ -32,15 +32,15 @@ object CommonBlocksApi {
   def apply(
       blockchain: Blockchain,
       metaAt: Int => Option[BlockMeta],
-      blockAt: Int => Option[(BlockMeta, Seq[Transaction])]
+      blockAt: Int => Option[(BlockMeta, Seq[(Transaction, Boolean)])]
   ): CommonBlocksApi = new CommonBlocksApi {
     private def fixHeight(h: Int)                  = if (h <= 0) blockchain.height + h else h
     private def heightOf(id: ByteStr): Option[Int] = blockchain.heightOf(id)
 
-    def blocksRange(fromHeight: Int, toHeight: Int): Observable[(BlockMeta, Seq[Transaction])] =
+    def blocksRange(fromHeight: Int, toHeight: Int): Observable[(BlockMeta, Seq[(Transaction, Boolean)])] =
       Observable.fromIterable((fixHeight(fromHeight) to fixHeight(toHeight)).flatMap(h => blockAt(h)))
 
-    def blocksRange(fromHeight: Int, toHeight: Int, generatorAddress: Address): Observable[(BlockMeta, Seq[Transaction])] =
+    def blocksRange(fromHeight: Int, toHeight: Int, generatorAddress: Address): Observable[(BlockMeta, Seq[(Transaction, Boolean)])] =
       Observable.fromIterable(
         (fixHeight(fromHeight) to fixHeight(toHeight))
           .flatMap(h => metaAt(h))
@@ -64,7 +64,7 @@ object CommonBlocksApi {
 
     def currentHeight: Int = blockchain.height
 
-    def blockAtHeight(height: Int): Option[(BlockMeta, Seq[Transaction])] = blockAt(height)
+    def blockAtHeight(height: Int): Option[(BlockMeta, Seq[(Transaction, Boolean)])] = blockAt(height)
 
     def metaAtHeight(height: Int): Option[BlockMeta] = metaAt(height)
 
@@ -73,6 +73,6 @@ object CommonBlocksApi {
     def metaRange(fromHeight: Int, toHeight: Int): Observable[BlockMeta] =
       Observable.fromIterable((fixHeight(fromHeight) to fixHeight(toHeight)).flatMap(h => metaAt(h)))
 
-    def block(blockId: BlockId): Option[(BlockMeta, Seq[Transaction])] = heightOf(blockId).flatMap(h => blockAt(h))
+    def block(blockId: BlockId): Option[(BlockMeta, Seq[(Transaction, Boolean)])] = heightOf(blockId).flatMap(h => blockAt(h))
   }
 }
