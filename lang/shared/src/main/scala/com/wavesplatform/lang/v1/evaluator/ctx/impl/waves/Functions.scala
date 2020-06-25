@@ -259,7 +259,7 @@ object Functions {
   val addressFromStringV4: BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "addressFromString",
-      10,
+      1,
       ADDRESSFROMSTRING_NATIVE,
       optionAddress,
       ("@string", STRING)
