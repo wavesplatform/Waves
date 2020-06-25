@@ -40,6 +40,7 @@ package object utils {
     override def tthis: Environment.Tthis                                                                        = ???
     override def multiPaymentAllowed: Boolean                                                                    = true
     override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
+    override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???
   }
 
   val lazyContexts: Map[DirectiveSet, Coeval[CTX[Environment]]] = {
