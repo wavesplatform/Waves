@@ -2,7 +2,7 @@ package com.wavesplatform.mining.microblocks
 
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
-import com.wavesplatform.mining.{MinerDebugInfo, MiningConstraint, MiningConstraints}
+import com.wavesplatform.mining.{MinerDebugInfo, MiningConstraint}
 import com.wavesplatform.settings.MinerSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.BlockchainUpdater
@@ -15,7 +15,6 @@ trait MicroBlockMiner {
   def generateMicroBlockSequence(
       account: KeyPair,
       accumulatedBlock: Block,
-      constraints: MiningConstraints,
       restTotalConstraint: MiningConstraint,
       lastMicroBlock: Long
   ): Task[Unit]

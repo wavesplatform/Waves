@@ -467,7 +467,7 @@ class BlockchainUpdaterImpl(
               val blockId = ng.createBlockId(microBlock)
               blockchainUpdateTriggers.onProcessMicroBlock(microBlock, detailedDiff, this, blockId)
               ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis, Some(blockId))
-              log.info(s"MicroBlock(${blockId.trim} ~> ${microBlock.reference.trim}, txs=${microBlock.transactionData.size}) appended")
+              log.info(s"${microBlock.stringRepr(blockId)} appended")
               internalLastBlockInfo.onNext(LastBlockInfo(blockId, height, score, ready = true))
 
               for {
