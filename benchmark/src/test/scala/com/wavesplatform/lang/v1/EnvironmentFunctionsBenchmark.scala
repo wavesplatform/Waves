@@ -120,7 +120,7 @@ object EnvironmentFunctionsBenchmark {
     override def txId: ByteStr                                                                                   = ByteStr(new Array[Byte](64))
     override def addressFromString(addressStr: String): Either[String, Recipient.Address] =
       account.Address
-        .fromString(addressStr, chainId)
+        .fromString(addressStr)
         .bimap(
           _.toString,
           address => Address(ByteStr(address.bytes))
