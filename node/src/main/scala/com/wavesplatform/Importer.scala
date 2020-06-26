@@ -133,7 +133,7 @@ object Importer extends ScorexLogging {
               Application.loadBlockAt(db, blockchainUpdater)
             )
           override def blocksApi: CommonBlocksApi =
-            CommonBlocksApi(blockchainUpdater, Application.loadBlockMetaAt(db, blockchainUpdater), Application.loadBlockAt(db, blockchainUpdater))
+            CommonBlocksApi(blockchainUpdater, Application.loadBlockMetaAt(db, blockchainUpdater), Application.loadBlockInfoAt(db, blockchainUpdater))
           override def accountsApi: CommonAccountsApi =
             CommonAccountsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
           override def assetsApi: CommonAssetsApi =
