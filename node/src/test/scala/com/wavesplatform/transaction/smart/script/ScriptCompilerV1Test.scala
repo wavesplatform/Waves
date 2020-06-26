@@ -203,9 +203,9 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
     ): String =
       s"""
          | func script() = {
-         |   let a0 = base58''
+         |   let a0 = ""
          |   ${1 to assigns map (i => s"let a$i = a${i - 1} + a0") mkString " "}
-         |   a$assigns == base58'' ${"&& true " * conjunctions}
+         |   a$assigns == "" ${"&& true " * conjunctions}
          | }
          |
          | ${if (withVerifier) "@Verifier(tx) func verify() = " else ""}
@@ -221,11 +221,14 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
 
       val directives = buildDirectives(version, contentType, scriptType)
       val (assigns, conjunctions) = (version, contentType, scriptType) match {
-        case (V3 | V4, DApp, Account)       => (155, 15)
-        case (V3 | V4, Expression, Account) => (155, 20)
-        case (V3 | V4, Expression, Asset)   => (209, 7)
-        case (_, Expression, _)             => (103, 14)
-        case _                              => ???
+        case (V3, DApp, Account)       => (155, 15)
+        case (V3, Expression, Account) => (155, 20)
+        case (V3, Expression, Asset)   => (209, 7)
+        case (V4, DApp, Account)       => (101, 23)
+        case (V4, Expression, Account) => (101, 28)
+        case (V4, Expression, Asset)   => (137, 6)
+        case (_, Expression, _)        => (103, 14)
+        case _                         => ???
       }
       val withVerifier         = contentType == DApp
       val validScript          = directives + buildScript(assigns, conjunctions, withVerifier)

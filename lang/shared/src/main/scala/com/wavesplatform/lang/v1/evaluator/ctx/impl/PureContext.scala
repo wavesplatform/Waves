@@ -27,6 +27,7 @@ import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 
 import scala.annotation.tailrec
+import scala.collection.mutable.ArrayBuffer
 import scala.util.{Success, Try}
 
 object PureContext {
@@ -47,7 +48,13 @@ object PureContext {
   lazy val subLong: BaseFunction[NoContext] =
     createTryOp(SUB_OP, LONG, LONG, SUB_LONG)((a, b) => Math.subtractExact(a, b))
   lazy val sumString: BaseFunction[NoContext] =
-    createRawOp(SUM_OP, STRING, STRING, SUM_STRING, 10) {
+    createRawOp(
+      SUM_OP,
+      STRING,
+      STRING,
+      SUM_STRING,
+      Map[StdLibVersion, Long](V1 -> 10L, V2 -> 10L, V3 -> 10L, V4 -> 20L)
+    ) {
       case (CONST_STRING(a), CONST_STRING(b)) =>
         if (a.length + b.length <= Terms.DataEntryValueMax) {
           CONST_STRING(a + b)
@@ -57,7 +64,13 @@ object PureContext {
       case _ => ???
     }
   lazy val sumByteStr: BaseFunction[NoContext] =
-    createRawOp(SUM_OP, BYTESTR, BYTESTR, SUM_BYTES, 10) {
+    createRawOp(
+      SUM_OP,
+      BYTESTR,
+      BYTESTR,
+      SUM_BYTES,
+      Map[StdLibVersion, Long](V1 -> 10L, V2 -> 10L, V3 -> 10L, V4 -> 2L),
+    ) {
       case (CONST_BYTESTR(a), CONST_BYTESTR(b)) =>
         if (a.arr.length + b.arr.length <= Terms.DataEntryValueMax) {
           CONST_BYTESTR(a ++ b)
@@ -112,7 +125,7 @@ object PureContext {
   lazy val value: BaseFunction[NoContext] =
     UserFunction(
       "value",
-      13L,
+      Map[StdLibVersion, Long](V1 -> 13, V2 -> 13, V3 -> 13, V4 -> 2),
       TYPEPARAM('T'),
       ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)): TYPE)
     ) {
@@ -126,7 +139,7 @@ object PureContext {
   lazy val valueOrElse: BaseFunction[NoContext] =
     UserFunction(
       "valueOrElse",
-      13L,
+      Map[StdLibVersion, Long](V1 -> 13, V2 -> 13, V3 -> 13, V4 -> 2),
       TYPEPARAM('T'),
       ("@value", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT))),
       ("@alternative", TYPEPARAM('T'))
@@ -141,7 +154,7 @@ object PureContext {
   lazy val valueOrErrorMessage: BaseFunction[NoContext] =
     UserFunction(
       "valueOrErrorMessage",
-      13,
+      Map[StdLibVersion, Long](V1 -> 13, V2 -> 13, V3 -> 13, V4 -> 2),
       TYPEPARAM('T'),
       ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT))),
       ("@msg", STRING)
@@ -226,7 +239,13 @@ object PureContext {
   }
 
   lazy val toBytesString: BaseFunction[NoContext] =
-    NativeFunction("toBytes", 1, STRING_TO_BYTES, BYTESTR, ("s", STRING)) {
+    NativeFunction(
+      "toBytes",
+      Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 8L),
+      STRING_TO_BYTES,
+      BYTESTR,
+      ("s", STRING)
+    ) {
       case CONST_STRING(s) :: Nil => CONST_BYTESTR(ByteStr(s.getBytes(StandardCharsets.UTF_8)))
       case xs                     => notImplemented[Id, EVALUATED]("toBytes(s: String)", xs)
     }
@@ -249,19 +268,36 @@ object PureContext {
   }
 
   lazy val takeBytes: BaseFunction[NoContext] =
-    NativeFunction("take", 1, TAKE_BYTES, BYTESTR, ("xs", BYTESTR), ("number", LONG)) {
+    NativeFunction(
+      "take",
+      Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 6L),
+      TAKE_BYTES,
+      BYTESTR,
+      ("xs", BYTESTR), ("number", LONG)
+    ) {
       case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil => CONST_BYTESTR(xs.take(number))
       case xs                                             => notImplemented[Id, EVALUATED]("take(xs: ByteVector, number: Int)", xs)
     }
 
   lazy val dropBytes: BaseFunction[NoContext] =
-    NativeFunction("drop", 1, DROP_BYTES, BYTESTR, ("xs", BYTESTR), ("number", LONG)) {
+    NativeFunction(
+      "drop",
+      Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 6L),
+      DROP_BYTES,
+      BYTESTR,
+      ("xs", BYTESTR), ("number", LONG)
+    ) {
       case CONST_BYTESTR(xs) :: CONST_LONG(number) :: Nil => CONST_BYTESTR(xs.drop(number))
       case xs                                             => notImplemented[Id, EVALUATED]("drop(xs: ByteVector, number: Int)", xs)
     }
 
   lazy val dropRightBytes: BaseFunction[NoContext] =
-    UserFunction("dropRight", "dropRightBytes", 19, BYTESTR, ("@xs", BYTESTR), ("@number", LONG)) {
+    UserFunction(
+      "dropRight", "dropRightBytes",
+      Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 6L),
+      BYTESTR,
+      ("@xs", BYTESTR), ("@number", LONG)
+    ) {
       FUNCTION_CALL(
         takeBytes,
         List(
@@ -278,7 +314,12 @@ object PureContext {
     }
 
   lazy val takeRightBytes: BaseFunction[NoContext] =
-    UserFunction("takeRight", "takeRightBytes", 19, BYTESTR, ("@xs", BYTESTR), ("@number", LONG)) {
+    UserFunction(
+      "takeRight", "takeRightBytes",
+      Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 6L),
+      BYTESTR,
+      ("@xs", BYTESTR), ("@number", LONG)
+    ) {
       FUNCTION_CALL(
         dropBytes,
         List(
@@ -297,7 +338,13 @@ object PureContext {
   private def trimLongToInt(x: Long): Int = Math.toIntExact(Math.max(Math.min(x, Int.MaxValue), Int.MinValue))
 
   lazy val takeString: BaseFunction[NoContext] =
-    NativeFunction("take", 1, TAKE_STRING, STRING, ("xs", STRING), ("number", LONG)) {
+    NativeFunction(
+      "take",
+      Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 20L),
+      TAKE_STRING,
+      STRING,
+      ("xs", STRING), ("number", LONG)
+    ) {
       case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => CONST_STRING(xs.take(trimLongToInt(number)))
       case xs                                            => notImplemented[Id, EVALUATED]("take(xs: String, number: Int)", xs)
     }
@@ -305,7 +352,7 @@ object PureContext {
   def listConstructor(checkSize: Boolean): NativeFunction[NoContext] =
     NativeFunction(
       "cons",
-      2,
+      Map[StdLibVersion, Long](V1 -> 2L, V2 -> 2L, V3 -> 2L, V4 -> 1L),
       CREATE_LIST,
       PARAMETERIZEDLIST(PARAMETERIZEDUNION(List(TYPEPARAM('A'), TYPEPARAM('B')))),
       ("head", TYPEPARAM('A')),
@@ -318,7 +365,7 @@ object PureContext {
   lazy val listAppend: NativeFunction[NoContext] =
     NativeFunction(
       LIST_APPEND_OP.func,
-      3,
+      Map[StdLibVersion, Long](V1 -> 3L, V2 -> 3L, V3 -> 3L, V4 -> 1L),
       APPEND_LIST,
       PARAMETERIZEDLIST(PARAMETERIZEDUNION(List(TYPEPARAM('A'), TYPEPARAM('B')))),
       ("list", PARAMETERIZEDLIST(TYPEPARAM('A'))),
@@ -331,7 +378,7 @@ object PureContext {
   lazy val listConcat: NativeFunction[NoContext] =
     NativeFunction(
       LIST_CONCAT_OP.func,
-      10,
+      Map[StdLibVersion, Long](V1 -> 10L, V2 -> 10L, V3 -> 10L, V4 -> 4L),
       CONCAT_LIST,
       PARAMETERIZEDLIST(PARAMETERIZEDUNION(List(TYPEPARAM('A'), TYPEPARAM('B')))),
       ("list1", PARAMETERIZEDLIST(TYPEPARAM('A'))),
@@ -342,13 +389,24 @@ object PureContext {
     }
 
   lazy val dropString: BaseFunction[NoContext] =
-    NativeFunction("drop", 1, DROP_STRING, STRING, ("xs", STRING), ("number", LONG)) {
+    NativeFunction(
+      "drop",
+      Map[StdLibVersion, Long](V1 -> 1L, V2 -> 1L, V3 -> 1L, V4 -> 20L),
+      DROP_STRING,
+      STRING,
+      ("xs", STRING), ("number", LONG)
+    ) {
       case CONST_STRING(xs) :: CONST_LONG(number) :: Nil => CONST_STRING(xs.drop(trimLongToInt(number)))
       case xs                                            => notImplemented[Id, EVALUATED]("drop(xs: String, number: Int)", xs)
     }
 
   lazy val takeRightString: BaseFunction[NoContext] =
-    UserFunction("takeRight", 19, STRING, ("@xs", STRING), ("@number", LONG)) {
+    UserFunction(
+      "takeRight",
+      Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 20L),
+      STRING,
+      ("@xs", STRING), ("@number", LONG)
+    ) {
       FUNCTION_CALL(
         dropString,
         List(
@@ -365,7 +423,12 @@ object PureContext {
     }
 
   lazy val dropRightString: BaseFunction[NoContext] =
-    UserFunction("dropRight", 19, STRING, ("@xs", STRING), ("@number", LONG)) {
+    UserFunction(
+      "dropRight",
+      Map[StdLibVersion, Long](V1 -> 19L, V2 -> 19L, V3 -> 19L, V4 -> 20L),
+      STRING,
+      ("@xs", STRING), ("@number", LONG)
+    ) {
       FUNCTION_CALL(
         takeString,
         List(
@@ -384,7 +447,13 @@ object PureContext {
   val UTF8Decoder = UTF_8.newDecoder
 
   def toUtf8String(version: StdLibVersion): BaseFunction[NoContext] =
-    NativeFunction("toUtf8String", 20, UTF8STRING, STRING, ("u", BYTESTR)) {
+    NativeFunction(
+      "toUtf8String",
+      Map[StdLibVersion, Long](V1 -> 20L, V2 -> 20L, V3 -> 20L, V4 -> 7L),
+      UTF8STRING,
+      STRING,
+      ("u", BYTESTR)
+    ) {
       case CONST_BYTESTR(u) :: Nil =>
         Try(ByteBuffer.wrap(u.arr))
           .map(UTF8Decoder.decode)
@@ -399,7 +468,7 @@ object PureContext {
     }
 
   lazy val toLong: BaseFunction[NoContext] =
-    NativeFunction("toInt", 10, BININT, LONG, ("bin", BYTESTR)) {
+    NativeFunction("toInt",  Map[StdLibVersion, Long](V1 -> 10L, V2 -> 10L, V3 -> 10L, V4 -> 1L), BININT, LONG, ("bin", BYTESTR)) {
       case CONST_BYTESTR(u) :: Nil =>
         Try(CONST_LONG(ByteBuffer.wrap(u.arr).getLong())).toEither.left.map {
           case _: BufferUnderflowException => "Buffer underflow"
@@ -423,7 +492,14 @@ object PureContext {
     }
 
   lazy val indexOf: BaseFunction[NoContext] =
-    NativeFunction("indexOf", 20, INDEXOF, optionLong, ("str", STRING), ("substr", STRING)) {
+    NativeFunction(
+      "indexOf",
+      Map[StdLibVersion, Long](V1 -> 20L, V2 -> 20L, V3 -> 20L, V4 -> 3L),
+      INDEXOF,
+      optionLong,
+      ("str", STRING),
+      ("substr", STRING)
+    ) {
       case CONST_STRING(m) :: CONST_STRING(sub) :: Nil =>
         Right({
           val i = m.indexOf(sub)
@@ -437,7 +513,13 @@ object PureContext {
     }
 
   lazy val indexOfN: BaseFunction[NoContext] =
-    NativeFunction("indexOf", 20, INDEXOFN, optionLong, ("str", STRING), ("substr", STRING), ("offset", LONG)) {
+    NativeFunction(
+      "indexOf",
+      Map[StdLibVersion, Long](V1 -> 20L, V2 -> 20L, V3 -> 20L, V4 -> 3L),
+      INDEXOFN,
+      optionLong,
+      ("str", STRING), ("substr", STRING), ("offset", LONG)
+    ) {
       case CONST_STRING(m) :: CONST_STRING(sub) :: CONST_LONG(off) :: Nil =>
         Right(if (off >= 0 && off <= m.length) {
           val i = m.indexOf(sub, off.toInt)
@@ -455,7 +537,7 @@ object PureContext {
   lazy val lastIndexOf: BaseFunction[NoContext] =
     NativeFunction(
       "lastIndexOf",
-      20,
+      Map[StdLibVersion, Long](V1 -> 20L, V2 -> 20L, V3 -> 20L, V4 -> 3L),
       LASTINDEXOF,
       optionLong,
       ("str", STRING),
@@ -476,7 +558,7 @@ object PureContext {
   lazy val lastIndexOfWithOffset: BaseFunction[NoContext] =
     NativeFunction(
       "lastIndexOf",
-      20,
+      Map[StdLibVersion, Long](V1 -> 20L, V2 -> 20L, V3 -> 20L, V4 -> 3L),
       LASTINDEXOFN,
       optionLong,
       ("str", STRING),
@@ -499,35 +581,37 @@ object PureContext {
     }
 
   lazy val splitStr: BaseFunction[NoContext] =
-    NativeFunction("split", 100, SPLIT, listString, ("str", STRING), ("separator", STRING)) {
+    NativeFunction("split", Map(V3 -> 100L, V4 -> 75L), SPLIT, listString, ("str", STRING), ("separator", STRING)) {
       case CONST_STRING(str) :: CONST_STRING(sep) :: Nil =>
-        split(str, sep)
-          .traverse(CONST_STRING(_))
-          .flatMap(s => ARR(s.toIndexedSeq, true))
-      case xs => notImplemented[Id, EVALUATED]("split(str: String, separator: String)", xs)
+          ARR(split(str, sep).toIndexedSeq, limited = true)
+      case xs =>
+        notImplemented[Id, EVALUATED]("split(str: String, separator: String)", xs)
     }
 
-  private def split(str: String, sep: String) =
+  private def split(str: String, sep: String): Iterable[CONST_STRING] = {
     if (str == "") listWithEmptyStr
-    else if (sep == "") 1 to str.length map (i => String.valueOf(str.charAt(i - 1))) toList
-    else splitRec(str, sep).reverse
+    else if (sep == "")
+      (1 to str.length)
+        .map(i => CONST_STRING(String.valueOf(str.charAt(i - 1))).explicitGet())
+    else splitRec(str, sep)
+  }
 
-  private val listWithEmptyStr = List("")
+  private val listWithEmptyStr = List(CONST_STRING("").explicitGet())
 
   @tailrec private def splitRec(
       str: String,
       sep: String,
       offset: Int = 0,
-      splitted: List[String] = Nil
-  ): List[String] = {
+      splitted: ArrayBuffer[CONST_STRING] = ArrayBuffer()
+  ): ArrayBuffer[CONST_STRING] = {
     val index = str.indexOf(sep, offset)
-    if (index == -1) str.substring(offset, str.length) :: splitted
+    if (index == -1) splitted += CONST_STRING(str.substring(offset, str.length)).explicitGet()
     else
       splitRec(
         str,
         sep,
         index + sep.length,
-        str.substring(offset, index) :: splitted
+        splitted += CONST_STRING(str.substring(offset, index)).explicitGet()
       )
   }
 
@@ -547,7 +631,12 @@ object PureContext {
     }
 
   lazy val contains: BaseFunction[NoContext] =
-    UserFunction("contains", 20, BOOLEAN, ("@source", STRING), ("@substr", STRING)) {
+    UserFunction(
+      "contains",
+      Map[StdLibVersion, Long](V1 -> 20L, V2 -> 20L, V3 -> 20L, V4 -> 3L),
+      BOOLEAN,
+      ("@source", STRING), ("@substr", STRING)
+    ) {
       FUNCTION_CALL(
         User("isDefined"),
         List(
@@ -560,7 +649,12 @@ object PureContext {
     }
 
   lazy val parseInt: BaseFunction[NoContext] =
-    NativeFunction("parseInt", 20, PARSEINT, optionLong, ("str", STRING)) {
+    NativeFunction(
+      "parseInt",
+      Map[StdLibVersion, Long](V1 -> 20L, V2 -> 20L, V3 -> 20L, V4 -> 2L),
+      PARSEINT,
+      optionLong,
+      ("str", STRING)) {
       case CONST_STRING(u) :: Nil => Try(CONST_LONG(u.toLong)).orElse(Success(unit)).toEither.left.map(_.toString)
       case xs                     => notImplemented[Id, EVALUATED]("parseInt(str: String)", xs)
     }
@@ -568,7 +662,7 @@ object PureContext {
   lazy val parseIntVal: BaseFunction[NoContext] =
     UserFunction(
       "parseIntValue",
-      20,
+      Map[StdLibVersion, Long](V1 -> 20L, V2 -> 20L, V3 -> 20L, V4 -> 2L),
       LONG,
       ("str", STRING)
     ) {
@@ -579,18 +673,26 @@ object PureContext {
       )
     }
 
-  def createRawOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, complicity: Int = 1)(
+  def createRawOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, complexity: Int = 1)(
       body: (EVALUATED, EVALUATED) => Either[String, EVALUATED]
   ): BaseFunction[NoContext] =
-    NativeFunction(opsToFunctions(op), complicity, func, r, ("a", t), ("b", t)) {
+    NativeFunction(opsToFunctions(op), complexity, func, r, ("a", t), ("b", t)) {
       case a :: b :: Nil => body(a, b)
       case xs            => notImplemented[Id, EVALUATED](s"${opsToFunctions(op)}(a: ${t.toString}, b: ${t.toString})", xs)
     }
 
-  def createOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, complicity: Int = 1)(
+  def createRawOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, complexity: Map[StdLibVersion, Long])(
+      body: (EVALUATED, EVALUATED) => Either[String, EVALUATED]
+  ): BaseFunction[NoContext] =
+    NativeFunction(opsToFunctions(op), complexity, func, r, ("a", t), ("b", t)) {
+      case a :: b :: Nil => body(a, b)
+      case xs            => notImplemented[Id, EVALUATED](s"${opsToFunctions(op)}(a: ${t.toString}, b: ${t.toString})", xs)
+    }
+
+  def createOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, complexity: Int = 1)(
       body: (Long, Long) => Boolean
   ): BaseFunction[NoContext] =
-    NativeFunction(opsToFunctions(op), complicity, func, r, ("a", t), ("b", t)) {
+    NativeFunction(opsToFunctions(op), complexity, func, r, ("a", t), ("b", t)) {
       case CONST_LONG(a) :: CONST_LONG(b) :: Nil => Right(CONST_BOOLEAN(body(a, b)))
       case xs                                    => notImplemented[Id, EVALUATED](s"${opsToFunctions(op)}(a: ${t.toString}, b: ${t.toString})", xs)
     }

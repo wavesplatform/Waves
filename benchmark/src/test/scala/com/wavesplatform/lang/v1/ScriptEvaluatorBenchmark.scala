@@ -16,6 +16,7 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.{FROMBASE58, SIGVERIFY, TOBASE58}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, FunctionIds}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
@@ -72,6 +73,9 @@ class ScriptEvaluatorBenchmark {
   @Benchmark
   def listMedianEqualElements(st: Median, bh: Blackhole): Unit =
     bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.equalElements))
+
+  @Benchmark
+  def sigVerify32Kb(st: SigVerify32Kb, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.expr))
 }
 
 @State(Scope.Benchmark)
@@ -237,6 +241,28 @@ class Median {
     FUNCTION_CALL(
       Native(FunctionIds.MEDIAN_LIST),
       List(ARR(listOfLong, limited = true).explicitGet())
+    )
+  }
+}
+
+@State(Scope.Benchmark)
+class SigVerify32Kb {
+  val context: EvaluationContext[NoContext, Id] =
+    Monoid.combine(PureContext.build(Global, V4).evaluationContext, CryptoContext.build(Global, V4).evaluationContext)
+
+
+  val expr: EXPR = {
+    val (privateKey, publicKey) = curve25519.generateKeypair
+    val message                 = randomBytes(32 * 1024 - 1)
+    val signature               = curve25519.sign(privateKey, message)
+
+    FUNCTION_CALL(
+      Native(SIGVERIFY),
+      List(
+        CONST_BYTESTR(ByteStr(message)).explicitGet(),
+        CONST_BYTESTR(ByteStr(signature)).explicitGet(),
+        CONST_BYTESTR(ByteStr(publicKey)).explicitGet()
+      )
     )
   }
 }

@@ -60,7 +60,7 @@ object LevelDBWriterBenchmark {
 
   @State(Scope.Benchmark)
   class TransactionByAddressSt extends BaseSt {
-    val txsAddresses: Vector[Address] = load("transactionByAddress", benchSettings.txsAddressesFile)(x => Address.fromString(x).explicitGet())
+    val txsAddresses: Vector[Address] = load("transactionByAddress", ???)(x => Address.fromString(x).explicitGet())
   }
 
   @State(Scope.Benchmark)

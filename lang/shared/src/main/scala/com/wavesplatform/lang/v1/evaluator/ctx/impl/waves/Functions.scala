@@ -5,7 +5,7 @@ import cats.{Id, Monad}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ExecutionError
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V4}
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -26,7 +26,7 @@ object Functions {
     val args = Seq(("addressOrAlias", addressOrAliasType), ("key", STRING))
     NativeFunction.withEnvironment[Environment](
       name,
-      100,
+      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 25L),
       internalName,
       UNION(dataType.innerType, UNIT),
       ("addressOrAlias", addressOrAliasType),
@@ -94,7 +94,7 @@ object Functions {
   private def getDataByIndexF(name: String, dataType: DataType, version: StdLibVersion): BaseFunction[Environment] =
     UserFunction(
       name,
-      30,
+      Map[StdLibVersion, Long](V1 -> 30L, V2 -> 30L, V3 -> 30L, V4 -> 4L),
       UNION(dataType.innerType, UNIT),
       ("@data", LIST(commonDataEntryType(version))),
       ("@index", LONG)
@@ -117,18 +117,25 @@ object Functions {
   def getBinaryByIndexF(v: StdLibVersion): BaseFunction[Environment]  = getDataByIndexF("getBinary", DataType.ByteArray, v)
   def getStringByIndexF(v: StdLibVersion): BaseFunction[Environment]  = getDataByIndexF("getString", DataType.String, v)
 
-  private def secureHashExpr(xs: EXPR): EXPR = FUNCTION_CALL(
-    FunctionHeader.Native(KECCAK256),
-    List(
-      FUNCTION_CALL(
-        FunctionHeader.Native(BLAKE256),
-        List(xs)
+  private def secureHashExpr(xs: EXPR, version: StdLibVersion): EXPR =
+    FUNCTION_CALL(
+      FunctionHeader.Native(if (version >= V4) KECCAK256_LIM else KECCAK256),
+      List(
+        FUNCTION_CALL(
+          FunctionHeader.Native(if (version >= V4) BLAKE256_LIM else BLAKE256),
+          List(xs)
+        )
       )
     )
-  )
 
-  val addressFromPublicKeyF: BaseFunction[Environment] =
-    UserFunction.withEnvironment[Environment]("addressFromPublicKey", 82, addressType, ("@publicKey", BYTESTR))(
+  def addressFromPublicKeyF(version: StdLibVersion): BaseFunction[Environment] =
+    UserFunction.withEnvironment[Environment](
+      name = "addressFromPublicKey",
+      internalName = "addressFromPublicKey",
+      Map[StdLibVersion, Long](V1 -> 82L, V2 -> 82L, V3 -> 82L, V4 -> 63L),
+      addressType,
+      ("@publicKey", BYTESTR)
+    )(
       new ContextfulUserFunction[Environment] {
         override def apply[F[_]: Monad](env: Environment[F]): EXPR =
           FUNCTION_CALL(
@@ -145,7 +152,7 @@ object Functions {
                       FUNCTION_CALL(
                         PureContext.takeBytes,
                         List(
-                          secureHashExpr(REF("@publicKey")),
+                          secureHashExpr(REF("@publicKey"), version),
                           CONST_LONG(EnvironmentFunctions.HashLength)
                         )
                       )
@@ -160,7 +167,7 @@ object Functions {
                     FUNCTION_CALL(
                       PureContext.takeBytes,
                       List(
-                        secureHashExpr(REF("@afpk_withoutChecksum")),
+                        secureHashExpr(REF("@afpk_withoutChecksum"), version),
                         CONST_LONG(EnvironmentFunctions.ChecksumLength)
                       )
                     )
@@ -184,7 +191,7 @@ object Functions {
     str
   )
 
-  private def verifyAddressChecksumExpr(addressBytes: EXPR): EXPR = FUNCTION_CALL(
+  private def verifyAddressChecksumExpr(addressBytes: EXPR, version: StdLibVersion): EXPR = FUNCTION_CALL(
     PureContext.eq,
     List(
       // actual checksum
@@ -193,14 +200,17 @@ object Functions {
       FUNCTION_CALL(
         PureContext.takeBytes,
         List(
-          secureHashExpr(FUNCTION_CALL(PureContext.dropRightBytes, List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength)))),
+          secureHashExpr(
+            FUNCTION_CALL(PureContext.dropRightBytes, List(addressBytes, CONST_LONG(EnvironmentFunctions.ChecksumLength))),
+            version
+          ),
           CONST_LONG(EnvironmentFunctions.ChecksumLength)
         )
       )
     )
   )
 
-  val addressFromStringF: BaseFunction[Environment] =
+  def addressFromStringF(version: StdLibVersion): BaseFunction[Environment] =
     UserFunction.withEnvironment("addressFromString", 124, optionAddress, ("@string", STRING)) {
       new ContextfulUserFunction[Environment] {
         override def apply[F[_]: Monad](env: Environment[F]): EXPR =
@@ -242,7 +252,7 @@ object Functions {
                     )
                   ),
                   IF(
-                    verifyAddressChecksumExpr(REF("@afs_addrBytes")),
+                    verifyAddressChecksumExpr(REF("@afs_addrBytes"), version),
                     FUNCTION_CALL(FunctionHeader.User("Address"), List(REF("@afs_addrBytes"))),
                     REF("unit")
                   ),
@@ -283,7 +293,7 @@ object Functions {
   val addressFromRecipientF: BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "addressFromRecipient",
-      100,
+      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 10L),
       ADDRESSFROMRECIPIENT,
       addressType,
       ("AddressOrAlias", addressOrAliasType)
@@ -325,7 +335,7 @@ object Functions {
   val assetBalanceF: BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "assetBalance",
-      100,
+      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 15L),
       ACCOUNTASSETBALANCE,
       LONG,
       ("addressOrAlias", addressOrAliasType),
@@ -348,7 +358,7 @@ object Functions {
   val assetBalanceV4F: BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "assetBalance",
-      100,
+      15,
       ACCOUNTASSETONLYBALANCE,
       LONG,
       ("addressOrAlias", addressOrAliasType),
@@ -369,7 +379,7 @@ object Functions {
   val wavesBalanceV4F: BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "wavesBalance",
-      100,
+      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 10L),
       ACCOUNTWAVESBALANCE,
       balanceDetailsType,
       ("addressOrAlias", addressOrAliasType)
@@ -394,7 +404,7 @@ object Functions {
   def assetInfoF(version: StdLibVersion): BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "assetInfo",
-      100,
+      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 50L),
       GETASSETINFOBYID,
       optionAsset(version),
       ("id", BYTESTR)
@@ -422,7 +432,7 @@ object Functions {
   val txHeightByIdF: BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "transactionHeightById",
-      100,
+      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 15L),
       TRANSACTIONHEIGHTBYID,
       optionLong,
       ("id", BYTESTR)
@@ -443,7 +453,7 @@ object Functions {
   def blockInfoByHeightF(version: StdLibVersion): BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "blockInfoByHeight",
-      100,
+      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 5L),
       BLOCKINFOBYHEIGHT,
       UNION(UNIT, blockInfo(version)),
       ("height", LONG)
@@ -490,7 +500,7 @@ object Functions {
       getBooleanByIndexF(v),
       getBinaryByIndexF(v),
       getStringByIndexF(v),
-      if (v >= V4) addressFromStringV4 else addressFromStringF
+      if (v >= V4) addressFromStringV4 else addressFromStringF(v)
     ).map(withExtract)
 
   def txByIdF(proofsEnabled: Boolean, version: StdLibVersion): BaseFunction[Environment] =
@@ -518,7 +528,7 @@ object Functions {
   def transferTxByIdF(proofsEnabled: Boolean, version: StdLibVersion): BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "transferTransactionById",
-      100,
+      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 60L),
       TRANSFERTRANSACTIONBYID,
       UNION(buildTransferTransactionType(proofsEnabled, version), UNIT),
       ("id", BYTESTR)
