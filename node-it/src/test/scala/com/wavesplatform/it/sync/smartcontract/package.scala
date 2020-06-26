@@ -5,6 +5,7 @@ import com.wavesplatform.transaction.DataTransaction
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.utils.Time
 import play.api.libs.json.JsObject
+import com.wavesplatform.common.utils.EitherExt2
 
 package object smartcontract {
   val invokeScrTxSupportedVersions: List[Byte] = List(1, 2)
@@ -14,14 +15,14 @@ package object smartcontract {
     s"""
        |{-# STDLIB_VERSION 2 #-}
        |match tx {
-       |  case ext : ExchangeTransaction =>
+       |  case _: ExchangeTransaction =>
        |    # Crypto context
        |    let bks = blake2b256(base58'') != base58'' && keccak256(base58'') != base58'' && sha256(base58'') != base58''
        |    let sig = sigVerify(base58'333', base58'123', base58'567') != true
        |    let str58 = fromBase58String(toBase58String(tx.id)) == tx.id
        |    let str64 = fromBase64String(toBase64String(tx.id)) == tx.id
        |    bks && sig && str58 && str64
-       |  ${if (accountScript) "case s : SetScriptTransaction => true" else ""}
+       |  ${if (accountScript) "case _: SetScriptTransaction => true" else ""}
        |  case _ => false
        |}
      """.stripMargin
@@ -59,9 +60,9 @@ package object smartcontract {
        |    let pure = basic && ne && gteLong && getListSize && unary && frAction #&& bytesOps && strOps
        |
        | match tx {
-       |  case ex : ExchangeTransaction =>
+       |  case _ : ExchangeTransaction =>
        |    pure && height > 0
-       |  ${if (accountScript) "case s : SetScriptTransaction | Order => pure && height > 0 " else ""}
+       |  ${if (accountScript) "case _: SetScriptTransaction | Order => pure && height > 0 " else ""}
        |  case _ => false
        | }
      """.stripMargin
@@ -107,7 +108,7 @@ package object smartcontract {
        |     let balances = assetBalance(ext.sender, unit) > 0 && wavesBalance(ext.sender) != 0
        |
        |     entries && balances && aFromPK && aFromStr && height > 0
-       |  ${if (accountScript) "case s : SetScriptTransaction => true" else ""}
+       |  ${if (accountScript) "case _: SetScriptTransaction => true" else ""}
        |  case _ => false
        | }
      """.stripMargin
@@ -138,8 +139,7 @@ package object smartcontract {
         fee = matcherFee,
         timestamp = time.correctedTime()
       )
-      .right
-      .get
+      .explicitGet()
       .json()
 
     tx

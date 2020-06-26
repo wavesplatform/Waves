@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.api.http.ApiError.InvalidIds
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -77,8 +78,7 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
 
   private def mkTransactions: List[ProvenTransaction] =
     (1001 to 1020).map { amount =>
-      TransferTransaction
-        .selfSigned(
+      TransferTransaction.selfSigned(
           2.toByte,
           miner.keyPair,
           AddressOrAlias.fromString(secondAddress).explicitGet(),
@@ -86,7 +86,7 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
           amount,
           Waves,
           minFee,
-          None,
+          ByteStr.empty,
           ntpTime.correctedTime(),
         )
         .explicitGet()
@@ -108,7 +108,7 @@ object TransactionsStatusSuite {
   object CheckData {
     def apply(height: Int, confirmed: List[TransactionInfo], unconfirmed: List[String], notFound: List[String]): CheckData =
       new CheckData(
-        confirmed.map(info => TransactionStatus(info.id, "confirmed", Some(height - info.height), Some(info.height), Some("succeed"))),
+        confirmed.map(info => TransactionStatus(info.id, "confirmed", Some(height - info.height), Some(info.height), Some("succeeded"))),
         unconfirmed.map(d => TransactionStatus(d, "unconfirmed", None, None, None)),
         notFound.map(d => TransactionStatus(d, "not_found", None, None, None))
       )

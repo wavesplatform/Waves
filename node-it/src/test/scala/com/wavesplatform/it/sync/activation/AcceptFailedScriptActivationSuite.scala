@@ -9,6 +9,7 @@ import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionStatus
 import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.transactions.OverflowBlock
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{NTPTime, NodeConfigs}
@@ -22,7 +23,7 @@ import play.api.libs.json.JsObject
 
 import scala.concurrent.duration._
 
-class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTime {
+class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTime with OverflowBlock {
   import AcceptFailedScriptActivationSuite._
 
   private val (dApp, dAppKP)               = (firstAddress, pkByAddress(firstAddress))
@@ -49,7 +50,10 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
          |
          |@Callable(i)
          |func error() = {
-         |  throw("Error in DApp")
+         |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 20} true
+         |  if (check)
+         |    then throw("Error in DApp")
+         |    else throw("Error in DApp")
          |}
          |
          |@Callable(i)
@@ -63,22 +67,18 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
   }
 
   test("reject failed transaction before activation height") {
+    overflowBlock()
+    sender.setAssetScript(asset, dApp, priorityFee, assetScript(false))
     val txs =
       (1 to MaxTxsInMicroBlock * 2).map { _ =>
         sender.invokeScript(caller, dApp, Some("transfer"), fee = minInvokeFee)._1.id
       }
-
-    sender.setAssetScript(asset, dApp, priorityFee, assetScript(false), waitForTx = true)
-
     sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
 
     def check(): Unit = {
-      val statuses = sender.transactionStatus(txs).sortWith { case (f, s) => txs.indexOf(f.status) < txs.indexOf(s.status) }
-      val failed   = statuses.dropWhile(s => s.status == "confirmed")
-
-      failed.size should be > 0
-      all(failed.map(_.status)) shouldBe "not_found"
-      all(failed.map(_.applicationStatus)) shouldBe None
+      val statuses = sender.transactionStatus(txs)
+      all(statuses.map(_.status)) shouldBe "not_found"
+      all(statuses.map(_.applicationStatus)) shouldBe None
     }
 
     check() // liquid
@@ -88,44 +88,79 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
   test("accept valid transaction before activation height") {
     val tx = sender.invokeScript(caller, dApp, Some("write"), fee = invokeFee, waitForTx = true)._1.id
+    all(sender.lastBlock().transactions.map(_.applicationStatus)) shouldBe None
 
     def check(): Unit = {
       val txInfo = sender.transactionInfo[JsObject](tx)
+      val txHeight = (txInfo \ "height").as[Int]
       (txInfo \ "id").as[String] shouldBe tx
       txInfo.value.contains("applicationStatus") shouldBe false
+      val block = sender.blockAt(txHeight)
+      all(block.transactions.map(_.applicationStatus)) shouldBe None
+      all(sender.blockById(block.id).transactions.map(_.applicationStatus)) shouldBe None
+      all(sender.blockSeq(txHeight - 1, txHeight).flatMap(_.transactions.map(_.applicationStatus))) shouldBe None
+      sender.debugStateChanges(tx).applicationStatus shouldBe None
+      all(sender.debugStateChangesByAddress(caller, 1).map(_.applicationStatus)) shouldBe None
     }
 
     check() // liquid
     nodes.waitForHeightArise()
     check() // hardened
+    all(sender.blockSeqByAddress(sender.address, 1, ActivationHeight - 1).flatMap(_.transactions.map(_.applicationStatus))) shouldBe None
   }
 
   test("accept failed transaction after activation height") {
     sender.waitForHeight(ActivationHeight)
 
     sender.setAssetScript(asset, dApp, setAssetScriptFee + smartFee, assetScript(true), waitForTx = true)
-
+    overflowBlock()
+    sender.setAssetScript(asset, dApp, priorityFee, assetScript(false), waitForTx = true)
     val txs =
       (1 to MaxTxsInMicroBlock * 2).map { _ =>
         sender.invokeScript(caller, dApp, Some("transfer"), fee = minInvokeFee)._1.id
       }
 
-    sender.setAssetScript(asset, dApp, priorityFee, assetScript(false), waitForTx = true)
-
     sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
+
+    all(sender.lastBlock().transactions.map(_.applicationStatus.isDefined)) shouldBe true
 
     def check(): Unit = {
       val statuses = sender.transactionStatus(txs).sortWith { case (f, s) => txs.indexOf(f.status) < txs.indexOf(s.status) }
       all(statuses.map(_.status)) shouldBe "confirmed"
       all(statuses.map(_.applicationStatus.isDefined)) shouldBe true
 
-      val failed = statuses.dropWhile(s => s.applicationStatus.contains("succeed"))
+      val failed = statuses.dropWhile(s => s.applicationStatus.contains("succeeded"))
 
       failed.size should be > 0
-      all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
+      all(failed.flatMap(_.applicationStatus)) shouldBe "script_execution_failed"
 
       statuses.foreach { s =>
         (sender.transactionInfo[JsObject](s.id) \ "applicationStatus").asOpt[String] shouldBe s.applicationStatus
+      }
+
+      val heightToId = statuses.map(s => s.height.get -> s.id).toMap
+      val idToApplicationStatus = statuses.map(s => s.id -> s.applicationStatus).toMap
+      heightToId.keys.foreach { h =>
+        val block = sender.blockAt(h)
+        block.transactions.foreach { tx =>
+          tx.applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
+          if (tx._type == InvokeScriptTransaction.typeId) {
+            sender.debugStateChanges(tx.id).applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
+          }
+        }
+        sender.blockById(block.id).transactions.foreach { tx =>
+          tx.applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
+        }
+
+        sender.blockSeq(h - 1, h).flatMap(_.transactions).foreach { tx =>
+          tx.applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
+        }
+      }
+      sender.debugStateChangesByAddress(caller, txs.size).foreach { s =>
+        s.applicationStatus shouldBe idToApplicationStatus.getOrElse(s.id, Some("succeeded"))
+      }
+      sender.blockSeqByAddress(sender.address, ActivationHeight, sender.height).flatMap(_.transactions).foreach { tx =>
+        tx.applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
       }
     }
 
@@ -140,9 +175,9 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     def check(): Unit = {
       val txInfo = sender.transactionInfo[JsObject](tx)
       (txInfo \ "id").as[String] shouldBe tx
-      (txInfo \ "applicationStatus").as[String] shouldBe "succeed"
+      (txInfo \ "applicationStatus").as[String] shouldBe "succeeded"
 
-      sender.transactionStatus(Seq(tx)).map(_.applicationStatus) shouldBe Seq(Some("succeed"))
+      sender.transactionStatus(Seq(tx)).map(_.applicationStatus) shouldBe Seq(Some("succeeded"))
     }
 
     check() // liquid
@@ -165,8 +200,8 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       failed.size shouldBe MaxTxsInMicroBlock * 2
 
       all(failed.map(_.status)) shouldBe "confirmed"
-      all(failed.map(_.applicationStatus)) shouldBe 'defined
-      all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
+      all(failed.map(_.applicationStatus)) shouldBe defined
+      all(failed.flatMap(_.applicationStatus)) shouldBe "script_execution_failed"
     }
 
     check() // liquid
@@ -210,8 +245,8 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       failed.size shouldBe MaxTxsInMicroBlock * 2
 
       all(failed.map(_.status)) shouldBe "confirmed"
-      all(failed.map(_.applicationStatus)) shouldBe 'defined
-      all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
+      all(failed.map(_.applicationStatus)) shouldBe defined
+      all(failed.flatMap(_.applicationStatus)) shouldBe "script_execution_failed"
 
       sender.balance(caller).balance shouldBe callerBalance - MaxTxsInMicroBlock * 2 * minInvokeFee
       sender.assetBalance(caller, asset).balance shouldBe callerAssetBalance
@@ -255,8 +290,8 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       failed.size shouldBe MaxTxsInMicroBlock * 2
 
       all(failed.map(_.status)) shouldBe "confirmed"
-      all(failed.map(_.applicationStatus)) shouldBe 'defined
-      all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
+      all(failed.map(_.applicationStatus)) shouldBe defined
+      all(failed.flatMap(_.applicationStatus)) shouldBe "script_execution_failed"
     }
 
     check() // liquid
@@ -409,7 +444,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
         100.millis
       )
 
-      status.applicationStatus shouldBe Some("scriptExecutionFailed")
+      status.applicationStatus shouldBe Some("script_execution_failed")
     }
 
     {
@@ -437,7 +472,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
         100.millis
       )
 
-      status.applicationStatus shouldBe Some("scriptExecutionFailed")
+      status.applicationStatus shouldBe Some("script_execution_failed")
     }
 
   }
@@ -459,7 +494,7 @@ object AcceptFailedScriptActivationSuite {
     mkScript(
       s"""
        |match tx {
-       |  case tx: SetAssetScriptTransaction => true
+       |  case _: SetAssetScriptTransaction => true
        |  case _ => $result
        |}
        |""".stripMargin

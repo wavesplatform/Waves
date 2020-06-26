@@ -62,7 +62,7 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
                     |      let isRecipientAgreed = if(isDefined(recipientAgreement)) then extract(recipientAgreement) else false
                     |      let senderAddress = addressFromPublicKey(ttx.senderPublicKey)
                     |      senderAddress.bytes == company.bytes || (isNotary1Agreed && isRecipientAgreed)
-                    |   case other => throw()
+                    |   case _ => throw()
                     | }
         """.stripMargin
 
@@ -91,12 +91,11 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
         .selfSigned(1.toByte, king, List(BinaryDataEntry("notary1PK", notary.publicKey)), 1000, ts + 1)
         .explicitGet()
 
-      transferFromCompanyToA = TransferTransaction
-        .selfSigned(1.toByte, company, accountA.toAddress, assetId, 1, Waves, 1000, None, ts + 20)
+      transferFromCompanyToA = TransferTransaction.selfSigned(1.toByte, company, accountA.toAddress, assetId, 1, Waves, 1000, ByteStr.empty,  ts + 20)
         .explicitGet()
 
       transferFromAToB = TransferTransaction
-        .selfSigned(1.toByte, accountA, accountB.toAddress, assetId, 1, Waves, 1000, None, ts + 30)
+        .selfSigned(1.toByte, accountA, accountB.toAddress, assetId, 1, Waves, 1000, ByteStr.empty,  ts + 30)
         .explicitGet()
 
       notaryDataTransaction = DataTransaction
@@ -118,7 +117,7 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
 
   def dummyEvalContext(version: StdLibVersion): EvaluationContext[Environment, Id] = {
     val ds          = DirectiveSet(V1, Asset, Expression).explicitGet()
-    val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(null), ds, ByteStr.empty)
+    val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, null, ds, ByteStr.empty)
     lazyContexts(ds)().evaluationContext(environment)
   }
 

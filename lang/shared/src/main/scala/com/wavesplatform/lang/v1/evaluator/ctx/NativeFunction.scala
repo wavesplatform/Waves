@@ -12,7 +12,6 @@ import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, Contextful
 import com.wavesplatform.lang.{EvalF, ExecutionError, TrampolinedExecResult}
 
 import scala.annotation.meta.field
-import scala.language.implicitConversions
 import scala.scalajs.js.annotation._
 
 sealed trait BaseFunction[C[_[_]]] {

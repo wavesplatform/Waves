@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.account.{AddressScheme, Alias}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, setScriptFee, smartFee}
@@ -29,8 +30,8 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
         |  case t : TransferTransaction =>
         |    let res = if isDefined(t.assetId) then extract(t.assetId) == base58'' else isDefined(t.assetId) == false
         |    res
-        |  case s : SetScriptTransaction => true
-        |  case other => throw("Your transaction has incorrect type.")
+        |  case _: SetScriptTransaction => true
+        |  case _ => throw("Your transaction has incorrect type.")
         |}
       """.stripMargin
 
@@ -64,8 +65,7 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
 
     assertBadRequestAndResponse(
       sender.signedBroadcast(
-        TransferTransaction
-          .selfSigned(2.toByte, acc0, acc1.toAddress, Waves, 1000, Waves, minFee + smartFee, None, ts)
+        TransferTransaction.selfSigned(2.toByte, acc0, acc1.toAddress, Waves, 1000, Waves, minFee + smartFee, ByteStr.empty,  ts)
           .explicitGet()
           .json()
       ),

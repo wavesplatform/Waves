@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -32,20 +33,18 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
 
     val account = KeyPair(seed)
 
-    val transferToAccount = TransferTransaction
-      .selfSigned(1.toByte, miner.keyPair, account.toAddress, Waves, AMOUNT, Waves, ENOUGH_FEE, None, System.currentTimeMillis())
+    val transferToAccount = TransferTransaction.selfSigned(1.toByte, miner.keyPair, account.toAddress, Waves, AMOUNT, Waves, ENOUGH_FEE, ByteStr.empty,  System.currentTimeMillis())
       .explicitGet()
 
     miner.signedBroadcast(transferToAccount.json())
 
     nodes.waitForHeightAriseAndTxPresent(transferToAccount.id().toString)
 
-    val firstTransfer = TransferTransaction
-      .selfSigned(1.toByte, account, miner.keyPair.toAddress, Waves, AMOUNT - ENOUGH_FEE, Waves, ENOUGH_FEE, None, System.currentTimeMillis())
+    val firstTransfer = TransferTransaction.selfSigned(1.toByte, account, miner.keyPair.toAddress, Waves, AMOUNT - ENOUGH_FEE, Waves, ENOUGH_FEE, ByteStr.empty,  System.currentTimeMillis())
       .explicitGet()
 
     val secondTransfer = TransferTransaction
-      .selfSigned(1.toByte, account, notMiner.keyPair.toAddress, Waves, AMOUNT - ENOUGH_FEE, Waves, ENOUGH_FEE, None, System.currentTimeMillis())
+      .selfSigned(1.toByte, account, notMiner.keyPair.toAddress, Waves, AMOUNT - ENOUGH_FEE, Waves, ENOUGH_FEE, ByteStr.empty,  System.currentTimeMillis())
       .explicitGet()
 
     val tx2Id = notMiner.signedBroadcast(secondTransfer.json()).id

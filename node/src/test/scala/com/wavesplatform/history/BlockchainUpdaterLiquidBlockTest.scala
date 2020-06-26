@@ -17,6 +17,7 @@ class BlockchainUpdaterLiquidBlockTest
     with PropertyChecks
     with DomainScenarioDrivenPropertyCheck
     with Matchers
+    with EitherMatchers
     with TransactionGen
     with BlocksTransactionsHelpers
     with NoShrink {
@@ -97,7 +98,7 @@ class BlockchainUpdaterLiquidBlockTest
           d.blockchainUpdater.processBlock(genBlock)
           d.blockchainUpdater.processBlock(keyBlock)
           microBlocks.foreach { mb =>
-            d.blockchainUpdater.processMicroBlock(mb) shouldBe 'right
+            d.blockchainUpdater.processMicroBlock(mb) should beRight
           }
         }
     }

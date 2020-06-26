@@ -23,11 +23,11 @@ class ScriptComplexityMiningConstraintSuite
     with PathMockFactory
     with TransactionGen
     with NoShrink {
-  val settings = WavesSettings.fromRootConfig(ConfigFactory.load())
+  private val settings = WavesSettings.fromRootConfig(ConfigFactory.load())
 
-  val complexity = OneDimensionalMiningConstraint(1000, TxEstimators.scriptsComplexity, "MaxScriptsComplexityInBlock")
-  val maxTxs     = OneDimensionalMiningConstraint(3, TxEstimators.one, "MaxTxsInMicroBlock")
-  val constraint = MultiDimensionalMiningConstraint(complexity, maxTxs)
+  private val complexity = OneDimensionalMiningConstraint(1000, TxEstimators.scriptsComplexity, "MaxScriptsComplexityInBlock")
+  private val maxTxs     = OneDimensionalMiningConstraint(3, TxEstimators.one, "MaxTxsInMicroBlock")
+  private val constraint = MultiDimensionalMiningConstraint(complexity, maxTxs)
 
   val (script, _) = ScriptCompiler.compile("true", ScriptEstimatorV3).explicitGet()
 
@@ -48,14 +48,14 @@ class ScriptComplexityMiningConstraintSuite
 
         val c1          = constraint.put(blockchain, tx1, txDiffer(tx1))
         val cOverfilled = c1.put(blockchain, tx1, txDiffer(tx1))
-        cOverfilled shouldBe 'overfilled
+        cOverfilled.isOverfilled shouldBe true
 
         val c2 = c1.put(blockchain, tx2, txDiffer(tx2))
-        c2 should not be 'full
+        c2.isFull shouldBe false
 
         val c3 = c2.put(blockchain, tx3, txDiffer(tx3))
-        c3 shouldBe 'full
-        c3 should not be 'overfilled
+        c3.isFull shouldBe true
+        c3.isOverfilled shouldBe false
     }
 
   }

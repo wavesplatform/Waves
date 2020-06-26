@@ -9,7 +9,7 @@ import monix.eval.Coeval
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Suite}
 
 import scala.concurrent.ExecutionContext
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 trait GrpcBaseTransactionSuiteLike
   extends GrpcWaitForHeight
@@ -36,6 +36,7 @@ trait GrpcBaseTransactionSuiteLike
           .parseFile(new File(filePath))
           .getConfigList("nodes")
           .asScala
+          .toSeq
           .map(cfg => new ExternalNode(cfg.withFallback(defaultConfig).resolve()))
     }
   }

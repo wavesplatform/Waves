@@ -75,7 +75,7 @@ class ScriptEstimatorV1V2Test extends ScriptEstimatorTestBase(ScriptEstimatorV1,
   }
 
   property("evaluates simple expression - let + func_call + ref") {
-    val functionCosts: Map[FunctionHeader, Coeval[Long]] = Map[FunctionHeader, Long](Plus -> 1).mapValues(Coeval.now)
+    val functionCosts: Map[FunctionHeader, Coeval[Long]] = Map(Plus -> Coeval.now(1L))
 
     val expr = BLOCK(
       LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(1), CONST_LONG(2)))),

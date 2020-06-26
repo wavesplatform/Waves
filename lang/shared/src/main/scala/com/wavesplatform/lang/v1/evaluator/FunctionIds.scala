@@ -56,6 +56,8 @@ object FunctionIds {
   val LASTINDEXOFN: Short = 1208
   val MAKESTRING: Short   = 1209
 
+  val CREATE_TUPLE: Short = 1300 // Reserved 22 id for tuple constructors
+
   // Crypto
   val SIGVERIFY: Short = 500
   val KECCAK256: Short = 501
@@ -104,8 +106,9 @@ object FunctionIds {
   val DATA_BYTES_FROM_STATE: Short   = 1052
   val DATA_STRING_FROM_STATE: Short  = 1053
 
-  val ADDRESSFROMRECIPIENT: Short = 1060
-  val ADDRESSTOSTRING: Short      = 1061
+  val ADDRESSFROMRECIPIENT: Short     = 1060
+  val ADDRESSTOSTRING: Short          = 1061
+  val ADDRESSFROMSTRING_NATIVE: Short = 1062
 
   val TRANSFER_TRANSACTION_FROM_PROTO: Short = 1070
 

@@ -47,14 +47,14 @@ case class Block(
 
   val blockScore: Coeval[BigInt] = Coeval.evalOnce((BigInt("18446744073709551616") / header.baseTarget).ensuring(_ > 0))
 
-  private[block] val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce {
+  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     if (header.version < Block.ProtoBlockVersion) copy(signature = ByteStr.empty).bytes()
     else PBBlocks.protobuf(this).header.get.toByteArray
   }
 
   val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
     val publicKey = header.generator
-    !crypto.isWeakPublicKey(publicKey.arr) && crypto.verify(signature, bytesWithoutSignature(), publicKey)
+    !crypto.isWeakPublicKey(publicKey.arr) && crypto.verify(signature, bodyBytes(), publicKey)
   }
 
   protected val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))

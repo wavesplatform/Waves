@@ -1,6 +1,7 @@
 package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
@@ -27,8 +28,7 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
     alice                                                    <- accountGen
     (_, assetName, description, quantity, decimals, _, _, _) <- issueParamGen
     genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
-    masterToAlice: TransferTransaction = TransferTransaction
-      .selfSigned(1.toByte, master, alice.toAddress, Asset.Waves, 3 * Waves, Asset.Waves, transferAssetWavesFee, None, ts + 1)
+    masterToAlice: TransferTransaction = TransferTransaction.selfSigned(1.toByte, master, alice.toAddress, Asset.Waves, 3 * Waves, Asset.Waves, transferAssetWavesFee, ByteStr.empty,  ts + 1)
       .explicitGet()
     issue: IssueTransaction = IssueTransaction(TxVersion.V1, alice.publicKey, assetName, description, quantity, decimals, false, script = None, Waves, ts + 100)
       .signWith(alice.privateKey)

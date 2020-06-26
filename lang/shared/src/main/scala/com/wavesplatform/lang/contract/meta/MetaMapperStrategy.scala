@@ -1,11 +1,9 @@
 package com.wavesplatform.lang.contract.meta
 
-import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.protobuf.dapp.DAppMeta
 
 private[meta] trait MetaMapperStrategy[V <: MetaVersion] {
-  def toProto(data: V#Data): Either[String, DAppMeta]
-  def fromProto(meta: DAppMeta): Either[String, V#Data]
-  def textMap(data: V#Data, dApp: DApp): Dic
-  def protoInfo(dApp: DApp): Either[String, Dic] = fromProto(dApp.meta).map(textMap(_, dApp))
+  def toProto(data: List[List[FINAL]]): Either[String, DAppMeta]
+  def fromProto(meta: DAppMeta): Either[String, List[List[FINAL]]]
 }

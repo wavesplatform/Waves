@@ -14,6 +14,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.SponsorFeeTransaction
 import org.scalatest.{Assertion, FreeSpec, Matchers}
+import com.wavesplatform.common.utils.EitherExt2
 
 import scala.concurrent.duration._
 
@@ -144,8 +145,7 @@ class SponsorshipSuite
                 minFee,
                 timestamp + 1.day.toMillis
               )
-              .right
-              .get
+              .explicitGet()
 
           val iTx = invalidTx(timestamp = System.currentTimeMillis + 1.day.toMillis)
           assertBadRequestAndResponse(sender.broadcastRequest(iTx.json()), "Transaction timestamp .* is more than .*ms in the future")

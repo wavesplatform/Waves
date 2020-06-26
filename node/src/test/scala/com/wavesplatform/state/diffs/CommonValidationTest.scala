@@ -22,7 +22,7 @@ import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, G
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Assertion, Matchers, PropSpec}
+import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class CommonValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with WithState with NoShrink {
@@ -48,7 +48,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
     }
   }
 
-  private def sponsoredTransactionsCheckFeeTest(feeInAssets: Boolean, feeAmount: Long)(f: Either[ValidationError, Unit] => Assertion): Unit = {
+  private def sponsoredTransactionsCheckFeeTest(feeInAssets: Boolean, feeAmount: Long)(f: Either[ValidationError, Unit] => Any): Unit = {
     val settings = createSettings(BlockchainFeatures.FeeSponsorship -> 0)
     val gen      = sponsorAndSetScriptGen(sponsorship = true, smartToken = false, smartAccount = false, feeInAssets, feeAmount)
     forAll(gen) {
@@ -64,14 +64,14 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("checkFee for sponsored transactions sunny") {
-    sponsoredTransactionsCheckFeeTest(feeInAssets = true, feeAmount = 10)(_ shouldBe 'right)
+    sponsoredTransactionsCheckFeeTest(feeInAssets = true, feeAmount = 10)(_.explicitGet())
   }
 
   property("checkFee for sponsored transactions fails if the fee is not enough") {
     sponsoredTransactionsCheckFeeTest(feeInAssets = true, feeAmount = 1)(_ should produce("does not exceed minimal value of"))
   }
 
-  private def smartAccountCheckFeeTest(feeInAssets: Boolean, feeAmount: Long)(f: Either[ValidationError, Unit] => Assertion): Unit = {
+  private def smartAccountCheckFeeTest(feeInAssets: Boolean, feeAmount: Long)(f: Either[ValidationError, Unit] => Any): Unit = {
     val settings = createSettings(BlockchainFeatures.SmartAccounts -> 0)
     val gen      = sponsorAndSetScriptGen(sponsorship = false, smartToken = false, smartAccount = true, feeInAssets, feeAmount)
     forAll(gen) {
@@ -87,7 +87,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("checkFee for smart accounts sunny") {
-    smartAccountCheckFeeTest(feeInAssets = false, feeAmount = 400000)(_ shouldBe 'right)
+    smartAccountCheckFeeTest(feeInAssets = false, feeAmount = 400000)(_.explicitGet())
   }
 
   private def sponsorAndSetScriptGen(sponsorship: Boolean, smartToken: Boolean, smartAccount: Boolean, feeInAssets: Boolean, feeAmount: Long) =
@@ -128,8 +128,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
             ts
           ).signWith(richAcc.privateKey)
 
-      val transferWavesTx = TransferTransaction
-        .selfSigned(1.toByte, richAcc, recipientAcc.toAddress, Waves, 10 * Constants.UnitsInWave, Waves, 1 * Constants.UnitsInWave, None, ts)
+      val transferWavesTx = TransferTransaction.selfSigned(1.toByte, richAcc, recipientAcc.toAddress, Waves, 10 * Constants.UnitsInWave, Waves, 1 * Constants.UnitsInWave, ByteStr.empty, ts)
         .explicitGet()
 
       val transferAssetTx = TransferTransaction
@@ -144,8 +143,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
             1 * Constants.UnitsInWave + ScriptExtraFee
           } else {
             1 * Constants.UnitsInWave
-          },
-          None,
+          }, ByteStr.empty,
           ts
         )
         .explicitGet()
@@ -172,16 +170,14 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
           )
         else Seq.empty
 
-      val transferBackTx = TransferTransaction
-        .selfSigned(
+      val transferBackTx = TransferTransaction.selfSigned(
           1.toByte,
           recipientAcc,
           richAcc.toAddress,
           IssuedAsset(issueTx.id()),
           1,
           if (feeInAssets) IssuedAsset(issueTx.id()) else Waves,
-          feeAmount,
-          None,
+          feeAmount, ByteStr.empty,
           ts
         )
         .explicitGet()
@@ -192,12 +188,12 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
   private def createSettings(preActivatedFeatures: (BlockchainFeature, Int)*): FunctionalitySettings =
     TestFunctionalitySettings.Enabled
       .copy(
-        preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }(collection.breakOut),
+        preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }.toMap,
         blocksForFeatureActivation = 1,
         featureCheckBlocksPeriod = 1
       )
 
-  private def smartTokensCheckFeeTest(feeInAssets: Boolean, feeAmount: Long)(f: Either[ValidationError, Unit] => Assertion): Unit = {
+  private def smartTokensCheckFeeTest(feeInAssets: Boolean, feeAmount: Long)(f: Either[ValidationError, Unit] => Any): Unit = {
     val settings = createSettings(BlockchainFeatures.SmartAccounts -> 0, BlockchainFeatures.SmartAssets -> 0)
     val gen      = sponsorAndSetScriptGen(sponsorship = false, smartToken = true, smartAccount = false, feeInAssets, feeAmount)
     forAll(gen) {
@@ -213,7 +209,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("checkFee for smart tokens sunny") {
-    smartTokensCheckFeeTest(feeInAssets = false, feeAmount = 1)(_ shouldBe 'right)
+    smartTokensCheckFeeTest(feeInAssets = false, feeAmount = 1)(_.explicitGet())
   }
 
   property("disallows other network") {
@@ -242,7 +238,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
           amount,
           Waves,
           amount,
-          None,
+          ByteStr.empty,
           timestamp,
           Proofs.empty,
           invChainId
@@ -273,7 +269,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
           Seq(ParsedTransfer(invChainAddrOrAlias, amount)),
           amount,
           timestamp,
-          None,
+          ByteStr.empty,
           Proofs.empty,
           invChainId
         ).signWith(master.privateKey),

@@ -4,11 +4,13 @@ import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.serialization._
 import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
-import com.wavesplatform.transaction.transfer.{Attachment, MassTransferTransaction}
+import com.wavesplatform.utils.byteStrFormat
 import play.api.libs.json.{JsObject, JsValue, Json}
 
 import scala.util.Try
@@ -21,7 +23,7 @@ object MassTransferTxSerializer {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId"       -> assetId.maybeBase58Repr,
-      "attachment"    -> attachment.toJson(isProtobufVersion),
+      "attachment"    -> attachment,
       "transferCount" -> transfers.size,
       "totalAmount"   -> transfers.map(_.amount).sum,
       "transfers"     -> transfersJson(transfers)
@@ -42,7 +44,7 @@ object MassTransferTxSerializer {
           Bytes.concat(transferBytes: _*),
           Longs.toByteArray(timestamp),
           Longs.toByteArray(fee),
-          Deser.serializeArrayWithLength(attachment.toBytesStrict)
+          Deser.serializeArrayWithLength(attachment.arr)
         )
 
       case _ =>
@@ -77,6 +79,6 @@ object MassTransferTxSerializer {
     val fee        = buf.getLong
     val attachment = Deser.parseArrayWithLength(buf)
     val proofs     = buf.getProofs
-    MassTransferTransaction(TxVersion.V1, sender, assetId, transfers, fee, timestamp, Some(Attachment.Bin(attachment)), proofs, AddressScheme.current.chainId)
+    MassTransferTransaction(TxVersion.V1, sender, assetId, transfers, fee, timestamp, ByteStr(attachment), proofs, AddressScheme.current.chainId)
   }
 }

@@ -95,7 +95,12 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     )
 
     //able to "remove" nonexistent key (account state won't be changed, but transaction should be succesfully broadcasted)
-    sender.broadcastData(sender.keyPair, List(EmptyDataEntry("nonexistentkey")), calcDataFee(List(EmptyDataEntry("nonexistentkey")), TxVersion.V2), waitForTx = true)
+    sender.broadcastData(
+      sender.keyPair,
+      List(EmptyDataEntry("nonexistentkey")),
+      calcDataFee(List(EmptyDataEntry("nonexistentkey")), TxVersion.V2),
+      waitForTx = true
+    )
     sender.getData(sender.address).filter(_.key == "nonexistentkey") shouldBe List.empty
 
     // max number of data entries is 100
@@ -115,8 +120,8 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     // can put and remove same data within one block
     nodes.waitForHeightArise()
     val putDataEntries2 = List(IntegerDataEntry("del", 42))
-    val putDataTxId = sender.putData(address, putDataEntries2, calcDataFee(putDataEntries2, TxVersion.V1) * 10).id
-    val removeDataTxId = sender.broadcastData(sender.keyPair, List(EmptyDataEntry("del")), calcDataFee(List(EmptyDataEntry("del")), TxVersion.V2)).id
+    val putDataTxId     = sender.putData(address, putDataEntries2, calcDataFee(putDataEntries2, TxVersion.V1) * 10).id
+    val removeDataTxId  = sender.broadcastData(sender.keyPair, List(EmptyDataEntry("del")), calcDataFee(List(EmptyDataEntry("del")), TxVersion.V2)).id
     nodes.waitForTransaction(putDataTxId)
     nodes.waitForTransaction(removeDataTxId)
     sender.getData(address).filter(_.key == "del") shouldBe List.empty
@@ -211,8 +216,8 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       val txSender = if (v < 2) secondAddress else thirdAddress
       // define first int entry
       val intEntry = IntegerDataEntry("int", 8)
-      val intList = List(intEntry)
-      val tx1 = sender.putData(txSender, intList, calcDataFee(intList, v), version = v).id
+      val intList  = List(intEntry)
+      val tx1      = sender.putData(txSender, intList, calcDataFee(intList, v), version = v).id
       nodes.waitForHeightAriseAndTxPresent(tx1)
 
       sender.getDataByKey(txSender, "int") shouldBe intEntry
@@ -220,14 +225,14 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
 
       // define boolean entry
       val boolEntry = BooleanDataEntry("bool", true)
-      val boolList = List(boolEntry)
-      val tx2 = sender.putData(txSender, boolList, calcDataFee(boolList, v), version = v).id
+      val boolList  = List(boolEntry)
+      val tx2       = sender.putData(txSender, boolList, calcDataFee(boolList, v), version = v).id
       nodes.waitForHeightAriseAndTxPresent(tx2)
 
       // define string entry
       val stringEntry = StringDataEntry("str", "AAA")
-      val stringList = List(stringEntry)
-      val txS = sender.putData(txSender, stringList, calcDataFee(stringList, v), version = v).id
+      val stringList  = List(stringEntry)
+      val txS         = sender.putData(txSender, stringList, calcDataFee(stringList, v), version = v).id
       nodes.waitForHeightAriseAndTxPresent(txS)
 
       sender.getDataByKey(txSender, "int") shouldBe intEntry
@@ -237,8 +242,8 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
 
       // redefine int entry
       val reIntEntry = IntegerDataEntry("int", 10)
-      val reIntList = List(reIntEntry)
-      val tx3 = sender.putData(txSender, reIntList, calcDataFee(reIntList, v), version = v).id
+      val reIntList  = List(reIntEntry)
+      val tx3        = sender.putData(txSender, reIntList, calcDataFee(reIntList, v), version = v).id
       nodes.waitForHeightAriseAndTxPresent(tx3)
 
       sender.getDataByKey(txSender, "int") shouldBe reIntEntry
@@ -246,15 +251,15 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       sender.getData(txSender) shouldBe boolList ++ reIntList ++ stringList
 
       // define tx with all types
-      val (balance2, eff2) = miner.accountBalances(txSender)
-      val intEntry2 = IntegerDataEntry("int", -127)
-      val boolEntry2 = BooleanDataEntry("bool", false)
-      val blobEntry2 = BinaryDataEntry("blob", ByteStr(Array[Byte](127.toByte, 0, 1, 1)))
-      val stringEntry2 = StringDataEntry("str", "BBBB")
+      val (balance2, eff2)   = miner.accountBalances(txSender)
+      val intEntry2          = IntegerDataEntry("int", -127)
+      val boolEntry2         = BooleanDataEntry("bool", false)
+      val blobEntry2         = BinaryDataEntry("blob", ByteStr(Array[Byte](127.toByte, 0, 1, 1)))
+      val stringEntry2       = StringDataEntry("str", "BBBB")
       val unicodeStringEntry = StringDataEntry("?&$#^123\\/.a:;'\"\r\n\t\u0000|%è&", "specïal")
-      val dataAllTypes = List(intEntry2, boolEntry2, blobEntry2, stringEntry2, unicodeStringEntry)
-      val fee = calcDataFee(dataAllTypes, v)
-      val txId = sender.putData(txSender, dataAllTypes, fee, version = v).id
+      val dataAllTypes       = List(intEntry2, boolEntry2, blobEntry2, stringEntry2, unicodeStringEntry)
+      val fee                = calcDataFee(dataAllTypes, v)
+      val txId               = sender.putData(txSender, dataAllTypes, fee, version = v).id
       nodes.waitForHeightAriseAndTxPresent(txId)
 
       sender.getDataByKey(txSender, "int") shouldBe intEntry2
@@ -266,7 +271,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       miner.assertBalances(txSender, balance2 - fee, eff2 - fee)
 
       val json = Json.parse(sender.get(s"/transactions/info/$txId").getResponseBody)
-      ((json \ "data") (2) \ "value").as[String].startsWith("base64:") shouldBe true
+      ((json \ "data")(2) \ "value").as[String].startsWith("base64:") shouldBe true
     }
   }
 
@@ -300,15 +305,15 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
   test("update type for dataEntry") {
     for (v <- dataTxSupportedVersions) {
       val nonLatinKey = "\u05EA\u05E8\u05D1\u05D5\u05EA, \u05E1\u05E4\u05D5\u05E8\u05D8 \u05D5\u05EA\u05D9\u05D9\u05E8\u05D5\u05EA"
-      val boolData = List(BooleanDataEntry(nonLatinKey, true))
+      val boolData    = List(BooleanDataEntry(nonLatinKey, true))
       val boolDataFee = calcDataFee(boolData, v)
-      val firstTx = sender.putData(firstAddress, boolData, boolDataFee, version = v).id
+      val firstTx     = sender.putData(firstAddress, boolData, boolDataFee, version = v).id
       nodes.waitForHeightAriseAndTxPresent(firstTx)
       sender.getDataByKey(firstAddress, nonLatinKey) shouldBe boolData.head
 
-      val longData = List(IntegerDataEntry(nonLatinKey, 100500))
+      val longData    = List(IntegerDataEntry(nonLatinKey, 100500))
       val longDataFee = calcDataFee(longData, v)
-      val secondTx = sender.putData(firstAddress, longData, longDataFee, version = v).id
+      val secondTx    = sender.putData(firstAddress, longData, longDataFee, version = v).id
       nodes.waitForHeightAriseAndTxPresent(secondTx)
       sender.getDataByKey(firstAddress, nonLatinKey) shouldBe longData.head
     }
@@ -364,16 +369,16 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
           "/transactions/sign",
           Json.obj(
             "version" -> v,
-            "type" -> DataTransaction.typeId,
-            "sender" -> firstAddress,
-            "data" -> List(IntegerDataEntry("int", 333)),
-            "fee" -> 100000
+            "type"    -> DataTransaction.typeId,
+            "sender"  -> firstAddress,
+            "data"    -> List(DataEntry.Format.writes(IntegerDataEntry("int", 333))),
+            "fee"     -> 100000
           )
         )
         Json.parse(rs.getResponseBody).as[JsObject]
       }
 
-      def id(obj: JsObject) = obj.value("id").as[String]
+      def id(obj: JsObject): String = obj.value("id").as[String]
 
       val noProof = request - "proofs"
       assertBadRequestAndResponse(sender.postJson("/transactions/broadcast", noProof), "failed to parse json message.*proofs.*missing")
@@ -392,12 +397,12 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
 
   test("try to send tx above limits of key, value and entries count") {
     for (v <- dataTxSupportedVersions) {
-      val maxKeySize = if (v < 2) 100 else 400
-      val maxValueSize = Short.MaxValue
+      val maxKeySize    = if (v < 2) 100 else 400
+      val maxValueSize  = Short.MaxValue
       val maxEntryCount = 100
-      val TooBig = "Too big sequences requested"
-      val extraKey = "a" * (maxKeySize + 1)
-      val data = List(BooleanDataEntry(extraKey, false))
+      val TooBig        = "Too big sequences requested"
+      val extraKey      = "a" * (maxKeySize + 1)
+      val data          = List(BooleanDataEntry(extraKey, false))
 
       assertBadRequestAndResponse(sender.putData(firstAddress, data, calcDataFee(data, TxVersion.V1), version = v), TooBig)
       assertBadRequestAndResponse(sender.putData(firstAddress, List(IntegerDataEntry("", 4)), 100000, version = v), "Empty key found")
@@ -435,14 +440,14 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
   test("try to make address with 1000 DataEntries") {
     for (v <- dataTxSupportedVersions) {
       val dataSet = 0 until 200 flatMap (
-        i =>
-          List(
-            IntegerDataEntry(s"int$i", 1000 + i),
-            BooleanDataEntry(s"bool$i", false),
-            BinaryDataEntry(s"blob$i", ByteStr(Array[Byte](127.toByte, 0, 1, 1))),
-            StringDataEntry(s"str$i", s"hi there! + $i"),
-            IntegerDataEntry(s"integer$i", 1000 - i)
-          )
+          i =>
+            List(
+              IntegerDataEntry(s"int$i", 1000 + i),
+              BooleanDataEntry(s"bool$i", false),
+              BinaryDataEntry(s"blob$i", ByteStr(Array[Byte](127.toByte, 0, 1, 1))),
+              StringDataEntry(s"str$i", s"hi there! + $i"),
+              IntegerDataEntry(s"integer$i", 1000 - i)
+            )
         )
 
       val txIds = dataSet.grouped(100).map(_.toList).map(data => sender.putData(fourthAddress, data, calcDataFee(data, v), version = v).id)
@@ -461,7 +466,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
 
   test("put data in liquid block") {
     val newAddress = sender.createAddress()
-    val entries = List(StringDataEntry("test", "test"))
+    val entries    = List(StringDataEntry("test", "test"))
     sender.transfer(firstAddress, newAddress, 2 waves, 1 waves, waitForTx = true)
     sender.broadcastData(pkByAddress(newAddress), entries, 0.1 waves, waitForTx = true)
     sender.getData(newAddress) shouldBe entries

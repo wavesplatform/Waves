@@ -41,7 +41,7 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with WithSt
           TestBlock.create(Seq(aliceTransfersMoreThanOwnsMinusLeaseOut)),
           settings
         ) { totalDiffEi =>
-          totalDiffEi shouldBe 'right
+          totalDiffEi.explicitGet()
         }
     }
   }

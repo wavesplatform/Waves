@@ -49,7 +49,7 @@ object CompilerContext {
       CompilerContext(predefTypes = x.predefTypes ++ y.predefTypes, varDefs = x.varDefs ++ y.varDefs, functionDefs = x.functionDefs ++ y.functionDefs)
   }
 
-  val types: Lens[CompilerContext, Map[String, FINAL]] = lens[CompilerContext] >> 'predefTypes
-  val vars: Lens[CompilerContext, VariableTypes]       = lens[CompilerContext] >> 'varDefs
-  val functions: Lens[CompilerContext, FunctionTypes]  = lens[CompilerContext] >> 'functionDefs
+  val types: Lens[CompilerContext, Map[String, FINAL]] = lens[CompilerContext] >> Symbol("predefTypes")
+  val vars: Lens[CompilerContext, VariableTypes]       = lens[CompilerContext] >> Symbol("varDefs")
+  val functions: Lens[CompilerContext, FunctionTypes]  = lens[CompilerContext] >> Symbol("functionDefs")
 }

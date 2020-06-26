@@ -102,7 +102,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
           TestBlock.create(Seq(ci)),
           features
         )(_ should matchPattern {
-          case Right(diff: Diff) if diff.transactions.exists(!_._2._3) =>
+          case Right(diff: Diff) if diff.transactions.exists(!_._2.applied) =>
         })
     }
   }
@@ -266,7 +266,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
         ) {
           case Right(diff: Diff) =>
             val errMsg = diff.scriptResults(diff.transactions.keys.head).error.get.text
-            ((message(oldVersion.id, maybeFailedAssetId)).r.findFirstIn(errMsg)) should not be empty
+            ((message(oldVersion.id, maybeFailedAssetId)).r.findFirstIn(errMsg)) shouldBe defined
 
           case l @ Left(_) =>
             l should produce(message(oldVersion.id, maybeFailedAssetId))

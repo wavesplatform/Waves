@@ -64,7 +64,7 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
 }
 
 object BlocksApiGrpcImpl {
-  private def toBlockWithHeight(v: (BlockMeta, Seq[Transaction])) = {
-    BlockWithHeight(Some(PBBlock(Some(v._1.header.toPBHeader), v._1.signature.toPBByteString, v._2.map(_.toPB))), v._1.height)
+  private def toBlockWithHeight(v: (BlockMeta, Seq[(Transaction, Boolean)])) = {
+    BlockWithHeight(Some(PBBlock(Some(v._1.header.toPBHeader), v._1.signature.toPBByteString, v._2.map(_._1.toPB))), v._1.height)
   }
 }

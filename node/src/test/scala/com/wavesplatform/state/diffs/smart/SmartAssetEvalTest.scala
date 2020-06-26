@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.smart
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lang.directives.values.{Expression, V3}
@@ -78,8 +79,7 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with WithState wit
         .signed(1.toByte, firstAcc.publicKey, asset, Some(typedScript), 1000, ts + 10, firstAcc.privateKey)
         .explicitGet()
 
-      assetTransferTransaction = TransferTransaction
-        .selfSigned(1.toByte, firstAcc, secondAcc.toAddress, asset, 1, Waves, 1000, None, ts + 20)
+      assetTransferTransaction = TransferTransaction.selfSigned(1.toByte, firstAcc, secondAcc.toAddress, asset, 1, Waves, 1000, ByteStr.empty,  ts + 20)
         .explicitGet()
 
     } yield (genesis, issueTransaction, setAssetScriptTransaction, assetTransferTransaction)
@@ -91,7 +91,7 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with WithState wit
           append(Seq(genesis)).explicitGet()
           append(Seq(issueTransaction)).explicitGet()
           append(Seq(setAssetScriptTransaction)).explicitGet()
-          append(Seq(assetTransferTransaction)) shouldBe 'right
+          append(Seq(assetTransferTransaction)).explicitGet()
         }
     }
   }

@@ -4,7 +4,6 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -22,9 +21,17 @@ object ExchangeTransactionDiff {
     val seller  = tx.sellOrder.senderPublicKey.toAddress
 
     val assetIds =
-      List(tx.buyOrder.assetPair.amountAsset, tx.buyOrder.assetPair.priceAsset, tx.sellOrder.assetPair.amountAsset, tx.sellOrder.assetPair.priceAsset).collect {
+      Set(
+        tx.buyOrder.assetPair.amountAsset,
+        tx.buyOrder.assetPair.priceAsset,
+        tx.buyOrder.matcherFeeAssetId,
+        tx.sellOrder.assetPair.amountAsset,
+        tx.sellOrder.assetPair.priceAsset,
+        tx.sellOrder.matcherFeeAssetId
+      ).collect {
         case asset: IssuedAsset => asset
-      }.distinct
+      }.toVector
+
     val assets = assetIds.map(id => id -> blockchain.assetDescription(id)).toMap
 
     val smartTradesEnabled = blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading)
@@ -33,7 +40,7 @@ object ExchangeTransactionDiff {
     def isPriceValid(amountDecimals: Int, priceDecimals: Int) = {
       def convertPrice(price: Long, amountDecimals: Int, priceDecimals: Int) =
         Try {
-          (BigDecimal(price) / BigDecimal(10).pow(priceDecimals - amountDecimals)).toBigInt().bigInteger.longValueExact()
+          (BigDecimal(price) / BigDecimal(10).pow(priceDecimals - amountDecimals)).toBigInt.bigInteger.longValueExact()
         }.toEither.leftMap(x => GenericError(x.getMessage))
 
       def orderPrice(order: Order, amountDecimals: Int, priceDecimals: Int) =
@@ -78,8 +85,6 @@ object ExchangeTransactionDiff {
       sellPriceAssetChange  <- getReceiveAmount(tx.sellOrder, amountDecimals, priceDecimals, tx.amount, tx.price).liftValidationError(tx)
       sellAmountAssetChange <- getSpendAmount(tx.sellOrder, amountDecimals, priceDecimals, tx.amount, tx.price).liftValidationError(tx).map(-_)
       scripts = {
-        import com.wavesplatform.features.FeatureProvider._
-
         val addressScripted = Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
 
         // Don't count before Ride4DApps activation
@@ -91,22 +96,12 @@ object ExchangeTransactionDiff {
           addressScripted +
           ordersScripted
       }
-
-      assetsComplexity = assetIds
-        .flatMap(blockchain.assetScript)
-        .map(_._2)
-
-      accountsComplexity = List(tx.sender.toAddress, buyer, seller)
-        .flatMap(blockchain.accountScript)
-        .map(_.verifierComplexity)
-
-      scriptsComplexity = assetsComplexity.sum + accountsComplexity.sum
     } yield {
 
       def getAssetDiff(asset: Asset, buyAssetChange: Long, sellAssetChange: Long): Map[Address, Portfolio] = {
         Monoid.combine(
-          Map(buyer  → Portfolio.build(asset, buyAssetChange)),
-          Map(seller → Portfolio.build(asset, sellAssetChange))
+          Map(buyer  -> Portfolio.build(asset, buyAssetChange)),
+          Map(seller -> Portfolio.build(asset, sellAssetChange))
         )
       }
 
@@ -138,8 +133,7 @@ object ExchangeTransactionDiff {
           tx.buyOrder.id()  -> VolumeAndFee(tx.amount, tx.buyMatcherFee),
           tx.sellOrder.id() -> VolumeAndFee(tx.amount, tx.sellMatcherFee)
         ),
-        scriptsRun = scripts,
-        scriptsComplexity = scriptsComplexity
+        scriptsRun = scripts
       )
     }
   }
@@ -188,22 +182,34 @@ object ExchangeTransactionDiff {
     else Right(exTrans)
   }
 
-  private[diffs] def getSpendAmount(order: Order, amountDecimals: Int, priceDecimals: Int, matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
+  private[diffs] def getSpendAmount(
+      order: Order,
+      amountDecimals: Int,
+      priceDecimals: Int,
+      matchAmount: Long,
+      matchPrice: Long
+  ): Either[ValidationError, Long] =
     Try {
       if (order.orderType == OrderType.SELL) matchAmount
       else {
-        val spend = (BigDecimal(matchAmount) * matchPrice * BigDecimal(10).pow(priceDecimals - amountDecimals - 8)).toBigInt()
+        val spend = (BigDecimal(matchAmount) * matchPrice * BigDecimal(10).pow(priceDecimals - amountDecimals - 8)).toBigInt
         if (order.getSpendAssetId == Waves && !(spend + order.matcherFee).isValidLong) {
           throw new ArithmeticException("BigInteger out of long range")
         } else spend.bigInteger.longValueExact()
       }
     }.toEither.left.map(x => GenericError(x.getMessage))
 
-  private[diffs] def getReceiveAmount(order: Order, amountDecimals: Int, priceDecimals: Int, matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
+  private[diffs] def getReceiveAmount(
+      order: Order,
+      amountDecimals: Int,
+      priceDecimals: Int,
+      matchAmount: Long,
+      matchPrice: Long
+  ): Either[ValidationError, Long] =
     Try {
       if (order.orderType == OrderType.BUY) matchAmount
       else {
-        (BigDecimal(matchAmount) * matchPrice * BigDecimal(10).pow(priceDecimals - amountDecimals - 8)).toBigInt().bigInteger.longValueExact()
+        (BigDecimal(matchAmount) * matchPrice * BigDecimal(10).pow(priceDecimals - amountDecimals - 8)).toBigInt.bigInteger.longValueExact()
       }
     }.toEither.left.map(x => GenericError(x.getMessage))
 

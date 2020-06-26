@@ -15,7 +15,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.utils.doc.RideFullContext
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 object DocExport {
   def main(args: Array[String]) {
