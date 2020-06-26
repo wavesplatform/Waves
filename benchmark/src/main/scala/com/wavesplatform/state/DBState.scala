@@ -36,7 +36,7 @@ abstract class DBState extends ScorexLogging {
     Coeval.raiseError(new NotImplementedError("`tx` is not implemented")),
     Coeval(levelDBWriter.height),
     levelDBWriter,
-    Coeval.raiseError(new NotImplementedError("`this` is not implemented")),
+    null,
     DirectiveSet.contractDirectiveSet,
     ByteStr.empty
   )
