@@ -253,12 +253,19 @@ object ContractCompiler {
         argTypesError(func, funcName, types.mkString("(", ", ", ")"))
     }
 
-  private def checkAnnotatedParamType(t: (String, Option[Type])): Boolean =
+  private def checkAnnotatedParamType(t: (String, Option[Type])): Boolean = {
     t match {
       case (singleType, None) => primitiveCallableTypes.contains(singleType)
       case (genericType, Some(Expressions.Single(PART.VALID(_, tp), None))) => primitiveCallableTypes.contains(tp) && genericType == "List"
+      case (genericType, Some(Expressions.Union(u))) => genericType == "List" && u.forall { t => 
+        t match {
+          case Expressions.Single(PART.VALID(_, tp), None) => primitiveCallableTypes.contains(tp)
+          case _ => false
+        }
+      }
       case _ => false
     }
+  }
 
   val primitiveCallableTypes: Set[String] =
     Set(LONG, BYTESTR, BOOLEAN, STRING).map(_.name)
