@@ -67,7 +67,7 @@ class MassTransferTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
     assertGrpcError(
       sender.broadcastMassTransfer(firstAcc, transfers = transfers, fee = calcMassTransferFee(transfers.size)),
-      "Attempt to transfer unavailable funds",
+      "Accounts balance errors",
       Code.INVALID_ARGUMENT
     )
 
@@ -103,7 +103,7 @@ class MassTransferTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
     assertGrpcError(
       sender.broadcastMassTransfer(firstAcc, transfers = transfers, fee = massTransferTransactionFee),
-      "Attempt to transfer unavailable funds",
+      "Accounts balance errors",
       Code.INVALID_ARGUMENT
     )
     nodes.foreach(n => n.waitForHeight(n.height + 1))

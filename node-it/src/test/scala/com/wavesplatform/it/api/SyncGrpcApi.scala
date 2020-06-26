@@ -4,7 +4,7 @@ import java.util.concurrent.TimeoutException
 
 import com.google.protobuf.ByteString
 import com.google.protobuf.wrappers.StringValue
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
 import com.wavesplatform.api.grpc.{TransactionStatus => PBTransactionStatus, _}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -73,7 +73,7 @@ object SyncGrpcApi extends Assertions {
 
     def resolveAlias(alias: String): Addr = {
       val addr = accounts.resolveAlias(StringValue.of(alias))
-      Addr.fromBytes(addr.value.toByteArray).explicitGet()
+      PBRecipients.toAddress(addr.value.toByteArray, AddressScheme.current.chainId).explicitGet()
     }
 
     def stateChanges(txId: String): (VanillaTransaction, StateChangesDetails) = {

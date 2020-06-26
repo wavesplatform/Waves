@@ -212,7 +212,7 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     }
   }
 
-    test("try to put empty data") {
+  test("try to put empty data") {
     for (v <- dataTxSupportedVersions) {
       sender.putData(fourthAcc, List.empty, calcDataFee(List.empty, v))
       sender.getData(fourthAddress) shouldBe List.empty

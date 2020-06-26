@@ -48,7 +48,7 @@ class BurnTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
       assertGrpcError(
         sender.broadcastTransfer(secondAcc, Recipient().withPublicKeyHash(firstAddress), transferredQuantity, minFee, assetId = issuedAssetId),
-        "Attempt to transfer unavailable funds",
+        "Accounts balance errors",
         Code.INVALID_ARGUMENT
       )
     }
