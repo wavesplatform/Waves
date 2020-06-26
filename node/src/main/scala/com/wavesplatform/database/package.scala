@@ -554,6 +554,13 @@ package object database extends ScorexLogging {
       case _                      => None
     }
 
+  def loadTransactions(height: Height, db: ReadOnlyDB): Option[Seq[(Transaction, Boolean)]] =
+    for {
+      meta <- db.get(Keys.blockMetaAt(height))
+    } yield (0 until meta.transactionCount).toList.flatMap { n =>
+      db.get(Keys.transactionAt(height, TxNum(n.toShort)))
+    }
+
   def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] =
     for {
       meta <- db.get(Keys.blockMetaAt(height))

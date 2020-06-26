@@ -1,5 +1,7 @@
 package com.wavesplatform.transaction.smart
 
+import cats.implicits._
+import com.wavesplatform.account
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
@@ -142,9 +144,9 @@ class WavesEnvironment(
       .map(block => toBlockInfo(block.header, height.toInt, blockchain.vrf(height.toInt)))
 
   override def blockInfoByHeight(blockHeight: Int): Option[BlockInfo] =
-    blockchain.blockHeader(blockHeight)
-      .map(blockHAndSize =>
-        toBlockInfo(blockHAndSize.header, blockHeight, blockchain.vrf(blockHeight)))
+    blockchain
+      .blockHeader(blockHeight)
+      .map(blockHAndSize => toBlockInfo(blockHAndSize.header, blockHeight, blockchain.vrf(blockHeight)))
 
   private def toBlockInfo(blockH: BlockHeader, bHeight: Int, vrf: Option[ByteStr]) = {
     BlockInfo(
@@ -159,10 +161,19 @@ class WavesEnvironment(
   }
 
   override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer] =
-    PBTransactionSerializer.parseBytes(b)
+    PBTransactionSerializer
+      .parseBytes(b)
       .toOption
       .flatMap {
         case tx: TransferTransaction => Some(RealTransactionWrapper.mapTransferTx(tx, ds.stdLibVersion))
         case _                       => None
       }
+
+  override def addressFromString(addressStr: String): Either[String, Address] =
+    account.Address
+      .fromString(addressStr)
+      .bimap(
+        _.toString,
+        address => Address(ByteStr(address.bytes))
+      )
 }
