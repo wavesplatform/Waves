@@ -7,6 +7,7 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining._
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl._
+import com.wavesplatform.mining._
 import com.wavesplatform.network.{MicroBlockInv, _}
 import com.wavesplatform.settings.MinerSettings
 import com.wavesplatform.state.Blockchain

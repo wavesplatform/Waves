@@ -68,9 +68,8 @@ object MicroBlockSynchronizer extends ScorexLogging {
             case Some(channel) =>
               if (channel.isOpen) {
                 log.trace(s"${id(channel)} Requesting $totalBlockId")
-                val request = MicroBlockRequest(totalBlockId)
                 awaiting.put(totalBlockId, mbInv)
-                channel.writeAndFlush(request)
+                channel.writeAndFlush(MicroBlockRequest(totalBlockId))
                 task(attemptsAllowed - 1, exclude + channel).delayExecution(settings.waitResponseTimeout)
               } else task(attemptsAllowed, exclude + channel)
           }
