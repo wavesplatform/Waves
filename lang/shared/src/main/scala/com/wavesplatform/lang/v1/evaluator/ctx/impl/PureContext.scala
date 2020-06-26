@@ -34,7 +34,6 @@ object PureContext {
   implicit def intToLong(num: Int): Long = num.toLong
 
   private val defaultThrowMessage      = "Explicit script termination"
-  private val MaxListSizeForMedianCalc = 100
   val MaxListLengthV4                  = 1000
 
   lazy val mulLong: BaseFunction[NoContext] =
@@ -632,37 +631,6 @@ object PureContext {
       case xs              => notImplemented[Id, EVALUATED](s"size(arr: Array)", xs)
     }
 
-  lazy val getListMedian: BaseFunction[NoContext] =
-    NativeFunction("median", 10, MEDIAN_LIST, LONG, ("arr", PARAMETERIZEDLIST(LONG))) {
-      case xs @ (ARR(arr) :: Nil) => {
-
-        def getMedian(seq: Seq[Long]): Long = {
-          val targetArr = seq.toArray
-          scala.util.Sorting.quickSort(targetArr)
-          val size     = targetArr.size
-          val halfSize = size / 2
-          if (size % 2 == 1) {
-            targetArr(halfSize)
-          } else {
-            Math.floorDiv(targetArr(halfSize - 1) + targetArr(halfSize), 2)
-          }
-        }
-
-        if (arr.headOption.map(_.isInstanceOf[CONST_LONG]).getOrElse(true)) {
-          if (arr.size == 1) {
-            Right(arr.head)
-          } else if (arr.size > 1 && arr.size <= MaxListSizeForMedianCalc) {
-            Right(CONST_LONG(getMedian(arr.asInstanceOf[IndexedSeq[CONST_LONG]].map(_.t))))
-          } else {
-            Left(s"Invalid list size. Size should be between 1 and $MaxListSizeForMedianCalc")
-          }
-        } else {
-          notImplemented[Id, EVALUATED](s"median(arr: List[Int])", xs)
-        }
-      }
-      case xs => notImplemented[Id, EVALUATED](s"median(arr: List[Int])", xs)
-    }
-
   lazy val listMax: BaseFunction[NoContext] =
     NativeFunction("max", 3, MAX_LIST, LONG, ("list", PARAMETERIZEDLIST(LONG))) {
       case ARR(list) :: Nil =>
@@ -934,6 +902,21 @@ object PureContext {
           }
         case xs => notImplemented[Id, EVALUATED]("log(exponent: Int, ep: Int, base: Int, bp: Int, rp: Int, round: Rounds)", xs)
       }
+
+    val getListMedian: BaseFunction[NoContext] =
+      NativeFunction("median", 20, MEDIAN_LIST, LONG, ("arr", PARAMETERIZEDLIST(LONG))) {
+        case xs @ (ARR(arr) :: Nil) =>
+          if (arr.headOption.forall(_.isInstanceOf[CONST_LONG])) {
+            if (arr.nonEmpty)
+              Right(CONST_LONG(math.median(arr.asInstanceOf[IndexedSeq[CONST_LONG]].map(_.t))))
+            else
+              Left(s"Can't find median for empty list")
+          } else {
+            notImplemented[Id, EVALUATED](s"median(arr: List[Int])", xs)
+          }
+        case xs => notImplemented[Id, EVALUATED](s"median(arr: List[Int])", xs)
+      }
+
 
     val fromV3Funcs = Array(
       value,
