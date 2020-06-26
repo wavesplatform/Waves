@@ -6,13 +6,14 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V4}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CaseObj}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.state.diffs._
+import com.wavesplatform.transaction.TxValidationError.InvalidAddress
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
-import com.wavesplatform.transaction.TxValidationError.InvalidAddress
 
 class AddressTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   property("should calculate address from public key") {
@@ -31,16 +32,17 @@ class AddressTest extends PropSpec with PropertyChecks with Matchers with Transa
     forAll(for {
       account <- accountGen
       version <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all)
-    } yield (account, version)) { case (account, version) =>
-      val address = Address.fromPublicKey(account.publicKey, chainId)
-      val script =
-        s"""
+    } yield (account, version)) {
+      case (account, version) =>
+        val address = Address.fromPublicKey(account.publicKey, chainId)
+        val script =
+          s"""
            | let addressString = "$address"
            | let maybeAddress = addressFromString(addressString)
            | let address = extract(maybeAddress)
            | address.bytes
         """.stripMargin
-      runScript(script, ctxV = version) shouldBe evaluated(ByteStr(Address.fromBytes(address.bytes, chainId).explicitGet().bytes))
+        runScript(script, ctxV = version) shouldBe evaluated(ByteStr(Address.fromBytes(address.bytes, chainId).explicitGet().bytes))
     }
   }
 
@@ -48,15 +50,16 @@ class AddressTest extends PropSpec with PropertyChecks with Matchers with Transa
     forAll(for {
       account <- accountGen
       version <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all)
-    } yield (account, version)) { case (account, version) =>
-      val address = Address.fromPublicKey(account.publicKey, chainId)
-      val script =
-        s"""
+    } yield (account, version)) {
+      case (account, version) =>
+        val address = Address.fromPublicKey(account.publicKey, chainId)
+        val script =
+          s"""
            | let addressString = "$address"
            | let maybeAddress = addressFromString(addressString)
            | extract(maybeAddress).bytes
         """.stripMargin
-      runScript(script, ctxV = version) shouldBe evaluated(ByteStr(Address.fromBytes(address.bytes, chainId).explicitGet().bytes))
+        runScript(script, ctxV = version) shouldBe evaluated(ByteStr(Address.fromBytes(address.bytes, chainId).explicitGet().bytes))
     }
   }
 
@@ -68,13 +71,24 @@ class AddressTest extends PropSpec with PropertyChecks with Matchers with Transa
     Address.fromBytes(Array.fill(correctLength + 1)(1)) should produce("Wrong addressBytes length")
   }
 
-  property("RIDE addressFromString V4 limit exceeding result") {
-    runScript(s""" addressFromString("${"a" * 37}") """, ctxV = V4) shouldBe Right(unit)
-  }
-
   property("Address.fromString errors") {
     Address.fromString("a" * 37) shouldBe Left(InvalidAddress("Wrong address string length: max=36, actual: 37"))
     Address.fromString("a" * 36) shouldBe Left(InvalidAddress("Wrong addressBytes length: expected: 26, actual: 27"))
     Address.fromString("a" * 35) shouldBe Left(InvalidAddress("Unknown address version: 18"))
+  }
+
+  property("RIDE addressFromString V4 limit exceeding result") {
+    runScript(s""" addressFromString("${"a" * 37}") """, ctxV = V4) shouldBe Right(unit)
+    runScript(s""" addressFromString("${"a" * 36}") """, ctxV = V4) shouldBe Right(unit)
+    runScript(s""" addressFromString("${"a" * 35}") """, ctxV = V4) shouldBe Right(unit)
+  }
+
+  property("RIDE addressFromString V4 success") {
+    val base58 = """3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU"""
+    val result = runScript(s""" addressFromString("$base58") """, ctxV = V4, chainId = 'T')
+      .explicitGet()
+      .asInstanceOf[CaseObj]
+    result.caseType.name shouldBe "Address"
+    result.fields shouldBe Map("bytes" -> CONST_BYTESTR(ByteStr.decodeBase58(base58).get).explicitGet())
   }
 }
