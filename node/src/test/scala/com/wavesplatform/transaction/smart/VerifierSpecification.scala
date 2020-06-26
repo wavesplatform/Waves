@@ -56,7 +56,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
 
       (bc.height _).when().returns(0)
 
-      Verifier(bc)(tx).flatMap(tx => Verifier.assets(bc)(tx)).resultE.explicitGet()
+      verify(bc, tx).explicitGet()
     }
   }
 
@@ -138,6 +138,13 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
 
     (blockchain.height _).when().returns(0)
 
-    Verifier(blockchain)(tx).flatMap(tx => Verifier.assets(blockchain)(tx)).resultE
+    verify(blockchain, tx)
   }
+
+  def verify(blockchain: Blockchain, tx: Transaction): ValidationResult[Transaction] =
+    (for {
+      _ <- Verifier(blockchain)(tx)
+      _ <- Verifier.assets(blockchain)(tx).leftMap { case (_, ve) => ve }
+    } yield tx).resultE
+
 }

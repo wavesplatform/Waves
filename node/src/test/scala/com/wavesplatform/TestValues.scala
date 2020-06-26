@@ -42,4 +42,16 @@ object TestValues {
       ScriptEstimatorV1
     )
     .explicitGet()
+
+  val (rejectAssetScript, rejectAssetScriptComplexity) = ScriptCompiler
+    .compile(
+      """
+      |{-# STDLIB_VERSION 2 #-}
+      |{-# CONTENT_TYPE EXPRESSION #-}
+      |{-# SCRIPT_TYPE ASSET #-}
+      |false
+      |""".stripMargin,
+      ScriptEstimatorV1
+    )
+    .explicitGet()
 }

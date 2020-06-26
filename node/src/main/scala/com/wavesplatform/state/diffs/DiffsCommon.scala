@@ -12,24 +12,30 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.traits.domain.{Burn, Reissue, SponsorFee}
 import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, Diff, LeaseBalance, Portfolio, SponsorshipValue}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.ProvenTransaction
+import com.wavesplatform.transaction.{ProvenTransaction, Transaction}
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 
 object DiffsCommon {
   def countScriptRuns(blockchain: Blockchain, tx: ProvenTransaction): Int =
     tx.checkedAssets.count(blockchain.hasAssetScript) + Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
 
-  def getScriptsComplexity(blockchain: Blockchain, tx: ProvenTransaction): Long = {
-    val assetsComplexity = tx.checkedAssets.toList
-      .flatMap(blockchain.assetScript)
-      .map(_.complexity)
+  def getAssetsComplexity(blockchain: Blockchain, tx: Transaction): Long =
+    tx match {
+      case ptx: ProvenTransaction =>
+        ptx.checkedAssets.toList
+          .flatMap(blockchain.assetScript)
+          .map(_.complexity)
+          .sum
+      case _ => 0L
+    }
 
-    val accountComplexity = blockchain
-      .accountScript(tx.sender.toAddress)
-      .map(_.verifierComplexity)
-
-    assetsComplexity.sum + accountComplexity.getOrElse(0L)
-  }
+  def getAccountsComplexity(blockchain: Blockchain, tx: Transaction): Long =
+    (tx match {
+      case etx: ExchangeTransaction => Seq(etx.sender, etx.buyOrder.senderPublicKey, etx.sellOrder.senderPublicKey)
+      case ptx: ProvenTransaction   => Seq(ptx.sender)
+      case _                        => Seq.empty
+    }).flatMap(pk => blockchain.accountScript(pk.toAddress).map(_.verifierComplexity)).sum
 
   def countVerifierComplexity(
       script: Option[Script],
@@ -40,12 +46,12 @@ object DiffsCommon {
       .traverse { script =>
         val useV1PreCheck =
           blockchain.height > blockchain.settings.functionalitySettings.estimatorPreCheckHeight &&
-          !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)
+            !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)
 
         val cost =
           if (useV1PreCheck)
             Script.verifierComplexity(script, ScriptEstimatorV1, !isAsset && blockchain.useReducedVerifierComplexityLimit) *>
-            Script.verifierComplexity(script, ScriptEstimatorV2, !isAsset && blockchain.useReducedVerifierComplexityLimit)
+              Script.verifierComplexity(script, ScriptEstimatorV2, !isAsset && blockchain.useReducedVerifierComplexityLimit)
           else
             Script.verifierComplexity(script, blockchain.estimator, !isAsset && blockchain.useReducedVerifierComplexityLimit)
 
@@ -128,7 +134,7 @@ object DiffsCommon {
         !blockchain.hasAssetScript(asset),
         Diff.stateOps(
           portfolios = Map(sender -> Portfolio(balance = -fee)),
-          sponsorship = Map(asset -> SponsorshipValue(sponsorFee.minSponsoredAssetFee.getOrElse(0))),
+          sponsorship = Map(asset -> SponsorshipValue(sponsorFee.minSponsoredAssetFee.getOrElse(0)))
         ),
         GenericError("Sponsorship smart assets is disabled.")
       )
