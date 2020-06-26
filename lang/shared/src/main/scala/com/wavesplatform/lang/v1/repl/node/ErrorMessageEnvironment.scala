@@ -26,6 +26,7 @@ object ErrorMessageEnvironment extends Environment[Future] {
   override def multiPaymentAllowed: Boolean                                                                            = unavailable
   override def txId: ByteStr                                                                                           = unavailable
   override def transferTransactionFromProto(b: Array[Byte]): Future[Option[Tx.Transfer]]                               = unavailable
+  override def addressFromString(address: String): Either[String, Recipient.Address]                                   = unavailable
 }
 
 class BlockchainUnavailableException extends RuntimeException {

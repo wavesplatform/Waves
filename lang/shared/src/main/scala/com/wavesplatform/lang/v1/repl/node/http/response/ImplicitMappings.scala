@@ -40,4 +40,7 @@ case class ImplicitMappings(chainId: Byte) {
 
   implicit val balancesM: List[BalanceResponse] => Long =
     _.headOption.fold(0L)(_.balance)
+
+  implicit val addressFromString: String => Either[String, Address] =
+    chainDependentMapper.addressFromString
 }

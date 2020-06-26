@@ -3,6 +3,7 @@ package com.wavesplatform.lang.v1.repl.node.http.response
 import java.nio.ByteBuffer
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.v1.repl.global
 import com.wavesplatform.lang.v1.repl.node.http.response.model._
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
@@ -62,10 +63,12 @@ private[node] class ChainDependentMapper(chainId: Byte) {
     )
 
 
-  private val AddressVersion = 1
-  private val ChecksumLength = 4
-  private val HashLength     = 20
-  private val AddressLength  = 1 + 1 + HashLength + ChecksumLength
+  private val AddressPrefix: String = "address:"
+  private val AddressVersion       = 1
+  private val ChecksumLength       = 4
+  private val HashLength           = 20
+  private val AddressLength        = 1 + 1 + HashLength + ChecksumLength
+  private val AddressStringLength  = 36
 
   private def pkToAddress(publicKey: ByteString): ByteStr = {
     val withoutChecksum =
@@ -85,5 +88,42 @@ private[node] class ChainDependentMapper(chainId: Byte) {
         .array()
 
     ByteStr(bytes)
+  }
+
+  def addressFromString(addressStr: String): Either[String, Address] = {
+    val base58String = if (addressStr.startsWith(AddressPrefix)) addressStr.drop(AddressPrefix.length) else addressStr
+    for {
+      _ <- Either.cond(
+        base58String.length <= AddressStringLength,
+        (),
+        s"Wrong address string length: max=$AddressStringLength, actual: ${base58String.length}"
+      )
+      byteArray <- Base58.tryDecodeWithLimit(base58String).toEither.left.map(ex => s"Unable to decode base58: ${ex.getMessage}")
+      address   <- addressFromBytes(byteArray)
+    } yield address
+  }
+
+  def addressFromBytes(addressBytes: Array[Byte]): Either[String, Address] = {
+    val Array(version, network, _*) = addressBytes
+    for {
+      _ <- Either.cond(
+        addressBytes.length == AddressLength,
+        (),
+        s"Wrong addressBytes length: expected: $AddressLength, actual: ${addressBytes.length}"
+      )
+      _ <- Either.cond(
+        version == AddressVersion,
+        (),
+        s"Unknown address version: $version"
+      )
+      _ <- Either.cond(
+        network == chainId,
+        (),
+        s"Data from other network: expected: $chainId(${chainId.toChar}), actual: $network(${network.toChar})"
+      )
+      checkSum          = addressBytes.takeRight(ChecksumLength)
+      checkSumGenerated = global.secureHash(addressBytes.dropRight(ChecksumLength)).take(ChecksumLength)
+      _ <- Either.cond(java.util.Arrays.equals(checkSum, checkSumGenerated), (), s"Bad address checksum")
+    } yield Address(ByteStr(addressBytes))
   }
 }

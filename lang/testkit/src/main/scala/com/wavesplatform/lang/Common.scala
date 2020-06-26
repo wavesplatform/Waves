@@ -92,7 +92,8 @@ object Common {
     override def multiPaymentAllowed: Boolean                                                                    =  true
     override def txId: ByteStr                                                                                   = ???
     override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
-  }
+    override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???
+    }
 
   def addressFromPublicKey(chainId: Byte, pk: Array[Byte], addressVersion: Byte = EnvironmentFunctions.AddressVersion): Array[Byte] = {
     val publicKeyHash   = Global.secureHash(pk).take(EnvironmentFunctions.HashLength)

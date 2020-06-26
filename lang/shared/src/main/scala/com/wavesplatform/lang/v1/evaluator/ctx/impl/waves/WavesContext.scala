@@ -5,7 +5,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.CTX
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Functions._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Functions.{addressFromStringF, _}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Vals._
 import com.wavesplatform.lang.v1.traits._
@@ -22,18 +22,21 @@ object WavesContext {
       getBinaryFromStateF,
       getStringFromStateF,
       addressFromPublicKeyF,
-      addressFromStringF,
       addressFromRecipientF,
       )
-  private val balanceV123Functions =
+
+  private val v123OnlyFunctions =
     Array(
       assetBalanceF,
-      wavesBalanceF
+      wavesBalanceF,
+      addressFromStringF
     )
-  private val balanceV4Functions =
+
+  private val v4Functions =
     Array(
       assetBalanceV4F,
-      wavesBalanceV4F
+      wavesBalanceV4F,
+      addressFromStringV4
     )
 
   private val invariableCtx =
@@ -98,9 +101,9 @@ object WavesContext {
 
     val versionSpecificFuncs =
       version match {
-        case V1 | V2 => Array(txByIdF(proofsEnabled, version)) ++ balanceV123Functions
-        case V3      => fromV3Funcs(proofsEnabled, version) ++ balanceV123Functions
-        case V4      => fromV4Funcs(proofsEnabled, version) ++ balanceV4Functions
+        case V1 | V2 => Array(txByIdF(proofsEnabled, version)) ++ v123OnlyFunctions
+        case V3      => fromV3Funcs(proofsEnabled, version) ++ v123OnlyFunctions
+        case V4      => fromV4Funcs(proofsEnabled, version) ++ v4Functions
      }
     commonFuncs ++ versionSpecificFuncs
   }

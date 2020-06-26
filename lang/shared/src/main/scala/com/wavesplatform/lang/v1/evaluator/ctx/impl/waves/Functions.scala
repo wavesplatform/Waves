@@ -5,7 +5,7 @@ import cats.{Id, Monad}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ExecutionError
-import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V4}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -256,6 +256,30 @@ object Functions {
       }
     }
 
+  val addressFromStringV4: BaseFunction[Environment] =
+    NativeFunction.withEnvironment[Environment](
+      "addressFromString",
+      1,
+      ADDRESSFROMSTRING_NATIVE,
+      optionAddress,
+      ("@string", STRING)
+    ) {
+    new ContextfulNativeFunction[Environment]("addressFromString", optionAddress, Seq(("@string", STRING))) {
+      override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
+        input match {
+          case (env, CONST_STRING(address) :: Nil) =>
+            env.addressFromString(address)
+              .fold(
+                _ => unit,
+                address => CaseObj(addressType, Map("bytes" -> CONST_BYTESTR(address.bytes).explicitGet())): EVALUATED
+              )
+              .asRight[ExecutionError].pure[F]
+          case (_, other) =>
+            notImplemented[F, EVALUATED](s"addressFromString(a: String)", other)
+        }
+    }
+  }
+
   val addressFromRecipientF: BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "addressFromRecipient",
@@ -466,7 +490,7 @@ object Functions {
       getBooleanByIndexF(v),
       getBinaryByIndexF(v),
       getStringByIndexF(v),
-      addressFromStringF
+      if (v >= V4) addressFromStringV4 else addressFromStringF
     ).map(withExtract)
 
   def txByIdF(proofsEnabled: Boolean, version: StdLibVersion): BaseFunction[Environment] =
