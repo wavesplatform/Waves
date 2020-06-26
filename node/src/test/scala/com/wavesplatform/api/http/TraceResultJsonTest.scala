@@ -58,8 +58,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
 
     val result = TracedResult(Right(tx), trace)
 
-    Json.prettyPrint(result.json) shouldBe
-      """{
+    result.json shouldBe Json.parse("""{
         |  "senderPublicKey" : "9utotH1484Hb1WdAHuAKLjuGAmocPZg7jZDtnc35MuqT",
         |  "fee" : 10000000,
         |  "type" : 16,
@@ -81,7 +80,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         |    "result" : {
         |      "data" : [ {
         |        "key" : "3FVV4W61poEVXEbFfPG1qfJhJxJ7Pk4M2To",
-        |        "value" : "700000000"
+        |        "value" : 700000000
         |      } ],
         |      "transfers" : [ {
         |        "address" : "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
@@ -100,9 +99,9 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         |  } ],
         |  "id" : "2hoMeTHAneLExjFo2a9ei7D4co5zzr9VyT7tmBmAGmeu",
         |  "timestamp" : 1111
-        |}""".stripMargin
+        |}""".stripMargin)
 
-    Json.prettyPrint(result.loggedJson) shouldBe
+    result.loggedJson shouldBe Json.parse(
       """{
         |  "senderPublicKey" : "9utotH1484Hb1WdAHuAKLjuGAmocPZg7jZDtnc35MuqT",
         |  "fee" : 10000000,
@@ -125,7 +124,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         |    "result" : {
         |      "data" : [ {
         |        "key" : "3FVV4W61poEVXEbFfPG1qfJhJxJ7Pk4M2To",
-        |        "value" : "700000000"
+        |        "value" : 700000000
         |      } ],
         |      "transfers" : [ {
         |        "address" : "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
@@ -152,6 +151,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         |  "id" : "2hoMeTHAneLExjFo2a9ei7D4co5zzr9VyT7tmBmAGmeu",
         |  "timestamp" : 1111
         |}""".stripMargin
+    )
   }
 
   property("suitable TracedResult error json") {
@@ -165,7 +165,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
       InvokeScriptTrace(
         tx.dAppAddressOrAlias,
         tx.funcCall,
-        Left(TxValidationError.ScriptExecutionError.ByAccountScript(reason, vars)),
+        Left(TxValidationError.ScriptExecutionError(reason, vars, None)),
         vars
       )
     )
@@ -173,8 +173,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
 
     val result = TracedResult(Left(scriptExecutionError), trace)
 
-    Json.prettyPrint(result.json) shouldBe
-      """{
+    result.json shouldBe Json.parse("""{
       |  "trace" : [ {
       |    "dApp" : "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
       |    "function" : "func",
@@ -219,6 +218,6 @@ class TraceResultJsonTest extends PropSpec with Matchers {
       |    "version" : 1,
       |    "timestamp" : 1111
       |  }
-      |}""".stripMargin
+      |}""".stripMargin)
   }
 }

@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
 class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite with CancelAfterFailure {
-  val estimator = ScriptEstimatorV2
+  private val estimator = ScriptEstimatorV2
 
   private val dApp        = firstAddress
   private val caller      = secondAddress
@@ -78,7 +78,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
            |{-# STDLIB_VERSION 3 #-}
            |match tx {
            |  case tx:InvokeScriptTransaction => extract(tx.payment).amount > 10
-           |  case tx:TransferTransaction => true
+           |  case _:TransferTransaction => true
            |  case _ => false
            |}""".stripMargin,
               estimator
@@ -163,7 +163,13 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
           |  let pay = extract(i.payment)
           |  if (pay.assetId == asset2 && pay.amount > 15) then
           |    TransferSet([ScriptTransfer(i.caller, 15, asset1)])
-          |  else throw("need payment in 15+ tokens of asset2 " + toBase58String(asset2))
+          |  else {
+          |    if (${"sigVerify(base58'', base58'', base58'') ||" * 16} true)
+          |    then
+          |       throw("need payment in 15+ tokens of asset2 " + toBase58String(asset2))
+          |    else
+          |       throw("unexpected")
+          |  }
           |}
           |@Callable(i)
           |func payAsset2GetAsset3() = {
@@ -286,7 +292,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
       .id
     nodes.waitForHeightAriseAndTxPresent(invokeScriptTxId)
 
-    sender.debugStateChanges(invokeScriptTxId).stateChanges.get.error shouldBe 'empty
+    sender.debugStateChanges(invokeScriptTxId).stateChanges.get.error shouldBe empty
   }
 
   test("can't invoke with insufficient payment for @Verifier") {

@@ -71,7 +71,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         let backToAliceAfterHeight = ((height >= (21 + $beforeHeight)) && (ttx.recipient == Alice))
 
         txToBob || backToAliceAfterHeight
-      case other => false
+      case _ => false
     }""".stripMargin
 
     val pkSwapBC1 = pkByAddress(swapBC1)
@@ -103,7 +103,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           amount = transferAmount + setScriptFee + smartFee,
           feeAsset = Waves,
           fee = setScriptFee + smartFee,
-          attachment = None,
+          attachment = ByteStr.empty,
           timestamp = System.currentTimeMillis()
         )
         .explicitGet()
@@ -125,7 +125,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           amount = transferAmount,
           feeAsset = Waves,
           fee = setScriptFee + smartFee,
-          attachment = None,
+          attachment = ByteStr.empty,
           timestamp = System.currentTimeMillis()
         )
         .explicitGet()
@@ -149,7 +149,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         amount = transferAmount,
         feeAssetId = Waves,
         fee = setScriptFee + smartFee,
-        attachment = None,
+        attachment = ByteStr.empty,
         timestamp = System.currentTimeMillis(),
         proofs = Proofs.empty,
         AddressScheme.current.chainId
@@ -187,7 +187,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         amount = transferAmount,
         feeAsset = Waves,
         fee = setScriptFee + smartFee,
-        attachment = None,
+        attachment = ByteStr.empty,
         timestamp = System.currentTimeMillis()
       )
       .explicitGet()

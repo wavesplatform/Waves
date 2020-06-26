@@ -4,7 +4,6 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync._
-import com.wavesplatform.protobuf.transaction.Attachment.Attachment
 import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
 import io.grpc.Status.Code
 
@@ -155,75 +154,5 @@ class TransferTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
       sender.assetsBalance(firstAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe firstAssetBalance
       sender.assetsBalance(secondAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe secondAssetBalance
     }
-  }
-  test("able to pass typed attachment to transfer transaction V3") {
-    val txWithStringAtt = PBTransactions
-      .vanilla(
-        sender.broadcastTransfer(
-          firstAcc,
-          Recipient().withPublicKeyHash(secondAddress),
-          transferAmount,
-          minFee,
-          version = 3,
-          attachment = Attachment.StringValue("somestring"),
-          waitForTx = true
-        )
-      )
-      .explicitGet()
-      .id()
-      .toString
-
-    val txWithBoolAtt = PBTransactions
-      .vanilla(
-        sender.broadcastTransfer(
-          firstAcc,
-          Recipient().withPublicKeyHash(secondAddress),
-          transferAmount,
-          minFee,
-          version = 3,
-          attachment = Attachment.BoolValue(false),
-          waitForTx = true
-        )
-      )
-      .explicitGet()
-      .id()
-      .toString
-
-    val txWithIntAtt = PBTransactions
-      .vanilla(
-        sender.broadcastTransfer(
-          firstAcc,
-          Recipient().withPublicKeyHash(secondAddress),
-          transferAmount,
-          minFee,
-          version = 3,
-          attachment = Attachment.IntValue(123),
-          waitForTx = true
-        )
-      )
-      .explicitGet()
-      .id()
-      .toString
-
-    val txWithBinaryAtt = PBTransactions
-      .vanilla(
-        sender.broadcastTransfer(
-          firstAcc,
-          Recipient().withPublicKeyHash(secondAddress),
-          transferAmount,
-          minFee,
-          version = 3,
-          attachment = Attachment.BinaryValue(firstAddress),
-          waitForTx = true
-        )
-      )
-      .explicitGet()
-      .id()
-      .toString
-
-    sender.getTransaction(txWithStringAtt).getTransaction.getTransfer.getAttachment.getStringValue shouldBe "somestring"
-    sender.getTransaction(txWithBoolAtt).getTransaction.getTransfer.getAttachment.getBoolValue shouldBe false
-    sender.getTransaction(txWithIntAtt).getTransaction.getTransfer.getAttachment.getIntValue shouldBe 123
-    sender.getTransaction(txWithBinaryAtt).getTransaction.getTransfer.getAttachment.getBinaryValue shouldBe firstAddress
   }
 }

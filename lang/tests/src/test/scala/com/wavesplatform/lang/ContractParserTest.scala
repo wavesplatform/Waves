@@ -5,7 +5,7 @@ import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.testing.ScriptGenParser
-import fastparse.core.Parsed.{Failure, Success}
+import fastparse.Parsed.{Failure, Success}
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -13,12 +13,12 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class ContractParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
 
   private def parse(x: String): DAPP = Parser.parseContract(x) match {
-    case Success(r, _)    => r
-    case Failure(_, _, _) => throw new TestFailedException("Test failed", 0)
+    case Success(r, _)      => r
+    case f@Failure(_, _, _) => throw new TestFailedException(f.msg, 0)
   }
 
   private def cleanOffsets(l: LET): LET =
-    l.copy(Pos(0, 0), name = cleanOffsets(l.name), value = cleanOffsets(l.value), types = l.types.map(cleanOffsets(_)))
+    l.copy(Pos(0, 0), name = cleanOffsets(l.name), value = cleanOffsets(l.value)) // , types = l.types.map(cleanOffsets(_))
 
   private def cleanOffsets[T](p: PART[T]): PART[T] = p match {
     case PART.VALID(_, x)   => PART.VALID(AnyPos, x)

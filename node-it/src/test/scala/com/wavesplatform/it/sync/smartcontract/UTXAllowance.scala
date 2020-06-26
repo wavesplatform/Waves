@@ -24,7 +24,7 @@ class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with Cance
     val accounts = List(nodeA, nodeB).map(i => {
 
       val nodeAddress = i.createAddress()
-      val acc         = KeyPair.fromSeed(i.seed(nodeAddress)).right.get
+      val acc         = KeyPair.fromSeed(i.seed(nodeAddress)).explicitGet()
 
       i.transfer(i.address, nodeAddress, 10.waves, 0.005.waves, None, waitForTx = true)
 

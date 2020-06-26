@@ -80,8 +80,7 @@ class ReissueTransactionV1Specification extends PropSpec with PropertyChecks wit
         1526287561757L,
         Proofs(ByteStr.decodeBase58("3LnRMrjkk7RoV35PTwcdB4yW2rqUqXaKAh8DnPk5tNWABvhVQ9oqdTk3zM8b9AbGtry7WEcQZtevfK92DCFaa6hA").get)
       )
-      .right
-      .get
+      .explicitGet()
 
     js shouldEqual tx.json()
   }

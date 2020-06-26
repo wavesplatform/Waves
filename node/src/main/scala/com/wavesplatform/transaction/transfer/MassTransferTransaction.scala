@@ -1,7 +1,8 @@
 package com.wavesplatform.transaction.transfer
 
 import cats.implicits._
-import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account._
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -23,7 +24,7 @@ case class MassTransferTransaction(
     transfers: Seq[ParsedTransfer],
     fee: TxAmount,
     timestamp: TxTimestamp,
-    attachment: Option[Attachment],
+    attachment: ByteStr,
     proofs: Proofs,
     chainId: Byte
 ) extends ProvenTransaction
@@ -85,7 +86,7 @@ object MassTransferTransaction extends TransactionParser {
       transfers: Seq[ParsedTransfer],
       fee: TxAmount,
       timestamp: TxTimestamp,
-      attachment: Option[Attachment],
+      attachment: ByteStr,
       proofs: Proofs,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, MassTransferTransaction] =
@@ -98,7 +99,7 @@ object MassTransferTransaction extends TransactionParser {
       transfers: Seq[ParsedTransfer],
       fee: TxAmount,
       timestamp: TxTimestamp,
-      attachment: Option[Attachment],
+      attachment: ByteStr,
       signer: PrivateKey
   ): Either[ValidationError, MassTransferTransaction] =
     create(version, sender, assetId, transfers, fee, timestamp, attachment, Proofs.empty).map(_.signWith(signer))
@@ -110,7 +111,7 @@ object MassTransferTransaction extends TransactionParser {
       transfers: Seq[ParsedTransfer],
       fee: TxAmount,
       timestamp: TxTimestamp,
-      attachment: Option[Attachment]
+      attachment: ByteStr
   ): Either[ValidationError, MassTransferTransaction] =
     signed(version, sender.publicKey, assetId, transfers, fee, timestamp, attachment, sender.privateKey)
 

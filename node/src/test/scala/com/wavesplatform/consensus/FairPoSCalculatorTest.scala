@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import cats.implicits._
 import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import org.scalatest.{Matchers, PropSpec}
 
@@ -57,7 +57,7 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
     def getHit(account: (PrivateKey, PublicKey), prevHitSource: ByteStr): BigInt = {
       val (privateKey, publicKey) = account
       val vrfProof                = crypto.signVRF(privateKey, prevHitSource.arr)
-      val vrf                     = crypto.verifyVRF(vrfProof, prevHitSource.arr, publicKey).map(_.arr).right.get
+      val vrf                     = crypto.verifyVRF(vrfProof, prevHitSource.arr, publicKey).map(_.arr).explicitGet()
       PoSCalculator.hit(vrf)
     }
 

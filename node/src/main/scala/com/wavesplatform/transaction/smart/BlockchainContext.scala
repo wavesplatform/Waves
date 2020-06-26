@@ -23,7 +23,7 @@ object BlockchainContext {
             blockchain: Blockchain,
             isTokenContext: Boolean,
             isContract: Boolean,
-            address: Coeval[ByteStr],
+            address: Environment.Tthis,
             txId: ByteStr): Either[ExecutionError, EvaluationContext[Environment, Id]] = {
     DirectiveSet(
       version,
@@ -31,7 +31,7 @@ object BlockchainContext {
       ContentType.isDApp(isContract)
     ).map { ds =>
       val ctx =
-        PureContext.build(Global, version).withEnvironment[Environment]   |+|
+        PureContext.build(Global, ds).withEnvironment[Environment]   |+|
         CryptoContext.build(Global, version).withEnvironment[Environment] |+|
         WavesContext.build(ds)
 

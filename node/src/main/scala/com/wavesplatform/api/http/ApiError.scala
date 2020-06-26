@@ -40,7 +40,6 @@ object ApiError {
       case TxValidationError.ToSelf                          => ToSelfError
       case TxValidationError.MissingSenderPrivateKey         => MissingSenderPrivateKey
       case TxValidationError.GenericError(ge)                => CustomValidationError(ge)
-      case TxValidationError.InsufficientInvokeActionFee(ge) => CustomValidationError(ge)
       case TxValidationError.AlreadyInTheState(tx, txHeight) => AlreadyInState(tx, txHeight)
       case TxValidationError.AccountBalanceError(errs)       => AccountBalanceErrors(errs)
       case TxValidationError.AliasDoesNotExist(tx)           => AliasDoesNotExist(tx)
@@ -55,9 +54,11 @@ object ApiError {
           case e: TxValidationError.TransactionNotAllowedByScript =>
             if (e.isAssetScript) TransactionNotAllowedByAssetScript(tx)
             else TransactionNotAllowedByAccountScript(tx)
-          case TxValidationError.Mistiming(errorMessage) => Mistiming(errorMessage)
-          case e: TxValidationError.ScriptExecutionError => ScriptExecutionError(tx, e.error, isTokenScript = e.isAssetScript)
-          case err                                       => StateCheckFailed(tx, fromValidationError(err))
+          case TxValidationError.Mistiming(errorMessage)                         => Mistiming(errorMessage)
+          case e: TxValidationError.ScriptExecutionError                         => ScriptExecutionError(tx, e.error, isTokenScript = e.isAssetScript)
+          case e: TxValidationError.FailedTransactionError if e.isExecutionError => ScriptExecutionError(tx, e.message, e.isAssetScript)
+          case e: TxValidationError.FailedTransactionError                       => TransactionNotAllowedByAssetScript(tx)
+          case err                                                               => StateCheckFailed(tx, fromValidationError(err))
         }
       case error => CustomValidationError(error.toString)
     }
@@ -69,7 +70,7 @@ object ApiError {
     override val message = "Error is unknown"
   }
 
-  final case class WrongJson(cause: Option[Throwable] = None, errors: Seq[(JsPath, Seq[JsonValidationError])] = Seq.empty) extends ApiError {
+  final case class WrongJson(cause: Option[Throwable] = None, errors: scala.collection.Seq[(JsPath, scala.collection.Seq[JsonValidationError])] = Seq.empty) extends ApiError {
     override val id              = WrongJson.Id
     override val code            = StatusCodes.BadRequest
     override val message: String = WrongJson.Message

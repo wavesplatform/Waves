@@ -14,6 +14,8 @@ object ContractLimits {
     case V3 | V4 => 3000
   }
 
+  val FailFreeInvokeComplexity = 1500
+
   val MaxExprSizeInBytes     = 8 * 1024
   val MaxContractSizeInBytes = 32 * 1024
 
@@ -49,4 +51,7 @@ object ContractLimits {
       EMPTYARR_WEIGHT + (ELEM_WEIGHT + OBJ_WEIGHT + FIELD_WEIGHT * 2L) * 100L // Data entries
 
   val MaxCmpWeight = 13000L
+
+  val MinTupleSize = 2
+  val MaxTupleSize = 22
 }

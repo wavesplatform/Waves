@@ -33,7 +33,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.io.IOUtils
 import org.asynchttpclient.Dsl._
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, blocking}
@@ -199,7 +199,6 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     try {
       val nodeName = nodeConfig.getString("waves.network.node-name")
       val peersOverrides = if (autoConnect) {
-        import scala.collection.JavaConverters._
         val otherAddrs = peersFor(nodeName)
 
         ConfigFactory

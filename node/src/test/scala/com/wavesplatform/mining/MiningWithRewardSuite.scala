@@ -75,10 +75,10 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
         val recipient1 = createAccount.toAddress
         val recipient2 = createAccount.toAddress
         val tx1 = TransferTransaction
-          .selfSigned(2.toByte, account, recipient1, Waves, 10 * Constants.UnitsInWave, Waves, 400000, None, ts)
+          .selfSigned(2.toByte, account, recipient1, Waves, 10 * Constants.UnitsInWave, Waves, 400000, ByteStr.empty, ts)
           .explicitGet()
         val tx2 = TransferTransaction
-          .selfSigned(2.toByte, account, recipient2, Waves, 5 * Constants.UnitsInWave, Waves, 400000, None, ts)
+          .selfSigned(2.toByte, account, recipient2, Waves, 5 * Constants.UnitsInWave, Waves, 400000, ByteStr.empty, ts)
           .explicitGet()
         TestBlock.create(time = ts, ref = reference, txs = Seq(tx1, tx2), version = Block.NgBlockVersion)
       }
@@ -88,7 +88,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
       (ts, account) => {
         val recipient1 = createAccount.toAddress
         TransferTransaction
-          .selfSigned(2.toByte, account, recipient1, Waves, 10 * Constants.UnitsInWave, Waves, 400000, None, ts)
+          .selfSigned(2.toByte, account, recipient1, Waves, 10 * Constants.UnitsInWave, Waves, 400000, ByteStr.empty, ts)
           .explicitGet()
       }
     )
@@ -120,7 +120,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
       case (blockchainUpdater, _) =>
         for {
           _ <- Task.unit
-          pos          = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
+          pos          = PoSSelector(blockchainUpdater, settings.synchronizationSettings)
           utxPool      = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, settings.utxSettings, enablePriorityPool = true)
           scheduler    = Scheduler.singleThread("appender")
           allChannels  = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
@@ -145,10 +145,10 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
     }
 
   private def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] =
-    miner.invokePrivate(PrivateMethod[Task[Unit]]('generateBlockTask)(account))
+    miner.invokePrivate(PrivateMethod[Task[Unit]](Symbol("generateBlockTask"))(account, None))
 
   private def forgeBlock(miner: MinerImpl)(account: KeyPair): Either[String, (MiningConstraints, Block, MiningConstraint)] =
-    miner.invokePrivate(PrivateMethod[Either[String, (MiningConstraints, Block, MiningConstraint)]]('forgeBlock)(account))
+    miner.invokePrivate(PrivateMethod[Either[String, (MiningConstraints, Block, MiningConstraint)]](Symbol("forgeBlock"))(account))
 
   private def resources(settings: WavesSettings): Resource[Task, (BlockchainUpdaterImpl, DB)] =
     Resource.make {

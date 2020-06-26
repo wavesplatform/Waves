@@ -14,7 +14,7 @@ import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.{Assertion, EitherValues, Matchers, PropSpec}
+import org.scalatest.{EitherValues, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ReissueTransactionDiffTest
@@ -45,9 +45,9 @@ class ReissueTransactionDiffTest
       case (bs, txs) =>
         checkFee(bs, txs) {
           case (result, lessResult, moreResult) =>
-            result shouldBe 'right
-            lessResult shouldBe 'left
-            moreResult shouldBe 'right
+            result.explicitGet()
+            lessResult.left.value
+            moreResult.explicitGet()
         }
     }
   }
@@ -77,14 +77,14 @@ class ReissueTransactionDiffTest
       case (bs, txs) =>
         checkFee(bs, txs) {
           case (result, lessResult, moreResult) =>
-            result shouldBe 'right
-            lessResult shouldBe 'left
-            moreResult shouldBe 'right
+            result.explicitGet()
+            lessResult.left.value
+            moreResult.explicitGet()
         }
     }
   }
 
-  private def checkFee(preconditions: Seq[Block], txs: TransactionsForCheck)(f: ValidationResults => Assertion): Unit =
+  private def checkFee(preconditions: Seq[Block], txs: TransactionsForCheck)(f: ValidationResults => Any): Unit =
     withLevelDBWriter(fs) { blockchain =>
       preconditions.foreach { block =>
         val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) =
@@ -134,8 +134,8 @@ object ReissueTransactionDiffTest {
       featureCheckBlocksPeriod = 1,
       blocksForFeatureActivation = 1,
       preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures ++ Seq(
-        BlockchainFeatures.FeeSponsorship.id           -> 0,
-        BlockchainFeatures.BlockV5.id -> 3
+        BlockchainFeatures.FeeSponsorship.id -> 0,
+        BlockchainFeatures.BlockV5.id        -> 3
       )
     )
 

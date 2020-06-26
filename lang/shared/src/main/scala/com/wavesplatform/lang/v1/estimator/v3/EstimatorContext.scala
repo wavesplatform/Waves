@@ -14,7 +14,7 @@ private[v3] object EstimatorContext {
   type EvalM[A] = TaskM[EstimatorContext, ExecutionError, A]
 
   object Lenses {
-    val funcs: Lens[EstimatorContext, Map[FunctionHeader, Long]]  = lens[EstimatorContext] >> 'funcs
-    val usedRefs: Lens[EstimatorContext, Set[String]]             = lens[EstimatorContext] >> 'usedRefs
+    val funcs: Lens[EstimatorContext, Map[FunctionHeader, Long]]  = lens[EstimatorContext] >> Symbol("funcs")
+    val usedRefs: Lens[EstimatorContext, Set[String]]             = lens[EstimatorContext] >> Symbol("usedRefs")
   }
 }

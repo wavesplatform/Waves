@@ -9,22 +9,28 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.Keys
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, RewardsSettings}
-import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.state.diffs.BlockDiffer
+import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{EitherMatchers, NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDomain with Matchers with TransactionGen with NoShrink {
+class BlockRewardSpec
+    extends FreeSpec
+    with ScalaCheckPropertyChecks
+    with WithDomain
+    with Matchers
+    with EitherMatchers
+    with TransactionGen
+    with NoShrink {
 
   private val BlockRewardActivationHeight = 5
   private val NGActivationHeight          = 0
@@ -74,7 +80,9 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
     genesisBlock = TestBlock.create(
       ntpTime.getTimestamp(),
       Seq(
-        GenesisTransaction.create(sourceAddress.toAddress, (Constants.TotalWaves - 60000) * Constants.UnitsInWave, ntpTime.getTimestamp()).explicitGet(),
+        GenesisTransaction
+          .create(sourceAddress.toAddress, (Constants.TotalWaves - 60000) * Constants.UnitsInWave, ntpTime.getTimestamp())
+          .explicitGet(),
         GenesisTransaction.create(issuer.toAddress, 40000 * Constants.UnitsInWave, ntpTime.getTimestamp()).explicitGet(),
         GenesisTransaction.create(miner1.toAddress, InitialMinerBalance, ntpTime.getTimestamp()).explicitGet(),
         GenesisTransaction.create(miner2.toAddress, InitialMinerBalance, ntpTime.getTimestamp()).explicitGet()
@@ -135,27 +143,27 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
       withDomain(rewardSettings) { d =>
         val totalFee = transfers.map(_.fee).sum
 
-        b1s.foreach(b => d.blockchainUpdater.processBlock(b).explicitGet())
+        b1s.foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
 
-        b2s.foreach(b => d.blockchainUpdater.processBlock(b).explicitGet())
+        b2s.foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
         d.blockchainUpdater.height shouldEqual BlockRewardActivationHeight - 1
         d.blockchainUpdater.isFeatureActivated(BlockchainFeatures.BlockReward) shouldBe false
         d.blockchainUpdater.blockReward(BlockRewardActivationHeight - 1) shouldBe None
         d.blockchainUpdater.balance(miner.toAddress) shouldBe InitialMinerBalance + totalFee
 
-        d.blockchainUpdater.processBlock(activationBlock).explicitGet()
+        d.blockchainUpdater.processBlock(activationBlock) should beRight
         d.blockchainUpdater.height shouldEqual BlockRewardActivationHeight
         d.blockchainUpdater.isFeatureActivated(BlockchainFeatures.BlockReward) shouldBe true
         d.blockchainUpdater.blockReward(BlockRewardActivationHeight) shouldBe Some(InitialReward)
         d.blockchainUpdater.balance(miner.toAddress) shouldBe InitialReward + InitialMinerBalance + totalFee
 
-        b3s.foreach(b => d.blockchainUpdater.processBlock(b).explicitGet())
+        b3s.foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
         d.blockchainUpdater.height shouldEqual BlockRewardActivationHeight + 4
         d.blockchainUpdater.isFeatureActivated(BlockchainFeatures.BlockReward) shouldBe true
         d.blockchainUpdater.blockReward(BlockRewardActivationHeight + 4) shouldBe InitialReward.some
         d.blockchainUpdater.balance(miner.toAddress) shouldBe 5 * InitialReward + InitialMinerBalance + totalFee
 
-        b4s.foreach(b => d.blockchainUpdater.processBlock(b).explicitGet())
+        b4s.foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
         d.blockchainUpdater.height shouldEqual BlockRewardActivationHeight + 9
         d.blockchainUpdater.isFeatureActivated(BlockchainFeatures.BlockReward) shouldBe true
         d.blockchainUpdater.blockReward(BlockRewardActivationHeight + 9) shouldBe InitialReward.some
@@ -163,39 +171,39 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
 
         val NextReward = InitialReward + 1 * Constants.UnitsInWave
 
-        d.blockchainUpdater.processBlock(newTermBlock).explicitGet()
+        d.blockchainUpdater.processBlock(newTermBlock) should beRight
         d.blockchainUpdater.height shouldEqual BlockRewardActivationHeight + 10
         d.blockchainUpdater.isFeatureActivated(BlockchainFeatures.BlockReward) shouldBe true
         d.blockchainUpdater.balance(miner.toAddress) shouldBe 10 * InitialReward + NextReward + InitialMinerBalance + totalFee
         d.blockchainUpdater.blockReward(BlockRewardActivationHeight + 10) shouldBe NextReward.some
 
-        b5s.init.foreach(b => d.blockchainUpdater.processBlock(b).explicitGet())
+        b5s.init.foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
         d.blockchainUpdater.height shouldEqual BlockRewardActivationHeight + 10 + 10 - 1
         d.blockchainUpdater.isFeatureActivated(BlockchainFeatures.BlockReward) shouldBe true
         d.blockchainUpdater.blockReward(BlockRewardActivationHeight + 10 + 10 - 1) shouldBe NextReward.some
         d.blockchainUpdater.balance(miner.toAddress) shouldBe 10 * InitialReward + 10 * NextReward + InitialMinerBalance + totalFee
 
-        d.blockchainUpdater.processBlock(b5s.last).explicitGet()
+        d.blockchainUpdater.processBlock(b5s.last) should beRight
 
         d.blockchainUpdater.height shouldEqual BlockRewardActivationHeight + 10 + 10
         d.blockchainUpdater.isFeatureActivated(BlockchainFeatures.BlockReward) shouldBe true
         d.blockchainUpdater.blockReward(BlockRewardActivationHeight + 10 + 10) shouldBe InitialReward.some
         d.blockchainUpdater.balance(miner.toAddress) shouldBe 10 * InitialReward + 10 * NextReward + InitialReward + InitialMinerBalance + totalFee
 
-        b6s.init.foreach(b => d.blockchainUpdater.processBlock(b).explicitGet())
+        b6s.init.foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
         d.blockchainUpdater.height shouldEqual BlockRewardActivationHeight + 10 + 10 + 10 - 1
         d.blockchainUpdater.isFeatureActivated(BlockchainFeatures.BlockReward) shouldBe true
         d.blockchainUpdater.blockReward(BlockRewardActivationHeight + 10 + 10 + 10 - 1) shouldBe InitialReward.some
         d.blockchainUpdater.balance(miner.toAddress) shouldBe 10 * InitialReward + 10 * NextReward + 10 * InitialReward + InitialMinerBalance + totalFee
 
-        d.blockchainUpdater.processBlock(b6s.last).explicitGet()
+        d.blockchainUpdater.processBlock(b6s.last) should beRight
 
         d.blockchainUpdater.height shouldEqual BlockRewardActivationHeight + 10 + 10 + 10
         d.blockchainUpdater.isFeatureActivated(BlockchainFeatures.BlockReward) shouldBe true
         d.blockchainUpdater.blockReward(BlockRewardActivationHeight + 10 + 10 + 10) shouldBe InitialReward.some
         d.blockchainUpdater.balance(miner.toAddress) shouldBe 10 * InitialReward + 10 * NextReward + 11 * InitialReward + InitialMinerBalance + totalFee
 
-        b7s.init.foreach(b => d.blockchainUpdater.processBlock(b).explicitGet())
+        b7s.init.foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
         d.blockchainUpdater.height shouldEqual BlockRewardActivationHeight + 10 + 10 + 10 + 10 - 1
         d.blockchainUpdater.isFeatureActivated(BlockchainFeatures.BlockReward) shouldBe true
         d.blockchainUpdater.blockReward(BlockRewardActivationHeight + 10 + 10 + 10 + 10 - 1) shouldBe InitialReward.some
@@ -203,7 +211,7 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
 
         val DecreasedReward = InitialReward - 1 * Constants.UnitsInWave
 
-        d.blockchainUpdater.processBlock(b7s.last).explicitGet()
+        d.blockchainUpdater.processBlock(b7s.last) should beRight
 
         d.blockchainUpdater.height shouldEqual BlockRewardActivationHeight + 10 + 10 + 10 + 10
         d.blockchainUpdater.isFeatureActivated(BlockchainFeatures.BlockReward) shouldBe true
@@ -216,10 +224,30 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
     val ngEmptyScenario = for {
       (sourceAddress, issuer, miner1, miner2, genesisBlock) <- genesis
       tx1 = TransferTransaction
-        .selfSigned(1.toByte, issuer, sourceAddress.toAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
+        .selfSigned(
+          1.toByte,
+          issuer,
+          sourceAddress.toAddress,
+          Waves,
+          10 * Constants.UnitsInWave,
+          Waves,
+          OneTotalFee,
+          ByteStr.empty,
+          ntpTime.getTimestamp()
+        )
         .explicitGet()
       tx2 = TransferTransaction
-        .selfSigned(1.toByte, issuer, sourceAddress.toAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
+        .selfSigned(
+          1.toByte,
+          issuer,
+          sourceAddress.toAddress,
+          Waves,
+          10 * Constants.UnitsInWave,
+          Waves,
+          OneTotalFee,
+          ByteStr.empty,
+          ntpTime.getTimestamp()
+        )
         .explicitGet()
       b2        = mkEmptyBlock(genesisBlock.id(), miner1)
       b3        = mkEmptyBlock(b2.id(), miner1)
@@ -244,12 +272,12 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
           d.db.get(Keys.blockMetaAt(Height(BlockRewardActivationHeight - 1))).map(_.totalFeeInWaves) shouldBe OneTotalFee.some
           d.levelDBWriter.carryFee shouldBe OneCarryFee
 
-          d.blockchainUpdater.processBlock(b3).explicitGet()
+          d.blockchainUpdater.processBlock(b3) should beRight
           d.blockchainUpdater.balance(miner2.toAddress) shouldBe InitialMinerBalance + InitialReward + OneCarryFee
           d.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) shouldBe 0L.some
           d.blockchainUpdater.carryFee shouldBe 0L
 
-          m3s.foreach(mb => d.blockchainUpdater.processMicroBlock(mb).explicitGet())
+          m3s.foreach(mb => d.blockchainUpdater.processMicroBlock(mb) should beRight)
 
           d.blockchainUpdater.height shouldBe BlockRewardActivationHeight
           d.blockchainUpdater.balance(miner2.toAddress) shouldBe InitialMinerBalance + InitialReward + OneFee + OneCarryFee
@@ -261,7 +289,17 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
     val betterBlockScenario = for {
       (sourceAddress, issuer, miner, _, genesisBlock) <- genesis
       tx = TransferTransaction
-        .selfSigned(1.toByte, issuer, sourceAddress.toAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
+        .selfSigned(
+          1.toByte,
+          issuer,
+          sourceAddress.toAddress,
+          Waves,
+          10 * Constants.UnitsInWave,
+          Waves,
+          OneTotalFee,
+          ByteStr.empty,
+          ntpTime.getTimestamp()
+        )
         .explicitGet()
       b2        = mkEmptyBlock(genesisBlock.id(), miner)
       b3        = mkEmptyBlock(b2.id(), miner)
@@ -277,16 +315,16 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
     "when received better liquid block" in forAll(betterBlockScenario) {
       case (miner, b1s, m1s, b2a, b2b) =>
         withDomain(rewardSettings) { d =>
-          b1s.foreach(b => d.blockchainUpdater.processBlock(b).explicitGet())
-          m1s.foreach(m => d.blockchainUpdater.processMicroBlock(m).explicitGet())
+          b1s.foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
+          m1s.foreach(m => d.blockchainUpdater.processMicroBlock(m) should beRight)
 
           d.blockchainUpdater.height shouldBe BlockRewardActivationHeight
           d.blockchainUpdater.balance(miner.toAddress) shouldBe InitialMinerBalance + InitialReward + OneFee
           d.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) shouldBe OneTotalFee.some
           d.blockchainUpdater.carryFee shouldBe OneCarryFee
 
-          d.blockchainUpdater.processBlock(b2a).explicitGet()
-          d.blockchainUpdater.processBlock(b2b).explicitGet()
+          d.blockchainUpdater.processBlock(b2a) should beRight
+          d.blockchainUpdater.processBlock(b2b) should beRight
 
           d.blockchainUpdater.balance(miner.toAddress) shouldBe InitialMinerBalance + InitialReward + OneFee + InitialReward + OneCarryFee
           d.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) shouldBe 0L.some
@@ -297,10 +335,30 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
     val sameButBetterBlockScenario = for {
       (sourceAddress, issuer, miner, _, genesisBlock) <- genesis
       tx1 = TransferTransaction
-        .selfSigned(1.toByte, issuer, sourceAddress.toAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
+        .selfSigned(
+          1.toByte,
+          issuer,
+          sourceAddress.toAddress,
+          Waves,
+          10 * Constants.UnitsInWave,
+          Waves,
+          OneTotalFee,
+          ByteStr.empty,
+          ntpTime.getTimestamp()
+        )
         .explicitGet()
       tx2 = TransferTransaction
-        .selfSigned(1.toByte, issuer, sourceAddress.toAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
+        .selfSigned(
+          1.toByte,
+          issuer,
+          sourceAddress.toAddress,
+          Waves,
+          10 * Constants.UnitsInWave,
+          Waves,
+          OneTotalFee,
+          ByteStr.empty,
+          ntpTime.getTimestamp()
+        )
         .explicitGet()
       b2        = mkEmptyBlock(genesisBlock.id(), miner)
       b3        = mkEmptyBlock(b2.id(), miner)
@@ -313,16 +371,16 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
     "when received same liquid block but it is better than existing" in forAll(sameButBetterBlockScenario) {
       case (miner, b1s, m1s, b2a, b2b) =>
         withDomain(rewardSettings) { d =>
-          b1s.foreach(b => d.blockchainUpdater.processBlock(b).explicitGet())
-          m1s.foreach(m => d.blockchainUpdater.processMicroBlock(m).explicitGet())
+          b1s.foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
+          m1s.foreach(m => d.blockchainUpdater.processMicroBlock(m) should beRight)
 
           d.blockchainUpdater.height shouldBe BlockRewardActivationHeight
           d.blockchainUpdater.balance(miner.toAddress) shouldBe InitialMinerBalance + InitialReward + OneFee
           d.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) shouldBe OneTotalFee.some
           d.blockchainUpdater.carryFee shouldBe OneCarryFee
 
-          d.blockchainUpdater.processBlock(b2a).explicitGet()
-          d.blockchainUpdater.processBlock(b2b).explicitGet()
+          d.blockchainUpdater.processBlock(b2a) should beRight
+          d.blockchainUpdater.processBlock(b2b) should beRight
 
           d.blockchainUpdater.balance(miner.toAddress) shouldBe InitialMinerBalance + InitialReward + OneFee + InitialReward + OneFee + OneCarryFee
           d.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) shouldBe OneTotalFee.some
@@ -352,25 +410,25 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
           val initialWavesAmount = BigInt(Constants.TotalWaves) * BigInt(Constants.UnitsInWave)
           val term               = rewardSettings.blockchainSettings.rewardsSettings.term
           val minIncrement       = rewardSettings.blockchainSettings.rewardsSettings.minIncrement
-          b1s.foreach(b => d.blockchainUpdater.processBlock(b).explicitGet())
+          b1s.foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
           d.blockchainUpdater.height shouldBe BlockRewardActivationHeight - 1
           d.blockchainUpdater.wavesAmount(BlockRewardActivationHeight - 1) shouldBe initialWavesAmount
           d.blockchainUpdater.balance(miner1.toAddress) shouldBe InitialMinerBalance
           d.blockchainUpdater.balance(miner2.toAddress) shouldBe InitialMinerBalance
-          d.blockchainUpdater.processBlock(b2).explicitGet()
+          d.blockchainUpdater.processBlock(b2) should beRight
           d.blockchainUpdater.height shouldBe BlockRewardActivationHeight
           d.blockchainUpdater.wavesAmount(BlockRewardActivationHeight) shouldBe initialWavesAmount + InitialReward
           d.blockchainUpdater.balance(miner1.toAddress) shouldBe InitialMinerBalance + InitialReward
           d.blockchainUpdater.balance(miner2.toAddress) shouldBe InitialMinerBalance
           b3s.zipWithIndex.foreach {
             case (b, i) =>
-              d.blockchainUpdater.processBlock(b).explicitGet()
+              d.blockchainUpdater.processBlock(b) should beRight
               d.blockchainUpdater.height shouldBe BlockRewardActivationHeight + i + 1
               d.blockchainUpdater.wavesAmount(BlockRewardActivationHeight + i + 1) shouldBe initialWavesAmount + BigInt(InitialReward * (i + 2))
               d.blockchainUpdater.balance(miner1.toAddress) shouldBe InitialMinerBalance + ((i + 1) / 2) * InitialReward + InitialReward
               d.blockchainUpdater.balance(miner2.toAddress) shouldBe InitialMinerBalance + (i / 2 + 1) * InitialReward
           }
-          d.blockchainUpdater.processBlock(b4).explicitGet()
+          d.blockchainUpdater.processBlock(b4) should beRight
           d.blockchainUpdater.height shouldBe BlockRewardActivationHeight + term
           d.blockchainUpdater.wavesAmount(BlockRewardActivationHeight + term) shouldBe initialWavesAmount + term * InitialReward + InitialReward + minIncrement
           d.blockchainUpdater.balance(miner1.toAddress) shouldBe InitialMinerBalance + InitialReward * 5 + InitialReward + minIncrement
@@ -417,7 +475,7 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
   "Reward calculated correctly" in forAll(calcScenario) {
     case (b1s, b2, b3s, b4) =>
       withDomain(calcRewardSettings) { d =>
-        b1s.foreach(b => d.blockchainUpdater.processBlock(b).explicitGet())
+        b1s.foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
 
         d.blockchainUpdater.processBlock(b2)
 
@@ -434,11 +492,11 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
         d.blockchainUpdater.blockReward(9) shouldBe (6 * Constants.UnitsInWave).some
         d.blockchainUpdater.blockReward(15) shouldBe (6 * Constants.UnitsInWave).some
 
-        d.blockchainUpdater.processBlock(b4).explicitGet()
+        d.blockchainUpdater.processBlock(b4) should beRight
         d.blockchainUpdater.blockReward(16) shouldBe (7 * Constants.UnitsInWave).some
 
-        route.getRewards(9).right.get.votes.increase shouldBe 0
-        route.getRewards(10).right.get.votes.increase shouldBe 1
+        route.getRewards(9).explicitGet().votes.increase shouldBe 0
+        route.getRewards(10).explicitGet().votes.increase shouldBe 1
 
       }
   }
@@ -472,7 +530,7 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
   "Reward calculated correctly for small voting period" in forAll(smallCalcScenario) {
     case (b1s, b2, b3s) =>
       withDomain(smallPeriodRewardSettings) { d =>
-        b1s.foreach(b => d.blockchainUpdater.processBlock(b).explicitGet())
+        b1s.foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
 
         d.blockchainUpdater.processBlock(b2)
 

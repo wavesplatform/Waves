@@ -14,7 +14,7 @@ object DBResource {
 
     override def get[V](key: Key[V]): V = key.parse(db.get(key.keyBytes, readOptions))
 
-    override val iterator = db.iterator(readOptions)
+    override val iterator: DBIterator = db.iterator(readOptions)
 
     override def close(): Unit = {
       iterator.close()

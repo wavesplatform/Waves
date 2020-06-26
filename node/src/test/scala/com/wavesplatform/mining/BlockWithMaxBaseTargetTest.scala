@@ -63,7 +63,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
             }
           })
 
-          val forgeBlock = PrivateMethod[MinerImpl]('forgeBlock)
+          val forgeBlock = PrivateMethod[MinerImpl](Symbol("forgeBlock"))
           try {
             miner invokePrivate forgeBlock(account)
           } catch {
@@ -132,8 +132,8 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
       featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
     )
 
-    val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers)
-    val pos = new PoSSelector(bcu, settings.blockchainSettings, settings.synchronizationSettings)
+    val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
+    val pos = PoSSelector(bcu, settings.synchronizationSettings)
 
     val utxPoolStub                        = new UtxPoolImpl(ntpTime, bcu, ignoreSpendableBalanceChanged, settings0.utxSettings, enablePriorityPool = true)
     val schedulerService: SchedulerService = Scheduler.singleThread("appender")

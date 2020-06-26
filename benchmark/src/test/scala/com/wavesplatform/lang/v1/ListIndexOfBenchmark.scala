@@ -51,7 +51,7 @@ object ListIndexOfBenchmark {
       PureContext.genericListIndexOf(element, list.indexOf, list.indexWhere)
 
     def lastIndexOf(list: Seq[EVALUATED], element: EVALUATED): Either[String, EVALUATED] =
-      PureContext.genericListIndexOf(element, list.lastIndexOf, list.lastIndexWhere)
+      PureContext.genericListIndexOf(element, list.lastIndexOf(_), list.lastIndexWhere)
   }
 
   @State(Scope.Benchmark)

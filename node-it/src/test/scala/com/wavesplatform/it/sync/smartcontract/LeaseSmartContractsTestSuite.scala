@@ -34,7 +34,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
         match tx {
           case ltx: LeaseTransaction => sigVerify(ltx.bodyBytes,ltx.proofs[0],pkA) && sigVerify(ltx.bodyBytes,ltx.proofs[2],pkC)
           case lctx : LeaseCancelTransaction => sigVerify(lctx.bodyBytes,lctx.proofs[1],pkA) && sigVerify(lctx.bodyBytes,lctx.proofs[2],pkB)
-          case other => false
+          case _ => false
         }
         """.stripMargin
 
