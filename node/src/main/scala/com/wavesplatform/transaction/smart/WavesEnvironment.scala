@@ -171,7 +171,7 @@ class WavesEnvironment(
 
   override def addressFromString(addressStr: String): Either[String, Address] =
     account.Address
-      .fromString(addressStr, chainId)
+      .fromString(addressStr)
       .bimap(
         _.toString,
         address => Address(ByteStr(address.bytes))
