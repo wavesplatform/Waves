@@ -234,6 +234,55 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
     )
   }
 
+  test("state changes order") {
+    val script = ScriptCompiler.compile("""
+      |{-# STDLIB_VERSION 4 #-}
+      |{-# CONTENT_TYPE DAPP #-}
+      |{-# SCRIPT_TYPE ACCOUNT #-}
+
+      |@Callable(i)
+      |func orderTest() = {
+      |    [ScriptTransfer(i.caller, 1, unit),
+      |    IntegerEntry("a", 1),
+      |    StringEntry("b", "a"),
+      |    BinaryEntry("c", base58'a'),
+      |    BooleanEntry("y", true),
+      |    ScriptTransfer(i.caller, 2, unit),
+      |    StringEntry("b", "c")]
+      |  }
+      """.stripMargin, ScriptEstimatorV2).explicitGet()._1.bytes().base64
+    sender.setScript(contract, Some(script), setScriptFee + 0.4.waves, waitForTx = true)
+
+    val invokeTx = sender.invokeScript(
+      caller,
+      contract,
+      func = Some("orderTest"),
+      args = List.empty,
+      fee = 1.waves,
+      waitForTx = true
+    )
+    val expectedStateChanges = StateChangesDetails(
+      Seq(
+        DataResponse("integer",1,"a"),
+        DataResponse("string","a","b"),
+        DataResponse("binary","base64:IQ==","c"),
+        DataResponse("boolean",true,"y"),
+        DataResponse("string","c","b")
+      ),
+      Seq(TransfersInfoResponse(caller, None, 1), TransfersInfoResponse(caller, None, 2)),
+      Seq.empty,
+      Seq.empty,
+      Seq.empty,
+      Seq.empty,
+      None
+    )
+    val idStateChanges        = sender.debugStateChanges(invokeTx._1.id).stateChanges
+    val addressStateChanges    = sender.debugStateChangesByAddress(caller, 1).head.stateChanges
+
+    idStateChanges.get shouldBe expectedStateChanges
+    addressStateChanges.get shouldBe expectedStateChanges
+  }
+
   def txInfoShouldBeEqual(info: TransactionInfo, stateChanges: DebugStateChanges)(implicit pos: Position): Unit = {
     info._type shouldBe stateChanges._type
     info.id shouldBe stateChanges.id
