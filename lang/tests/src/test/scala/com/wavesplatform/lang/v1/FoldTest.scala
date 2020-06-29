@@ -93,7 +93,6 @@ class FoldTest extends PropSpec with PropertyChecks with Matchers with NoShrink 
          |
       """.stripMargin
 
-    val index = script.indexOf("1001")
     eval(script) shouldBe Right(CONST_LONG(1002L))
   }
 
