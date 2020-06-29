@@ -168,9 +168,15 @@ object Parser {
     case (_, id, None, _)                                     => id
   }
 
-  def foldP[_:P]: P[EXPR] = (Index ~~ P("FOLD<") ~~ digit.repX(1).! ~~ ">(" ~/ baseExpr ~ "," ~ baseExpr ~ "," ~ refP ~ ")" ~~ Index)
-    .map { case (start, limit, list, acc, f, end) =>
-      Macro.unwrapFold(Pos(start, end), limit.toInt, list, acc, f)
+  val limlim = com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
+  def foldP[_:P]: P[EXPR] = (Index ~~ P("FOLD<") ~~ Index ~~ digit.repX(1).! ~~ Index ~~ ">(" ~/ baseExpr ~ "," ~ baseExpr ~ "," ~ refP ~ ")" ~~ Index)
+    .map { case (start, limStart, limit, limEnd, list, acc, f, end) =>
+      val lim = limit.toInt
+      if(lim <= limlim) {
+        Macro.unwrapFold(Pos(start, end), lim, list, acc, f)
+      } else {
+        INVALID(Pos(limStart, limEnd), s"List size limit in FOLD is oversized, $lim must be less or equal $limlim")
+      }
     }
 
   def list[_:P]: P[EXPR] = (Index ~~ P("[") ~ functionCallArgs ~ P("]") ~~ Index).map {
