@@ -65,8 +65,15 @@ object ScriptEstimatorV3 extends ScriptEstimator {
       funcCost    <- evalHoldingFuncs(func.body)
       bodyEvalCtx <- get[Id, EstimatorContext, ExecutionError]
       usedRefsInBody = bodyEvalCtx.usedRefs diff startCtx.usedRefs
-      _        <- update(usedRefs.modify(_)(_ => startCtx.usedRefs))
-      _        <- update(funcs.modify(_)(_ + (FunctionHeader.User(func.name) -> (funcCost, usedRefsInBody))))
+      _ <- update(
+        (funcs ~ usedRefs).modify(_) {
+          case (funcs, _) =>
+            (
+              funcs + (FunctionHeader.User(func.name) -> (funcCost, usedRefsInBody)),
+              startCtx.usedRefs
+            )
+        }
+      )
       nextCost <- evalExpr(inner)
     } yield nextCost
 
