@@ -80,15 +80,11 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
     val lazyVal       = ContextfulVal.pure[C](pointInstance.orNull)
     val stringToTuple = Map(("p", (pointType, lazyVal)))
-    val directiveSet = DirectiveSet(version, Account, Expression).explicitGet()
-
-    val testCtx =
-      (addCtx.withEnvironment[C] |+| CTX[C](sampleTypes, stringToTuple, Array(f, f2))).compilerContext
 
     val ctx: CTX[C] =
       Monoid.combineAll(
         Seq(
-          PureContext.build(Global, directiveSet, testCompilerContext = testCtx).withEnvironment[C],
+          PureContext.build(Global, version).withEnvironment[C],
           CryptoContext.build(Global, version).withEnvironment[C],
           addCtx.withEnvironment[C],
           CTX[C](sampleTypes, stringToTuple, Array(f, f2)),
