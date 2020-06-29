@@ -1,7 +1,9 @@
 package com.wavesplatform.lang.v1.estimator
 
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.utils.functionCosts
+import com.wavesplatform.lang.v1.compiler.ContractCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 
 class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3) {
@@ -152,5 +154,24 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3) {
   property("groth16Verify") {
     implicit val version : StdLibVersion = V4
     estimate(functionCosts(V4), compile("groth16Verify(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')")) shouldBe Right(2703)
+  }
+
+  property("free declarations") {
+    estimate(
+      functionCosts(V4),
+      compile(
+        """
+          |
+          | let a = 1 + 1 + 1 + 1 + 1
+          | func f() = a
+          | func g() = f()
+          | let b = g()
+          | let c = a
+          |
+          | 1
+          |
+        """.stripMargin
+      )
+    ) shouldBe Right(1)
   }
 }
