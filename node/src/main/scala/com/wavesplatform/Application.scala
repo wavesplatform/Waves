@@ -223,7 +223,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         utxSynchronizer.publish,
         loadBlockAt(db, blockchainUpdater)
       )
-      override val blocksApi: CommonBlocksApi     = CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockAt(db, blockchainUpdater))
+      override val blocksApi: CommonBlocksApi     = CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
       override val accountsApi: CommonAccountsApi = CommonAccountsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
       override val assetsApi: CommonAssetsApi     = CommonAssetsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
     }
@@ -497,11 +497,14 @@ object Application {
   }
 
   private[wavesplatform] def loadBlockAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[(BlockMeta, Seq[Transaction])] =
+    loadBlockInfoAt(db, blockchainUpdater)(height).map { case (meta, txs) => (meta, txs.map(_._1)) }
+
+  private[wavesplatform] def loadBlockInfoAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[(BlockMeta, Seq[(Transaction, Boolean)])] =
     loadBlockMetaAt(db, blockchainUpdater)(height).map { meta =>
       meta -> blockchainUpdater
-        .liquidBlock(meta.id)
-        .orElse(db.readOnly(ro => database.loadBlock(Height(height), ro)))
-        .fold(Seq.empty[Transaction])(_.transactionData)
+        .liquidTransactions(meta.id)
+        .orElse(db.readOnly(ro => database.loadTransactions(Height(height), ro)))
+        .fold(Seq.empty[(Transaction, Boolean)])(identity)
     }
 
   private[wavesplatform] def loadBlockMetaAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] =

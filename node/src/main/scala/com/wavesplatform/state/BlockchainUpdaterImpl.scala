@@ -73,6 +73,13 @@ class BlockchainUpdaterImpl(
 
   def liquidBlock(id: ByteStr): Option[Block] = readLock(ngState.flatMap(_.totalDiffOf(id).map(_._1)))
 
+  def liquidTransactions(id: ByteStr): Option[Seq[(Transaction, Boolean)]] =
+    readLock(
+      ngState
+        .flatMap(_.totalDiffOf(id))
+        .map { case (_, diff, _, _, _) => diff.transactions.values.toSeq.map(info => (info.transaction, info.applied)) }
+    )
+
   def liquidBlockMeta: Option[BlockMeta] =
     readLock(ngState.map { ng =>
       val (_, _, totalFee) = ng.bestLiquidDiffAndFees
@@ -464,7 +471,7 @@ class BlockchainUpdaterImpl(
               val blockId = ng.createBlockId(microBlock)
               blockchainUpdateTriggers.onProcessMicroBlock(microBlock, detailedDiff, this, blockId)
               ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis, Some(blockId))
-              log.info(s"MicroBlock(${blockId.trim} ~> ${microBlock.reference.trim}, txs=${microBlock.transactionData.size}, diff=${diff.hashString}) appended")
+              log.info(s"${microBlock.stringRepr(blockId)} appended, diff=${diff.hashString}")
               internalLastBlockInfo.onNext(LastBlockInfo(blockId, height, score, ready = true))
 
               for {

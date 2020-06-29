@@ -49,7 +49,6 @@ class MicroBlockMinerSpec extends FlatSpec with Matchers with PrivateMethodTeste
         val task = microBlockMiner invokePrivate generateOneMicroBlockTask(
           acc,
           block,
-          MiningConstraints(d.blockchainUpdater, d.blockchainUpdater.height, Some(settings.minerSettings)),
           constraint,
           lastMicroBlock
         )
