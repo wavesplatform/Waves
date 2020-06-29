@@ -165,6 +165,7 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3) {
           | func g() = f()
           | let b = g()
           | let c = a
+          | func h() = a + b + c
           |
           | 1
           |
