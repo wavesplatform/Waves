@@ -69,7 +69,7 @@ object ScriptEstimatorV3 extends ScriptEstimator {
         (funcs ~ usedRefs).modify(_) {
           case (funcs, _) =>
             (
-              funcs + (FunctionHeader.User(func.name) -> (funcCost, usedRefsInBody)),
+              funcs + ((FunctionHeader.User(func.name), (funcCost, usedRefsInBody))),
               startCtx.usedRefs
             )
         }
@@ -102,7 +102,7 @@ object ScriptEstimatorV3 extends ScriptEstimator {
         (funcs ~ usedRefs).modify(_) {
           case (funcs, usedRefs) =>
             (
-              funcs + (header -> (bodyCost, Set())),
+              funcs + ((header, (bodyCost, Set[String]()))),
               usedRefs ++ bodyUsedRefs
             )
         }
