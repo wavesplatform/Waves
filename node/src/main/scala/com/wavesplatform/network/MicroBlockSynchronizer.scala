@@ -67,10 +67,10 @@ object MicroBlockSynchronizer extends ScorexLogging {
               Task.unit
             case Some(channel) =>
               if (channel.isOpen) {
-                log.trace(s"Requesting $totalBlockId from ${id(channel)}")
+                log.trace(s"${id(channel)} Requesting $totalBlockId")
                 val request = MicroBlockRequest(totalBlockId)
-                channel.writeAndFlush(request)
                 awaiting.put(totalBlockId, mbInv)
+                channel.writeAndFlush(request)
                 task(attemptsAllowed - 1, exclude + channel).delayExecution(settings.waitResponseTimeout)
               } else task(attemptsAllowed, exclude + channel)
           }
@@ -132,8 +132,11 @@ object MicroBlockSynchronizer extends ScorexLogging {
         successfullyReceived.put(totalRef, dummy)
         BlockStats.received(mb, ch)
         Option(awaiting.getIfPresent(totalRef)) match {
-          case None => Observable.empty
+          case None =>
+            log.trace(s"${id(ch)} Got unexpected ${mb.stringRepr(totalRef)}")
+            Observable.empty
           case Some(mi) =>
+            log.trace(s"${id(ch)} Got ${mb.stringRepr(totalRef)}, as expected")
             awaiting.invalidate(totalRef)
             Observable((ch, MicroblockData(Option(mi), mb, Coeval.evalOnce(owners(totalRef)))))
         }
