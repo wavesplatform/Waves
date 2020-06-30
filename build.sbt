@@ -122,7 +122,8 @@ inScope(Global)(
       "-Ywarn-unused:-implicits",
       "-Xlint",
       "-opt:l:inline",
-      "-opt-inline-from:**"
+      "-opt-inline-from:**",
+      "-Ybackend-parallelism", "8"
     ),
     crossPaths := false,
     scalafmtOnCompile := false,
