@@ -10,6 +10,7 @@ import com.wavesplatform.lang.directives.values.{StdLibVersion, V1, V2, DApp => 
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.v1.BaseGlobal.DAppInfo
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
@@ -136,28 +137,41 @@ trait BaseGlobal {
       )
     } yield ()
 
-  type ContractInfo = (Array[Byte], DApp, (String, Long), Map[String, Long])
-
   def compileContract(
       input: String,
       ctx: CompilerContext,
       stdLibVersion: StdLibVersion,
       estimator: ScriptEstimator
-  ): Either[String, ContractInfo] =
+  ): Either[String, DAppInfo] =
     for {
-      dApp                          <- ContractCompiler.compile(input, ctx)
-      (maxComplexity, complexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator, includeUserFunctions = true)
-      bytes                         <- serializeContract(dApp, stdLibVersion)
-    } yield (bytes, dApp, maxComplexity, complexities)
+      dApp                                   <- ContractCompiler.compile(input, ctx)
+      userFunctionComplexities               <- ContractScript.estimateUserFunctions(stdLibVersion, dApp, estimator)
+      globalVariableComplexities             <- ContractScript.estimateGlobalVariables(stdLibVersion, dApp, estimator)
+      (maxComplexity, annotatedComplexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator)
+      (verifierComplexity, callableComplexities) = dApp.verifierFuncOpt.fold(
+        (0L, annotatedComplexities)
+      )(v => (annotatedComplexities(v.u.name), annotatedComplexities - v.u.name))
+      bytes <- serializeContract(dApp, stdLibVersion)
+    } yield DAppInfo(
+      bytes,
+      dApp,
+      maxComplexity,
+      annotatedComplexities,
+      verifierComplexity,
+      callableComplexities,
+      userFunctionComplexities.toMap,
+      globalVariableComplexities.toMap
+    )
 
   def checkContract(
+      version: StdLibVersion,
       dApp: DApp,
-      complexity: (String, Long),
-      version: StdLibVersion
+      maxComplexity: (String, Long),
+      complexities: Map[String, Long]
   ): Either[String, Unit] =
     for {
       _ <- ContractScript.estimateComplexity(version, dApp, ScriptEstimatorV1)
-      _ <- ContractScript.checkComplexity(version, complexity)
+      _ <- ContractScript.checkComplexity(version, maxComplexity)
     } yield ()
 
   def decompile(compiledCode: String): Either[ScriptParseError, (String, Dic)] =
@@ -226,4 +240,15 @@ object BaseGlobal {
   case class RoundHalfEven() extends Rounds
   case class RoundCeiling()  extends Rounds
   case class RoundFloor()    extends Rounds
+
+  case class DAppInfo(
+      bytes: Array[Byte],
+      dApp: DApp,
+      maxComplexity: (String, Long),
+      annotatedComplexities: Map[String, Long],
+      verifierComplexity: Long,
+      callableComplexities: Map[String, Long],
+      userFunctionComplexities: Map[String, Long],
+      globalVariableComplexities: Map[String, Long]
+  )
 }
