@@ -103,7 +103,7 @@ object Dependencies {
       compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
       "com.softwaremill.sttp" %%% "core" % "1.6.4",
       "com.wavesplatform"     % "zwaves" % "0.1.0-SNAPSHOT",
-      "com.wavesplatform"     % "zwaves-bn256" % "0.1.0-SNAPSHOT",
+      "com.wavesplatform"     % "zwaves-bn256" % "0.1.1-SNAPSHOT",
       "org.web3j" % "crypto" % "4.5.18"
     ) ++ scalapbRuntime.value ++ circe.value
   )
