@@ -13,7 +13,6 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE, PART, Pos}
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser, ParserV2}
 import com.wavesplatform.lang.v1.task.imports._
@@ -695,7 +694,7 @@ object ExpressionCompiler {
         }
         Expressions.BLOCK(mc.position, Expressions.LET(mc.position, nv, refTmp, Some(caseType), allowShadowing), mc.expr)
       }
-      UNION(caseType).typeList match {
+      UNION(caseType).unfold.typeList match {
         case Nil => Right(blockWithNewVar)
         case types =>
           def isInst(matchType: String): Expressions.EXPR =
@@ -819,14 +818,4 @@ object ExpressionCompiler {
             s"Compilation failed: [${res.errors.map(e => Show[CompilationError].show(e)).mkString("; ")}]"
           )
       )
-
-  def parseType(expectedType: String, ctx: CompilerContext): Either[String, FINAL] = {
-    import fastparse._
-    val union = parse(expectedType, Parser.unionTypeP(_)).get.value
-    handleCompositeType(AnyPos, union, None, None)
-      .run(ctx)
-      .value
-      ._2
-      .leftMap(e => Show[CompilationError].show(e))
-  }
 }
