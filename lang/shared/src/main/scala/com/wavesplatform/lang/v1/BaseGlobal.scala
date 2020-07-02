@@ -268,6 +268,8 @@ trait BaseGlobal {
 
   def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean
 
+  def bn256Groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean
+
   def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte]
 
   def median(seq: Seq[Long]): Long = {
