@@ -2,7 +2,7 @@ package com.wavesplatform.api.http
 
 import akka.http.scaladsl.server.Route
 import cats.implicits._
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.common.state.ByteStr
@@ -13,9 +13,11 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
+import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
+import monix.eval.Task
 import monix.execution.Scheduler
 import play.api.libs.json._
 
@@ -161,32 +163,37 @@ case class TransactionsApiRoute(
     }
   }
 
-  def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String])(
-      implicit sc: Scheduler
-  ): Either[ApiError, Future[JsArray]] = {
-    def createTransactionsJsonArray(address: Address, limit: Int, fromId: Option[ByteStr]): Future[JsArray] = {
-      lazy val addressesCached = concurrent.blocking(blockchain.aliasesOfAddress(address).toVector :+ address).toSet
-
-      /**
-        * Produces compact representation for large transactions by stripping unnecessary data.
-        * Currently implemented for MassTransfer transaction only.
-        */
-      def txToCompactJson(address: Address, tx: Transaction): JsObject = {
-        import com.wavesplatform.transaction.transfer._
-        tx match {
-          case mtt: MassTransferTransaction if mtt.sender.toAddress != address => mtt.compactJson(addressesCached)
-          case _                                                               => txToExtendedJson(tx)
-        }
-      }
-
-      commonApi
-        .transactionsByAddress(address, fromId)
-        .take(limit)
-        .toListL
-        .map(txs => Json.arr(JsArray(txs.map { case (height, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(height)) })))
-        .runToFuture
+  /**
+    * Produces compact representation for large transactions by stripping unnecessary data.
+    * Currently implemented for MassTransfer transaction only.
+    */
+  private def txToCompactJson(address: Address, tx: Transaction, recipients: Set[AddressOrAlias]): JsObject =
+    tx match {
+      case mtt: MassTransferTransaction if mtt.sender.toAddress != address => mtt.compactJson(recipients)
+      case _                                                               => txToExtendedJson(tx)
     }
 
+  private def createTransactionsJsonArray(forAddress: Address, limit: Int, fromId: Option[ByteStr]): Task[JsArray] =
+    commonApi
+      .transactionsByAddress(forAddress, fromId)
+      .take(limit)
+      .toListL
+      .flatMap { txs =>
+        txs
+          .collectFirst {
+            case (_, mtt: MassTransferTransaction) if mtt.sender.toAddress != forAddress =>
+              blockchain.aliasesOfAddress(forAddress).map(aliases => txs -> (aliases :+ forAddress).toSet)
+          }
+          .getOrElse(Task(txs -> Set.empty[AddressOrAlias]))
+      }
+      .map {
+        case (txs, addresses) =>
+          Json.arr(JsArray(txs.map { case (height, tx) => txToCompactJson(forAddress, tx, addresses) + ("height" -> JsNumber(height)) }))
+      }
+
+  def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String])(
+      implicit sc: Scheduler
+  ): Either[ApiError, Future[JsArray]] =
     for {
       address <- Address.fromString(addressParam).left.map(ApiError.fromValidationError)
       limit   <- Either.cond(limitParam <= settings.transactionsByAddressLimit, limitParam, TooBigArrayAllocation)
@@ -200,6 +207,5 @@ case class TransactionsApiRoute(
             )
         case None => Right(None)
       }
-    } yield createTransactionsJsonArray(address, limit, maybeAfter)
-  }
+    } yield createTransactionsJsonArray(address, limit, maybeAfter).runToFuture
 }

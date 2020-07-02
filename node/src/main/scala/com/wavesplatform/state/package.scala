@@ -14,11 +14,11 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.utils.Paged
+import monix.eval.Task
 import monix.reactive.Observable
 import play.api.libs.json._
 import supertagged.TaggedType
 
-import scala.concurrent.duration.Duration
 import scala.reflect.ClassTag
 import scala.util.Try
 
@@ -165,17 +165,14 @@ package object state {
       if (balances.isEmpty) 0L else balances.view.map(_.regularBalance).min
     }
 
-    def aliasesOfAddress(address: Address): Seq[Alias] = {
-      import monix.execution.Scheduler.Implicits.global
-
+    def aliasesOfAddress(address: Address): Task[Seq[Alias]] =
       blockchain
         .addressTransactionsObservable(address, Set(CreateAliasTransactionV1, CreateAliasTransactionV2), None)
         .collect {
           case (_, a: CreateAliasTransaction) => a.alias
         }
         .toListL
-        .runSyncUnsafe(Duration.Inf)
-    }
+        .logErr
 
     def unsafeHeightOf(id: ByteStr): Int =
       blockchain
