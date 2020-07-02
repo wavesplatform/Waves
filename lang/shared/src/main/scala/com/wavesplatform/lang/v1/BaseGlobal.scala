@@ -166,8 +166,7 @@ trait BaseGlobal {
   def checkContract(
       version: StdLibVersion,
       dApp: DApp,
-      maxComplexity: (String, Long),
-      complexities: Map[String, Long]
+      maxComplexity: (String, Long)
   ): Either[String, Unit] =
     for {
       _ <- ContractScript.estimateComplexity(version, dApp, ScriptEstimatorV1)
