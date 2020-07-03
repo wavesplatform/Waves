@@ -28,10 +28,6 @@ RUN                                                                             
     curl -fL ${releaseUrl}/v${WAVES_VERSION}/waves-all-${WAVES_VERSION}.jar     \
         -o /waves/node/target/waves-all-${WAVES_VERSION}.jar                &&  \
                                                                                 \
-    echo "Downloading gRPC file"                                            &&  \
-    curl -fL ${releaseUrl}/v${WAVES_VERSION}/grpc-server-${WAVES_VERSION}.tgz   \
-        -o /waves/node/target/grpc-server-${WAVES_VERSION}.tgz              &&  \
-                                                                                \
     echo "Downloading mainnet config"                                       &&  \
     curl -fL ${rawContentUrl}/v${WAVES_VERSION}/node/waves-mainnet.conf         \
         -o /waves/node/waves-mainnet.conf                                   &&  \
@@ -63,14 +59,8 @@ RUN                                                                             
             -Xmx2g -Dnetwork=${network}" sbt 'packageAll'                   &&  \
         mkdir -p /out/${network}                                            &&  \
         mv node/target/waves*.deb /out/${network}/                          &&  \
-        cp node/target/waves-all*.jar /out/${network}/                      &&  \
-        mv grpc-server/target/universal/grpc-server*.tgz /out/${network}/   &&  \
-        mv grpc-server/target/grpc-server*.deb /out/${network}/             ;   \
+        cp node/target/waves-all*.jar /out/${network}/                      ;   \
     done                                                                        \
-;}
-
-RUN { \
-    cd waves/node/target && tar xzvf grpc-server*.tgz \
 ;}
 
 FROM openjdk:11-jre-slim
@@ -85,7 +75,6 @@ ENV WAVES_HEAP_SIZE=$WAVES_HEAP_SIZE
 ENV WAVES_NETWORK=$WAVES_NETWORK
 
 COPY --from=builder /waves/node/target/waves-all-*.jar /usr/share/waves/lib/
-COPY --from=builder /waves/node/target/grpc-server-*/lib/* /usr/share/waves/lib/
 COPY --from=builder /waves/node/waves-*.conf /usr/share/waves/conf/
 COPY entrypoint.sh /usr/share/waves/bin/
 
@@ -97,7 +86,7 @@ RUN groupadd -g 143 waves                                                   &&  
     ln -fs /var/lib/waves/log /var/log/waves
 
 WORKDIR /var/lib/waves
-EXPOSE 6870 6869 6868 6863 6862
+EXPOSE 6869 6868 6863 6862
 
 USER waves
 VOLUME /var/lib/waves

@@ -6,8 +6,6 @@ if [ ! -f /etc/waves/waves.conf ]; then
   echo "Custom '/etc/waves/waves.conf' not found. Using a default one for '${WAVES_NETWORK,,}' network." | tee -a /var/log/waves/waves.log
   if [[ $NETWORKS == *"${WAVES_NETWORK,,}"* ]]; then
     cp /usr/share/waves/conf/waves-${WAVES_NETWORK}.conf /etc/waves/waves.conf
-    echo "waves.extensions += com.wavesplatform.api.grpc.GRPCServerExtension" >> /etc/waves/waves.conf
-    echo "waves.grpc.host = 0.0.0.0" >> /etc/waves/waves.conf
   else
     echo "Network '${WAVES_NETWORK,,}' not found. Exiting."
     exit 1
