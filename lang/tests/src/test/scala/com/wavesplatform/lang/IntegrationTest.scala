@@ -1971,24 +1971,24 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("bn256Groth16Verify_*inputs with invalid proof size") {
-    val lets =
-      """
+    def lets(proofSize: Int) =
+     s"""
         |let vk = base64'mY//hEITCBCZUJUN/wsOlw1iUSSOESL6PFSbN1abGK80t5jPNICNlPuSorio4mmWpf+4uOyv3gPZe54SYGM4pfhteqJpwFQxdlpwXWyYxMTNaSLDj8VtSn/EJaSu+P6nFmWsda3mTYUPYMZzWE4hMqpDgFPcJhw3prArMThDPbR3Hx7E6NRAAR0LqcrdtsbDqu2T0tto1rpnFILdvHL4PqEUfTmF2mkM+DKj7lKwvvZUbukqBwLrnnbdfyqZJryzGAMIa2JvMEMYszGsYyiPXZvYx6Luk54oWOlOrwEKrCY4NMPwch6DbFq6KpnNSQwOpgRYCz7wpjk57X+NGJmo85tYKc+TNa1rT4/DxG9v6SHkpXmmPeHhzIIW8MOdkFjxB5o6Qn8Fa0c6Tt6br2gzkrGr1eK5/+RiIgEzVhcRrqdY/p7PLmKXqawrEvIv9QZ3ijytPNwinlC8XdRLO/YvP33PjcI9WSMcHV6POP9KPMo1rngaIPMegKgAvTEouNFKp4v3wAXRXX5xEjwXAmM5wyB/SAOaPPCK/emls9kqolHsaj7nuTTbrvSV8bqzUwzQ'
-        |let proof = base64'g53N8ecorvG2sDgNv8D7quVhKMIIpdP9Bqk/8gmV5cJ5Rhk9gKvb4F0ll8J/ZZJVqa27OyciJwx6lym6QpVK9q1ASrqio7rD5POMDGm64Iay/ixXXn+//F+uKgDXADj9AySri2J1j3qEkqqe3kxKthw94DzAfUBPncHfTPazVtE48AfzB1KWZA7Vf/x/3phYs4ckcP7ZrdVViJVLbUgFy543dpKfEH2MD30ZLLYRhw8SatRCyIJuTZcMlluEKG+d' + base16'00'
+        |let proof = base64'${ByteStr.fill(proofSize)(1).base64}'
         |let inputs = base64'aZ8tqrOeEJKt4AMqiRF/WJhIKTDC0HeDTgiJVLZ8OEs='
         |""".stripMargin
-    for (ii <- 0 to 16) {
+    for (ii <- 0 to 16; proofSize <- List(127, 129)) {
       val i = if (ii == 0) {
         1
       } else {
         ii
       }
-      val src = lets ++ (if (i != 16) {
+      val src = lets(proofSize) ++ (if (i != 16) {
         s"bn256Groth16Verify_${i}inputs(vk, proof, inputs)"
       } else {
         "bn256Groth16Verify(vk, proof, inputs)"
       })
-      eval(src, version = V4) shouldBe Left("Invalid proof size 193 bytes, must be equal to 128 bytes")
+      eval(src, version = V4) shouldBe Left(s"Invalid proof size $proofSize bytes, must be equal to 128 bytes")
     }
   }
 
