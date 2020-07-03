@@ -7,7 +7,7 @@ import cats.implicits._
 import cats.kernel.Monoid
 import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.DirectiveSet
@@ -29,8 +29,8 @@ import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import org.web3j.crypto.Keys
-import scorex.util.encode.Base16
 import scorex.crypto.hash.Keccak256
+import scorex.util.encode.Base16
 
 import scala.util.{Random, Try}
 
