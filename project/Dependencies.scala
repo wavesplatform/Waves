@@ -96,7 +96,7 @@ object Dependencies {
       ("org.typelevel" %% "cats-mtl-core" % "0.7.1").exclude("org.scalacheck", "scalacheck_2.13"),
       "ch.obermuhlner" % "big-math" % "2.1.0",
       ("org.scorexfoundation" %% "scrypto" % "2.1.8").exclude("org.whispersystems", "curve25519-java"),
-      "com.wavesplatform" % "curve25519-java" % "0.6.4-N2150-2-SNAPSHOT",
+      "com.wavesplatform" % "curve25519-java" % "0.6.4-N2150-3-SNAPSHOT",
       bouncyCastle("bcpkix"),
       bouncyCastle("bcprov"),
       kindProjector,
