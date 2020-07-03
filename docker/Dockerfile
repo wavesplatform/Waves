@@ -1,7 +1,7 @@
 FROM openjdk:8-jdk-stretch as builder
 ARG SBT_VERSION=1.2.8
 ARG WAVES_VERSION="latest"
-ARG BRANCH="version-0.17.x"
+ARG BRANCH="version-1.1.x"
 ARG DEB_PACKAGE_NETWORKS
 
 RUN                                                                             \
@@ -27,6 +27,10 @@ RUN                                                                             
     echo "Downloading jar file"                                             &&  \
     curl -fL ${releaseUrl}/v${WAVES_VERSION}/waves-all-${WAVES_VERSION}.jar     \
         -o /waves/node/target/waves-all-${WAVES_VERSION}.jar                &&  \
+                                                                                \
+    echo "Downloading gRPC file"                                            &&  \
+    curl -fL ${releaseUrl}/v${WAVES_VERSION}/grpc-server-${WAVES_VERSION}.tgz   \
+        -o /waves/node/target/grpc-server-${WAVES_VERSION}.tgz              &&  \
                                                                                 \
     echo "Downloading mainnet config"                                       &&  \
     curl -fL ${rawContentUrl}/v${WAVES_VERSION}/node/waves-mainnet.conf         \
@@ -65,9 +69,13 @@ RUN                                                                             
     done                                                                        \
 ;}
 
+RUN { \
+    cd waves/node/target && tar xzvf grpc-server*.tgz \
+;}
+
 FROM openjdk:11-jre-slim
 ARG WAVES_VERSION="latest"
-ARG WAVES_LOG_LEVEL="DEBUG"
+ARG WAVES_LOG_LEVEL="INFO"
 ARG WAVES_HEAP_SIZE="2g"
 ARG WAVES_NETWORK="mainnet"
 
@@ -77,19 +85,21 @@ ENV WAVES_HEAP_SIZE=$WAVES_HEAP_SIZE
 ENV WAVES_NETWORK=$WAVES_NETWORK
 
 COPY --from=builder /waves/node/target/waves-all-*.jar /usr/share/waves/lib/
+COPY --from=builder /waves/node/target/grpc-server-*/lib/* /usr/share/waves/lib/
 COPY --from=builder /waves/node/waves-*.conf /usr/share/waves/conf/
 COPY entrypoint.sh /usr/share/waves/bin/
 
 RUN groupadd -g 143 waves                                                   &&  \
     useradd -d /var/lib/waves -g 143 -u 143 -s /bin/bash -M waves           &&  \
-    mkdir -p /var/lib/waves /etc/waves                                      &&  \
+    mkdir -p /var/lib/waves /etc/waves /usr/share/waves/lib/plugins         &&  \
     chown -R 143:143 /var/lib/waves /usr/share/waves /etc/waves             &&  \
     chmod -R 755 /var/lib/waves /usr/share/waves /etc/waves                 &&  \
     ln -fs /var/lib/waves/log /var/log/waves
 
 WORKDIR /var/lib/waves
-EXPOSE 6869 6868 6863 6862
+EXPOSE 6870 6869 6868 6863 6862
 
 USER waves
 VOLUME /var/lib/waves
+VOLUME /usr/share/waves/lib/plugins
 ENTRYPOINT ["/usr/share/waves/bin/entrypoint.sh"]
