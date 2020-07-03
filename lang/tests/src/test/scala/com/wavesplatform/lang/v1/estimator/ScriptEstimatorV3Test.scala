@@ -153,4 +153,24 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3) {
     implicit val version : StdLibVersion = V4
     estimate(functionCosts(V4), compile("groth16Verify(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')")) shouldBe Right(2703)
   }
+
+  property("free declarations") {
+    estimate(
+      functionCosts(V4),
+      compile(
+        """
+          |
+          | let a = 1 + 1 + 1 + 1 + 1
+          | func f() = a
+          | func g() = f()
+          | let b = g()
+          | let c = a
+          | func h() = a + b + c
+          |
+          | 1
+          |
+        """.stripMargin
+      )
+    ) shouldBe Right(1)
+  }
 }
