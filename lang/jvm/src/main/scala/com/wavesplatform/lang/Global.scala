@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 import com.wavesplatform.utils.Merkle
 import com.wavesplatform.zwaves.bls12.{Groth16 => Bls12Groth16}
-import com.wavesplatform.zwaves.bn256.Bn256Groth16
+import com.wavesplatform.zwaves.bn256.{Groth16 => Bn256Groth16}
 import org.web3j.crypto.Sign
 import org.web3j.crypto.Sign.SignatureData
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
