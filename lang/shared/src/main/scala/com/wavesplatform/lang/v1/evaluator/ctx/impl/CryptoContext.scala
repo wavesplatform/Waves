@@ -363,12 +363,12 @@ object CryptoContext {
           Left(s"Invalid inputs size ${inputs.size} bytes, must be not greater than 512 bytes")
         else if (inputs.size % 32 != 0)
           Left(s"Invalid inputs size ${inputs.size} bytes, must be a multiple of 32 bytes")
-        else if (proof.size != 192)
-          Left(s"Invalid proof size ${proof.size} bytes, must be equal to 192 bytes")
-        else if (vk.size != 48 * (8 + inputs.size / 32))
-          Left(s"Invalid vk size ${vk.size} bytes, must be equal to ${(8 + inputs.size / 32) * 48} bytes for ${inputs.size / 32} inputs")
+        else if (proof.size != 128)
+          Left(s"Invalid proof size ${proof.size} bytes, must be equal to 128 bytes")
+        else if (vk.size != inputs.size + 256)
+          Left(s"Invalid vk size ${vk.size} bytes, must be equal to ${inputs.size + 256} bytes for ${inputs.size / 32} inputs")
         else
-          Right(CONST_BOOLEAN(global.groth16Verify(vk.arr, proof.arr, inputs.arr)))
+          Right(CONST_BOOLEAN(global.bn256Groth16Verify(vk.arr, proof.arr, inputs.arr)))
       case xs => notImplemented[Id, EVALUATED]("bn256Groth16Verify(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
     }
 
@@ -411,10 +411,10 @@ object CryptoContext {
             Left(s"Invalid inputs size ${inputs.size} bytes, must be not greater than 512 bytes")
           else if (inputs.size % 32 != 0)
             Left(s"Invalid inputs size ${inputs.size} bytes, must be a multiple of 32 bytes")
-          else if (proof.size != 192)
-            Left(s"Invalid proof size ${proof.size} bytes, must be equal to 192 bytes")
-          else if (vk.size != 48 * (8 + inputs.size / 32))
-            Left(s"Invalid vk size ${vk.size} bytes, must be equal to ${(8 + inputs.size / 32) * 48} bytes for ${inputs.size / 32} inputs")
+          else if (proof.size != 128)
+            Left(s"Invalid proof size ${proof.size} bytes, must be equal to 128 bytes")
+          else if (vk.size != inputs.size + 256)
+            Left(s"Invalid vk size ${vk.size} bytes, must be equal to ${inputs.size + 256} bytes for ${inputs.size / 32} inputs")
           else
             Right(CONST_BOOLEAN(global.bn256Groth16Verify(vk.arr, proof.arr, inputs.arr)))
         case xs => notImplemented[Id, EVALUATED]("bn256Groth16Verify(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
