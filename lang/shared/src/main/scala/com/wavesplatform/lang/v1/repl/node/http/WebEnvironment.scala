@@ -81,6 +81,9 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
       case Alias(name)    => resolveAlias(name).map(_.explicitGet().bytes.toString)
     }
 
+  override def addressFromString(address: String): Either[String, Address] =
+    mappings.addressFromString(address)
+
   override def inputEntity: InputEntity                             = ???
   override def transactionById(id: Array[Byte]): Future[Option[Tx]] = ???
   override def multiPaymentAllowed: Boolean                         = ???

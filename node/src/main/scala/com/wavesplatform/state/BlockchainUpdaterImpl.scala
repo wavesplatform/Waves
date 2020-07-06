@@ -73,6 +73,13 @@ class BlockchainUpdaterImpl(
 
   def liquidBlock(id: ByteStr): Option[Block] = readLock(ngState.flatMap(_.totalDiffOf(id).map(_._1)))
 
+  def liquidTransactions(id: ByteStr): Option[Seq[(Transaction, Boolean)]] =
+    readLock(
+      ngState
+        .flatMap(_.totalDiffOf(id))
+        .map { case (_, diff, _, _, _) => diff.transactions.values.toSeq.map(info => (info.transaction, info.applied)) }
+    )
+
   def liquidBlockMeta: Option[BlockMeta] =
     readLock(ngState.map { ng =>
       val (_, _, totalFee) = ng.bestLiquidDiffAndFees
