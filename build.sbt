@@ -97,7 +97,7 @@ lazy val it = project.aggregate(`node-it`)
 
 inScope(Global)(
   Seq(
-    scalaVersion := "2.13.2",
+    scalaVersion := "2.13.3",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
     V.fallback := (1, 2, 6),

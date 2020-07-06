@@ -15,7 +15,7 @@ Seq(
   "org.scoverage"      % "sbt-scoverage"             % "1.6.1",
   "se.marcuslonnberg"  % "sbt-docker"                % "1.4.1",
   "com.typesafe.sbt"   % "sbt-git"                   % "1.0.0",
-  "org.scala-js"       % "sbt-scalajs"               % "0.6.31",
+  "org.scala-js"       % "sbt-scalajs"               % "0.6.33",
   "org.portable-scala" % "sbt-scalajs-crossproject"  % "0.6.0",
   "org.scalameta"      % "sbt-scalafmt"              % "2.2.1",
   "pl.project13.scala" % "sbt-jmh"                   % "0.3.3",
