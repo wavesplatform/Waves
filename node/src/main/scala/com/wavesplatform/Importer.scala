@@ -234,12 +234,13 @@ object Importer extends ScorexLogging {
     }
 
     def initFileStream(file: String): InputStream = {
+      log.info(s"Opening import file: $file")
       file match {
         case "-" =>
           System.in
 
         case _ =>
-          System.setProperty("http.agent", "Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.4; en-US; rv:1.9.2.2) Gecko/20100316 Firefox/3.6.2")
+          System.setProperty("http.agent", s"waves-node/${Version.VersionString}")
           try new URL(file).openStream()
           catch {
             case _: MalformedURLException =>
