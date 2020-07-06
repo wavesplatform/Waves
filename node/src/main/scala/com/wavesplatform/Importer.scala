@@ -1,7 +1,7 @@
 package com.wavesplatform
 
 import java.io._
-import java.net.URL
+import java.net.{MalformedURLException, URL}
 
 import akka.actor.ActorSystem
 import com.google.common.io.ByteStreams
@@ -233,22 +233,22 @@ object Importer extends ScorexLogging {
       override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
     }
 
-    def initFileStream(file: String): Try[InputStream] = {
-      val result = Try(file match {
-        case url if url.startsWith("http://") || url.startsWith("https://") || url.startsWith("ftp://") =>
-          System.setProperty("http.agent", "Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.4; en-US; rv:1.9.2.2) Gecko/20100316 Firefox/3.6.2")
-          new URL(url).openStream()
+    def initFileStream(file: String): InputStream = {
+      file match {
         case "-" =>
           System.in
-        case _ =>
-          new FileInputStream(file)
-      })
 
-      result.failed.foreach(log.error(s"Failed to open $file", _))
-      result
+        case _ =>
+          System.setProperty("http.agent", "Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.4; en-US; rv:1.9.2.2) Gecko/20100316 Firefox/3.6.2")
+          try new URL(file).openStream()
+          catch {
+            case _: MalformedURLException =>
+              new FileInputStream(file)
+          }
+      }
     }
 
-    val bis = new BufferedInputStream(initFileStream(importOptions.blockchainFile).get, 2 * 1024 * 1024)
+    val bis = new BufferedInputStream(initFileStream(importOptions.blockchainFile), 2 * 1024 * 1024)
 
     val scheduler = Schedulers.singleThread("appender")
     val time      = new NTP(settings.ntpServer)
