@@ -22,7 +22,7 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
           Seq(
             DirectiveSet(version, Account, Expression).explicitGet(),
             DirectiveSet(version, Asset, Expression).explicitGet()
-          ) ++ (if (version >= V3) Seq(DirectiveSet(version, Account, Expression).explicitGet())
+          ) ++ (if (version >= V3) Seq(DirectiveSet(version, Account, DApp).explicitGet())
                 else Seq())
       )
 
