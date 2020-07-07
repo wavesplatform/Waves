@@ -5,18 +5,21 @@
       params: [ "A", "List[B]" ]
       doc: "Gets an element from a list by index."
       paramsDoc: [ "The element.", "The list." ]
+      complexity: 2
     }
     {
       name: "size"
       params: [ "List[T]" ]
       doc: "Prepends a new element to the list."
       paramsDoc: [ "The list." ]
+      complexity: 2
     }
 	 {
       name: "getElement"
       params: [ "List[T]", "Int" ]
       doc: "Returns the size of a list."
       paramsDoc: [ "The list.", "The index of the element." ]
+      complexity: 2
     }
   ]
 }

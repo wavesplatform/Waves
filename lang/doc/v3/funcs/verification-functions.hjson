@@ -5,6 +5,7 @@
       params: [ "ByteVector", "ByteVector", "ByteVector" ]
       doc: "Verifies a [Curve25519](https://en.wikipedia.org/wiki/Curve25519) signature."
       paramsDoc: [ "The message.", "The signature.", "The account public key." ]
+      complexity: 100
     }
     {
       name: "rsaVerify"
@@ -16,6 +17,7 @@
       ]
       doc: "Verifies an [RSA](https://en.wikipedia.org/wiki/RSA_%28cryptosystem%29) signature."
       paramsDoc: [ "The RSA algorithm.", "The message.", "The signature.", "The public key." ]
+      complexity: 300
     }
     {
       name: "checkMerkleProof"
@@ -26,6 +28,7 @@
         "The array of bytes of the Merkle tree proof."
         "The tree of hashes."
       ]
+      complexity: 30
     }
   ]
 }
