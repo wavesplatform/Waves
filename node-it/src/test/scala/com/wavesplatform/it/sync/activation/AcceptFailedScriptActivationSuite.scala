@@ -88,16 +88,25 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
   test("accept valid transaction before activation height") {
     val tx = sender.invokeScript(caller, dApp, Some("write"), fee = invokeFee, waitForTx = true)._1.id
+    all(sender.lastBlock().transactions.map(_.applicationStatus)) shouldBe None
 
     def check(): Unit = {
       val txInfo = sender.transactionInfo[JsObject](tx)
+      val txHeight = (txInfo \ "height").as[Int]
       (txInfo \ "id").as[String] shouldBe tx
       txInfo.value.contains("applicationStatus") shouldBe false
+      val block = sender.blockAt(txHeight)
+      all(block.transactions.map(_.applicationStatus)) shouldBe None
+      all(sender.blockById(block.id).transactions.map(_.applicationStatus)) shouldBe None
+      all(sender.blockSeq(txHeight - 1, txHeight).flatMap(_.transactions.map(_.applicationStatus))) shouldBe None
+      sender.debugStateChanges(tx).applicationStatus shouldBe None
+      all(sender.debugStateChangesByAddress(caller, 1).map(_.applicationStatus)) shouldBe None
     }
 
     check() // liquid
     nodes.waitForHeightArise()
     check() // hardened
+    all(sender.blockSeqByAddress(sender.address, 1, ActivationHeight - 1).flatMap(_.transactions.map(_.applicationStatus))) shouldBe None
   }
 
   test("accept failed transaction after activation height") {
@@ -113,18 +122,45 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
     sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
 
+    all(sender.lastBlock().transactions.map(_.applicationStatus.isDefined)) shouldBe true
+
     def check(): Unit = {
       val statuses = sender.transactionStatus(txs).sortWith { case (f, s) => txs.indexOf(f.status) < txs.indexOf(s.status) }
       all(statuses.map(_.status)) shouldBe "confirmed"
       all(statuses.map(_.applicationStatus.isDefined)) shouldBe true
 
-      val failed = statuses.dropWhile(s => s.applicationStatus.contains("succeed"))
+      val failed = statuses.dropWhile(s => s.applicationStatus.contains("succeeded"))
 
       failed.size should be > 0
-      all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
+      all(failed.flatMap(_.applicationStatus)) shouldBe "script_execution_failed"
 
       statuses.foreach { s =>
         (sender.transactionInfo[JsObject](s.id) \ "applicationStatus").asOpt[String] shouldBe s.applicationStatus
+      }
+
+      val heightToId = statuses.map(s => s.height.get -> s.id).toMap
+      val idToApplicationStatus = statuses.map(s => s.id -> s.applicationStatus).toMap
+      heightToId.keys.foreach { h =>
+        val block = sender.blockAt(h)
+        block.transactions.foreach { tx =>
+          tx.applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
+          if (tx._type == InvokeScriptTransaction.typeId) {
+            sender.debugStateChanges(tx.id).applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
+          }
+        }
+        sender.blockById(block.id).transactions.foreach { tx =>
+          tx.applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
+        }
+
+        sender.blockSeq(h - 1, h).flatMap(_.transactions).foreach { tx =>
+          tx.applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
+        }
+      }
+      sender.debugStateChangesByAddress(caller, txs.size).foreach { s =>
+        s.applicationStatus shouldBe idToApplicationStatus.getOrElse(s.id, Some("succeeded"))
+      }
+      sender.blockSeqByAddress(sender.address, ActivationHeight, sender.height).flatMap(_.transactions).foreach { tx =>
+        tx.applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
       }
     }
 
@@ -139,9 +175,9 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     def check(): Unit = {
       val txInfo = sender.transactionInfo[JsObject](tx)
       (txInfo \ "id").as[String] shouldBe tx
-      (txInfo \ "applicationStatus").as[String] shouldBe "succeed"
+      (txInfo \ "applicationStatus").as[String] shouldBe "succeeded"
 
-      sender.transactionStatus(Seq(tx)).map(_.applicationStatus) shouldBe Seq(Some("succeed"))
+      sender.transactionStatus(Seq(tx)).map(_.applicationStatus) shouldBe Seq(Some("succeeded"))
     }
 
     check() // liquid
@@ -165,7 +201,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
       all(failed.map(_.status)) shouldBe "confirmed"
       all(failed.map(_.applicationStatus)) shouldBe defined
-      all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
+      all(failed.flatMap(_.applicationStatus)) shouldBe "script_execution_failed"
     }
 
     check() // liquid
@@ -210,7 +246,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
       all(failed.map(_.status)) shouldBe "confirmed"
       all(failed.map(_.applicationStatus)) shouldBe defined
-      all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
+      all(failed.flatMap(_.applicationStatus)) shouldBe "script_execution_failed"
 
       sender.balance(caller).balance shouldBe callerBalance - MaxTxsInMicroBlock * 2 * minInvokeFee
       sender.assetBalance(caller, asset).balance shouldBe callerAssetBalance
@@ -255,7 +291,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
       all(failed.map(_.status)) shouldBe "confirmed"
       all(failed.map(_.applicationStatus)) shouldBe defined
-      all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
+      all(failed.flatMap(_.applicationStatus)) shouldBe "script_execution_failed"
     }
 
     check() // liquid
@@ -408,7 +444,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
         100.millis
       )
 
-      status.applicationStatus shouldBe Some("scriptExecutionFailed")
+      status.applicationStatus shouldBe Some("script_execution_failed")
     }
 
     {
@@ -436,7 +472,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
         100.millis
       )
 
-      status.applicationStatus shouldBe Some("scriptExecutionFailed")
+      status.applicationStatus shouldBe Some("script_execution_failed")
     }
 
   }

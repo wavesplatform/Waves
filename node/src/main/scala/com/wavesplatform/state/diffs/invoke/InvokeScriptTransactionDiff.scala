@@ -133,7 +133,7 @@ object InvokeScriptTransactionDiff {
                     (result, log) <-
                       failFreeResult match {
                         case IncompleteResult(expr, unusedComplexity) =>
-                          continueEvaluation(version, expr, evaluationCtx, fullLimit - failFreeLimit + unusedComplexity, tx.id())
+                          continueEvaluation(version, expr, evaluationCtx, fullLimit - failFreeLimit + unusedComplexity, tx.id(), invocationComplexity)
                         case _ =>
                           Right((failFreeResult, Nil))
                       }
@@ -145,8 +145,6 @@ object InvokeScriptTransactionDiff {
                 )
               }
 
-              verifierComplexity = blockchain.accountScript(tx.sender.toAddress).map(_.verifierComplexity).getOrElse(0L)
-
               doProcessActions = InvokeDiffsCommon.processActions(
                 _,
                 version,
@@ -154,7 +152,6 @@ object InvokeScriptTransactionDiff {
                 pk,
                 feeInfo,
                 invocationComplexity,
-                verifierComplexity,
                 tx,
                 blockchain,
                 blockTime,
@@ -164,7 +161,7 @@ object InvokeScriptTransactionDiff {
               resultDiff <- scriptResult._1 match {
                 case ScriptResultV3(dataItems, transfers) => doProcessActions(dataItems ::: transfers)
                 case ScriptResultV4(actions)              => doProcessActions(actions)
-                case ir: IncompleteResult                 => TracedResult(Left(GenericError("Unexpected IncompleteResult")))
+                case _: IncompleteResult                  => TracedResult(Left(GenericError("Unexpected IncompleteResult")))
               }
             } yield resultDiff
           } else TracedResult.wrapValue(InvokeDiffsCommon.paymentsPart(tx, dAppAddress, feeInfo._2))
@@ -182,14 +179,14 @@ object InvokeScriptTransactionDiff {
       invocation: ContractEvaluator.Invocation,
       environment: WavesEnvironment,
       limit: Int
-  ): Either[ScriptExecutionError.RejectedByDAppScript, (ScriptResult, EvaluationContext[Environment, Id], Log[Id])] = {
+  ): Either[ScriptExecutionError, (ScriptResult, EvaluationContext[Environment, Id], Log[Id])] = {
     val wavesContext = WavesContext.build(directives)
     val ctx =
-      PureContext.build(Global, directives).withEnvironment[Environment] |+|
+      PureContext.build(Global, version).withEnvironment[Environment] |+|
         CryptoContext.build(Global, version).withEnvironment[Environment] |+|
         wavesContext.copy(vars = Map())
 
-    val freezingLets = wavesContext.evaluationContext(environment).letDefs
+    val freezingLets  = wavesContext.evaluationContext(environment).letDefs
     val evaluationCtx = ctx.evaluationContext(environment)
 
     Try(ContractEvaluator.applyV2(evaluationCtx, freezingLets, contract, invocation, version, limit))
@@ -198,20 +195,21 @@ object InvokeScriptTransactionDiff {
         _.map { case (result, log) => (result, evaluationCtx, log) }
       )
       .leftMap {
-        case (error, log) => ScriptExecutionError.RejectedByDAppScript(error, log)
+        case (error, log) => ScriptExecutionError.dAppExecution(error, log)
       }
   }
 
   private def continueEvaluation(
-    version: StdLibVersion,
-    expr: EXPR,
-    evaluationCtx: EvaluationContext[Environment, Id],
-    limit: Int,
-    transactionId: ByteStr
-  ): Either[ScriptExecutionError.FailedByDAppScript, (ScriptResult, Log[Id])] =
+      version: StdLibVersion,
+      expr: EXPR,
+      evaluationCtx: EvaluationContext[Environment, Id],
+      limit: Int,
+      transactionId: ByteStr,
+      failComplexity: Long
+  ): Either[FailedTransactionError, (ScriptResult, Log[Id])] =
     Try(ContractEvaluator.applyV2(evaluationCtx, Map[String, LazyVal[Id]](), expr, version, transactionId, limit))
       .fold(e => Left((e.getMessage, Nil)), identity)
-      .leftMap { case (error, log) => ScriptExecutionError.FailedByDAppScript(error, log) }
+      .leftMap { case (error, log) => FailedTransactionError.dAppExecution(error, failComplexity, log) }
 
   private def checkCall(fc: FUNCTION_CALL, blockchain: Blockchain): Either[ExecutionError, Unit] = {
     val (check, expectedTypes) =

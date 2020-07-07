@@ -80,15 +80,11 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
     val lazyVal       = ContextfulVal.pure[C](pointInstance.orNull)
     val stringToTuple = Map(("p", (pointType, lazyVal)))
-    val directiveSet = DirectiveSet(version, Account, Expression).explicitGet()
-
-    val testCtx =
-      (addCtx.withEnvironment[C] |+| CTX[C](sampleTypes, stringToTuple, Array(f, f2))).compilerContext
 
     val ctx: CTX[C] =
       Monoid.combineAll(
         Seq(
-          PureContext.build(Global, directiveSet, testCompilerContext = testCtx).withEnvironment[C],
+          PureContext.build(Global, version).withEnvironment[C],
           CryptoContext.build(Global, version).withEnvironment[C],
           addCtx.withEnvironment[C],
           CTX[C](sampleTypes, stringToTuple, Array(f, f2)),
@@ -1344,24 +1340,16 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(src, version = V4) shouldBe Right(CONST_LONG(-3))
   }
 
-  property("List[Int] median - 101 elements - error") {
-    val arr = (1 to 101).map(_ => Long.MaxValue)
+  property("List[Int] median - 1000 elements - success") {
     val src =
-      s"[${arr.mkString(",")}].median()"
-    eval(src, version = V4) should produce("Invalid list size. Size should be between 1 and")
-  }
-
-  property("List[Int] median - 500 elements - error") {
-    val arr = (1 to 500).map(_ => Long.MaxValue)
-    val src =
-      s"[${arr.mkString(",")}].median()"
-    eval(src, version = V4) should produce("Invalid list size. Size should be between 1 and")
+      s"[${(1 to 1000).mkString(",")}].median()"
+    eval(src, version = V4) shouldBe Right(CONST_LONG(Math.floorDiv(500 + 501, 2)))
   }
 
   property("List[Int] median - empty list - error") {
     val src =
       s"[].median()"
-    eval(src, version = V4) should produce("Invalid list size. Size should be between 1 and")
+    eval(src, version = V4) should produce("Can't find median for empty list")
   }
 
   property("List[Int] median - list with non int elements - error") {

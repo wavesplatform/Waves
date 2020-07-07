@@ -106,6 +106,9 @@ class NgState(
 
   def bestLiquidDiff: Diff = bestLiquidDiffAndFees._1
 
+  def allDiffs: Seq[(MicroBlock, Diff)] =
+    microBlocks.toVector.map(mb => mb.microBlock -> microDiffs(mb.totalBlockId).diff).reverse
+
   def contains(blockId: BlockId): Boolean =
     base.id() == blockId || microBlocks.exists(_.idEquals(blockId))
 
@@ -156,15 +159,19 @@ class NgState(
         val microBlocksAsc = microBlocks.reverse
 
         if (base.id() == blockId) {
-          Some((base, microBlocksAsc.map(_.microBlock).toSeq))
+          Some((base, microBlocksAsc.toVector.map { mb =>
+            val diff = microDiffs(mb.totalBlockId).diff
+            (mb.microBlock, diff)
+          }))
         } else if (!microBlocksAsc.exists(_.idEquals(blockId))) None
         else {
           val (accumulatedTxs, maybeFound) = microBlocksAsc.foldLeft((Vector.empty[Transaction], Option.empty[(ByteStr, DiscardedMicroBlocks)])) {
-            case ((accumulated, Some((sig, discarded))), MicroBlockInfo(_, micro)) =>
-              (accumulated, Some((sig, micro +: discarded)))
+            case ((accumulated, Some((sig, discarded))), MicroBlockInfo(mbId, micro)) =>
+              val discDiff = microDiffs(mbId).diff
+              (accumulated, Some((sig, discarded :+ (micro -> discDiff))))
 
             case ((accumulated, None), mb) if mb.idEquals(blockId) =>
-              val found = Some(mb.microBlock.totalResBlockSig -> Seq.empty[MicroBlock])
+              val found = Some((mb.microBlock.totalResBlockSig, Seq.empty[(MicroBlock, Diff)]))
               (accumulated ++ mb.microBlock.transactionData, found)
 
             case ((accumulated, None), MicroBlockInfo(_, mb)) =>

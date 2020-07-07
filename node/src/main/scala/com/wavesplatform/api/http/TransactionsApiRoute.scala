@@ -65,8 +65,8 @@ case class TransactionsApiRoute(
       complete(InvalidTransactionId("Transaction ID was not specified"))
     } ~ path(TransactionId) { id =>
       commonApi.transactionById(id) match {
-        case Some((h, either, succeed)) =>
-          complete(txToExtendedJson(either.fold(identity, _._1)) ++ applicationStatus(h, succeed) + ("height" -> JsNumber(h)))
+        case Some((h, either, succeeded)) =>
+          complete(txToExtendedJson(either.fold(identity, _._1)) ++ applicationStatus(isBlockV5(h), succeeded) + ("height" -> JsNumber(h)))
         case None => complete(ApiError.TransactionDoesNotExist)
       }
     }
@@ -75,19 +75,19 @@ case class TransactionsApiRoute(
   private def loadTransactionStatus(id: ByteStr): JsObject = {
     import Status._
     val statusJson = blockchain.transactionInfo(id) match {
-      case Some((height, _, succeed)) =>
+      case Some((height, _, succeeded)) =>
         Json.obj(
           "status"        -> Confirmed,
           "height"        -> height,
           "confirmations" -> (blockchain.height - height).max(0)
-        ) ++ applicationStatus(height, succeed)
+        ) ++ applicationStatus(isBlockV5(height), succeeded)
       case None =>
         commonApi.unconfirmedTransactionById(id) match {
           case Some(_) => Json.obj("status" -> Unconfirmed)
           case None    => Json.obj("status" -> NotFound)
         }
     }
-    (statusJson ++ Json.obj("id" -> id.toString))
+    statusJson ++ Json.obj("id" -> id.toString)
   }
 
   def status: Route = pathPrefix("status") {
@@ -195,14 +195,6 @@ case class TransactionsApiRoute(
     case t => t.json()
   }
 
-  private def applicationStatus(height: Int, succeed: Boolean): JsObject = {
-    import ApplicationStatus._
-    if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height))
-      JsObject(Map("applicationStatus" -> JsString(if (succeed) Succeed else ScriptExecutionFailed)))
-    else
-      JsObject.empty
-  }
-
   def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr])(implicit sc: Scheduler): Future[List[JsObject]] =
     Observable
       .fromTask(commonApi.aliasesOfAddress(address).collect { case (_, cat) => cat.alias }.toListL)
@@ -224,10 +216,15 @@ case class TransactionsApiRoute(
         commonApi
           .transactionsByAddress(address, None, Set.empty, maybeAfter)
           .take(limitParam)
-          .map { case (height, tx, _) => txToCompactJson(address, tx) + ("height" -> JsNumber(height)) }
+          .map {
+            case (height, tx, succeeded) =>
+              txToCompactJson(address, tx) ++ applicationStatus(isBlockV5(height), succeeded) + ("height" -> JsNumber(height))
+          }
       }
       .toListL
       .runToFuture
+
+  private def isBlockV5(height: Int): Boolean = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height)
 }
 
 object TransactionsApiRoute {
@@ -243,9 +240,15 @@ object TransactionsApiRoute {
   }
 
   object ApplicationStatus {
-    val Succeed               = "succeed"
-    val ScriptExecutionFailed = "scriptExecutionFailed"
+    val Succeeded             = "succeeded"
+    val ScriptExecutionFailed = "script_execution_failed"
   }
+
+  def applicationStatus(isBlockV5: Boolean, succeeded: Boolean): JsObject =
+    if (isBlockV5)
+      JsObject(Map("applicationStatus" -> JsString(if (succeeded) ApplicationStatus.Succeeded else ApplicationStatus.ScriptExecutionFailed)))
+    else
+      JsObject.empty
 
   implicit val transactionProofWrites: Writes[TransactionProof] = Writes { mi =>
     Json.obj(

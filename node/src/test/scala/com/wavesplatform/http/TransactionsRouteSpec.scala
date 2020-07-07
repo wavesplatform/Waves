@@ -283,7 +283,7 @@ class TransactionsRouteSpec
 
             val extraFields =
               if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height))
-                Json.obj("height"    -> height, "applicationStatus" -> JsString(if (succeed) "succeed" else "scriptExecutionFailed"))
+                Json.obj("height"    -> height, "applicationStatus" -> JsString(if (succeed) "succeeded" else "script_execution_failed"))
               else Json.obj("height" -> height)
             responseAs[JsValue] shouldEqual (tx.json() ++ extraFields)
           }
@@ -332,7 +332,7 @@ class TransactionsRouteSpec
               )
               val applicationStatus =
                 if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height))
-                  Json.obj("applicationStatus" -> JsString(if (succeed) "succeed" else "scriptExecutionFailed"))
+                  Json.obj("applicationStatus" -> JsString(if (succeed) "succeeded" else "script_execution_failed"))
                 else Json.obj()
               common ++ applicationStatus
             }
