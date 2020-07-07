@@ -202,7 +202,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       )
       .explicitGet()
 
-    val dataTx = sender.putData(firstAddress, List(IntegerDataEntry(s"${blackTx.id.value.toString}", 42)), minFee).id
+    val dataTx = sender.putData(firstAddress, List(IntegerDataEntry(s"${blackTx.id()}", 42)), minFee).id
     nodes.waitForHeightAriseAndTxPresent(dataTx)
 
     sender.signedBroadcast(blackTx.json(), waitForTx = true)

@@ -164,7 +164,6 @@ class MinerImpl(
       )
       consensusData <- consensusData(height, account, lastBlock.header, refBlockBT, refBlockTS, currentTime)
       (unconfirmed, totalConstraint) = packTransactionsForKeyBlock()
-
       block <- Block
         .buildAndSign(
           version,
@@ -231,7 +230,7 @@ class MinerImpl(
     } yield offset
   }
 
-  private def generateBlockTask(account: KeyPair, maybeBlockchain: Option[Blockchain] = None): Task[Unit] = {
+  private def generateBlockTask(account: KeyPair, maybeBlockchain: Option[Blockchain]): Task[Unit] = {
     (for {
       offset <- nextBlockGenOffsetWithConditions(account, maybeBlockchain.getOrElse(blockchainUpdater))
       quorumAvailable = checkQuorumAvailable().isRight
@@ -259,7 +258,7 @@ class MinerImpl(
             case Right((block, totalConstraint)) =>
               BlockAppender(blockchainUpdater, timeService, utx, pos, appenderScheduler)(block).flatMap {
                 case Left(BlockFromFuture(_)) => // Time was corrected, retry
-                  generateBlockTask(account)
+                  generateBlockTask(account, None)
 
                 case Left(err) =>
                   Task.raiseError(new RuntimeException(err.toString))
@@ -277,7 +276,7 @@ class MinerImpl(
 
             case Left(err) =>
               log.debug(s"No block generated because $err, retrying")
-              generateBlockTask(account)
+              generateBlockTask(account, None)
           }
 
       case Left(err) =>
@@ -318,7 +317,6 @@ class MinerImpl(
   //noinspection TypeAnnotation,ScalaStyle
   private[this] object metrics {
     val blockBuildTimeStats      = Kamon.timer("miner.pack-and-forge-block-time").withoutTags()
-    val microBlockBuildTimeStats = Kamon.timer("miner.forge-microblock-time").withoutTags()
   }
 }
 

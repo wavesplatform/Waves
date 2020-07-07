@@ -281,11 +281,10 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
   property("get assetInfo by asset id") {
     forAll(for {
       (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) <- preconditionsAndPayments
-      version      <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3).toSeq)
-      v4Activation <- if (version >= V4) Gen.const(true) else Gen.oneOf(false, true)
+      version                                                                            <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3).toSeq)
+      v4Activation                                                                       <- if (version >= V4) Gen.const(true) else Gen.oneOf(false, true)
     } yield (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, v4Activation)) {
       case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, v4Activation) =>
-
         val fs = {
           val features = smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (FeeSponsorship.id -> 0))
           if (v4Activation) features.copy(preActivatedFeatures = features.preActivatedFeatures + (BlockV5.id -> 0))
@@ -302,29 +301,31 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
           val assetScript = None
 
           val issueTx = IssueTransaction(
-              TxVersion.V2,
-              masterAcc.publicKey,
-              "testAsset".utf8Bytes,
-              "Test asset".utf8Bytes,
-              quantity,
-              decimals,
-              reissuable,
-              assetScript,
-              MinIssueFee * 2,
-              dataTransaction.timestamp + 5
-            ).signWith(masterAcc.privateKey)
+            TxVersion.V2,
+            masterAcc.publicKey,
+            "testAsset".utf8Bytes,
+            "Test asset".utf8Bytes,
+            quantity,
+            decimals,
+            reissuable,
+            assetScript,
+            MinIssueFee * 2,
+            dataTransaction.timestamp + 5
+          ).signWith(masterAcc.privateKey)
 
           val sponsoredFee = 100
           val sponsorTx =
-            SponsorFeeTransaction.signed(
-              TxVersion.V1,
-              masterAcc.publicKey,
-              IssuedAsset(issueTx.assetId),
-              Some(sponsoredFee),
-              MinIssueFee,
-              dataTransaction.timestamp + 6,
-              masterAcc.privateKey
-            ).explicitGet()
+            SponsorFeeTransaction
+              .signed(
+                TxVersion.V1,
+                masterAcc.publicKey,
+                IssuedAsset(issueTx.assetId),
+                Some(sponsoredFee),
+                MinIssueFee,
+                dataTransaction.timestamp + 6,
+                masterAcc.privateKey
+              )
+              .explicitGet()
 
           append(Seq(transferTx, issueTx)).explicitGet()
 
@@ -420,8 +421,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
   property("block info by height") {
     forAll(for {
       (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) <- preconditionsAndPayments
-      version <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3).toSeq)
-      withVrf <- Gen.oneOf(version >= V4, true)
+      version                                                                            <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3).toSeq)
+      withVrf                                                                            <- Gen.oneOf(version >= V4, true)
     } yield (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, withVrf)) {
       case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, withVrf) =>
         val generationSignature =
@@ -528,11 +529,21 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
           }
 
           val compiledScript = ContractScript(V3, compiler.ContractCompiler(ctx.compilerContext, expr, V3).explicitGet()).explicitGet()
-          val setScriptTx    = SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(compiledScript), 1000000L, transferTx.timestamp + 5).explicitGet()
-          val fc             = Terms.FUNCTION_CALL(FunctionHeader.User("compareBlocks"), List.empty)
+          val setScriptTx =
+            SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(compiledScript), 1000000L, transferTx.timestamp + 5).explicitGet()
+          val fc = Terms.FUNCTION_CALL(FunctionHeader.User("compareBlocks"), List.empty)
 
           val ci = InvokeScriptTransaction
-            .selfSigned(1.toByte, masterAcc, masterAcc.toAddress, Some(fc), Seq.empty, FeeValidation.FeeUnit * (FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + FeeValidation.ScriptExtraFee), Waves, System.currentTimeMillis())
+            .selfSigned(
+              1.toByte,
+              masterAcc,
+              masterAcc.toAddress,
+              Some(fc),
+              Seq.empty,
+              FeeValidation.FeeUnit * (FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + FeeValidation.ScriptExtraFee),
+              Waves,
+              System.currentTimeMillis()
+            )
             .explicitGet()
 
           append(Seq(setScriptTx)).explicitGet()
@@ -557,7 +568,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
                  | {-# SCRIPT_TYPE    ACCOUNT    #-}
                  |
                  | let transfer = extract(
-                 |   transferTransactionById(base64'${transferTx.id.value.base64Raw}')
+                 |   transferTransactionById(base64'${transferTx.id().base64Raw}')
                  | )
                  |
                  | let checkTransferOpt = match transferTransactionById(base64'') {
@@ -585,7 +596,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
                  | }
                  |
                  | let checkAnotherTxType = !isDefined(
-                 |   transferTransactionById(base64'${dataTransaction.id.value.base64Raw}')
+                 |   transferTransactionById(base64'${dataTransaction.id().base64Raw}')
                  | )
                  |
                  | checkTransferOpt    &&
@@ -682,7 +693,6 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
   property("transactionFromProtoBytes") {
     forAll(preconditionsAndPayments) {
       case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
-
         val fs = smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (BlockV5.id -> 0))
 
         assertDiffAndState(fs) { append =>
@@ -691,7 +701,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
           append(Seq(transferTx)).explicitGet()
 
           val txBytesBase58 = Base58.encode(PBTransactionSerializer.bytes(transferTx))
-          val script = ScriptCompiler.compile(
+          val script = ScriptCompiler
+            .compile(
               s"""
                  |
                  | {-# STDLIB_VERSION 4 #-}

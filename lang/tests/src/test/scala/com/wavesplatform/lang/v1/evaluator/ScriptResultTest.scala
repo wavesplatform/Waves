@@ -38,7 +38,7 @@ class ScriptResultTest extends PropSpec with PropertyChecks with Matchers with N
         "key"   -> CONST_STRING("xxx").explicitGet(),
         "value" -> CONST_LONG(42)
       )
-    ): EVALUATED), false).explicitGet)
+    ): EVALUATED), false).explicitGet())
   )
 
   val transferSetObj = CaseObj(
@@ -61,7 +61,7 @@ class ScriptResultTest extends PropSpec with PropertyChecks with Matchers with N
             "asset"     -> noAsset
           )
         )
-      ), false).explicitGet)
+      ), false).explicitGet())
   )
 
   val scriptResultObj = CaseObj(CASETYPEREF("ScriptResult", el), Map(FieldNames.ScriptWriteSet -> writeSetObj, FieldNames.ScriptTransferSet -> transferSetObj))

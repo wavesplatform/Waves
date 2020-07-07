@@ -22,9 +22,9 @@ class MicroBlockSynchronizerSpec extends FreeSpec with Matchers with Transaction
           PS[(Channel, MicroBlockResponse)],
           Observable[(Channel, MicroBlockSynchronizer.MicroblockData)]) => Any) = {
     val peers          = PeerDatabase.NoOp
-    val lastBlockIds   = PS[ByteStr]
-    val microInvs      = PS[(Channel, MicroBlockInv)]
-    val microResponses = PS[(Channel, MicroBlockResponse)]
+    val lastBlockIds   = PS[ByteStr]()
+    val microInvs      = PS[(Channel, MicroBlockInv)]()
+    val microResponses = PS[(Channel, MicroBlockResponse)]()
     val (r, _)         = MicroBlockSynchronizer(defaultSettings, peers, lastBlockIds, microInvs, microResponses, testScheduler)
     try {
       f(lastBlockIds, microInvs, microResponses, r)

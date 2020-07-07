@@ -1,9 +1,12 @@
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
+import com.spotify.docker.client.DefaultDockerClient
 import sbt.Keys._
 import sbt.Tests.Group
 import sbt._
+
+import scala.util.control.NonFatal
 
 // Separate projects for integration tests because of IDEA: https://youtrack.jetbrains.com/issue/SCL-14363#focus=streamItem-27-3061842.0-0
 object IntegrationTestsPlugin extends AutoPlugin {
@@ -66,13 +69,28 @@ object IntegrationTestsPlugin extends AutoPlugin {
         }
       )
     ) ++ inScope(Global)(
-      concurrentRestrictions := Seq(
-        Tags.limit(Tags.ForkedTestGroup, Integer.getInteger("waves.it.max-parallel-suites", EvaluateTask.SystemProcessors * 2))
+      Seq(
+        dockerCpuCount := {
+          try {
+            val docker = DefaultDockerClient.fromEnv().build()
+            try {
+              docker.info().cpus()
+            } finally docker.close()
+          } catch {
+            case NonFatal(_) =>
+              sLog.value.warn(s"Could not connect to Docker, is the daemon running?")
+              EvaluateTask.SystemProcessors
+          }
+        },
+        concurrentRestrictions := Seq(
+          Tags.limit(Tags.ForkedTestGroup, Integer.getInteger("waves.it.max-parallel-suites", dockerCpuCount.value * 2))
+        )
       )
     )
 
 }
 
 trait ItKeys {
-  val logDirectory = taskKey[File]("The directory where logs of integration tests are written")
+  val logDirectory   = taskKey[File]("The directory where logs of integration tests are written")
+  val dockerCpuCount = settingKey[Int]("Docker processor count")
 }

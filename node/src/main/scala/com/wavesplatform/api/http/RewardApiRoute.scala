@@ -11,7 +11,7 @@ case class RewardApiRoute(blockchain: Blockchain) extends ApiRoute {
   import RewardApiRoute._
 
   override lazy val route: Route = pathPrefix("blockchain" / "rewards") {
-    rewards ~ rewardsAtHeight()
+    rewards() ~ rewardsAtHeight()
   }
 
   def rewards(): Route = (get & pathEndOrSingleSlash) {

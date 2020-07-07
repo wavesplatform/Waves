@@ -84,7 +84,7 @@ class ListParamInvokeTest extends PropSpec with PropertyChecks with Matchers wit
             List(ARR(IndexedSeq(
               CONST_STRING("value1").explicitGet(),
               CONST_STRING("value2").explicitGet()
-            ), false).explicitGet)
+            ), false).explicitGet())
           )
         )
       for {
