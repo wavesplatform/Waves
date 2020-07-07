@@ -767,6 +767,28 @@ object PureContext {
         notImplemented[Id, EVALUATED]("lastIndexOf(list: List[T], element: T)", xs)
     }
 
+  lazy val listRemoveByIndex: BaseFunction[NoContext] =
+    NativeFunction(
+      "removeByIndex",
+      7,
+      REMOVE_BY_INDEX_OF_LIST,
+      PARAMETERIZEDLIST(TYPEPARAM('T')),
+      ("list", PARAMETERIZEDLIST(TYPEPARAM('T'))),
+      ("index", LONG)
+    ) {
+      case ARR(list) :: CONST_LONG(index) :: Nil =>
+        if (list.isEmpty)
+          Left("Can't remove an element from empty list")
+        else if (index < 0)
+          Left(s"Index of the removing element should be positive, but $index was passed")
+        else if (index >= list.size)
+          Left(s"Index of the removing element should be lower than list size = ${list.length}, but $index was passed")
+        else
+          ARR(list.take(index.toInt) ++ list.drop(index.toInt + 1), limited = true)
+      case xs =>
+        notImplemented[Id, EVALUATED]("removeByIndex(list: List[T], index: Int)", xs)
+    }
+
   @VisibleForTesting
   private[v1] def genericListIndexOf(
      element: EVALUATED,
@@ -1028,6 +1050,7 @@ object PureContext {
           getListMedian,
           listIndexOf,
           listLastIndexOf,
+          listRemoveByIndex,
           listContains,
           listMin,
           listMax,

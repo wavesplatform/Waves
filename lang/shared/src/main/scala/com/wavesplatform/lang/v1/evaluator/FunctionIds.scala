@@ -39,11 +39,12 @@ object FunctionIds {
   val LONG_TO_STRING: Short    = 420
   val BOOLEAN_TO_STRING: Short = 421
 
-  val CREATE_LIST: Short        = 1100
-  val APPEND_LIST: Short        = 1101
-  val CONCAT_LIST: Short        = 1102
-  val INDEX_OF_LIST: Short      = 1103
-  val LAST_INDEX_OF_LIST: Short = 1104
+  val CREATE_LIST: Short             = 1100
+  val APPEND_LIST: Short             = 1101
+  val CONCAT_LIST: Short             = 1102
+  val INDEX_OF_LIST: Short           = 1103
+  val LAST_INDEX_OF_LIST: Short      = 1104
+  val REMOVE_BY_INDEX_OF_LIST: Short = 1105
 
   val UTF8STRING: Short   = 1200
   val BININT: Short       = 1201

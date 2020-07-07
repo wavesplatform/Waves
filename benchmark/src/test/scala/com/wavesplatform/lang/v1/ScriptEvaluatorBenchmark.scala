@@ -75,6 +75,18 @@ class ScriptEvaluatorBenchmark {
     bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.equalElements))
 
   @Benchmark
+  def listRemoveFirstByIndex(st: ListRemoveByIndex, bh: Blackhole): Unit =
+    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.removeFirst))
+
+  @Benchmark
+  def listRemoveMiddleByIndex(st: ListRemoveByIndex, bh: Blackhole): Unit =
+    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.removeMiddle))
+
+  @Benchmark
+  def listRemoveLastByIndex(st: ListRemoveByIndex, bh: Blackhole): Unit =
+    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.removeLast))
+
+  @Benchmark
   def sigVerify32Kb(st: SigVerify32Kb, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.expr))
 }
 
@@ -265,4 +277,42 @@ class SigVerify32Kb {
       )
     )
   }
+}
+
+@State(Scope.Benchmark)
+class ListRemoveByIndex {
+  val context: EvaluationContext[NoContext, Id] =
+    Monoid.combine(
+      PureContext.build(Global, V4).evaluationContext,
+      CryptoContext.build(Global, V4).evaluationContext
+    )
+
+  val list: ARR = ARR(Vector.fill(1000)(CONST_LONG(Long.MaxValue)), limited = true).explicitGet()
+
+  val removeFirst: EXPR =
+    FUNCTION_CALL(
+      Native(FunctionIds.REMOVE_BY_INDEX_OF_LIST),
+      List(
+        list,
+        CONST_LONG(0)
+      )
+    )
+
+  val removeMiddle: EXPR =
+    FUNCTION_CALL(
+      Native(FunctionIds.REMOVE_BY_INDEX_OF_LIST),
+      List(
+        list,
+        CONST_LONG(500)
+      )
+    )
+
+  val removeLast: EXPR =
+    FUNCTION_CALL(
+      Native(FunctionIds.REMOVE_BY_INDEX_OF_LIST),
+      List(
+        list,
+        CONST_LONG(1000)
+      )
+    )
 }
