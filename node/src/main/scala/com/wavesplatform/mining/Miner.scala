@@ -140,7 +140,7 @@ class MinerImpl(
     }
   }
 
-  private def forgeBlock(account: KeyPair): Either[String, (Block, MiningConstraint)] = {
+  private[mining] def forgeBlock(account: KeyPair): Either[String, (Block, MiningConstraint)] = {
     // should take last block right at the time of mining since microblocks might have been added
     val height              = blockchainUpdater.height
     val version             = blockchainUpdater.nextBlockVersion
@@ -230,7 +230,7 @@ class MinerImpl(
     } yield offset
   }
 
-  private def generateBlockTask(account: KeyPair, maybeBlockchain: Option[Blockchain]): Task[Unit] = {
+  private[mining] def generateBlockTask(account: KeyPair, maybeBlockchain: Option[Blockchain]): Task[Unit] = {
     (for {
       offset <- nextBlockGenOffsetWithConditions(account, maybeBlockchain.getOrElse(blockchainUpdater))
       quorumAvailable = checkQuorumAvailable().isRight

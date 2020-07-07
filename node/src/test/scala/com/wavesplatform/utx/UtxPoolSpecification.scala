@@ -17,7 +17,6 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.history.randomSig
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
@@ -32,7 +31,6 @@ import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.{GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Transaction, _}
@@ -47,7 +45,7 @@ import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.PatienceConfiguration.{Interval, Timeout}
-import org.scalatest.{EitherValues, FreeSpec, Matchers, PrivateMethodTester}
+import org.scalatest.{EitherValues, FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.collection.mutable.ListBuffer
@@ -78,7 +76,6 @@ class UtxPoolSpecification
     with NoShrink
     with BlocksTransactionsHelpers
     with WithDomain
-    with PrivateMethodTester
     with EitherValues
     with Eventually {
   private val PoolDefaultMaxBytes = 50 * 1024 * 1024 // 50 MB
@@ -805,9 +802,6 @@ class UtxPoolSpecification
           all(expectedTxs2.map(tx => utx.pessimisticPortfolio(tx.sender.toAddress))) shouldBe empty
       }
 
-      val nonPriorityTransactions = PrivateMethod[Seq[Transaction]](Symbol("nonPriorityTransactions"))
-      val putNewTx                = PrivateMethod[TracedResult[ValidationError, Boolean]](Symbol("putNewTx"))
-
       "removes priority transactions from ordinary pool on pack" in forAll(gen) {
         case (_, nonScripted, scripted) =>
           val blockchain = createState(scripted.head.sender.toAddress)
@@ -816,9 +810,9 @@ class UtxPoolSpecification
 
           utx.addPriorityTxs(nonScripted)
           nonScripted.foreach(utx.putIfNew(_).resultE should beRight)
-          utx.invokePrivate(nonPriorityTransactions()) shouldBe empty
+          utx.nonPriorityTransactions shouldBe empty
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(nonScripted)
-          utx.invokePrivate(nonPriorityTransactions()) shouldBe empty
+          utx.nonPriorityTransactions shouldBe empty
       }
 
       val genDependent = for {
@@ -838,8 +832,8 @@ class UtxPoolSpecification
           val utx =
             new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
           utx.addPriorityTxs(Seq(tx1))
-          utx.invokePrivate(putNewTx(tx2, false)).resultE should beRight
-          utx.invokePrivate(nonPriorityTransactions()) shouldBe Seq(tx2)
+          utx.putNewTx(tx2, false).resultE should beRight
+          utx.nonPriorityTransactions shouldBe Seq(tx2)
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(tx1 :: tx2 :: Nil)
       }
 
@@ -943,8 +937,8 @@ class UtxPoolSpecification
           val utx =
             new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
           utx.addPriorityTxs(Seq(tx1))
-          utx.invokePrivate(putNewTx(tx2, true)).resultE.explicitGet()
-          utx.invokePrivate(nonPriorityTransactions()) shouldBe Seq(tx2)
+          utx.putNewTx(tx2, true).resultE.explicitGet()
+          utx.nonPriorityTransactions shouldBe Seq(tx2)
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(tx1 :: tx2 :: Nil)
       }
     }
@@ -981,8 +975,7 @@ class UtxPoolSpecification
               }
 
               def addUnverified(tx: Transaction): Unit = {
-                val addTransaction = PrivateMethod[TracedResult[ValidationError, Boolean]](Symbol("addTransaction"))
-                utxPool invokePrivate addTransaction(tx, false)
+                utxPool.addTransaction(tx, false)
               }
 
               val differ = TransactionDiffer(d.blockchainUpdater.lastBlockTimestamp, System.currentTimeMillis(), verify = false)(

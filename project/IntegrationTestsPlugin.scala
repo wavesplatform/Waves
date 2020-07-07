@@ -37,6 +37,7 @@ object IntegrationTestsPlugin extends AutoPlugin {
           val args = Seq("-fFW", (logDirectory.value / "summary.log").toString) ++ excludeTags
           Tests.Argument(TestFrameworks.ScalaTest, args: _*)
         },
+        parallelExecution := true,
         testGrouping := {
           // ffs, sbt!
           // https://github.com/sbt/sbt/issues/3266

@@ -20,9 +20,9 @@ import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.Scheduler.Implicits.global
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.{FlatSpec, Matchers, PrivateMethodTester}
+import org.scalatest.{FlatSpec, Matchers}
 
-class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTester with PathMockFactory with WithDB with TransactionGen {
+class MiningFailuresSuite extends FlatSpec with Matchers with PathMockFactory with WithDB with TransactionGen {
   trait BlockchainUpdaterNG extends Blockchain with BlockchainUpdater with NG
 
   behavior of "Miner"
@@ -109,5 +109,5 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
   }
 
   private[this] def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] =
-    miner.invokePrivate(PrivateMethod[Task[Unit]](Symbol("generateBlockTask"))(account, None))
+    miner.generateBlockTask(account, None)
 }
