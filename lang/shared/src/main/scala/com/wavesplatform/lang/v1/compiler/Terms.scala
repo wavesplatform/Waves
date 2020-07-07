@@ -15,6 +15,8 @@ object Terms {
   sealed abstract class DECLARATION {
     def toStr: Coeval[String]
     override def toString: String = toStr()
+
+    def name: String
   }
   case class LET(name: String, value: EXPR)                     extends DECLARATION {
     def toStr: Coeval[String] = for {

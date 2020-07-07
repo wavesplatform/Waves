@@ -7,6 +7,7 @@ import com.wavesplatform.lang.directives.Directive.extractDirectives
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveParser, DirectiveSet}
 import com.wavesplatform.lang.script.ScriptPreprocessor
+import com.wavesplatform.lang.v1.BaseGlobal.DAppInfo
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -205,21 +206,33 @@ object JsAPI {
         // Just ignore stdlib version here
         Global.compileContract(input, fullContractContext.compilerContext, version, estimator)
           .map {
-            case (bytes, dApp, maxComplexityFunc @ (_, maxComplexity), complexityByFunc) =>
+            case DAppInfo(
+              bytes,
+              dApp,
+              maxComplexityFunc @ (_, maxComplexity),
+              annotatedComplexities,
+              verifierComplexity,
+              callableComplexities,
+              userFunctionComplexities,
+              globalVariableComplexities
+            ) =>
               val resultFields: Seq[(String, Any)] = Seq(
-                "result"           -> Global.toBuffer(bytes),
-                "ast"              -> toJs(dApp),
-                "complexity"       -> maxComplexity,
-                "complexityByFunc" -> complexityByFunc.mapValues(t => t: Any).toJSDictionary
+                "result"                     -> Global.toBuffer(bytes),
+                "ast"                        -> toJs(dApp),
+                "complexity"                 -> maxComplexity,
+                "verifierComplexity"         -> verifierComplexity,
+                "callableComplexities"       -> callableComplexities.mapValues(c => c: Any).toMap.toJSDictionary,
+                "userFunctionComplexities"   -> userFunctionComplexities.mapValues(c => c: Any).toMap.toJSDictionary,
+                "globalVariableComplexities" -> globalVariableComplexities.mapValues(c => c: Any).toMap.toJSDictionary,
               )
-              val errorFieldOpt: Seq[(String, Any)] =
-                Global.checkContract(dApp, maxComplexityFunc, version)
+              val errorFieldOpt: Seq[(String, Any)] = {
+                Global.checkContract(version, dApp, maxComplexityFunc)
                   .fold(
                     error => Seq("error" -> error),
                     _     => Seq()
                   )
+              }
               js.Dynamic.literal.applyDynamic("apply")(resultFields ++ errorFieldOpt: _*)
-
           }
     }
   }
