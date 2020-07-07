@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.smartcontract
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.TransactionInfo
+import com.wavesplatform.it.api.{PutDataResponse, TransactionInfo}
 import com.wavesplatform.it.sync.{minFee, setScriptFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -159,7 +159,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     val stateChangesInfo = sender.debugStateChanges(invokeScriptId).stateChanges
 
-    val stateChangesData = stateChangesInfo.get.data.head
+    val stateChangesData = stateChangesInfo.get.data.head.asInstanceOf[PutDataResponse]
     stateChangesInfo.get.data.length shouldBe 1
     stateChangesData.`type` shouldBe "integer"
     stateChangesData.value.asInstanceOf[Long] shouldBe 0.01.waves

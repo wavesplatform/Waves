@@ -157,16 +157,6 @@ object InvokeDiffsCommon {
       currentTxDiffWithKeys = currentTxDiff.copy(affected = currentTxDiff.affected ++ transfers.keys ++ compositeDiff.accountData.keys)
       updatedTxDiff         = compositeDiff.transactions.concat(Map(tx.id() -> currentTxDiffWithKeys))
 
-      resultSponsorFeeList = {
-        val sponsorFeeDiff =
-          compositeDiff.sponsorship.map {
-            case (asset, SponsorshipValue(minFee)) => SponsorFee(asset.id, Some(minFee).filter(_ > 0))
-            case (asset, SponsorshipNoInfo)        => SponsorFee(asset.id, None)
-          }.toSet
-
-        sponsorFeeList.filter(sponsorFeeDiff.contains)
-      }
-
       isr = InvokeScriptResult(
         dataEntries,
         transferList.map { tr =>
@@ -179,7 +169,7 @@ object InvokeDiffsCommon {
         issueList,
         reissueList,
         burnList,
-        resultSponsorFeeList
+        sponsorFeeList
       )
 
       resultDiff = compositeDiff.copy(

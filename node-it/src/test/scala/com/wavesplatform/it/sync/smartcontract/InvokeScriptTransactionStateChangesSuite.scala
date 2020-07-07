@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.{DataResponse, DebugStateChanges, StateChangesDetails, TransactionInfo, TransfersInfoResponse}
+import com.wavesplatform.it.api._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -120,7 +120,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
 
     txInfoShouldBeEqual(txInfo, txStateChanges)
 
-    val expected = StateChangesDetails(Seq(DataResponse("integer", 10, "result")), Seq(), Seq(), Seq(), Seq(), Seq(), None)
+    val expected = StateChangesDetails(Seq(DataResponse.put("integer", 10, "result")), Seq(), Seq(), Seq(), Seq(), Seq(), None)
     txStateChanges.stateChanges.get shouldBe expected
     callerStateChanges.head.stateChanges.get shouldBe expected
     dAppStateChanges.head.stateChanges.get shouldBe expected
@@ -208,7 +208,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
     txInfoShouldBeEqual(txInfo, recipientStateChanges.head)
 
     val expected = StateChangesDetails(
-      Seq(DataResponse("integer", 7, "result")),
+      Seq(DataResponse.put("integer", 7, "result")),
       Seq(TransfersInfoResponse(caller, None, 10)),
       Seq(),
       Seq(),
@@ -239,21 +239,42 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
   test("state changes order") {
     val script = ScriptCompiler
       .compile(
-        """
+        s"""
       |{-# STDLIB_VERSION 4 #-}
       |{-# CONTENT_TYPE DAPP #-}
       |{-# SCRIPT_TYPE ACCOUNT #-}
 
       |@Callable(i)
-      |func orderTest() = {
-      |    [ScriptTransfer(i.caller, 1, unit),
+      |func order1() = {
+      |  [
+      |    ScriptTransfer(i.caller, 1, unit),
       |    IntegerEntry("a", 1),
       |    StringEntry("b", "a"),
       |    BinaryEntry("c", base58'a'),
-      |    BooleanEntry("y", true),
+      |    BooleanEntry("d", true),
+      |    DeleteEntry("e"),
       |    ScriptTransfer(i.caller, 2, unit),
-      |    StringEntry("b", "c")]
-      |  }
+      |    BooleanEntry("d", false),
+      |    DeleteEntry("e"),
+      |    StringEntry("f", "a")
+      |  ]
+      |}
+      |
+      |@Callable(i)
+      |func order2() = {
+      |  [
+      |    SponsorFee(base58'$assetSponsoredByDApp', 950),
+      |    Issue("asset #1", "", 100, 8, true, unit, 0),
+      |    Reissue(base58'$simpleAsset', true, 1),
+      |    Burn(base58'$simpleAsset', 3),
+      |    Reissue(base58'$assetSponsoredByDApp', true, 2),
+      |    SponsorFee(base58'$simpleAsset', 500),
+      |    Burn(base58'$assetSponsoredByDApp', 4),
+      |    Issue("asset #2", "", 100, 8, true, unit, 0),
+      |    SponsorFee(base58'$assetSponsoredByDApp', 1000),
+      |    Reissue(base58'$simpleAsset', true, 3)
+      |  ]
+      |}
       """.stripMargin,
         ScriptEstimatorV2
       )
@@ -263,34 +284,73 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       .base64
     sender.setScript(contract, Some(script), setScriptFee + 0.4.waves, waitForTx = true)
 
-    val invokeTx = sender.invokeScript(
+    val invokeTx1 = sender.invokeScript(
       caller,
       contract,
-      func = Some("orderTest"),
+      func = Some("order1"),
       args = List.empty,
-      fee = 1.waves,
+      fee = 10.waves,
       waitForTx = true
     )
-    val expectedStateChanges = StateChangesDetails(
-      Seq(
-        DataResponse("integer", 1, "a"),
-        DataResponse("string", "a", "b"),
-        DataResponse("binary", "base64:IQ==", "c"),
-        DataResponse("boolean", true, "y"),
-        DataResponse("string", "c", "b")
-      ),
-      Seq(TransfersInfoResponse(caller, None, 1), TransfersInfoResponse(caller, None, 2)),
-      Seq.empty,
-      Seq.empty,
-      Seq.empty,
-      Seq.empty,
-      None
-    )
-    val idStateChanges      = sender.debugStateChanges(invokeTx._1.id).stateChanges
-    val addressStateChanges = sender.debugStateChangesByAddress(caller, 1).head.stateChanges
 
-    idStateChanges.get shouldBe expectedStateChanges
-    addressStateChanges.get shouldBe expectedStateChanges
+    val expectedDataResponses = Seq(
+      DataResponse.put("integer", 1, "a"),
+      DataResponse.put("string", "a", "b"),
+      DataResponse.put("binary", "base64:IQ==", "c"),
+      DataResponse.put("boolean", true, "d"),
+      DataResponse.delete("e"),
+      DataResponse.put("boolean", false, "d"),
+      DataResponse.delete("e"),
+      DataResponse.put("string", "a", "f")
+    )
+    val expectedTransferResponses = Seq(TransfersInfoResponse(caller, None, 1), TransfersInfoResponse(caller, None, 2))
+
+    val idStateChanges1      = sender.debugStateChanges(invokeTx1._1.id).stateChanges
+    val addressStateChanges1 = sender.debugStateChangesByAddress(caller, 1).head.stateChanges
+
+    Seq(idStateChanges1, addressStateChanges1).foreach { actualStateChanges =>
+      actualStateChanges.get.data shouldBe expectedDataResponses
+      actualStateChanges.get.transfers shouldBe expectedTransferResponses
+    }
+
+    val invokeTx2 = sender.invokeScript(
+      caller,
+      contract,
+      func = Some("order2"),
+      args = List.empty,
+      fee = 10.waves,
+      waitForTx = true
+    )
+
+    val expectedSponsorFeeResponses = Seq(
+      SponsorFeeResponse(assetSponsoredByDApp, Some(950)),
+      SponsorFeeResponse(simpleAsset, Some(500)),
+      SponsorFeeResponse(assetSponsoredByDApp, Some(1000))
+    )
+
+    val expectedIssueNames = Seq("asset #1", "asset #2")
+    val expectedReissueResponses = Seq(
+      ReissueInfoResponse(simpleAsset, isReissuable = true, 1),
+      ReissueInfoResponse(assetSponsoredByDApp, isReissuable = true, 2),
+      ReissueInfoResponse(simpleAsset, isReissuable = true, 3)
+    )
+    val expectedBurnResponses = Seq(BurnInfoResponse(simpleAsset, 3), BurnInfoResponse(assetSponsoredByDApp, 4))
+
+    val idStateChanges2      = sender.debugStateChanges(invokeTx2._1.id).stateChanges
+    val addressStateChanges2 = sender.debugStateChangesByAddress(caller, 1).head.stateChanges
+
+    Seq(idStateChanges2, addressStateChanges2).foreach { actualStateChanges =>
+      actualStateChanges.get.sponsorFees shouldBe expectedSponsorFeeResponses
+      actualStateChanges.get.reissues shouldBe expectedReissueResponses
+      actualStateChanges.get.burns shouldBe expectedBurnResponses
+      actualStateChanges.get.issues.map(_.name) shouldBe expectedIssueNames
+      actualStateChanges.get.issues.foreach { actualIssue =>
+        actualIssue.quantity shouldBe 100
+        actualIssue.decimals shouldBe 8
+        actualIssue.isReissuable shouldBe true
+      }
+    }
+
   }
 
   def txInfoShouldBeEqual(info: TransactionInfo, stateChanges: DebugStateChanges)(implicit pos: Position): Unit = {
