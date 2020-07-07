@@ -178,7 +178,7 @@ class BlockchainUpdaterImpl(
       .orElse(lastBlockReward)
   }
 
-  override def processBlock(block: Block, hitSource: ByteStr, verify: Boolean = true): Either[ValidationError, Option[DiscardedTransactions]] =
+  override def processBlock(block: Block, hitSource: ByteStr, verify: Boolean = true): Either[ValidationError, Seq[Diff]] =
     writeLock {
       val height                             = leveldb.height
       val notImplementedFeatures: Set[Short] = leveldb.activatedFeaturesAt(height).diff(BlockchainFeatures.implemented)
@@ -189,7 +189,7 @@ class BlockchainUpdaterImpl(
           (),
           GenericError(s"UNIMPLEMENTED ${displayFeatures(notImplementedFeatures)} ACTIVATED ON BLOCKCHAIN, UPDATE THE NODE IMMEDIATELY")
         )
-        .flatMap[ValidationError, Option[DiscardedTransactions]](
+        .flatMap[ValidationError, Seq[Diff]](
           _ =>
             (ngState match {
               case None =>
@@ -213,7 +213,7 @@ class BlockchainUpdaterImpl(
                       .map { r =>
                         val refBlockchain = CompositeBlockchain(leveldb, Some(r.diff), Some(block), r.carry, reward, Some(hitSource))
                         miner.scheduleMining(Some(refBlockchain))
-                        Option((r, Seq.empty[Transaction], reward, hitSource))
+                        Option((r, Nil, reward, hitSource))
                       }
                 }
               case Some(ng) =>
@@ -236,7 +236,9 @@ class BlockchainUpdaterImpl(
                         log.trace(
                           s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})"
                         )
-                        Some((r, ng.transactions, ng.reward, hitSource))
+                        val (mbs, diffs) = ng.allDiffs.unzip
+                        log.trace(s"Discarded microblocks = $mbs, diffs = ${diffs.map(_.hashString)}")
+                        Some((r, diffs, ng.reward, hitSource))
                       }
                   } else if (areVersionsOfSameBlock(block, ng.base)) {
                     if (block.transactionData.lengthCompare(ng.transactions.size) <= 0) {
@@ -257,7 +259,7 @@ class BlockchainUpdaterImpl(
                           miningConstraints.total,
                           verify
                         )
-                        .map(r => Some((r, Seq.empty[Transaction], ng.reward, hitSource)))
+                        .map(r => Some((r, Nil, ng.reward, hitSource)))
                     }
                   } else
                     Left(
@@ -309,7 +311,9 @@ class BlockchainUpdaterImpl(
                           leveldb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
                           BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
                           TxsInBlockchainStats.record(ng.transactions.size)
-                          Some((differResult, discarded.flatMap(_.transactionData), reward, hitSource))
+                          val (discardedMbs, discardedDiffs) = discarded.unzip
+                          log.trace(s"Discarded microblocks: $discardedMbs")
+                          Some((differResult, discardedDiffs, reward, hitSource))
                         }
                       } else {
                         val errorText = s"Forged block has invalid signature. Base: ${ng.base}, requested reference: ${block.header.reference}"
@@ -319,7 +323,7 @@ class BlockchainUpdaterImpl(
                   }
             }).map {
               _ map {
-                case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, detailedDiff), discarded, reward, hitSource) =>
+                case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, detailedDiff), discDiffs, reward, hitSource) =>
                   val newHeight   = leveldb.height + 1
                   val prevNgState = ngState
 
@@ -346,8 +350,8 @@ class BlockchainUpdaterImpl(
 
                   blockchainUpdateTriggers.onProcessBlock(block, detailedDiff, reward, leveldb)
 
-                  discarded
-              }
+                  discDiffs
+              } getOrElse Nil
             }
         )
     }
@@ -467,7 +471,7 @@ class BlockchainUpdaterImpl(
               val blockId = ng.createBlockId(microBlock)
               blockchainUpdateTriggers.onProcessMicroBlock(microBlock, detailedDiff, this, blockId)
               ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis, Some(blockId))
-              log.info(s"MicroBlock(${blockId.trim} ~> ${microBlock.reference.trim}, txs=${microBlock.transactionData.size}) appended")
+              log.info(s"${microBlock.stringRepr(blockId)} appended, diff=${diff.hashString}")
               internalLastBlockInfo.onNext(LastBlockInfo(blockId, height, score, ready = true))
 
               for {

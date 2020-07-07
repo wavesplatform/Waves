@@ -38,18 +38,18 @@ import monix.reactive.Observer
 import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
-import scala.jdk.CollectionConverters._
 import scala.collection.mutable
+import scala.jdk.CollectionConverters._
 import scala.util.{Left, Right}
 
+//noinspection ScalaStyle
 class UtxPoolImpl(
     time: Time,
     blockchain: Blockchain,
     spendableBalanceChanged: Observer[(Address, Asset)],
     utxSettings: UtxSettings,
-    enablePriorityPool: Boolean,
     onEvent: UtxEvent => Unit = _ => (),
-    nanoTimeSource: () => Long = () => System.nanoTime()
+    nanoTimeSource: () => TxTimestamp = () => System.nanoTime()
 ) extends ScorexLogging
     with AutoCloseable
     with UtxPool {
@@ -63,10 +63,13 @@ class UtxPoolImpl(
   // State
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).isDefined) // TODO delete in the future
-  private[this] val priorityTransactions  = mutable.LinkedHashMap.empty[ByteStr, Transaction]
+
+  private[this] val priorityDiffs          = mutable.LinkedHashSet.empty[Diff]
+  private[this] def priorityTransactionIds = priorityDiffs.synchronized(priorityDiffs.toVector.flatMap(_.transactions.keys))
+  private[this] def priorityTransactions   = priorityDiffs.synchronized(priorityDiffs.toVector.flatMap(_.transactionsValues))
 
   override def putIfNew(tx: Transaction): TracedResult[ValidationError, Boolean] = {
-    if (transactions.containsKey(tx.id()) || priorityTransactions.contains(tx.id())) TracedResult.wrapValue(false)
+    if (transactions.containsKey(tx.id()) || priorityDiffs.exists(_.contains(tx.id()))) TracedResult.wrapValue(false)
     else putNewTx(tx, verify = true)
   }
 
@@ -158,7 +161,7 @@ class UtxPoolImpl(
       } yield ()
     } else Right(())
 
-    val tracedIsNew = TracedResult(checks).flatMap(_ => addTransaction(tx, verify, priority = false))
+    val tracedIsNew = TracedResult(checks).flatMap(_ => addTransaction(tx, verify))
     tracedIsNew.resultE match {
       case Right(isNew) => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = $isNew")
       case Left(err) =>
@@ -169,47 +172,61 @@ class UtxPoolImpl(
   }
 
   override def removeAll(txs: Iterable[Transaction]): Unit = {
+    if (txs.isEmpty) return
     val ids = txs.map(_.id()).toSet
     removeIds(ids)
   }
 
-  private[this] def removeFromBothPools(txId: ByteStr): Unit = priorityTransactions.synchronized {
-    val removedFromPriority = priorityTransactions.remove(txId)
-    removedFromPriority.foreach(PoolMetrics.removeTransactionPriority)
-    removeFromOrdPool(txId)
-  }
-
-  private[this] def removeFromOrdPool(txId: ByteStr): Unit = priorityTransactions.synchronized {
-    for (tx <- Option(transactions.remove(txId))) PoolMetrics.removeTransaction(tx)
-    if (!priorityTransactions.contains(txId)) pessimisticPortfolios.remove(txId)
-  }
-
-  private[this] def removeIds(removed: Set[ByteStr]): Unit = priorityTransactions.synchronized {
-    removed.foreach { id =>
-      val tx = priorityTransactions.get(id).orElse(Option(transactions.get(id)))
-      tx.foreach(tx => onEvent(UtxEvent.TxRemoved(tx, None)))
-      removeFromBothPools(id)
+  private[this] def removeFromOrdPool(txId: ByteStr): Unit = {
+    for (tx <- Option(transactions.remove(txId))) {
+      PoolMetrics.removeTransaction(tx)
+      pessimisticPortfolios.remove(txId)
     }
   }
 
-  private[this] def addTransaction(tx: Transaction, verify: Boolean, priority: Boolean): TracedResult[ValidationError, Boolean] = {
-    val diffEi = TransactionDiffer.skipFailing(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(blockchain, tx)
+  private[this] def removeIds(removed: Set[ByteStr]): Unit = priorityDiffs.synchronized {
+    val diffsToReset = priorityDiffs.filter(pd => removed.exists(pd.contains))
+    val factRemoved  = Set.newBuilder[Transaction]
+    diffsToReset.foreach { diff =>
+      val fullyReset: Boolean = diff.transactions.keySet.forall(removed)
+      diff.transactionsValues.foreach { tx =>
+        PoolMetrics.removeTransactionPriority(tx)
+        factRemoved += tx
+      }
+      if (!fullyReset) {
+        val txsToAdd = diff.transactions.view.filterKeys(!removed(_)).values.map(_.transaction)
+        log.warn {
+          val added   = txsToAdd.map(_.id())
+          val removedIds = diff.transactions.keySet.intersect(removed)
+          s"Resetting diff ${diff.hashString} partially: removed = [${removedIds.mkString(", ")}], resorted = [${added.mkString(", ")}]"
+        }
+        txsToAdd.foreach(addTransaction(_, verify = false))
+      }
+    }
+    priorityDiffs --= diffsToReset
+
+    factRemoved ++= removed.flatMap(id => Option(transactions.get(id)))
+    removed.foreach(removeFromOrdPool)
+    factRemoved.result().foreach(tx => onEvent(UtxEvent.TxRemoved(tx, None)))
+  }
+
+  private[this] def addTransaction(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
+    val diffEi = priorityDiffs.synchronized {
+      val patchedBlockchain = CompositeBlockchain(blockchain, Some(Monoid.combineAll(priorityDiffs)))
+      TransactionDiffer.skipFailing(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(patchedBlockchain, tx)
+    }
+
     def addPortfolio(): Unit = diffEi.map { diff =>
       pessimisticPortfolios.add(tx.id(), diff)
       onEvent(UtxEvent.TxAdded(tx, diff))
     }
 
     if (!verify || diffEi.resultE.isRight) {
-      if (priority) priorityTransactions.synchronized {
-        priorityTransactions += tx.id() -> tx
-        PoolMetrics.addTransactionPriority(tx)
+      transactions.computeIfAbsent(tx.id(), { _ =>
+        PoolMetrics.addTransaction(tx)
         addPortfolio()
-      } else
-        transactions.computeIfAbsent(tx.id(), { _ =>
-          PoolMetrics.addTransaction(tx)
-          addPortfolio()
-          tx
-        })
+        tx
+      })
     }
 
     diffEi.map(_ => true)
@@ -222,8 +239,15 @@ class UtxPoolImpl(
         .getAggregated(addr)
         .spendableBalanceOf(assetId)
 
-  override def pessimisticPortfolio(addr: Address): Portfolio =
-    pessimisticPortfolios.getAggregated(addr)
+  override def pessimisticPortfolio(addr: Address): Portfolio = priorityDiffs.synchronized {
+    val diffPf = for {
+      diff    <- priorityDiffs.toVector
+      (a, pf) <- diff.portfolios if a == addr
+    } yield pf.pessimistic
+
+    val pessimistic = pessimisticPortfolios.getAggregated(addr)
+    Monoid.combineAll(diffPf :+ pessimistic)
+  }
 
   private[this] def nonPriorityTransactions: Seq[Transaction] = {
     transactions.values.asScala.toVector
@@ -231,7 +255,7 @@ class UtxPoolImpl(
   }
 
   override def all: Seq[Transaction] =
-    (priorityTransactions.values ++ nonPriorityTransactions).toVector.distinct
+    (priorityTransactions ++ nonPriorityTransactions).distinct
 
   override def size: Int = transactions.size
 
@@ -250,7 +274,7 @@ class UtxPoolImpl(
   private[this] case class TxEntry(tx: Transaction, priority: Boolean)
 
   private[this] def createTxEntrySeq(): Seq[TxEntry] =
-    priorityTransactions.synchronized(priorityTransactions.values.map(TxEntry(_, priority = true)).toVector) ++ nonPriorityTransactions.map(
+    priorityTransactions.map(TxEntry(_, priority = true)) ++ nonPriorityTransactions.map(
       TxEntry(_, priority = false)
     )
 
@@ -301,9 +325,9 @@ class UtxPoolImpl(
                 r // don't run any checks here to speed up mining
               else if (TxCheck.isExpired(tx)) {
                 log.debug(s"Transaction ${tx.id()} expired")
-                this.removeFromBothPools(tx.id())
+                this.removeFromOrdPool(tx.id())
                 onEvent(UtxEvent.TxRemoved(tx, Some(GenericError("Expired"))))
-                r.copy(iterations = r.iterations + 1)
+                r.copy(iterations = r.iterations + 1, removedTransactions = r.removedTransactions + tx.id())
               } else {
                 val newScriptedAddresses = scriptedAddresses(tx)
                 if (!priority && r.checkedAddresses.intersect(newScriptedAddresses).nonEmpty) r
@@ -339,7 +363,8 @@ class UtxPoolImpl(
                           updatedConstraint,
                           r.iterations + 1,
                           newCheckedAddresses,
-                          r.validatedTransactions + tx.id()
+                          r.validatedTransactions + tx.id(),
+                          r.removedTransactions
                         )
                       }
 
@@ -351,12 +376,13 @@ class UtxPoolImpl(
                     case Left(error) =>
                       log.debug(s"Transaction ${tx.id()} removed due to ${extractErrorMessage(error)}")
                       traceLogger.trace(error.toString)
-                      this.removeFromBothPools(tx.id())
+                      this.removeFromOrdPool(tx.id())
                       onEvent(UtxEvent.TxRemoved(tx, Some(error)))
                       r.copy(
                         iterations = r.iterations + 1,
                         validatedTransactions = r.validatedTransactions + tx.id(),
-                        checkedAddresses = newCheckedAddresses
+                        checkedAddresses = newCheckedAddresses,
+                        removedTransactions = r.removedTransactions + tx.id()
                       )
                   }
                 }
@@ -365,7 +391,7 @@ class UtxPoolImpl(
 
       @tailrec
       def loop(seed: PackResult): PackResult = {
-        def allValidated(seed: PackResult) = (transactions.keys().asScala ++ priorityTransactions.keysIterator).forall(seed.validatedTransactions)
+        def allValidated(seed: PackResult) = (transactions.keys().asScala ++ priorityTransactionIds).forall(seed.validatedTransactions)
 
         val newSeed = packIteration(
           seed.copy(checkedAddresses = Set.empty),
@@ -395,7 +421,7 @@ class UtxPoolImpl(
         }
       }
 
-      loop(PackResult(None, Monoid[Diff].empty, initialConstraint, 0, Set.empty, Set.empty))
+      loop(PackResult(None, Monoid[Diff].empty, initialConstraint, 0, Set.empty, Set.empty, Set.empty))
     }
 
     log.trace(
@@ -403,6 +429,8 @@ class UtxPoolImpl(
         s"of which ${packResult.transactions.fold(0)(_.size)} were packed, ${transactions.size() + priorityTransactions.size} transactions remaining"
     )
 
+    if (packResult.removedTransactions.nonEmpty) log.trace(s"Removing invalid transactions: ${packResult.removedTransactions.mkString(", ")}")
+    removeIds(packResult.removedTransactions)
     packResult.transactions.map(_.reverse) -> packResult.constraint
   }
 
@@ -452,18 +480,44 @@ class UtxPoolImpl(
   }
 
   /** DOES NOT verify transactions */
-  def addAndCleanup(transactions: Iterable[Transaction]): Unit = priorityTransactions.synchronized {
-    transactions.foreach { tx =>
-      addTransaction(tx, verify = false, this.enablePriorityPool)
-      if (this.enablePriorityPool) removeFromOrdPool(tx.id())
+  def addAndCleanup(transactions: Iterable[Transaction]): Unit = {
+    transactions.foreach(addTransaction(_, verify = false))
+    TxCleanup.runCleanupAsync()
+  }
+
+  def addAndCleanupPriority(discDiffs: Seq[Diff]): Unit = {
+    if (discDiffs.nonEmpty) priorityDiffs.synchronized {
+      discDiffs.filterNot(priorityDiffs.contains).foreach { diff =>
+        diff.transactionsValues.foreach(PoolMetrics.addTransactionPriority(_))
+        priorityDiffs += diff
+        log.trace {
+          val ids = diff.transactions.keys
+          s"Priority diff ${diff.hashString} added: ${ids.mkString(", ")}"
+        }
+      }
+      log.trace(s"Priority pool transactions order: ${priorityTransactionIds.mkString(", ")}")
     }
     TxCleanup.runCleanupAsync()
+  }
+
+  def nextMicroBlockSize(): Option[Int] = priorityDiffs.synchronized {
+    val maybeSize = priorityDiffs.headOption.map(_.transactions.size)
+    maybeSize
   }
 
   override def close(): Unit = {
     import scala.concurrent.duration._
     cleanupScheduler.shutdown()
     cleanupScheduler.awaitTermination(10 seconds)
+  }
+
+  override def finalize(): Unit = {
+    cleanupScheduler.shutdown()
+  }
+
+  private[this] implicit class DiffExt(diff: Diff) {
+    def contains(txId: ByteStr): Boolean     = diff.transactions.contains(txId)
+    def transactionsValues: Seq[Transaction] = diff.transactions.values.map(_.transaction).toVector
   }
 
   //noinspection TypeAnnotation
@@ -516,7 +570,8 @@ object UtxPoolImpl {
       constraint: MultiDimensionalMiningConstraint,
       iterations: Int,
       checkedAddresses: Set[Address],
-      validatedTransactions: Set[ByteStr]
+      validatedTransactions: Set[ByteStr],
+      removedTransactions: Set[ByteStr]
   )
 
   private class PessimisticPortfolios(spendableBalanceChanged: Observer[(Address, Asset)], isTxKnown: ByteStr => Boolean) {

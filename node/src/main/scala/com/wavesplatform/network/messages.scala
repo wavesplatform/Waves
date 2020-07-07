@@ -59,7 +59,9 @@ case class BlockForged(block: Block) extends Message
 
 case class MicroBlockRequest(totalBlockSig: ByteStr) extends Message
 
-case class MicroBlockResponse(microblock: MicroBlock, totalBlockId: BlockId)
+case class MicroBlockResponse(microblock: MicroBlock, totalBlockId: BlockId) extends Message {
+  override def toString: String = microblock.stringRepr(totalBlockId)
+}
 
 object MicroBlockResponse {
   def apply(mb: MicroBlock): MicroBlockResponse = {
@@ -76,7 +78,6 @@ case class MicroBlockInv(sender: PublicKey, totalBlockId: ByteStr, reference: By
 }
 
 object MicroBlockInv {
-
   def apply(sender: KeyPair, totalBlockRef: ByteStr, prevBlockRef: ByteStr): MicroBlockInv = {
     val signature = crypto.sign(sender.privateKey, sender.toAddress.bytes ++ totalBlockRef.arr ++ prevBlockRef.arr)
     new MicroBlockInv(sender.publicKey, totalBlockRef, prevBlockRef, signature)
