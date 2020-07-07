@@ -661,7 +661,7 @@ object DataResponse {
   def delete(key: String): DeleteDataResponse = DeleteDataResponse(key)
   implicit val dataResponseFormat: Reads[DataResponse] = Reads {
     case JsObject(fields) if fields.get("key").exists(_.isInstanceOf[JsString]) && fields.get("type").exists(_.isInstanceOf[JsString]) =>
-      val key = fields("key").asInstanceOf[JsString].value
+      val key    = fields("key").asInstanceOf[JsString].value
       val `type` = fields("type").asInstanceOf[JsString].value
       val value = `type` match {
         case "binary"  => fields("value").asInstanceOf[JsString].value
@@ -677,24 +677,6 @@ object DataResponse {
     case _ => JsError()
   }
 }
-
-//case class DataResponse(`type`: String, value: Any, key: String)
-//object DataResponse {
-//  implicit val dataResponseFormat: Reads[DataResponse] = Reads {
-//    case JsObject(fields) =>
-//      val key = fields("key").asInstanceOf[JsString].value
-//      val `type` = fields("type").asInstanceOf[JsString].value
-//      val value = `type` match {
-//        case "binary"  => fields("value").asInstanceOf[JsString].value
-//        case "string"  => fields("value").asInstanceOf[JsString].value
-//        case "integer" => fields("value").asInstanceOf[JsNumber].value.toLongExact
-//        case "boolean" => fields("value").asInstanceOf[JsBoolean].value
-//        case _         => JsError()
-//      }
-//      JsSuccess(DataResponse(`type`, value, key))
-//    case _ => JsError()
-//  }
-//}
 
 case class TransfersInfoResponse(address: String, asset: Option[String], amount: Long)
 object TransfersInfoResponse {
