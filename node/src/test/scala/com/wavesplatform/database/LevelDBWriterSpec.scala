@@ -279,7 +279,7 @@ class LevelDBWriterSpec
 
       forAll(randomTransactionGen) { tx =>
         val transactionId = tx.id()
-        db.put(Keys.transactionHNById(TransactionId @@ transactionId).keyBytes, Ints.toByteArray(1) ++ Shorts.toByteArray(0))
+        db.put(Keys.transactionHNSById(TransactionId @@ transactionId).keyBytes, Ints.toByteArray(1) ++ Shorts.toByteArray(0))
         db.put(Keys.transferTransactionAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](1, 2, 3, 4, 5, 6))
 
         writer.transferById(transactionId) shouldBe None
@@ -309,7 +309,7 @@ class LevelDBWriterSpec
       forAll(scenario) {
         case (tx, s) =>
           val transactionId = tx.id()
-          db.put(Keys.transactionHNById(TransactionId(transactionId)).keyBytes, database.writeTransactionHN((Height(1), TxNum(0.toShort))))
+          db.put(Keys.transactionHNSById(TransactionId(transactionId)).keyBytes, database.writeTransactionHNS((Height(1), TxNum(0.toShort), s)))
           db.put(Keys.transactionAt(Height(1), TxNum(0.toShort)).keyBytes, database.writeTransaction((tx, s)))
 
           writer.transactionInfo(transactionId) shouldBe Some((1, tx, s))

@@ -140,12 +140,12 @@ object Keys {
       writeTransactionHNSeqAndType
     )
 
-  def transactionHNById(txId: TransactionId): Key[Option[(Height, TxNum)]] =
+  def transactionHNSById(txId: TransactionId): Key[Option[(Height, TxNum, Boolean)]] =
     Key.opt(
-      TransactionHeightAndNumsById,
+      TransactionHeightNumsAndStatusById,
       txId.arr,
-      readTransactionHN,
-      writeTransactionHN
+      readTransactionHNS,
+      writeTransactionHNS
     )
 
   def blockTransactionsFee(height: Int): Key[Long] =

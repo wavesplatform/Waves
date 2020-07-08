@@ -358,21 +358,23 @@ package object database extends ScorexLogging {
     ndo.toByteArray
   }
 
-  def readTransactionHN(bs: Array[Byte]): (Height, TxNum) = {
+  def readTransactionHNS(bs: Array[Byte]): (Height, TxNum, Boolean) = {
     val ndi = newDataInput(bs)
     val h   = Height(ndi.readInt())
     val num = TxNum(ndi.readShort())
+    val succeeded = ndi.readBoolean()
 
-    (h, num)
+    (h, num, succeeded)
   }
 
-  def writeTransactionHN(v: (Height, TxNum)): Array[Byte] = {
+  def writeTransactionHNS(v: (Height, TxNum, Boolean)): Array[Byte] = {
     val ndo = newDataOutput(8)
 
-    val (h, num) = v
+    val (h, num, succeeded) = v
 
     ndo.writeInt(h)
     ndo.writeShort(num)
+    ndo.writeBoolean(succeeded)
 
     ndo.toByteArray
   }
@@ -503,14 +505,14 @@ package object database extends ScorexLogging {
 
   def writeTransaction(v: (Transaction, Boolean)): Array[Byte] = {
     import pb.TransactionData.Transaction._
-    val (tx, succeed) = v
+    val (tx, succeeded) = v
     val ptx = tx match {
       case lps: LegacyPBSwitch if !lps.isProtobufVersion => LegacyBytes(ByteString.copyFrom(tx.bytes()))
       case _: GenesisTransaction                         => LegacyBytes(ByteString.copyFrom(tx.bytes()))
       case _: PaymentTransaction                         => LegacyBytes(ByteString.copyFrom(tx.bytes()))
       case _                                             => NewTransaction(PBTransactions.protobuf(tx))
     }
-    pb.TransactionData(!succeed, ptx).toByteArray
+    pb.TransactionData(!succeeded, ptx).toByteArray
   }
 
   /** Returns status (succeed - true, failed -false) and bytes (left - legacy format bytes, right - new format bytes) */
@@ -616,8 +618,8 @@ package object database extends ScorexLogging {
       id          <- leaseIds
       leaseStatus <- fromHistory(r, Keys.leaseStatusHistory(id), Keys.leaseStatus(id))
       if leaseStatus
-      (h, n) <- r.get(Keys.transactionHNById(TransactionId(id)))
-      tx     <- r.get(Keys.transactionAt(h, n))
+      (h, n, _) <- r.get(Keys.transactionHNSById(TransactionId(id)))
+      tx        <- r.get(Keys.transactionAt(h, n))
     } yield tx).collect {
       case (lt: LeaseTransaction, true) => lt
     }.toSeq

@@ -164,7 +164,7 @@ object WavesEnvironmentRebenchmark {
       val txCountAtHeight =
         Map.empty[Int, Int].withDefault(h => db.get(Keys.blockMetaAt(Height(h))).fold(0)(_.transactionCount))
 
-      (1 to (environment.height.toInt, 100))
+      1.to(environment.height.toInt, 100)
         .flatMap { h =>
           val txCount = txCountAtHeight(h)
           if (txCount == 0)
@@ -178,7 +178,7 @@ object WavesEnvironmentRebenchmark {
       val txCountAtHeight =
         Map.empty[Int, Int].withDefault(h => db.get(Keys.blockMetaAt(Height(h))).fold(0)(_.transactionCount))
 
-      (1 to (environment.height.toInt, 10))
+      1.to(environment.height.toInt, 10)
         .flatMap { h =>
           val txCount = txCountAtHeight(h)
           if (txCount == 0)
@@ -198,7 +198,7 @@ object WavesEnvironmentRebenchmark {
       val txCountAtHeight =
         Map.empty[Int, Int].withDefault(h => db.get(Keys.blockMetaAt(Height(h))).fold(0)(_.transactionCount))
 
-      (1 to (environment.height.toInt, 100))
+      1.to(environment.height.toInt, 100)
         .flatMap { h =>
           val txCount = txCountAtHeight(h)
           if (txCount == 0)
@@ -210,6 +210,6 @@ object WavesEnvironmentRebenchmark {
     }
 
     lazy val heights: IndexedSeq[Int] =
-      (1 to (environment.height.toInt, 1000)).toVector
+      1.to(environment.height.toInt, 1000).toVector
   }
 }

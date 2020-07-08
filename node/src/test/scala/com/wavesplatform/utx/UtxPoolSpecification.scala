@@ -752,7 +752,7 @@ class UtxPoolSpecification
         (blockchain.accountScript _).when(*).returns(None)
         val tb = TestBlock.create(Nil)
         (blockchain.blockHeader _).when(*).returning(Some(SignedBlockHeader(tb.header, tb.signature)))
-        (blockchain.transactionHeight _).when(*).returning(None)
+        (blockchain.transactionHeightAndStatus _).when(*).returning(None)
         blockchain
       }
 

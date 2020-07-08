@@ -46,7 +46,7 @@ case object EmptyBlockchain extends Blockchain {
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)] = None
 
-  override def transactionHeight(id: ByteStr): Option[Int] = None
+  override def transactionHeightAndStatus(id: ByteStr): Option[(Int, Boolean)] = None
 
   override def containsTransaction(tx: Transaction): Boolean = false
 

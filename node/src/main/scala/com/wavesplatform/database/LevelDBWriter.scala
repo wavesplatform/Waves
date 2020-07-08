@@ -380,11 +380,11 @@ abstract class LevelDBWriter private[database] (
         rw.put(Keys.safeRollbackHeight, height - dbSettings.maxRollbackDepth)
       }
 
-      val transactions: Map[TransactionId, (Transaction, TxNum)] =
+      val transactions: Map[TransactionId, (Transaction, TxNum, Boolean)] =
         block.transactionData.zipWithIndex.map { in =>
           val (tx, idx) = in
           val k         = TransactionId(tx.id())
-          val v         = (tx, TxNum(idx.toShort))
+          val v         = (tx, TxNum(idx.toShort), !failedTransactionIds.contains(tx.id()))
           k -> v
         }.toMap
 
@@ -481,8 +481,7 @@ abstract class LevelDBWriter private[database] (
         val kk        = Keys.addressTransactionSeqNr(addressId)
         val nextSeqNr = rw.get(kk) + 1
         val txTypeNumSeq = txIds.map { txId =>
-          val (tx, num) = transactions(txId)
-
+          val (tx, num, _) = transactions(txId)
           (tx.typeId, num)
         }
         rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
@@ -493,9 +492,9 @@ abstract class LevelDBWriter private[database] (
         rw.put(Keys.addressIdOfAlias(alias), Some(addressId))
       }
 
-      for ((id, (tx, num)) <- transactions) {
-        rw.put(Keys.transactionAt(Height(height), num), Some((tx, !failedTransactionIds.contains(id))))
-        rw.put(Keys.transactionHNById(id), Some((Height(height), num)))
+      for ((id, (tx, num, succeeded)) <- transactions) {
+        rw.put(Keys.transactionAt(Height(height), num), Some((tx, succeeded)))
+        rw.put(Keys.transactionHNSById(id), Some((Height(height), num, succeeded)))
       }
 
       val activationWindowSize = settings.functionalitySettings.activationWindowSize(height)
@@ -542,8 +541,8 @@ abstract class LevelDBWriter private[database] (
         case (txId, result) =>
           val (txHeight, txNum) = transactions
             .get(TransactionId(txId))
-            .map { case (_, txNum) => (height, txNum) }
-            .orElse(rw.get(Keys.transactionHNById(TransactionId(txId))))
+            .map { case (_, txNum, _) => (height, txNum) }
+            .orElse(rw.get(Keys.transactionHNSById(TransactionId(txId))).map { case (height, txNum, _) => (height, txNum) })
             .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
 
           try rw.put(Keys.invokeScriptResult(txHeight, txNum), Some(result))
@@ -687,7 +686,7 @@ abstract class LevelDBWriter private[database] (
 
               if (tx.typeId != GenesisTransaction.typeId) {
                 rw.delete(Keys.transactionAt(h, num))
-                rw.delete(Keys.transactionHNById(TransactionId(tx.id())))
+                rw.delete(Keys.transactionHNSById(TransactionId(tx.id())))
               }
           }
 
@@ -765,8 +764,8 @@ abstract class LevelDBWriter private[database] (
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
     for {
-      (height, num) <- db.get(Keys.transactionHNById(TransactionId @@ id))
-      tx            <- db.get(Keys.transferTransactionAt(height, num))
+      (height, num, _) <- db.get(Keys.transactionHNSById(TransactionId @@ id))
+      tx               <- db.get(Keys.transferTransactionAt(height, num))
     } yield (height, tx)
   }
 
@@ -775,13 +774,13 @@ abstract class LevelDBWriter private[database] (
   protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(Int, Transaction, Boolean)] = {
     val txId = TransactionId(id)
     for {
-      (height, num) <- db.get(Keys.transactionHNById(txId))
-      (tx, status)  <- db.get(Keys.transactionAt(height, num))
+      (height, num, status) <- db.get(Keys.transactionHNSById(txId))
+      (tx, _)               <- db.get(Keys.transactionAt(height, num))
     } yield (height, tx, status)
   }
 
-  override def transactionHeight(id: ByteStr): Option[Int] = readOnly { db =>
-    db.get(Keys.transactionHNById(TransactionId(id))).map(_._1)
+  override def transactionHeightAndStatus(id: ByteStr): Option[(Int, Boolean)] = readOnly { db =>
+    db.get(Keys.transactionHNSById(TransactionId(id))).map { case (height, _, succeeded) => (height, succeeded) }
   }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readOnly { db =>
