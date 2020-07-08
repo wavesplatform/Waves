@@ -2,14 +2,13 @@ package com.wavesplatform.lang.v1
 
 import java.util.concurrent.TimeUnit
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.CalculateAssetIdBenchmark._
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.traits.domain.Issue
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
-import scorex.crypto.signatures.{Curve25519, Signature}
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -77,10 +76,6 @@ class CalculateAssetIdBenchmark {
   @Benchmark
   def keccak256_32Kb(st: CurveSt32k, bh: Blackhole): Unit =
     bh.consume(Keccak256.hash(st.message))
-
-  @Benchmark
-  def sigVerify_150Kb(st: CurveSt150k, bh: Blackhole): Unit =
-    bh.consume(Curve25519.verify(Signature @@ st.signature, st.message, st.publicKey))
 
   @Benchmark
   def calculateAssetId(st: CalculateAssetIdSt, bh: Blackhole): Unit =
