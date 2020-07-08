@@ -518,7 +518,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
             Monoid
               .combineAll(
                 Seq(
-                  PureContext.build(Global, V3).withEnvironment[Environment],
+                  PureContext.build(V3).withEnvironment[Environment],
                   CryptoContext.build(Global, V3).withEnvironment[Environment],
                   WavesContext.build(
                     DirectiveSet(V3, Account, Expression).explicitGet()

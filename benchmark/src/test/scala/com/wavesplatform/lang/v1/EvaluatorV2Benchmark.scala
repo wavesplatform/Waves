@@ -17,7 +17,7 @@ import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
 object EvaluatorV2Benchmark {
-  val pureContext: CTX[Environment]                       = PureContext.build(Global, V1).withEnvironment[Environment]
+  val pureContext: CTX[Environment]                       = PureContext.build(V1).withEnvironment[Environment]
   val pureEvalContext: EvaluationContext[Environment, Id] = pureContext.evaluationContext(Common.emptyBlockchainEnvironment())
   val evaluatorV2: EvaluatorV2                            = new EvaluatorV2(LoggedEvaluationContext(_ => _ => (), pureEvalContext), V1)
 }
