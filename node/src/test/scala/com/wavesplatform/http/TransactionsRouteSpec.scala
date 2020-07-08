@@ -229,7 +229,7 @@ class TransactionsRouteSpec
       "address and limit" in {
         forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect")) {
           case (address, limit) =>
-            (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once
+            (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
             (addressTransactions.transactionsByAddress _).expects(*, *, *, None).returning(Observable.empty).once()
             Get(routePath(s"/address/$address/limit/$limit")) ~> route ~> check {
               status shouldEqual StatusCodes.OK
@@ -240,7 +240,7 @@ class TransactionsRouteSpec
       "address, limit and after" in {
         forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect"), bytes32StrGen) {
           case (address, limit, txId) =>
-            (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once
+            (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
             (addressTransactions.transactionsByAddress _).expects(*, *, *, *).returning(Observable.empty).once()
             Get(routePath(s"/address/$address/limit/$limit?after=$txId")) ~> route ~> check {
               status shouldEqual StatusCodes.OK
@@ -273,7 +273,7 @@ class TransactionsRouteSpec
           val h: Height           = Height(height)
           val info                = if (tx.typeId == InvokeScriptTransaction.typeId) Right((tx.asInstanceOf[InvokeScriptTransaction], None)) else Left(tx)
           (addressTransactions.transactionById _).expects(tx.id()).returning(Some((h, info, succeed))).once()
-          (blockchain.activatedFeatures _)
+          (() => blockchain.activatedFeatures)
             .expects()
             .returning(Map(BlockchainFeatures.BlockV5.id -> acceptFailedActivationHeight))
             .anyNumberOfTimes()
@@ -315,8 +315,8 @@ class TransactionsRouteSpec
       forAll(txAvailability) {
         case (tx, height, acceptFailedActivationHeight, succeed) =>
           (blockchain.transactionInfo _).expects(tx.id()).returning(Some((height, tx, succeed))).anyNumberOfTimes()
-          (blockchain.height _).expects().returning(1000).anyNumberOfTimes()
-          (blockchain.activatedFeatures _)
+          (() => blockchain.height).expects().returning(1000).anyNumberOfTimes()
+          (() => blockchain.activatedFeatures)
             .expects()
             .returning(Map(BlockchainFeatures.BlockV5.id -> acceptFailedActivationHeight))
             .anyNumberOfTimes()
@@ -353,7 +353,7 @@ class TransactionsRouteSpec
       } yield t
 
       forAll(g) { txs =>
-        (addressTransactions.unconfirmedTransactions _).expects().returning(txs).once()
+        (() => addressTransactions.unconfirmedTransactions).expects().returning(txs).once()
         Get(routePath("/unconfirmed")) ~> route ~> check {
           val resp = responseAs[Seq[JsValue]]
           for ((r, t) <- resp.zip(txs)) {

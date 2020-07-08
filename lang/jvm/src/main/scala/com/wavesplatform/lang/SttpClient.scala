@@ -1,11 +1,10 @@
 package com.wavesplatform.lang
 
-import com.softwaremill.sttp.{HttpURLConnectionBackend, MonadError, Request, Response, SttpBackend}
-import com.softwaremill.sttp.{Response, sttp, _}
+import com.softwaremill.sttp.{HttpURLConnectionBackend, MonadError, Request, Response, SttpBackend, sttp, _}
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
-import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{ExecutionContext, Future}
 
 class SttpClient {
   private implicit val sttpBackend: SttpBackend[Future, Nothing] = new SttpBackend[Future, Nothing] {

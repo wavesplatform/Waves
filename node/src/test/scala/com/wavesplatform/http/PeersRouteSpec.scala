@@ -72,7 +72,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
     } yield inetAddress -> ts
 
     forAll(genListOf(TestsCount, gen)) { m =>
-      (peerDatabase.knownPeers _).expects().returning(m.toMap[InetSocketAddress, Long])
+      (() => peerDatabase.knownPeers).expects().returning(m.toMap[InetSocketAddress, Long])
       val route  = PeersApiRoute(restAPISettings, connectToPeer, peerDatabase, new ConcurrentHashMap[Channel, PeerInfo]()).route
       val result = Get(routePath("/all")) ~> route ~> runRoute
 
@@ -94,7 +94,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
     }
 
     val address = inetSocketAddressGen.sample.get
-    connectToPeer.expects(address).once
+    connectToPeer.expects(address).once()
     val result = Post(connectUri, ConnectReq(address.getHostName, address.getPort)) ~> ApiKeyHeader ~> route ~> runRoute
     check {
       responseAs[ConnectResp].hostname shouldEqual address.getHostName

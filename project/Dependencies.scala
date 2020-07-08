@@ -187,7 +187,7 @@ object Dependencies {
   )
 
   lazy val circe = Def.setting {
-    val circeVersion = "0.12.3"
+    val circeVersion = "0.13.0"
     Seq(
       "io.circe" %%% "circe-core",
       "io.circe" %%% "circe-generic",

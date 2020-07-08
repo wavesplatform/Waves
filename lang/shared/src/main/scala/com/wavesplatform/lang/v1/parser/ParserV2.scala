@@ -122,9 +122,9 @@ class ParserV2(val input: ParserInput) extends Parser {
   def NEOP: Rule1[BinaryOperation]              = rule { "!=" ~ push(NE_OP) }
 
   def COMPARE_GROUP_OP: Rule1[BinaryOperation] = rule { GTOP | GEOP | LTOP | LEOP }
-  def GTOP: Rule1[BinaryOperation]             = rule { ">" ~ !"=" ~ push(GT_OP) }
+  def GTOP: Rule1[BinaryOperation]             = rule { ">" ~ "=".unary_!() ~ push(GT_OP) }
   def GEOP: Rule1[BinaryOperation]             = rule { ">=" ~ push(GE_OP) }
-  def LTOP: Rule1[BinaryOperation]             = rule { "<" ~ !"=" ~ push(LT_OP) }
+  def LTOP: Rule1[BinaryOperation]             = rule { "<" ~ "=".unary_!() ~ push(LT_OP) }
   def LEOP: Rule1[BinaryOperation]             = rule { "<=" ~ push(LE_OP) }
 
   def CONSOP: Rule1[BinaryOperation] = rule { "::" ~ push(CONS_OP) }
@@ -146,10 +146,10 @@ class ParserV2(val input: ParserInput) extends Parser {
   def ConstAtom: Rule1[EXPR] = rule { IntegerAtom | StringAtom | ByteVectorAtom | BooleanAtom | ListAtom }
 
   def IdentifierAtom: Rule1[PART[String]] = rule {
-    push(cursor) ~ capture((!ReservedWords ~ Char ~ zeroOrMore(Char | Digit)) | (ReservedWords ~ (Char | Digit) ~ zeroOrMore(Char | Digit))) ~ push(cursor) ~> parseIdentifierAtom _
+    push(cursor) ~ capture((ReservedWords.unary_!() ~ Char ~ zeroOrMore(Char | Digit)) | (ReservedWords ~ (Char | Digit) ~ zeroOrMore(Char | Digit))) ~ push(cursor) ~> parseIdentifierAtom _
   }
   def ReferenceAtom: Rule1[EXPR] = rule {
-    push(cursor) ~ capture((!ReservedWords ~ Char ~ zeroOrMore(Char | Digit)) | (ReservedWords ~ (Char | Digit) ~ zeroOrMore(Char | Digit))) ~ push(cursor) ~> parseReferenceAtom _
+    push(cursor) ~ capture((ReservedWords.unary_!() ~ Char ~ zeroOrMore(Char | Digit)) | (ReservedWords ~ (Char | Digit) ~ zeroOrMore(Char | Digit))) ~ push(cursor) ~> parseReferenceAtom _
   }
 
   def GenericTypesAtom: Rule1[Seq[(PART[String], Option[PART[String]])]] = rule { oneOrMore(OneGenericTypeAtom).separatedBy(WS ~ "|" ~ WS) }

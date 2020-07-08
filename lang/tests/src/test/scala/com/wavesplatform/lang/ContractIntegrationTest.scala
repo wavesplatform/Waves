@@ -124,7 +124,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
     inside(evalResult) {
       case Left((error, log)) =>
         error shouldBe "exception message"
-        log should contain allOf (
+        log should contain.allOf(
           ("a", Right(CONST_LONG(1))),
           ("b", Right(CONST_LONG(2))),
           ("isError", Right(TRUE))

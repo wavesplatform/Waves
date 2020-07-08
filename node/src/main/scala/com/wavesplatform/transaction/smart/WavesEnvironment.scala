@@ -49,12 +49,12 @@ class WavesEnvironment(
       .map(tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, tthis)).explicitGet())
 
   override def inputEntity: InputEntity =
-    in.value
+    in.value()
 
   override def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer] =
     blockchain
       .transferById(ByteStr(id))
-      .map(t => RealTransactionWrapper.mapTransferTx(t._2, ds.stdLibVersion))
+      .map(t => RealTransactionWrapper.mapTransferTx(t._2))
 
   override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any] = {
     for {
@@ -164,9 +164,8 @@ class WavesEnvironment(
     PBTransactionSerializer
       .parseBytes(b)
       .toOption
-      .flatMap {
-        case tx: TransferTransaction => Some(RealTransactionWrapper.mapTransferTx(tx, ds.stdLibVersion))
-        case _                       => None
+      .collect {
+        case tx: TransferTransaction => RealTransactionWrapper.mapTransferTx(tx)
       }
 
   override def addressFromString(addressStr: String): Either[String, Address] =
