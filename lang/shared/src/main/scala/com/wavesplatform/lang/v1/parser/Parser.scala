@@ -214,8 +214,10 @@ object Parser {
   case class Getter(name: PART[String])                  extends Accessor
   case class ListIndex(index: EXPR)                      extends Accessor
 
-  def singleTypeP[_:P]: P[Single] = (anyVarName ~~ ("[" ~~ anyVarName ~~ "]").?).map { case (t, param) => Single(t, param) }
-  def unionTypeP[_:P]: P[Union]   = P(singleTypeP | tupleTypeP).rep(1, comment ~ "|" ~ comment).map(Union)
+  def singleTypeP[_:P]: P[Single] = (anyVarName ~~ ("[" ~~ Index ~ unionTypeP ~ Index ~~ "]").?).map {
+    case (t, param) => Single(t, param.map { case (start, param, end) => VALID(Pos(start, end), param) })
+  }
+  def unionTypeP[_:P]: P[Type] = P(singleTypeP | tupleTypeP).rep(1, comment ~ "|" ~ comment).map(Union.apply)
   def tupleTypeP[_:P]: P[Tuple] =
     ("(" ~
       P(unionTypeP).rep(
