@@ -28,6 +28,18 @@ class SigVerifyBenchmark {
     bh.consume(Curve25519.verify(Signature @@ st.signature, st.message, st.publicKey))
 
   @Benchmark
+  def sigVerify_6Kb(st: CurveSt6Kb, bh: Blackhole): Unit =
+    bh.consume(Curve25519.verify(Signature @@ st.signature, st.message, st.publicKey))
+
+  @Benchmark
+  def sigVerify_7Kb(st: CurveSt7Kb, bh: Blackhole): Unit =
+    bh.consume(Curve25519.verify(Signature @@ st.signature, st.message, st.publicKey))
+
+  @Benchmark
+  def sigVerify_8Kb(st: CurveSt8Kb, bh: Blackhole): Unit =
+    bh.consume(Curve25519.verify(Signature @@ st.signature, st.message, st.publicKey))
+
+  @Benchmark
   def sigVerify_16Kb(st: CurveSt16Kb, bh: Blackhole): Unit =
     bh.consume(Curve25519.verify(Signature @@ st.signature, st.message, st.publicKey))
 
@@ -64,6 +76,15 @@ object SigVerifyBenchmark {
 
   @State(Scope.Benchmark)
   class CurveSt16Kb extends CurveSt(16 * 1024)
+
+  @State(Scope.Benchmark)
+  class CurveSt8Kb extends CurveSt(8 * 1024)
+
+  @State(Scope.Benchmark)
+  class CurveSt7Kb extends CurveSt(7 * 1024)
+
+  @State(Scope.Benchmark)
+  class CurveSt6Kb extends CurveSt(6 * 1024)
 
   @State(Scope.Benchmark)
   class CurveSt5Kb extends CurveSt(5 * 1024)
