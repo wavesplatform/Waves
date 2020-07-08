@@ -88,20 +88,13 @@ object InvokeDiffsCommon {
       blockTime: Long,
       verifyAssets: Boolean
   ): TracedResult[ValidationError, Diff] = {
-    val actionsByType  = actions.groupBy(_.getClass).withDefaultValue(Nil)
+    val actionsByType  = actions.groupBy(a => if (classOf[DataOp].isAssignableFrom(a.getClass)) classOf[DataOp] else a.getClass).withDefaultValue(Nil)
     val transferList   = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
     val issueList      = actionsByType(classOf[Issue]).asInstanceOf[List[Issue]]
     val reissueList    = actionsByType(classOf[Reissue]).asInstanceOf[List[Reissue]]
     val burnList       = actionsByType(classOf[Burn]).asInstanceOf[List[Burn]]
     val sponsorFeeList = actionsByType(classOf[SponsorFee]).asInstanceOf[List[SponsorFee]]
-
-    val dataEntries = actionsByType.view
-      .filterKeys(classOf[DataOp].isAssignableFrom)
-      .values
-      .flatten
-      .toList
-      .asInstanceOf[List[DataOp]]
-      .map(dataItemToEntry)
+    val dataEntries    = actionsByType(classOf[DataOp]).asInstanceOf[List[DataOp]].map(dataItemToEntry)
 
     for {
       _ <- TracedResult(checkDataEntries(tx, dataEntries, version)).leftMap(FailedTransactionError.dAppExecution(_, invocationComplexity))
@@ -164,16 +157,6 @@ object InvokeDiffsCommon {
       currentTxDiffWithKeys = currentTxDiff.copy(affected = currentTxDiff.affected ++ transfers.keys ++ compositeDiff.accountData.keys)
       updatedTxDiff         = compositeDiff.transactions.concat(Map(tx.id() -> currentTxDiffWithKeys))
 
-      resultSponsorFeeList = {
-        val sponsorFeeDiff =
-          compositeDiff.sponsorship.map {
-            case (asset, SponsorshipValue(minFee)) => SponsorFee(asset.id, Some(minFee).filter(_ > 0))
-            case (asset, SponsorshipNoInfo)        => SponsorFee(asset.id, None)
-          }.toSet
-
-        sponsorFeeList.filter(sponsorFeeDiff.contains)
-      }
-
       isr = InvokeScriptResult(
         dataEntries,
         transferList.map { tr =>
@@ -186,7 +169,7 @@ object InvokeDiffsCommon {
         issueList,
         reissueList,
         burnList,
-        resultSponsorFeeList
+        sponsorFeeList
       )
 
       resultDiff = compositeDiff.copy(
