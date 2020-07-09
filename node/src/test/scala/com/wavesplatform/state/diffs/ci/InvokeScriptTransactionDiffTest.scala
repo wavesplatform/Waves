@@ -1671,7 +1671,7 @@ class InvokeScriptTransactionDiffTest
            |{-#SCRIPT_TYPE ACCOUNT#-}
            |
            |@Callable(i)
-           |func $funcName() = [Reissue(base58'$asset', false, 1), Reissue(base58'$asset', 4, true)]
+           |func $funcName() = [Reissue(base58'$asset', 1, false), Reissue(base58'$asset', 4, true)]
            |""".stripMargin
       Parser.parseContract(script).get.value
     }
