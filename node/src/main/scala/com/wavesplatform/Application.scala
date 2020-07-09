@@ -1,6 +1,7 @@
 package com.wavesplatform
 
 import java.io.File
+import java.nio.file.Files
 import java.security.Security
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -134,14 +135,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val utxStorage =
-      new UtxPoolImpl(
-        time,
-        blockchainUpdater,
-        spendableBalanceChanged,
-        settings.utxSettings,
-        enablePriorityPool = settings.minerSettings.enable,
-        utxEvents.onNext
-      )
+      new UtxPoolImpl(time, blockchainUpdater, spendableBalanceChanged, settings.utxSettings, utxEvents.onNext)
     maybeUtx = Some(utxStorage)
 
     val timer                 = new HashedWheelTimer()
@@ -471,7 +465,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   }
 }
 
-object Application {
+object Application extends ScorexLogging {
   private[wavesplatform] def loadApplicationConfig(external: Option[File] = None): WavesSettings = {
     import com.wavesplatform.settings._
 
@@ -480,6 +474,11 @@ object Application {
     // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
     System.setProperty("waves.directory", config.getString("waves.directory"))
     if (config.hasPath("waves.config.directory")) System.setProperty("waves.config.directory", config.getString("waves.config.directory"))
+
+    external match {
+      case None    => log.debug("Config file not defined, TESTNET config will be used")
+      case Some(f) => if (!Files.exists(f.toPath)) log.warn(s"Config ${f.toPath.toAbsolutePath.toString} not found, TESTNET config will be used")
+    }
 
     val settings = WavesSettings.fromRootConfig(config)
 

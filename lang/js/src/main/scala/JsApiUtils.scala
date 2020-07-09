@@ -13,6 +13,15 @@ import scala.scalajs.js.JSConverters._
 
 package object JsApiUtils {
 
+  def serPart[T](f: T => js.Any)(part: PART[T]): js.Object = {
+    val partValue = Expressions.PART.toOption(part).fold(null:Any)(f)
+    jObj.applyDynamic("apply")(
+      "value"    -> partValue,
+      "posStart" -> part.position.start,
+      "posEnd"   -> part.position.end
+    )
+  }
+
   def serPartStr(part: PART[String]): js.Object = {
     val partValue = Expressions.PART.toOption(part).getOrElse("").toString
     jObj.applyDynamic("apply")(
@@ -202,7 +211,7 @@ package object JsApiUtils {
       case Expressions.Single(name, parameter) =>
         jObj.applyDynamic("apply")(
           "typeName"  -> serPartStr(name),
-          "typeParam" -> parameter.map(serPartStr).orUndefined
+          "typeParam" -> parameter.map(serPart(serType)).orUndefined
         )
       case Expressions.Union(types) =>
         jObj.applyDynamic("apply")(

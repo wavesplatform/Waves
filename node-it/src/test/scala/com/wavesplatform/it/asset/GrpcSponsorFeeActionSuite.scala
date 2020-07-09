@@ -205,10 +205,10 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
           Seq(IssueInfoResponse(`assetId`, _, _, _, _, _, _, _)),
           Nil,
           Nil,
-          Seq(SponsorFeeResponse(`assetId`, Some(`lastMinSponsoredAssetFee`))),
+          sponsorFeeResponses,
           None
           )
-        ) =>
+        ) if sponsorFeeResponses.size == 9 && sponsorFeeResponses.last == SponsorFeeResponse(`assetId`, Some(`lastMinSponsoredAssetFee`)) =>
       }
       txStateChanges should matchDebugResult
       miner.debugStateChangesByAddress(dApp, limit = 100).flatMap(_.stateChanges) should matchDebugResult
@@ -251,7 +251,7 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
           Seq(IssueInfoResponse(`assetId`, _, _, _, _, _, _, _)),
           Nil,
           Nil,
-          Seq(SponsorFeeResponse(`assetId`, None)),
+          Seq(SponsorFeeResponse(`assetId`, Some(100)), SponsorFeeResponse(`assetId`, None)),
           None
           )
         ) =>

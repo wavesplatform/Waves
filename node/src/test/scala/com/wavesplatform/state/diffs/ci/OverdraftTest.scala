@@ -126,7 +126,7 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
       val fee = if (withEnoughFee) InvokeFee else 1
       val (payment, invokerBalance) =
         if (withPayment)
-          (List(Payment(issue.quantity, IssuedAsset(issue.id.value()))), IssueFee)
+          (List(Payment(issue.quantity, IssuedAsset(issue.id()))), IssueFee)
         else
           (Nil, 0L)
       for {
@@ -147,7 +147,7 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
       issue   <- issueV2TransactionGen(invoker, Gen.const(None), feeParam = Some(IssueFee))
     } yield {
       val count    = ContractLimits.MaxAttachedPaymentAmount
-      val payments = (1 to count).map(_ => Payment(issue.quantity / count + 1, IssuedAsset(issue.id.value())))
+      val payments = (1 to count).map(_ => Payment(issue.quantity / count + 1, IssuedAsset(issue.id())))
       for {
         genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
         genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)

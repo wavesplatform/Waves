@@ -653,12 +653,15 @@ object BurnTransactionInfo {
     Json.writes[BurnTransactionInfo]
   )
 }
-
-case class DataResponse(`type`: String, value: Any, key: String)
+sealed trait DataResponse extends Product with Serializable
+case class PutDataResponse(`type`: String, value: Any, key: String) extends DataResponse
+case class DeleteDataResponse(key: String) extends DataResponse
 object DataResponse {
+  def put(`type`: String, value: Any, key: String): PutDataResponse = PutDataResponse(`type`, value, key)
+  def delete(key: String): DeleteDataResponse = DeleteDataResponse(key)
   implicit val dataResponseFormat: Reads[DataResponse] = Reads {
-    case JsObject(fields) =>
-      val key = fields("key").asInstanceOf[JsString].value
+    case JsObject(fields) if fields.get("key").exists(_.isInstanceOf[JsString]) && fields.get("type").exists(_.isInstanceOf[JsString]) =>
+      val key    = fields("key").asInstanceOf[JsString].value
       val `type` = fields("type").asInstanceOf[JsString].value
       val value = `type` match {
         case "binary"  => fields("value").asInstanceOf[JsString].value
@@ -667,7 +670,10 @@ object DataResponse {
         case "boolean" => fields("value").asInstanceOf[JsBoolean].value
         case _         => JsError()
       }
-      JsSuccess(DataResponse(`type`, value, key))
+      JsSuccess(PutDataResponse(`type`, value, key))
+    case JsObject(fields) if fields.get("key").exists(_.isInstanceOf[JsString]) && fields.get("type").forall(_ == JsNull) =>
+      val key = fields("key").asInstanceOf[JsString].value
+      JsSuccess(DeleteDataResponse(key))
     case _ => JsError()
   }
 }

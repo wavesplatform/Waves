@@ -52,9 +52,9 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
         AnyPos,
         Expressions.FUNC(
           AnyPos,
+          Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x")),
           Expressions.PART.VALID(AnyPos, "id"),
-          Seq((Expressions.PART.VALID(AnyPos, "x"), Seq((Expressions.PART.VALID(AnyPos, "Int"), None)))),
-          Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
+          Seq((Expressions.PART.VALID(AnyPos, "x"), Single(Expressions.PART.VALID(AnyPos, "Int"), None)))
         ),
         Expressions.FUNCTION_CALL(AnyPos, Expressions.PART.VALID(AnyPos, "id"), List(Expressions.TRUE(AnyPos)))
       ),
@@ -63,9 +63,9 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
         AnyPos,
         Expressions.FUNC(
           AnyPos,
+          Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x")),
           Expressions.PART.VALID(AnyPos, "id"),
-          Seq((Expressions.PART.VALID(AnyPos, "x"), Seq((Expressions.PART.VALID(AnyPos, "Int"), None)))),
-          Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
+          Seq((Expressions.PART.VALID(AnyPos, "x"), Single(Expressions.PART.VALID(AnyPos, "Int"), None)))
         ),
         Expressions.FUNCTION_CALL(
           AnyPos,
@@ -78,12 +78,12 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
         AnyPos,
         Expressions.FUNC(
           AnyPos,
+          Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x")),
           Expressions.PART.VALID(AnyPos, "id"),
           Seq(
-            (Expressions.PART.VALID(AnyPos, "x"), Seq((Expressions.PART.VALID(AnyPos, "Int"), None))),
-            (Expressions.PART.VALID(AnyPos, "x"), Seq((Expressions.PART.VALID(AnyPos, "Int"), None)))
-          ),
-          Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
+            (Expressions.PART.VALID(AnyPos, "x"), Single(Expressions.PART.VALID(AnyPos, "Int"), None)),
+            (Expressions.PART.VALID(AnyPos, "x"), Single(Expressions.PART.VALID(AnyPos, "Int"), None))
+          )
         ),
         CONST_LONG(AnyPos, 1)
       )

@@ -220,12 +220,12 @@ object Types {
     List("amount" -> LONG, "recipient" -> addressOrAliasType) ++ header
   )
 
-  def anyTransactionType(proofsEnabled: Boolean, version: StdLibVersion): UNION =
+  def anyTransactionType(proofsEnabled: Boolean, version: StdLibVersion): FINAL =
     UNION(
       buildObsoleteTransactionTypes(proofsEnabled) ++ buildActiveTransactionTypes(proofsEnabled, version)
     )
 
-  def txByIdReturnType(proofsEnabled: Boolean, version: StdLibVersion): UNION =
+  def txByIdReturnType(proofsEnabled: Boolean, version: StdLibVersion): FINAL =
     UNION.create(UNIT +: anyTransactionType(proofsEnabled, version).typeList)
 
   def buildTransferTransactionType(proofsEnabled: Boolean, version: StdLibVersion) =

@@ -46,7 +46,7 @@ object Global extends BaseGlobal {
       output.append(hex((b >> 4) & 0xf))
       output.append(hex(b & 0xf))
     }
-    Right(output.result)
+    Right(output.result())
   }
 
   override def base16DecodeImpl(input: String): Either[String, Array[Byte]] = {
@@ -103,8 +103,8 @@ object Global extends BaseGlobal {
   ): Either[String, Long] =
     tryEi {
       val result = calc(
-        base * Math.pow(10, -baseScale),
-        exponent * Math.pow(10, -exponentScale)
+        base * Math.pow(10, -baseScale.toDouble),
+        exponent * Math.pow(10, -exponentScale.toDouble)
       )
       unscaled(result, resultScale, round)
     }

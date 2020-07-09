@@ -35,7 +35,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           features
         ) {
           case (_, blockchain) =>
-            val asset        = IssuedAsset(issue.id.value)
+            val asset        = IssuedAsset(issue.id())
             val resultAmount = issue.quantity + reissueAmount - burnAmount
 
             blockchain.assetDescription(asset).get.totalVolume shouldBe resultAmount
@@ -116,7 +116,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           features
         ) {
           case (_, blockchain) =>
-            val asset                 = IssuedAsset(issue.id.value)
+            val asset                 = IssuedAsset(issue.id())
             val totalResultAmount     = issue.quantity + (reissueAmount - burnAmount) * 2
             val issuerResultAmount    = issue.quantity + (reissueAmount - burnAmount - transferAmount) * 2
             val recipientResultAmount = transferAmount * 2
@@ -215,7 +215,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       reissueAmount <- positiveLongGen
       burnAmount    <- Gen.choose(0, reissueAmount)
     } yield {
-      val dApp = Some(reissueAndBurnDApp(issue.id.value, reissueAmount, burnAmount))
+      val dApp = Some(reissueAndBurnDApp(issue.id(), reissueAmount, burnAmount))
       for {
         genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
         genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
@@ -338,7 +338,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       assetScript              = Some(checkStateAsset(startAmount, reissueAmount, burnAmount, assetCheckTransferAmount, invoker.toAddress))
       issue <- issueV2TransactionGen(master, Gen.const(assetScript), reissuableParam = Some(true), quantityParam = Some(startAmount))
     } yield {
-      val dApp = Some(multiActionDApp(issue.id.value, invoker.publicKey.toAddress, reissueAmount, burnAmount, transferAmount))
+      val dApp = Some(multiActionDApp(issue.id(), invoker.publicKey.toAddress, reissueAmount, burnAmount, transferAmount))
       for {
         genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
         genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)

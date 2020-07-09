@@ -28,12 +28,12 @@ import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.{FreeSpec, Matchers, PrivateMethodTester}
+import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with TransactionGen with PrivateMethodTester with DBCacheSettings {
+class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with TransactionGen with DBCacheSettings {
 
   "base target limit" - {
     "node should stop if base target greater than maximum in block creation " in {
@@ -63,9 +63,8 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
             }
           })
 
-          val forgeBlock = PrivateMethod[MinerImpl](Symbol("forgeBlock"))
           try {
-            miner invokePrivate forgeBlock(account)
+            miner.forgeBlock(account)
           } catch {
             case _: SecurityException => // NOP
           }
@@ -135,7 +134,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
     val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
     val pos = PoSSelector(bcu, settings.synchronizationSettings)
 
-    val utxPoolStub                        = new UtxPoolImpl(ntpTime, bcu, ignoreSpendableBalanceChanged, settings0.utxSettings, enablePriorityPool = true)
+    val utxPoolStub                        = new UtxPoolImpl(ntpTime, bcu, ignoreSpendableBalanceChanged, settings0.utxSettings)
     val schedulerService: SchedulerService = Scheduler.singleThread("appender")
 
     try {

@@ -99,8 +99,15 @@ object TypeInferrer {
                 case s: SINGLE          => s
               }
               matchTypes(nonMatchedArgTypes, singlePlaceholder, knownTypes)
-            case many => Left(s"Can't resolve correct type for parameterized $placeholder, actual: $argType")
+            case _ => Left(s"Can't resolve correct type for parameterized $placeholder, actual: $argType")
           }
+
+      case (_:REAL, UNION(types, _))      => types.foldLeft(Right(None):Either[String, Option[MatchResult]]) {
+        (acc, t) => for {
+          a <- acc
+          b <- matchTypes(t, placeholder, knownTypes)
+        } yield b
+      }
 
       case (LIST(tp), LIST(t))            => matchTypes(t, tp, knownTypes)
       case (TUPLE(types1), TUPLE(types2)) => matchTupleTypes(err, types1, types2, knownTypes)
@@ -132,14 +139,17 @@ object TypeInferrer {
   }
 
   // if-then-else
-  def findCommonType(t1: FINAL, t2: FINAL, mergeTuples: Boolean = true): FINAL = (t1, t2) match {
+  def findCommonType(t1: FINAL, t2: FINAL, mergeTuples: Boolean = true): FINAL =
+    findCommonTypeR(t1, t2, mergeTuples)
+
+  private def findCommonTypeR(t1: FINAL, t2: FINAL, mergeTuples: Boolean): FINAL = (t1, t2) match {
     case (t1, NOTHING)        => t1
     case (NOTHING, t2)        => t2
     case (t1, t2) if t1 == t2 => t1
 
-    case (LIST(it1), LIST(it2)) => LIST(findCommonType(it1, it2))
+    case (LIST(it1), LIST(it2)) => LIST(findCommonTypeR(it1, it2, mergeTuples))
     case (TUPLE(types1), TUPLE(types2)) if mergeTuples && types1.length == types2.length =>
-      TUPLE((types1 zip types2).map { case (t1, t2) => findCommonType(t1, t2) })
+      TUPLE((types1 zip types2).map { case (t1, t2) => findCommonTypeR(t1, t2, mergeTuples) })
 
     case (p1: SINGLE, p2: SINGLE) => UNION.create(List(p1, p2))
     case (r: UNION, a: UNION)     => UNION.create((r.typeList.toSet ++ a.typeList.toSet).toSeq)

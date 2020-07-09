@@ -12,6 +12,7 @@
         "The number of decimals of the resulting value."
         "One of the rounding functions. The HalfUp() function may be used as the default value."
       ]
+      complexity: 100
     }
 	 {
       name: "log"
@@ -28,12 +29,14 @@
         The HalfUp() function may be used as the default value.
         '''
       ]
+      complexity: 100
     }
 	 {
       name: "fraction"
       params: [ "Int", "Int", "Int" ]
       doc: "Multiply and division with big integer intermediate representation"
       paramsDoc: [ "Multiplier", "Multiplier", "Divisor" ]
+      complexity: 1
     }
   ]
 }
