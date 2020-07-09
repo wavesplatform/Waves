@@ -148,6 +148,7 @@ trait BaseGlobal {
     for {
       expr <- compiler(input, context)
       bytes = serializeExpression(expr, version)
+      _ <- ExprScript.validateBytes(bytes)
       complexity <- ExprScript.estimateExact(expr, version, estimator)
     } yield (bytes, expr, complexity)
 
@@ -188,6 +189,7 @@ trait BaseGlobal {
         (0L, annotatedComplexities)
       )(v => (annotatedComplexities(v.u.name), annotatedComplexities - v.u.name))
       bytes <- serializeContract(dApp, stdLibVersion)
+      _ <- ContractScript.validateBytes(bytes)
     } yield DAppInfo(
       bytes,
       dApp,
