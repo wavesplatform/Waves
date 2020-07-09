@@ -355,7 +355,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
     )
   }
 
-  property("forbid unused case variables") {
+  ignore("forbid unused case variables") {
     val script =
       """
         | {-# STDLIB_VERSION 3 #-}
