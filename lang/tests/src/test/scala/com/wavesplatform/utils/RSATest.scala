@@ -314,8 +314,24 @@ class RSATest extends PropSpec with PropertyChecks with Matchers with BeforeAndA
     }
   }
 
-  property("rsaVerify illegal params") {
-    eval("rsaVerify(SHA512, base58'2345', base58'2345', base58'2345')") should produce("Illegal input params")
+  property("rsaVerify invalid key") {
+    forAll(keyPairGenerator, messageGenerator) { (keyPair, message) =>
+      val xprv = keyPair.getPrivate
+
+      algs foreach { alg =>
+        val prefix = RSA.digestAlgorithmPrefix(alg)
+
+        val privateSignature = Signature.getInstance(s"${prefix}withRSA", provider)
+        privateSignature.initSign(xprv)
+        privateSignature.update(message)
+
+        val signature = privateSignature.sign
+        val ctx = PureContext.build(Global, V3) |+| CryptoContext.build(Global, V3)
+
+        val invalidKey = Array[Byte](1, 2, 3)
+        eval(scriptSrc(alg, message, signature, invalidKey), ctx) should produce(s"Invalid key base58'${ByteStr(invalidKey)}'")
+      }
+    }
   }
 
   private val evaluator = new EvaluatorV1[Id, NoContext]()
