@@ -265,14 +265,14 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       |  [
       |    SponsorFee(base58'$assetSponsoredByDApp', 950),
       |    Issue("asset #1", "", 100, 8, true, unit, 0),
-      |    Reissue(base58'$simpleAsset', true, 1),
+      |    Reissue(base58'$simpleAsset', 1, true),
       |    Burn(base58'$simpleAsset', 3),
-      |    Reissue(base58'$assetSponsoredByDApp', true, 2),
+      |    Reissue(base58'$assetSponsoredByDApp', 2, true),
       |    SponsorFee(base58'$simpleAsset', 500),
       |    Burn(base58'$assetSponsoredByDApp', 4),
       |    Issue("asset #2", "", 100, 8, true, unit, 0),
       |    SponsorFee(base58'$assetSponsoredByDApp', 1000),
-      |    Reissue(base58'$simpleAsset', true, 3)
+      |    Reissue(base58'$simpleAsset', 3, true)
       |  ]
       |}
       """.stripMargin,

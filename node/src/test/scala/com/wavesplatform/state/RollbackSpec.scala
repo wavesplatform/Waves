@@ -833,7 +833,7 @@ object RollbackSpec {
            |
            |@Callable(i)
            |func reissue(assetId: ByteVector, isReissuable: Boolean, quantity: Int) =
-           |  [Reissue(assetId, isReissuable, quantity)]
+           |  [Reissue(assetId, quantity, isReissuable)]
            |
            |@Callable(i)
            |func burn(assetId: ByteVector, quantity: Int) =
