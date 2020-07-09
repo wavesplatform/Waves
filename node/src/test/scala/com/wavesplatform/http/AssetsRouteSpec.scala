@@ -7,10 +7,11 @@ import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.requests.{TransferV1Request, TransferV2Request}
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{RequestGen, TestTime, TestValues}
+import com.wavesplatform.{RequestGen, TestTime}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.Writes
@@ -43,8 +44,8 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
       val req = TransferV1Request(
         assetId = None,
         feeAssetId = None,
-        amount = TestValues.OneWaves,
-        fee = TestValues.OneWaves / 3,
+        amount = 1.waves,
+        fee = 0.3.waves,
         sender = senderPrivateKey.toAddress.toString,
         attachment = Some("attachment"),
         recipient = receiverPrivateKey.toAddress.toString,
@@ -61,9 +62,9 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
     "accepts VersionedTransferRequest" in {
       val req = TransferV2Request(
         assetId = None,
-        amount = TestValues.OneWaves,
+        amount = 1.waves,
         feeAssetId = None,
-        fee = TestValues.OneWaves / 3,
+        fee = 0.3.waves,
         sender = senderPrivateKey.toAddress.toString,
         attachment = None,
         recipient = receiverPrivateKey.toAddress.toString,

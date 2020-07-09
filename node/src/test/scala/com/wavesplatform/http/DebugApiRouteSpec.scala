@@ -3,6 +3,7 @@ package com.wavesplatform.http
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.block.SignedBlockHeader
+import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.WavesSettings
@@ -70,7 +71,7 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
 
       val route = debugApiRoute.copy(blockchain = blockchain).route
 
-      val tx = TxHelpers.transfer(TxHelpers.defaultSigner, TestValues.address, TestValues.OneWaves)
+      val tx = TxHelpers.transfer(TxHelpers.defaultSigner, TestValues.address, 1.waves)
       Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString())) ~> route ~> check {
         val json = Json.parse(responseAs[String])
         (json \ "valid").as[Boolean] shouldBe true
@@ -84,7 +85,7 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
 
       val route = debugApiRoute.copy(blockchain = blockchain).route
 
-      val tx = TxHelpers.transfer(TxHelpers.defaultSigner, TestValues.address, TestValues.OneWaves)
+      val tx = TxHelpers.transfer(TxHelpers.defaultSigner, TestValues.address, 1.waves)
       Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString())) ~> route ~> check {
         val json = Json.parse(responseAs[String])
         println(json)
