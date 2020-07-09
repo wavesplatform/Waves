@@ -342,7 +342,7 @@ object CryptoContext {
     }
 
     val bn256Groth16VerifyComplexities =
-      (800 to (1600, 50)).toArray
+      Array(800, 850, 950, 1000, 1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1550, 1600)
 
     val bn256Groth16VerifyL: Array[BaseFunction[NoContext]] = lgen(
       (1 to 15).toArray,
