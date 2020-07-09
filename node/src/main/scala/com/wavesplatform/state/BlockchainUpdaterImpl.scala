@@ -312,7 +312,10 @@ class BlockchainUpdaterImpl(
                           BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
                           TxsInBlockchainStats.record(ng.transactions.size)
                           val (discardedMbs, discardedDiffs) = discarded.unzip
-                          log.trace(s"Discarded microblocks: $discardedMbs")
+                          if (discardedMbs.nonEmpty) {
+                            log.trace(s"Discarded microblocks: $discardedMbs")
+                          }
+
                           Some((differResult, discardedDiffs, reward, hitSource))
                         }
                       } else {
