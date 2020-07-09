@@ -403,6 +403,20 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
     )
   }
 
+  property("allow unused case variables") {
+    val script =
+      """
+        |
+        | match tx {
+        |   case transfer: TransferTransaction => true
+        |   case other => false
+        | }
+        |
+      """.stripMargin
+
+    ScriptCompiler.compile(script, estimator) shouldBe Symbol("right")
+  }
+
   private val expectedExpr = LET_BLOCK(
     LET("x", CONST_LONG(10)),
     FUNCTION_CALL(
