@@ -53,11 +53,11 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
     def createBlockchainStub(): Blockchain with NG = {
       trait Blockchain1 extends Blockchain with NG
       val blockchain = stub[Blockchain1]
-      (blockchain.settings _).when().returns(WavesSettings.default().blockchainSettings)
-      (blockchain.activatedFeatures _).when().returns(Map.empty)
+      (() => blockchain.settings).when().returns(WavesSettings.default().blockchainSettings)
+      (() => blockchain.activatedFeatures).when().returns(Map.empty)
       (blockchain.accountScript _).when(*).returns(None)
       (blockchain.leaseBalance _).when(*).returns(LeaseBalance.empty)
-      (blockchain.height _).when().returns(1)
+      (() => blockchain.height).when().returns(1)
       (blockchain.blockHeader _).when(*).returns {
         val block = TestBlock.create(Nil)
         Some(SignedBlockHeader(block.header, block.signature))
