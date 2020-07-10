@@ -43,7 +43,7 @@ object KeyTags extends Enumeration {
   NthTransactionInfoAtHeight,
   AddressTransactionSeqNr,
   AddressTransactionHeightTypeAndNums,
-  TransactionHeightNumsAndStatusById,
+  TransactionMetaById,
   BlockTransactionsFee,
   InvokeScriptResult,
   BlockReward,

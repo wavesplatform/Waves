@@ -2,6 +2,7 @@ package com.wavesplatform.api.common
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.database.{DBExt, DBResource, Keys}
 import com.wavesplatform.state.{Diff, Height, InvokeScriptResult, NewTransactionInfo, TransactionId, TxNum}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -54,8 +55,8 @@ object AddressTransactions {
 
   private def loadInvokeScriptResult(resource: DBResource, txId: ByteStr): Option[InvokeScriptResult] =
     for {
-      (h, txNum, _) <- resource.get(Keys.transactionHNSById(TransactionId(txId)))
-      r             <- resource.get(Keys.invokeScriptResult(h, txNum))
+      pb.TransactionMeta(h, txNum, _) <- resource.get(Keys.transactionMetaById(TransactionId(txId)))
+      r                               <- resource.get(Keys.invokeScriptResult(h, TxNum(txNum.toShort)))
     } yield r
 
   def loadInvokeScriptResult(db: DB, txId: ByteStr): Option[InvokeScriptResult] =
@@ -88,8 +89,8 @@ object AddressTransactions {
     addressId =>
       val (maxHeight, maxTxNum) =
         fromId
-          .flatMap(id => resource.get(Keys.transactionHNSById(TransactionId(id))))
-          .map { case (h, n, _) => (h, n) }
+          .flatMap(id => resource.get(Keys.transactionMetaById(TransactionId(id))))
+          .map { case pb.TransactionMeta(h, n, _) => (Height(h), TxNum(n.toShort)) }
           .getOrElse(Height(Int.MaxValue) -> TxNum(Short.MaxValue))
 
       (for {

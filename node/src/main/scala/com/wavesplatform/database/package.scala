@@ -358,27 +358,6 @@ package object database extends ScorexLogging {
     ndo.toByteArray
   }
 
-  def readTransactionHNS(bs: Array[Byte]): (Height, TxNum, Boolean) = {
-    val ndi = newDataInput(bs)
-    val h   = Height(ndi.readInt())
-    val num = TxNum(ndi.readShort())
-    val succeeded = ndi.readBoolean()
-
-    (h, num, succeeded)
-  }
-
-  def writeTransactionHNS(v: (Height, TxNum, Boolean)): Array[Byte] = {
-    val ndo = newDataOutput(8)
-
-    val (h, num, succeeded) = v
-
-    ndo.writeInt(h)
-    ndo.writeShort(num)
-    ndo.writeBoolean(succeeded)
-
-    ndo.toByteArray
-  }
-
   def readDataEntry(key: String)(bs: Array[Byte]): DataEntry[_] =
     pb.DataEntry.parseFrom(bs).value match {
       case Value.Empty              => EmptyDataEntry(key)
@@ -618,8 +597,8 @@ package object database extends ScorexLogging {
       id          <- leaseIds
       leaseStatus <- fromHistory(r, Keys.leaseStatusHistory(id), Keys.leaseStatus(id))
       if leaseStatus
-      (h, n, _) <- r.get(Keys.transactionHNSById(TransactionId(id)))
-      tx        <- r.get(Keys.transactionAt(h, n))
+      pb.TransactionMeta(h, n, _) <- r.get(Keys.transactionMetaById(TransactionId(id)))
+      tx                          <- r.get(Keys.transactionAt(Height(h), TxNum(n.toShort)))
     } yield tx).collect {
       case (lt: LeaseTransaction, true) => lt
     }.toSeq

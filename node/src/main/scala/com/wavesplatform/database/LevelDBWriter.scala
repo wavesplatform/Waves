@@ -15,6 +15,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
+import com.wavesplatform.database.protobuf.TransactionMeta
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBTransactions
@@ -494,7 +495,7 @@ abstract class LevelDBWriter private[database] (
 
       for ((id, (tx, num, succeeded)) <- transactions) {
         rw.put(Keys.transactionAt(Height(height), num), Some((tx, succeeded)))
-        rw.put(Keys.transactionHNSById(id), Some((Height(height), num, succeeded)))
+        rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, !succeeded)))
       }
 
       val activationWindowSize = settings.functionalitySettings.activationWindowSize(height)
@@ -542,7 +543,7 @@ abstract class LevelDBWriter private[database] (
           val (txHeight, txNum) = transactions
             .get(TransactionId(txId))
             .map { case (_, txNum, _) => (height, txNum) }
-            .orElse(rw.get(Keys.transactionHNSById(TransactionId(txId))).map { case (height, txNum, _) => (height, txNum) })
+            .orElse(rw.get(Keys.transactionMetaById(TransactionId(txId))).map { case TransactionMeta(height, txNum, _) => (height, TxNum(txNum.toShort)) })
             .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
 
           try rw.put(Keys.invokeScriptResult(txHeight, txNum), Some(result))
@@ -686,7 +687,7 @@ abstract class LevelDBWriter private[database] (
 
               if (tx.typeId != GenesisTransaction.typeId) {
                 rw.delete(Keys.transactionAt(h, num))
-                rw.delete(Keys.transactionHNSById(TransactionId(tx.id())))
+                rw.delete(Keys.transactionMetaById(TransactionId(tx.id())))
               }
           }
 
@@ -764,8 +765,8 @@ abstract class LevelDBWriter private[database] (
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
     for {
-      (height, num, _) <- db.get(Keys.transactionHNSById(TransactionId @@ id))
-      tx               <- db.get(Keys.transferTransactionAt(height, num))
+      TransactionMeta(height, num, _) <- db.get(Keys.transactionMetaById(TransactionId @@ id))
+      tx                              <- db.get(Keys.transferTransactionAt(Height(height), TxNum(num.toShort)))
     } yield (height, tx)
   }
 
@@ -774,13 +775,13 @@ abstract class LevelDBWriter private[database] (
   protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(Int, Transaction, Boolean)] = {
     val txId = TransactionId(id)
     for {
-      (height, num, status) <- db.get(Keys.transactionHNSById(txId))
-      (tx, _)               <- db.get(Keys.transactionAt(height, num))
-    } yield (height, tx, status)
+      TransactionMeta(height, num, failed) <- db.get(Keys.transactionMetaById(txId))
+      (tx, _)                              <- db.get(Keys.transactionAt(Height(height), TxNum(num.toShort)))
+    } yield (height, tx, !failed)
   }
 
   override def transactionHeightAndStatus(id: ByteStr): Option[(Int, Boolean)] = readOnly { db =>
-    db.get(Keys.transactionHNSById(TransactionId(id))).map { case (height, _, succeeded) => (height, succeeded) }
+    db.get(Keys.transactionMetaById(TransactionId(id))).map { case TransactionMeta(height, _, failed) => (height, !failed) }
   }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readOnly { db =>

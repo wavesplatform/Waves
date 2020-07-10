@@ -5,6 +5,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.database.protobuf.TransactionMeta
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -140,12 +141,12 @@ object Keys {
       writeTransactionHNSeqAndType
     )
 
-  def transactionHNSById(txId: TransactionId): Key[Option[(Height, TxNum, Boolean)]] =
+  def transactionMetaById(txId: TransactionId): Key[Option[TransactionMeta]] =
     Key.opt(
-      TransactionHeightNumsAndStatusById,
+      TransactionMetaById,
       txId.arr,
-      readTransactionHNS,
-      writeTransactionHNS
+      TransactionMeta.parseFrom,
+      _.toByteArray
     )
 
   def blockTransactionsFee(height: Int): Key[Long] =
