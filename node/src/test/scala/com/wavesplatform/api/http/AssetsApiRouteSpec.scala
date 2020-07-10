@@ -73,7 +73,7 @@ class AssetsApiRouteSpec
   }
 
   routePath("/{assetId}/distribution/1/limit/10") in {
-    (blockchain.height _).when().returning(2)
+    (() => blockchain.height).when().returning(2)
     (assetsApi.assetDistribution _).when(TestValues.asset, *, *).returning(Observable(TestValues.address -> 10L))
 
     Get(routePath(s"/${TestValues.asset.id}/distribution/1/limit/10")) ~> route ~> check {

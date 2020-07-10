@@ -539,7 +539,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       minFee  <- smallFeeGen
       minFee1 <- smallFeeGen
       assetId = IssuedAsset(issue.assetId)
-      fee = (if (reducedFee) 0.001 * Constants.UnitsInWave else 1 * Constants.UnitsInWave).toLong
+      fee = (if (reducedFee) 0.001 * Constants.UnitsInWave else 1 * Constants.UnitsInWave.toDouble).toLong
     } yield (
       issue,
       SponsorFeeTransaction.selfSigned(1.toByte, sender, assetId, Some(minFee), fee, timestamp).explicitGet(),

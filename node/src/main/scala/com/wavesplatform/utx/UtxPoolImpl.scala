@@ -73,7 +73,7 @@ class UtxPoolImpl(
     else putNewTx(tx, verify = true)
   }
 
-  private[this] def putNewTx(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
+  private[utx] def putNewTx(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
     PoolMetrics.putRequestStats.increment()
 
     val checks = if (verify) PoolMetrics.putTimeStats.measure {
@@ -210,7 +210,7 @@ class UtxPoolImpl(
     factRemoved.result().foreach(tx => onEvent(UtxEvent.TxRemoved(tx, None)))
   }
 
-  private[this] def addTransaction(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
+  private[utx] def addTransaction(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
     val diffEi = priorityDiffs.synchronized {
       val patchedBlockchain = CompositeBlockchain(blockchain, Some(Monoid.combineAll(priorityDiffs)))
       TransactionDiffer.skipFailing(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(patchedBlockchain, tx)
@@ -249,7 +249,7 @@ class UtxPoolImpl(
     Monoid.combineAll(diffPf :+ pessimistic)
   }
 
-  private[this] def nonPriorityTransactions: Seq[Transaction] = {
+  private[utx] def nonPriorityTransactions: Seq[Transaction] = {
     transactions.values.asScala.toVector
       .sorted(TransactionsOrdering.InUTXPool)
   }

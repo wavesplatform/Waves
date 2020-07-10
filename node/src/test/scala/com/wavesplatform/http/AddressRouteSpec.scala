@@ -42,7 +42,7 @@ class AddressRouteSpec
   private val allAccounts  = testWallet.privateKeyAccounts
   private val allAddresses = allAccounts.map(_.toAddress)
   private val blockchain   = stub[Blockchain]("globalBlockchain")
-  (blockchain.activatedFeatures _).when().returning(Map())
+  (() => blockchain.activatedFeatures).when().returning(Map())
 
   private[this] val utxPoolSynchronizer = DummyUtxPoolSynchronizer.accepting
 

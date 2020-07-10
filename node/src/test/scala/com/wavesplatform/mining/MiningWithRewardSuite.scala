@@ -27,12 +27,12 @@ import monix.execution.Scheduler
 import org.iq80.leveldb.DB
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.compatible.Assertion
-import org.scalatest.{AsyncFlatSpec, Matchers, PrivateMethodTester}
+import org.scalatest.{AsyncFlatSpec, Matchers}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with TransactionGen with PrivateMethodTester with DBCacheSettings {
+class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with TransactionGen with DBCacheSettings {
   import MiningWithRewardSuite._
 
   behavior of "Miner with activated reward feature"
@@ -144,11 +144,9 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
         } yield r
     }
 
-  private def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] =
-    miner.invokePrivate(PrivateMethod[Task[Unit]](Symbol("generateBlockTask"))(account, None))
+  private def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] = miner.generateBlockTask(account, None)
 
-  private def forgeBlock(miner: MinerImpl)(account: KeyPair): Either[String, (Block, MiningConstraint)] =
-    miner.invokePrivate(PrivateMethod[Either[String, (Block, MiningConstraint)]](Symbol("forgeBlock"))(account))
+  private def forgeBlock(miner: MinerImpl)(account: KeyPair): Either[String, (Block, MiningConstraint)] = miner.forgeBlock(account)
 
   private def resources(settings: WavesSettings): Resource[Task, (BlockchainUpdaterImpl, DB)] =
     Resource.make {

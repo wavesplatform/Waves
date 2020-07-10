@@ -47,8 +47,8 @@ class CustomJsonMarshallerSpec
 
   private val numberFormat = Accept(`application/json`.withParams(Map("large-significand-format" -> "string")))
 
-  (blockchain.activatedFeatures _).expects().returning(BlockchainFeatures.implemented.map(_ -> 0).toMap).anyNumberOfTimes()
-  (blockchain.settings _).expects().returning(DefaultBlockchainSettings).anyNumberOfTimes()
+  (() => blockchain.activatedFeatures).expects().returning(BlockchainFeatures.implemented.map(_ -> 0).toMap).anyNumberOfTimes()
+  (() => blockchain.settings).expects().returning(DefaultBlockchainSettings).anyNumberOfTimes()
 
   private def ensureFieldsAre[A: ClassTag](v: JsObject, fields: String*)(implicit pos: Position): Unit =
     for (f <- fields) (v \ f).get shouldBe a[A]
@@ -79,7 +79,7 @@ class CustomJsonMarshallerSpec
   }
 
   property("/transactions/calculateFee") {
-    (blockchain.height _).expects().returning(1000).anyNumberOfTimes()
+    (() => blockchain.height).expects().returning(1000).anyNumberOfTimes()
     (blockchain.assetScript _).expects(*).returning(None).anyNumberOfTimes()
 
     forAll(transferV2Gen) { tx =>
@@ -91,7 +91,7 @@ class CustomJsonMarshallerSpec
   private val rewardRoute = RewardApiRoute(blockchain).route
 
   property("/blockchain/rewards") {
-    (blockchain.height _).expects().returning(1000).anyNumberOfTimes()
+    (() => blockchain.height).expects().returning(1000).anyNumberOfTimes()
     (blockchain.blockReward _).expects(*).returning(Some(1000)).twice()
     (blockchain.wavesAmount _).expects(*).returning(BigInt(10000000)).twice()
     (blockchain.blockRewardVotes _).expects(1000).returning(Seq(100L)).twice()

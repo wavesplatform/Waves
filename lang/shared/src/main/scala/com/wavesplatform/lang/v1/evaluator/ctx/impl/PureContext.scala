@@ -458,7 +458,7 @@ object PureContext {
     }
 
   lazy val toLongOffset: BaseFunction[NoContext] =
-    NativeFunction("toInt", 10, BININT_OFF, LONG, ("bin", BYTESTR), ("offset", LONG)) {
+    NativeFunction("toInt", Map[StdLibVersion, Long](V1 -> 10L, V2 -> 10L, V3 -> 10L, V4 -> 1L), BININT_OFF, LONG, ("bin", BYTESTR), ("offset", LONG)) {
       case CONST_BYTESTR(ByteStr(u)) :: CONST_LONG(o) :: Nil =>
         if (o >= 0 && o <= u.size - 8) {
           Try(CONST_LONG(ByteBuffer.wrap(u).getLong(o.toInt))).toEither.left.map {

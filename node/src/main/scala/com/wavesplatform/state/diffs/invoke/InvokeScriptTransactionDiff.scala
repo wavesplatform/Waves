@@ -98,7 +98,7 @@ object InvokeScriptTransactionDiff {
                     tx.sender,
                     payments,
                     ByteStr(tx.dAppAddressOrAlias.bytes),
-                    tx.id.value,
+                    tx.id(),
                     tx.fee,
                     tx.feeAssetId.compatId
                   )
