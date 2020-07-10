@@ -42,7 +42,7 @@ trait Blockchain {
 
   def transferById(id: ByteStr): Option[(Int, TransferTransaction)]
   def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)]
-  def transactionHeightAndStatus(id: ByteStr): Option[(Int, Boolean)]
+  def transactionMeta(id: ByteStr): Option[(Int, Boolean)]
 
   def containsTransaction(tx: Transaction): Boolean
 

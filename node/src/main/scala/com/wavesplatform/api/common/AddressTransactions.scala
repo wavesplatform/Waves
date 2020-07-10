@@ -55,8 +55,8 @@ object AddressTransactions {
 
   private def loadInvokeScriptResult(resource: DBResource, txId: ByteStr): Option[InvokeScriptResult] =
     for {
-      pb.TransactionMeta(h, txNum, _) <- resource.get(Keys.transactionMetaById(TransactionId(txId)))
-      r                               <- resource.get(Keys.invokeScriptResult(h, TxNum(txNum.toShort)))
+      pb.TransactionMeta(h, txNum, InvokeScriptTransaction.typeId, _) <- resource.get(Keys.transactionMetaById(TransactionId(txId)))
+      r                                                               <- resource.get(Keys.invokeScriptResult(h, TxNum(txNum.toShort)))
     } yield r
 
   def loadInvokeScriptResult(db: DB, txId: ByteStr): Option[InvokeScriptResult] =
@@ -90,7 +90,7 @@ object AddressTransactions {
       val (maxHeight, maxTxNum) =
         fromId
           .flatMap(id => resource.get(Keys.transactionMetaById(TransactionId(id))))
-          .map { case pb.TransactionMeta(h, n, _) => (Height(h), TxNum(n.toShort)) }
+          .map { case pb.TransactionMeta(h, n, _, _) => (Height(h), TxNum(n.toShort)) }
           .getOrElse(Height(Int.MaxValue) -> TxNum(Short.MaxValue))
 
       (for {

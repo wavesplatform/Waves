@@ -10,7 +10,6 @@ import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.utils._
 
 object Keys {
@@ -120,14 +119,6 @@ object Keys {
       hNum(height, n),
       readTransaction,
       writeTransaction
-    )
-
-  def transferTransactionAt(height: Height, n: TxNum): Key[Option[TransferTransaction]] =
-    Key(
-      NthTransactionInfoAtHeight,
-      hNum(height, n),
-      bytes => readTransferTransaction(bytes),
-      unsupported("Can not explicitly write transfer transaction")
     )
 
   def addressTransactionSeqNr(addressId: AddressId): Key[Int] =

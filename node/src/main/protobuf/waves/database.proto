@@ -28,7 +28,8 @@ message BlockMeta {
 message TransactionMeta {
     int32 height = 1;
     int32 num = 2;
-    bool failed = 3;
+    int32 type = 3;
+    bool failed = 4;
 }
 
 message TransactionData {

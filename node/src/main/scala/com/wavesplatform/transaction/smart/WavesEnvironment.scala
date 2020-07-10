@@ -118,7 +118,7 @@ class WavesEnvironment(
   }
 
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
-    blockchain.transactionHeightAndStatus(ByteStr(id)).collect { case (h, true) => h.toLong }
+    blockchain.transactionMeta(ByteStr(id)).collect { case (h, true) => h.toLong }
 
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
     for {

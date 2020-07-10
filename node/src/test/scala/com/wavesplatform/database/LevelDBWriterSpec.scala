@@ -279,12 +279,12 @@ class LevelDBWriterSpec
 
       forAll(randomTransactionGen) { tx =>
         val transactionId = tx.id()
-        db.put(Keys.transactionMetaById(TransactionId @@ transactionId).keyBytes, TransactionMeta(1, 0, true).toByteArray)
-        db.put(Keys.transferTransactionAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](1, 2, 3, 4, 5, 6))
+        db.put(Keys.transactionMetaById(TransactionId @@ transactionId).keyBytes, TransactionMeta(1, 0, tx.typeId, true).toByteArray)
+        db.put(Keys.transactionAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](1, 2, 3, 4, 5, 6))
 
         writer.transferById(transactionId) shouldBe None
 
-        db.put(Keys.transferTransactionAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))
+        db.put(Keys.transactionAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))
         intercept[BufferUnderflowException](writer.transferById(transactionId))
       }
     }
@@ -309,7 +309,7 @@ class LevelDBWriterSpec
       forAll(scenario) {
         case (tx, s) =>
           val transactionId = tx.id()
-          db.put(Keys.transactionMetaById(TransactionId(transactionId)).keyBytes, TransactionMeta(1, 0, !s).toByteArray)
+          db.put(Keys.transactionMetaById(TransactionId(transactionId)).keyBytes, TransactionMeta(1, 0, tx.typeId, !s).toByteArray)
           db.put(Keys.transactionAt(Height(1), TxNum(0.toShort)).keyBytes, database.writeTransaction((tx, s)))
 
           writer.transactionInfo(transactionId) shouldBe Some((1, tx, s))
