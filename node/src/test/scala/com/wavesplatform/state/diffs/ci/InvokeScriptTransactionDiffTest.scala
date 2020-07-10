@@ -273,7 +273,7 @@ class InvokeScriptTransactionDiffTest
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(Global, V3).withEnvironment[Environment],
+            PureContext.build(V3).withEnvironment[Environment],
             CryptoContext.build(Global, V3).withEnvironment[Environment],
             WavesContext.build(
               DirectiveSet(V3, Account, Expression).explicitGet()
@@ -344,7 +344,7 @@ class InvokeScriptTransactionDiffTest
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(Global, stdLibVersion).withEnvironment[Environment],
+            PureContext.build(stdLibVersion).withEnvironment[Environment],
             CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment],
             WavesContext.build(
               DirectiveSet(stdLibVersion, Account, DAppType).explicitGet()

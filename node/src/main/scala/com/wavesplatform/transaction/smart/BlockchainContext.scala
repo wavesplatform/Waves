@@ -31,7 +31,7 @@ object BlockchainContext {
       ContentType.isDApp(isContract)
     ).map { ds =>
       val ctx =
-        PureContext.build(Global, version).withEnvironment[Environment]   |+|
+        PureContext.build(version).withEnvironment[Environment]   |+|
         CryptoContext.build(Global, version).withEnvironment[Environment] |+|
         WavesContext.build(ds)
 
