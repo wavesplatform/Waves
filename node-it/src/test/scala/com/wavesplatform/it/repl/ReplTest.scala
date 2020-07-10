@@ -1,5 +1,6 @@
 package com.wavesplatform.it.repl
 
+import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
@@ -12,18 +13,15 @@ import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxVersion
-import com.wavesplatform.it.util._
-import com.wavesplatform.it.BaseSuite
-import com.wavesplatform.it.api.SyncHttpApi._
-import org.scalatest.Ignore
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import org.scalatest.Ignore
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 @Ignore
 class ReplTest extends BaseSuite {
-  override def nodeConfigs =
+  override def nodeConfigs: Seq[Config] =
     com.wavesplatform.it.NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
       .overrideBase(_.preactivatedFeatures(BlockchainFeatures.BlockV5.id.toInt -> 0))
@@ -33,15 +31,16 @@ class ReplTest extends BaseSuite {
   def await[A](f: Future[A]): A = Await.result(f, 2 seconds)
 
   "waves context" in {
-    val issuer = miner.createAddress()
-    val sample = miner.createAddress()
-    val ikey = KeyPair(Base58.decode(miner.seed(issuer)))
-    val trans = miner.transfer(miner.address, issuer, 100.waves, 1.waves, version = TxVersion.V3, waitForTx = true)
-    miner.transfer(miner.address, sample, 100.waves, 1.waves, waitForTx = true)
-    miner.createAlias(miner.address, "aaaa", waitForTx = true)
+    val issuer = miner.createKeyPair()
+    val sample = miner.createKeyPair()
+    val ikey   = KeyPair(Base58.decode(miner.seed(issuer.toAddress.toString)))
+    val trans  = miner.transfer(miner.keyPair, issuer.toAddress.toString, 100.waves, 1.waves, version = TxVersion.V3, waitForTx = true)
+    miner.transfer(miner.keyPair, sample.toAddress.toString, 100.waves, 1.waves, waitForTx = true)
+    miner.createAlias(miner.keyPair, "aaaa", waitForTx = true)
 
-    val failDApp = ScriptCompiler.compile(
-           s"""
+    val failDApp = ScriptCompiler
+      .compile(
+        s"""
                |{-# STDLIB_VERSION 4 #-}
                |{-# CONTENT_TYPE DAPP #-}
                |{-# SCRIPT_TYPE ACCOUNT #-}
@@ -51,66 +50,84 @@ class ReplTest extends BaseSuite {
                | if (${"sigVerify(base58'', base58'', base58'') ||" * 8} true) then throw("") else throw("")
                |}
                |""".stripMargin,
-            ScriptEstimatorV3
-          )
-          .explicitGet()
-          ._1
-          .bytes()
-          .base64
+        ScriptEstimatorV3
+      )
+      .explicitGet()
+      ._1
+      .bytes()
+      .base64
 
-    val assetScript = ScriptCompiler.compile(
-            """
+    val assetScript = ScriptCompiler
+      .compile(
+        """
                |{-# STDLIB_VERSION 2 #-}
                |{-# CONTENT_TYPE EXPRESSION #-}
                |{-# SCRIPT_TYPE ASSET #-}
                |
                | false
                |""".stripMargin,
-            ScriptEstimatorV3
-          )
-          .explicitGet()
-          ._1
-          .bytes()
-          .base64
-
+        ScriptEstimatorV3
+      )
+      .explicitGet()
+      ._1
+      .bytes()
+      .base64
 
     val assetId =
-      miner.broadcastIssue(ikey, "asset", "description", 1000, decimals = 1, reissuable = true, script = Some(assetScript), waitForTx = true, fee = 1.waves).id
+      miner
+        .broadcastIssue(
+          ikey,
+          "asset",
+          "description",
+          1000,
+          decimals = 1,
+          reissuable = true,
+          script = Some(assetScript),
+          waitForTx = true,
+          fee = 1.waves
+        )
+        .id
     val height = miner.height
 
-    miner.putData(issuer, List[DataEntry[_]](
-      IntegerDataEntry("int", 100500L),
-      StringDataEntry("str", "text"),
-      BinaryDataEntry("bin", ByteStr(Base58.decode("r1Mw3j9J"))),
-      BooleanDataEntry("bool", true)), 1.waves, waitForTx = true)
+    miner.putData(
+      issuer,
+      List[DataEntry[_]](
+        IntegerDataEntry("int", 100500L),
+        StringDataEntry("str", "text"),
+        BinaryDataEntry("bin", ByteStr(Base58.decode("r1Mw3j9J"))),
+        BooleanDataEntry("bool", true)
+      ),
+      1.waves,
+      waitForTx = true
+    )
 
     miner.setScript(issuer, Some(failDApp), 1.waves, waitForTx = true)
 
     val transFailed = miner.invokeScript(
-        issuer,
-        issuer,
-        func = None,
-        payment = Seq(),
-        fee = 1.waves,
-        waitForTx = true
-      )
- 
+      issuer,
+      issuer.toAddress.toString,
+      func = None,
+      payment = Seq(),
+      fee = 1.waves,
+      waitForTx = true
+    )
+
     val idFailed = transFailed._1.id
 
     (miner.rawTransactionInfo(idFailed) \ "applicationStatus").as[String] shouldBe "script_execution_failed"
 
-    val settings = NodeConnectionSettings(miner.nodeApiEndpoint.toString, 'I'.toByte, issuer)
-    val repl = Repl(Some(settings))
+    val settings = NodeConnectionSettings(miner.nodeApiEndpoint.toString, 'I'.toByte, issuer.toAddress.toString)
+    val repl     = Repl(Some(settings))
 
-    await(repl.execute(""" this.getInteger("int") """))  shouldBe Right("res1: Int|Unit = 100500")
-    await(repl.execute(""" this.getString("str") """))   shouldBe Right("""res2: String|Unit = "text"""")
-    await(repl.execute(""" this.getBinary("bin") """))   shouldBe Right("res3: ByteVector|Unit = base58'r1Mw3j9J'")
+    await(repl.execute(""" this.getInteger("int") """)) shouldBe Right("res1: Int|Unit = 100500")
+    await(repl.execute(""" this.getString("str") """)) shouldBe Right("""res2: String|Unit = "text"""")
+    await(repl.execute(""" this.getBinary("bin") """)) shouldBe Right("res3: ByteVector|Unit = base58'r1Mw3j9J'")
     await(repl.execute(""" this.getBoolean("bool") """)) shouldBe Right("res4: Boolean|Unit = true")
 
     await(repl.execute(""" height """)).explicitGet() should fullyMatch regex "res5: Int = \\d+".r
 
     await(repl.execute(s""" transferTransactionById(base58'${trans.id}') """)).explicitGet() should fullyMatch regex
-        s"""
+      s"""
           |res6: TransferTransaction\\|Unit = TransferTransaction\\(
           |	recipient = Address\\(
           |		bytes = base58'$issuer'
@@ -156,7 +173,7 @@ class ReplTest extends BaseSuite {
       )
 
     await(repl.execute(s""" blockInfoByHeight($height) """)).explicitGet() should fullyMatch regex
-        s"""
+      s"""
           |res9: BlockInfo\\|Unit = BlockInfo\\(
           |	baseTarget = \\d+
           |	generator = Address\\(
@@ -170,29 +187,33 @@ class ReplTest extends BaseSuite {
           |\\)
         """.trim.stripMargin
 
-    await(repl.execute(
-     s""" addressFromRecipient(Alias("aaaa")) ==
+    await(
+      repl.execute(
+        s""" addressFromRecipient(Alias("aaaa")) ==
           addressFromRecipient(Address(base58'${miner.address}'))
       """
-    )) shouldBe
+      )
+    ) shouldBe
       Right("res10: Boolean = true")
 
-    await(repl.execute(
-     s""" assetBalance(
-            Address(base58'${issuer}'),
-            base58'${assetId}'
+    await(
+      repl.execute(
+        s""" assetBalance(
+            Address(base58'$issuer'),
+            base58'$assetId'
           )
        """
-    )).explicitGet() shouldBe "res11: Int = 1000"
+      )
+    ).explicitGet() shouldBe "res11: Int = 1000"
 
     await(repl.execute(s""" wavesBalance(Address(base58'${sample}')).regular """)) shouldBe Right(s"res12: Int = ${100.waves}")
-    await(repl.execute(""" this.wavesBalance() """)).explicitGet() should fullyMatch regex "res13: BalanceDetails = BalanceDetails\\(\\s+available = \\d+\\s+regular = \\d+\\s+generating = \\d+\\s+effective = \\d+\\s+\\)".r
-
+    await(repl.execute(""" this.wavesBalance() """))
+      .explicitGet() should fullyMatch regex "res13: BalanceDetails = BalanceDetails\\(\\s+available = \\d+\\s+regular = \\d+\\s+generating = \\d+\\s+effective = \\d+\\s+\\)".r
 
     await(repl.execute(s""" transactionHeightById(base58'$idFailed') """)) shouldBe
       Right("res14: Int|Unit = Unit")
 
-/* It function removed from node API. Wait native protobufs implementation. */
+    /* It function removed from node API. Wait native protobufs implementation. */
 //    await(repl.execute(s""" transferTransactionFromProto(base58'3nec5yth17jNrNgA7dfbbmzJTKysfVyrbkAH5A8w8ncBtWYGgfxEn5hGMnNKQyacgGxuoT9DQdbufGBybzPEpR4SFSbM2o1rxgLUtocDdzLWdbSAUKKHM7f2fsCDqEExkGF2f7Se6Tfi44y3yuNMTYAKrfShEBrKGzCgbEaJtLoZo4bPdnX5V6K2eWCBFnmFjUjA947TckxnNGboh7CL6') """)) shouldBe Right(
 //      s"""|res15: TransferTransaction|Unit = TransferTransaction(
 //          |	recipient = Address(
