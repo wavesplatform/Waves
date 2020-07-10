@@ -9,7 +9,7 @@ object ContractLimits {
     case V3 | V4 => 4000
   }
 
-  // used after BlockV5
+  // used after activation of BlockV5
   val MaxAccountVerifierComplexityByVersion: StdLibVersion => Int =
     _ => 2000
 
