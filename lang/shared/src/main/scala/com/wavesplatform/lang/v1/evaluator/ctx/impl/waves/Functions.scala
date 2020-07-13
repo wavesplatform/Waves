@@ -26,7 +26,7 @@ object Functions {
     val args = Seq(("addressOrAlias", addressOrAliasType), ("key", STRING))
     NativeFunction.withEnvironment[Environment](
       name,
-      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 25L),
+      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 10L),
       internalName,
       UNION(dataType.innerType, UNIT),
       ("addressOrAlias", addressOrAliasType),
@@ -293,7 +293,7 @@ object Functions {
   val addressFromRecipientF: BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "addressFromRecipient",
-      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 10L),
+      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 5L),
       ADDRESSFROMRECIPIENT,
       addressType,
       ("AddressOrAlias", addressOrAliasType)
@@ -335,7 +335,7 @@ object Functions {
   val assetBalanceF: BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "assetBalance",
-      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 15L),
+      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 10L),
       ACCOUNTASSETBALANCE,
       LONG,
       ("addressOrAlias", addressOrAliasType),
@@ -358,7 +358,7 @@ object Functions {
   val assetBalanceV4F: BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "assetBalance",
-      15,
+      10,
       ACCOUNTASSETONLYBALANCE,
       LONG,
       ("addressOrAlias", addressOrAliasType),
@@ -404,7 +404,7 @@ object Functions {
   def assetInfoF(version: StdLibVersion): BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "assetInfo",
-      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 50L),
+      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 15L),
       GETASSETINFOBYID,
       optionAsset(version),
       ("id", BYTESTR)
@@ -432,7 +432,7 @@ object Functions {
   val txHeightByIdF: BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "transactionHeightById",
-      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 15L),
+      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 20L),
       TRANSACTIONHEIGHTBYID,
       optionLong,
       ("id", BYTESTR)
