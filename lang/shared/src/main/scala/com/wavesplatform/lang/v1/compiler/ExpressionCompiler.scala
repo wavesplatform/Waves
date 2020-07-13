@@ -245,17 +245,6 @@ object ExpressionCompiler {
           MultipleDefaultCases(p.start, p.end, defaultCasesCount)
         ).toCompileM
       }
-      _ <- {
-        val unusedCaseVariables =
-          cases.collect {
-            case MATCH_CASE(_, Some(PART.VALID(_, name)), _, expr, _, _) if !exprContainsRef(expr, name) => name
-          }
-        Either.cond(
-          unusedCaseVariables.isEmpty,
-          (),
-          UnusedCaseVariables(p.start, p.end, unusedCaseVariables)
-        ).toCompileM
-      }
       typedExpr <- compileExprWithCtx(expr, saveExprContext)
       exprTypesWithErr <- (typedExpr.t match {
         case u: UNION => u.pure[CompileM]

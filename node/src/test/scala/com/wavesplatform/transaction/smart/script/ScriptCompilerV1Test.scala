@@ -355,7 +355,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
     )
   }
 
-  property("forbid unused case variables") {
+  ignore("forbid unused case variables") {
     val script =
       """
         | {-# STDLIB_VERSION 3 #-}
@@ -401,6 +401,20 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
     ScriptCompiler.compile(script, estimator) should produce(
       "Compilation failed: Unused case variable(s) `unused1`, `unused2`, `unused3`, `unused4` in 91-920"
     )
+  }
+
+  property("allow unused case variables") {
+    val script =
+      """
+        |
+        | match tx {
+        |   case transfer: TransferTransaction => true
+        |   case other => false
+        | }
+        |
+      """.stripMargin
+
+    ScriptCompiler.compile(script, estimator) shouldBe Symbol("right")
   }
 
   private val expectedExpr = LET_BLOCK(
