@@ -62,7 +62,7 @@ class UtxPoolImpl(
 
   // State
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
-  private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).isDefined) // TODO delete in the future
+  private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionMeta(_).isDefined) // TODO delete in the future
 
   private[this] val priorityDiffs          = mutable.LinkedHashSet.empty[Diff]
   private[this] def priorityTransactionIds = priorityDiffs.synchronized(priorityDiffs.toVector.flatMap(_.transactions.keys))

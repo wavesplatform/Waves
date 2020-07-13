@@ -5,11 +5,11 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.database.protobuf.TransactionMeta
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.utils._
 
 object Keys {
@@ -121,14 +121,6 @@ object Keys {
       writeTransaction
     )
 
-  def transferTransactionAt(height: Height, n: TxNum): Key[Option[TransferTransaction]] =
-    Key(
-      NthTransactionInfoAtHeight,
-      hNum(height, n),
-      bytes => readTransferTransaction(bytes),
-      unsupported("Can not explicitly write transfer transaction")
-    )
-
   def addressTransactionSeqNr(addressId: AddressId): Key[Int] =
     bytesSeqNr(AddressTransactionSeqNr, addressId.toByteArray)
 
@@ -140,12 +132,12 @@ object Keys {
       writeTransactionHNSeqAndType
     )
 
-  def transactionHNById(txId: TransactionId): Key[Option[(Height, TxNum)]] =
+  def transactionMetaById(txId: TransactionId): Key[Option[TransactionMeta]] =
     Key.opt(
-      TransactionHeightAndNumsById,
+      TransactionMetaById,
       txId.arr,
-      readTransactionHN,
-      writeTransactionHN
+      TransactionMeta.parseFrom,
+      _.toByteArray
     )
 
   def blockTransactionsFee(height: Int): Key[Long] =

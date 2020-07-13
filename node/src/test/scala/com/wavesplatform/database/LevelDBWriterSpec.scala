@@ -2,12 +2,12 @@ package com.wavesplatform.database
 
 import java.nio.BufferUnderflowException
 
-import com.google.common.primitives.{Ints, Shorts}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.database.protobuf.TransactionMeta
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -279,12 +279,12 @@ class LevelDBWriterSpec
 
       forAll(randomTransactionGen) { tx =>
         val transactionId = tx.id()
-        db.put(Keys.transactionHNById(TransactionId @@ transactionId).keyBytes, Ints.toByteArray(1) ++ Shorts.toByteArray(0))
-        db.put(Keys.transferTransactionAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](1, 2, 3, 4, 5, 6))
+        db.put(Keys.transactionMetaById(TransactionId @@ transactionId).keyBytes, TransactionMeta(1, 0, tx.typeId, true).toByteArray)
+        db.put(Keys.transactionAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](1, 2, 3, 4, 5, 6))
 
         writer.transferById(transactionId) shouldBe None
 
-        db.put(Keys.transferTransactionAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))
+        db.put(Keys.transactionAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))
         intercept[BufferUnderflowException](writer.transferById(transactionId))
       }
     }
@@ -309,7 +309,7 @@ class LevelDBWriterSpec
       forAll(scenario) {
         case (tx, s) =>
           val transactionId = tx.id()
-          db.put(Keys.transactionHNById(TransactionId(transactionId)).keyBytes, database.writeTransactionHN((Height(1), TxNum(0.toShort))))
+          db.put(Keys.transactionMetaById(TransactionId(transactionId)).keyBytes, TransactionMeta(1, 0, tx.typeId, !s).toByteArray)
           db.put(Keys.transactionAt(Height(1), TxNum(0.toShort)).keyBytes, database.writeTransaction((tx, s)))
 
           writer.transactionInfo(transactionId) shouldBe Some((1, tx, s))

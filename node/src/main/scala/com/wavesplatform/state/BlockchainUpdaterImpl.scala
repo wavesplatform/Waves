@@ -642,8 +642,8 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.accountData(acc, key)
   }
 
-  override def transactionHeight(id: ByteStr): Option[Int] = readLock {
-    compositeBlockchain.transactionHeight(id)
+  override def transactionMeta(id: ByteStr): Option[(Int, Boolean)] = readLock {
+    compositeBlockchain.transactionMeta(id)
   }
 
   override def balance(address: Address, mayBeAssetId: Asset): Long = readLock {
