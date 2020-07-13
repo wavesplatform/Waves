@@ -6,6 +6,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.{NoShrink, produce}
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.directives.DirectiveSet
@@ -37,7 +38,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   private val dAppV4Ctx: CompilerContext = Monoid
     .combineAll(
       Seq(
-        PureContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
+        PureContext.build(V4).withEnvironment[Environment],
         CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
         WavesContext.build(
           DirectiveSet(V4, Account, DAppType).explicitGet()

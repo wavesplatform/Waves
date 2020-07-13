@@ -306,7 +306,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     val expr = s" ${"sigVerify(base58'', base58'', base58'') &&" * 350} true "
     val ctx = Monoid.combineAll(
         Seq(
-          PureContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
+          PureContext.build(V4).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
           WavesContext.build(
             DirectiveSet(V4, Account, Expression).explicitGet()
