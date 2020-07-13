@@ -8,32 +8,39 @@
       complexity: 200
     }
     {
+      name: "sigVerify_8Kb"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "Verifies a [Curve25519](https://en.wikipedia.org/wiki/Curve25519) signature. For message size <= 16Kb."
+      paramsDoc: [ "The message.", "The signature.", "The account public key." ]
+      complexity: 47
+    }
+    {
       name: "sigVerify_16Kb"
       params: [ "ByteVector", "ByteVector", "ByteVector" ]
       doc: "Verifies a [Curve25519](https://en.wikipedia.org/wiki/Curve25519) signature. For message size <= 16Kb."
       paramsDoc: [ "The message.", "The signature.", "The account public key." ]
-      complexity: 100
+      complexity: 57
     }
     {
       name: "sigVerify_32Kb"
       params: [ "ByteVector", "ByteVector", "ByteVector" ]
       doc: "Verifies a [Curve25519](https://en.wikipedia.org/wiki/Curve25519) signature. For message size <= 32Kb."
       paramsDoc: [ "The message.", "The signature.", "The account public key." ]
-      complexity: 110
+      complexity: 70
     }
     {
       name: "sigVerify_64Kb"
       params: [ "ByteVector", "ByteVector", "ByteVector" ]
       doc: "Verifies a [Curve25519](https://en.wikipedia.org/wiki/Curve25519) signature. For message size <= 64Kb."
       paramsDoc: [ "The message.", "The signature.", "The account public key." ]
-      complexity: 125
+      complexity: 102
     }
     {
       name: "sigVerify_128Kb"
       params: [ "ByteVector", "ByteVector", "ByteVector" ]
       doc: "Verifies a [Curve25519](https://en.wikipedia.org/wiki/Curve25519) signature. For message size <= 128Kb."
       paramsDoc: [ "The message.", "The signature.", "The account public key." ]
-      complexity: 150
+      complexity: 172
     }
     {
       name: "rsaVerify"

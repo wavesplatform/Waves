@@ -116,13 +116,14 @@ object CryptoContext {
     }))(global.sha256)
 
     val sigVerifyL: Array[BaseFunction[NoContext]] = lgen(
-      Array(16, 32, 64, 128),
+      Array(8, 16, 32, 64, 128),
       (n => (s"sigVerify_${n._1}Kb", (SIGVERIFY_LIM + n._2).toShort)),
       ({
-        case 16  => 100
-        case 32  => 110
-        case 64  => 125
-        case 128 => 150
+        case 8   => 47
+        case 16  => 57
+        case 32  => 70
+        case 64  => 102
+        case 128 => 172
       }),
       (n => {
         case CONST_BYTESTR(msg: ByteStr) :: _ => Either.cond(msg.size <= n * 1024, (), s"Invalid message size = ${msg.size} bytes, must be not greater than $n KB")
