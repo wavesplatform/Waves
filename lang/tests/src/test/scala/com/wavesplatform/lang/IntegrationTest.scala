@@ -2028,4 +2028,31 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       eval(src, version = V4) shouldBe Left("Invalid inputs size 33 bytes, must be a multiple of 32 bytes")
     }
   }
+
+  property("removeByIndex") {
+    eval(" [1, 2, 3, 4].removeByIndex(0) == [2, 3, 4] ", version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(" [1, 2, 3, 4].removeByIndex(1) == [1, 3, 4] ", version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(" [1, 2, 3, 4].removeByIndex(2) == [1, 2, 4] ", version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(" [1, 2, 3, 4].removeByIndex(3) == [1, 2, 3] ", version = V4) shouldBe Right(CONST_BOOLEAN(true))
+
+    eval(" [1, 2, 3, 4].removeByIndex(-1)", version = V4) should produce(
+      "Index of the removing element should be positive, but -1 was passed"
+    )
+
+    eval(" [1, 2, 3, 4].removeByIndex(4)", version = V4) should produce(
+      "Index of the removing element should be lower than list size = 4, but 4 was passed"
+    )
+
+    eval(" [1, 2, 3, 4].removeByIndex(5)", version = V4) should produce(
+      "Index of the removing element should be lower than list size = 4, but 5 was passed"
+    )
+
+    eval(" [].removeByIndex(0)", version = V4) should produce(
+      "Can't remove an element from empty list"
+    )
+
+    eval(" [1, 2, 3, 4].removeByIndex(0)", version = V3) should produce(
+      "Can't find a function 'removeByIndex'(List[Int], Int)"
+    )
+  }
 }

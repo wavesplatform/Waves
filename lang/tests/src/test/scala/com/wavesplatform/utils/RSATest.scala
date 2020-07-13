@@ -326,7 +326,7 @@ class RSATest extends PropSpec with PropertyChecks with Matchers with BeforeAndA
         privateSignature.update(message)
 
         val signature = privateSignature.sign
-        val ctx = PureContext.build(Global, V3) |+| CryptoContext.build(Global, V3)
+        val ctx = PureContext.build(V3) |+| CryptoContext.build(Global, V3)
 
         val invalidKey = Array[Byte](1, 2, 3)
         eval(scriptSrc(alg, message, signature, invalidKey), ctx) should produce(s"Invalid key base58'${ByteStr(invalidKey)}'")
