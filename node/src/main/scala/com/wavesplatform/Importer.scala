@@ -295,7 +295,5 @@ object Importer extends ScorexLogging {
 
       blockchainUpdater.processBlock(pseudoBlock, ByteStr.empty, verify = false)
     }
-
-    sys.exit(0)
   }
 }
