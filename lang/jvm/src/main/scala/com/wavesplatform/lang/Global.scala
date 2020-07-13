@@ -1,6 +1,7 @@
 package com.wavesplatform.lang
 
 import java.math.{MathContext, BigDecimal => BD}
+import java.security.spec.InvalidKeySpecException
 
 import cats.implicits._
 import ch.obermuhlner.math.big.BigDecimalMath
@@ -11,7 +12,8 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 import com.wavesplatform.utils.Merkle
-import com.wavesplatform.zwaves.bls12.Groth16
+import com.wavesplatform.zwaves.bls12.{Groth16 => Bls12Groth16}
+import com.wavesplatform.zwaves.bn256.{Groth16 => Bn256Groth16}
 import org.web3j.crypto.Sign
 import org.web3j.crypto.Sign.SignatureData
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
@@ -50,19 +52,25 @@ object Global extends BaseGlobal {
   private def toEither[A](f: => A): Either[String, A] =
     Try(f).toEither
       .leftMap { exception =>
-        @tailrec
-        def findThrowableCause(th: Throwable): Throwable =
-          if (th.getCause == null) th
-          else findThrowableCause(th.getCause)
-
         val cause = findThrowableCause(exception)
         if (cause.getMessage != null) cause.getMessage
         else cause.toString
       }
 
+  @tailrec
+  private def findThrowableCause(th: Throwable): Throwable =
+    if (th.getCause == null) th
+    else findThrowableCause(th.getCause)
+
   def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean = Curve25519.verify(Signature(sig), message, PublicKey(pub))
 
-  override def rsaVerify(alg: DigestAlgorithm, message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean = RSA.verify(alg, message, sig, pub)
+  override def rsaVerify(alg: DigestAlgorithm, message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Either[String, Boolean] =
+    Try(RSA.verify(alg, message, sig, pub))
+      .toEither
+      .leftMap {
+        case err: InvalidKeySpecException => s"Invalid key base58'${Base58.encode(pub)}': ${findThrowableCause(err).getMessage}"
+        case err                          => findThrowableCause(err).getMessage
+      }
 
   def keccak256(message: Array[Byte]): Array[Byte]  = Keccak256.hash(message)
   def blake2b256(message: Array[Byte]): Array[Byte] = Blake2b256.hash(message)
@@ -93,7 +101,10 @@ object Global extends BaseGlobal {
     client.requestNode(url)
 
   override def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
-    Groth16.verify(verifyingKey, proof, inputs)
+    Bls12Groth16.verify(verifyingKey, proof, inputs)
+
+  override def bn256Groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
+    Bn256Groth16.verify(verifyingKey, proof, inputs)
 
   override def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte] = {
     // https://github.com/web3j/web3j/blob/master/crypto/src/test/java/org/web3j/crypto/ECRecoverTest.java#L43

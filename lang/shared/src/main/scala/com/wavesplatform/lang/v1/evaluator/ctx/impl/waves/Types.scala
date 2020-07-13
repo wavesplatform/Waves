@@ -141,8 +141,8 @@ object Types {
       FieldNames.Reissue,
       List(
         FieldNames.ReissueAssetId      -> BYTESTR,
-        FieldNames.ReissueIsReissuable -> BOOLEAN,
-        FieldNames.ReissueQuantity     -> LONG
+        FieldNames.ReissueQuantity     -> LONG,
+        FieldNames.ReissueIsReissuable -> BOOLEAN
       )
     )
 

@@ -77,10 +77,12 @@ object FunctionIds {
   val CREATE_MERKLE_ROOT: Short = 701
 
   val BLS12_GROTH16_VERIFY: Short = 800
+  val BN256_GROTH16_VERIFY: Short = 801
 
   val ECRECOVER: Short = 900
 
   val BLS12_GROTH16_VERIFY_LIM: Short = 2400 // Reserved n id for generated limited functions
+  val BN256_GROTH16_VERIFY_LIM: Short = 2450 // Reserved n id for generated limited functions
   val SIGVERIFY_LIM: Short            = 2500 // Reserved n id for generated limited functions
   val RSAVERIFY_LIM: Short            = 2600 // Reserved n id for generated limited functions
   val KECCAK256_LIM: Short            = 2700 // Reserved n id for generated limited functions

@@ -69,7 +69,7 @@ trait BaseGlobal {
 
   def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean
 
-  def rsaVerify(alg: DigestAlgorithm, message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean
+  def rsaVerify(alg: DigestAlgorithm, message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Either[String, Boolean]
 
   def keccak256(message: Array[Byte]): Array[Byte]
   def blake2b256(message: Array[Byte]): Array[Byte]
@@ -267,6 +267,8 @@ trait BaseGlobal {
   def requestNode(url: String): Future[NodeResponse]
 
   def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean
+
+  def bn256Groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean
 
   def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte]
 

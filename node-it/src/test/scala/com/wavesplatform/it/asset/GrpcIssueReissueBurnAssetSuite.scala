@@ -553,14 +553,14 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
        |@Callable (i) func process11actions(a: ByteVector) = {
        |  [
        |    Issue($issueParams, 0),
-       |    Reissue(a, true, 1000),
+       |    Reissue(a, 1000, true),
        |    Issue($issueParams, 2),
        |    Issue($issueParams, 3),
-       |    Reissue(a, true, 2000),
-       |    Reissue(a, true, 2000),
-       |    Reissue(a, true, 3000),
+       |    Reissue(a, 2000, true),
+       |    Reissue(a, 2000, true),
+       |    Reissue(a, 3000, true),
        |    Burn(a, 6212),
-       |    Reissue(a, true, 2000),
+       |    Reissue(a, 2000, true),
        |    Issue($issueParams, 1),
        |    Burn(a, 12311)
        |  ]
@@ -570,9 +570,9 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
        |
        |@Callable (i) func burnAsset(a: ByteVector, q: Int) = [Burn(a, q)]
        |
-       |@Callable (i) func reissueAsset(a: ByteVector, r: Boolean, q: Int) = [Reissue(a, r, q)]
+       |@Callable (i) func reissueAsset(a: ByteVector, r: Boolean, q: Int) = [Reissue(a, q, r)]
        |
-       |@Callable (i) func reissueAndReissue(a: ByteVector, rq: Int) = [Reissue(a, false, rq), Reissue(a, false, rq)]
+       |@Callable (i) func reissueAndReissue(a: ByteVector, rq: Int) = [Reissue(a, rq, false), Reissue(a, rq, false)]
        |
        |@Callable(i)
        |func transferAndBurn(a: ByteVector, q: Int) = {
@@ -586,7 +586,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
        |func reissueIssueAndNft(a: ByteVector) = {
        |  [
        |    Issue($issueParams, ${asset.nonce + 1}),
-       |    Reissue(a, true, 100),
+       |    Reissue(a, 100, true),
        |    Burn(a, 100),
        |    Issue(${createIssueParams(nftAsset)}, 1)
        |  ]

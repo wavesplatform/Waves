@@ -254,14 +254,14 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
            |   IntegerEntry("int", 1),
            |   BooleanEntry("bool", true),
            |
-           |   Reissue(base58'$assetId', true, $reissueAmount),
+           |   Reissue(base58'$assetId', $reissueAmount, true),
            |   Burn(base58'$assetId', $burnAmount),
            |   ScriptTransfer(Address(base58'$recipient'), $transferAmount, base58'$assetId'),
            |
            |   StringEntry("str", "str"),
            |   BinaryEntry("bin", base58'$assetId'),
            |
-           |   Reissue(base58'$assetId', false, $reissueAmount),
+           |   Reissue(base58'$assetId', $reissueAmount, false),
            |   Burn(base58'$assetId', $burnAmount),
            |   ScriptTransfer(Address(base58'$recipient'), $transferAmount, base58'$assetId')
            | ]
@@ -367,7 +367,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     dApp(
       s"""
          | [
-         |   Reissue(base58'$assetId', true, $reissueAmount),
+         |   Reissue(base58'$assetId', $reissueAmount, true),
          |   Burn(base58'$assetId', $burnAmount)
          | ]
        """.stripMargin

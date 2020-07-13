@@ -45,7 +45,7 @@ class PseudoTxSenderPubKeySuite extends BaseTransactionSuite {
          |{-# SCRIPT_TYPE ACCOUNT #-}
          |
          |@Callable (i)
-         |func reissueAsset(a: ByteVector, r: Boolean, q: Int) = [Reissue(a, r, q)]
+         |func reissueAsset(a: ByteVector, r: Boolean, q: Int) = [Reissue(a, q, r)]
          |
          |@Callable (i)
          |func burnAsset(a: ByteVector, q: Int) = [Burn(a, q)]

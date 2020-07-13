@@ -179,7 +179,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
            | func bar() = {
            |   [
            |    ScriptTransfer(Address(base58'$acc'), 1, base58'$asset'),
-           |    Reissue(base58'$asset', false, 2)
+           |    Reissue(base58'$asset', 2, false)
            |   ]
            | }
         """.stripMargin
@@ -272,7 +272,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
            | func bar() = {
            |   [
            |    ScriptTransfer(Address(base58'$acc'), 1, unit),
-           |    Reissue(base58'$asset', false, 1)
+           |    Reissue(base58'$asset', 1, false)
            |   ]
            | }
         """.stripMargin
