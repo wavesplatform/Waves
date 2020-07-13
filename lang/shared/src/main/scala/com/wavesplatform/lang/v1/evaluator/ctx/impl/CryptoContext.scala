@@ -16,8 +16,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, EvaluationContext, NativeFunction}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 
-import scala.util.Try
-
 object CryptoContext {
 
   private val rsaTypeNames = List("NoAlg", "Md5", "Sha1", "Sha224", "Sha256", "Sha384", "Sha512", "Sha3224", "Sha3256", "Sha3384", "Sha3512")
@@ -156,6 +154,17 @@ object CryptoContext {
       }
     }
 
+    def rsaVerify(
+      digestAlg: CaseObj,
+      msg: ByteStr,
+      sig: ByteStr,
+      pub: ByteStr
+    ) =
+      for {
+        alg    <- algFromCO(digestAlg)
+        result <- global.rsaVerify(alg, msg.arr, sig.arr, pub.arr)
+      } yield CONST_BOOLEAN(result)
+
     val rsaVerifyF: BaseFunction[NoContext] = {
       val lim = global.MaxByteStrSizeForVerifyFuncs
       NativeFunction(
@@ -176,10 +185,7 @@ object CryptoContext {
             if version < V4 && msg.size > lim =>
           Left(s"Invalid message size = ${msg.size} bytes, must be not greater than ${lim / 1024} KB")
         case (digestAlg: CaseObj) :: CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
-          algFromCO(digestAlg) flatMap { alg =>
-            Try(global.rsaVerify(alg, msg.arr, sig.arr, pub.arr)).toEither
-              .bimap(_ => "Illegal input params", CONST_BOOLEAN)
-          }
+          rsaVerify(digestAlg, msg, sig, pub)
         case xs => notImplemented[Id, EVALUATED](s"rsaVerify(digest: DigestAlgorithmType, message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
       }
     }
@@ -205,10 +211,7 @@ object CryptoContext {
       ("pub", BYTESTR)
     ) {
       case (digestAlg: CaseObj) :: CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
-        algFromCO(digestAlg) flatMap { alg =>
-          Try(global.rsaVerify(alg, msg.arr, sig.arr, pub.arr)).toEither
-            .bimap(_ => "Illegal input params", CONST_BOOLEAN)
-        }
+        rsaVerify(digestAlg, msg, sig, pub)
       case xs => notImplemented[Id, EVALUATED](s"rsaVerify(digest: DigestAlgorithmType, message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
     }
 
