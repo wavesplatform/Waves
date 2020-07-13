@@ -1,23 +1,28 @@
 package com.wavesplatform.lang.compiler
 
+import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V1, V2, V3, V4}
+import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.compiler.CompilerContext.VariableInfo
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
 import com.wavesplatform.lang.v1.parser.Expressions.Pos
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.testing.ScriptGen
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
+import com.wavesplatform.lang.{Common, Global}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -294,6 +299,23 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       """.stripMargin
     val expr5 = Parser.parseExpr(script5).get.value
     ExpressionCompiler(compilerContextV4, expr5) shouldBe Symbol("right")
+  }
+
+
+  property("JS API compile limit exceeding error") {
+    val expr = s" ${"sigVerify(base58'', base58'', base58'') &&" * 350} true "
+    val ctx = Monoid.combineAll(
+        Seq(
+          PureContext.build(V4).withEnvironment[Environment],
+          CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
+          WavesContext.build(
+            DirectiveSet(V4, Account, Expression).explicitGet()
+          )
+        )
+      )
+      .compilerContext
+
+    Global.compileExpression(expr, ctx, V4, ScriptEstimatorV3) should produce("Script is too large: 8756 bytes > 8192 bytes")
   }
 
   property("extract() removed from V4") {
