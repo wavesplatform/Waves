@@ -25,7 +25,7 @@ package object ci {
 
   def compileContractFromExpr(expr: DAPP, version: StdLibVersion = V3): DApp = {
     val ctx =
-      PureContext.build(Global, version).withEnvironment[Environment] |+|
+      PureContext.build(version).withEnvironment[Environment] |+|
         CryptoContext.build(Global, version).withEnvironment[Environment] |+|
         WavesContext.build(
           DirectiveSet(version, Account, DAppType).explicitGet()
@@ -35,7 +35,7 @@ package object ci {
 
   def compileExpr(expr: EXPR, version: StdLibVersion, scriptType: ScriptType): Terms.EXPR = {
     val ctx =
-      PureContext.build(Global, version).withEnvironment[Environment] |+|
+      PureContext.build(version).withEnvironment[Environment] |+|
         CryptoContext.build(Global, version).withEnvironment[Environment] |+|
         WavesContext.build(
           DirectiveSet(version, scriptType, Expression).explicitGet()

@@ -57,7 +57,7 @@ package object utils {
         val ctx = Coeval.evalOnce(
           Monoid.combineAll(
             Seq(
-              PureContext.build(Global, version).withEnvironment[Environment],
+              PureContext.build(version).withEnvironment[Environment],
               CryptoContext.build(Global, version).withEnvironment[Environment],
               WavesContext.build(ds)
             )

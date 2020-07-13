@@ -4,8 +4,8 @@ import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{Account, Expression, V4}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.VariableInfo
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -316,6 +316,19 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       .compilerContext
 
     Global.compileExpression(expr, ctx, V4, ScriptEstimatorV3) should produce("Script is too large: 8756 bytes > 8192 bytes")
+  }
+
+  property("extract() removed from V4") {
+    def checkExtract(version: StdLibVersion) =
+      ExpressionCompiler(
+        getTestContext(version).compilerContext,
+        Parser.parseExpr(" extract(1) ").get.value
+      )
+
+    checkExtract(V1) shouldBe Symbol("right")
+    checkExtract(V2) shouldBe Symbol("right")
+    checkExtract(V3) shouldBe Symbol("right")
+    checkExtract(V4) should produce("Can't find a function 'extract'")
   }
 
   treeTypeTest("GETTER")(

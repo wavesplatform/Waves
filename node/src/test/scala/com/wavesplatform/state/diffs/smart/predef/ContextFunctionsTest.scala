@@ -345,7 +345,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
               | {-# SCRIPT_TYPE ACCOUNT #-}
               |
               | let aInfoOpt        = assetInfo(base58'$assetId')
-              | let aInfo           = extract(aInfoOpt)
+              | let aInfo           = aInfoOpt.value()
               | let id              = aInfo.id == base58'$assetId'
               | let quantity        = aInfo.quantity == $quantity
               | let decimals        = aInfo.decimals == $decimals
@@ -460,7 +460,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
                  | let nonExistedBlockZero = !blockInfoByHeight(0).isDefined()
                  | let nonExistedBlockNextPlus = !blockInfoByHeight(6).isDefined()
                  |
-                 | let block = extract(blockInfoByHeight(3))
+                 | let block = blockInfoByHeight(3).value()
                  | let checkHeight = block.height == 3
                  | let checkBaseTarget = block.baseTarget == 2
                  | let checkGenSignature = block.generationSignature == base58'$generationSignature'
@@ -519,7 +519,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
             Monoid
               .combineAll(
                 Seq(
-                  PureContext.build(Global, V3).withEnvironment[Environment],
+                  PureContext.build(V3).withEnvironment[Environment],
                   CryptoContext.build(Global, V3).withEnvironment[Environment],
                   WavesContext.build(
                     DirectiveSet(V3, Account, Expression).explicitGet()
