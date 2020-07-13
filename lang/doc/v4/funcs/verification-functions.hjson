@@ -215,6 +215,118 @@
       complexity: 2600
     }
     {
+      name: "bn256Groth16Verify"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+      complexity: 1650
+    }
+    {
+      name: "bn256Groth16Verify_1inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 1 input."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+      complexity: 800
+    }
+    {
+      name: "bn256Groth16Verify_2inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 2 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+      complexity: 850
+    }
+    {
+      name: "bn256Groth16Verify_3inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 3 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+      complexity: 950
+    }
+    {
+      name: "bn256Groth16Verify_4inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 4 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+      complexity: 1000
+    }
+    {
+      name: "bn256Groth16Verify_5inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 5 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+      complexity: 1050
+    }
+    {
+      name: "bn256Groth16Verify_6inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 6 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+      complexity: 1100
+    }
+    {
+      name: "bn256Groth16Verify_7inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 7 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+      complexity: 1150
+    }
+    {
+      name: "bn256Groth16Verify_8inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 8 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+      complexity: 1200
+    }
+    {
+      name: "bn256Groth16Verify_9inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 9 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+      complexity: 1250
+    }
+    {
+      name: "bn256Groth16Verify_10inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 10 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+      complexity: 1300
+    }
+    {
+      name: "bn256Groth16Verify_11inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 11 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+      complexity: 1350
+    }
+    {
+      name: "bn256Groth16Verify_12inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 12 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+      complexity: 1400
+    }
+    {
+      name: "bn256Groth16Verify_13inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 13 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+      complexity: 1450
+    }
+    {
+      name: "bn256Groth16Verify_14inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 14 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+      complexity: 1550
+    }
+    {
+      name: "bn256Groth16Verify_15inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 15 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+      complexity: 1600
+    }
+    {
       name: "checkMerkleProof"
       params: [ "ByteVector", "ByteVector", "ByteVector" ]
       doc: "Verifies if a tree of hashes is part of the [Merkle tree](https://en.wikipedia.org/wiki/Merkle_tree)."

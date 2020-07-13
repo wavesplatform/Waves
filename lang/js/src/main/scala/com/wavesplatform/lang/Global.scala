@@ -3,13 +3,12 @@ package com.wavesplatform.lang
 import java.math.{BigDecimal, BigInteger}
 
 import cats.implicits._
-
-import scala.concurrent.ExecutionContext.Implicits.global
 import com.wavesplatform.lang.v1.BaseGlobal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
 import scala.collection.mutable
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.scalajs.js
 import scala.scalajs.js.JSConverters._
@@ -147,6 +146,9 @@ object Global extends BaseGlobal {
       .map(r => NodeResponse(r.status.asInstanceOf[Int], r.body.asInstanceOf[String]))
 
   override def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
+    ???
+
+  override def bn256Groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
     ???
 
   override def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte] =

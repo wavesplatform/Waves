@@ -345,6 +345,37 @@ object CryptoContext {
       case xs => notImplemented[Id, EVALUATED]("groth16Verify(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
     }
 
+    val bn256Groth16VerifyComplexities =
+      Array(800, 850, 950, 1000, 1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1550, 1600)
+
+    val bn256Groth16VerifyL: Array[BaseFunction[NoContext]] = lgen(
+      (1 to 15).toArray,
+      n => (s"bn256Groth16Verify_${n._1}inputs", (BN256_GROTH16_VERIFY_LIM + n._2).toShort),
+      n => bn256Groth16VerifyComplexities(n - 1),
+      n => {
+        case _ :: _ :: CONST_BYTESTR(inputs: ByteStr) :: _ =>
+          Either.cond(inputs.size <= n * 32, (), s"Invalid inputs size ${inputs.size} bytes, must be not greater than ${n * 32} bytes")
+        case xs => notImplemented[Id, Unit](s"bn256Groth16Verify_${n}inputs(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
+      },
+      BOOLEAN,
+      ("verifying key", BYTESTR),
+      ("proof", BYTESTR),
+      ("inputs", BYTESTR)
+    ) {
+      case CONST_BYTESTR(vk: ByteStr) :: CONST_BYTESTR(proof: ByteStr) :: CONST_BYTESTR(inputs: ByteStr) :: Nil =>
+        if (inputs.size > 512)
+          Left(s"Invalid inputs size ${inputs.size} bytes, must be not greater than 512 bytes")
+        else if (inputs.size % 32 != 0)
+          Left(s"Invalid inputs size ${inputs.size} bytes, must be a multiple of 32 bytes")
+        else if (proof.size != 128)
+          Left(s"Invalid proof size ${proof.size} bytes, must be equal to 128 bytes")
+        else if (vk.size != inputs.size + 256)
+          Left(s"Invalid vk size ${vk.size} bytes, must be equal to ${inputs.size + 256} bytes for ${inputs.size / 32} inputs")
+        else
+          Right(CONST_BOOLEAN(global.bn256Groth16Verify(vk.arr, proof.arr, inputs.arr)))
+      case xs => notImplemented[Id, EVALUATED]("bn256Groth16Verify(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
+    }
+
     val bls12Groth16VerifyF: BaseFunction[NoContext] =
       NativeFunction(
         "groth16Verify",
@@ -367,6 +398,30 @@ object CryptoContext {
           else
             Right(CONST_BOOLEAN(global.groth16Verify(vk.arr, proof.arr, inputs.arr)))
         case xs => notImplemented[Id, EVALUATED]("groth16Verify(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
+      }
+
+    val bn256Groth16VerifyF: BaseFunction[NoContext] =
+      NativeFunction(
+        "bn256Groth16Verify",
+        1650,
+        BN256_GROTH16_VERIFY,
+        BOOLEAN,
+        ("verifying key", BYTESTR),
+        ("proof", BYTESTR),
+        ("inputs", BYTESTR)
+      ) {
+        case CONST_BYTESTR(vk: ByteStr) :: CONST_BYTESTR(proof: ByteStr) :: CONST_BYTESTR(inputs: ByteStr) :: Nil =>
+          if (inputs.size > 512)
+            Left(s"Invalid inputs size ${inputs.size} bytes, must be not greater than 512 bytes")
+          else if (inputs.size % 32 != 0)
+            Left(s"Invalid inputs size ${inputs.size} bytes, must be a multiple of 32 bytes")
+          else if (proof.size != 128)
+            Left(s"Invalid proof size ${proof.size} bytes, must be equal to 128 bytes")
+          else if (vk.size != inputs.size + 256)
+            Left(s"Invalid vk size ${vk.size} bytes, must be equal to ${inputs.size + 256} bytes for ${inputs.size / 32} inputs")
+          else
+            Right(CONST_BOOLEAN(global.bn256Groth16Verify(vk.arr, proof.arr, inputs.arr)))
+        case xs => notImplemented[Id, EVALUATED]("bn256Groth16Verify(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
       }
 
     val ecrecover: BaseFunction[NoContext] =
@@ -426,11 +481,12 @@ object CryptoContext {
     val v4Functions =
       Array(
         bls12Groth16VerifyF,
+        bn256Groth16VerifyF,
         createMerkleRootF, ecrecover,// new in V4
         rsaVerifyF,
         toBase16StringF(checkLength = true),
         fromBase16StringF(checkLength = true) // from V3
-      ) ++ sigVerifyL ++ rsaVerifyL ++ keccak256F_lim ++ blake2b256F_lim ++ sha256F_lim ++ bls12Groth16VerifyL
+      ) ++ sigVerifyL ++ rsaVerifyL ++ keccak256F_lim ++ blake2b256F_lim ++ sha256F_lim ++ bls12Groth16VerifyL ++ bn256Groth16VerifyL
 
     val fromV1Ctx = CTX[NoContext](Seq(), Map(), v1Functions)
     val fromV3Ctx = fromV1Ctx |+| CTX[NoContext](v3Types, v3Vars, v3Functions)

@@ -29,8 +29,8 @@ import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import org.web3j.crypto.Keys
-import scorex.util.encode.Base16
 import scorex.crypto.hash.Keccak256
+import scorex.util.encode.Base16
 
 import scala.util.{Random, Try}
 
@@ -1860,5 +1860,172 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """.stripMargin
 
     eval(script, version = V4) shouldBe Right(CONST_LONG(24L))
+  }
+
+  val bn256GrothsFail = Seq(
+    (0, s"""
+          |let vk = base64'${ByteStr.fill(256)(1).base64}'
+          |let proof = base64'CfEpVT6b8+4NAeDs3QwiSN7zqfxzAkQdIu8eBXzoAQIS+AgJcYppUx7COvtbWa7TDtaER1ydtoYWBcBtRMvrHQJ64u4XmLooTwikzECPz+VRcYknrGEoyGeZanNFWEwgplf9bX3JvW1RshlAfN7iJESdqBCmUNsrObHNxhHFJRo='
+          |let inputs = base64''
+        """.stripMargin),
+    (1, s"""
+          |let vk = base64'${ByteStr.fill(256 + 32)(1).base64}'
+          |let proof = base64'CfEpVT6b8+4NAeDs3QwiSN7zqfxzAkQdIu8eBXzoAQIS+AgJcYppUx7COvtbWa7TDtaER1ydtoYWBcBtRMvrHQJ64u4XmLooTwikzECPz+VRcYknrGEoyGeZanNFWEwgplf9bX3JvW1RshlAfN7iJESdqBCmUNsrObHNxhHFJRo='
+          |let inputs = base64'c9BSUPtO0xjPxWVNkEMfXe7O4UZKpaH/nLIyQJj7iA4='
+        """.stripMargin),
+    (15, s"""
+           |let vk = base64'${ByteStr.fill(256 + 32 * 15)(1).base64}'
+           |let proof = base64'CfEpVT6b8+4NAeDs3QwiSN7zqfxzAkQdIu8eBXzoAQIS+AgJcYppUx7COvtbWa7TDtaER1ydtoYWBcBtRMvrHQJ64u4XmLooTwikzECPz+VRcYknrGEoyGeZanNFWEwgplf9bX3JvW1RshlAfN7iJESdqBCmUNsrObHNxhHFJRo='
+           |let inputs = base64'I8C5RcBDPi2n4omt9oOV2rZk9T9xlSV8PQvLeVHjGb00fCVz7AHOIjLJ03ZCTLQwEKkAk9tQWJ6gFTBnG2+0DDHlXcVkwpMafcpS2diKFe0T4fRb0t9mxNzOFiRVcJoeMU1zb/rE4dIMm9rbEPSDnVSOd8tHNnJDkT+/NcNsQ2w0UEVJJRAEnC7G0Y3522RlDLxpTZ6w0U/9V0pLNkFgDCkFBKvpaEfPDJjoEVyCUWDC1ts9LIR43xh3ZZBdcO/HATHoLzxM3Ef11qF+riV7WDPEJfK11u8WGazzCAFhsx0aKkkbnKl7LnypBzwRvrG2JxdLI/oXL0eoIw9woVjqrg6elHudnHDXezDVXjRWMPaU+L3tOW9aqN+OdP4AhtpgT2CoRCjrOIU3MCFqsrCK9bh33PW1gtNeHC78mIetQM5LWZHtw4KNwafTrQ+GCKPelJhiC2x7ygBtat5rtBsJAVF5wjssLPZx/7fqNqifXB7WyMV7J1M8LBQVXj5kLoS9bpmNHlERRSadC0DEUbY9xhIG2xo7R88R0sq04a299MFv8XJNd+IdueYiMiGF5broHD4UUhPxRBlBO3lOfDTPnRSUGS3Sr6GxwCjKO3MObz/6RNxCk9SnQ4NccD17hS/m'
+         """.stripMargin),
+    (16, s"""
+           |let vk = base64'${ByteStr.fill(256 + 32 * 16)(1).base64}'
+           |let proof = base64'CfEpVT6b8+4NAeDs3QwiSN7zqfxzAkQdIu8eBXzoAQIS+AgJcYppUx7COvtbWa7TDtaER1ydtoYWBcBtRMvrHQJ64u4XmLooTwikzECPz+VRcYknrGEoyGeZanNFWEwgplf9bX3JvW1RshlAfN7iJESdqBCmUNsrObHNxhHFJRo='
+           |let inputs = base64'I8C5RcBDPi2n4omt9oOV2rZk9T9xlSV8PQvLeVHjGb00fCVz7AHOIjLJ03ZCTLQwEKkAk9tQWJ6gFTBnG2+0DDHlXcVkwpMafcpS2diKFe0T4fRb0t9mxNzOFiRVcJoeMU1zb/rE4dIMm9rbEPSDnVSOd8tHNnJDkT+/NcNsQ2w0UEVJJRAEnC7G0Y3522RlDLxpTZ6w0U/9V0pLNkFgDCkFBKvpaEfPDJjoEVyCUWDC1ts9LIR43xh3ZZBdcO/HATHoLzxM3Ef11qF+riV7WDPEJfK11u8WGazzCAFhsx0aKkkbnKl7LnypBzwRvrG2JxdLI/oXL0eoIw9woVjqrg6elHudnHDXezDVXjRWMPaU+L3tOW9aqN+OdP4AhtpgT2CoRCjrOIU3MCFqsrCK9bh33PW1gtNeHC78mIetQM5LWZHtw4KNwafTrQ+GCKPelJhiC2x7ygBtat5rtBsJAVF5wjssLPZx/7fqNqifXB7WyMV7J1M8LBQVXj5kLoS9bpmNHlERRSadC0DEUbY9xhIG2xo7R88R0sq04a299MFv8XJNd+IdueYiMiGF5broHD4UUhPxRBlBO3lOfDTPnRSUGS3Sr6GxwCjKO3MObz/6RNxCk9SnQ4NccD17hS/mEFt8d4ERZOfmuvD3A0RCPCnx3Fr6rHdm6j+cfn/NM6o='
+         """.stripMargin)
+  )
+
+  property("bn256Groth16Verify_*inputs (false)") {
+    for ((ii, lets) <- bn256GrothsFail) {
+      val i = if (ii == 0) {
+        1
+      } else {
+        ii
+      }
+      val src = lets ++ (if (i != 16) {
+        s"bn256Groth16Verify_${i}inputs(vk, proof, inputs)"
+      } else {
+        "bn256Groth16Verify(vk, proof, inputs)"
+      })
+      eval(src, version = V4) shouldBe Right(CONST_BOOLEAN(false))
+    }
+  }
+
+  val bn256GrothsOk = Seq(
+    (0, """
+          |let vk = base64'oNme33MLprvAodIU3H8rA1WVUVN6IwJtouPFt3rD76EhTyetvNmF9cCLETzYB4K9YC4EIAnZywPddo8kG70hDAeEOBf1FwaXr53SXD0A2pGbHJPRuTTj21tXNXAu7D6MkGKUMCACqi7buNhBbz0X7SKNBgh2Lwxo9CFcv4VBCzkljSjsy0dXI1nUz8oAN99WPRgEqsGtH6wFSllr/AMgKxUVjbIGGpcKvAgvuOfP6HYRsVR8XP7Ecnh/A/aARw4jCycuzPPhJlgjUxs+xCwF/AizkOvYoKFAdFlLKACJIFsIOU8NmXM08eizRXg96hvpfbCVjlWYE1hI90EnJLKTBg=='
+          |let proof = base64'G3CEMZl39+IlulSqUjmLUP4tB8pnGGteKKU8AlMzkMMcThMVl9rOa5G3DDcm4iF3BFxS3ubW5JADnVvPhX9wNQXMMjh+BKVLUIaC8gwtwciCscaCMw6cIA5ltWuoWX9jB/ig6Yqg4Hc6u2/9XzKfCWG42Si+BkTh8X0DAQ2fAzY='
+          |let inputs = base64''
+          |""".stripMargin),
+    (1, """
+          |let vk = base64'LDCJzjgi5HtcHEXHfU8TZz+ZUHD2ZwsQ7JIEvzdMPYKYs9SoGkKUmg1yya4TE0Ms7x+KOJ4Ze/CPfKp2s5jbniFNM71N/YlHVbNkytLtQi1DzReSh9SNBsvskdY5mavQJe+67PuPVEYnx+lJ97qIG8243njZbGWPqUJ2Vqj49NAunhqX+eIkK3zAB3IPWls3gruzX2t9wrmyE9cVVvf1kgWx63PsQV37qdH0KcFRpCH89k4TPS6fLmqdFxX3YGHCGFTpr6tLogvjbUFJPT98kJ/xck0C0B/s8PTVKdao4VQHT4DBIO8+GB3CQVh6VV4EcMLtDWWNxF4yloAlKcFT0Q4AzJSimpFqd/SwSz9Pb7uk5srte3nwphVamC+fHlJt'
+          |let proof = base64'GQPBoHuCPcIosF+WZKE5jZV13Ib4EdjLnABncpSHcMKBZl0LhllnPxcuzExIQwhxcfXvFFAjlnDGpKauQ9OQsjBKUBsdBZnGiV2Sg4TSdyHuLo2AbRRqJN0IV3iH3On8I4ngnL30ZAxVyGQH2EK58aUZGxMbbXGR9pQdh99QaiE='
+          |let inputs = base64'IfZhAypdtgvecKDWzVyRuvXatmFf2ZYcMWVkCJ0/MQo='
+          |""".stripMargin),
+    (2, """
+          |let vk = base64'nV33RK4rTODU42ZKyFxTFl9d86FrP+h6acIdT4m/rfAZBBfPWLxcjYyMUBHlXgM/jTBDOH7dTGL1zqbRLr1eGwR9zemG9LJnqPl/eiJ0LZLZKz3/iDde8p1zj5DRvar2Fa6rv0WJRJR32+22iaZHrD/64/SyFb2j5f12ipT5S2Eq+SnYSSr8HhStVu3s4VFK57nhi2aRFUgXWkGaqhJJ6ie6zlaVf52s79qdlBUOuTTVsATXa58FVXVSHJb5wanwK578EWV/BulP1TCq5y0q7k6YCZV15Nu9FHpzIUow9Ged8l8LwPmHxki+/S2MnA0v2mFgdC1ZXE+BesWOx3tXThrq7st5+lUMmaY5S76l0yuzzHoeSZEZAoS6heG8WWUGJW2QBTzq3GVaubssoR/HtIT1dGPswNTF8HY78BPYb8M='
+          |let proof = base64'pE0Y4zE1A5UvC8ATBJPMOAFm3dDQABrhu5VxxGj5GOom+pFpQsVZe6mMLT8ZwyWXQmJ+od+cYtUOH2Fxiem1yCdMkGi64f5k9qWwYDRrtIxXHhj9f43pHKylJV0Z1jCJgpebExv+hPmwNYh3cWxHxywYMEXwSutAjyqi8Swl1O0='
+          |let inputs = base64'IfZhAypdtgvecKDWzVyRuvXatmFf2ZYcMWVkCJ0/MQou2EkLZ569itz7cL7GQnzipNe1JRCQ/QK8UXr8IG8k0g=='
+          |""".stripMargin),
+    (4, """
+          |let vk = base64'q1U6rGRU+/F+e3xx6oCBeokQsIVIQDESLC/l+PK8WX0Rw2NglYMRP6In971j7/puuDsJwZm2AK7fTcmKQd5v/g6InaZLdKGQK1C+52BbMyoGsueMfmML9pJmJvivE2N7m9WyiixGvDawwhz7JYst5Jr3ChczYgLAS7b2WQscCRcm8ZE9FKTNdfu4WAYEDEl6IONCFnNiYw6wR8Kc2J7Z9BkHcOzQj2X4PuxZGdPeWF+7vB1dXQZZlCBScImWeVPNKaYF7H3Ot0wOYzigQXYkSZD5v9vBWXN/f1YajxR1kjMrSZ90fx4WapypjaLREbaNgOcAN5niSzTmwymK3e3Idgpt+Pdq34YPOZ5lDx5+3gMWYl1QYeWi6miDIasts0owjZVOTUXf292iZDsjSWaYurcLNEH3Rf8lTCKSMyosjkAV2Fkselh0/Vy4jkPj3hTFeIpY3inMmI+N6Nvwxv50ZpaUIQmU5rlia4pS8MSMxgO+khyyPKb1OUHbFTgDHf6p'
+          |let proof = base64'mtMjjG0IVNq3t7ICtij1nLFH1UjFu6FaNZmdXam0gdCY/efE2wVHSctp1vqgVcfgiSpl/WCCcaQ2CQGbirLE/wVj2w0eiVEUy6gs9aK01nS0bx4ErymppOugPDPXGCV6FtiAM6Cq+fMbOKhhhDPutn6dIntO3gSqtsWL0KreCPY='
+          |let inputs = base64'IfZhAypdtgvecKDWzVyRuvXatmFf2ZYcMWVkCJ0/MQou2EkLZ569itz7cL7GQnzipNe1JRCQ/QK8UXr8IG8k0hW3GAoAXun/Pwk0Jq9fst26FET2RehSLbxUdvZQLjEzCJmfahCreklII85wEMuwYctsOv/3JWgvrI8hmn8sWjw='
+          |""".stripMargin),
+    (8, """
+           |let vk = base64'kikeX/IlYwL5e1nkJ3FbD4/IantLORJJtmgMPywFCoCdYF304ka26knjzRodk7mujA0HqXxknBkzZSqQuuqcSSZkVOudYO1dwOw73U9SlL/nF4UWP4YOkVfKntqi825LkCrBcl3rw7zhMHorldspOwWNVybCLGt86Zbd92hze3wcSIk2GqMxtoBQiurYqlt1SARwIn06tRExJ0YULl/7/4qrYi+Tsjy0xQwltrHJQy/eeVNNq9x/GrVJemN2r+SUK6lF6kWLJzTH5jUUu7HvpUCtRlGJ3JRZIAJ7qChT3v+fD5LNjz86Ei1ItV4Wgqk/iXAAXeORUM3T3RD2NepVgS3U35HXhJ1ZtzJZoFUQyQjlGYp6+U6q8+rXYSQkZjEHmQh/Atr0lb1QRIG+PK+mLj1Nxwb/aibt7z7WtRTfj3mudYCEjXA/ceDVtz8FKkeTo9dcVYGsf/VJaxnteVa7B4UMRQjX0gdNKC+AEjKxcRk373IqLBCCtukQYBG8o2TKFYfJcJuI1geuGtNij1jwgmLxl7hH3Y0JqMZPoS9vKwudBL5Nnt38g/rfNTyoe7UIJV246oAOkuuskfxNUHeEnILjkHYhjfIuuPMGUG4FK2LHkscqib6eHo3wSy31I65urmsiHROrMEtfUdYcGDJxV+IyrTUs2m5KQgmlXo8jvUo='
+           |let proof = base64'HUaOoIyn6KUkVXzttFMcRobGBZUtpRjAQMId9n3ABZKPUk8Rv0EPKmzp/1Ut0LNJ5cNI48VwD6/kVbhNgoBbdQijsqDktFjjeJtzj6KF2TuHOlcHL6s7dc38cvNVD0O1ISiJlLdrc5QKcXePAGJK/YaD/CUQfKnijgCGDREUDXo='
+           |let inputs = base64'IfZhAypdtgvecKDWzVyRuvXatmFf2ZYcMWVkCJ0/MQou2EkLZ569itz7cL7GQnzipNe1JRCQ/QK8UXr8IG8k0hW3GAoAXun/Pwk0Jq9fst26FET2RehSLbxUdvZQLjEzCJmfahCreklII85wEMuwYctsOv/3JWgvrI8hmn8sWjwELKgjqMSLQgJ7u5ZHe9PDhBgF/3dliXhY1jUsXFvkig6pfEr0bFuXhXcg2R+vuPErhG0w08SPNOi2SjvPngYpJ8nsOT98G6EDlyNaHtJuRC/xOA+6ftL/k2+hzFsd+1Ui5/1NGTfDxLDndEE1NQ+opvk79ZeaY+qPP7pEc0uQMw=='
+           |""".stripMargin),
+    (16, """
+           | let vk = base64'qladoBQdTIMTqRD5nLplvCqxlHwZrFv7scw72CqqjkMsK1J9mo3aYYCS8MXIl224CTjyJF/IQ2nFONXeSUdoFAFN1RfVylmeW3Qbeqj8ePv9JA+LjpgE68Zr9u85DqI4hK+0BABhe1S+m79CtKaSOAt7pJNDmiNqEKsGYDBhYBIBLAdgsmLkOfA197v06p/UaXCOXvNQMjprjuvt3SCrkoV8jZU/cSrB+cPPE8s4OgVl0eXr08YRmmDym/veV4eTI1WV59Qxb3uZCOtJFPwwd6gTiXvnGhhWrgJPwjAIJhmFDEUI19IHTSgvgBIysXEZN+9yKiwQgrbpEGARvKNkyhWHyXCbiNYHrhrTYo9Y8IJi8Ze4R92NCajGT6EvbysLnQS+TZ7d/IP63zU8qHu1CCVduOqADpLrrJH8TVB3hJyC45B2IY3yLrjzBlBuBStix5LHKom+nh6N8Est9SOubq5rIh0TqzBLX1HWHBgycVfiMq01LNpuSkIJpV6PI71KmXEqw09G6gPAM1465XNSWZV0gLUTctlavUWfG7jILPafEBGrM69wVNmnBm0lSOq9fBTatb8Ivm4+SDNHALraRo1guaelsx+MuKox7hj5WkuIjo7PSprYHsM6Wc3/10VpJQwX6/Dp5J0MZzYscKLlGX5DXXbaQLcIT6I+cjioLcIwK20hLc56+CaCSZRyKMB9IWUmavploHQrjBW+vyyOPQNIbqUTWjTVHJ9QCCdVxUWP+0yHwCjZUymqnVoG6HrPkYvh0nuIsz552K6SWFMuhddTW+JN/uUIpniAKCI4WwafIl/0mH/DRktCA5uQdpevX62mWKfyYGL1if6TV20CgSMvo6fiK+yC5GCzMKtsHxMFWW5fYkjQ2b/C8RWjCySpDQPFVqJwr5uMYxdqtsSs7ysGZfpoRZS1SDbVgFVL1E6d/ECJMiqIOM0OH0uBRzF7B3q2BT5GChq/naHPEucCcBU8HgairQQ3uV+V+UyWbYmrwjGQZSg0pSQ3Jff41MGe'
+           | let proof = base64'CfEpVT6b8+4NAeDs3QwiSN7zqfxzAkQdIu8eBXzoAQIS+AgJcYppUx7COvtbWa7TDtaER1ydtoYWBcBtRMvrHQJ64u4XmLooTwikzECPz+VRcYknrGEoyGeZanNFWEwgplf9bX3JvW1RshlAfN7iJESdqBCmUNsrObHNxhHFJRo='
+           | let inputs = base64'IfZhAypdtgvecKDWzVyRuvXatmFf2ZYcMWVkCJ0/MQou2EkLZ569itz7cL7GQnzipNe1JRCQ/QK8UXr8IG8k0hW3GAoAXun/Pwk0Jq9fst26FET2RehSLbxUdvZQLjEzCJmfahCreklII85wEMuwYctsOv/3JWgvrI8hmn8sWjwELKgjqMSLQgJ7u5ZHe9PDhBgF/3dliXhY1jUsXFvkig6pfEr0bFuXhXcg2R+vuPErhG0w08SPNOi2SjvPngYpJ8nsOT98G6EDlyNaHtJuRC/xOA+6ftL/k2+hzFsd+1Ui5/1NGTfDxLDndEE1NQ+opvk79ZeaY+qPP7pEc0uQMxnEIHHpcYsRt9dal9bSQpE5hWKu1nOBzIVmXb/Ef51YDg+nW5w9a2tEAY2zQCZ/z3sFs7FwAZ5TXhDfhYR5sQ8tZaF3FWh+Yzf5hgMmXWrApp/arwPszNhKCoxScnhPSgfcxYSdauqvp5+vcacJFY1OkWG6tQ6iuh5CZSdX645oA7oNr9d5kXYSewhTflcV9pufeaH21BtEipHpO3sNRkUngnHC+uj1D8ReSgcCofnv8s0mVme9Ml64r6CbeaHK+x5Mc9bolN96XJZ137xkPDpev+RVrVK6ZIFrH2hFl8/vGoBwWDlmjmVzUt4YQdsCavsf7c0vBa7d33EcvyvQMDY='
+         """.stripMargin)
+  )
+
+  property("bn256Groth16Verify_*inputs") {
+    for ((ii, lets) <- bn256GrothsOk if (ii <= 16)) {
+      val i = if (ii == 0) {
+        1
+      } else {
+        ii
+      }
+      val src = lets ++ (if (i != 16) {
+        s"bn256Groth16Verify_${i}inputs(vk, proof, inputs)"
+      } else {
+        "bn256Groth16Verify(vk, proof, inputs)"
+      })
+      eval(src, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    }
+  }
+
+  property("bn256Groth16Verify_*inputs fail if too many inputs") {
+    for ((i, lets) <- bn256GrothsFail ++ bn256GrothsOk if (i > 1)) {
+      val src = lets ++ (if (i <= 16) {
+        s"bn256Groth16Verify_${i - 1}inputs(vk, proof, inputs)"
+      } else {
+        "bn256Groth16Verify(vk, proof, inputs)"
+      })
+      eval(src, version = V4) shouldBe Left(s"Invalid inputs size ${i * 32} bytes, must be not greater than ${i * 32 - 32} bytes")
+    }
+  }
+
+  property("bn256Groth16Verify_*inputs with invalid vk size") {
+    for {
+      ii <- 0 to 16
+      n  <- Seq(0, (8 + ii) * 48 + 1, (8 + ii) * 48 - 1)
+    } {
+      val lets = s"""
+                    |let vk = base16'${"AA" * n}'
+                    |let proof = base64'CfEpVT6b8+4NAeDs3QwiSN7zqfxzAkQdIu8eBXzoAQIS+AgJcYppUx7COvtbWa7TDtaER1ydtoYWBcBtRMvrHQJ64u4XmLooTwikzECPz+VRcYknrGEoyGeZanNFWEwgplf9bX3JvW1RshlAfN7iJESdqBCmUNsrObHNxhHFJRo='
+                    |let inputs = base16'${"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" * ii}'
+                    |""".stripMargin
+      val i = if (ii == 0) {
+        1
+      } else {
+        ii
+      }
+      val src = lets ++ (if (i != 16) {
+        s"bn256Groth16Verify_${i}inputs(vk, proof, inputs)"
+      } else {
+        "bn256Groth16Verify(vk, proof, inputs)"
+      })
+      eval(src, version = V4) shouldBe Left(s"Invalid vk size ${n} bytes, must be equal to ${(8 + ii) * 32} bytes for ${ii} inputs")
+    }
+  }
+
+  property("bn256Groth16Verify_*inputs with invalid proof size") {
+    def lets(proofSize: Int) =
+     s"""
+        |let vk = base64'mY//hEITCBCZUJUN/wsOlw1iUSSOESL6PFSbN1abGK80t5jPNICNlPuSorio4mmWpf+4uOyv3gPZe54SYGM4pfhteqJpwFQxdlpwXWyYxMTNaSLDj8VtSn/EJaSu+P6nFmWsda3mTYUPYMZzWE4hMqpDgFPcJhw3prArMThDPbR3Hx7E6NRAAR0LqcrdtsbDqu2T0tto1rpnFILdvHL4PqEUfTmF2mkM+DKj7lKwvvZUbukqBwLrnnbdfyqZJryzGAMIa2JvMEMYszGsYyiPXZvYx6Luk54oWOlOrwEKrCY4NMPwch6DbFq6KpnNSQwOpgRYCz7wpjk57X+NGJmo85tYKc+TNa1rT4/DxG9v6SHkpXmmPeHhzIIW8MOdkFjxB5o6Qn8Fa0c6Tt6br2gzkrGr1eK5/+RiIgEzVhcRrqdY/p7PLmKXqawrEvIv9QZ3ijytPNwinlC8XdRLO/YvP33PjcI9WSMcHV6POP9KPMo1rngaIPMegKgAvTEouNFKp4v3wAXRXX5xEjwXAmM5wyB/SAOaPPCK/emls9kqolHsaj7nuTTbrvSV8bqzUwzQ'
+        |let proof = base64'${ByteStr.fill(proofSize)(1).base64}'
+        |let inputs = base64'aZ8tqrOeEJKt4AMqiRF/WJhIKTDC0HeDTgiJVLZ8OEs='
+        |""".stripMargin
+    for (ii <- 0 to 16; proofSize <- List(127, 129)) {
+      val i = if (ii == 0) {
+        1
+      } else {
+        ii
+      }
+      val src = lets(proofSize) ++ (if (i != 16) {
+        s"bn256Groth16Verify_${i}inputs(vk, proof, inputs)"
+      } else {
+        "bn256Groth16Verify(vk, proof, inputs)"
+      })
+      eval(src, version = V4) shouldBe Left(s"Invalid proof size $proofSize bytes, must be equal to 128 bytes")
+    }
+  }
+
+  property("bn256Groth16Verify_*inputs with invalid inputs size") {
+    val lets =
+      """
+        |let vk = base64'mY//hEITCBCZUJUN/wsOlw1iUSSOESL6PFSbN1abGK80t5jPNICNlPuSorio4mmWpf+4uOyv3gPZe54SYGM4pfhteqJpwFQxdlpwXWyYxMTNaSLDj8VtSn/EJaSu+P6nFmWsda3mTYUPYMZzWE4hMqpDgFPcJhw3prArMThDPbR3Hx7E6NRAAR0LqcrdtsbDqu2T0tto1rpnFILdvHL4PqEUfTmF2mkM+DKj7lKwvvZUbukqBwLrnnbdfyqZJryzGAMIa2JvMEMYszGsYyiPXZvYx6Luk54oWOlOrwEKrCY4NMPwch6DbFq6KpnNSQwOpgRYCz7wpjk57X+NGJmo85tYKc+TNa1rT4/DxG9v6SHkpXmmPeHhzIIW8MOdkFjxB5o6Qn8Fa0c6Tt6br2gzkrGr1eK5/+RiIgEzVhcRrqdY/p7PLmKXqawrEvIv9QZ3ijytPNwinlC8XdRLO/YvP33PjcI9WSMcHV6POP9KPMo1rngaIPMegKgAvTEouNFKp4v3wAXRXX5xEjwXAmM5wyB/SAOaPPCK/emls9kqolHsaj7nuTTbrvSV8bqzUwzQ'
+        |let proof = base64'g53N8ecorvG2sDgNv8D7quVhKMIIpdP9Bqk/8gmV5cJ5Rhk9gKvb4F0ll8J/ZZJVqa27OyciJwx6lym6QpVK9q1ASrqio7rD5POMDGm64Iay/ixXXn+//F+uKgDXADj9AySri2J1j3qEkqqe3kxKthw94DzAfUBPncHfTPazVtE48AfzB1KWZA7Vf/x/3phYs4ckcP7ZrdVViJVLbUgFy543dpKfEH2MD30ZLLYRhw8SatRCyIJuTZcMlluEKG+d'
+        |let inputs = base64'aZ8tqrOeEJKt4AMqiRF/WJhIKTDC0HeDTgiJVLZ8OEs=' + base16'00'
+        |""".stripMargin
+    for (ii <- 2 to 16) {
+      val i = if (ii == 0) {
+        1
+      } else {
+        ii
+      }
+      val src = lets ++ (if (i != 16) {
+        s"bn256Groth16Verify_${i}inputs(vk, proof, inputs)"
+      } else {
+        "bn256Groth16Verify(vk, proof, inputs)"
+      })
+      eval(src, version = V4) shouldBe Left("Invalid inputs size 33 bytes, must be a multiple of 32 bytes")
+    }
   }
 }

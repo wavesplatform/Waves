@@ -12,7 +12,8 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 import com.wavesplatform.utils.Merkle
-import com.wavesplatform.zwaves.bls12.Groth16
+import com.wavesplatform.zwaves.bls12.{Groth16 => Bls12Groth16}
+import com.wavesplatform.zwaves.bn256.{Groth16 => Bn256Groth16}
 import org.web3j.crypto.Sign
 import org.web3j.crypto.Sign.SignatureData
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
@@ -100,7 +101,10 @@ object Global extends BaseGlobal {
     client.requestNode(url)
 
   override def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
-    Groth16.verify(verifyingKey, proof, inputs)
+    Bls12Groth16.verify(verifyingKey, proof, inputs)
+
+  override def bn256Groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
+    Bn256Groth16.verify(verifyingKey, proof, inputs)
 
   override def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte] = {
     // https://github.com/web3j/web3j/blob/master/crypto/src/test/java/org/web3j/crypto/ECRecoverTest.java#L43
