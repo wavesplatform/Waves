@@ -5,7 +5,6 @@ import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
@@ -337,7 +336,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
+          PureContext.build(V3).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
             DirectiveSet(V3, Account, DAppType).explicitGet()
@@ -422,7 +421,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
+          PureContext.build(V4).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
           WavesContext.build(
             DirectiveSet(V4, Account, DAppType).explicitGet()
@@ -446,7 +445,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
+          PureContext.build(V4).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
           WavesContext.build(
             DirectiveSet(V4, Account, DAppType).explicitGet()
@@ -475,7 +474,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
+          PureContext.build(V4).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
           WavesContext.build(
             DirectiveSet(V4, Account, DAppType).explicitGet()
@@ -499,7 +498,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
+          PureContext.build(V3).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
             DirectiveSet(V3, Account, DAppType).explicitGet()
@@ -926,7 +925,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       Parser.parseContract(script).get.value
     }
     val ctx =
-      PureContext.build(Global, V4).withEnvironment[Environment] |+|
+      PureContext.build(V4).withEnvironment[Environment] |+|
       WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe Symbol("right")
@@ -936,7 +935,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
+          PureContext.build(V3).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
             DirectiveSet(V3, Account, DAppType).explicitGet()
@@ -960,7 +959,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
+          PureContext.build(V4).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
           WavesContext.build(
             DirectiveSet(V4, Account, DAppType).explicitGet()

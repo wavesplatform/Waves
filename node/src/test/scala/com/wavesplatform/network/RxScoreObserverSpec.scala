@@ -14,10 +14,10 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen wit
   override def testSchedulerName = "test-rx-score-observer"
 
   private def withObserver(f: (Coeval[Seq[SyncWith]], PublishSubject[BigInt], PublishSubject[(Channel, BigInt)], PublishSubject[Channel]) => Any) = {
-    val localScores   = PublishSubject[BigInt]
-    val remoteScores  = PublishSubject[(Channel, BigInt)]
-    val channelClosed = PublishSubject[Channel]
-    val timeout       = PublishSubject[Channel]
+    val localScores   = PublishSubject[BigInt]()
+    val remoteScores  = PublishSubject[(Channel, BigInt)]()
+    val channelClosed = PublishSubject[Channel]()
+    val timeout       = PublishSubject[Channel]()
 
     val (syncWith, _) = RxScoreObserver(1.minute, 0.seconds, 0, localScores, remoteScores, channelClosed, timeout, testScheduler)
 

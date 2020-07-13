@@ -148,6 +148,10 @@ object Exporter extends ScorexLogging {
       opt[String]('o', "output-prefix")
         .text("Output file name prefix")
         .action((p, c) => c.copy(outputFileNamePrefix = p)),
+      opt[Int]('h', "height")
+        .text("Export to height")
+        .action((h, c) => c.copy(exportHeight = Some(h)))
+        .validate(h => if (h > 0) success else failure("Export height must be > 0")),
       opt[String]('f', "format")
         .text("Output file format")
         .valueName(s"<${Formats.list.mkString("|")}> (default is ${Formats.default})")

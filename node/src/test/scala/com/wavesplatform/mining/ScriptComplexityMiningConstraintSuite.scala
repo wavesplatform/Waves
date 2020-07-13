@@ -35,9 +35,9 @@ class ScriptComplexityMiningConstraintSuite
     forAll(preconditions) {
       case (acc1, tx1, tx2, tx3) =>
         val blockchain = stub[Blockchain]
-        (blockchain.settings _).when().returning(settings.blockchainSettings)
-        (blockchain.height _).when().returning(1)
-        (blockchain.activatedFeatures _).when().returning(Map(BlockchainFeatures.DataTransaction.id -> 0))
+        (() => blockchain.settings).when().returning(settings.blockchainSettings)
+        (() => blockchain.height).when().returning(1)
+        (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.DataTransaction.id -> 0))
 
         val txDiffer =
           TransactionDiffer(Some(System.currentTimeMillis() - 1000), System.currentTimeMillis())(blockchain, _: Transaction).resultE.explicitGet()

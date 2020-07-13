@@ -48,7 +48,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
   }
 
   routePath("/last") in {
-    (blocksApi.currentHeight _).expects().returning(2).once()
+    (() => blocksApi.currentHeight).expects().returning(2).once()
     (blocksApi.blockAtHeight _).expects(2).returning(Some(testBlock2Meta -> Seq.empty)).once()
     Get(routePath("/last")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -125,7 +125,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
   }
 
   routePath("/headers/last") in {
-    (blocksApi.currentHeight _).expects().returning(2).once()
+    (() => blocksApi.currentHeight).expects().returning(2).once()
     (blocksApi.metaAtHeight _).expects(2).returning(Some(testBlock2Meta)).once()
     Get(routePath("/headers/last")) ~> route ~> check {
       val response = responseAs[JsObject]

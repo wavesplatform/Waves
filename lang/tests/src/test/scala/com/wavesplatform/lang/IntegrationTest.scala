@@ -84,7 +84,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val ctx: CTX[C] =
       Monoid.combineAll(
         Seq(
-          PureContext.build(Global, version).withEnvironment[C],
+          PureContext.build(version).withEnvironment[C],
           CryptoContext.build(Global, version).withEnvironment[C],
           addCtx.withEnvironment[C],
           CTX[C](sampleTypes, stringToTuple, Array(f, f2)),
@@ -426,7 +426,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     }
 
     val context = Monoid.combine(
-      PureContext.build(Global, V1).evaluationContext[Id],
+      PureContext.build(V1).evaluationContext[Id],
       EvaluationContext.build(
         typeDefs = Map.empty,
         letDefs = Map("x" -> LazyVal.fromEvaluated[Id](CONST_LONG(3L))),
@@ -440,7 +440,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   property("context won't change after execution of an inner block") {
     val context = Monoid.combine(
-      PureContext.build(Global, V1).evaluationContext[Id],
+      PureContext.build(V1).evaluationContext[Id],
       EvaluationContext.build(
         typeDefs = Map.empty,
         letDefs = Map("x" -> LazyVal.fromEvaluated[Id](CONST_LONG(3L))),
@@ -540,7 +540,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
           )
         ),
         false
-      ).explicitGet
+      ).explicitGet()
     )
   }
 
@@ -859,7 +859,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
           CONST_STRING("q;we:x;q.we").explicitGet()
         ),
         false
-      ).explicitGet
+      ).explicitGet()
     )
   }
 
@@ -875,7 +875,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
           CONST_STRING("str4").explicitGet()
         ),
         false
-      ).explicitGet
+      ).explicitGet()
     )
   }
 
@@ -890,7 +890,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
           CONST_STRING("").explicitGet()
         ),
         false
-      ).explicitGet
+      ).explicitGet()
     )
   }
 
@@ -906,7 +906,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
           CONST_STRING("str3").explicitGet()
         ),
         false
-      ).explicitGet
+      ).explicitGet()
     )
   }
 

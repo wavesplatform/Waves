@@ -6,7 +6,6 @@ import java.nio.{BufferUnderflowException, ByteBuffer}
 
 import cats.Id
 import cats.implicits._
-import cats.kernel.Monoid
 import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -29,6 +28,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.util.{Success, Try}
 
 object PureContext {
+  private val global: BaseGlobal = com.wavesplatform.lang.Global
 
   implicit def intToLong(num: Int): Long = num.toLong
 
@@ -426,7 +426,7 @@ object PureContext {
 
   val UTF8Decoder = UTF_8.newDecoder
 
-  def toUtf8String(version: StdLibVersion): BaseFunction[NoContext] =
+  def toUtf8String(reduceLimit: Boolean): BaseFunction[NoContext] =
     NativeFunction(
       "toUtf8String",
       Map[StdLibVersion, Long](V1 -> 20L, V2 -> 20L, V3 -> 20L, V4 -> 7L),
@@ -439,7 +439,7 @@ object PureContext {
           .map(UTF8Decoder.decode)
           .toEither
           .map(_.toString)
-          .flatMap(CONST_STRING(_, reduceLimit = version >= V4))
+          .flatMap(CONST_STRING(_, reduceLimit))
           .leftMap {
             case _: MalformedInputException => "Input contents invalid UTF8 sequence"
             case e                          => e.toString
@@ -857,47 +857,6 @@ object PureContext {
       IF(REF("@p"), FALSE, TRUE)
     }
 
-  private lazy val operators: Array[BaseFunction[NoContext]] = Array(
-    mulLong,
-    divLong,
-    modLong,
-    sumLong,
-    subLong,
-    sumString,
-    sumByteStr,
-    eq,
-    ne,
-    ge,
-    gt,
-    getElement,
-    getListSize,
-    uMinus,
-    uNot
-  )
-  private lazy val functions = Array(
-    fraction,
-    sizeBytes,
-    toBytesBoolean,
-    toBytesLong,
-    toBytesString,
-    takeBytes,
-    dropBytes,
-    takeRightBytes,
-    dropRightBytes,
-    sizeString,
-    toStringBoolean,
-    toStringLong,
-    takeString,
-    dropString,
-    takeRightString,
-    dropRightString,
-    isDefined,
-    extract,
-    throwWithMessage,
-    _isInstanceOf,
-    throwNoMessage
-  ) ++ operators
-
   val roundCeiling  = CASETYPEREF("Ceiling", List.empty, true)
   val roundFloor    = CASETYPEREF("Floor", List.empty, true)
   val roundHalfEven = CASETYPEREF("HalfEven", List.empty, true)
@@ -907,7 +866,7 @@ object PureContext {
   val roundHalfDown = CASETYPEREF("HalfDown", List.empty, true)
   val rounds        = UNION(roundDown, roundUp, roundHalfUp, roundHalfDown, roundCeiling, roundFloor, roundHalfEven)
 
-  def roundMode(m: EVALUATED): BaseGlobal.Rounds = {
+  private def roundMode(m: EVALUATED): BaseGlobal.Rounds = {
     m match {
       case (p: CaseObj) =>
         p.caseType.name match {
@@ -924,7 +883,53 @@ object PureContext {
     }
   }
 
-  lazy val unitVarName = "unit"
+  val pow: BaseFunction[NoContext] =
+    NativeFunction("pow", 100, POW, LONG, ("base", LONG), ("bp", LONG), ("exponent", LONG), ("ep", LONG), ("rp", LONG), ("round", rounds)) {
+      case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
+        if (bp < 0
+          || bp > 8
+          || ep < 0
+          || ep > 8
+          || rp < 0
+          || rp > 8) {
+          Left("pow: scale out of range 0-8")
+        } else {
+          global.pow(b, bp, e, ep, rp, roundMode(round)).map(CONST_LONG)
+        }
+      case xs => notImplemented[Id, EVALUATED]("pow(base: Int, bp: Int, exponent: Int, ep: Int, rp: Int, round: Rounds)", xs)
+    }
+
+  val log: BaseFunction[NoContext] =
+    NativeFunction("log", 100, LOG, LONG, ("exponent", LONG), ("ep", LONG), ("base", LONG), ("bp", LONG), ("rp", LONG), ("round", rounds)) {
+      case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
+        if (bp < 0
+          || bp > 8
+          || ep < 0
+          || ep > 8
+          || rp < 0
+          || rp > 8) {
+          Left("log: scale out of range 0-8")
+        } else {
+          global.log(b, bp, e, ep, rp, roundMode(round)).map(CONST_LONG)
+        }
+      case xs => notImplemented[Id, EVALUATED]("log(exponent: Int, ep: Int, base: Int, bp: Int, rp: Int, round: Rounds)", xs)
+    }
+
+  val getListMedian: BaseFunction[NoContext] =
+    NativeFunction("median", 20, MEDIAN_LIST, LONG, ("arr", PARAMETERIZEDLIST(LONG))) {
+      case xs @ (ARR(arr) :: Nil) =>
+        if (arr.headOption.forall(_.isInstanceOf[CONST_LONG])) {
+          if (arr.nonEmpty)
+            Right(CONST_LONG(global.median(arr.asInstanceOf[IndexedSeq[CONST_LONG]].map(_.t))))
+          else
+          Left(s"Can't find median for empty list")
+        } else {
+          notImplemented[Id, EVALUATED](s"median(arr: List[Int])", xs)
+        }
+      case xs => notImplemented[Id, EVALUATED](s"median(arr: List[Int])", xs)
+    }
+
+  val unitVarName = "unit"
 
   private def singleObj(
       ty: CASETYPEREF,
@@ -932,7 +937,10 @@ object PureContext {
   ): (CASETYPEREF, ContextfulVal[NoContext]) =
     ty -> ContextfulVal.pure(CaseObj(ty, v))
 
-  private lazy val vars: Map[String, (FINAL, ContextfulVal[NoContext])] =
+  private val nil: (String, (LIST, ContextfulVal[NoContext])) =
+    ("nil", (LIST(NOTHING), ContextfulVal.pure[NoContext](ARR(IndexedSeq.empty[EVALUATED], EMPTYARR_WEIGHT, limited = false).explicitGet())))
+
+  private val commonVars: Map[String, (FINAL, ContextfulVal[NoContext])] =
     Map(
       (unitVarName, (UNIT, ContextfulVal.pure(unit))),
       ("UP", singleObj(roundUp)),
@@ -944,7 +952,7 @@ object PureContext {
       ("FLOOR", singleObj(roundFloor))
     )
 
-  private lazy val ctx: CTX[NoContext] = CTX[NoContext](
+  private val commonTypes =
     Seq(
       UNIT,
       LONG,
@@ -959,63 +967,60 @@ object PureContext {
       roundCeiling,
       roundFloor,
       rounds
-    ),
-    vars,
-    functions
-  )
+    )
 
-  def build(math: BaseGlobal, version: StdLibVersion): CTX[NoContext] = {
-    val pow: BaseFunction[NoContext] =
-      NativeFunction("pow", 100, POW, LONG, ("base", LONG), ("bp", LONG), ("exponent", LONG), ("ep", LONG), ("rp", LONG), ("round", rounds)) {
-        case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
-          if (bp < 0
-              || bp > 8
-              || ep < 0
-              || ep > 8
-              || rp < 0
-              || rp > 8) {
-            Left("pow: scale out of range 0-8")
-          } else {
-            math.pow(b, bp, e, ep, rp, roundMode(round)).map(CONST_LONG)
-          }
-        case xs => notImplemented[Id, EVALUATED]("pow(base: Int, bp: Int, exponent: Int, ep: Int, rp: Int, round: Rounds)", xs)
-      }
+  private val v3V4Vars = commonVars + nil
 
-    val log: BaseFunction[NoContext] =
-      NativeFunction("log", 100, LOG, LONG, ("exponent", LONG), ("ep", LONG), ("base", LONG), ("bp", LONG), ("rp", LONG), ("round", rounds)) {
-        case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
-          if (bp < 0
-              || bp > 8
-              || ep < 0
-              || ep > 8
-              || rp < 0
-              || rp > 8) {
-            Left("log: scale out of range 0-8")
-          } else {
-            math.log(b, bp, e, ep, rp, roundMode(round)).map(CONST_LONG)
-          }
-        case xs => notImplemented[Id, EVALUATED]("log(exponent: Int, ep: Int, base: Int, bp: Int, rp: Int, round: Rounds)", xs)
-      }
+  private val operators: Array[BaseFunction[NoContext]] =
+    Array(
+      mulLong,
+      divLong,
+      modLong,
+      sumLong,
+      subLong,
+      sumString,
+      sumByteStr,
+      eq,
+      ne,
+      ge,
+      gt,
+      getElement,
+      getListSize,
+      uMinus,
+      uNot
+    )
 
-    val getListMedian: BaseFunction[NoContext] =
-      NativeFunction("median", 20, MEDIAN_LIST, LONG, ("arr", PARAMETERIZEDLIST(LONG))) {
-        case xs @ (ARR(arr) :: Nil) =>
-          if (arr.headOption.forall(_.isInstanceOf[CONST_LONG])) {
-            if (arr.nonEmpty)
-              Right(CONST_LONG(math.median(arr.asInstanceOf[IndexedSeq[CONST_LONG]].map(_.t))))
-            else
-              Left(s"Can't find median for empty list")
-          } else {
-            notImplemented[Id, EVALUATED](s"median(arr: List[Int])", xs)
-          }
-        case xs => notImplemented[Id, EVALUATED](s"median(arr: List[Int])", xs)
-      }
+  private val commonFunctions =
+    Array(
+      fraction,
+      sizeBytes,
+      toBytesBoolean,
+      toBytesLong,
+      toBytesString,
+      takeBytes,
+      dropBytes,
+      takeRightBytes,
+      dropRightBytes,
+      sizeString,
+      toStringBoolean,
+      toStringLong,
+      takeString,
+      dropString,
+      takeRightString,
+      dropRightString,
+      isDefined,
+      throwWithMessage,
+      _isInstanceOf,
+      throwNoMessage
+    ) ++ operators
 
+  private val v1V2V3CommonFunctions =
+    commonFunctions :+ extract
 
-    val fromV3Funcs = Array(
+  private val v3V4CommonFunctions =
+    Array(
       value,
       valueOrErrorMessage,
-      toUtf8String(version),
       toLong,
       toLongOffset,
       indexOf,
@@ -1029,38 +1034,59 @@ object PureContext {
       log
     )
 
-    val v3Ctx = Monoid.combine(
-      ctx,
-      CTX[NoContext](
-        Seq.empty,
-        Map(("nil", (LIST(NOTHING), ContextfulVal.pure[NoContext](ARR(IndexedSeq.empty[EVALUATED], EMPTYARR_WEIGHT, limited = false).explicitGet())))),
-        fromV3Funcs :+ listConstructor(checkSize = false)
+  private val v3Functions =
+    v1V2V3CommonFunctions ++
+    v3V4CommonFunctions ++
+      Array(
+        toUtf8String(reduceLimit = false),
+        listConstructor(checkSize = false)
       )
-    )
 
-    val v4Functions =
-      ctx.functions ++
-        fromV3Funcs ++
-        Array(
-          contains,
-          valueOrElse,
-          listAppend,
-          listConcat,
-          listConstructor(checkSize = true),
-          getListMedian,
-          listIndexOf,
-          listLastIndexOf,
-          listRemoveByIndex,
+  private val v4Functions =
+    commonFunctions ++
+    v3V4CommonFunctions ++
+      Array(
+        contains,
+        valueOrElse,
+        listAppend,
+        listConcat,
+        toUtf8String(reduceLimit = true),
+        listConstructor(checkSize = true),
+        getListMedian,
+        listIndexOf,
+        listLastIndexOf,
+        listRemoveByIndex,
           listContains,
           listMin,
           listMax,
           makeString,
         ) ++ (MinTupleSize to MaxTupleSize).map(i => createTupleN(i))
 
+  private val v1V2Ctx =
+    CTX[NoContext](
+      commonTypes,
+      commonVars,
+      v1V2V3CommonFunctions
+    )
+
+  private val v3Ctx =
+    CTX[NoContext](
+      commonTypes,
+      v3V4Vars,
+      v3Functions
+    )
+
+  private val v4Ctx =
+    CTX[NoContext](
+      commonTypes,
+      v3V4Vars,
+      v4Functions
+    )
+
+  def build(version: StdLibVersion): CTX[NoContext] =
     version match {
-      case V1 | V2 => ctx
+      case V1 | V2 => v1V2Ctx
       case V3      => v3Ctx
-      case V4      => v3Ctx.copy(functions = v4Functions)
+      case V4      => v4Ctx
     }
-  }
 }

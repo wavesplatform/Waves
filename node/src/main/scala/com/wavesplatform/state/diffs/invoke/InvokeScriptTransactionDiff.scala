@@ -98,7 +98,7 @@ object InvokeScriptTransactionDiff {
                     tx.sender,
                     payments,
                     ByteStr(tx.dAppAddressOrAlias.bytes),
-                    tx.id.value,
+                    tx.id(),
                     tx.fee,
                     tx.feeAssetId.compatId
                   )
@@ -182,7 +182,7 @@ object InvokeScriptTransactionDiff {
   ): Either[ScriptExecutionError, (ScriptResult, EvaluationContext[Environment, Id], Log[Id])] = {
     val wavesContext = WavesContext.build(directives)
     val ctx =
-      PureContext.build(Global, version).withEnvironment[Environment] |+|
+      PureContext.build(version).withEnvironment[Environment] |+|
         CryptoContext.build(Global, version).withEnvironment[Environment] |+|
         wavesContext.copy(vars = Map())
 

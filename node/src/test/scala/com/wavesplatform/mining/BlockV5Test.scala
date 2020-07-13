@@ -49,7 +49,6 @@ class BlockV5Test
     with NoShrink
     with OptionValues
     with EitherValues
-    with PrivateMethodTester
     with BlocksTransactionsHelpers {
   import BlockV5Test._
 
@@ -139,7 +138,7 @@ class BlockV5Test
 
               shiftTime(miner, minerAcc1)
 
-              val forge = miner invokePrivate forgeBlock(minerAcc1)
+              val forge = miner.forgeBlock(minerAcc1)
               val block = forge.explicitGet()._1
               Await.result(appender(block).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
               blockchain.height shouldBe h
@@ -149,7 +148,7 @@ class BlockV5Test
 
             shiftTime(miner, minerAcc2)
 
-            val forgedAtActivationHeight = miner invokePrivate forgeBlock(minerAcc2)
+            val forgedAtActivationHeight = miner.forgeBlock(minerAcc2)
             val blockAtActivationHeight  = forgedAtActivationHeight.explicitGet()._1
             blockAtActivationHeight.header.version shouldBe Block.ProtoBlockVersion
 
@@ -172,7 +171,7 @@ class BlockV5Test
 
             shiftTime(miner, minerAcc1)
 
-            val forgedAfterActivationHeight = miner invokePrivate forgeBlock(minerAcc1)
+            val forgedAfterActivationHeight = miner.forgeBlock(minerAcc1)
             val blockAfterActivationHeight  = forgedAfterActivationHeight.explicitGet()._1
             blockAfterActivationHeight.header.version shouldBe Block.ProtoBlockVersion
 
@@ -192,7 +191,7 @@ class BlockV5Test
 
             shiftTime(miner, minerAcc2)
 
-            val forgedAfterVRFUsing = miner invokePrivate forgeBlock(minerAcc2)
+            val forgedAfterVRFUsing = miner.forgeBlock(minerAcc2)
             val blockAfterVRFUsing  = forgedAfterVRFUsing.explicitGet()._1
             blockAfterVRFUsing.header.version shouldBe Block.ProtoBlockVersion
 
@@ -221,7 +220,7 @@ class BlockV5Test
 
             shiftTime(miner, minerAcc2)
 
-            val oldVersionBlockForge = miner invokePrivate forgeBlock(minerAcc2)
+            val oldVersionBlockForge = miner.forgeBlock(minerAcc2)
             val oldVersionBlock      = oldVersionBlockForge.explicitGet()._1
             oldVersionBlock.header.version shouldBe Block.RewardBlockVersion
 
@@ -232,7 +231,7 @@ class BlockV5Test
 
               shiftTime(miner, minerAcc1)
 
-              val forged = miner invokePrivate forgeBlock(minerAcc1)
+              val forged = miner.forgeBlock(minerAcc1)
               val block  = forged.explicitGet()._1
               block.header.version shouldBe Block.ProtoBlockVersion
 
@@ -265,7 +264,7 @@ class BlockV5Test
 
               shiftTime(miner, minerAcc1)
 
-              val forged = miner invokePrivate forgeBlock(minerAcc1)
+              val forged = miner.forgeBlock(minerAcc1)
               val block  = forged.explicitGet()._1
               block.header.version shouldBe Block.ProtoBlockVersion
 
@@ -284,7 +283,7 @@ class BlockV5Test
         withMiner(blockchain, testTime) {
           case (miner, appender, scheduler) =>
             def forge(): Block = {
-              val forge = miner invokePrivate forgeBlock(minerAcc)
+              val forge = miner.forgeBlock(minerAcc)
               forge.explicitGet()._1
             }
 
@@ -437,8 +436,6 @@ class BlockV5Test
         }
     }
   }
-
-  private val forgeBlock = PrivateMethod[Either[String, (Block, MiningConstraint)]](Symbol("forgeBlock"))
 
   private def genesis: Gen[(KeyPair, KeyPair, Block)] =
     for {

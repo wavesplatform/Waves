@@ -55,7 +55,7 @@ class MicroBlockMinerImpl(
       }
       .recover { case e => log.error("Error mining microblock", e) }
 
-  private def generateOneMicroBlockTask(
+  private[mining] def generateOneMicroBlockTask(
       account: KeyPair,
       accumulatedBlock: Block,
       restTotalConstraint: MiningConstraint,

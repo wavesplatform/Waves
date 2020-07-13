@@ -42,7 +42,7 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with P
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(Global, V1).withEnvironment[Environment],
+          PureContext.build(V1).withEnvironment[Environment],
           CryptoContext.build(Global, V1).withEnvironment[Environment],
           WavesContext.build(
             DirectiveSet(V1, Account, Expression).explicitGet()
@@ -56,7 +56,7 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with P
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(Global, V2).withEnvironment[Environment],
+          PureContext.build(V2).withEnvironment[Environment],
           CryptoContext.build(Global, V2).withEnvironment[Environment],
           WavesContext.build(
             DirectiveSet(V2, Account, Expression).explicitGet()
@@ -70,7 +70,7 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with P
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(Global, V3).withEnvironment[Environment],
+          PureContext.build(V3).withEnvironment[Environment],
           CryptoContext.build(Global, V3).withEnvironment[Environment],
           WavesContext.build(
             DirectiveSet(V3, Account, Expression).explicitGet()

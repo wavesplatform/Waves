@@ -25,7 +25,7 @@ import scala.util.Random
 class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
   private val version = V4
   private val ctx =
-    PureContext.build(Global, version).withEnvironment[Environment] |+|
+    PureContext.build(version).withEnvironment[Environment] |+|
     WavesContext.build(DirectiveSet.contractDirectiveSet)
 
   private val environment = Common.emptyBlockchainEnvironment()

@@ -851,7 +851,7 @@ object RollbackSpec {
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(Global, stdLibVersion).withEnvironment[Environment],
+            PureContext.build(stdLibVersion).withEnvironment[Environment],
             CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment],
             WavesContext.build(
               DirectiveSet(stdLibVersion, Account, DAppType).explicitGet()

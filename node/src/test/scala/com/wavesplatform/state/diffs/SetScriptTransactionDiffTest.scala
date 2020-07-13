@@ -124,7 +124,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
     val exprV3WithComplexityBetween3000And4000 = {
       val ctx = {
         val directives = DirectiveSet(V3, Account, Expression).explicitGet()
-        PureContext.build(Global, V3).withEnvironment[Environment] |+|
+        PureContext.build(V3).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V3).withEnvironment[Environment] |+|
           WavesContext.build(directives)
       }
@@ -154,7 +154,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
     val contractV3WithComplexityBetween3000And4000 = {
       val ctx = {
         val directives = DirectiveSet(V3, Account, DAppType).explicitGet()
-        PureContext.build(Global, V3).withEnvironment[Environment] |+|
+        PureContext.build(V3).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V3).withEnvironment[Environment] |+|
           WavesContext.build(directives)
       }
@@ -186,7 +186,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
     val exprV4WithComplexityBetween3000And4000 = {
       val ctx = {
         val directives = DirectiveSet(V4, Account, Expression).explicitGet()
-        PureContext.build(Global, V4).withEnvironment[Environment] |+|
+        PureContext.build(V4).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
           WavesContext.build(directives)
       }
@@ -207,7 +207,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
     val contractV4WithComplexityBetween3000And4000 = {
       val ctx = {
         val directives = DirectiveSet(V4, Account, DAppType).explicitGet()
-        PureContext.build(Global, V4).withEnvironment[Environment] |+|
+        PureContext.build(V4).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
           WavesContext.build(directives)
       }
@@ -231,7 +231,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
     val contractV4WithCallableComplexityBetween3000And4000 = {
       val ctx = {
         val directives = DirectiveSet(V4, Account, DAppType).explicitGet()
-        PureContext.build(Global, V4).withEnvironment[Environment] |+|
+        PureContext.build(V4).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
           WavesContext.build(directives)
       }

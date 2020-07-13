@@ -118,7 +118,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
               v shouldEqual te.value
             case _: DataEntry[_] =>
               re shouldEqual te
-            case _ => fail
+            case _ => fail()
           }
       }
     }

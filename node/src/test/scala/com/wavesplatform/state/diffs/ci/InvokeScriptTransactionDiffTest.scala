@@ -273,7 +273,7 @@ class InvokeScriptTransactionDiffTest
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(Global, V3).withEnvironment[Environment],
+            PureContext.build(V3).withEnvironment[Environment],
             CryptoContext.build(Global, V3).withEnvironment[Environment],
             WavesContext.build(
               DirectiveSet(V3, Account, Expression).explicitGet()
@@ -344,7 +344,7 @@ class InvokeScriptTransactionDiffTest
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(Global, stdLibVersion).withEnvironment[Environment],
+            PureContext.build(stdLibVersion).withEnvironment[Environment],
             CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment],
             WavesContext.build(
               DirectiveSet(stdLibVersion, Account, DAppType).explicitGet()
@@ -912,9 +912,9 @@ class InvokeScriptTransactionDiffTest
                 AssetVerifierTrace(transferringAssetId, None),
                 AssetVerifierTrace(attachedAssetId, None)
                 ) =>
-              attachedAssetId shouldBe attachedAsset.id.value
-              transferringAssetId shouldBe transferringAsset.id.value
-              transfers.head.assetId.get shouldBe transferringAsset.id.value
+              attachedAssetId shouldBe attachedAsset.id()
+              transferringAssetId shouldBe transferringAsset.id()
+              transfers.head.assetId.get shouldBe transferringAsset.id()
           }
         }
     }
@@ -951,7 +951,7 @@ class InvokeScriptTransactionDiffTest
           blockDiffEi.resultE should produce("TransactionNotAllowedByScript")
           inside(blockDiffEi.trace) {
             case List(_, AssetVerifierTrace(assetId, Some(tne: TransactionNotAllowedByScript))) =>
-              assetId shouldBe asset.id.value
+              assetId shouldBe asset.id()
               tne.isAssetScript shouldBe true
           }
         }
@@ -1065,8 +1065,8 @@ class InvokeScriptTransactionDiffTest
               dAppAddress shouldBe ci.dAppAddressOrAlias
               functionCall shouldBe ci.funcCall
 
-              allowedAssetId shouldBe asset1.id.value
-              bannedAssetId shouldBe asset2.id.value
+              allowedAssetId shouldBe asset1.id()
+              bannedAssetId shouldBe asset2.id()
 
               transfers.flatMap(_.assetId.toList) shouldBe List(allowedAssetId, bannedAssetId)
           }
@@ -1126,8 +1126,8 @@ class InvokeScriptTransactionDiffTest
                 InvokeScriptTrace(_, _, Right(ScriptResultV3(_, transfers)), _),
                 AssetVerifierTrace(transferringAssetId, Some(_))
                 ) =>
-              transferringAssetId shouldBe transferringAsset.id.value
-              transfers.head.assetId.get shouldBe transferringAsset.id.value
+              transferringAssetId shouldBe transferringAsset.id()
+              transfers.head.assetId.get shouldBe transferringAsset.id()
           }
         }
     }
@@ -1627,7 +1627,7 @@ class InvokeScriptTransactionDiffTest
     val blockchain: Blockchain = mock[Blockchain]
     forAll(uniqueAssetIdScenario) {
       case (asset, invoke, master, script, funcBinding) =>
-        (blockchain.settings _).expects().returning(TestSettings.Default.blockchainSettings)
+        (() => blockchain.settings).expects().returning(TestSettings.Default.blockchainSettings)
         (blockchain.assetScript _).expects(*).returning(None)
         (blockchain.accountScript _)
           .expects(master.toAddress)
@@ -1635,11 +1635,11 @@ class InvokeScriptTransactionDiffTest
           .anyNumberOfTimes()
         (blockchain.accountScript _).expects(invoke.sender.toAddress).returning(None).anyNumberOfTimes()
         (blockchain.hasAccountScript _).expects(invoke.sender.toAddress).returning(false).anyNumberOfTimes()
-        (blockchain.activatedFeatures _)
+        (() => blockchain.activatedFeatures)
           .expects()
           .returning(Map(BlockchainFeatures.Ride4DApps.id -> 0))
           .anyNumberOfTimes()
-        (blockchain.height _).expects().returning(1).anyNumberOfTimes()
+        (() => blockchain.height).expects().returning(1).anyNumberOfTimes()
         (blockchain.blockHeader _)
           .expects(*)
           .returning(
@@ -1688,7 +1688,7 @@ class InvokeScriptTransactionDiffTest
       assetTx     <- issueV2TransactionGen(master, None, reissuableParam = Some(true))
       fee         <- ciFee()
       funcBinding <- funcNameGen
-      contract    = reissueContract(funcBinding, assetTx.id.value)
+      contract    = reissueContract(funcBinding, assetTx.id())
       script      = ContractScript(V4, contract)
       setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
       fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)

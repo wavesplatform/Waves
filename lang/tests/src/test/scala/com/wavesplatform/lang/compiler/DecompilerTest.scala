@@ -6,7 +6,7 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
+import com.wavesplatform.lang.directives.values.{DApp => DAppType}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
@@ -786,7 +786,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
     val ctx =
       Monoid.combine(
-        PureContext.build(Global, V4).withEnvironment[Environment],
+        PureContext.build(V4).withEnvironment[Environment],
         WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
       )
 
@@ -847,7 +847,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val ctx =
       Monoid.combineAll(
         Seq(
-          PureContext.build(Global, V4).withEnvironment[Environment],
+          PureContext.build(V4).withEnvironment[Environment],
           CryptoContext.build(Global, V4).withEnvironment[Environment],
           WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
         )
@@ -888,7 +888,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val ctx =
       Monoid.combineAll(
         Seq(
-          PureContext.build(Global, V4).withEnvironment[Environment],
+          PureContext.build(V4).withEnvironment[Environment],
           CryptoContext.build(Global, V4).withEnvironment[Environment],
           WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
         )

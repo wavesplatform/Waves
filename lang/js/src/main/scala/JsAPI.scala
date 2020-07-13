@@ -33,7 +33,7 @@ object JsAPI {
     )
 
   private def cryptoContext(version: StdLibVersion) = CryptoContext.build(Global, version).withEnvironment[Environment]
-  private def pureContext(version: StdLibVersion)   = PureContext.build(Global, version).withEnvironment[Environment]
+  private def pureContext(version: StdLibVersion)   = PureContext.build(version).withEnvironment[Environment]
 
   private val fullDAppContext: Map[StdLibVersion, CTX[Environment]] =
     DirectiveDictionary[StdLibVersion].all
@@ -290,7 +290,7 @@ object JsAPI {
     jObj(
       "evaluate"    -> (repl.execute _ andThen mapResult),
       "info"        -> repl.info _,
-      "totalInfo"   -> repl.totalInfo _,
+      "totalInfo"   -> (() => repl.totalInfo),
       "clear"       -> repl.clear _,
       "reconfigure" -> (repl.reconfigure _ andThen asJs)
     )

@@ -23,7 +23,7 @@ class EvaluatorV2(
 
   def apply(expr: EXPR, limit: Int): (EXPR, Int) = {
     var ref    = expr.deepCopy.value
-    val unused = root(ref, v => Coeval.delay { ref = v }, limit, Nil).value
+    val unused = root(ref, v => Coeval.delay { ref = v }, limit, Nil).value()
     (ref, unused)
   }
 

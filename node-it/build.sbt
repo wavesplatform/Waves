@@ -1,12 +1,14 @@
 import WavesDockerKeys._
 
-enablePlugins(WavesDockerPlugin, ItTestPlugin)
+enablePlugins(WavesDockerPlugin, IntegrationTestsPlugin)
 
 description := "NODE integration tests"
 libraryDependencies ++= Dependencies.it
 
 def stageFiles(ref: ProjectReference): TaskKey[File] =
   ref / Universal / stage
+
+(Test / test) := (Test / test).dependsOn(Docker / docker).value
 
 inTask(docker)(
   Seq(
