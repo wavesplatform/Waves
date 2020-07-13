@@ -12,7 +12,7 @@
       params: [ "Address|Alias" ]
       doc: "Extract address or lookup alias"
       paramsDoc: [ "Address or alias of the account." ]
-      complexity: 10
+      complexity: 5
     }
     {
       name: "parseInt"
