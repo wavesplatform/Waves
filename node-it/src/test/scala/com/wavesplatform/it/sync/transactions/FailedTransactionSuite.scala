@@ -86,7 +86,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
          |  let action = valueOrElse(getString(this, "tikTok"), "unknown")
          |  if (action == "transfer") then [ScriptTransfer(inv.caller, 15, asset)]
          |  else if (action == "issue") then [Issue("new asset", "", 100, 8, true, unit, 0)]
-         |  else if (action == "reissue") then [Reissue(asset, true, 15)]
+         |  else if (action == "reissue") then [Reissue(asset, 15, true)]
          |  else if (action == "burn") then [Burn(asset, 15)]
          |  else []
          |}
