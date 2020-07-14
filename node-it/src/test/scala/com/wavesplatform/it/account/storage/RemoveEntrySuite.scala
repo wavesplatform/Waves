@@ -151,7 +151,7 @@ class RemoveEntrySuite extends BaseSuite {
             .selfSigned(1.toByte, KeyPair(Base58.decode(miner.seed(address))), Some(compiledScript), setScriptFee, System.currentTimeMillis())
             .explicitGet()
             .json
-            .value
+            .value()
         )
         .id
     )

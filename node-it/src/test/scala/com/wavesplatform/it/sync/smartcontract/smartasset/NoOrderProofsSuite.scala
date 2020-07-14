@@ -37,7 +37,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
               |}""".stripMargin,
             isAssetScript = true,
             estimator
-          ).explicitGet()._1.bytes.value.base64
+          ).explicitGet()._1.bytes.value().base64
         )
       )
 
@@ -70,7 +70,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
                 }""".stripMargin,
             false,
             estimator
-          ).explicitGet()._1.bytes.value.base64
+          ).explicitGet()._1.bytes.value().base64
         ),
         waitForTx = true
       )

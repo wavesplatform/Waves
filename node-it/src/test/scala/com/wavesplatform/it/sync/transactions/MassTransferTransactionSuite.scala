@@ -21,7 +21,7 @@ import scala.util.Random
 
 class MassTransferTransactionSuite extends BaseTransactionSuite /*with CancelAfterFailure*/ {
 
-  private def fakeSignature = ByteStr(Array.fill(64)(Random.nextInt.toByte))
+  private def fakeSignature = ByteStr(Array.fill(64)(Random.nextInt().toByte))
 
   test("asset mass transfer changes asset balances and sender's.waves balance is decreased by fee.") {
     for (v <- massTransferTxSupportedVersions) {

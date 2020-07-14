@@ -42,7 +42,7 @@ trait GrpcBaseTransactionSuiteLike
   }
 
   protected override def beforeAll(): Unit = {
-    theNodes.run
+    theNodes.run()
     super.beforeAll()
   }
 }

@@ -56,7 +56,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
             .explicitGet()
             ._1
             .bytes
-            .value
+            .value()
             .base64
         )
       )
@@ -86,7 +86,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
             .explicitGet()
             ._1
             .bytes
-            .value
+            .value()
             .base64
         )
       )
@@ -115,7 +115,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
             .explicitGet()
             ._1
             .bytes
-            .value
+            .value()
             .base64
         )
       )

@@ -134,11 +134,11 @@ class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
     sender.transfer(acc0.toAddress.toString, newAddress, 10.waves, minFee, waitForTx = true)
 
     val scriptSet = SetScriptTransaction.selfSigned(1.toByte, pkNewAddress, Some(compiledScript), setScriptFee, System.currentTimeMillis())
-    val scriptSetBroadcast = sender.signedBroadcast(scriptSet.explicitGet().json.value)
+    val scriptSetBroadcast = sender.signedBroadcast(scriptSet.explicitGet().json.value())
     nodes.waitForHeightAriseAndTxPresent(scriptSetBroadcast.id)
 
     val transfer = TransferTransaction.selfSigned(2.toByte, pkNewAddress, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, ByteStr.empty,  System.currentTimeMillis())
-    val transferBroadcast = sender.signedBroadcast(transfer.explicitGet().json.value)
+    val transferBroadcast = sender.signedBroadcast(transfer.explicitGet().json.value())
     nodes.waitForHeightAriseAndTxPresent(transferBroadcast.id)
   }
 

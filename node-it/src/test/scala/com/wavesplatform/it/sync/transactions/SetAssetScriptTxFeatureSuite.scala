@@ -75,7 +75,7 @@ class SetAssetScriptTxFeatureSuite extends BaseTransactionSuite {
       .explicitGet()
       ._1
       .bytes
-      .value
+      .value()
       .base64
 
     val txId = sender

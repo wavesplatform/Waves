@@ -34,7 +34,7 @@ class PseudoTxSenderPubKeySuite extends BaseTransactionSuite {
          """.stripMargin,
       isAssetScript = true,
       ScriptEstimatorV3
-    ).explicitGet()._1.bytes.value.base64
+    ).explicitGet()._1.bytes.value().base64
     firstAssetId = sender.issue(firstDApp, fee = issueFee, script = Some(smartAssetScript), waitForTx = true).id
     secondAssetId = sender.issue(secondDApp, fee = issueFee, script = Some(smartAssetScript), waitForTx = true).id
 
@@ -55,7 +55,7 @@ class PseudoTxSenderPubKeySuite extends BaseTransactionSuite {
          """.stripMargin,
       isAssetScript = false,
       ScriptEstimatorV3
-    ).explicitGet()._1.bytes.value.base64
+    ).explicitGet()._1.bytes.value().base64
 
     sender.setScript(firstDApp, Some(dAppScript), waitForTx = true)
     sender.setScript(secondDApp, Some(dAppScript), waitForTx = true)

@@ -35,7 +35,7 @@ class InvokeScriptWithSponsorshipSuite extends BaseTransactionSuite with CancelA
   test("_issue and transfer assets") {
     dAppAsset = sender.issue(dApp, "dApp", "d", quantity, 0, waitForTx = true).id
     callerAsset = sender.issue(caller, "caller", "c", quantity, 0, waitForTx = true).id
-    val script = Some(ScriptCompiler.compile("true", estimator).explicitGet()._1.bytes.value.base64)
+    val script = Some(ScriptCompiler.compile("true", estimator).explicitGet()._1.bytes.value().base64)
     smartAsset = sender.issue(dApp, "Smart", "s", quantity, 0, script = script, waitForTx = true).id
 
     sender.transfer(dApp, caller, halfQuantity, minFee, Some(dAppAsset), waitForTx = true).id

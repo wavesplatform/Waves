@@ -60,7 +60,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
          """.stripMargin,
       isAssetScript = true,
       estimator
-    ).explicitGet()._1.bytes.value.base64
+    ).explicitGet()._1.bytes.value().base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
     assertApiError(sender.transfer(firstAddress, secondAddress, 100, smartMinFee, Some(asset)), errNotAllowedByTokenApiError)
@@ -84,7 +84,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
          """.stripMargin,
       isAssetScript = true,
       estimator
-    ).explicitGet()._1.bytes.value.base64
+    ).explicitGet()._1.bytes.value().base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
     sender.transfer(firstAddress, secondAddress, 100, smartMinFee, Some(asset), waitForTx = true)
@@ -105,7 +105,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
          """.stripMargin,
       isAssetScript = true,
       estimator
-    ).explicitGet()._1.bytes.value.base64
+    ).explicitGet()._1.bytes.value().base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr1), waitForTx = true)
 
     sender.transfer(firstAddress, thirdAddress, 100, smartMinFee, Some(asset), waitForTx = true)
@@ -132,7 +132,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
          """.stripMargin,
       isAssetScript = true,
       estimator
-    ).explicitGet()._1.bytes.value.base64
+    ).explicitGet()._1.bytes.value().base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
     assertApiError(sender.transfer(firstAddress, thirdAddress, 100, 2, Some(asset), feeAssetId = Some(feeAsset))) { error =>
@@ -174,7 +174,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
          """.stripMargin,
       isAssetScript = true,
       estimator
-    ).explicitGet()._1.bytes.value.base64
+    ).explicitGet()._1.bytes.value().base64
     sender.setAssetScript(blackAsset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
     val blackTx = TransferTransaction.selfSigned(
@@ -227,7 +227,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
          """.stripMargin,
       isAssetScript = true,
       estimator
-    ).explicitGet()._1.bytes.value.base64
+    ).explicitGet()._1.bytes.value().base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
     sender.burn(secondAddress, asset, 10, smartMinFee, waitForTx = true)
@@ -244,7 +244,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
          """.stripMargin,
       isAssetScript = true,
       estimator
-    ).explicitGet()._1.bytes.value.base64
+    ).explicitGet()._1.bytes.value().base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr1), waitForTx = true)
 
     sender.burn(thirdAddress, asset, 10, smartMinFee, waitForTx = true)
@@ -265,7 +265,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
          """.stripMargin,
       isAssetScript = true,
       estimator
-    ).explicitGet()._1.bytes.value.base64
+    ).explicitGet()._1.bytes.value().base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
     if (nodes.map(_.height).max % 2 != 0) nodes.waitForHeightArise()
@@ -300,7 +300,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
          """.stripMargin,
             isAssetScript = true,
             estimator
-          ).explicitGet()._1.bytes.value.base64
+          ).explicitGet()._1.bytes.value().base64
         ),
         waitForTx = true
       )
@@ -324,7 +324,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
          """.stripMargin,
       isAssetScript = true,
       estimator
-    ).explicitGet()._1.bytes.value.base64
+    ).explicitGet()._1.bytes.value().base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
     val transfers       = List(Transfer(firstAddress, 10), Transfer(secondAddress, 100))
@@ -347,7 +347,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
          """.stripMargin,
       isAssetScript = true,
       estimator
-    ).explicitGet()._1.bytes.value.base64
+    ).explicitGet()._1.bytes.value().base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
     val transfers                  = List(Transfer(firstAddress, 10), Transfer(secondAddress, 100), Transfer(firstAddress, 10))
@@ -375,7 +375,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
          """.stripMargin,
       isAssetScript = true,
       estimator
-    ).explicitGet()._1.bytes.value.base64
+    ).explicitGet()._1.bytes.value().base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
     assertApiError(sender.reissue(secondAddress, asset, someAssetAmount, reissuable = true, fee = issueFee + smartFee)) { error =>
@@ -408,7 +408,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
          |}""".stripMargin,
       isAssetScript = true,
       estimator
-    ).explicitGet()._1.bytes.value.base64
+    ).explicitGet()._1.bytes.value().base64
     sender.setAssetScript(assetNonReissue, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
     assertApiError(
@@ -433,7 +433,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
         reissuable = false,
         issueFee,
         2,
-        script = Some(ScriptCompiler(s"false".stripMargin, isAssetScript = true, estimator).explicitGet()._1.bytes.value.base64),
+        script = Some(ScriptCompiler(s"false".stripMargin, isAssetScript = true, estimator).explicitGet()._1.bytes.value().base64),
         waitForTx = true
       )
       .id

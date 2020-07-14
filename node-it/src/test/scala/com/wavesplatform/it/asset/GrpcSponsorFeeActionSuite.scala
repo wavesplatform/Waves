@@ -442,7 +442,7 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
       val dApp = miner.createAddress()
       miner.transfer(sender.address, dApp, initialWavesBalance, minFee, waitForTx = true)
 
-      val script = ScriptCompiler.compile("true", ScriptEstimatorV2).explicitGet()._1.bytes.value.base64
+      val script = ScriptCompiler.compile("true", ScriptEstimatorV2).explicitGet()._1.bytes.value().base64
       val assetId = miner.issue(dApp, script = Some(script), waitForTx = true).id
 
       createDApp(

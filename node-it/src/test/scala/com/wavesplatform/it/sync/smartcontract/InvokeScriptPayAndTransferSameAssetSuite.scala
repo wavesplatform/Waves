@@ -30,11 +30,11 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
   test("_issue and transfer asset") {
     assetId = sender.issue(caller, "Asset", "a", assetQuantity, 0).id
 
-    val script = Some(ScriptCompiler.compile("true", estimator).explicitGet()._1.bytes.value.base64)
+    val script = Some(ScriptCompiler.compile("true", estimator).explicitGet()._1.bytes.value().base64)
     smartAssetId = sender.issue(caller, "Smart", "s", assetQuantity, 0, script = script).id
 
     val scriptText  = "match tx {case _:TransferTransaction => false case _ => true}"
-    val smartScript = Some(ScriptCompiler.compile(scriptText, estimator).explicitGet()._1.bytes.value.base64)
+    val smartScript = Some(ScriptCompiler.compile(scriptText, estimator).explicitGet()._1.bytes.value().base64)
     rejAssetId = sender.issue(caller, "Reject", "r", assetQuantity, 0, script = smartScript, waitForTx = true).id
   }
 

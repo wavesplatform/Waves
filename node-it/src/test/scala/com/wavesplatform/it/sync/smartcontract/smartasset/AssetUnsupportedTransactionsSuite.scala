@@ -41,7 +41,7 @@ class AssetUnsupportedTransactionsSuite extends BaseTransactionSuite with TableD
                  |}""".stripMargin,
               isAssetScript = true,
               ScriptEstimatorV2
-            ).explicitGet()._1.bytes.value.base64),
+            ).explicitGet()._1.bytes.value().base64),
           waitForTx = true
         )
 

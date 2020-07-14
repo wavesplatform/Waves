@@ -127,7 +127,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
                |""".stripMargin,
             isAssetScript = true,
             estimator
-          ).explicitGet()._1.bytes.value.base64
+          ).explicitGet()._1.bytes.value().base64
         )
       )
       .id
@@ -169,7 +169,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
          """.stripMargin,
       isAssetScript = true,
       estimator
-    ).explicitGet()._1.bytes.value.base64
+    ).explicitGet()._1.bytes.value().base64
 
     val details        = miner.assetsDetails(assetWScript, true).scriptDetails.getOrElse(fail("Expecting to get asset details"))
     assert(details.scriptComplexity == 1)
@@ -281,7 +281,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       }
       nodes.foreach(_.ensureTxDoesntExist(id(noProof)))
 
-      val badProof = request ++ Json.obj("proofs" -> Seq(Base58.encode(Array.fill(64)(Random.nextInt.toByte))))
+      val badProof = request ++ Json.obj("proofs" -> Seq(Base58.encode(Array.fill(64)(Random.nextInt().toByte))))
       assertApiError(sender.postJson("/transactions/broadcast", badProof)) { error =>
         error.message should include regex "Proof doesn't validate as signature"
       }
@@ -319,7 +319,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         reissuable = false,
         issueFee,
         2.toByte,
-        script = Some(unchangeableScript.bytes.value.base64)
+        script = Some(unchangeableScript.bytes.value().base64)
       )
       .id
 

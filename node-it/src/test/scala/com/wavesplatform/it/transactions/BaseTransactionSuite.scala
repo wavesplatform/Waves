@@ -42,7 +42,7 @@ trait BaseTransactionSuiteLike extends WaitForHeight2 with IntegrationSuiteWithT
   override protected def nodes: Seq[Node] = theNodes()
 
   protected override def beforeAll(): Unit = {
-    theNodes.run
+    theNodes.run()
     super.beforeAll()
   }
 }

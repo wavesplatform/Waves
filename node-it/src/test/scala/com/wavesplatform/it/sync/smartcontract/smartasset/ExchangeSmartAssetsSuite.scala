@@ -50,7 +50,7 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
            |case _ => false}""".stripMargin,
         isAssetScript = true,
         estimator
-      ).explicitGet()._1.bytes.value.base64)
+      ).explicitGet()._1.bytes.value().base64)
 
     val sAsset = sender
       .issue(firstAddress, "SmartAsset", "TestCoin", someAssetAmount, 0, reissuable = false, issueFee, 2, s, waitForTx = true)
@@ -78,7 +78,7 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
            |case _ => false}""".stripMargin,
         isAssetScript = true,
         estimator
-      ).explicitGet()._1.bytes.value.base64)
+      ).explicitGet()._1.bytes.value().base64)
 
     sender.setAssetScript(sAsset, firstAddress, setAssetScriptFee, sUpdated, waitForTx = true)
 
@@ -115,7 +115,7 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
                                         |case _ => false}""".stripMargin,
         isAssetScript = true,
         estimator
-      ).explicitGet()._1.bytes.value.base64)
+      ).explicitGet()._1.bytes.value().base64)
 
     sender.setAssetScript(assetA, firstAddress, setAssetScriptFee, script, waitForTx = true)
     sender.setAssetScript(assetB, secondAddress, setAssetScriptFee, script, waitForTx = true)
@@ -158,9 +158,9 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
   }
 
   test("use all functions from RIDE for asset script") {
-    val script1 = Some(ScriptCompiler(cryptoContextScript(false), isAssetScript = true, estimator).explicitGet()._1.bytes.value.base64)
-    val script2 = Some(ScriptCompiler(pureContextScript(dtx, false), isAssetScript = true, estimator).explicitGet()._1.bytes.value.base64)
-    val script3 = Some(ScriptCompiler(wavesContextScript(dtx, false), isAssetScript = true, estimator).explicitGet()._1.bytes.value.base64)
+    val script1 = Some(ScriptCompiler(cryptoContextScript(false), isAssetScript = true, estimator).explicitGet()._1.bytes.value().base64)
+    val script2 = Some(ScriptCompiler(pureContextScript(dtx, false), isAssetScript = true, estimator).explicitGet()._1.bytes.value().base64)
+    val script3 = Some(ScriptCompiler(wavesContextScript(dtx, false), isAssetScript = true, estimator).explicitGet()._1.bytes.value().base64)
 
     List(script1, script2, script3)
       .map { i =>
