@@ -34,4 +34,12 @@ object TxEstimators extends ScorexLogging {
     override def apply(blockchain: Blockchain, tx: Transaction, diff: Diff): Long = diff.scriptsComplexity
     override val minEstimate                                                      = 0L
   }
+
+  case object spentComplexity extends Fn {
+    override def apply(blockchain: Blockchain, tx: Transaction, diff: Diff): Long = {
+      //println(diff.spentComplexity)
+      diff.spentComplexity
+    }
+    override val minEstimate                                                      = 0L
+  }
 }

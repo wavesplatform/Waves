@@ -7,6 +7,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.v1.evaluator.Complexity
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -157,7 +158,8 @@ case class Diff(
     sponsorship: Map[IssuedAsset, Sponsorship],
     scriptsRun: Int,
     scriptsComplexity: Long,
-    scriptResults: Map[ByteStr, InvokeScriptResult]
+    scriptResults: Map[ByteStr, InvokeScriptResult],
+    spentComplexity: Complexity
 ) {
   def bindTransaction(tx: Transaction): Diff =
     copy(transactions = transactions.concat(Map(Diff.toDiffTxData(tx, portfolios, accountData))))
@@ -176,7 +178,8 @@ object Diff {
       accountData: Map[Address, AccountDataInfo] = Map.empty,
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
-      scriptsRun: Int = 0
+      scriptsRun: Int = 0,
+      spentComplexity: Complexity = 0
   ): Diff =
     Diff(
       transactions = mutable.LinkedHashMap(),
@@ -192,7 +195,8 @@ object Diff {
       sponsorship = sponsorship,
       scriptsRun = scriptsRun,
       scriptResults = scriptResults,
-      scriptsComplexity = 0
+      scriptsComplexity = 0,
+      spentComplexity = spentComplexity
     )
 
   def apply(
@@ -209,7 +213,8 @@ object Diff {
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptsRun: Int = 0,
       scriptsComplexity: Long = 0,
-      scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
+      scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
+      spentComplexity: Complexity = 0
   ): Diff =
     Diff(
       // should be changed to VectorMap after 2.13 https://github.com/scala/scala/pull/6854
@@ -226,7 +231,8 @@ object Diff {
       sponsorship = sponsorship,
       scriptsRun = scriptsRun,
       scriptResults = scriptResults,
-      scriptsComplexity = scriptsComplexity
+      scriptsComplexity = scriptsComplexity,
+      spentComplexity = spentComplexity
     )
 
   private def toDiffTxData(
@@ -251,7 +257,8 @@ object Diff {
       Map.empty,
       0,
       0,
-      Map.empty
+      Map.empty,
+      0
     )
 
   implicit val diffMonoid: Monoid[Diff] = new Monoid[Diff] {
@@ -272,7 +279,8 @@ object Diff {
         sponsorship = older.sponsorship.combine(newer.sponsorship),
         scriptsRun = older.scriptsRun.combine(newer.scriptsRun),
         scriptResults = older.scriptResults.combine(newer.scriptResults),
-        scriptsComplexity = older.scriptsComplexity + newer.scriptsComplexity
+        scriptsComplexity = older.scriptsComplexity + newer.scriptsComplexity,
+        spentComplexity = older.spentComplexity + newer.spentComplexity
       )
   }
 

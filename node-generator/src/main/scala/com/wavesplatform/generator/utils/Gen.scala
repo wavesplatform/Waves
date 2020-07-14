@@ -85,10 +85,10 @@ object Gen {
           s"let accountSigned$i = if(sigVerify(tx.bodyBytes, tx.proofs[$i], accountPK$i)) then 1 else 0"
       } mkString "\n"
 
-    val proofSum = accountsWithIndexes map {
+    val proofSum = (accountsWithIndexes map {
       case (_, ind) =>
         s"accountSigned$ind"
-    } mkString ("let proofSum = ", " + ", "")
+    }).mkString("let proofSum = ", " + ", "")
 
     val finalStatement = s"proofSum >= $requiredProofsCount"
 

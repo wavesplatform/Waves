@@ -908,7 +908,7 @@ class InvokeScriptTransactionDiffTest
           blockDiffEi.resultE.explicitGet().scriptsRun shouldBe 3
           inside(blockDiffEi.trace) {
             case List(
-                InvokeScriptTrace(_, _, Right(ScriptResultV3(_, transfers)), _),
+                InvokeScriptTrace(_, _, Right(ScriptResultV3(_, transfers, _)), _),
                 AssetVerifierTrace(transferringAssetId, None),
                 AssetVerifierTrace(attachedAssetId, None)
                 ) =>
@@ -1058,7 +1058,7 @@ class InvokeScriptTransactionDiffTest
           blockDiffEi.resultE should produce("Transaction is not allowed by script")
           inside(blockDiffEi.trace) {
             case List(
-                InvokeScriptTrace(dAppAddress, functionCall, Right(ScriptResultV3(_, transfers)), _),
+                InvokeScriptTrace(dAppAddress, functionCall, Right(ScriptResultV3(_, transfers, _)), _),
                 AssetVerifierTrace(allowedAssetId, None),
                 AssetVerifierTrace(bannedAssetId, Some(_: FailedTransactionError))
                 ) =>
@@ -1123,7 +1123,7 @@ class InvokeScriptTransactionDiffTest
           blockDiffEi.resultE should produce("TransactionValidationError")
           inside(blockDiffEi.trace) {
             case List(
-                InvokeScriptTrace(_, _, Right(ScriptResultV3(_, transfers)), _),
+                InvokeScriptTrace(_, _, Right(ScriptResultV3(_, transfers, _)), _),
                 AssetVerifierTrace(transferringAssetId, Some(_))
                 ) =>
               transferringAssetId shouldBe transferringAsset.id()

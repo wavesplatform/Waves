@@ -90,7 +90,7 @@ object ContractEvaluator {
     for {
       expr              <- buildExprFromInvocation(dApp, i, version).leftMap((_, Nil))
       (evaluation, log) <- EvaluatorV1().applyWithLogging[EVALUATED](ctx, expr)
-      result            <- ScriptResult.fromObj(ctx, i.transactionId, evaluation, version).leftMap((_, log))
+      result            <- ScriptResult.fromObj(ctx, i.transactionId, evaluation, version, 0 /* unknown complexity */).leftMap((_, log))
     } yield (result, log)
 
   def applyV2(
@@ -123,8 +123,8 @@ object ContractEvaluator {
         case (expr, unusedComplexity, log) =>
           val result =
             expr match {
-              case value: EVALUATED => ScriptResult.fromObj(ctx, transactionId, value, version)
-              case expr: EXPR       => Right(IncompleteResult(expr, unusedComplexity))
+              case value: EVALUATED => ScriptResult.fromObj(ctx, transactionId, value, version, limit - unusedComplexity)
+              case expr: EXPR       => Right(IncompleteResult(expr, unusedComplexity, limit - unusedComplexity))
             }
         result.bimap((_, log), (_, log))
       }

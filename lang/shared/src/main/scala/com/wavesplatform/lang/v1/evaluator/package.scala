@@ -7,6 +7,7 @@ import com.wavesplatform.lang.v1.task.TaskMT
 import com.wavesplatform.lang.{EvalF, ExecutionError, TrampolinedExecResult}
 
 package object evaluator {
+  type Complexity = Long
   type EvalM[F[_], C[_[_]], A] = TaskMT[F, LoggedEvaluationContext[C, F], ExecutionError, A]
 
   implicit class EvalMOps[F[_], C[_[_]], A](ev: EvalM[F, C, A]) {
