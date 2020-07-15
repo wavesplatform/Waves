@@ -425,7 +425,6 @@ object AsyncHttpApi extends Assertions {
 
       val jsUpdated = if (script.isDefined) js ++ Json.obj("script" -> JsString(script.get)) else js
       signAndBroadcast(jsUpdated)
-
     }
 
     def setScript(sender: String, script: Option[String] = None, fee: Long = 1000000, version: TxVersion = TxVersion.V1): Future[Transaction] = {

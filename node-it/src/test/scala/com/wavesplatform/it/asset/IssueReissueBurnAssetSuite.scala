@@ -306,7 +306,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
     }
 
     "rollback works" in {
-      val acc   = createDapp(script(simpleReissuableAsset))
+      val acc    = createDapp(script(simpleReissuableAsset))
       val assetA = issueValidated(acc, simpleReissuableAsset)
 
       sender.debugStateChangesByAddress(acc, 100).flatMap(_.stateChanges) should matchPattern {
@@ -317,11 +317,15 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       nodes.waitForHeightArise()
       val txId = invokeScript(acc, "reissueIssueAndNft", assetId = assetA, fee = invocationCost(1)).id
 
-      val (assetNft, assetB) = sender.debugStateChanges(txId).stateChanges.map { scd =>
-        val nft = scd.issues.find(_.name == nftAsset.name).get.assetId
-        val asset = scd.issues.find(_.name == simpleReissuableAsset.name).get.assetId
-        (nft, asset)
-      }.get
+      val (assetNft, assetB) = sender
+        .debugStateChanges(txId)
+        .stateChanges
+        .map { scd =>
+          val nft   = scd.issues.find(_.name == nftAsset.name).get.assetId
+          val asset = scd.issues.find(_.name == simpleReissuableAsset.name).get.assetId
+          (nft, asset)
+        }
+        .get
 
       nodes.waitForHeightArise()
 
@@ -344,26 +348,6 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       sender.assetsBalance(acc).balances.map(_.assetId).toSet shouldBe Set(assetA)
       sender.nftList(acc, 10) shouldBe empty
     }
-
-    "liquid block works" in {
-      val acc   = createDapp(script(simpleReissuableAsset))
-      val asset = issueValidated(acc, simpleReissuableAsset)
-      val tx    = invokeScript(acc, "reissueIssueAndNft", assetId = asset, fee = invocationCost(1))
-      def checks(): Unit = {
-        assertStateChanges(tx) { sd =>
-          sd.issues should have size 2
-          sd.burns should have size 1
-          sd.reissues should have size 1
-        }
-        assertQuantity(asset)(simpleReissuableAsset.quantity + 50)
-        sender.assertAssetBalance(acc, asset, simpleReissuableAsset.quantity + 50)
-        sender.assetsBalance(acc).balances should have size 2
-        sender.nftList(acc, 10) should have size 1
-      }
-      checks()
-      nodes.waitForHeightArise()
-      checks()
-    }
   }
 
   def createDapp(scriptParts: String*): String = {
@@ -377,7 +361,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       .explicitGet()
       ._1
 
-    miner.transfer(sender.address, address, initialWavesBalance, minFee, waitForTx = true)
+    miner.transfer(sender.address, address, initialWavesBalance, setScriptFee * 2, waitForTx = true)
 
     nodes.waitForTransaction(
       miner
@@ -425,7 +409,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
         payment = payments
       )
 
-    if (wait) nodes.waitForTransaction(tx._1.id)
+    if (wait) nodes.waitForHeightAriseAndTxPresent(tx._1.id)
     tx._1
   }
 
