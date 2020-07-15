@@ -147,10 +147,11 @@ object Importer extends ScorexLogging {
         val extensionClass = Class.forName(extensionClassName).asInstanceOf[Class[Extension]]
         val ctor           = extensionClass.getConstructor(classOf[Context])
         log.info(s"Enable extension: $extensionClassName")
-        ctor.newInstance(extensionContext)
+        ctor.newInstance()
       }
+
       extensions.flatMap { ext =>
-        Try(ext.start()) match {
+        Try(ext.start(extensionContext)) match {
           case Success(_) =>
             Some(ext)
           case Failure(e) =>

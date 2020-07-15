@@ -9,8 +9,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import cats.instances.all._
-import cats.syntax.option._
+import cats.kernel.Monoid
+import com.wavesplatform.events.BlockchainUpdateTriggers.monoid
+import cats.implicits._
 import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
@@ -24,7 +25,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.database.{DBExt, Keys, openDB}
-import com.wavesplatform.events.{BlockchainUpdateTriggersImpl, BlockchainUpdated, UtxEvent}
+import com.wavesplatform.events.{BlockchainUpdateTriggers, BlockchainUpdateTriggersImpl, BlockchainUpdated, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.api.ActivationApiRoute
@@ -106,7 +107,22 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val blockchainUpdatesScheduler = singleThread("blockchain-updates", reporter = log.error("Error on sending blockchain updates", _))
   private val blockchainUpdated          = ConcurrentSubject.publish[BlockchainUpdated](scheduler)
   private val utxEvents                  = ConcurrentSubject.publish[UtxEvent](scheduler)
-  private val blockchainUpdateTriggers   = new BlockchainUpdateTriggersImpl(blockchainUpdated)
+
+  private val extensions = settings.extensions.map { extensionClassName =>
+    val extensionClass = Class.forName(extensionClassName).asInstanceOf[Class[Extension]]
+    val ctor           = extensionClass.getConstructor(classOf[Context])
+    log.info(s"Enable extension: $extensionClassName")
+    ctor.newInstance()
+  }
+
+  private val blockchainUpdateTriggers = {
+    val t: BlockchainUpdateTriggers = new BlockchainUpdateTriggersImpl(blockchainUpdated)
+    val extensionTriggers =
+      extensions
+        .collect { case ext: BlockchainUpdateTriggers => ext }
+        .foldLeft(Monoid[BlockchainUpdateTriggers].empty)(Monoid[BlockchainUpdateTriggers].combine)
+    t.combine(extensionTriggers)
+  }
 
   private[this] var miner: Miner with MinerDebugInfo = Miner.Disabled
   private val (blockchainUpdater, levelDB) =
@@ -115,8 +131,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
   private var maybeUtx: Option[UtxPool]                                        = None
   private var maybeNetwork: Option[NS]                                         = None
-
-  private var extensions = Seq.empty[Extension]
 
   def apiShutdown(): Unit = {
     for {
@@ -224,18 +238,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         utxSynchronizer.publish,
         loadBlockAt(db, blockchainUpdater)
       )
-      override val blocksApi: CommonBlocksApi     = CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
+      override val blocksApi: CommonBlocksApi =
+        CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
       override val accountsApi: CommonAccountsApi = CommonAccountsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
       override val assetsApi: CommonAssetsApi     = CommonAssetsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
     }
 
-    extensions = settings.extensions.map { extensionClassName =>
-      val extensionClass = Class.forName(extensionClassName).asInstanceOf[Class[Extension]]
-      val ctor           = extensionClass.getConstructor(classOf[Context])
-      log.info(s"Enable extension: $extensionClassName")
-      ctor.newInstance(extensionContext)
-    }
-    extensions.foreach(_.start())
+    extensions.foreach(_.start(extensionContext))
 
     // Node start
     // After this point, node actually starts doing something
@@ -505,7 +514,9 @@ object Application extends ScorexLogging {
   private[wavesplatform] def loadBlockAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[(BlockMeta, Seq[Transaction])] =
     loadBlockInfoAt(db, blockchainUpdater)(height).map { case (meta, txs) => (meta, txs.map(_._1)) }
 
-  private[wavesplatform] def loadBlockInfoAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[(BlockMeta, Seq[(Transaction, Boolean)])] =
+  private[wavesplatform] def loadBlockInfoAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(
+      height: Int
+  ): Option[(BlockMeta, Seq[(Transaction, Boolean)])] =
     loadBlockMetaAt(db, blockchainUpdater)(height).map { meta =>
       meta -> blockchainUpdater
         .liquidTransactions(meta.id)
