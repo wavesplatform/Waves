@@ -117,11 +117,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val blockchainUpdateTriggers = {
     val t: BlockchainUpdateTriggers = new BlockchainUpdateTriggersImpl(blockchainUpdated)
-    val extensionTriggers =
-      extensions
-        .collect { case ext: BlockchainUpdateTriggers => ext }
-        .foldLeft(Monoid[BlockchainUpdateTriggers].empty)(Monoid[BlockchainUpdateTriggers].combine)
-    t.combine(extensionTriggers)
+    extensions
+      .collect { case ext: BlockchainUpdateTriggers => ext }
+      .foldLeft(t)(Monoid[BlockchainUpdateTriggers].combine)
   }
 
   private[this] var miner: Miner with MinerDebugInfo = Miner.Disabled
