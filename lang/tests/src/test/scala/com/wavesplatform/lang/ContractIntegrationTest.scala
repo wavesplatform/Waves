@@ -88,7 +88,8 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         DataItem.Lng("fee", fee),
         DataItem.Bin("feeAssetId", ByteStr.empty),
       ),
-      List()
+      List(),
+      0L
     )
   }
 
@@ -102,7 +103,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       """.stripMargin,
       "foo",
       Range(1, 23).map(i => Terms.CONST_LONG(i)).toList
-    ).explicitGet()._1 shouldBe ScriptResultV3(List(DataItem.Lng("1", 22)), List())
+    ).explicitGet()._1 shouldBe ScriptResultV3(List(DataItem.Lng("1", 22)), List(), 0L)
   }
 
   property("@Callable exception error contains initialised values") {
@@ -300,7 +301,8 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       List(
         AssetTransfer(Recipient.Address(callerAddress), 1L, None),
         AssetTransfer(Recipient.Address(callerAddress), 2L, None)
-      )
+      ),
+      0L
     )
   }
 
@@ -368,7 +370,8 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       List(
         AssetTransfer(Recipient.Address(callerAddress), 3, None),
         AssetTransfer(Recipient.Address(callerAddress), 4, None)
-      )
+      ),
+     0L
     )
   }
 }
