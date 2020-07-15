@@ -20,14 +20,18 @@ import org.apache.kafka.common.TopicPartition
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class BlockchainUpdates(private val context: Context) extends Extension with ScorexLogging {
+case class Dependencies(
+    context: Context,
+    settings: BlockchainUpdatesSettings,
+    producer: KafkaProducer[Int, BlockchainUpdated]
+);
+
+class BlockchainUpdates extends Extension with ScorexLogging {
   import monix.execution.Scheduler.Implicits.global
 
-  private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("blockchain-updates")
+  private[this] var maybeDeps: Option[Dependencies] = None
 
-  private[this] var maybeProducer: Option[KafkaProducer[Int, BlockchainUpdated]] = None
-
-  private def getLastHeight(timeout: Duration = 10.seconds): Int = {
+  private def getLastHeight(settings: BlockchainUpdatesSettings, timeout: Duration = 10.seconds): Int = {
     import scala.jdk.CollectionConverters._
 
     val props = createProperties(settings)
@@ -74,11 +78,13 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     // if kafka is empty, but blockchain is further than genesis block — fail
     // if both kafka and blockchain are empty — OK
 
-    // Idea for better checks: maintain Kafka view of blocks with signatures and check for (and recover from) forks.
-    // The view can be maintained via transaction writes
+    val (context, settings) = maybeDeps match {
+      case Some(deps) => (deps.context, deps.settings)
+      case None       => throw new IllegalStateException("No context in BlockchainUpdates extension.")
+    }
 
     val blockchainHeight = context.blockchain.height
-    val kafkaHeight      = getLastHeight()
+    val kafkaHeight      = getLastHeight(settings)
 
     if (kafkaHeight == 0 && blockchainHeight > 1)
       throw new IllegalStateException("No events in Kafka, but blockchain is neither empty nor on genesis block.")
@@ -103,9 +109,18 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     }
   }
 
-  override def start(): Unit = {
-    maybeProducer = Some(createProducer(settings))
-    maybeProducer foreach { producer =>
+  override def start(context: Context): Unit = {
+    val settings = context.settings.config.as[BlockchainUpdatesSettings]("blockchain-updates")
+
+    maybeDeps = Some(
+      Dependencies(
+        context = context,
+        settings = settings,
+        producer = createProducer(settings)
+      )
+    )
+
+    maybeDeps.map(_.producer).foreach { producer =>
       log.info("Performing startup node/Kafka consistency check...")
 
       context.blockchainUpdated.subscribe(new Observer.Sync[BlockchainUpdated] {
@@ -138,6 +153,6 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
   override def shutdown(): Future[Unit] = Future {
     log.info("Shutting down blockchain updates sending")
-    maybeProducer foreach (_.close())
+    maybeDeps.map(_.producer).foreach(_.close())
   }
 }
