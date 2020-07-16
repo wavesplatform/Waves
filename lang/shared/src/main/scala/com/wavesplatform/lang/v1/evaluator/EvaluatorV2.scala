@@ -157,9 +157,15 @@ class EvaluatorV2(
                         update(argsWithExpr).flatMap(_ => root(argsWithExpr, update, unusedArgsComplexity, parentBlocks))
                       }
                       .getOrElse {
-                        val objectType = ctx.ec.typeDefs(name).asInstanceOf[CASETYPEREF] // todo handle absence
-                        val fields     = objectType.fields.map(_._1) zip fc.args.asInstanceOf[List[EVALUATED]]
-                        root(CaseObj(objectType, fields.toMap), update, unusedArgsComplexity, parentBlocks)
+                        val caseType =
+                          ctx.ec.typeDefs.get(name) match {
+                            case Some(caseType: CASETYPEREF) => Coeval.now(caseType)
+                            case _                           => Coeval.raiseError(new NoSuchElementException(s"Function or type '$name' not found"))
+                          }
+                        caseType.flatMap { objectType =>
+                          val fields = objectType.fields.map(_._1) zip fc.args.asInstanceOf[List[EVALUATED]]
+                          root(CaseObj(objectType, fields.toMap), update, unusedArgsComplexity, parentBlocks)
+                        }
                       } else
                     Coeval.now(unusedArgsComplexity)
               }
@@ -219,7 +225,8 @@ class EvaluatorV2(
           }
       }
       .onErrorHandle { e =>
-        if (!wasLogged) ctx.l(let.name)(Left(e.getMessage))
+        val error = if (e.getMessage != null) e.getMessage else e.toString
+        if (!wasLogged) ctx.l(let.name)(Left(error))
         throw e
       }
   }
