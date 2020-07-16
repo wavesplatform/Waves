@@ -16,8 +16,9 @@ object BurnTxSerializer {
   def toJson(tx: BurnTransaction): Coeval[JsObject] = Coeval.evalOnce {
     import tx._
     BaseTxJson.toJson(tx) ++
-      Json.obj("assetId" -> asset.id.toString, (if (version < TxVersion.V3) "amount" else "quantity") -> quantity) ++
-      (if (version == TxVersion.V2) Json.obj("chainId" -> chainId) else JsObject.empty)
+      Json.obj("assetId" -> asset.id.toString, "amount" -> quantity) ++
+      (if (version == TxVersion.V2) Json.obj("chainId"  -> chainId) else JsObject.empty) ++
+      (if (version >= TxVersion.V3) Json.obj("quantity" -> quantity) else JsObject.empty)
   }
 
   def bodyBytes(tx: BurnTransaction): Coeval[Array[Byte]] = Coeval.evalOnce {
