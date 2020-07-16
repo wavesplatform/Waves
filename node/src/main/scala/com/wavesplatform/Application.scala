@@ -9,8 +9,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import cats.kernel.Monoid
-import com.wavesplatform.events.BlockchainUpdateTriggers.monoid
 import cats.implicits._
 import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
@@ -21,6 +19,7 @@ import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.AliasApiRoute
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
@@ -38,6 +37,7 @@ import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
+import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
@@ -108,23 +108,32 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val blockchainUpdated          = ConcurrentSubject.publish[BlockchainUpdated](scheduler)
   private val utxEvents                  = ConcurrentSubject.publish[UtxEvent](scheduler)
 
-  private val extensions = settings.extensions.map { extensionClassName =>
-    val extensionClass = Class.forName(extensionClassName).asInstanceOf[Class[Extension]]
-    val ctor           = extensionClass.getConstructor(classOf[Context])
-    log.info(s"Enable extension: $extensionClassName")
-    ctor.newInstance()
-  }
+  private var extensions = Seq.empty[Extension]
 
-  private val blockchainUpdateTriggers = {
-    val t: BlockchainUpdateTriggers = new BlockchainUpdateTriggersImpl(blockchainUpdated)
-    extensions
-      .collect { case ext: BlockchainUpdateTriggers => ext }
-      .foldLeft(t)(Monoid[BlockchainUpdateTriggers].combine)
+  // update triggers combined into one instance
+  private var triggers: Seq[BlockchainUpdateTriggers] = Seq(new BlockchainUpdateTriggersImpl(blockchainUpdated))
+  private val triggersCombined = new BlockchainUpdateTriggers {
+    override def onProcessBlock(block: Block, diff: BlockDiffer.DetailedDiff, minerReward: Option[Long], blockchainBefore: Blockchain): Unit =
+      triggers.foreach(_.onProcessBlock(block, diff, minerReward, blockchainBefore))
+
+    override def onProcessMicroBlock(
+        microBlock: MicroBlock,
+        diff: BlockDiffer.DetailedDiff,
+        blockchainBefore: Blockchain,
+        totalBlockId: ByteStr
+    ): Unit =
+      triggers.foreach(_.onProcessMicroBlock(microBlock, diff, blockchainBefore, totalBlockId))
+
+    override def onRollback(toBlockId: ByteStr, toHeight: Int): Unit =
+      triggers.foreach(_.onRollback(toBlockId, toHeight))
+
+    override def onMicroBlockRollback(toBlockId: ByteStr, height: Int): Unit =
+      triggers.foreach(_.onMicroBlockRollback(toBlockId, height))
   }
 
   private[this] var miner: Miner with MinerDebugInfo = Miner.Disabled
   private val (blockchainUpdater, levelDB) =
-    StorageFactory(settings, db, time, spendableBalanceChanged, blockchainUpdateTriggers, bc => miner.scheduleMining(bc))
+    StorageFactory(settings, db, time, spendableBalanceChanged, triggersCombined, bc => miner.scheduleMining(bc))
 
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
   private var maybeUtx: Option[UtxPool]                                        = None
@@ -236,12 +245,20 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         utxSynchronizer.publish,
         loadBlockAt(db, blockchainUpdater)
       )
-      override val blocksApi: CommonBlocksApi     = CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
+      override val blocksApi: CommonBlocksApi =
+        CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
       override val accountsApi: CommonAccountsApi = CommonAccountsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
       override val assetsApi: CommonAssetsApi     = CommonAssetsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
     }
 
-    extensions.foreach(_.start(extensionContext))
+    extensions = settings.extensions.map { extensionClassName =>
+      val extensionClass = Class.forName(extensionClassName).asInstanceOf[Class[Extension]]
+      val ctor           = extensionClass.getConstructor(classOf[Context])
+      log.info(s"Enable extension: $extensionClassName")
+      ctor.newInstance(extensionContext)
+    }
+    triggers ++= extensions.collect { case e: BlockchainUpdateTriggers => e }
+    extensions.foreach(_.start())
 
     // Node start
     // After this point, node actually starts doing something

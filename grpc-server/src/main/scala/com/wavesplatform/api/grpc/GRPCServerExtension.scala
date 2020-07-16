@@ -13,19 +13,18 @@ import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
 import scala.concurrent.Future
 
-class GRPCServerExtension extends Extension with ScorexLogging {
+class GRPCServerExtension(context: ExtensionContext) extends Extension with ScorexLogging {
   @volatile
   var server: Server = _
-  var context: ExtensionContext = _
 
-  override def start(context: ExtensionContext): Unit = {
-    this.context = context
-    this.server = startServer(context)
+  override def start(): Unit = {
+    val settings = context.settings.config.as[GRPCSettings]("waves.grpc")
+    this.server = startServer(settings)
   }
 
   override def shutdown(): Future[Unit] = {
     log.debug("Shutting down gRPC server")
-    if (server != null && context != null) {
+    if (server != null) {
       server.shutdown()
       Future(server.awaitTermination())(context.actorSystem.dispatcher)
     } else {
@@ -33,8 +32,7 @@ class GRPCServerExtension extends Extension with ScorexLogging {
     }
   }
 
-  private[this] def startServer(context: ExtensionContext): Server = {
-    val settings = context.settings.config.as[GRPCSettings]("waves.grpc")
+  private[this] def startServer(settings: GRPCSettings): Server = {
     implicit val apiScheduler: Scheduler = Scheduler(context.actorSystem.dispatcher)
 
     val bindAddress = new InetSocketAddress(settings.host, settings.port)
