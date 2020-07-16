@@ -160,7 +160,7 @@ class EvaluatorV2(
                         val caseType =
                           ctx.ec.typeDefs.get(name) match {
                             case Some(caseType: CASETYPEREF) => Coeval.now(caseType)
-                            case None                        => Coeval.raiseError(new RuntimeException(s"Function or case type '$name' not found"))
+                            case _                           => Coeval.raiseError(new RuntimeException(s"Function or case type '$name' not found"))
                           }
                         caseType.flatMap { objectType =>
                           val fields = objectType.fields.map(_._1) zip fc.args.asInstanceOf[List[EVALUATED]]
