@@ -265,10 +265,7 @@ object TransactionDiffer {
       }
 
     def scriptResult(cf: FailedTransactionError, tx: Transaction): Option[InvokeScriptResult] =
-      tx match {
-        case _: InvokeScriptTransaction => Some(InvokeScriptResult(error = Some(ErrorMessage(cf.code, cf.message))))
-        case _                          => None
-      }
+      Some(InvokeScriptResult(error = Some(ErrorMessage(cf.code, cf.message))))
   }
 
   // helpers

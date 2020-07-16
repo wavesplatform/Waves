@@ -32,6 +32,10 @@ object TxHelpers {
       .selfSigned(TxVersion.V2, defaultSigner, "test", "", amount, 0, reissuable = false, Option(script), TestValues.OneWaves, timestamp)
       .explicitGet()
 
+  def order(orderType: OrderType, asset: Asset): Order = {
+    orderV3(orderType, asset, Waves)
+  }
+
   def orderV3(orderType: OrderType, asset: Asset, feeAsset: Asset): Order = {
     orderV3(orderType, asset, Waves, feeAsset)
   }
