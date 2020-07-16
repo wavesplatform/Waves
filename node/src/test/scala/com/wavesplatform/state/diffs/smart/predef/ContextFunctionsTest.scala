@@ -120,10 +120,10 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
                |  let okBin  = bin  == base58'${Base58.encode(bin.asInstanceOf[BinaryDataEntry].value.arr)}'
                |  let okStr  = str  == "${str.value}"
                |
-               |  let okIntV  = int + 1  == ${int.value} + 1
-               |  let okBoolV = bool || true == ${bool.value} || true
-               |  let okBinV  = bin  == base58'${Base58.encode(bin.asInstanceOf[BinaryDataEntry].value.arr)}'
-               |  let okStrV  = str + ""  == "${str.value}"
+               |  let okIntV  = intV + 1  == ${int.value} + 1
+               |  let okBoolV = boolV || true == ${bool.value} || true
+               |  let okBinV  = binV  == base58'${Base58.encode(bin.asInstanceOf[BinaryDataEntry].value.arr)}'
+               |  let okStrV  = strV + ""  == "${str.value}"
                |
                |  let badInt  = isDefined(getInteger(d, "${bool.key}"))
                |  let badBool = isDefined(getBoolean(d, "${bin.key}"))
