@@ -25,7 +25,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.database.{DBExt, Keys, openDB}
-import com.wavesplatform.events.{BlockchainUpdateTriggers, BlockchainUpdateTriggersImpl, BlockchainUpdated, UtxEvent}
+import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.api.ActivationApiRoute
@@ -105,14 +105,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val historyRepliesScheduler         = fixedPool(poolSize = 2, "history-replier", reporter = log.error("Error in History Replier", _))
   private val minerScheduler                  = singleThread("block-miner", reporter = log.error("Error in Miner", _))
 
-  private val blockchainUpdatesScheduler = singleThread("blockchain-updates", reporter = log.error("Error on sending blockchain updates", _))
-  private val blockchainUpdated          = ConcurrentSubject.publish[BlockchainUpdated](scheduler)
-  private val utxEvents                  = ConcurrentSubject.publish[UtxEvent](scheduler)
+  private val utxEvents = ConcurrentSubject.publish[UtxEvent](scheduler)
 
   private var extensions = Seq.empty[Extension]
 
   // update triggers combined into one instance
-  private var triggers: Seq[BlockchainUpdateTriggers] = Seq(new BlockchainUpdateTriggersImpl(blockchainUpdated))
+  private var triggers = Seq.empty[BlockchainUpdateTriggers]
   private val triggersCombined = new BlockchainUpdateTriggers {
     override def onProcessBlock(block: Block, diff: BlockDiffer.DetailedDiff, minerReward: Option[Long], blockchainBefore: Blockchain): Unit =
       triggers.foreach(_.onProcessBlock(block, diff, minerReward, blockchainBefore))
@@ -235,7 +233,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def spendableBalanceChanged: Observable[(Address, Asset)]                         = app.spendableBalanceChanged
       override def actorSystem: ActorSystem                                                      = app.actorSystem
       override def utxEvents: Observable[UtxEvent]                                               = app.utxEvents
-      override def blockchainUpdated: Observable[BlockchainUpdated]                              = app.blockchainUpdated
 
       override val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
         blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
@@ -246,7 +243,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         utxSynchronizer.publish,
         loadBlockAt(db, blockchainUpdater)
       )
-      override val blocksApi: CommonBlocksApi     = CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
+      override val blocksApi: CommonBlocksApi =
+        CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
       override val accountsApi: CommonAccountsApi = CommonAccountsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
       override val assetsApi: CommonAssetsApi     = CommonAssetsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
     }
@@ -453,9 +451,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       log.info("Stopping network services")
       network.shutdown()
 
-      blockchainUpdated.onComplete()
-
-      shutdownAndWait(blockchainUpdatesScheduler, "BlockchainUpdated")
       shutdownAndWait(minerScheduler, "Miner")
       shutdownAndWait(microblockSynchronizerScheduler, "MicroblockSynchronizer")
       shutdownAndWait(scoreObserverScheduler, "ScoreObserver")
@@ -528,7 +523,9 @@ object Application extends ScorexLogging {
   private[wavesplatform] def loadBlockAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[(BlockMeta, Seq[Transaction])] =
     loadBlockInfoAt(db, blockchainUpdater)(height).map { case (meta, txs) => (meta, txs.map(_._1)) }
 
-  private[wavesplatform] def loadBlockInfoAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[(BlockMeta, Seq[(Transaction, Boolean)])] =
+  private[wavesplatform] def loadBlockInfoAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(
+      height: Int
+  ): Option[(BlockMeta, Seq[(Transaction, Boolean)])] =
     loadBlockMetaAt(db, blockchainUpdater)(height).map { meta =>
       meta -> blockchainUpdater
         .liquidTransactions(meta.id)
