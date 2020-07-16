@@ -514,7 +514,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
         )
       )
 
-    an[NoSuchElementException] should be thrownBy eval(expr, limit = 100)
+    (the[NoSuchElementException] thrownBy eval(expr, limit = 100)).getMessage shouldBe "A definition of 'b' not found"
 
     val expr2 =
       BLOCK(
@@ -525,7 +525,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
         )
       )
 
-    an[NoSuchElementException] should be thrownBy eval(expr2, limit = 100)
+    (the[NoSuchElementException] thrownBy eval(expr2, limit = 100)).getMessage shouldBe "Function or type 'b' not found"
   }
 
   property("function context leak") {
@@ -548,7 +548,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
       f() + x
     */
 
-    an[NoSuchElementException] should be thrownBy eval(expr, limit = 100)
+    (the[NoSuchElementException] thrownBy eval(expr, limit = 100)).getMessage shouldBe "A definition of 'x' not found"
 
     val expr2 = BLOCK(
       FUNC("f", Nil, BLOCK(FUNC("g", Nil, CONST_LONG(1)), FUNCTION_CALL(FunctionHeader.User("g"), Nil))),
@@ -569,7 +569,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
       f() + g()
     */
 
-    an[NoSuchElementException] should be thrownBy eval(expr2, limit = 100)
+    (the[NoSuchElementException] thrownBy eval(expr2, limit = 100)).getMessage shouldBe "Function or type 'g' not found"
   }
 
   property("if block by step") {
