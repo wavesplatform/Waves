@@ -1,7 +1,7 @@
 package com.wavesplatform.utils
 import com.wavesplatform.lang.ScriptMeta.FunctionArgument
 import com.wavesplatform.lang.directives.values.V4
-import com.wavesplatform.lang.{EstimateResult, Ride, RideException, Script}
+import com.wavesplatform.lang.{Ride, RideException, Script}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
