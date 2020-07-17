@@ -27,9 +27,17 @@ lazy val lang =
     .settings(
       coverageExcludedPackages := ".*",
       test in assembly := {},
+      assemblyMergeStrategy in assembly := {
+        case PathList("META-INF", xs @ _*)                       => MergeStrategy.discard
+        case PathList("jackson-annotations-2.11.0.jar", xs @ _*) => MergeStrategy.last
+        case PathList("jackson-core-2.11.0.jar", xs @ _*)        => MergeStrategy.last
+        case PathList("jackson-databind-2.11.0.jar", xs @ _*)    => MergeStrategy.last
+        case _                                                   => MergeStrategy.first
+      },
       libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
       inConfig(Compile)(
         Seq(
+          excludeFilter := ("*.SF" || "*.DSA" || "*.RSA"),
           sourceGenerators += Tasks.docSource,
           PB.targets += scalapb.gen(flatPackage = true) -> (sourceManaged in Compile).value,
           PB.protoSources := Seq(baseDirectory.value.getParentFile / "shared" / "src" / "main" / "protobuf"),
