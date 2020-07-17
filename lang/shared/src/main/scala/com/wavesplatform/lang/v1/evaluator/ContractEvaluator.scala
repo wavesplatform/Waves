@@ -69,9 +69,9 @@ object ContractEvaluator {
       decls: List[DECLARATION],
       v: VerifierFunction,
       ctx: EvaluationContext[Environment, Id],
-      evaluate: (EvaluationContext[Environment, Id], EXPR) => Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])],
+      evaluate: (EvaluationContext[Environment, Id], EXPR) => Either[(ExecutionError, Complexity, Log[Id]), (EVALUATED, Complexity, Log[Id])],
       entity: CaseObj
-  ): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] = {
+  ): Either[(ExecutionError, Complexity, Log[Id]), (EVALUATED, Complexity, Log[Id])] = {
     val verifierBlock =
       BLOCK(
         LET(v.annotation.invocationArgName, entity),
@@ -99,10 +99,10 @@ object ContractEvaluator {
       dApp: DApp,
       i: Invocation,
       version: StdLibVersion,
-      limit: Int
-  ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] =
+      limit: Complexity
+  ): Either[(ExecutionError, Complexity, Log[Id]), (ScriptResult, Log[Id])] =
     buildExprFromInvocation(dApp, i, version)
-      .leftMap((_, Nil))
+      .leftMap((_, limit, Nil))
       .flatMap(applyV2(ctx, freezingLets, _, version, i.transactionId, limit))
 
   def applyV2(
@@ -111,8 +111,8 @@ object ContractEvaluator {
       expr: EXPR,
       version: StdLibVersion,
       transactionId: ByteStr,
-      limit: Int
-  ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] = {
+      limit: Complexity
+  ): Either[(ExecutionError, Complexity, Log[Id]), (ScriptResult, Log[Id])] = {
     val exprWithLets =
       freezingLets.foldLeft(expr) {
         case (buildingExpr, (letName, letValue)) =>
@@ -126,7 +126,7 @@ object ContractEvaluator {
               case value: EVALUATED => ScriptResult.fromObj(ctx, transactionId, value, version, limit - unusedComplexity)
               case expr: EXPR       => Right(IncompleteResult(expr, unusedComplexity, limit - unusedComplexity))
             }
-        result.bimap((_, log), (_, log))
+          result.bimap((_, unusedComplexity, log), (_, log))
       }
    }
 }

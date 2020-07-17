@@ -20,7 +20,7 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal}
-import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
+import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4, Complexity}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.metrics._
@@ -178,7 +178,7 @@ object InvokeScriptTransactionDiff {
       directives: DirectiveSet,
       invocation: ContractEvaluator.Invocation,
       environment: WavesEnvironment,
-      limit: Int
+      limit: Complexity
   ): Either[ScriptExecutionError, (ScriptResult, EvaluationContext[Environment, Id], Log[Id])] = {
     val wavesContext = WavesContext.build(directives)
     val ctx =
@@ -191,11 +191,11 @@ object InvokeScriptTransactionDiff {
 
     Try(ContractEvaluator.applyV2(evaluationCtx, freezingLets, contract, invocation, version, limit))
       .fold(
-        e => Left((e.getMessage, Nil)),
+        e => Left((e.getMessage, limit, Nil)),
         _.map { case (result, log) => (result, evaluationCtx, log) }
       )
       .leftMap {
-        case (error, log) => ScriptExecutionError.dAppExecution(error, log)
+        case (error, unusedComplexity, log) => ScriptExecutionError.dAppExecution(error, log)
       }
   }
 
@@ -203,13 +203,13 @@ object InvokeScriptTransactionDiff {
       version: StdLibVersion,
       expr: EXPR,
       evaluationCtx: EvaluationContext[Environment, Id],
-      limit: Int,
+      limit: Complexity,
       transactionId: ByteStr,
       failComplexity: Long
   ): Either[FailedTransactionError, (ScriptResult, Log[Id])] =
     Try(ContractEvaluator.applyV2(evaluationCtx, Map[String, LazyVal[Id]](), expr, version, transactionId, limit))
-      .fold(e => Left((e.getMessage, Nil)), identity)
-      .leftMap { case (error, log) => FailedTransactionError.dAppExecution(error, failComplexity, log) }
+      .fold(e => Left((e.getMessage, limit, Nil)), identity)
+      .leftMap { case (error, unusedComplexity, log) => FailedTransactionError.dAppExecution(error, failComplexity, log) }
 
   private def checkCall(fc: FUNCTION_CALL, blockchain: Blockchain): Either[ExecutionError, Unit] = {
     val (check, expectedTypes) =
