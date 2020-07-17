@@ -12,7 +12,7 @@ public class Ride {
         return JavaAdapter.decompile(script);
     }
 
-    public static int estimate(Script script) {
+    public static EstimateResult estimate(Script script) {
         return JavaAdapter.estimate(script);
     }
 

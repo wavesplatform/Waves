@@ -1,6 +1,5 @@
 package com.wavesplatform.lang
 
-import scala.jdk.CollectionConverters._
 import cats.implicits._
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang
@@ -19,6 +18,7 @@ import com.wavesplatform.lang.v1.repl.{Repl, _}
 import com.wavesplatform.lang.v1.traits.Environment
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.jdk.CollectionConverters._
 
 object JavaAdapter {
   private val allDirectives: Iterable[Either[ExecutionError, DirectiveSet]] =
@@ -37,8 +37,8 @@ object JavaAdapter {
 
   private def buildCtx(directiveSet: DirectiveSet): CTX[Environment] =
     CryptoContext.build(Global, directiveSet.stdLibVersion).withEnvironment[Environment] |+|
-    WavesContext.build(directiveSet)                                                     |+|
-    PureContext.build(directiveSet.stdLibVersion).withEnvironment[Environment]
+      WavesContext.build(directiveSet) |+|
+      PureContext.build(directiveSet.stdLibVersion).withEnvironment[Environment]
 
   def compile(input: String): Script = {
     val script =
@@ -56,12 +56,12 @@ object JavaAdapter {
   }
 
   private def compileDApp(
-    input: String,
-    compilerContext: CompilerContext,
-    directiveSet: DirectiveSet
+      input: String,
+      compilerContext: CompilerContext,
+      directiveSet: DirectiveSet
   ): Either[ExecutionError, lang.DApp] =
     for {
-      dApp <- ContractCompiler.compile(input, compilerContext, directiveSet.stdLibVersion)
+      dApp  <- ContractCompiler.compile(input, compilerContext, directiveSet.stdLibVersion)
       bytes <- Global.serializeContract(dApp, directiveSet.stdLibVersion)
     } yield new lang.DApp(
       bytes,
@@ -70,12 +70,12 @@ object JavaAdapter {
     )
 
   private def compileExpression(
-    input: String,
-    compilerContext: CompilerContext,
-    directiveSet: DirectiveSet
+      input: String,
+      compilerContext: CompilerContext,
+      directiveSet: DirectiveSet
   ): Either[ExecutionError, lang.Expression] =
     for {
-      expr <- ExpressionCompiler.compile(input, compilerContext)
+      expr  <- ExpressionCompiler.compile(input, compilerContext)
       bytes <- Right(Global.serializeExpression(expr, directiveSet.stdLibVersion))
     } yield new lang.Expression(
       bytes,
@@ -85,7 +85,8 @@ object JavaAdapter {
     )
 
   def parseBytes(bytes: Array[Byte], isAsset: Boolean): Script =
-    ScriptReader.fromBytes(bytes)
+    ScriptReader
+      .fromBytes(bytes)
       .map {
         case script: ExprScript =>
           new lang.Expression(bytes, script.stdLibVersion.id, isAsset, script.expr)
@@ -103,26 +104,41 @@ object JavaAdapter {
         Decompiler(dApp.internal, ctx.decompilerContext)
       case expression: Expression =>
         val scriptType = if (expression.isAsset) Asset else Account
-        val ctx = ctxCache(DirectiveSet(version, scriptType, Expression).explicitGet())
+        val ctx        = ctxCache(DirectiveSet(version, scriptType, Expression).explicitGet())
         Decompiler(expression.internal, ctx.decompilerContext)
       case _ => ???
     }
   }
 
-  def estimate(script: Script): Int = {
+  def estimate(script: Script): EstimateResult = {
     val version = DirectiveDictionary[StdLibVersion].idMap(script.version())
     val cost = script match {
-      case dApp: DApp             =>
-        ContractScript.estimateComplexity(version, dApp.internal, ScriptEstimatorV3).map(_._1)
+      case dApp: DApp =>
+        ContractScript
+          .estimateComplexity(version, dApp.internal, ScriptEstimatorV3)
+          .map { complexities =>
+            val verifierComplexity =
+              dApp.internal.verifierFuncOpt
+                .flatMap(verifier => complexities._2.get(verifier.u.name))
+                .map(_.toInt)
+                .getOrElse(0)
+            new EstimateResult(
+              verifierComplexity,
+              complexities._2.view.mapValues(cost => new Integer(cost.toInt)).toMap.asJava
+            )
+          }
       case expression: Expression =>
-        ExprScript.estimate(expression.internal, version, ScriptEstimatorV3, useContractVerifierLimit = !script.isAsset)
-      case _                      => ???
+        ExprScript
+          .estimate(expression.internal, version, ScriptEstimatorV3, useContractVerifierLimit = !script.isAsset)
+          .map(cost => new EstimateResult(cost.toInt, new java.util.HashMap()))
+      case _ => ???
     }
-    cost.fold(error => throw new RideException(error), _.toInt)
+    cost.fold(error => throw new RideException(error), identity)
   }
 
   def extractMeta(script: Script): ScriptMeta =
-    Global.dAppFuncTypes(script.base64String())
+    Global
+      .dAppFuncTypes(script.base64String())
       .map { signatures =>
         val mappedSignatures =
           signatures.argsWithFuncName
@@ -139,7 +155,6 @@ object JavaAdapter {
       }
       .fold(error => throw new RideException(error.m), identity)
 
-
   def repl(version: StdLibVersion): RideRepl =
     repl(version, None)
 
@@ -148,9 +163,9 @@ object JavaAdapter {
 
   def repl(version: StdLibVersion, settings: Option[NodeConnectionSettings]): RideRepl = {
     val directiveSet = DirectiveSet(version, Account, Expression).explicitGet()
-    val ctx = buildCtx(directiveSet)
-    val environment = buildEnvironment(settings)
-    val replCtx = (ctx.compilerContext, ctx.evaluationContext(environment))
+    val ctx          = buildCtx(directiveSet)
+    val environment  = buildEnvironment(settings)
+    val replCtx      = (ctx.compilerContext, ctx.evaluationContext(environment))
     new RideRepl(Repl(settings, replCtx))
   }
 }
