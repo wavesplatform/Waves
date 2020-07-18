@@ -80,7 +80,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
 
   private def evalWithLogging(context: EvaluationContext[Environment, Id], expr: EXPR): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] = {
     val evaluatorV1Result = defaultEvaluator.applyWithLogging[EVALUATED](context, expr)
-    val evaluatorV2Result = EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion])
+    val evaluatorV2Result = EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion]).bimap( { case (err, unusedComplexity, log) => (err, log) }, { case (res, unusedComplexity, log) => (res, log) } )
 
     evaluatorV2Result shouldBe evaluatorV1Result
     evaluatorV1Result

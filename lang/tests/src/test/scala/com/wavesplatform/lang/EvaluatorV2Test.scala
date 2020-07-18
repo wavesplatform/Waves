@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, FunctionIds, Complexity}
+import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, NoSuchElementException, FunctionIds, Complexity}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
@@ -216,7 +216,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
   property("user function evaluation by step") {
     val script =
       """
-        | func f(a: Complexity, b: Complexity) = {
+        | func f(a: Int, b: Int) = {
         |   let c = a + b
         |   let d = a - b
         |   c * d - 1
@@ -422,9 +422,9 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
       """                                            # complexity
         | let x = 1 + 1 + 1                          # 2 (should be calculated once)
         | let a = 1 + 1                              # 1 (should be calculated once)
-        | func f(a: Complexity, b: Complexity) = a - b + x         # 5
+        | func f(a: Int, b: Int) = a - b + x         # 5
         | let b = 4                                  #
-        | func g(a: Complexity, b: Complexity) = a * b             # 3
+        | func g(a: Int, b: Int) = a * b             # 3
         | let expected = (a - b + x) * (b - a + x)   # 11
         | let actual = g(f(a, b), f(b, a))           # 3 + 5 * 2 + 4 = 17
         | actual == expected &&                      # 11 + 17 + 4 = 32
@@ -447,9 +447,9 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
         | let x = 1 + 1 + 1 + 1 + 1         # 4
         | let y = x + 1                     # 2
         |
-        | func f(x: Complexity) = x + 1            # 2
-        | func g(x: Complexity) = x + 1 + 1        # 3
-        | func h(x: Complexity) = x + 1 + 1 + 1    # 4
+        | func f(x: Int) = x + 1            # 2
+        | func g(x: Int) = x + 1 + 1        # 3
+        | func h(x: Int) = x + 1 + 1 + 1    # 4
         |
         | f(g(h(y))) == x + x + 2
         |
@@ -737,12 +737,12 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
   property("big script randomly splitted") {
     val body =
       """
-        | func f(a: Complexity) = {
-        |   func f(a: Complexity) = {
-        |     func f(a: Complexity) = {
-        |       func g(a: Complexity) = {
-        |         func h(a: Complexity) = {
-        |           func f(a: Complexity) = a
+        | func f(a: Int) = {
+        |   func f(a: Int) = {
+        |     func f(a: Int) = {
+        |       func g(a: Int) = {
+        |         func h(a: Int) = {
+        |           func f(a: Int) = a
         |           f(a)
         |         }
         |         h(a)
@@ -753,8 +753,8 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
         |   }
         |   1 + f(a) + height
         | }
-        | func g(a: Complexity) = f(1) + f(a)
-        | func h(a: Complexity) = f(1) + g(a) + g(a)
+        | func g(a: Int) = f(1) + f(a)
+        | func h(a: Int) = f(1) + g(a) + g(a)
         |
         |
         | let a = {
@@ -768,8 +768,8 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
         | let b = 1
         | let length = Address((let bytes = base58'aaaa'; bytes)).bytes.size()
         | if (h(a) == f(a) + g(a) + length)
-        |   then (h(b) + f(b) + g(b) + 1) > (func ff(a: Complexity) = a + b; ff(h(f(a))))
-        |   else (h(b) + f(b) + g(b) + 1) > (func ff(a: Complexity) = a + b; ff(h(f(a))))
+        |   then (h(b) + f(b) + g(b) + 1) > (func ff(a: Int) = a + b; ff(h(f(a))))
+        |   else (h(b) + f(b) + g(b) + 1) > (func ff(a: Int) = a + b; ff(h(f(a))))
         |
       """.stripMargin
 
