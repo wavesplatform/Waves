@@ -11,4 +11,6 @@ trait UpdatesRepo {
   def appendBlock(blockAppended: BlockAppended): Unit
 
   def removeAfter(height: Int): Unit
+
+  def getForHeight(height: Int): Option[BlockAppended]
 }
