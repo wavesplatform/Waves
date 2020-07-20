@@ -1,8 +1,8 @@
 package com.wavesplatform.events.grpc
 
-import com.wavesplatform.events.UpdatesRepo
 import com.wavesplatform.events.grpc.protobuf.{BlockchainUpdatesApiGrpc, GetForHeightRequest, GetForHeightResponse}
 import com.wavesplatform.events.protobuf.PBEvents
+import com.wavesplatform.events.repo.UpdatesRepo
 import monix.execution.Scheduler
 import io.grpc.{Status, StatusRuntimeException}
 

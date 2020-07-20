@@ -1,7 +1,7 @@
-package com.wavesplatform.events.db
+package com.wavesplatform.events.repo
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.events.{BlockAppended, MicroBlockAppended, UpdatesRepo}
+import com.wavesplatform.events.{BlockAppended, MicroBlockAppended}
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
 

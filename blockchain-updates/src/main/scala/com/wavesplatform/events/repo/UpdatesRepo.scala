@@ -1,6 +1,7 @@
-package com.wavesplatform.events
+package com.wavesplatform.events.repo
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.events.{BlockAppended, MicroBlockAppended}
 
 trait UpdatesRepo {
   def appendMicroBlock(microBlockAppended: MicroBlockAppended): Unit

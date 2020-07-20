@@ -1,12 +1,10 @@
 package com.wavesplatform.events
 
 import java.net.InetSocketAddress
-
-import akka.http.scaladsl.Http.ServerBinding
 import cats.syntax.monoid._
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.events.db.UpdatesRepoImpl
+import com.wavesplatform.events.repo.UpdatesRepoImpl
 import com.wavesplatform.events.grpc.BlockchainUpdatesApiGrpcImpl
 import com.wavesplatform.events.grpc.protobuf.BlockchainUpdatesApiGrpc
 import com.wavesplatform.events.http.HttpServer

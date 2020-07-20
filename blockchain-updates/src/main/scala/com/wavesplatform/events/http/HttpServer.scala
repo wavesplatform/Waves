@@ -7,6 +7,7 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.api.http.ApiRoute
 import com.wavesplatform.events._
+import com.wavesplatform.events.repo.UpdatesRepo
 import com.wavesplatform.utils.ScorexLogging
 import play.api.libs.json._
 
