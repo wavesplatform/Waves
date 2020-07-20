@@ -1,14 +1,21 @@
 package com.wavesplatform.events
 
+import java.net.InetSocketAddress
+
 import cats.syntax.monoid._
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.events.grpc.BlockchainUpdatesApiGrpcImpl
+import com.wavesplatform.events.grpc.protobuf.BlockchainUpdatesApiGrpc
 import com.wavesplatform.extensions.{Context, Extension}
 import net.ceedubs.ficus.Ficus._
 import com.wavesplatform.events.settings.BlockchainUpdatesSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.utils.{ScorexLogging, forceStopApplication}
+import io.grpc.Server
+import io.grpc.netty.NettyServerBuilder
+import monix.execution.Scheduler
 
 import scala.concurrent.Future
 
@@ -16,14 +23,42 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   import monix.execution.Scheduler.Implicits.global
 
   private[this] val settings          = context.settings.config.as[BlockchainUpdatesSettings]("blockchain-updates")
-  private[this] val repo: UpdatesRepo = ???
+  private[this] var repo: UpdatesRepo = ???
+  private[this] var server: Server    = null
 
   override def start(): Unit = {
     log.info("BlockchainUpdates extension starting")
+
+    // ensure there is no liquid state remaining (from previous restart/crash, etc.)
+    repo.dropLiquidState()
+
+    implicit val apiScheduler: Scheduler = Scheduler(context.actorSystem.dispatcher)
+
+    val bindAddress = new InetSocketAddress("0.0.0.0", settings.port)
+
+    server = NettyServerBuilder
+      .forAddress(bindAddress)
+      .addService(BlockchainUpdatesApiGrpc.bindService(new BlockchainUpdatesApiGrpcImpl(repo)(apiScheduler), apiScheduler))
+      .build()
+      .start()
+
+    log.info(s"BlockchainUpdates extension started gRPC API on port ${settings.port}")
   }
 
   override def shutdown(): Future[Unit] = Future {
-    log.info("BlockchainUpdates extension shitting down")
+    log.info("BlockchainUpdates extension shutting down")
+
+    // node does not persist liquid state, neither should the extension
+    if (repo != null) {
+      repo.dropLiquidState()
+    }
+
+    if (server != null) {
+      server.shutdown()
+      Future(server.awaitTermination())(context.actorSystem.dispatcher)
+    } else {
+      Future.successful(())
+    }
   }
 
   // todo stream events to already subscribed clients
