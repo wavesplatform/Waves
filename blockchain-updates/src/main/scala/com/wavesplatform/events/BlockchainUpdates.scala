@@ -16,7 +16,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   import monix.execution.Scheduler.Implicits.global
 
   private[this] val settings          = context.settings.config.as[BlockchainUpdatesSettings]("blockchain-updates")
-  private[this] val repo: LevelDBRepo = ???
+  private[this] val repo: UpdatesRepo = ???
 
   override def start(): Unit = {
     log.info("BlockchainUpdates extension starting")

@@ -2,7 +2,7 @@ package com.wavesplatform.events
 
 import com.wavesplatform.common.state.ByteStr
 
-trait LevelDBRepo {
+trait UpdatesRepo {
   def appendMicroBlock(microBlockAppended: MicroBlockAppended): Unit
 
   def getLiquidState(): (BlockAppended, Seq[MicroBlockAppended])
