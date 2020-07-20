@@ -19,14 +19,18 @@ import com.wavesplatform.utils.ScorexLogging
 import io.grpc.Server
 import io.grpc.netty.NettyServerBuilder
 import monix.execution.Scheduler
+import com.wavesplatform.database.openDB
 
 import scala.concurrent.Future
 
 class BlockchainUpdates(private val context: Context) extends Extension with ScorexLogging with BlockchainUpdateTriggers {
   import monix.execution.Scheduler.Implicits.global
 
-  private[this] val settings               = context.settings.config.as[BlockchainUpdatesSettings]("blockchain-updates")
-  private[this] var repo: UpdatesRepo      = null
+  private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("blockchain-updates")
+
+  private[this] val db   = openDB(settings.directory)
+  private[this] val repo = new UpdatesRepoImpl(db)
+
   private[this] var grpcServer: Server     = null
   private[this] var httpServer: HttpServer = null
 
@@ -34,7 +38,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     log.info("BlockchainUpdates extension starting")
 
     // ensure there is no liquid state remaining (from previous restart/crash, etc.)
-    repo = new UpdatesRepoImpl
+
     repo.dropLiquidState()
 
     // starting gRPC API
@@ -65,16 +69,16 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
       repo.dropLiquidState()
     }
 
-    if (grpcServer != null) {
-      grpcServer.shutdown()
-      Future(grpcServer.awaitTermination())(context.actorSystem.dispatcher)
-    } else {
-      Future.successful(())
-    }
-
     if (httpServer != null) {
       httpServer.shutdown()
     }
+
+    if (grpcServer != null) {
+      grpcServer.shutdown()
+      grpcServer.awaitTermination()
+    }
+
+    db.close()
   }
 
   // todo stream events to already subscribed clients
