@@ -45,7 +45,6 @@ private[this] class GetUpdatesAtRoute(repo: UpdatesRepo) extends ApiRoute {
   override def route: Route = get {
     path("at" / IntNumber) { height =>
       repo.getForHeight(height) match {
-//        case Some(upd) => complete(Json.obj("update" -> upd.toString))
         case Some(upd) => complete(blockchainUpdatedWrites.writes(upd))
         case None      => complete(StatusCodes.NoContent)
       }
