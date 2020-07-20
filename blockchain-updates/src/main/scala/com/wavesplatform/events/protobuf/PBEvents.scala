@@ -11,7 +11,7 @@ import com.wavesplatform.protobuf.block.{PBBlocks, PBMicroBlocks}
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.Transaction
 
-object sPBEvents {
+object PBEvents {
   import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 
   def protobuf(event: events.BlockchainUpdated): BlockchainUpdated =
