@@ -30,11 +30,23 @@ class HttpServer(port: Int, repo: UpdatesRepo)(implicit actorSystem: ActorSystem
 
 }
 
+object HttpServer {
+  implicit val blockchainUpdatedWrites: Writes[BlockchainUpdated] = (a: BlockchainUpdated) =>
+    Json.obj(
+      "toHeight" -> a.toHeight,
+      "toId"     -> a.toId.toString,
+      "raw"      -> a.toString
+    )
+}
+
 private[this] class GetUpdatesAtRoute(repo: UpdatesRepo) extends ApiRoute {
+  import HttpServer._
+
   override def route: Route = get {
     path("at" / IntNumber) { height =>
       repo.getForHeight(height) match {
-        case Some(upd) => complete(Json.obj("update" -> upd.toString))
+//        case Some(upd) => complete(Json.obj("update" -> upd.toString))
+        case Some(upd) => complete(blockchainUpdatedWrites.writes(upd))
         case None      => complete(StatusCodes.NoContent)
       }
     }
