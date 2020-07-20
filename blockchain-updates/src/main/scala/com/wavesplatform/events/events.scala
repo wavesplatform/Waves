@@ -1,5 +1,6 @@
 package com.wavesplatform.events
 
+import cats.Monoid
 import cats.syntax.monoid._
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
@@ -11,6 +12,7 @@ import com.wavesplatform.state.{AccountDataInfo, AssetDescription, AssetScriptIn
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, Transaction}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 final case class AssetStateUpdate(
@@ -36,6 +38,55 @@ final case class StateUpdate(
 }
 
 object StateUpdate {
+  implicit val monoid: Monoid[StateUpdate] = new Monoid[StateUpdate] {
+    override def empty: StateUpdate = StateUpdate(Seq.empty, Seq.empty, Seq.empty, Seq.empty)
+
+    override def combine(x: StateUpdate, y: StateUpdate): StateUpdate = {
+      // merge balance updates, preserving order
+      val balancesMap = mutable.LinkedHashMap.empty[(Address, Asset), Long]
+      (x.balances ++ y.balances).foreach {
+        case (addr, asset, balance) =>
+          balancesMap.remove((addr, asset))
+          balancesMap.addOne(((addr, asset), balance))
+      }
+      val balances = balancesMap.toList.map { case ((addr, asset), balance) => (addr, asset, balance) }
+
+      // merge leases, preserving order
+      val leasesMap = mutable.LinkedHashMap.empty[Address, LeaseBalance]
+      (x.leases ++ y.leases).foreach {
+        case (addr, balance) =>
+          leasesMap.remove(addr)
+          leasesMap.addOne((addr, balance))
+      }
+      val leases = leasesMap.toList
+
+      // todo deletion of data entries
+      // merge data entries, preserving order
+      val dataEntriesMap = mutable.LinkedHashMap.empty[(Address, String), DataEntry[_]]
+      (x.dataEntries ++ y.dataEntries).foreach {
+        case (addr, entry) =>
+          dataEntriesMap.remove((addr, entry.key))
+          dataEntriesMap.addOne(((addr, entry.key), entry))
+      }
+      val dataEntries = dataEntriesMap.toList.map { case ((addr, _), entry) => (addr, entry) }
+
+      // merge asset state updates, preserving order
+      val assetsMap = mutable.LinkedHashMap.empty[IssuedAsset, AssetStateUpdate]
+      (x.assets ++ y.assets).foreach(a => {
+        assetsMap.remove(a.asset)
+        assetsMap.addOne((a.asset, a))
+      })
+      val assets = assetsMap.toList.map { case (_, upd) => upd }
+
+      StateUpdate(
+        balances = balances,
+        leases = leases,
+        dataEntries = dataEntries,
+        assets = assets
+      )
+    }
+  }
+
   def atomic(blockchainBefore: Blockchain, diff: Diff, byTransaction: Option[Transaction]): StateUpdate = {
     val blockchainAfter = CompositeBlockchain(blockchainBefore, Some(diff))
 
