@@ -6,6 +6,8 @@ import com.wavesplatform.consensus.PoSCalculator.HitSize
 import com.wavesplatform.crypto
 import com.wavesplatform.settings.FunctionalitySettings
 
+import scala.concurrent.duration._
+
 trait PoSCalculator {
   def calculateBaseTarget(
       targetBlockDelaySeconds: Long,
@@ -89,9 +91,9 @@ object FairPoSCalculator {
   lazy val V1 = FairPoSCalculator(5000, 0)
   lazy val V2 = FairPoSCalculator(15000, 8)
 
-  def fromSettings(fs: FunctionalitySettings) =
-    if (fs.minBlockTime == 15 && fs.delayDelta == 8) V2
-    else FairPoSCalculator(fs.minBlockTime * 1000, fs.delayDelta)
+  def fromSettings(fs: FunctionalitySettings): PoSCalculator =
+    if (fs.minBlockTime == 15.seconds && fs.delayDelta == 8) V2
+    else FairPoSCalculator(fs.minBlockTime.toMillis.toInt, fs.delayDelta)
 
   private val MaxHit = BigDecimal(BigInt(1, Array.fill[Byte](HitSize)(-1)))
   private val C1     = 70000

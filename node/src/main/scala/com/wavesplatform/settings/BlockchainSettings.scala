@@ -72,7 +72,7 @@ case class FunctionalitySettings(
     leaseExpiration: Int = 1000000,
     estimatorPreCheckHeight: Int = 0,
     minAssetInfoUpdateInterval: Int = 100000,
-    minBlockTime: Int = 15,
+    minBlockTime: FiniteDuration = 15.seconds,
     delayDelta: Int = 8
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int        = blockVersion3AfterHeight
@@ -235,7 +235,7 @@ object BlockchainSettings {
         val functionality = config.as[FunctionalitySettings](s"custom.functionality")
         val genesis       = config.as[GenesisSettings](s"custom.genesis")
         val rewards       = config.as[RewardsSettings](s"custom.rewards")
-        require(functionality.minBlockTime <= genesis.averageBlockDelay.toSeconds, "minBlockTime should be <= averageBlockDelay")
+        require(functionality.minBlockTime <= genesis.averageBlockDelay, "minBlockTime should be <= averageBlockDelay")
         (networkId, functionality, genesis, rewards)
     }
 
