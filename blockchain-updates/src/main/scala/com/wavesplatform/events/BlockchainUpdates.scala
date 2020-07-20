@@ -38,7 +38,6 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     log.info("BlockchainUpdates extension starting")
 
     // ensure there is no liquid state remaining (from previous restart/crash, etc.)
-
     repo.dropLiquidState()
 
     // starting gRPC API
