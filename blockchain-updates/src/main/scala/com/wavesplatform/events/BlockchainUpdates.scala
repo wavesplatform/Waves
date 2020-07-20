@@ -5,6 +5,7 @@ import java.net.InetSocketAddress
 import cats.syntax.monoid._
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.events.db.UpdatesRepoImpl
 import com.wavesplatform.events.grpc.BlockchainUpdatesApiGrpcImpl
 import com.wavesplatform.events.grpc.protobuf.BlockchainUpdatesApiGrpc
 import com.wavesplatform.extensions.{Context, Extension}
@@ -23,13 +24,14 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   import monix.execution.Scheduler.Implicits.global
 
   private[this] val settings          = context.settings.config.as[BlockchainUpdatesSettings]("blockchain-updates")
-  private[this] var repo: UpdatesRepo = ???
+  private[this] var repo: UpdatesRepo = null
   private[this] var server: Server    = null
 
   override def start(): Unit = {
     log.info("BlockchainUpdates extension starting")
 
     // ensure there is no liquid state remaining (from previous restart/crash, etc.)
+    repo = new UpdatesRepoImpl
     repo.dropLiquidState()
 
     implicit val apiScheduler: Scheduler = Scheduler(context.actorSystem.dispatcher)
@@ -64,11 +66,16 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   // todo stream events to already subscribed clients
   // for now, only updating database
   override def onProcessBlock(block: Block, diff: BlockDiffer.DetailedDiff, minerReward: Option[Long], blockchainBefore: Blockchain): Unit = {
-    val newBlock                = BlockAppended.from(block, diff, minerReward, blockchainBefore)
-    val (keyBlock, microBlocks) = repo.getLiquidState()
-    val squashedBlock           = squash(keyBlock, microBlocks)
-    repo.dropLiquidState()
-    repo.appendBlock(squashedBlock)
+    val newBlock = BlockAppended.from(block, diff, minerReward, blockchainBefore)
+
+    // solidify current liquid state, if exists
+    repo.getLiquidState().foreach {
+      case (keyBlock, microBlocks) =>
+        val squashedBlock = squash(keyBlock, microBlocks)
+        repo.dropLiquidState()
+        repo.appendBlock(squashedBlock)
+    }
+
     repo.appendBlock(newBlock)
   }
 
