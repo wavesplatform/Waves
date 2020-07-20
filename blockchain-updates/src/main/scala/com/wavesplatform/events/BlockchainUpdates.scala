@@ -2,18 +2,20 @@ package com.wavesplatform.events
 
 import java.net.InetSocketAddress
 
+import akka.http.scaladsl.Http.ServerBinding
 import cats.syntax.monoid._
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.db.UpdatesRepoImpl
 import com.wavesplatform.events.grpc.BlockchainUpdatesApiGrpcImpl
 import com.wavesplatform.events.grpc.protobuf.BlockchainUpdatesApiGrpc
+import com.wavesplatform.events.http.HttpServer
 import com.wavesplatform.extensions.{Context, Extension}
 import net.ceedubs.ficus.Ficus._
 import com.wavesplatform.events.settings.BlockchainUpdatesSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.utils.{ScorexLogging, forceStopApplication}
+import com.wavesplatform.utils.ScorexLogging
 import io.grpc.Server
 import io.grpc.netty.NettyServerBuilder
 import monix.execution.Scheduler
@@ -23,9 +25,10 @@ import scala.concurrent.Future
 class BlockchainUpdates(private val context: Context) extends Extension with ScorexLogging with BlockchainUpdateTriggers {
   import monix.execution.Scheduler.Implicits.global
 
-  private[this] val settings          = context.settings.config.as[BlockchainUpdatesSettings]("blockchain-updates")
-  private[this] var repo: UpdatesRepo = null
-  private[this] var server: Server    = null
+  private[this] val settings               = context.settings.config.as[BlockchainUpdatesSettings]("blockchain-updates")
+  private[this] var repo: UpdatesRepo      = null
+  private[this] var grpcServer: Server     = null
+  private[this] var httpServer: HttpServer = null
 
   override def start(): Unit = {
     log.info("BlockchainUpdates extension starting")
@@ -34,17 +37,24 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     repo = new UpdatesRepoImpl
     repo.dropLiquidState()
 
+    // starting gRPC API
     implicit val apiScheduler: Scheduler = Scheduler(context.actorSystem.dispatcher)
 
-    val bindAddress = new InetSocketAddress("0.0.0.0", settings.port)
+    val bindAddress = new InetSocketAddress("0.0.0.0", settings.grpcPort)
 
-    server = NettyServerBuilder
+    grpcServer = NettyServerBuilder
       .forAddress(bindAddress)
       .addService(BlockchainUpdatesApiGrpc.bindService(new BlockchainUpdatesApiGrpcImpl(repo)(apiScheduler), apiScheduler))
       .build()
       .start()
 
-    log.info(s"BlockchainUpdates extension started gRPC API on port ${settings.port}")
+    log.info(s"BlockchainUpdates extension started gRPC API on port ${settings.grpcPort}")
+
+    // starting HTTP API
+    httpServer = new HttpServer(settings.httpPort, repo)(context.actorSystem)
+    httpServer.start()
+
+    log.info(s"BlockchainUpdates extension started HTTP API on port ${settings.httpPort}")
   }
 
   override def shutdown(): Future[Unit] = Future {
@@ -55,11 +65,15 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
       repo.dropLiquidState()
     }
 
-    if (server != null) {
-      server.shutdown()
-      Future(server.awaitTermination())(context.actorSystem.dispatcher)
+    if (grpcServer != null) {
+      grpcServer.shutdown()
+      Future(grpcServer.awaitTermination())(context.actorSystem.dispatcher)
     } else {
       Future.successful(())
+    }
+
+    if (httpServer != null) {
+      httpServer.shutdown()
     }
   }
 

@@ -5,7 +5,7 @@ import net.ceedubs.ficus.readers.ValueReader
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.arbitraryTypeValueReader
 import net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
 
-case class BlockchainUpdatesSettings(port: Int)
+case class BlockchainUpdatesSettings(httpPort: Int, grpcPort: Int)
 
 object BlockchainUpdatesSettings {
   implicit val valueReader: ValueReader[BlockchainUpdatesSettings] = arbitraryTypeValueReader
