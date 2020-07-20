@@ -22,7 +22,7 @@ case class PoSSelector(blockchain: Blockchain, syncSettings: SynchronizationSett
 
   protected def posCalculator(height: Int): PoSCalculator =
     if (fairPosActivated(height))
-      if (vrfActivated(height)) FairPoSCalculator.V2
+      if (vrfActivated(height)) FairPoSCalculator.fromSettings(blockchain.settings.functionalitySettings)
       else FairPoSCalculator.V1
     else NxtPoSCalculator
 
