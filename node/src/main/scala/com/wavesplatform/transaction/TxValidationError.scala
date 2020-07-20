@@ -5,7 +5,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.evaluator.Log
+import com.wavesplatform.lang.v1.evaluator.{Log, Complexity}
 import com.wavesplatform.transaction.TxValidationError.FailedTransactionError.Cause
 import com.wavesplatform.transaction.assets.exchange.Order
 
@@ -56,6 +56,7 @@ object TxValidationError {
   case class FailedTransactionError(
       cause: Cause,
       spentComplexity: Long,
+      realComplexity: Complexity,
       log: Log[Id],
       error: Option[String],
       assetId: Option[ByteStr]
@@ -71,7 +72,7 @@ object TxValidationError {
     def isAssetScript: Boolean    = assetId.isDefined
     def isExecutionError: Boolean = error.nonEmpty
 
-    def addComplexity(complexity: Long): FailedTransactionError = copy(spentComplexity = spentComplexity + complexity)
+    def addComplexity(complexity: Long, real: Complexity): FailedTransactionError = copy(spentComplexity = spentComplexity + complexity, realComplexity = realComplexity + real)
 
     private def assetScriptError(assetId: ByteStr, error: Option[String]): String =
       s"Transaction is not allowed by script of the asset $assetId" + error.fold("")(e => s": $e")
@@ -80,23 +81,23 @@ object TxValidationError {
   }
 
   object FailedTransactionError {
-    def dAppExecution(error: String, spentComplexity: Long, log: Log[Id] = List.empty): FailedTransactionError =
-      FailedTransactionError(Cause.DAppExecution, spentComplexity, log, Some(error), None)
+    def dAppExecution(error: String, spentComplexity: Long, realComplexity: Complexity, log: Log[Id] = List.empty): FailedTransactionError =
+      FailedTransactionError(Cause.DAppExecution, spentComplexity, realComplexity, log, Some(error), None)
 
-    def feeForActions(error: String, spentComplexity: Long): FailedTransactionError =
-      FailedTransactionError(Cause.FeeForActions, spentComplexity, List.empty, Some(error), None)
+    def feeForActions(error: String, spentComplexity: Long, realComplexity: Complexity): FailedTransactionError =
+      FailedTransactionError(Cause.FeeForActions, spentComplexity, realComplexity, List.empty, Some(error), None)
 
-    def assetExecutionInAction(error: String, spentComplexity: Long, log: Log[Id], assetId: ByteStr): FailedTransactionError =
-      FailedTransactionError(Cause.AssetScriptInAction, spentComplexity, log, Some(error), Some(assetId))
+    def assetExecutionInAction(error: String, spentComplexity: Long, realComplexity: Complexity, log: Log[Id], assetId: ByteStr): FailedTransactionError =
+      FailedTransactionError(Cause.AssetScriptInAction, spentComplexity, realComplexity, log, Some(error), Some(assetId))
 
-    def notAllowedByAssetInAction(spentComplexity: Long, log: Log[Id], assetId: ByteStr): FailedTransactionError =
-      FailedTransactionError(Cause.AssetScriptInAction, spentComplexity, log, None, Some(assetId))
+    def notAllowedByAssetInAction(spentComplexity: Long, realComplexity: Complexity, log: Log[Id], assetId: ByteStr): FailedTransactionError =
+      FailedTransactionError(Cause.AssetScriptInAction, spentComplexity, realComplexity, log, None, Some(assetId))
 
-    def assetExecution(error: String, spentComplexity: Long, log: Log[Id], assetId: ByteStr): FailedTransactionError =
-      FailedTransactionError(Cause.AssetScript, spentComplexity, log, Some(error), Some(assetId))
+    def assetExecution(error: String, spentComplexity: Long, realComplexity: Complexity, log: Log[Id], assetId: ByteStr): FailedTransactionError =
+      FailedTransactionError(Cause.AssetScript, spentComplexity, realComplexity, log, Some(error), Some(assetId))
 
-    def notAllowedByAsset(spentComplexity: Long, log: Log[Id], assetId: ByteStr): FailedTransactionError =
-      FailedTransactionError(Cause.AssetScript, spentComplexity, log, None, Some(assetId))
+    def notAllowedByAsset(spentComplexity: Long, realComplexity: Complexity, log: Log[Id], assetId: ByteStr): FailedTransactionError =
+      FailedTransactionError(Cause.AssetScript, spentComplexity, realComplexity, log, None, Some(assetId))
 
     sealed trait Cause extends Product with Serializable {
       def code: Int

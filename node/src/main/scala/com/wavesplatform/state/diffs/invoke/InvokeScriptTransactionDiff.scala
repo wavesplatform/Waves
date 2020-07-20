@@ -68,7 +68,7 @@ object InvokeScriptTransactionDiff {
           }
 
           stepLimit = ContractLimits.MaxComplexityByVersion(version)
-          stepsNumber = if (invocationComplexity % stepLimit == 0)
+          stepsNumber = if (invocationComplexity % stepLimit == 0)   // XXX Is it maximal or real steps number?
             invocationComplexity / stepLimit
           else
             invocationComplexity / stepLimit + 1
@@ -152,6 +152,7 @@ object InvokeScriptTransactionDiff {
                 pk,
                 feeInfo,
                 invocationComplexity,
+                scriptResult._1.spentComplexity,
                 tx,
                 blockchain,
                 blockTime,
@@ -209,7 +210,7 @@ object InvokeScriptTransactionDiff {
   ): Either[FailedTransactionError, (ScriptResult, Log[Id])] =
     Try(ContractEvaluator.applyV2(evaluationCtx, Map[String, LazyVal[Id]](), expr, version, transactionId, limit))
       .fold(e => Left((e.getMessage, limit, Nil)), identity)
-      .leftMap { case (error, unusedComplexity, log) => FailedTransactionError.dAppExecution(error, failComplexity, log) }
+      .leftMap { case (error, unusedComplexity, log) => FailedTransactionError.dAppExecution(error, failComplexity, limit - unusedComplexity, log) }
 
   private def checkCall(fc: FUNCTION_CALL, blockchain: Blockchain): Either[ExecutionError, Unit] = {
     val (check, expectedTypes) =

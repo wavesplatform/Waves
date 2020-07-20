@@ -29,12 +29,12 @@ object ScriptRunner {
       script: Script,
       isAssetScript: Boolean,
       scriptContainerAddress: Environment.Tthis
-  ): (Log[Id], Either[ExecutionError, EVALUATED]) = {
+  ): (Log[Id], Complexity, Either[ExecutionError, EVALUATED]) = {
 
     def evalVerifier(
         isContract: Boolean,
         partialEvaluate: (DirectiveSet, EvaluationContext[Environment, Id]) => Either[(ExecutionError, Complexity, Log[Id]), (EVALUATED, Complexity, Log[Id])]
-    ): (Log[Id], Either[ExecutionError, EVALUATED]) = {
+    ): (Log[Id], Complexity, Either[ExecutionError, EVALUATED]) = {
       val txId = in.eliminate(_.id(), _ => ByteStr.empty)
       val eval = for {
         ds <- DirectiveSet(script.stdLibVersion, if (isAssetScript) Asset else Account, Expression).leftMap((_, 0L, Nil))
@@ -56,8 +56,8 @@ object ScriptRunner {
       } yield result
 
       eval.fold(
-        { case (error, unusedComplexity, log)  => (log, error.asLeft[EVALUATED]) },
-        { case (result, unusedComplexity, log) => (log, result.asRight[ExecutionError]) }
+        { case (error, unusedComplexity, log)  => (log, unusedComplexity, error.asLeft[EVALUATED]) },
+        { case (result, unusedComplexity, log) => (log, unusedComplexity, result.asRight[ExecutionError]) }
       )
     }
 
@@ -93,10 +93,10 @@ object ScriptRunner {
               _ => ???
             )
           )
-        (Nil, Verifier.verifyAsEllipticCurveSignature(proven).bimap(_.err, _ => TRUE))
+        (Nil, 0L, Verifier.verifyAsEllipticCurveSignature(proven).bimap(_.err, _ => TRUE))
 
       case other =>
-        (Nil, s"$other: Unsupported script version".asLeft[EVALUATED])
+        (Nil, 0L, s"$other: Unsupported script version".asLeft[EVALUATED])
     }
   }
 }
