@@ -6,7 +6,8 @@ import com.wavesplatform.events.{BlockAppended, MicroBlockAppended}
 trait UpdatesRepo {
   def appendMicroBlock(microBlockAppended: MicroBlockAppended): Unit
 
-  def getLiquidState(): Option[(BlockAppended, Seq[MicroBlockAppended])]
+  def getLiquidState(): Option[LiquidState]
+
   def dropLiquidState(afterId: Option[ByteStr] = None): Unit
 
   def appendBlock(blockAppended: BlockAppended): Unit

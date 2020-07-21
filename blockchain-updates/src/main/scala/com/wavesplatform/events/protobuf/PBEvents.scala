@@ -6,10 +6,17 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events
 import com.wavesplatform.events.protobuf.BlockchainUpdated.{Append => PBAppend, Rollback => PBRollback}
-import com.wavesplatform.events.protobuf.StateUpdate.{AssetStateUpdate, BalanceUpdate => PBBalanceUpdate, DataEntryUpdate => PBDataEntryUpdate, LeasingUpdate => PBLeasingUpdate}
+import com.wavesplatform.events.protobuf.StateUpdate.{
+  AssetStateUpdate,
+  BalanceUpdate => PBBalanceUpdate,
+  DataEntryUpdate => PBDataEntryUpdate,
+  LeasingUpdate => PBLeasingUpdate
+}
 import com.wavesplatform.protobuf.block.{PBBlocks, PBMicroBlocks}
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.Transaction
+
+import scala.util.Try
 
 object PBEvents {
   import com.wavesplatform.protobuf.utils.PBImplicitConversions._
@@ -74,6 +81,8 @@ object PBEvents {
           )
         )
     }
+
+  def vanilla(protobuf: BlockchainUpdated): Try[events.BlockchainUpdated] = ???
 
   private def toString(bytes: ByteStr): String = new String(bytes.arr, StandardCharsets.UTF_8)
 

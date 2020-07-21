@@ -82,15 +82,6 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   // for now, only updating database
   override def onProcessBlock(block: Block, diff: BlockDiffer.DetailedDiff, minerReward: Option[Long], blockchainBefore: Blockchain): Unit = {
     val newBlock = BlockAppended.from(block, diff, minerReward, blockchainBefore)
-
-    // solidify current liquid state, if exists
-    repo.getLiquidState().foreach {
-      case (keyBlock, microBlocks) =>
-        val squashedBlock = squash(keyBlock, microBlocks)
-        repo.dropLiquidState()
-        repo.appendBlock(squashedBlock)
-    }
-
     repo.appendBlock(newBlock)
   }
 
@@ -110,26 +101,5 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
   override def onMicroBlockRollback(toBlockId: ByteStr, height: Int): Unit = {
     repo.dropLiquidState(Some(toBlockId))
-  }
-
-  private def squash(keyBlock: BlockAppended, microBlocks: Seq[MicroBlockAppended]): BlockAppended = {
-    val totalResBlockSig        = microBlocks.lastOption.fold(keyBlock.block.signature)(_.microBlock.totalResBlockSig)
-    val transactionData         = microBlocks.foldLeft(keyBlock.block.transactionData)((txs, mb) => txs ++ mb.microBlock.transactionData)
-    val blockStateUpdate        = microBlocks.foldLeft(keyBlock.blockStateUpdate)((upd, mb) => upd.combine(mb.microBlockStateUpdate))
-    val transactionStateUpdates = microBlocks.foldLeft(keyBlock.transactionStateUpdates)((upds, mb) => upds ++ mb.transactionStateUpdates)
-
-    // todo make sure generationSignature and transactionsRoot are correct in Block
-    // not touching them for now
-    BlockAppended(
-      toId = totalResBlockSig,
-      toHeight = keyBlock.toHeight,
-      block = keyBlock.block.copy(
-        signature = totalResBlockSig,
-        transactionData = transactionData
-      ),
-      updatedWavesAmount = keyBlock.updatedWavesAmount,
-      blockStateUpdate = blockStateUpdate,
-      transactionStateUpdates = transactionStateUpdates
-    )
   }
 }
