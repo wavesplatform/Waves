@@ -161,6 +161,20 @@ object Verifier extends ScorexLogging {
       }
     } yield result
 
+  case class Estimated[T] (val v: (Complexity, TracedResult[ValidationError, T])) {
+    def flatMap[R](f: T => Estimated[R]): Estimated[R] = {
+       Estimated(v._2 match {
+         case TracedResult(Left(err), log) => (v._1, TracedResult(Left(err), log))
+         case TracedResult(Right(x), log) =>
+           val Estimated((c, TracedResult(r, l))) = f(x)
+           (v._1 + c, TracedResult(r, log ++ l))
+       })
+    }
+    def map[R](f: T => R) : Estimated[R] = {
+      Estimated(v._1, v._2.map(f))
+    }
+  }
+
   private def verifyExchange(
       et: ExchangeTransaction,
       blockchain: Blockchain,
@@ -198,11 +212,11 @@ object Verifier extends ScorexLogging {
       (complexity, TracedResult(verificationResult))
     }
 
-    for {
-      _ <- matcherTxVerification
-      _ <- orderVerification(sellOrder)
-      _ <- orderVerification(buyOrder)
-    } yield et
+    (for {
+      _ <- Estimated(matcherTxVerification)
+      _ <- Estimated(orderVerification(sellOrder))
+      _ <- Estimated(orderVerification(buyOrder))
+    } yield et).v
   }
 
   def verifyAsEllipticCurveSignature[T <: Proven with Authorized](pt: T): Either[GenericError, T] =
