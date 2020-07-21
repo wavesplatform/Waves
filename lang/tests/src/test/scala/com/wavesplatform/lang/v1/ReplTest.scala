@@ -1,10 +1,9 @@
 package com.wavesplatform.lang.v1
 
-import com.wavesplatform.lang.Common.NoShrink
+import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import com.wavesplatform.lang.v1.testing.ScriptGen
-import com.wavesplatform.lang.Common.produce
 import org.scalatest.{Matchers, PropSpec}
 
 import scala.concurrent.duration._
@@ -197,5 +196,11 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
          |)
        """.trim.stripMargin
     )
+  }
+
+  property("parse error message") {
+    val repl = Repl()
+    await(repl.execute("FOLD<1>()")) shouldBe Left("Can't parse 'FOLD<1>()'")
+    await(repl.execute("getInteger(")) shouldBe Left("Can't parse 'getInteger('")
   }
 }
