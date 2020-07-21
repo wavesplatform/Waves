@@ -133,7 +133,7 @@ class PureFunctionsRebenchmark {
 object PureFunctionsRebenchmark {
   val context: EvaluationContext[Environment, Id] =
     Monoid.combine(
-      PureContext.build(Global, V4).evaluationContext,
+      PureContext.build(V4).evaluationContext,
       CryptoContext.build(Global, V4).evaluationContext
     ).asInstanceOf[EvaluationContext[Environment, Id]]
 

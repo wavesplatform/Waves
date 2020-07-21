@@ -69,7 +69,7 @@ trait BaseGlobal {
 
   def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean
 
-  def rsaVerify(alg: DigestAlgorithm, message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean
+  def rsaVerify(alg: DigestAlgorithm, message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Either[String, Boolean]
 
   def keccak256(message: Array[Byte]): Array[Byte]
   def blake2b256(message: Array[Byte]): Array[Byte]
@@ -148,6 +148,7 @@ trait BaseGlobal {
     for {
       expr <- compiler(input, context)
       bytes = serializeExpression(expr, version)
+      _ <- ExprScript.validateBytes(bytes)
       complexity <- ExprScript.estimateExact(expr, version, estimator)
     } yield (bytes, expr, complexity)
 
@@ -188,6 +189,7 @@ trait BaseGlobal {
         (0L, annotatedComplexities)
       )(v => (annotatedComplexities(v.u.name), annotatedComplexities - v.u.name))
       bytes <- serializeContract(dApp, stdLibVersion)
+      _ <- ContractScript.validateBytes(bytes)
     } yield DAppInfo(
       bytes,
       dApp,
@@ -267,6 +269,8 @@ trait BaseGlobal {
   def requestNode(url: String): Future[NodeResponse]
 
   def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean
+
+  def bn256Groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean
 
   def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte]
 

@@ -37,12 +37,13 @@ class AddressTest extends PropSpec with PropertyChecks with Matchers with Transa
       version <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all)
     } yield (account, version)) {
       case (account, version) =>
+        val extractFunction = if (version >= V4) "value" else "extract"
         val address = Address.fromPublicKey(account.publicKey)
         val script =
           s"""
            | let addressString = "$address"
            | let maybeAddress = addressFromString(addressString)
-           | let address = extract(maybeAddress)
+           | let address = $extractFunction(maybeAddress)
            | address.bytes
         """.stripMargin
         runScript(script, ctxV = version) shouldBe evaluated(ByteStr(Address.fromBytes(address.bytes).explicitGet().bytes))
@@ -57,12 +58,13 @@ class AddressTest extends PropSpec with PropertyChecks with Matchers with Transa
       version <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all)
     } yield (account, version)) {
       case (account, version) =>
+        val extractFunction = if (version >= V4) "value" else "extract"
         val address = Address.fromPublicKey(account.publicKey)
         val script =
           s"""
            | let addressString = "$address"
            | let maybeAddress = addressFromString(addressString)
-           | extract(maybeAddress).bytes
+           | $extractFunction(maybeAddress).bytes
         """.stripMargin
         runScript(script, ctxV = version) shouldBe evaluated(ByteStr(Address.fromBytes(address.bytes).explicitGet().bytes))
     }

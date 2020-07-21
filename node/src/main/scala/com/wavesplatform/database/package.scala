@@ -20,11 +20,10 @@ import com.wavesplatform.database.protobuf.DataEntry.Value
 import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.{ScorexLogging, _}
 import monix.eval.Task
@@ -358,25 +357,6 @@ package object database extends ScorexLogging {
     ndo.toByteArray
   }
 
-  def readTransactionHN(bs: Array[Byte]): (Height, TxNum) = {
-    val ndi = newDataInput(bs)
-    val h   = Height(ndi.readInt())
-    val num = TxNum(ndi.readShort())
-
-    (h, num)
-  }
-
-  def writeTransactionHN(v: (Height, TxNum)): Array[Byte] = {
-    val ndo = newDataOutput(8)
-
-    val (h, num) = v
-
-    ndo.writeInt(h)
-    ndo.writeShort(num)
-
-    ndo.toByteArray
-  }
-
   def readDataEntry(key: String)(bs: Array[Byte]): DataEntry[_] =
     pb.DataEntry.parseFrom(bs).value match {
       case Value.Empty              => EmptyDataEntry(key)
@@ -503,14 +483,14 @@ package object database extends ScorexLogging {
 
   def writeTransaction(v: (Transaction, Boolean)): Array[Byte] = {
     import pb.TransactionData.Transaction._
-    val (tx, succeed) = v
+    val (tx, succeeded) = v
     val ptx = tx match {
       case lps: LegacyPBSwitch if !lps.isProtobufVersion => LegacyBytes(ByteString.copyFrom(tx.bytes()))
       case _: GenesisTransaction                         => LegacyBytes(ByteString.copyFrom(tx.bytes()))
       case _: PaymentTransaction                         => LegacyBytes(ByteString.copyFrom(tx.bytes()))
       case _                                             => NewTransaction(PBTransactions.protobuf(tx))
     }
-    pb.TransactionData(!succeed, ptx).toByteArray
+    pb.TransactionData(!succeeded, ptx).toByteArray
   }
 
   /** Returns status (succeed - true, failed -false) and bytes (left - legacy format bytes, right - new format bytes) */
@@ -546,13 +526,6 @@ package object database extends ScorexLogging {
 
     (succeed, bytes)
   }
-
-  def readTransferTransaction(b: Array[Byte]): Option[TransferTransaction] =
-    readTransactionBytes(b) match {
-      case (true, Left(oldBytes)) => TransferTransaction.parseBytes(oldBytes).toOption
-      case (true, Right(bytes))   => PBTransactions.vanilla(PBSignedTransaction.parseFrom(bytes)).toOption.collect { case t: TransferTransaction => t }
-      case _                      => None
-    }
 
   def loadTransactions(height: Height, db: ReadOnlyDB): Option[Seq[(Transaction, Boolean)]] =
     for {
@@ -616,8 +589,8 @@ package object database extends ScorexLogging {
       id          <- leaseIds
       leaseStatus <- fromHistory(r, Keys.leaseStatusHistory(id), Keys.leaseStatus(id))
       if leaseStatus
-      (h, n) <- r.get(Keys.transactionHNById(TransactionId(id)))
-      tx     <- r.get(Keys.transactionAt(h, n))
+      pb.TransactionMeta(h, n, _, _) <- r.get(Keys.transactionMetaById(TransactionId(id)))
+      tx                             <- r.get(Keys.transactionAt(Height(h), TxNum(n.toShort)))
     } yield tx).collect {
       case (lt: LeaseTransaction, true) => lt
     }.toSeq

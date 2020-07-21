@@ -3,7 +3,6 @@ package com.wavesplatform.lang.v1.evaluator
 import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.lang.Common.{AorBorC, NoShrink, addCtx, sampleTypes}
-import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
@@ -32,7 +31,7 @@ class SplitFunctionTest
     val stringToTuple = Map(("p", (pointType, lazyVal)))
     val ctx: CTX[NoContext] =
       Monoid.combineAll(Seq(
-        PureContext.build(Global, V3),
+        PureContext.build(V3),
         CTX[NoContext](sampleTypes, stringToTuple, Array.empty),
         addCtx
       ))

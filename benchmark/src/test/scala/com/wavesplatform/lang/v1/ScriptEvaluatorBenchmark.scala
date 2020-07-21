@@ -26,7 +26,7 @@ import scala.util.Random
 
 object ScriptEvaluatorBenchmark {
   val version                                           = V1
-  val pureEvalContext: EvaluationContext[NoContext, Id] = PureContext.build(Global, V1).evaluationContext
+  val pureEvalContext: EvaluationContext[NoContext, Id] = PureContext.build(V1).evaluationContext
   val evaluatorV1: EvaluatorV1[Id, NoContext]           = new EvaluatorV1[Id, NoContext]()
 }
 
@@ -73,6 +73,18 @@ class ScriptEvaluatorBenchmark {
   @Benchmark
   def listMedianEqualElements(st: Median, bh: Blackhole): Unit =
     bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.equalElements))
+
+  @Benchmark
+  def listRemoveFirstByIndex(st: ListRemoveByIndex, bh: Blackhole): Unit =
+    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.removeFirst))
+
+  @Benchmark
+  def listRemoveMiddleByIndex(st: ListRemoveByIndex, bh: Blackhole): Unit =
+    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.removeMiddle))
+
+  @Benchmark
+  def listRemoveLastByIndex(st: ListRemoveByIndex, bh: Blackhole): Unit =
+    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.removeLast))
 
   @Benchmark
   def sigVerify32Kb(st: SigVerify32Kb, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.expr))
@@ -205,7 +217,7 @@ class Concat {
 
 @State(Scope.Benchmark)
 class Median {
-  val context: EvaluationContext[NoContext, Id] = PureContext.build(Global, V4).evaluationContext
+  val context: EvaluationContext[NoContext, Id] = PureContext.build(V4).evaluationContext
 
   val randomElements: Array[EXPR] =
     (1 to 10000).map { _ =>
@@ -248,7 +260,7 @@ class Median {
 @State(Scope.Benchmark)
 class SigVerify32Kb {
   val context: EvaluationContext[NoContext, Id] =
-    Monoid.combine(PureContext.build(Global, V4).evaluationContext, CryptoContext.build(Global, V4).evaluationContext)
+    Monoid.combine(PureContext.build(V4).evaluationContext, CryptoContext.build(Global, V4).evaluationContext)
 
 
   val expr: EXPR = {
@@ -265,4 +277,42 @@ class SigVerify32Kb {
       )
     )
   }
+}
+
+@State(Scope.Benchmark)
+class ListRemoveByIndex {
+  val context: EvaluationContext[NoContext, Id] =
+    Monoid.combine(
+      PureContext.build(Global, V4).evaluationContext,
+      CryptoContext.build(Global, V4).evaluationContext
+    )
+
+  val list: ARR = ARR(Vector.fill(1000)(CONST_LONG(Long.MaxValue)), limited = true).explicitGet()
+
+  val removeFirst: EXPR =
+    FUNCTION_CALL(
+      Native(FunctionIds.REMOVE_BY_INDEX_OF_LIST),
+      List(
+        list,
+        CONST_LONG(0)
+      )
+    )
+
+  val removeMiddle: EXPR =
+    FUNCTION_CALL(
+      Native(FunctionIds.REMOVE_BY_INDEX_OF_LIST),
+      List(
+        list,
+        CONST_LONG(500)
+      )
+    )
+
+  val removeLast: EXPR =
+    FUNCTION_CALL(
+      Native(FunctionIds.REMOVE_BY_INDEX_OF_LIST),
+      List(
+        list,
+        CONST_LONG(1000)
+      )
+    )
 }

@@ -5,8 +5,8 @@ import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Common.{NoShrink, produce}
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.directives.DirectiveSet
@@ -14,6 +14,7 @@ import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms}
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -27,6 +28,24 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
+  private val cmpCtx: CompilerContext =
+    WavesContext
+      .build(
+        DirectiveSet(V3, Account, DAppType).explicitGet()
+      )
+      .compilerContext
+
+  private val dAppV4Ctx: CompilerContext = Monoid
+    .combineAll(
+      Seq(
+        PureContext.build(V4).withEnvironment[Environment],
+        CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
+        WavesContext.build(
+          DirectiveSet(V4, Account, DAppType).explicitGet()
+        )
+      )
+    )
+    .compilerContext
 
   property("contract compiles when uses annotation bindings and correct return type") {
     val ctx = Monoid.combine(
@@ -179,13 +198,6 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     compiler.ContractCompiler(ctx, expr, V3) shouldBe expectedResult
   }
 
-  private val cmpCtx: CompilerContext =
-    WavesContext
-      .build(
-        DirectiveSet(V3, Account, DAppType).explicitGet()
-      )
-      .compilerContext
-
   property("contract compiles callable functions independently") {
     val ctx = Monoid.combine(compilerContext, cmpCtx)
     val expr = {
@@ -337,7 +349,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
+          PureContext.build(V3).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
             DirectiveSet(V3, Account, DAppType).explicitGet()
@@ -419,16 +431,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("wavesBalanceV4 have type BalanceDetails") {
-    val ctx = Monoid
-      .combineAll(
-        Seq(
-          PureContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
-          CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
-          WavesContext.build(
-            DirectiveSet(V4, Account, DAppType).explicitGet()
-          )
-        ))
-      .compilerContext
+    val ctx = dAppV4Ctx
     val expr = {
       val script =
         """
@@ -443,16 +446,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("wavesBalanceV4 have type BalanceDetails with fields") {
-    val ctx = Monoid
-      .combineAll(
-        Seq(
-          PureContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
-          CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
-          WavesContext.build(
-            DirectiveSet(V4, Account, DAppType).explicitGet()
-          )
-        ))
-      .compilerContext
+    val ctx = dAppV4Ctx
     val expr = {
       val script =
         """
@@ -472,16 +466,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("assetBalanceV4 allow issued assets only") {
-    val ctx = Monoid
-      .combineAll(
-        Seq(
-          PureContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
-          CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
-          WavesContext.build(
-            DirectiveSet(V4, Account, DAppType).explicitGet()
-          )
-        ))
-      .compilerContext
+    val ctx = dAppV4Ctx
     val expr = {
       val script =
         """
@@ -499,7 +484,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
+          PureContext.build(V3).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
             DirectiveSet(V3, Account, DAppType).explicitGet()
@@ -918,7 +903,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |     DeleteEntry("key"),
           |     ScriptTransfer(i.caller, 1, base58''),
           |     Issue("name", "description", 1000, 4, true, unit, 0),
-          |     Reissue(base58'', false, 1),
+          |     Reissue(base58'', 1, false),
           |     Burn(base58'', 1),
           |     SponsorFee(base58'', 1)
           |   ]
@@ -926,7 +911,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       Parser.parseContract(script).get.value
     }
     val ctx =
-      PureContext.build(Global, V4).withEnvironment[Environment] |+|
+      PureContext.build(V4).withEnvironment[Environment] |+|
       WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe Symbol("right")
@@ -936,7 +921,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
+          PureContext.build(V3).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
             DirectiveSet(V3, Account, DAppType).explicitGet()
@@ -957,16 +942,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("Asset has some name") {
-    val ctx = Monoid
-      .combineAll(
-        Seq(
-          PureContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
-          CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
-          WavesContext.build(
-            DirectiveSet(V4, Account, DAppType).explicitGet()
-          )
-        ))
-      .compilerContext
+    val ctx = dAppV4Ctx
     val expr = {
       val script =
         """
@@ -980,5 +956,16 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     compiler.ContractCompiler(ctx, expr, V4) shouldBe Symbol("right")
   }
 
+  property("JS API compile limit exceeding error") {
+    val dApp =
+     s"""
+        |
+        |@Verifier(tx)
+        |func verify() =
+        |  ${"sigVerify(base58'', base58'', base58'') &&" * 1500} true
+        |
+      """.stripMargin
 
+    Global.compileContract(dApp, dAppV4Ctx, V4, ScriptEstimatorV3) should produce("Script is too large: 37551 bytes > 32768 bytes")
+  }
 }
