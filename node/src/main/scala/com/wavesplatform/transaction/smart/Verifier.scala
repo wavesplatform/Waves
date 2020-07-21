@@ -171,7 +171,7 @@ object Verifier extends ScorexLogging {
        })
     }
     def map[R](f: T => R) : Estimated[R] = {
-      Estimated(v._1, v._2.map(f))
+      Estimated((v._1, v._2.map(f)))
     }
   }
 
