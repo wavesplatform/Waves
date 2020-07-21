@@ -3,7 +3,8 @@ package com.wavesplatform.events.repo
 import java.nio.ByteBuffer
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated, PBEvents}
+import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
+import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.events.{BlockAppended, BlockchainUpdated, MicroBlockAppended}
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
@@ -47,7 +48,7 @@ class UpdatesRepoImpl(db: DB) extends UpdatesRepo with ScorexLogging {
     liquidState.foreach { ls =>
       val solidBlock = ls.solidify()
       val key        = blockKey(solidBlock.toHeight)
-      db.put(key, PBEvents.protobuf(solidBlock).toByteArray)
+      db.put(key, solidBlock.protobuf.toByteArray)
     }
     liquidState = Some(LiquidState(blockAppended, Seq.empty))
   }
@@ -67,8 +68,11 @@ class UpdatesRepoImpl(db: DB) extends UpdatesRepo with ScorexLogging {
         } else {
           try {
             log.debug(s"BlockchainUpdates extension parsing bytes from leveldb for height $height")
-            val pb = PBBlockchainUpdated.parseFrom(bytes)
-            PBEvents.vanilla(pb).toOption.collect { case ba: BlockAppended => ba }
+            PBBlockchainUpdated
+              .parseFrom(bytes)
+              .vanilla
+              .toOption
+              .collect { case ba: BlockAppended => ba }
           } catch {
             case e: Throwable =>
               log.error("Failed to parse leveldb block update", e)

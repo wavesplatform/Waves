@@ -1,7 +1,7 @@
 package com.wavesplatform.events.grpc
 
 import com.wavesplatform.events.grpc.protobuf.{BlockchainUpdatesApiGrpc, GetForHeightRequest, GetForHeightResponse}
-import com.wavesplatform.events.protobuf.PBEvents
+import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.events.repo.UpdatesRepo
 import monix.execution.Scheduler
 import io.grpc.{Status, StatusRuntimeException}
@@ -13,7 +13,7 @@ class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo)(implicit sc: Scheduler) ex
     repo.getForHeight(request.height) match {
       case Some(upd) =>
         Future.successful {
-          GetForHeightResponse(Some(PBEvents.protobuf(upd)))
+          GetForHeightResponse(Some(upd.protobuf))
         }
       case None =>
         Future {
