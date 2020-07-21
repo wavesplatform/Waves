@@ -15,6 +15,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
+// todo decide what to do with name and description
 final case class AssetStateUpdate(
     asset: IssuedAsset,
     decimals: Int,
@@ -22,7 +23,7 @@ final case class AssetStateUpdate(
     description: ByteStr,
     reissuable: Boolean,
     volume: BigInt,
-    script: Option[AssetScriptInfo],
+    scriptInfo: Option[AssetScriptInfo],
     sponsorship: Option[Long],
     nft: Boolean,
     assetExistedBefore: Boolean

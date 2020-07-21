@@ -12,7 +12,8 @@ inConfig(Compile)(
     includeFilter in PB.generate := new SimpleFileFilter(
       (f: File) => {
         val name = f.getName
-        name == "blockchain_updates.proto" || (name.endsWith(".proto") && f.getParent.replace('\\', '/').contains("waves"))
+        name == "blockchain_updates.proto" || name == "events_temp.proto" || (name.endsWith(".proto") && f.getParent.contains("waves") && !name
+          .endsWith("events.proto"))
       }
     ),
     PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value

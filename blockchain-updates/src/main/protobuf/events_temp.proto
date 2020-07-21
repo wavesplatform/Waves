@@ -1,0 +1,97 @@
+syntax = "proto3";
+package waves.events;
+option java_package = "com.wavesplatform.events.protobuf";
+
+import "waves/block.proto";
+import "waves/amount.proto";
+import "waves/transaction.proto";
+
+message BlockchainUpdated {
+    bytes id = 1;
+    int32 height = 2;
+
+    message Append {
+        message BlockAppend {
+            Block block = 1;
+            int64 updated_waves_amount = 2;
+        }
+
+        message MicroBlockAppend {
+            SignedMicroBlock micro_block = 1;
+        }
+
+        oneof body {
+            BlockAppend block = 1;
+            MicroBlockAppend micro_block = 2;
+        }
+
+        repeated bytes transaction_ids = 3;
+
+        StateUpdate state_update = 11;
+        repeated StateUpdate transaction_state_updates = 12;
+    }
+
+    message Rollback {
+        enum RollbackType {
+            BLOCK = 0;
+            MICROBLOCK = 1;
+        }
+
+        RollbackType type = 1;
+    }
+
+    oneof update {
+        Append append = 11;
+        Rollback rollback = 12;
+    }
+}
+
+message StateUpdate {
+    repeated BalanceUpdate balances = 1;
+    repeated LeasingUpdate leases = 2;
+    repeated DataEntryUpdate data_entries = 3;
+    repeated AssetStateUpdate assets = 4;
+
+    message BalanceUpdate {
+        bytes address = 1;
+        Amount amount = 2;
+    }
+
+    message LeasingUpdate {
+        bytes address = 1;
+        int64 in = 2;
+        int64 out = 3;
+    }
+
+    message DataEntryUpdate {
+        bytes address = 1;
+        DataTransactionData.DataEntry data_entry = 2;
+    }
+
+    message AssetStateUpdate {
+        message AssetScriptInfo {
+            bytes script = 1;
+            int64 complexity = 2;
+        }
+
+        bytes asset_id = 1;
+        int32 decimals = 2;
+        string name = 3;
+        string description = 4;
+        bool reissuable = 5;
+        int64 volume = 6;
+        AssetScriptInfo script_info = 7;
+        int64 sponsorship = 8;
+        bool nft = 9;
+
+        bool asset_existed_before = 20;
+        /*
+                Related to a past behavior in the blockchain when it was possible to reissue
+                assets so that the total volume became more then int64 max value.
+                This field represents accurate volume even for those assets.
+                Can be ignored if the target system does not need such accuracy.
+                Encoding: like Java BigInteger, https://docs.oracle.com/javase/7/docs/api/java/math/BigInteger.html#toByteArray()
+            */
+        bytes safe_volume = 21;
+    }
+}

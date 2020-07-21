@@ -3,7 +3,7 @@ package waves.events.grpc;
 option java_package = "com.wavesplatform.events.grpc.protobuf";
 option csharp_namespace = "Waves.Events.Grpc";
 
-import "waves/events/events.proto";
+import "events_temp.proto";
 
 service BlockchainUpdatesApi {
     rpc GetForHeight(GetForHeightRequest) returns (GetForHeightResponse);

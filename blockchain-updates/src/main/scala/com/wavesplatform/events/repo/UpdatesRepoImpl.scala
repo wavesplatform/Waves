@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
 import com.wavesplatform.events.protobuf.serde._
-import com.wavesplatform.events.{BlockAppended, BlockchainUpdated, MicroBlockAppended}
+import com.wavesplatform.events.{BlockAppended, MicroBlockAppended}
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
 
