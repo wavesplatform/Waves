@@ -54,6 +54,8 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     val repl = Repl()
     val msg = "error message"
     await(repl.execute(s""" throw("$msg") """)) shouldBe Left(msg)
+    await(repl.execute(s""" throw() """)) shouldBe Left("Explicit script termination")
+    await(repl.execute(s""" throw("") """)) shouldBe Left("Evaluation error")
   }
 
   property("waves context funcs absent") {
