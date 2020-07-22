@@ -1,13 +1,7 @@
 package com.wavesplatform.events.grpc
 
 import com.wavesplatform.events.BlockchainUpdated
-import com.wavesplatform.events.grpc.protobuf.{
-  BlockchainUpdatesApiGrpc,
-  GetForHeightRequest,
-  GetForHeightResponse,
-  SubscribeEvent,
-  SubscribeRequest
-}
+import com.wavesplatform.events.grpc.protobuf.{BlockchainUpdatesApiGrpc, GetForHeightRequest, GetForHeightResponse, SubscribeEvent, SubscribeRequest}
 import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.events.repo.UpdatesRepo
 import com.wavesplatform.utils.ScorexLogging
@@ -40,8 +34,11 @@ class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo, currentUpdates: Observable
         responseObserver.onNext(SubscribeEvent(update = Some(elem.protobuf)))
         Future.successful(Continue)
       }
-      override def onError(ex: Throwable): Unit = responseObserver.onError(ex)
-      override def onComplete(): Unit           = responseObserver.onCompleted()
+      override def onError(ex: Throwable): Unit = {
+        log.error("Streaming updaes failed with error", ex)
+        responseObserver.onError(new StatusRuntimeException(Status.INTERNAL))
+      }
+      override def onComplete(): Unit = responseObserver.onCompleted()
     })
   }
 
