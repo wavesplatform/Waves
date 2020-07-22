@@ -125,9 +125,9 @@ object serde {
                 VanillaBlockAppended(
                   toId = ByteStr(self.id.toByteArray),
                   toHeight = self.height,
-                  block = PBBlocks.vanilla(body.block.get, unsafe = true).get,
+                  block = PBBlocks.vanilla(body.block.get).get,
                   updatedWavesAmount = body.updatedWavesAmount,
-                  blockStateUpdate = append.stateUpdate.get.vanilla.getOrElse(Monoid[VanillaStateUpdate].empty),
+                  blockStateUpdate = append.stateUpdate.map(_.vanilla.get).getOrElse(Monoid[VanillaStateUpdate].empty),
                   transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get)
                 )
               case Body.MicroBlock(body) =>
@@ -135,7 +135,7 @@ object serde {
                   toId = ByteStr(self.id.toByteArray),
                   toHeight = self.height,
                   microBlock = PBMicroBlocks.vanilla(body.microBlock.get).get.microblock,
-                  microBlockStateUpdate = append.stateUpdate.get.vanilla.getOrElse(Monoid[VanillaStateUpdate].empty),
+                  microBlockStateUpdate = append.stateUpdate.map(_.vanilla.get).getOrElse(Monoid[VanillaStateUpdate].empty),
                   transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get)
                 )
               case Body.Empty => throw error
@@ -159,9 +159,9 @@ object serde {
       } recoverWith { case _: Throwable => Failure(error) }
   }
 
-  implicit class AssetStateUpdateProtobufImpl(self: VanillaAssetStateUpdate) extends Protobuf[AssetStateUpdate] {
+  implicit class AssetStateUpdateProtobuf(self: VanillaAssetStateUpdate) extends Protobuf[AssetStateUpdate] {
 
-    import AssetStateUpdateProtobufImpl._
+    import AssetStateUpdateProtobuf._
 
     override def protobuf: AssetStateUpdate = AssetStateUpdate(
       assetId = self.asset.id.toByteString,
@@ -178,7 +178,7 @@ object serde {
     )
   }
 
-  object AssetStateUpdateProtobufImpl {
+  object AssetStateUpdateProtobuf {
     private def toStringUtf8(bytes: ByteStr): String = new String(bytes.arr, StandardCharsets.UTF_8)
   }
 
