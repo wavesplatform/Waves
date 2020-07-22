@@ -58,38 +58,48 @@ object PBTransactions {
   def vanilla(signedTx: PBSignedTransaction, unsafe: Boolean = false): Either[ValidationError, VanillaTransaction] = {
     for {
       parsedTx <- signedTx.transaction.toRight(GenericError("Transaction must be specified"))
-      fee      <- parsedTx.fee.toRight(GenericError("Fee must be specified"))
-      _        <- Either.cond(parsedTx.data.isDefined, (), GenericError("Transaction data must be specified"))
-      feeAmount = PBAmounts.toAssetAndAmount(fee)
-      sender    = PublicKey(parsedTx.senderPublicKey.toByteArray)
-      tx <- if (unsafe)
-        Right(
-          createVanillaUnsafe(
-            parsedTx.version,
-            parsedTx.chainId.toByte,
-            sender,
-            feeAmount._2,
-            feeAmount._1,
-            parsedTx.timestamp,
-            Proofs(signedTx.proofs.map(bs => ByteStr(bs.toByteArray))),
-            parsedTx.data
-          )
-        )
-      else
-        createVanilla(
-          parsedTx.version,
-          parsedTx.chainId.toByte,
-          sender,
-          feeAmount._2,
-          feeAmount._1,
-          parsedTx.timestamp,
-          Proofs(signedTx.proofs.map(bs => ByteStr(bs.toByteArray))),
-          parsedTx.data
-        )
+      tx <- parsedTx.data match {
+        case Data.Empty => Left(GenericError("Transaction data must be specified"))
+        case Data.Genesis(GenesisTransactionData(recipient, amount)) =>
+          for {
+            addr <- PBRecipients.toAddress(recipient.toByteArray, parsedTx.chainId.toByte)
+            tx   <- vt.GenesisTransaction.create(addr, amount, parsedTx.timestamp)
+          } yield tx
+        case _ =>
+          for {
+            fee <- parsedTx.fee.toRight(GenericError("Fee must be specified for non-Genesis transactions"))
+            (asset, amount) = PBAmounts.toAssetAndAmount(fee)
+            sender <- Try(PublicKey(parsedTx.senderPublicKey.toByteArray)).toEither.left.map(t => GenericError(t.getMessage))
+            tx <- if (unsafe)
+              Right(
+                createVanillaExceptGenesisUnsafe(
+                  parsedTx.version,
+                  parsedTx.chainId.toByte,
+                  sender,
+                  amount,
+                  asset,
+                  parsedTx.timestamp,
+                  Proofs(signedTx.proofs.map(bs => ByteStr(bs.toByteArray))),
+                  parsedTx.data
+                )
+              )
+            else
+              createVanillaExceptGenesis(
+                parsedTx.version,
+                parsedTx.chainId.toByte,
+                sender,
+                amount,
+                asset,
+                parsedTx.timestamp,
+                Proofs(signedTx.proofs.map(bs => ByteStr(bs.toByteArray))),
+                parsedTx.data
+              )
+          } yield tx
+      }
     } yield tx
   }
 
-  private[this] def createVanilla(
+  private[this] def createVanillaExceptGenesis(
       version: Int,
       chainId: Byte,
       sender: PublicKey,
@@ -102,12 +112,6 @@ object PBTransactions {
 
     val signature = proofs.toSignature
     val result: Either[ValidationError, VanillaTransaction] = data match {
-      case Data.Genesis(GenesisTransactionData(recipient, amount)) =>
-        for {
-          addr <- PBRecipients.toAddress(recipient.toByteArray, chainId)
-          tx   <- vt.GenesisTransaction.create(addr, amount, timestamp)
-        } yield tx
-
       case Data.Payment(PaymentTransactionData(recipient, amount)) =>
         for {
           addr <- PBRecipients.toAddress(recipient.toByteArray, chainId)
@@ -298,7 +302,7 @@ object PBTransactions {
     result
   }
 
-  private[this] def createVanillaUnsafe(
+  private[this] def createVanillaExceptGenesisUnsafe(
       version: Int,
       chainId: Byte,
       sender: PublicKey,
@@ -312,9 +316,6 @@ object PBTransactions {
 
     val signature = proofs.toSignature
     data match {
-      case Data.Genesis(GenesisTransactionData(recipient, amount)) =>
-        vt.GenesisTransaction(PBRecipients.toAddress(recipient.toByteArray, chainId).explicitGet(), amount, timestamp, signature, chainId)
-
       case Data.Payment(PaymentTransactionData(recipient, amount)) =>
         vt.PaymentTransaction(
           sender,
