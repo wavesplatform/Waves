@@ -68,12 +68,12 @@ class UtxPoolImpl(
   private[this] def priorityTransactionIds = priorityDiffs.synchronized(priorityDiffs.toVector.flatMap(_.transactions.keys))
   private[this] def priorityTransactions   = priorityDiffs.synchronized(priorityDiffs.toVector.flatMap(_.transactionsValues))
 
-  override def putIfNew(tx: Transaction): TracedResult[ValidationError, Boolean] = {
+  override def putIfNew(tx: Transaction, forceValidate: Boolean): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id()) || priorityDiffs.exists(_.contains(tx.id()))) TracedResult.wrapValue(false)
-    else putNewTx(tx, verify = true)
+    else putNewTx(tx, verify = true, forceValidate)
   }
 
-  private[utx] def putNewTx(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
+  private[utx] def putNewTx(tx: Transaction, verify: Boolean, forceValidate: Boolean): TracedResult[ValidationError, Boolean] = {
     PoolMetrics.putRequestStats.increment()
 
     val checks = if (verify) PoolMetrics.putTimeStats.measure {
@@ -161,7 +161,7 @@ class UtxPoolImpl(
       } yield ()
     } else Right(())
 
-    val tracedIsNew = TracedResult(checks).flatMap(_ => addTransaction(tx, verify))
+    val tracedIsNew = TracedResult(checks).flatMap(_ => addTransaction(tx, verify, forceValidate))
     tracedIsNew.resultE match {
       case Right(isNew) => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = $isNew")
       case Left(err) =>
@@ -196,7 +196,7 @@ class UtxPoolImpl(
       if (!fullyReset) {
         val txsToAdd = diff.transactions.view.filterKeys(!removed(_)).values.map(_.transaction)
         log.warn {
-          val added   = txsToAdd.map(_.id())
+          val added      = txsToAdd.map(_.id())
           val removedIds = diff.transactions.keySet.intersect(removed)
           s"Resetting diff ${diff.hashString} partially: removed = [${removedIds.mkString(", ")}], resorted = [${added.mkString(", ")}]"
         }
@@ -210,10 +210,14 @@ class UtxPoolImpl(
     factRemoved.result().foreach(tx => onEvent(UtxEvent.TxRemoved(tx, None)))
   }
 
-  private[utx] def addTransaction(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
+  private[utx] def addTransaction(tx: Transaction, verify: Boolean, forceValidate: Boolean = false): TracedResult[ValidationError, Boolean] = {
     val diffEi = priorityDiffs.synchronized {
       val patchedBlockchain = CompositeBlockchain(blockchain, Some(Monoid.combineAll(priorityDiffs)))
-      TransactionDiffer.skipFailing(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(patchedBlockchain, tx)
+
+      if (forceValidate)
+        TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(patchedBlockchain, tx)
+      else
+        TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(patchedBlockchain, tx)
     }
 
     def addPortfolio(): Unit = diffEi.map { diff =>
@@ -287,7 +291,7 @@ class UtxPoolImpl(
   }
 
   private def cleanUnconfirmed(): Unit =
-    pack(TransactionDiffer.skipFailing(blockchain.lastBlockTimestamp, time.correctedTime()))(
+    pack(TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime()))(
       MultiDimensionalMiningConstraint.unlimited,
       PackStrategy.Unlimited,
       () => false

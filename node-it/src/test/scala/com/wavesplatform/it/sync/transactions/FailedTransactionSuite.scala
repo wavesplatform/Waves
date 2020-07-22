@@ -138,7 +138,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     sendPriorityTxAndThenOtherTxs(
       _ => sender.invokeScript(caller, contractAddress, Some("canThrow"), fee = invokeFee)._1.id,
-      () => sender.putData(contract, priorityData, priorityFee, waitForTx = true).id
+      () => sender.putData(contract, priorityData, priorityFee).id
     ) { (txs, priorityTx) =>
       logPriorityTx(priorityTx)
       waitForHeightArise()

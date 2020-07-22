@@ -34,7 +34,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
       checker: (Seq[T], T) => Seq[S]
   ): Seq[S] = {
     val maxTxsInMicroBlock = sender.config.getInt("waves.miner.max-transactions-in-micro-block")
-    val txs                = (1 to maxTxsInMicroBlock * 2).map(i => t(i))
+    val txs = (1 to maxTxsInMicroBlock * 2).map(i => t(i))
     val priorityTx         = pt()
     waitForEmptyUtx()
     waitForHeightArise()
@@ -259,6 +259,14 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
     import com.wavesplatform.it.api.SyncHttpApi._
 
     sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
+  }
+
+  def genExprWithComplexity(targetComplexity: Int, result: Boolean = true): String = {
+    s"""
+       |(if ($result) then
+       |  ${"sigVerify(base58'', base58'', base58'') ||" * (targetComplexity / 200)} true
+       |else
+       |  ${"sigVerify(base58'', base58'', base58'') ||" * (targetComplexity / 200)} false)""".stripMargin
   }
 }
 
