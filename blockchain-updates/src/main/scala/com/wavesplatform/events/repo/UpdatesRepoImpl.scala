@@ -9,21 +9,26 @@ import com.wavesplatform.events.{BlockAppended, MicroBlockAppended}
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
 
+import scala.annotation.tailrec
+import scala.collection.mutable.ArrayBuffer
+import scala.util.{Failure, Success, Try}
+
 class UpdatesRepoImpl(db: DB) extends UpdatesRepo with ScorexLogging {
   import UpdatesRepoImpl.blockKey
 
   // no need to persist liquid state. Keeping it mutable in a class
   private[this] var liquidState: Option[LiquidState] = None
 
-  override def appendMicroBlock(microBlockAppended: MicroBlockAppended): Unit =
+  override def getLiquidState(): Option[LiquidState] = liquidState
+
+  override def appendMicroBlock(microBlockAppended: MicroBlockAppended): Try[Unit] =
     liquidState match {
       case Some(LiquidState(keyBlock, microBlocks)) =>
         liquidState = Some(LiquidState(keyBlock, microBlocks :+ microBlockAppended))
+        Success()
       case None =>
-        throw new IllegalStateException("Attempting to insert a microblock without a keyblock")
+        Failure(new IllegalStateException("Attempting to insert a microblock without a keyblock"))
     }
-
-  override def getLiquidState(): Option[LiquidState] = liquidState
 
   override def dropLiquidState(afterId: Option[ByteStr]): Unit =
     (afterId, liquidState) match {
@@ -42,9 +47,9 @@ class UpdatesRepoImpl(db: DB) extends UpdatesRepo with ScorexLogging {
       case _         => ()
     }
 
-  override def removeAfter(height: Int): Unit = ???
+  override def removeAfter(height: Int): Try[Unit] = ???
 
-  override def appendBlock(blockAppended: BlockAppended): Unit = {
+  override def appendBlock(blockAppended: BlockAppended): Try[Unit] = Try {
     liquidState.foreach { ls =>
       val solidBlock = ls.solidify()
       val key        = blockKey(solidBlock.toHeight)
@@ -53,36 +58,57 @@ class UpdatesRepoImpl(db: DB) extends UpdatesRepo with ScorexLogging {
     liquidState = Some(LiquidState(blockAppended, Seq.empty))
   }
 
-  override def getForHeight(height: Int): Option[BlockAppended] = {
+  override def getForHeight(height: Int): Try[Option[BlockAppended]] = {
     liquidState match {
       case Some(ls) if ls.keyBlock.toHeight == height =>
         log.debug(s"BlockchainUpdates extension requested liquid block at height $height")
-        Some(ls.solidify())
+        Success(Some(ls.solidify()))
       case Some(ls) if ls.keyBlock.toHeight < height =>
         log.debug(s"BlockchainUpdates extension requested non-existing block at height $height, current ${ls.keyBlock.toHeight}")
-        None
+        Success(None)
       case _ =>
         val bytes = db.get(blockKey(height))
         if (bytes.isEmpty) {
-          None
+          Success(None)
         } else {
-          try {
+          Try {
             log.debug(s"BlockchainUpdates extension parsing bytes from leveldb for height $height")
             PBBlockchainUpdated
               .parseFrom(bytes)
               .vanilla
               .toOption
               .collect { case ba: BlockAppended => ba }
-          } catch {
-            case e: Throwable =>
-              log.error("Failed to parse leveldb block update", e)
-              None
           }
         }
     }
   }
 
-//  def streamFrom(height: Int): Observable[BlockchainUpdated]
+  override def getRange(from: Int, to: Int): Try[Seq[BlockAppended]] = Try {
+    val iterator = db.iterator()
+    iterator.seek(blockKey(from))
+
+    var results = Seq.newBuilder[BlockAppended]
+    results.sizeHint(to - from + 1)
+
+    @tailrec
+    def go(remaining: Int): Unit = {
+      if (remaining > 0) {
+        val blockBytes = iterator.next().getValue
+        if (blockBytes.nonEmpty) {
+          PBBlockchainUpdated.parseFrom(blockBytes).vanilla.get match {
+            case b: BlockAppended => results += b
+            case _                => ()
+          }
+          if (iterator.hasNext) go(remaining - 1)
+        }
+      }
+    }
+
+    go(to - from + 1)
+
+    iterator.close()
+    results.result()
+  }
 }
 
 object UpdatesRepoImpl {

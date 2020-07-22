@@ -16,7 +16,9 @@ import scala.concurrent.duration._
 import scala.util.Try
 
 class HttpServer(port: Int, repo: UpdatesRepo)(implicit actorSystem: ActorSystem) extends ScorexLogging {
-  private[this] val combinedRoute = new GetUpdatesAtRoute(repo).route ~ complete(StatusCodes.NotFound)
+  private[this] val combinedRoute = new routes.GetUpdatesAt(repo).route ~
+    new routes.GetUpdatesSeq(repo).route ~
+    complete(StatusCodes.NotFound)
 
   private[this] var binding: Http.ServerBinding = _
 
@@ -38,17 +40,4 @@ object HttpServer {
       "toId"     -> a.toId.toString,
       "raw"      -> a.toString
     )
-}
-
-private[this] class GetUpdatesAtRoute(repo: UpdatesRepo) extends ApiRoute {
-  import HttpServer._
-
-  override def route: Route = get {
-    path("at" / IntNumber) { height =>
-      repo.getForHeight(height) match {
-        case Some(upd) => complete(blockchainUpdatedWrites.writes(upd))
-        case None      => complete(StatusCodes.NoContent)
-      }
-    }
-  }
 }
