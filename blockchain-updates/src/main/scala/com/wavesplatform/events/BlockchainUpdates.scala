@@ -1,6 +1,7 @@
 package com.wavesplatform.events
 
 import java.net.InetSocketAddress
+
 import cats.syntax.monoid._
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
@@ -18,20 +19,23 @@ import io.grpc.Server
 import io.grpc.netty.NettyServerBuilder
 import monix.execution.Scheduler
 import com.wavesplatform.database.openDB
+import monix.reactive.subjects.{ConcurrentSubject, Subject}
 
 import scala.concurrent.Future
 
 class BlockchainUpdates(private val context: Context) extends Extension with ScorexLogging with BlockchainUpdateTriggers {
-  import monix.execution.Scheduler.Implicits.global
+  implicit val scheduler: Scheduler = Scheduler(context.actorSystem.dispatcher)
 
   private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("blockchain-updates")
 
-  private[this] val db   = openDB(settings.directory)
+  private[this] val db = openDB(settings.directory)
   log.info(s"BlockchainUpdates extension opened db at ${settings.directory}")
   private[this] val repo = new UpdatesRepoImpl(db)
 
   private[this] var grpcServer: Server     = null
   private[this] var httpServer: HttpServer = null
+
+  private[this] val currentUpdates = ConcurrentSubject.publish[BlockchainUpdated]
 
   override def start(): Unit = {
     log.info("BlockchainUpdates extension starting")
@@ -40,13 +44,11 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     repo.dropLiquidState()
 
     // starting gRPC API
-    implicit val apiScheduler: Scheduler = Scheduler(context.actorSystem.dispatcher)
-
     val bindAddress = new InetSocketAddress("0.0.0.0", settings.grpcPort)
 
     grpcServer = NettyServerBuilder
       .forAddress(bindAddress)
-      .addService(BlockchainUpdatesApiGrpc.bindService(new BlockchainUpdatesApiGrpcImpl(repo)(apiScheduler), apiScheduler))
+      .addService(BlockchainUpdatesApiGrpc.bindService(new BlockchainUpdatesApiGrpcImpl(repo, currentUpdates)(scheduler), scheduler))
       .build()
       .start()
 
@@ -84,6 +86,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   override def onProcessBlock(block: Block, diff: BlockDiffer.DetailedDiff, minerReward: Option[Long], blockchainBefore: Blockchain): Unit = {
     val newBlock = BlockAppended.from(block, diff, minerReward, blockchainBefore)
     repo.appendBlock(newBlock)
+    currentUpdates.onNext(newBlock)
   }
 
   override def onProcessMicroBlock(
@@ -94,13 +97,16 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   ): Unit = {
     val newMicroBlock = MicroBlockAppended.from(microBlock, diff, blockchainBefore, totalBlockId)
     repo.appendMicroBlock(newMicroBlock)
+    currentUpdates.onNext(newMicroBlock)
   }
 
   override def onRollback(toBlockId: ByteStr, toHeight: Int): Unit = {
     repo.removeAfter(toHeight)
+    currentUpdates.onNext(RollbackCompleted(toBlockId, toHeight))
   }
 
   override def onMicroBlockRollback(toBlockId: ByteStr, height: Int): Unit = {
     repo.dropLiquidState(Some(toBlockId))
+    currentUpdates.onNext(MicroBlockRollbackCompleted(toBlockId, height))
   }
 }
