@@ -19,6 +19,7 @@ message GetForHeightResponse {
 }
 
 message SubscribeRequest {
+    int32 from_height = 1;
 }
 
 message SubscribeEvent {

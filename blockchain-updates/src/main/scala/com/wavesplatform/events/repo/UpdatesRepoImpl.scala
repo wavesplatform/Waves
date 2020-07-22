@@ -5,19 +5,28 @@ import java.nio.ByteBuffer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
 import com.wavesplatform.events.protobuf.serde._
-import com.wavesplatform.events.{BlockAppended, MicroBlockAppended}
+import com.wavesplatform.events.{BlockAppended, BlockchainUpdated, MicroBlockAppended}
 import com.wavesplatform.utils.ScorexLogging
+import monix.eval.Task
+import monix.execution.{Ack, Cancelable, Scheduler}
+import monix.reactive.observers.Subscriber
+import monix.reactive.{Observable, OverflowStrategy}
+import monix.reactive.subjects.ConcurrentSubject
 import org.iq80.leveldb.DB
 
 import scala.annotation.tailrec
-import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
-class UpdatesRepoImpl(db: DB) extends UpdatesRepo with ScorexLogging {
+class UpdatesRepoImpl(db: DB, currentUpdates: Observable[BlockchainUpdated])(implicit val scheduler: Scheduler)
+    extends UpdatesRepo
+    with ScorexLogging {
   import UpdatesRepoImpl.blockKey
 
   // no need to persist liquid state. Keeping it mutable in a class
   private[this] var liquidState: Option[LiquidState] = None
+
+  override def height: Int = liquidState.map(_.keyBlock.toHeight).getOrElse(0)
 
   override def getLiquidState(): Option[LiquidState] = liquidState
 
@@ -108,6 +117,85 @@ class UpdatesRepoImpl(db: DB) extends UpdatesRepo with ScorexLogging {
 
     iterator.close()
     results.result()
+  }
+
+  val BATCH_SIZE = 10
+
+  override def stream(from: Int): Observable[BlockchainUpdated] = {
+    val subject = ConcurrentSubject.publish[BlockchainUpdated]
+
+    // todo async requests in Tasks
+    Task
+      .evalAsync {
+        def sendHistorical(from: Int): Unit = {
+          var batchStart = from
+          while (true) {
+            getRange(batchStart, batchStart + BATCH_SIZE - 1) match {
+              case Success(batch) =>
+                log.info(s"Requested batch from ${batch.head.toHeight} to ${batch.last.toHeight}")
+                for (ba <- batch) {
+                  val ack = subject.onNext(ba)
+                  ack match {
+                    case Ack.Continue => ()
+                    case Ack.Stop     => return
+                  }
+                }
+                if (batch.length < BATCH_SIZE) return
+                batchStart += BATCH_SIZE
+              case Failure(exception) =>
+                log.error("Failed to get range, [$from, ${from + BATCH_SIZE - 1}]")
+                subject.onError(exception)
+                return
+            }
+          }
+        }
+
+        sendHistorical(from)
+
+        // subscribe to current events and put them into buffer, at the same time
+
+        log.info(s"Historical events sent")
+      }
+      .flatMap { _ =>
+        log.info(s"Subscribing stream to current events")
+        // todo will concurrent subscriptions work?
+        // will they be cancelled correctly?
+        Task.evalAsync(currentUpdates.subscribe(subject))
+      }
+      .runAsyncAndForget
+
+    subject
+
+//    @tailrec
+//    def producerLoop(sub: Subscriber[BlockchainUpdated], from: Option[Int]): Cancelable /* Task[Unit] */ =
+//      def send(upd: BlockchainUpdated): Task[Ack] = ???
+//
+//      from match {
+//        case None => Task.from(currentUpdates.subscribe(sub))
+//        case Some(h) => Task.defer {
+//          getRange(h, h + BATCH_SIZE - 1) match {
+//            case Success(batch) =>
+//
+//              Task.deferFuture(sub.onNext(n))
+//                .flatMap {
+//                case Ack.Continue => producerLoop(sub, n + 1)
+//                case Ack.Stop => Task.unit
+//                }
+//
+//              batch.foreach()
+//              if (value.length < BATCH_SIZE) {
+//                // then next time it's current events only
+//                producerLoop()
+//              }
+//
+//
+//            case Failure(exception) =>
+//              log.error("Failed to get range, [$from, ${from + BATCH_SIZE - 1}]")
+//              sub.onError(exception)
+//              Task.raiseError(exception)
+//          }
+//        }
+//      }
   }
 }
 

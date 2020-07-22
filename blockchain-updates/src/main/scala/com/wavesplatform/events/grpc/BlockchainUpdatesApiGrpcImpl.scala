@@ -9,12 +9,12 @@ import io.grpc.stub.StreamObserver
 import monix.execution.{Ack, Scheduler}
 import io.grpc.{Status, StatusRuntimeException}
 import monix.execution.Ack.Continue
-import monix.reactive.{Observable, Observer}
+import monix.reactive.Observer
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo, currentUpdates: Observable[BlockchainUpdated])(implicit sc: Scheduler)
+class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo)(implicit sc: Scheduler)
     extends BlockchainUpdatesApiGrpc.BlockchainUpdatesApi
     with ScorexLogging {
   override def getForHeight(request: GetForHeightRequest): Future[GetForHeightResponse] = Future {
@@ -27,19 +27,29 @@ class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo, currentUpdates: Observable
     }
   }
 
-  // one client should not block whole database
   override def subscribe(request: SubscribeRequest, responseObserver: StreamObserver[SubscribeEvent]): Unit = {
-    currentUpdates.subscribe(new Observer[BlockchainUpdated] {
-      override def onNext(elem: BlockchainUpdated): Future[Ack] = {
-        responseObserver.onNext(SubscribeEvent(update = Some(elem.protobuf)))
-        Future.successful(Continue)
-      }
-      override def onError(ex: Throwable): Unit = {
-        log.error("Streaming updaes failed with error", ex)
-        responseObserver.onError(new StatusRuntimeException(Status.INTERNAL))
-      }
-      override def onComplete(): Unit = responseObserver.onCompleted()
-    })
+    if (request.fromHeight <= 0) {
+      responseObserver.onError(new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("height must be a positive integer")))
+    } else {
+      repo
+        .stream(request.fromHeight)
+        .subscribe({
+          log.info("Subscribed")
+          new Observer[BlockchainUpdated] {
+            override def onNext(elem: BlockchainUpdated): Future[Ack] = {
+              log.info(s"Sending update ${elem.toHeight}, ${elem.toId}")
+              // todo handle exception
+              responseObserver.onNext(SubscribeEvent(update = Some(elem.protobuf)))
+              Future.successful(Continue)
+            }
+            override def onError(ex: Throwable): Unit = {
+              log.error("Streaming updaes failed with error", ex)
+              responseObserver.onError(new StatusRuntimeException(Status.INTERNAL))
+            }
+            override def onComplete(): Unit = responseObserver.onCompleted()
+          }
+        })
+    }
   }
 
 }

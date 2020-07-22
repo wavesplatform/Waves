@@ -28,14 +28,14 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
   private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("blockchain-updates")
 
+  private[this] val currentUpdates = ConcurrentSubject.publish[BlockchainUpdated]
+
   private[this] val db = openDB(settings.directory)
   log.info(s"BlockchainUpdates extension opened db at ${settings.directory}")
-  private[this] val repo = new UpdatesRepoImpl(db)
+  private[this] val repo = new UpdatesRepoImpl(db, currentUpdates)
 
   private[this] var grpcServer: Server     = null
   private[this] var httpServer: HttpServer = null
-
-  private[this] val currentUpdates = ConcurrentSubject.publish[BlockchainUpdated]
 
   override def start(): Unit = {
     log.info("BlockchainUpdates extension starting")
@@ -48,7 +48,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
     grpcServer = NettyServerBuilder
       .forAddress(bindAddress)
-      .addService(BlockchainUpdatesApiGrpc.bindService(new BlockchainUpdatesApiGrpcImpl(repo, currentUpdates)(scheduler), scheduler))
+      .addService(BlockchainUpdatesApiGrpc.bindService(new BlockchainUpdatesApiGrpcImpl(repo)(scheduler), scheduler))
       .build()
       .start()
 
@@ -61,6 +61,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     log.info(s"BlockchainUpdates extension started HTTP API on port ${settings.httpPort}")
   }
 
+  // todo proper shutdown
   override def shutdown(): Future[Unit] = Future {
     log.info("BlockchainUpdates extension shutting down")
 
@@ -85,8 +86,12 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   // for now, only updating database
   override def onProcessBlock(block: Block, diff: BlockDiffer.DetailedDiff, minerReward: Option[Long], blockchainBefore: Blockchain): Unit = {
     val newBlock = BlockAppended.from(block, diff, minerReward, blockchainBefore)
+    log.info(s"Receiving block ${newBlock.toHeight}")
     repo.appendBlock(newBlock)
     currentUpdates.onNext(newBlock)
+    if (newBlock.toHeight > 100) {
+      Thread.sleep(5000)
+    }
   }
 
   override def onProcessMicroBlock(
