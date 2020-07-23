@@ -156,121 +156,86 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
   val BATCH_SIZE                = 10
   val BACK_PRESSURE_BUFFER_SIZE = 1000
 
-  // I think the stream should be back-pressured
-  // todo (maybe) parameterize strategy or at least buffer size
+  // todo maybe the stream should be back-pressured
   // todo detect out-or-order events and throw exception
   override def stream(from: Int): Observable[BlockchainUpdated] = {
-    // it guarantees to send solid and liquid states concatenated as they are at the moment of last call
-    def syncTick(from: Option[Int]): Task[Option[(Seq[BlockchainUpdated], Option[Int])]] =
-      from match {
-        case None => Task.eval(None)
-        case Some(f) =>
-          Task.evalAsync {
-            withReadLock {
-              log.info(s"syncTick, $from, current height $height")
-              val syncPhase = (height - f) <= BATCH_SIZE
-              // if syncPhase take iterator, send all events, then send liquid state in its current form, then return None as next state
+    // it guarantees to send solid and liquid states concatenated as they are at the moment of last tick
+    def syncTick(maybeFrom: Option[Int]): Task[Option[(Seq[BlockchainUpdated], Option[Int])]] = Task.eval {
+      maybeFrom match {
+        case None => None
+        case Some(from) =>
+          withReadLock {
+            val res = Seq.newBuilder[BlockchainUpdated]
+            res.sizeHint(BATCH_SIZE)
 
-              val iterator = db.iterator()
-              iterator.seek(blockKey(f))
-
-              val res = Seq.newBuilder[BlockchainUpdated]
-              res.sizeHint(BATCH_SIZE)
+            val iterator = db.iterator()
+            val isLastBatch = try {
+              iterator.seek(blockKey(from))
 
               @tailrec
-              def go(remaining: Int): Unit = {
+              def goUnsafe(remaining: Int): Boolean = {
                 if (remaining > 0 && iterator.hasNext) {
                   val next       = iterator.next()
                   val blockBytes = next.getValue
-                  if (blockBytes.nonEmpty) {
-                    PBBlockchainUpdated.parseFrom(blockBytes).vanilla match {
-                      case Success(value) =>
-                        res += value
-                        go(remaining - 1)
-                      case Failure(exception) => Task.raiseError(exception)
-                    }
-                  } else {
-                    Task.raiseError(new IllegalStateException(s"Empty block bytes in the database at height ${fromBlockKey(next.getKey)}"))
-                  }
+                  res += PBBlockchainUpdated.parseFrom(blockBytes).vanilla.get
+                  goUnsafe(remaining - 1)
+                } else {
+                  !iterator.hasNext
                 }
               }
 
-              go(BATCH_SIZE)
-
+              goUnsafe(BATCH_SIZE)
+            } catch {
+              case t: Throwable =>
+                Task.raiseError(t)
+                true
+            } finally {
               iterator.close()
+            }
 
-              val lastHistoricalBatch = res.result()
+            if (isLastBatch) {
+              // send all liquid state to the stream
+              liquidState.foreach {
+                case LiquidState(keyBlock, microBlocks) =>
+                  res += keyBlock
+                  res ++= microBlocks
+              }
 
-              val liquidStateUpdates = if (syncPhase) {
-                liquidState.toSeq.flatMap {
-                  case LiquidState(keyBlock, microBlocks) =>
-                    println(s"syncPhase, last from leveldb ${lastHistoricalBatch.last.toHeight}, liquidState at ${keyBlock.toHeight}")
-                    Seq(keyBlock) ++ microBlocks
-                }
-              } else Seq.empty
-
-              val nextState = if (syncPhase) None else lastHistoricalBatch.lastOption.map(_.toHeight + 1).orElse(from)
-
-              log.info(s"syncTick over, $from, current (updated?) height $height")
-
-              Some((lastHistoricalBatch ++ liquidStateUpdates, nextState))
+              Some((res.result(), None))
+            } else {
+              val result = res.result()
+              Some((result, result.lastOption.map(_.toHeight + 1)))
             }
           }
       }
+    }
 
-    val history: Observable[BlockchainUpdated] = Observable
+    val history = Observable
       .unfoldEval(from.some)(syncTick)
       .flatMap(Observable.fromIterable) // this gets us all historical updates
+      .map((Historical, _))
 
-    // todo do I need repeat? or smth like withLatestFrom
-    val lastEvent = history.last.repeat
+    val recent = recentUpdates.map((Recent, _))
 
-    // todo stream cancellation
-
-    Observable(
-      history,
-      recentUpdates
-        .zip(lastEvent)
-        .dropWhile {
-          case (recentUpd, lastHistorical) =>
-            println(s"recent ${recentUpd.toHeight}, historical ${lastHistorical.toHeight}")
-            recentUpd.toId != lastHistorical.toId
-        }
-        .tail
-        .map(_._1)
-    ).concat
-//    todo async requests in Tasks
-//    Task
-//      .evalAsync {
-//        def sendHistorical(from: Int): Unit = {
-//          var batchStart = from
-//          while (true) {
-//            getRange(batchStart, batchStart + BATCH_SIZE - 1) match {
-//              case Success(batch) =>
-//                log.info(s"Requested batch from ${batch.head.toHeight} to ${batch.last.toHeight}")
-//                for (ba <- batch) {
-//                  val ack = subject.onNext(ba)
-//                  ack match {
-//                    case Ack.Continue => ()
-//                    case Ack.Stop     => return
-//                  }
-//                }
-//                if (batch.length < BATCH_SIZE) return
-//                batchStart += BATCH_SIZE
-//              case Failure(exception) =>
-//                log.error("Failed to get range, [$from, ${from + BATCH_SIZE - 1}]")
-//                subject.onError(exception)
-//                return
-//            }
-//          }
-//        }
-
-//        sendHistorical(from)
+    (history ++ recent)
+    // the construct below is used to get lastHistorical event
+    // and based on it decide when to start streaming recent events
+      .mapAccumulate(none[BlockchainUpdated]) {
+        case (_, (Historical, ba)) => (Some(ba), Some(ba))
+        case (Some(lastHistorical), (Recent, recentUpdate)) =>
+          if (recentUpdate.toHeight > lastHistorical.toHeight) {
+            (Some(lastHistorical), Some(recentUpdate))
+          } else (Some(lastHistorical), None)
+        case _ => ???
+      }
+      .collect { case Some(value) => value }
   }
 }
 
+private[repo] sealed trait UpdateType
+private[repo] case object Historical extends UpdateType
+private[repo] case object Recent     extends UpdateType
+
 object UpdatesRepoImpl {
   private def blockKey(height: Int): Array[Byte] = ByteBuffer.allocate(8).putInt(height).array()
-
-  private def fromBlockKey(key: Array[Byte]): Int = ByteBuffer.wrap(key).getInt
 }

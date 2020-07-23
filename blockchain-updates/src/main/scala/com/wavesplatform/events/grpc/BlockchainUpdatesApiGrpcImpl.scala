@@ -36,18 +36,20 @@ class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo.Read with UpdatesRepo.Strea
         .subscribe({
           log.info(s"BlockchainUpdates started streaming updates from ${request.fromHeight}")
           new Observer[BlockchainUpdated] {
-            override def onNext(elem: BlockchainUpdated): Future[Ack] = {
+            override def onNext(elem: BlockchainUpdated): Future[Ack] = Future {
               log.info(s"Sending update ${elem.toHeight}, ${elem.toId}")
               try {
                 responseObserver.onNext(SubscribeEvent(update = Some(elem.protobuf)))
-                Future.successful(Continue)
+                Continue
               } catch {
                 case ex: StatusRuntimeException if ex.getStatus == Status.CANCELLED =>
                   log.info("BlockchainUpdates stream cancelled by client")
-                  Future.successful(Stop)
+                  responseObserver.onError(ex)
+                  Stop
                 case ex: Throwable =>
                   log.error("BlockchainUpdates gRPC streaming error", ex)
-                  Future.successful(Stop)
+                  responseObserver.onError(ex)
+                  Stop
               }
             }
             override def onError(ex: Throwable): Unit = {
