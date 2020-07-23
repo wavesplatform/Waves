@@ -4,51 +4,38 @@ import java.nio.ByteBuffer
 import java.util.concurrent.locks.{ReadWriteLock, ReentrantReadWriteLock}
 
 import cats.implicits._
+import com.wavesplatform.Shutdownable
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
+import com.wavesplatform.database.openDB
 import com.wavesplatform.events.protobuf.serde._
-import com.wavesplatform.events.{BlockAppended, BlockchainUpdated, MicroBlockAppended, MicroBlockRollbackCompleted, RollbackCompleted}
+import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
+import com.wavesplatform.events._
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
-import monix.execution.{Ack, Cancelable, Scheduler}
-import monix.reactive.OverflowStrategy.BackPressure
-import monix.reactive.observers.Subscriber
-import monix.reactive.{Observable, OverflowStrategy}
+import monix.execution.{Ack, Scheduler}
+import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
-import org.iq80.leveldb.DB
 
 import scala.annotation.tailrec
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}
 
-class UpdatesRepoImpl(db: DB)(implicit val scheduler: Scheduler)
+class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
     extends UpdatesRepo.Read
     with UpdatesRepo.Write
     with UpdatesRepo.Stream
-    with ScorexLogging {
+    with ScorexLogging
+    with Shutdownable {
   import UpdatesRepoImpl._
-
-  // synchronization for state and db
-  private val lock: ReadWriteLock = new ReentrantReadWriteLock()
-
-  // no need to persist liquid state. Keeping it mutable in a class, like in node itself
+  // STATE
+  private[this] val db                               = openDB(directory)
   private[this] var liquidState: Option[LiquidState] = None
+  private val lock: ReadWriteLock                    = new ReentrantReadWriteLock()
 
-  // A buffered replayable stream of recent updates for synchronization.
-  // A streaming subscriber will real leveldb + liquid state fully, then find exact place
-  // in recent events to start from, and continue from there
-  // todo buffer size establish
-  // todo handle long rollback (big buffer? find tollback event?)
-  val RECENT_UPDATES_BUFFER_SIZE  = 1024
-  private[this] val recentUpdates = ConcurrentSubject.replayLimited[BlockchainUpdated](RECENT_UPDATES_BUFFER_SIZE)
+  log.info(s"BlockchainUpdates extension opened db at ${directory}")
 
-  private[this] def sendToRecentUpdates(ba: BlockchainUpdated): Try[Unit] = {
-    recentUpdates.onNext(ba) match {
-      case Ack.Continue => Success(())
-      case Ack.Stop     => Failure(new IllegalStateException("recentUpdates stream sent Ack.Stop"))
-    }
-  }
+  override def shutdown(): Unit = db.close()
 
   private[this] def withReadLock[A](a: => A): A = {
     lock.readLock().lock()
@@ -65,6 +52,21 @@ class UpdatesRepoImpl(db: DB)(implicit val scheduler: Scheduler)
       a
     } finally {
       lock.writeLock().unlock()
+    }
+  }
+
+  // RECENT UPDATES STREAM
+  // A buffered replayable stream of recent updates for synchronization.
+  // A streaming subscriber will real leveldb + liquid state fully, then find exact place
+  // in recent events to start from, and continue from there
+  // todo buffer size establish
+  // todo handle long rollback (big buffer? find tollback event?)
+  val RECENT_UPDATES_BUFFER_SIZE  = 1024
+  private[this] val recentUpdates = ConcurrentSubject.replayLimited[BlockchainUpdated](RECENT_UPDATES_BUFFER_SIZE)
+  private[this] def sendToRecentUpdates(ba: BlockchainUpdated): Try[Unit] = {
+    recentUpdates.onNext(ba) match {
+      case Ack.Continue => Success(())
+      case Ack.Stop     => Failure(new IllegalStateException("recentUpdates stream sent Ack.Stop"))
     }
   }
 

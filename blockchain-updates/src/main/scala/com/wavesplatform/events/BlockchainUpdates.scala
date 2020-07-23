@@ -28,9 +28,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
   private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("blockchain-updates")
 
-  private[this] val db = openDB(settings.directory)
-  log.info(s"BlockchainUpdates extension opened db at ${settings.directory}")
-  private[this] val repo = new UpdatesRepoImpl(db)
+  private[this] val repo = new UpdatesRepoImpl(settings.directory)
 
   private[this] var grpcServer: Server     = null
   private[this] var httpServer: HttpServer = null
@@ -69,7 +67,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
       grpcServer.awaitTermination()
     }
 
-    db.close()
+    repo.shutdown()
   }
 
   override def onProcessBlock(block: Block, diff: BlockDiffer.DetailedDiff, minerReward: Option[Long], blockchainBefore: Blockchain): Unit = {
