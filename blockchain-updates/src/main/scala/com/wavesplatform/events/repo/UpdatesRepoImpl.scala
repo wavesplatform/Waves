@@ -90,7 +90,7 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
         log.debug(s"BlockchainUpdates extension requested non-existing block at height $height, current ${ls.keyBlock.toHeight}")
         Success(None)
       case _ =>
-        val bytes = db.get(blockKey(height))
+        val bytes = db.get(key(height))
         if (bytes.isEmpty) {
           Success(None)
         } else {
@@ -118,7 +118,7 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
     Try {
       liquidState.foreach { ls =>
         val solidBlock = ls.solidify()
-        val key        = blockKey(solidBlock.toHeight)
+        val key        = key(solidBlock.toHeight)
         db.put(key, solidBlock.protobuf.toByteArray)
       }
       liquidState = Some(LiquidState(blockAppended, Seq.empty))
@@ -136,11 +136,37 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
     }
   }
 
-  override def rollback(rollback: RollbackCompleted): Try[Unit] = ???
+  override def rollback(rollback: RollbackCompleted): Try[Unit] =
+    if (rollback.toHeight > height) {
+      Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback to a height higher than current"))
+    } else if (rollback.toHeight <= 0) {
+      Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback to a non-positive height"))
+    } else if (rollback.toHeight == height) {
+      Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback to current height"))
+    } else if (rollback.toHeight == height - 1) {
+      liquidState = None
+      Success(())
+    } else
+      withWriteLock {
+        val iter  = db.iterator()
+        val batch = db.createWriteBatch()
+        try {
+          iter.seek(key(rollback.toHeight))
+          iter.next
+          while (iter.hasNext) { batch.delete(iter.next.getKey) }
+          db.write(batch)
+          Success(())
+        } catch {
+          case t: Throwable => Failure(t)
+        } finally {
+          iter.close()
+          batch.close()
+        }
+      }
 
   override def rollbackMicroBlock(microBlockRollback: MicroBlockRollbackCompleted): Try[Unit] = withWriteLock {
     if (microBlockRollback.toHeight != height) {
-      Failure(new IllegalArgumentException("BlockchainUpdates MicroBlock rollback height was not equal to current height."))
+      Failure(new IllegalArgumentException("BlockchainUpdates microblock rollback height was not equal to current height"))
     } else {
       liquidState match {
         case Some(ls) =>
@@ -150,13 +176,13 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
           } else {
             val remainingMicroBlocks = ls.microBlocks.reverse.dropWhile(_.toId != microBlockRollback.toId).reverse
             if (remainingMicroBlocks.isEmpty) {
-              Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback a non-existing MicroBlock"))
+              Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback a non-existing microblock"))
             } else {
               liquidState = Some(ls.copy(microBlocks = remainingMicroBlocks))
               Success(())
             }
           }
-        case None => Failure(new IllegalStateException("BlockchainUpdates attempted to rollback MicroBlock without liquid state present"))
+        case None => Failure(new IllegalStateException("BlockchainUpdates attempted to rollback microblock without liquid state present"))
       }
     }
   }
@@ -182,7 +208,7 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
 
           val iterator = db.iterator()
           val isLastBatch = try {
-            iterator.seek(blockKey(from))
+            iterator.seek(key(from))
 
             @tailrec
             def goUnsafe(remaining: Int): Boolean = {
@@ -249,5 +275,5 @@ private[repo] case object Historical extends UpdateType
 private[repo] case object Recent     extends UpdateType
 
 object UpdatesRepoImpl {
-  private def blockKey(height: Int): Array[Byte] = ByteBuffer.allocate(8).putInt(height).array()
+  private def key(height: Int): Array[Byte] = ByteBuffer.allocate(8).putInt(height).array()
 }
