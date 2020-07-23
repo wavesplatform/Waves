@@ -1,6 +1,7 @@
 package com.wavesplatform.events.repo
 
 import java.nio.ByteBuffer
+import java.util.concurrent.locks.{ReadWriteLock, ReentrantReadWriteLock}
 
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
@@ -28,6 +29,9 @@ class UpdatesRepoImpl(db: DB)(implicit val scheduler: Scheduler)
     with ScorexLogging {
   import UpdatesRepoImpl._
 
+  // synchronization for state and db
+  private val lock: ReadWriteLock = new ReentrantReadWriteLock()
+
   // no need to persist liquid state. Keeping it mutable in a class, like in node itself
   private[this] var liquidState: Option[LiquidState] = None
 
@@ -46,10 +50,30 @@ class UpdatesRepoImpl(db: DB)(implicit val scheduler: Scheduler)
     }
   }
 
-  // Read
-  override def height: Int = liquidState.map(_.keyBlock.toHeight).getOrElse(0)
+  private[this] def withReadLock[A](a: => A): A = {
+    lock.readLock().lock()
+    try {
+      a
+    } finally {
+      lock.readLock().unlock()
+    }
+  }
 
-  override def updateForHeight(height: Int): Try[Option[BlockAppended]] = {
+  private[this] def withWriteLock[A](a: => A): A = {
+    lock.writeLock().lock()
+    try {
+      a
+    } finally {
+      lock.writeLock().unlock()
+    }
+  }
+
+  // Read
+  override def height: Int = withReadLock {
+    liquidState.map(_.keyBlock.toHeight).getOrElse(0)
+  }
+
+  override def updateForHeight(height: Int): Try[Option[BlockAppended]] = withReadLock {
     liquidState match {
       case Some(ls) if ls.keyBlock.toHeight == height =>
         log.debug(s"BlockchainUpdates extension requested liquid block at height $height")
@@ -74,24 +98,27 @@ class UpdatesRepoImpl(db: DB)(implicit val scheduler: Scheduler)
     }
   }
 
-  override def updatesRange(from: Int, to: Int): Try[Seq[BlockAppended]] = {
+  override def updatesRange(from: Int, to: Int): Try[Seq[BlockAppended]] = withReadLock {
     // todo error handling, limits and timeouts
-    log.info("Requesting stream")
-    Try(Await.result(streamRangeOneIter(from, to).bufferTumbling(to - from + 1).runAsyncGetLast, Duration.Inf).get)
+    log.info("Requesting updatesRange")
+    val cnt = to - from + 1
+    Try(Await.result(stream(from).collect { case u: BlockAppended => u }.take(cnt).bufferTumbling(cnt).runAsyncGetLast, Duration.Inf).get)
   }
 
   // Write
-  override def appendBlock(blockAppended: BlockAppended): Try[Unit] = Try {
-    liquidState.foreach { ls =>
-      val solidBlock = ls.solidify()
-      val key        = blockKey(solidBlock.toHeight)
-      db.put(key, solidBlock.protobuf.toByteArray)
+  override def appendBlock(blockAppended: BlockAppended): Try[Unit] = withWriteLock {
+    Try {
+      liquidState.foreach { ls =>
+        val solidBlock = ls.solidify()
+        val key        = blockKey(solidBlock.toHeight)
+        db.put(key, solidBlock.protobuf.toByteArray)
+      }
+      liquidState = Some(LiquidState(blockAppended, Seq.empty))
+      sendToRecentUpdates(blockAppended)
     }
-    liquidState = Some(LiquidState(blockAppended, Seq.empty))
-    sendToRecentUpdates(blockAppended)
   }
 
-  override def appendMicroBlock(microBlockAppended: MicroBlockAppended): Try[Unit] =
+  override def appendMicroBlock(microBlockAppended: MicroBlockAppended): Try[Unit] = withWriteLock {
     liquidState match {
       case Some(LiquidState(keyBlock, microBlocks)) =>
         liquidState = Some(LiquidState(keyBlock, microBlocks :+ microBlockAppended))
@@ -99,6 +126,7 @@ class UpdatesRepoImpl(db: DB)(implicit val scheduler: Scheduler)
       case None =>
         Failure(new IllegalStateException("Attempting to insert a microblock without a keyblock"))
     }
+  }
 
   override def rollback(rollback: RollbackCompleted): Try[Unit] = ???
 
@@ -122,53 +150,6 @@ class UpdatesRepoImpl(db: DB)(implicit val scheduler: Scheduler)
       case _         => ()
     }
 
-  // todo remove
-  private[repo] def streamRangeOneIter(from: Int, to: Int): Observable[BlockAppended] = {
-    Observable.create(OverflowStrategy.Unbounded) { sub =>
-      val iterator = db.iterator()
-      iterator.seek(blockKey(from))
-
-      var cancelled = false
-      val cancel = new Cancelable {
-        override def cancel(): Unit = {
-          cancelled = true
-          sub.onComplete()
-        }
-      }
-
-      @tailrec
-      def go(remaining: Int): Unit = {
-        if (remaining > 0 && iterator.hasNext && !cancelled) {
-          val next       = iterator.next()
-          val blockBytes = next.getValue
-          if (blockBytes.nonEmpty) {
-            PBBlockchainUpdated.parseFrom(blockBytes).vanilla match {
-              case Success(value) =>
-                value match {
-                  case b: BlockAppended =>
-                    sub.onNext(b) match {
-                      case Ack.Continue => go(remaining - 1)
-                      case Ack.Stop     => sub.onComplete()
-                    }
-                  case _ => sub.onError(new IllegalStateException(s"Incorrect type of update in the database at height ${fromBlockKey(next.getKey)}"))
-                }
-              case Failure(exception) => sub.onError(exception)
-            }
-          } else {
-            sub.onError(new IllegalStateException(s"Empty block bytes in the database at height ${fromBlockKey(next.getKey)}"))
-          }
-        }
-      }
-
-      go(to - from + 1)
-
-      iterator.close()
-      sub.onComplete()
-
-      cancel
-    }
-  }
-
   // Stream
   val BATCH_SIZE                = 10
   val BACK_PRESSURE_BUFFER_SIZE = 1000
@@ -183,51 +164,55 @@ class UpdatesRepoImpl(db: DB)(implicit val scheduler: Scheduler)
         case None => Task.eval(None)
         case Some(f) =>
           Task.evalAsync {
-            log.info(s"syncTick, $from")
-            val syncPhase = (height - f) <= BATCH_SIZE
-            // if syncPhase take iterator, send all events, then send liquid state in its current form, then return None as next state
+            withReadLock {
+              log.info(s"syncTick, $from, current height $height")
+              val syncPhase = (height - f) <= BATCH_SIZE
+              // if syncPhase take iterator, send all events, then send liquid state in its current form, then return None as next state
 
-            val iterator = db.iterator()
-            iterator.seek(blockKey(f))
+              val iterator = db.iterator()
+              iterator.seek(blockKey(f))
 
-            val res = Seq.newBuilder[BlockchainUpdated]
-            res.sizeHint(BATCH_SIZE)
+              val res = Seq.newBuilder[BlockchainUpdated]
+              res.sizeHint(BATCH_SIZE)
 
-            @tailrec
-            def go(remaining: Int): Unit = {
-              if (remaining > 0 && iterator.hasNext) {
-                val next       = iterator.next()
-                val blockBytes = next.getValue
-                if (blockBytes.nonEmpty) {
-                  PBBlockchainUpdated.parseFrom(blockBytes).vanilla match {
-                    case Success(value) =>
-                      res += value
-                      go(remaining - 1)
-                    case Failure(exception) => Task.raiseError(exception)
+              @tailrec
+              def go(remaining: Int): Unit = {
+                if (remaining > 0 && iterator.hasNext) {
+                  val next       = iterator.next()
+                  val blockBytes = next.getValue
+                  if (blockBytes.nonEmpty) {
+                    PBBlockchainUpdated.parseFrom(blockBytes).vanilla match {
+                      case Success(value) =>
+                        res += value
+                        go(remaining - 1)
+                      case Failure(exception) => Task.raiseError(exception)
+                    }
+                  } else {
+                    Task.raiseError(new IllegalStateException(s"Empty block bytes in the database at height ${fromBlockKey(next.getKey)}"))
                   }
-                } else {
-                  Task.raiseError(new IllegalStateException(s"Empty block bytes in the database at height ${fromBlockKey(next.getKey)}"))
                 }
               }
+
+              go(BATCH_SIZE)
+
+              iterator.close()
+
+              val lastHistoricalBatch = res.result()
+
+              val liquidStateUpdates = if (syncPhase) {
+                liquidState.toSeq.flatMap {
+                  case LiquidState(keyBlock, microBlocks) =>
+                    println(s"syncPhase, last from leveldb ${lastHistoricalBatch.last.toHeight}, liquidState at ${keyBlock.toHeight}")
+                    Seq(keyBlock) ++ microBlocks
+                }
+              } else Seq.empty
+
+              val nextState = if (syncPhase) None else lastHistoricalBatch.lastOption.map(_.toHeight + 1).orElse(from)
+
+              log.info(s"syncTick over, $from, current (updated?) height $height")
+
+              Some((lastHistoricalBatch ++ liquidStateUpdates, nextState))
             }
-
-            go(BATCH_SIZE)
-
-            iterator.close()
-
-            if (syncPhase) {
-              liquidState foreach {
-                case LiquidState(keyBlock, microBlocks) =>
-                  res += keyBlock
-                  res ++= microBlocks
-              }
-            }
-
-            val res1 = res.result()
-
-            val nextState = if (syncPhase) None else res1.lastOption.map(_.toHeight + 1).orElse(from)
-
-            Some((res1, nextState))
           }
       }
 
@@ -238,9 +223,19 @@ class UpdatesRepoImpl(db: DB)(implicit val scheduler: Scheduler)
     // todo do I need repeat? or smth like withLatestFrom
     val lastEvent = history.last.repeat
 
+    // todo stream cancellation
+
     Observable(
       history,
-      recentUpdates.zip(lastEvent).dropWhile { case (recentUpd, lastHistorical) => recentUpd.toId != lastHistorical.toId }.tail.map(_._1)
+      recentUpdates
+        .zip(lastEvent)
+        .dropWhile {
+          case (recentUpd, lastHistorical) =>
+            println(s"recent ${recentUpd.toHeight}, historical ${lastHistorical.toHeight}")
+            recentUpd.toId != lastHistorical.toId
+        }
+        .tail
+        .map(_._1)
     ).concat
 //    todo async requests in Tasks
 //    Task
