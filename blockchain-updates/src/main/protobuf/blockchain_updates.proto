@@ -6,20 +6,34 @@ option csharp_namespace = "Waves.Events.Grpc";
 import "events_temp.proto";
 
 service BlockchainUpdatesApi {
-    rpc GetForHeight (GetForHeightRequest) returns (GetForHeightResponse);
+    rpc GetBlockUpdate (GetBlockUpdateRequest) returns (GetBlockUpdateResponse);
+    rpc GetBlockRangeUpdates (GetBlockRangeUpdatesRequest) returns (GetBlockRangeUpdatesResponse);
     rpc Subscribe (SubscribeRequest) returns (stream SubscribeEvent);
 }
 
-message GetForHeightRequest {
+message GetBlockUpdateRequest {
     int32 height = 1;
 }
 
-message GetForHeightResponse {
+message GetBlockUpdateResponse {
     waves.events.BlockchainUpdated update = 1;
 }
 
-message SubscribeRequest {
+message GetBlockRangeUpdatesRequest {
+    // both required, inclusive
     int32 from_height = 1;
+    int32 to_height = 2;
+}
+
+message GetBlockRangeUpdatesResponse {
+    repeated waves.events.BlockchainUpdated update = 1;
+}
+
+message SubscribeRequest {
+    // Optional. Default: start at the genesis, height 1.
+    int32 from_height = 1;
+    // Optional. Default: stream historical, then switch to current events.
+    int32 to_height = 2;
 }
 
 message SubscribeEvent {
