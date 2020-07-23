@@ -9,6 +9,8 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.evaluator.FunctionIds._
+import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
@@ -88,11 +90,14 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
       BlockchainFeatures.DataTransaction.id     -> 0,
       BlockchainFeatures.MassTransfer.id        -> 0,
       BlockchainFeatures.FeeSponsorship.id      -> 0,
-      BlockchainFeatures.Ride4DApps.id          -> 0
+      BlockchainFeatures.Ride4DApps.id          -> 0,
+      BlockchainFeatures.BlockV5.id             -> 0
     )
   )
 
-  val allAllowed = ExprScript(TRUE).explicitGet()
+  val allAllowed = ExprScript(IF(FALSE,
+                                 TRUE,
+                                 FUNCTION_CALL(FunctionHeader.Native(EQ), List(CONST_STRING("q").explicitGet(), CONST_STRING("q").explicitGet())))).explicitGet()
 
   property("check pre-Ride4DApps scripts run count") {
     forAll(for {
@@ -363,6 +368,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
         case (blockDiff, _) =>
           blockDiff.scriptsRun shouldBe 31
           blockDiff.scriptsComplexity shouldBe (Script.estimate(allAllowed, ScriptEstimatorV2, useContractVerifierLimit = false).explicitGet() * 31)
+          blockDiff.spentComplexity shouldBe (2 * 31)
       }
     }) { x =>
       x
