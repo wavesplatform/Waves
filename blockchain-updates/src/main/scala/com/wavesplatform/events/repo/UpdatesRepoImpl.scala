@@ -28,7 +28,8 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
     with ScorexLogging
     with Shutdownable {
   import UpdatesRepoImpl._
-  // STATE
+
+  // State with locks
   private[this] val db                               = openDB(directory)
   private[this] var liquidState: Option[LiquidState] = None
   private val lock: ReadWriteLock                    = new ReentrantReadWriteLock()
@@ -55,13 +56,18 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
     }
   }
 
-  // RECENT UPDATES STREAM
-  // A buffered replayable stream of recent updates for synchronization.
-  // A streaming subscriber will real leveldb + liquid state fully, then find exact place
-  // in recent events to start from, and continue from there
-  // todo buffer size establish
-  // todo handle long rollback (big buffer? find tollback event?)
-  val RECENT_UPDATES_BUFFER_SIZE  = 1024
+  // Recent updates stream
+  /*
+  A limited buffered replayable stream of recent updates for synchronization.
+  A streaming subscriber will real leveldb + liquid state fully, then find exact place
+  in recent updates to start from, and continue from there.
+
+  Buffer size reasoning:
+  Let's assume max rollback to be a 100 blocks (current mainnet assumption).
+  On average, there are 12 microblocks per block. Add one microfork, get 13 events per block.
+  100 * 13 = 1300. 2048 should to be enough.
+   */
+  val RECENT_UPDATES_BUFFER_SIZE  = 2048
   private[this] val recentUpdates = ConcurrentSubject.replayLimited[BlockchainUpdated](RECENT_UPDATES_BUFFER_SIZE)
   private[this] def sendToRecentUpdates(ba: BlockchainUpdated): Try[Unit] = {
     recentUpdates.onNext(ba) match {
@@ -70,7 +76,7 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
     }
   }
 
-  // Read
+  // UpdatesRepo.Read impl
   override def height: Int = withReadLock {
     liquidState.map(_.keyBlock.toHeight).getOrElse(0)
   }
@@ -107,7 +113,7 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
     Try(Await.result(stream(from).collect { case u: BlockAppended => u }.take(cnt).bufferTumbling(cnt).runAsyncGetLast, Duration.Inf).get)
   }
 
-  // Write
+  // UpdatesRepo.Write impl
   override def appendBlock(blockAppended: BlockAppended): Try[Unit] = withWriteLock {
     Try {
       liquidState.foreach { ls =>
@@ -152,69 +158,76 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
       case _         => ()
     }
 
-  // Stream
-  val BATCH_SIZE                = 10
-  val BACK_PRESSURE_BUFFER_SIZE = 1000
+  // UpdatesRepo.Stream impl
+  val LEVELDB_READ_BATCH_SIZE = 1024
 
-  // todo maybe the stream should be back-pressured
-  // todo detect out-or-order events and throw exception
-  override def stream(from: Int): Observable[BlockchainUpdated] = {
-    // it guarantees to send solid and liquid states concatenated as they are at the moment of last tick
-    def syncTick(maybeFrom: Option[Int]): Task[Option[(Seq[BlockchainUpdated], Option[Int])]] = Task.eval {
-      maybeFrom match {
-        case None => None
-        case Some(from) =>
-          withReadLock {
-            val res = Seq.newBuilder[BlockchainUpdated]
-            res.sizeHint(BATCH_SIZE)
+  // todo detect out-or-order events and throw an exception, or at least log an error
+  override def stream(fromHeight: Int): Observable[BlockchainUpdated] = {
+    /**
+      * reads from level db by synchronous batches each using one iterator
+      * each batch gets a read lock
+      * last batch also includes liquid state appended at the end
+      * @param startingFrom batch start height
+      * @return Task to be consumed by Observable.unfoldEval
+      */
+    def readBatch(startingFrom: Option[Int]): Task[Option[(Seq[BlockchainUpdated], Option[Int])]] = Task.eval {
+      startingFrom map { from =>
+        withReadLock {
+          val res = Seq.newBuilder[BlockchainUpdated]
+          res.sizeHint(LEVELDB_READ_BATCH_SIZE)
 
-            val iterator = db.iterator()
-            val isLastBatch = try {
-              iterator.seek(blockKey(from))
+          val iterator = db.iterator()
+          val isLastBatch = try {
+            iterator.seek(blockKey(from))
 
-              @tailrec
-              def goUnsafe(remaining: Int): Boolean = {
-                if (remaining > 0 && iterator.hasNext) {
-                  val next       = iterator.next()
-                  val blockBytes = next.getValue
-                  res += PBBlockchainUpdated.parseFrom(blockBytes).vanilla.get
-                  goUnsafe(remaining - 1)
-                } else {
-                  !iterator.hasNext
-                }
+            @tailrec
+            def goUnsafe(remaining: Int): Boolean = {
+              if (remaining > 0 && iterator.hasNext) {
+                val next       = iterator.next()
+                val blockBytes = next.getValue
+                res += PBBlockchainUpdated.parseFrom(blockBytes).vanilla.get
+                goUnsafe(remaining - 1)
+              } else {
+                !iterator.hasNext
               }
-
-              goUnsafe(BATCH_SIZE)
-            } catch {
-              case t: Throwable =>
-                Task.raiseError(t)
-                true
-            } finally {
-              iterator.close()
             }
 
-            if (isLastBatch) {
-              // send all liquid state to the stream
-              liquidState.foreach(res ++= _.toSeq)
-              Some((res.result(), None))
-            } else {
-              val result = res.result()
-              Some((result, result.lastOption.map(_.toHeight + 1)))
-            }
+            goUnsafe(LEVELDB_READ_BATCH_SIZE)
+          } catch {
+            case t: Throwable =>
+              Task.raiseError(t)
+              true
+          } finally {
+            iterator.close()
           }
+
+          if (isLastBatch) {
+            // send all liquid state to the stream
+            liquidState.foreach(res ++= _.toSeq)
+            (res.result(), None)
+          } else {
+            val result       = res.result()
+            val nextTickFrom = result.lastOption.map(_.toHeight + 1)
+            (result, nextTickFrom)
+          }
+        }
       }
     }
 
-    val history = Observable
-      .unfoldEval(from.some)(syncTick)
-      .flatMap(Observable.fromIterable) // this gets us all historical updates
+    val historical = Observable
+      .unfoldEval(fromHeight.some)(readBatch)
+      .flatMap(Observable.fromIterable)
       .map((Historical, _))
 
     val recent = recentUpdates.map((Recent, _))
 
-    (history ++ recent)
-    // the construct below is used to get lastHistorical event
-    // and based on it decide when to start streaming recent events
+    /*
+    Recent events is a buffered stream, so they overlap with historical.
+    Some of the recent events need to be dropped.
+    The construct below is used to get lastHistorical event
+    and, based on it, to decide when to append recent events.
+     */
+    (historical ++ recent)
       .mapAccumulate(none[BlockchainUpdated]) {
         case (_, (Historical, ba)) => (Some(ba), Some(ba))
         case (Some(lastHistorical), (Recent, recentUpdate)) =>
