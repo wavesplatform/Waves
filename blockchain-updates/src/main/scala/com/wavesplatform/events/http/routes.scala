@@ -8,12 +8,12 @@ import com.wavesplatform.events.repo.UpdatesRepo
 import scala.util.{Failure, Success}
 
 private[http] object routes {
-  class GetUpdatesAt(repo: UpdatesRepo) extends ApiRoute {
+  class GetUpdatesAt(repo: UpdatesRepo.Read) extends ApiRoute {
     import HttpServer._
 
     override def route: Route = get {
       path("at" / IntNumber) { height =>
-        repo.getForHeight(height) match {
+        repo.updateForHeight(height) match {
           case Success(Some(upd)) => complete(blockchainUpdatedWrites.writes(upd))
           case Success(None)      => complete(StatusCodes.NoContent)
           case Failure(exception) =>
@@ -24,12 +24,12 @@ private[http] object routes {
     }
   }
 
-  class GetUpdatesSeq(repo: UpdatesRepo) extends ApiRoute {
+  class GetUpdatesSeq(repo: UpdatesRepo.Read) extends ApiRoute {
     import HttpServer._
 
     override def route: Route = get {
       path("seq" / IntNumber / IntNumber) { (from, to) =>
-        repo.getRange(from, to) match {
+        repo.updatesRange(from, to) match {
           case Success(upds) => complete(upds.map(blockchainUpdatedWrites.writes))
           case Failure(exception) =>
             log.error(s"Failed to get block appends for range [$from, $to]", exception)

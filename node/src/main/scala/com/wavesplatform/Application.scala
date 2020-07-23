@@ -423,12 +423,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   def shutdown(utx: UtxPool, network: NS): Unit =
     if (shutdownInProgress.compareAndSet(false, true)) {
-
-      if (extensions.nonEmpty) {
-        log.info(s"Shutting down extensions")
-        Await.ready(Future.sequence(extensions.map(_.shutdown())), settings.extensionsShutdownTimeout)
-      }
-
       spendableBalanceChanged.onComplete()
       utx.close()
 
@@ -462,6 +456,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       log.info("Closing storage")
       db.close()
+
+      // extensions should be shut down last, after all node functionality, to guarantee no data loss
+      if (extensions.nonEmpty) {
+        log.info(s"Shutting down extensions")
+        Await.ready(Future.sequence(extensions.map(_.shutdown())), settings.extensionsShutdownTimeout)
+      }
 
       time.close()
       log.info("Shutdown complete")

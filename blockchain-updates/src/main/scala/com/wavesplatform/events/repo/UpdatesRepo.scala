@@ -1,30 +1,34 @@
 package com.wavesplatform.events.repo
 
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.events.{BlockAppended, BlockchainUpdated, MicroBlockAppended}
+import com.wavesplatform.events.{BlockAppended, BlockchainUpdated, MicroBlockAppended, MicroBlockRollbackCompleted, RollbackCompleted}
 import monix.reactive.Observable
 
 import scala.util.Try
 
-trait UpdatesRepo {
-  def height: Int
+object UpdatesRepo {
+  trait Read {
+    def height: Int
 
-  // infallible operations
-  def getLiquidState(): Option[LiquidState]
+    def updateForHeight(height: Int): Try[Option[BlockAppended]]
 
-  def dropLiquidState(afterId: Option[ByteStr] = None): Unit
+    // inclusive from both sides
+    def updatesRange(from: Int, to: Int): Try[Seq[BlockAppended]]
+  }
 
-  // fallible operations
-  def appendMicroBlock(microBlockAppended: MicroBlockAppended): Try[Unit]
+  trait Write {
+    //  def dropLiquidState(afterId: Option[ByteStr] = None): Unit
 
-  def appendBlock(blockAppended: BlockAppended): Try[Unit]
+    def appendMicroBlock(microBlockAppended: MicroBlockAppended): Try[Unit]
 
-  def removeAfter(height: Int): Try[Unit]
+    def appendBlock(blockAppended: BlockAppended): Try[Unit]
 
-  def getForHeight(height: Int): Try[Option[BlockAppended]]
+    def rollback(rollback: RollbackCompleted): Try[Unit]
 
-  // inclusive from both sides
-  def getRange(from: Int, to: Int): Try[Seq[BlockAppended]]
+    def rollbackMicroBlock(microBlockRollback: MicroBlockRollbackCompleted): Try[Unit]
+  }
 
-  def stream(from: Int): Observable[BlockchainUpdated]
+  trait Stream {
+    // inclusive
+    def stream(from: Int): Observable[BlockchainUpdated]
+  }
 }

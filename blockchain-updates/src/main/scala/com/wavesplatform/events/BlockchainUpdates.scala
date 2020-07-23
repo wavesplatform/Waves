@@ -28,20 +28,15 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
   private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("blockchain-updates")
 
-  private[this] val currentUpdates = ConcurrentSubject.publish[BlockchainUpdated]
-
   private[this] val db = openDB(settings.directory)
   log.info(s"BlockchainUpdates extension opened db at ${settings.directory}")
-  private[this] val repo = new UpdatesRepoImpl(db, currentUpdates)
+  private[this] val repo = new UpdatesRepoImpl(db)
 
   private[this] var grpcServer: Server     = null
   private[this] var httpServer: HttpServer = null
 
   override def start(): Unit = {
     log.info("BlockchainUpdates extension starting")
-
-    // ensure there is no liquid state remaining (from previous restart/crash, etc.)
-    repo.dropLiquidState()
 
     // starting gRPC API
     val bindAddress = new InetSocketAddress("0.0.0.0", settings.grpcPort)
@@ -63,12 +58,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
   // todo proper shutdown
   override def shutdown(): Future[Unit] = Future {
-    log.info("BlockchainUpdates extension shutting down")
-
-    // node does not persist liquid state, neither should the extension
-    if (repo != null) {
-      repo.dropLiquidState()
-    }
+    log.info(s"BlockchainUpdates extension shutting down, last persisted height ${repo.height - 1}")
 
     if (httpServer != null) {
       httpServer.shutdown()
@@ -82,15 +72,13 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     db.close()
   }
 
-  // todo stream events to already subscribed clients
-  // for now, only updating database
   override def onProcessBlock(block: Block, diff: BlockDiffer.DetailedDiff, minerReward: Option[Long], blockchainBefore: Blockchain): Unit = {
     val newBlock = BlockAppended.from(block, diff, minerReward, blockchainBefore)
-    log.info(s"Receiving block ${newBlock.toHeight}")
     repo.appendBlock(newBlock)
-    currentUpdates.onNext(newBlock)
-    if (newBlock.toHeight > 100) {
-      Thread.sleep(5000)
+    // todo log.debug, and make it every 100 blocks, like in BlockchainUpdater
+    if (newBlock.toHeight % 100 == 0) {
+      log.info(s"BlockchainUpdates extension appended blocks up to ${newBlock.toHeight}")
+//      Thread.sleep(5000)
     }
   }
 
@@ -102,16 +90,15 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   ): Unit = {
     val newMicroBlock = MicroBlockAppended.from(microBlock, diff, blockchainBefore, totalBlockId)
     repo.appendMicroBlock(newMicroBlock)
-    currentUpdates.onNext(newMicroBlock)
   }
 
   override def onRollback(toBlockId: ByteStr, toHeight: Int): Unit = {
-    repo.removeAfter(toHeight)
-    currentUpdates.onNext(RollbackCompleted(toBlockId, toHeight))
+    val rollbackCompleted = RollbackCompleted(toBlockId, toHeight)
+    repo.rollback(rollbackCompleted)
   }
 
   override def onMicroBlockRollback(toBlockId: ByteStr, height: Int): Unit = {
-    repo.dropLiquidState(Some(toBlockId))
-    currentUpdates.onNext(MicroBlockRollbackCompleted(toBlockId, height))
+    val microBlockRollbackCompleted = MicroBlockRollbackCompleted(toBlockId, height)
+    repo.rollbackMicroBlock(microBlockRollbackCompleted)
   }
 }

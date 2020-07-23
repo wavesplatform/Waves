@@ -8,21 +8,21 @@ import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.StreamObserver
 import monix.execution.{Ack, Scheduler}
 import io.grpc.{Status, StatusRuntimeException}
-import monix.execution.Ack.Continue
+import monix.execution.Ack.{Continue, Stop}
 import monix.reactive.Observer
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo)(implicit sc: Scheduler)
+class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo.Read with UpdatesRepo.Stream)(implicit sc: Scheduler)
     extends BlockchainUpdatesApiGrpc.BlockchainUpdatesApi
     with ScorexLogging {
   override def getForHeight(request: GetForHeightRequest): Future[GetForHeightResponse] = Future {
-    repo.getForHeight(request.height) match {
+    repo.updateForHeight(request.height) match {
       case Success(Some(upd)) => GetForHeightResponse(Some(upd.protobuf))
       case Success(None)      => throw new StatusRuntimeException(Status.NOT_FOUND)
       case Failure(exception) =>
-        log.error(s"Failed to get block append for height ${request.height}", exception)
+        log.error(s"BlockchainUpdates failed to get block append for height ${request.height}", exception)
         throw new StatusRuntimeException(Status.INTERNAL)
     }
   }
@@ -34,16 +34,24 @@ class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo)(implicit sc: Scheduler)
       repo
         .stream(request.fromHeight)
         .subscribe({
-          log.info("Subscribed")
+          log.info(s"BlockchainUpdates started streaming updates from ${request.fromHeight}")
           new Observer[BlockchainUpdated] {
             override def onNext(elem: BlockchainUpdated): Future[Ack] = {
               log.info(s"Sending update ${elem.toHeight}, ${elem.toId}")
-              // todo handle exception
-              responseObserver.onNext(SubscribeEvent(update = Some(elem.protobuf)))
-              Future.successful(Continue)
+              try {
+                responseObserver.onNext(SubscribeEvent(update = Some(elem.protobuf)))
+                Future.successful(Continue)
+              } catch {
+                case ex: StatusRuntimeException if ex.getStatus == Status.CANCELLED =>
+                  log.info("BlockchainUpdates stream cancelled by client")
+                  Future.successful(Stop)
+                case ex: Throwable =>
+                  log.error("BlockchainUpdates gRPC streaming error", ex)
+                  Future.successful(Stop)
+              }
             }
             override def onError(ex: Throwable): Unit = {
-              log.error("Streaming updaes failed with error", ex)
+              log.error("BlockchainUpdates gRPC streaming error", ex)
               responseObserver.onError(new StatusRuntimeException(Status.INTERNAL))
             }
             override def onComplete(): Unit = responseObserver.onCompleted()

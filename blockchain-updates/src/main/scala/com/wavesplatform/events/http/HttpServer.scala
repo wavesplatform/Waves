@@ -15,7 +15,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Try
 
-class HttpServer(port: Int, repo: UpdatesRepo)(implicit actorSystem: ActorSystem) extends ScorexLogging {
+class HttpServer(port: Int, repo: UpdatesRepo.Read)(implicit actorSystem: ActorSystem) extends ScorexLogging {
   private[this] val combinedRoute = new routes.GetUpdatesAt(repo).route ~
     new routes.GetUpdatesSeq(repo).route ~
     complete(StatusCodes.NotFound)
