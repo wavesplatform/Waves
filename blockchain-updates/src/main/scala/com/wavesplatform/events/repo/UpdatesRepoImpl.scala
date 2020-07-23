@@ -5,7 +5,6 @@ import java.util.concurrent.locks.{ReadWriteLock, ReentrantReadWriteLock}
 
 import cats.implicits._
 import com.wavesplatform.Shutdownable
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
@@ -120,8 +119,10 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
     Try {
       liquidState.foreach { ls =>
         val solidBlock = ls.solidify()
-        val key        = key(solidBlock.toHeight)
-        db.put(key, solidBlock.protobuf.toByteArray)
+        db.put(
+          key(solidBlock.toHeight),
+          solidBlock.protobuf.toByteArray
+        )
       }
       liquidState = Some(LiquidState(blockAppended, Seq.empty))
       sendToRecentUpdates(blockAppended)
