@@ -1,4 +1,4 @@
-package com.wavesplatform.events.http
+package com.wavesplatform.events.api.rest
 
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
@@ -7,7 +7,7 @@ import com.wavesplatform.events.repo.UpdatesRepo
 
 import scala.util.{Failure, Success}
 
-private[http] object routes {
+private[rest] object routes {
   class GetUpdatesAt(repo: UpdatesRepo.Read) extends ApiRoute {
     import HttpServer._
 

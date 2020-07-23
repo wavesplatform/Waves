@@ -4,9 +4,9 @@ import java.net.InetSocketAddress
 
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.events.grpc.BlockchainUpdatesApiGrpcImpl
-import com.wavesplatform.events.grpc.protobuf.BlockchainUpdatesApiGrpc
-import com.wavesplatform.events.http.HttpServer
+import com.wavesplatform.events.api.grpc.BlockchainUpdatesApiGrpcImpl
+import com.wavesplatform.events.api.grpc.protobuf.BlockchainUpdatesApiGrpc
+import com.wavesplatform.events.api.rest.HttpServer
 import com.wavesplatform.events.repo.UpdatesRepoImpl
 import com.wavesplatform.events.settings.BlockchainUpdatesSettings
 import com.wavesplatform.extensions.{Context, Extension}

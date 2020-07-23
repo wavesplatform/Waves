@@ -1,11 +1,9 @@
-package com.wavesplatform.events.http
+package com.wavesplatform.events.api.rest
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.Route
-import com.wavesplatform.api.http.ApiRoute
 import com.wavesplatform.events._
 import com.wavesplatform.events.repo.UpdatesRepo
 import com.wavesplatform.utils.ScorexLogging
