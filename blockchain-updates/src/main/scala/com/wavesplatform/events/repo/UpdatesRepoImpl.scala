@@ -89,6 +89,8 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
       case Some(ls) if ls.keyBlock.toHeight < height =>
         log.debug(s"BlockchainUpdates extension requested non-existing block at height $height, current ${ls.keyBlock.toHeight}")
         Success(None)
+      case _ if height <= 0 =>
+        Failure(new IllegalArgumentException("BlockchainUpdates asked for an update at a non-positive height"))
       case _ =>
         val bytes = db.get(key(height))
         if (bytes.isEmpty) {
