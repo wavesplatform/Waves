@@ -38,6 +38,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
     val priorityTx         = pt()
     waitForEmptyUtx()
     waitForHeightArise()
+    waitForEmptyUtx()
     checker(txs, priorityTx) // hardened
   }
 
@@ -98,7 +99,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
       invalid
     }
 
-    def updateAssetScript(result: Boolean, asset: String, owner: KeyPair, fee: Long): String = {
+    def updateAssetScript(result: Boolean, asset: String, owner: KeyPair, fee: Long, waitForTx: Boolean = true): String = {
       sender
         .setAssetScript(
           asset,
@@ -120,7 +121,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
               .bytes()
               .base64
           ),
-          waitForTx = true
+          waitForTx = waitForTx
         )
         .id
     }

@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.transactions
 
 import com.google.common.primitives.Longs
 import com.typesafe.config.Config
-import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAccountScript
+import com.wavesplatform.api.http.ApiError.{ScriptExecutionError, TransactionNotAllowedByAccountScript, TransactionNotAllowedByAssetScript}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.http.DebugMessage
@@ -28,15 +28,15 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
   import restApi._
 
   private lazy val contract = sender.createKeyPair()
-  private def caller   = thirdKeyPair
+  private def caller        = thirdKeyPair
 
   private val assetAmount    = 1000000000L
   private var smartAsset     = ""
   private var sponsoredAsset = ""
 
-  private def seller         = firstKeyPair
-  private def buyer          = secondKeyPair
-  private def matcher        = thirdKeyPair
+  private def seller  = firstKeyPair
+  private def buyer   = secondKeyPair
+  private def matcher = thirdKeyPair
 
   private def sellerAddress  = firstKeyPair
   private def buyerAddress   = secondKeyPair
@@ -128,6 +128,23 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     sender.setScript(contract, Some(script), setScriptFee, waitForTx = true).id
   }
 
+  test("InvokeScriptTransaction: broadcast fails on failed tx") {
+    val invokeFee    = 0.005.waves
+    val priorityData = List(StringDataEntry("crash", "yes"))
+    val putDataFee   = calcDataFee(priorityData, 1)
+    val priorityFee  = putDataFee + invokeFee
+
+    val prevBalance = sender.balance(caller.toAddress.toString).balance
+
+    sender.putData(contract, priorityData, priorityFee, waitForTx = true)
+    assertApiError(
+      sender.invokeScript(caller, contractAddress, Some("canThrow"), fee = invokeFee),
+      AssertiveApiError(ScriptExecutionError.Id, "Error while executing account-script: Crashed by dApp")
+    )
+    waitForEmptyUtx()
+    sender.balance(caller.toAddress.toString).balance shouldBe prevBalance
+  }
+
   test("InvokeScriptTransaction: dApp error propagates failed transaction") {
     val invokeFee    = 0.005.waves
     val priorityData = List(StringDataEntry("crash", "yes"))
@@ -136,6 +153,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     val prevBalance = sender.balance(caller.toAddress.toString).balance
 
+    overflowBlock()
     sendPriorityTxAndThenOtherTxs(
       _ => sender.invokeScript(caller, contractAddress, Some("canThrow"), fee = invokeFee)._1.id,
       () => sender.putData(contract, priorityData, priorityFee).id
@@ -279,7 +297,9 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
         .assetsBalance(contractAddress)
         .balances
         .map(_.assetId) should contain theSameElementsAs prevAssets ++ includePaymentAsset
-      sender.assetBalance(caller.toAddress.toString, paymentAsset) shouldBe prevPaymentAssetBalance.copy(balance = prevPaymentAssetBalance.balance + paymentDelta)
+      sender.assetBalance(caller.toAddress.toString, paymentAsset) shouldBe prevPaymentAssetBalance.copy(
+        balance = prevPaymentAssetBalance.balance + paymentDelta
+      )
 
       failed.foreach { s =>
         checkStateChange(sender.debugStateChanges(s.id), 4, "Transaction is not allowed by script of the asset")
@@ -423,6 +443,8 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     updateAccountScript(None, caller, setScriptFee + smartFee)
     updateTikTok("reissue", setAssetScriptMinFee)
     updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
+    waitForEmptyUtx()
+    overflowBlock()
 
     val failedTxs = sendPriorityTxAndThenOtherTxs(
       _ => sender.invokeScript(caller, contractAddress, Some("tikTok"), fee = invokeFee)._1.id,
@@ -456,18 +478,48 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       Seq((amountAsset, sellerAddress), (priceAsset, buyerAddress), (sellFeeAsset, matcherAddress), (buyFeeAsset, matcherAddress))
 
     for ((invalidScriptAsset, owner) <- allCases) {
-      val txsSend = (_: Int) => {
-        val tx = mkExchange(buyer, seller, matcher, assetPair, fee, buyFeeAsset, sellFeeAsset, buyMatcherFee, sellMatcherFee)
-        sender.signedBroadcast(tx.json()).id
-      }
-
+      overflowBlock()
       sendPriorityTxAndThenOtherTxs(
-        txsSend,
-        () => updateAssetScript(result = false, invalidScriptAsset, owner, priorityFee)
+        _ =>
+          sender
+            .signedBroadcast(mkExchange(buyer, seller, matcher, assetPair, fee, buyFeeAsset, sellFeeAsset, buyMatcherFee, sellMatcherFee).json())
+            .id,
+        () => updateAssetScript(result = false, invalidScriptAsset, owner, priorityFee, waitForTx = false)
       ) { (txs, priorityTx) =>
         logPriorityTx(priorityTx)
         assertFailedTxs(txs)
       }
+      updateAssetScript(result = true, invalidScriptAsset, owner, setAssetScriptFee + smartFee)
+    }
+  }
+
+  test("ExchangeTransaction: invalid exchange tx when asset script fails on broadcast") {
+    val init = Seq(
+      sender.setScript(firstKeyPair, None, setScriptFee + smartFee).id,
+      sender.setScript(secondKeyPair, None, setScriptFee + smartFee).id,
+      sender.setScript(thirdKeyPair, None, setScriptFee + smartFee).id
+    )
+    waitForTxs(init)
+
+    val Precondition(amountAsset, priceAsset, buyFeeAsset, sellFeeAsset) =
+      exchangePreconditions(Some(ScriptCompiler.compile("true", ScriptEstimatorV3).explicitGet()._1.bytes().base64))
+
+    val assetPair      = AssetPair.createAssetPair(amountAsset, priceAsset).get
+    val fee            = 0.003.waves + 4 * smartFee
+    val sellMatcherFee = fee / 100000L
+    val buyMatcherFee  = fee / 100000L
+
+    val allCases =
+      Seq((amountAsset, sellerAddress), (priceAsset, buyerAddress), (sellFeeAsset, matcherAddress), (buyFeeAsset, matcherAddress))
+
+    for ((invalidScriptAsset, owner) <- allCases) {
+      updateAssetScript(result = false, invalidScriptAsset, owner, setAssetScriptFee + smartFee)
+      val tx = mkExchange(buyer, seller, matcher, assetPair, fee, buyFeeAsset, sellFeeAsset, buyMatcherFee, sellMatcherFee)
+      assertApiError(
+        sender.signedBroadcast(tx.json()),
+        AssertiveApiError(TransactionNotAllowedByAssetScript.Id, "Transaction is not allowed by token-script")
+      )
+      assertInvalidTxs(Seq(tx.id().toString))
       updateAssetScript(result = true, invalidScriptAsset, owner, setAssetScriptFee + smartFee)
     }
   }
@@ -640,8 +692,10 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     waitForTxs(preconditions)
 
-    val transferToSeller = sender.transfer(matcherAddress, sellerAddress.toAddress.toString, 1000000000, fee = minFee + smartFee, assetId = Some(sellFeeAsset)).id
-    val transferToBuyer  = sender.transfer(matcherAddress, buyerAddress.toAddress.toString, 1000000000, fee = minFee + smartFee, assetId = Some(buyFeeAsset)).id
+    val transferToSeller =
+      sender.transfer(matcherAddress, sellerAddress.toAddress.toString, 1000000000, fee = minFee + smartFee, assetId = Some(sellFeeAsset)).id
+    val transferToBuyer =
+      sender.transfer(matcherAddress, buyerAddress.toAddress.toString, 1000000000, fee = minFee + smartFee, assetId = Some(buyFeeAsset)).id
 
     waitForTxs(Seq(transferToSeller, transferToBuyer))
 
