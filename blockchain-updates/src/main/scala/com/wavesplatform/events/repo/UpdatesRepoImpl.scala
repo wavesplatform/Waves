@@ -195,12 +195,7 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
 
             if (isLastBatch) {
               // send all liquid state to the stream
-              liquidState.foreach {
-                case LiquidState(keyBlock, microBlocks) =>
-                  res += keyBlock
-                  res ++= microBlocks
-              }
-
+              liquidState.foreach(res ++= _.toSeq)
               Some((res.result(), None))
             } else {
               val result = res.result()

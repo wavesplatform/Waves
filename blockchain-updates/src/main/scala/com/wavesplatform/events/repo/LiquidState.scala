@@ -1,7 +1,7 @@
 package com.wavesplatform.events.repo
 
 import cats.syntax.monoid._
-import com.wavesplatform.events.{BlockAppended, MicroBlockAppended}
+import com.wavesplatform.events.{BlockAppended, BlockchainUpdated, MicroBlockAppended}
 
 case class LiquidState(
     keyBlock: BlockAppended,
@@ -27,4 +27,6 @@ case class LiquidState(
       transactionStateUpdates = transactionStateUpdates
     )
   }
+
+  def toSeq: Seq[BlockchainUpdated] = Seq(keyBlock) ++ microBlocks
 }
