@@ -132,37 +132,41 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
         liquidState = Some(LiquidState(keyBlock, microBlocks :+ microBlockAppended))
         sendToRecentUpdates(microBlockAppended)
       case None =>
-        Failure(new IllegalStateException("Attempting to insert a microblock without a keyblock"))
+        Failure(new IllegalStateException("BlockchainUpdates attempted to insert a microblock without a keyblock"))
     }
   }
 
   override def rollback(rollback: RollbackCompleted): Try[Unit] = ???
 
-  override def rollbackMicroBlock(microBlockRollback: MicroBlockRollbackCompleted): Try[Unit] = ???
-
-  // todo remove
-  private[this] def dropLiquidState(afterId: Option[ByteStr]): Unit =
-    (afterId, liquidState) match {
-      case (Some(id), Some(LiquidState(keyBlock, microBlocks))) =>
-        if (keyBlock.toId == id) {
-          // rollback to key block
-          liquidState = Some(LiquidState(keyBlock, Seq.empty))
-        } else {
-          // otherwise, rollback to a microblock
-          val index = microBlocks.indexWhere(_.toId == id)
-          if (index != -1) {
-            liquidState = Some(LiquidState(keyBlock, microBlocks.dropRight(microBlocks.length - index - 1)))
+  override def rollbackMicroBlock(microBlockRollback: MicroBlockRollbackCompleted): Try[Unit] = withWriteLock {
+    if (microBlockRollback.toHeight != height) {
+      Failure(new IllegalArgumentException("BlockchainUpdates MicroBlock rollback height was not equal to current height."))
+    } else {
+      liquidState match {
+        case Some(ls) =>
+          if (microBlockRollback.toId == ls.keyBlock.toId) {
+            liquidState = Some(ls.copy(microBlocks = Seq.empty))
+            Success(())
+          } else {
+            val remainingMicroBlocks = ls.microBlocks.reverse.dropWhile(_.toId != microBlockRollback.toId).reverse
+            if (remainingMicroBlocks.isEmpty) {
+              Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback a non-existing MicroBlock"))
+            } else {
+              liquidState = Some(ls.copy(microBlocks = remainingMicroBlocks))
+              Success(())
+            }
           }
-        }
-      case (None, _) => liquidState = None
-      case _         => ()
+        case None => Failure(new IllegalStateException("BlockchainUpdates attempted to rollback MicroBlock without liquid state present"))
+      }
     }
+  }
 
   // UpdatesRepo.Stream impl
   val LEVELDB_READ_BATCH_SIZE = 1024
 
   // todo detect out-or-order events and throw an exception, or at least log an error
   override def stream(fromHeight: Int): Observable[BlockchainUpdated] = {
+
     /**
       * reads from level db by synchronous batches each using one iterator
       * each batch gets a read lock
