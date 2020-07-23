@@ -2,24 +2,21 @@ package com.wavesplatform.events
 
 import java.net.InetSocketAddress
 
-import cats.syntax.monoid._
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.events.repo.UpdatesRepoImpl
 import com.wavesplatform.events.grpc.BlockchainUpdatesApiGrpcImpl
 import com.wavesplatform.events.grpc.protobuf.BlockchainUpdatesApiGrpc
 import com.wavesplatform.events.http.HttpServer
-import com.wavesplatform.extensions.{Context, Extension}
-import net.ceedubs.ficus.Ficus._
+import com.wavesplatform.events.repo.UpdatesRepoImpl
 import com.wavesplatform.events.settings.BlockchainUpdatesSettings
+import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.Server
 import io.grpc.netty.NettyServerBuilder
 import monix.execution.Scheduler
-import com.wavesplatform.database.openDB
-import monix.reactive.subjects.{ConcurrentSubject, Subject}
+import net.ceedubs.ficus.Ficus._
 
 import scala.concurrent.Future
 
