@@ -1,7 +1,6 @@
 package com.wavesplatform.it.repl
 
 import com.typesafe.config.Config
-import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.features.BlockchainFeatures
@@ -14,7 +13,6 @@ import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.Ignore
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -32,7 +30,6 @@ class ReplTest extends BaseSuite {
   "waves context" in {
     val issuer = miner.createKeyPair()
     val sample = miner.createKeyPair()
-    val ikey   = KeyPair(Base58.decode(miner.seed(issuer.toAddress.toString)))
     val trans  = miner.transfer(miner.keyPair, issuer.toAddress.toString, 100.waves, 1.waves, version = TxVersion.V3, waitForTx = true)
     miner.transfer(miner.keyPair, sample.toAddress.toString, 100.waves, 1.waves, waitForTx = true)
     miner.createAlias(miner.keyPair, "aaaa", waitForTx = true)
@@ -75,7 +72,7 @@ class ReplTest extends BaseSuite {
     val assetId =
       miner
         .broadcastIssue(
-          ikey,
+          issuer,
           "asset",
           "description",
           1000,
@@ -129,7 +126,7 @@ class ReplTest extends BaseSuite {
       s"""
           |res6: TransferTransaction\\|Unit = TransferTransaction\\(
           |	recipient = Address\\(
-          |		bytes = base58'$issuer'
+          |		bytes = base58'${issuer.toAddress}'
           |	\\)
           |	timestamp = ${trans.timestamp}
           |	bodyBytes = base58'[$Base58Alphabet]+'
@@ -157,10 +154,10 @@ class ReplTest extends BaseSuite {
           |res8: Asset|Unit = Asset(
           |	description = "description"
           |	issuer = Address(
-          |		bytes = base58'$issuer'
+          |		bytes = base58'${issuer.toAddress}'
           |	)
           |	scripted = true
-          |	issuerPublicKey = base58'${Base58.encode(ikey.publicKey.arr)}'
+          |	issuerPublicKey = base58'${issuer.publicKey}'
           |	minSponsoredFee = Unit
           |	id = base58'$assetId'
           |	decimals = 1
@@ -198,14 +195,14 @@ class ReplTest extends BaseSuite {
     await(
       repl.execute(
         s""" assetBalance(
-            Address(base58'$issuer'),
+            Address(base58'${issuer.toAddress}'),
             base58'$assetId'
           )
        """
       )
     ).explicitGet() shouldBe "res11: Int = 1000"
 
-    await(repl.execute(s""" wavesBalance(Address(base58'${sample}')).regular """)) shouldBe Right(s"res12: Int = ${100.waves}")
+    await(repl.execute(s""" wavesBalance(Address(base58'${sample.toAddress}')).regular """)) shouldBe Right(s"res12: Int = ${100.waves}")
     await(repl.execute(""" this.wavesBalance() """))
       .explicitGet() should fullyMatch regex "res13: BalanceDetails = BalanceDetails\\(\\s+available = \\d+\\s+regular = \\d+\\s+generating = \\d+\\s+effective = \\d+\\s+\\)".r
 

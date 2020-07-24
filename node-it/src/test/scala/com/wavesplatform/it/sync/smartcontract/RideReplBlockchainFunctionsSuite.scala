@@ -1,5 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
+import java.nio.charset.StandardCharsets
+
 import com.typesafe.config.Config
 import com.wavesplatform.account.Alias
 import com.wavesplatform.common.state.ByteStr
@@ -210,7 +212,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
             amount = transferAmount,
             feeAsset = Waves,
             fee = responseTx.fee,
-            attachment = ByteStr.decodeBase58(attachment).get,
+            attachment = ByteStr(attachment.getBytes(StandardCharsets.UTF_8)),
             timestamp = responseTx.timestamp
           )
             .explicitGet()
@@ -233,7 +235,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
                |	version = $version
                |	id = base58'$transferTxId'
                |	senderPublicKey = base58'${alice.publicKey}'
-               |	attachment = base58'$attachment'
+               |	attachment = base58'${ByteStr(attachment.getBytes(StandardCharsets.UTF_8))}'
                |	sender = Address(
                |		bytes = base58'${responseTx.sender.get}'
                |	)
