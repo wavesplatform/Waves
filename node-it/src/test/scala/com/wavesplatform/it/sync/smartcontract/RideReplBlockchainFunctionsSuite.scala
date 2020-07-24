@@ -1,7 +1,5 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import java.nio.charset.StandardCharsets
-
 import com.typesafe.config.Config
 import com.wavesplatform.account.Alias
 import com.wavesplatform.common.state.ByteStr
