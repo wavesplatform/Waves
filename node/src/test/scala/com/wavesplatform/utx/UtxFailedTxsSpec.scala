@@ -132,7 +132,7 @@ class UtxFailedTxsSpec extends FlatSpec with Matchers with WithDomain with Event
     utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe Some(Seq(tx))
   }
 
-  private[this] def genExpr(targetComplexity: Int, result: Boolean = false): String = {
+  private[this] def genExpr(targetComplexity: Int, result: Boolean): String = {
     s"""
          |if ($result) then
          |  ${"sigVerify(base58'', base58'', base58'') ||" * (targetComplexity / 200)} true
