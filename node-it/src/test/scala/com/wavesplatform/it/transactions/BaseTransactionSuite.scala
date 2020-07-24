@@ -24,8 +24,11 @@ trait BaseTransactionSuiteLike extends WaitForHeight2 with IntegrationSuiteWithT
 
   override def miner: Node = nodes.head
 
+  private var istRunning = false
+
   // protected because https://github.com/sbt/zinc/issues/292
-  protected val theNodes: Coeval[Seq[Node]] = Coeval.evalOnce {
+  protected lazy val theNodes: Coeval[Seq[Node]] = Coeval.evalOnce {
+    require(istRunning, "Do not attempt to access node instances from suite constructors")
     Option(System.getProperty("waves.it.config.file")) match {
       case None => dockerNodes()
       case Some(filePath) =>
@@ -42,7 +45,8 @@ trait BaseTransactionSuiteLike extends WaitForHeight2 with IntegrationSuiteWithT
   override protected def nodes: Seq[Node] = theNodes()
 
   protected override def beforeAll(): Unit = {
-    theNodes.run
+    istRunning = true
+    theNodes.run()
     super.beforeAll()
   }
 }

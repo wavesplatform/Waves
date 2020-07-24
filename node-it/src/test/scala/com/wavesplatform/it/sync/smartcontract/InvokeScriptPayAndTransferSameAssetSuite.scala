@@ -15,9 +15,13 @@ import org.scalatest.CancelAfterFailure
 class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with CancelAfterFailure {
   private val estimator = ScriptEstimatorV2
 
-  private val dApp     = firstAddress
-  private val caller   = secondAddress
-  private val receiver = thirdAddress
+  private def dApp     = firstKeyPair
+  private def caller   = secondKeyPair
+  private def receiver = thirdKeyPair
+
+  private lazy val dAppAddress: String = dApp.toAddress.toString
+  private lazy val callerAddress: String = caller.toAddress.toString
+  private lazy val receiverAddress: String = receiver.toAddress.toString
 
   var dAppInitBalance: Long     = 0
   var callerInitBalance: Long   = 0
@@ -30,23 +34,24 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
   test("_issue and transfer asset") {
     assetId = sender.issue(caller, "Asset", "a", assetQuantity, 0).id
 
-    val script = Some(ScriptCompiler.compile("true", estimator).explicitGet()._1.bytes.value.base64)
+    val script = Some(ScriptCompiler.compile("true", estimator).explicitGet()._1.bytes().base64)
     smartAssetId = sender.issue(caller, "Smart", "s", assetQuantity, 0, script = script).id
 
     val scriptText  = "match tx {case _:TransferTransaction => false case _ => true}"
-    val smartScript = Some(ScriptCompiler.compile(scriptText, estimator).explicitGet()._1.bytes.value.base64)
+    val smartScript = Some(ScriptCompiler.compile(scriptText, estimator).explicitGet()._1.bytes().base64)
     rejAssetId = sender.issue(caller, "Reject", "r", assetQuantity, 0, script = smartScript, waitForTx = true).id
   }
 
+
   test("_set script to dApp account and transfer out all waves") {
-    val dAppBalance = sender.accountBalances(dApp)._1
-    sender.transfer(dApp, caller, dAppBalance - smartMinFee - setScriptFee, smartMinFee, waitForTx = true).id
+    val dAppBalance = sender.accountBalances(dAppAddress)._1
+    sender.transfer(dApp, callerAddress, dAppBalance - smartMinFee - setScriptFee, smartMinFee, waitForTx = true).id
 
     val dAppScript        = ScriptCompiler.compile(s"""
           |{-# STDLIB_VERSION 3 #-}
           |{-# CONTENT_TYPE DAPP #-}
           |
-          |let receiver = Address(base58'$receiver')
+          |let receiver = Address(base58'$receiverAddress')
           |
           |@Callable(i)
           |func resendPayment() = {
@@ -61,46 +66,46 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
   }
 
   test("dApp can transfer payed asset if its own balance is 0") {
-    dAppInitBalance = sender.accountBalances(dApp)._1
-    callerInitBalance = sender.accountBalances(caller)._1
-    receiverInitBalance = sender.accountBalances(receiver)._1
+    dAppInitBalance = sender.accountBalances(dAppAddress)._1
+    callerInitBalance = sender.accountBalances(callerAddress)._1
+    receiverInitBalance = sender.accountBalances(receiverAddress)._1
 
     val paymentAmount = 10
 
     invoke("resendPayment", paymentAmount, issued(assetId))
 
-    sender.accountBalances(dApp)._1 shouldBe dAppInitBalance
-    sender.accountBalances(caller)._1 shouldBe callerInitBalance - smartMinFee
-    sender.accountBalances(receiver)._1 shouldBe receiverInitBalance
+    sender.accountBalances(dAppAddress)._1 shouldBe dAppInitBalance
+    sender.accountBalances(callerAddress)._1 shouldBe callerInitBalance - smartMinFee
+    sender.accountBalances(receiverAddress)._1 shouldBe receiverInitBalance
 
-    sender.assetBalance(dApp, assetId).balance shouldBe paymentAmount - 1
-    sender.assetBalance(caller, assetId).balance shouldBe assetQuantity - paymentAmount
-    sender.assetBalance(receiver, assetId).balance shouldBe 1
+    sender.assetBalance(dAppAddress, assetId).balance shouldBe paymentAmount - 1
+    sender.assetBalance(callerAddress, assetId).balance shouldBe assetQuantity - paymentAmount
+    sender.assetBalance(receiverAddress, assetId).balance shouldBe 1
   }
 
   test("dApp can transfer payed smart asset if its own balance is 0") {
-    dAppInitBalance = sender.accountBalances(dApp)._1
-    callerInitBalance = sender.accountBalances(caller)._1
-    receiverInitBalance = sender.accountBalances(receiver)._1
+    dAppInitBalance = sender.accountBalances(dAppAddress)._1
+    callerInitBalance = sender.accountBalances(callerAddress)._1
+    receiverInitBalance = sender.accountBalances(receiverAddress)._1
 
     val paymentAmount = 10
     val fee           = smartMinFee + smartFee * 2
 
     invoke("resendPayment", paymentAmount, issued(smartAssetId), fee)
 
-    sender.accountBalances(dApp)._1 shouldBe dAppInitBalance
-    sender.accountBalances(caller)._1 shouldBe callerInitBalance - fee
-    sender.accountBalances(receiver)._1 shouldBe receiverInitBalance
+    sender.accountBalances(dAppAddress)._1 shouldBe dAppInitBalance
+    sender.accountBalances(callerAddress)._1 shouldBe callerInitBalance - fee
+    sender.accountBalances(receiverAddress)._1 shouldBe receiverInitBalance
 
-    sender.assetBalance(dApp, smartAssetId).balance shouldBe paymentAmount - 1
-    sender.assetBalance(caller, smartAssetId).balance shouldBe assetQuantity - paymentAmount
-    sender.assetBalance(receiver, smartAssetId).balance shouldBe 1
+    sender.assetBalance(dAppAddress, smartAssetId).balance shouldBe paymentAmount - 1
+    sender.assetBalance(callerAddress, smartAssetId).balance shouldBe assetQuantity - paymentAmount
+    sender.assetBalance(receiverAddress, smartAssetId).balance shouldBe 1
   }
 
   test("dApp can't transfer payed smart asset if it rejects transfers and its own balance is 0") {
-    dAppInitBalance = sender.accountBalances(dApp)._1
-    callerInitBalance = sender.accountBalances(caller)._1
-    receiverInitBalance = sender.accountBalances(receiver)._1
+    dAppInitBalance = sender.accountBalances(dAppAddress)._1
+    callerInitBalance = sender.accountBalances(callerAddress)._1
+    receiverInitBalance = sender.accountBalances(receiverAddress)._1
 
     val paymentAmount = 10
     val fee           = smartMinFee + smartFee * 2
@@ -111,18 +116,18 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
   }
 
   test("dApp can transfer payed Waves if its own balance is 0") {
-    dAppInitBalance = sender.accountBalances(dApp)._1
-    callerInitBalance = sender.accountBalances(caller)._1
-    receiverInitBalance = sender.accountBalances(receiver)._1
+    dAppInitBalance = sender.accountBalances(dAppAddress)._1
+    callerInitBalance = sender.accountBalances(callerAddress)._1
+    receiverInitBalance = sender.accountBalances(receiverAddress)._1
 
     dAppInitBalance shouldBe 0
 
     val paymentAmount    = 10
     invoke("resendPayment", paymentAmount)
 
-    sender.accountBalances(dApp)._1 shouldBe dAppInitBalance + paymentAmount - 1
-    sender.accountBalances(caller)._1 shouldBe callerInitBalance - paymentAmount - smartMinFee
-    sender.accountBalances(receiver)._1 shouldBe receiverInitBalance + 1
+    sender.accountBalances(dAppAddress)._1 shouldBe dAppInitBalance + paymentAmount - 1
+    sender.accountBalances(callerAddress)._1 shouldBe callerInitBalance - paymentAmount - smartMinFee
+    sender.accountBalances(receiverAddress)._1 shouldBe receiverInitBalance + 1
   }
 
   def issued(assetId: String): Asset = IssuedAsset(ByteStr.decodeBase58(assetId).get)
@@ -131,7 +136,7 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
     sender
       .invokeScript(
         caller,
-        dApp,
+        dAppAddress,
         Some(func),
         payment = Seq(Payment(amount, asset)),
         fee = fee,
