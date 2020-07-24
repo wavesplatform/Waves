@@ -25,7 +25,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
   private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("blockchain-updates")
 
-  private[this] val repo = new UpdatesRepoImpl(settings.directory)
+  private[this] val repo = new UpdatesRepoImpl(s"${context.settings.directory}/blockchain-updates")
 
   private[this] var grpcServer: Server     = null
   private[this] var httpServer: HttpServer = null
@@ -45,10 +45,10 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     log.info(s"BlockchainUpdates extension started gRPC API on port ${settings.grpcPort}")
 
     // starting HTTP API
-    httpServer = new HttpServer(settings.httpPort, repo)(context.actorSystem)
+    httpServer = new HttpServer(settings.restPort, repo)(context.actorSystem)
     httpServer.start()
 
-    log.info(s"BlockchainUpdates extension started HTTP API on port ${settings.httpPort}")
+    log.info(s"BlockchainUpdates extension started HTTP API on port ${settings.restPort}")
   }
 
   // todo proper shutdown
