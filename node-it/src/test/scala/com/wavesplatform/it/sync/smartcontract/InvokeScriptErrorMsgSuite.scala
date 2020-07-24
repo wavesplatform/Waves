@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync.{issueFee, minFee, scriptBase64, setScriptFee, someAssetAmount}
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
@@ -12,14 +12,16 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
 class InvokeScriptErrorMsgSuite extends BaseTransactionSuite with CancelAfterFailure {
-  private val contract = firstAddress
-  private val caller   = secondAddress
+  private def contract = firstKeyPair
+  private def caller   = secondKeyPair
+
+  private lazy val contractAddress: String = contract.toAddress.toString
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
 
-    sender.transfer(sender.address, recipient = contract, assetId = None, amount = 5.waves, fee = minFee, waitForTx = true).id
-    sender.transfer(sender.address, recipient = contract, assetId = None, amount = 5.waves, fee = minFee, waitForTx = true).id
+    sender.transfer(sender.keyPair, recipient = contractAddress, assetId = None, amount = 5.waves, fee = minFee, waitForTx = true).id
+    sender.transfer(sender.keyPair, recipient = contractAddress, assetId = None, amount = 5.waves, fee = minFee, waitForTx = true).id
 
     val scriptText =
       """
@@ -64,7 +66,7 @@ class InvokeScriptErrorMsgSuite extends BaseTransactionSuite with CancelAfterFai
     assertBadRequestAndMessage(
       sender.invokeScript(
         caller,
-        contract,
+        contractAddress,
         Some("f"),
         payment = Seq(
           InvokeScriptTransaction.Payment(10, Asset.fromString(Some(asset1)))
@@ -78,7 +80,7 @@ class InvokeScriptErrorMsgSuite extends BaseTransactionSuite with CancelAfterFai
     val tx = sender
       .invokeScript(
         caller,
-        contract,
+        contractAddress,
         Some("f"),
         payment = Seq(
           InvokeScriptTransaction.Payment(10, Asset.fromString(Some(asset1)))

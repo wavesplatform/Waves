@@ -13,33 +13,33 @@ class MicroblocksSponsoredFeeTestSuite extends FreeSpec with Matchers with Cance
 
   private def notMiner = nodes.head
 
-  val sponsor           = nodes(1)
-  val Token             = 100L
-  val sponsorAssetTotal = 100000 * Token
-  val minSponsorFee     = Token
-  val SmallFee          = Token + Token / 2
+  private lazy val sponsor      = nodes(1)
+  private val Token             = 100L
+  private val sponsorAssetTotal = 100000 * Token
+  private val minSponsorFee     = Token
+  private val SmallFee          = Token + Token / 2
 
   private def secondAddress = nodes(2).address
 
   private def txRequestsGen(n: Int, sponsorAssetId: String): Unit = {
     1 to n map (_ => {
-      sponsor.transfer(sponsor.address, secondAddress, Token, fee = SmallFee, None, Some(sponsorAssetId))
+      sponsor.transfer(sponsor.keyPair, secondAddress, Token, fee = SmallFee, None, Some(sponsorAssetId))
     })
   }
 
   "fee distribution with sponsorship" - {
-    val sponsorAssetId = sponsor
-      .issue(sponsor.address, "SponsoredAsset", "Created by Sponsorship Suite", sponsorAssetTotal, decimals = 2, reissuable = false, fee = issueFee)
-      .id
-    nodes.waitForHeightAriseAndTxPresent(sponsorAssetId)
-
-    val transferTxToSecondAddress = sponsor.transfer(sponsor.address, secondAddress, sponsorAssetTotal / 2, minFee, Some(sponsorAssetId), None).id
-    nodes.waitForHeightAriseAndTxPresent(transferTxToSecondAddress)
-
-    val sponsorId = sponsor.sponsorAsset(sponsor.address, sponsorAssetId, baseFee = Token, fee = sponsorReducedFee).id
-    nodes.waitForHeightAriseAndTxPresent(sponsorId)
-
     "check fee distribution" in {
+      val sponsorAssetId = sponsor
+        .issue(sponsor.keyPair, "SponsoredAsset", "Created by Sponsorship Suite", sponsorAssetTotal, reissuable = false, fee = issueFee)
+        .id
+      nodes.waitForHeightAriseAndTxPresent(sponsorAssetId)
+
+      val transferTxToSecondAddress = sponsor.transfer(sponsor.keyPair, secondAddress, sponsorAssetTotal / 2, minFee, Some(sponsorAssetId), None).id
+      nodes.waitForHeightAriseAndTxPresent(transferTxToSecondAddress)
+
+      val sponsorId = sponsor.sponsorAsset(sponsor.keyPair, sponsorAssetId, baseFee = Token, fee = sponsorReducedFee).id
+      nodes.waitForHeightAriseAndTxPresent(sponsorId)
+
       val height = nodes.waitForHeightArise()
 
       txRequestsGen(50, sponsorAssetId)

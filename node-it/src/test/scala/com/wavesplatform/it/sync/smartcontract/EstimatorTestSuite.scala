@@ -32,8 +32,8 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
                               |}""".stripMargin))
       .buildNonConflicting()
 
-  private val smartAcc  = firstAddress
-  private val callerAcc = secondAddress
+  private def smartAcc  = firstKeyPair
+  private def callerAcc = secondKeyPair
 
   private val accScript = ScriptCompiler
     .compile(
@@ -116,8 +116,8 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
       r =>
         sender
           .transfer(
-            sender.address,
-            recipient = r,
+            sender.keyPair,
+            recipient = r.toAddress.toString,
             assetId = None,
             amount = 5.waves,
             fee = minFee,
@@ -183,7 +183,7 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
     sender
       .invokeScript(
         callerAcc,
-        smartAcc,
+        smartAcc.toAddress.toString,
         Some("default"),
         List.empty,
         Seq.empty,
@@ -240,7 +240,7 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
     sender
       .invokeScript(
         callerAcc,
-        smartAcc,
+        smartAcc.toAddress.toString,
         Some("default"),
         List.empty,
         Seq.empty,
@@ -251,7 +251,7 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
       ._1
       .id
 
-    sender.transfer(smartAcc, callerAcc, 1, minFee + 2 * smartFee, Some(issuedAssetId), None, waitForTx = true)
+    sender.transfer(smartAcc, callerAcc.toAddress.toString, 1, minFee + 2 * smartFee, Some(issuedAssetId), None, waitForTx = true)
   }
 
 }
