@@ -1,5 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
+import java.nio.charset.StandardCharsets
+
 import com.typesafe.config.Config
 import com.wavesplatform.account.Alias
 import com.wavesplatform.common.state.ByteStr
@@ -15,13 +17,12 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEn
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import org.scalatest.{Assertion, Ignore}
+import org.scalatest.Assertion
 import org.scalatest.EitherValues._
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-@Ignore
 class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
 
   override protected def nodeConfigs: Seq[Config] =
@@ -38,12 +39,13 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   private val settings = NodeConnectionSettings(miner.nodeApiEndpoint.toString, chainId.toByte, alice.toAddress.stringRepr)
   private val repl     = Repl(Some(settings))
 
-  private var dataTxId     = ""
-  private var assetId      = ""
-  private var transferTxId = ""
+  private var dataTxId       = ""
+  private var assetId        = ""
+  private var transferTxIds  = Map[TxVersion, String]()
 
   private val alias = "nickname"
   private val transferAmount = 100
+  private val attachment = "attachment"
 
   private def execute(expr: String): Either[String, String] =
     Await.result(repl.execute(expr), 2 seconds)
@@ -68,8 +70,25 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
 
     sender.createAlias(bob.toAddress.stringRepr, alias, minFee).id
     assetId = sender.issue(alice.toAddress.stringRepr, "Asset", "descr", 1000, 2, waitForTx = true).id
-    transferTxId = sender.transfer(alice.toAddress.stringRepr, s"alias:$chainId:$alias", transferAmount, minFee, Some(assetId)).id
-    nodes.waitForHeightAriseAndTxPresent(transferTxId)
+
+    transferTxIds =
+      Seq(TxVersion.V1, TxVersion.V2, TxVersion.V3)
+          .map {
+            version =>
+              val tx = sender.transfer(
+                alice.toAddress.stringRepr,
+                s"alias:$chainId:$alias",
+                transferAmount,
+                minFee,
+                Some(assetId),
+                version = version,
+                attachment = Some(attachment)
+              )
+              (version, tx.id)
+          }
+          .toMap
+
+    transferTxIds.values.foreach(nodes.waitForHeightAriseAndTxPresent)
   }
 
   test("this") {
@@ -89,7 +108,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   }
 
   test("assetBalance()") {
-    assert(s"this.assetBalance(base58'$assetId')", "= 900")
+    assert(s"this.assetBalance(base58'$assetId')", "= 700")
   }
 
   test("wavesBalance()") {
@@ -97,10 +116,10 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
       "this.wavesBalance()",
       """
         |BalanceDetails(
-        |	available = 9899800000
-        |	regular = 9899800000
+        |	available = 9899600000
+        |	regular = 9899600000
         |	generating = 0
-        |	effective = 9899800000
+        |	effective = 9899600000
         |)
       """.trim.stripMargin
     )
@@ -180,47 +199,52 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   }
 
   test("transferTransactionById()") {
-    val responseTx = sender.transactionInfo[TransferTransactionInfo](transferTxId)
-    val bodyBytes = TransferTransaction.selfSigned(
-        version = TxVersion.V2,
-        sender = alice,
-        recipient = Alias.createWithChainId(alias, chainId.toByte).explicitGet(),
-        asset = IssuedAsset(ByteStr.decodeBase58(assetId).get),
-        amount = transferAmount,
-        feeAsset = Waves,
-        fee = responseTx.fee,
-        attachment = ByteStr.empty,
-        timestamp = responseTx.timestamp
-      )
-      .explicitGet()
-      .bodyBytes
-      .value()
+    Seq(TxVersion.V1, TxVersion.V2, TxVersion.V3)
+      .foreach {
+        version =>
+          val transferTxId = transferTxIds(version)
+          val responseTx = sender.transactionInfo[TransferTransactionInfo](transferTxId)
+          val bodyBytes = TransferTransaction.selfSigned(
+            version = version,
+            sender = alice,
+            recipient = Alias.createWithChainId(alias, chainId.toByte).explicitGet(),
+            asset = IssuedAsset(ByteStr.decodeBase58(assetId).get),
+            amount = transferAmount,
+            feeAsset = Waves,
+            fee = responseTx.fee,
+            attachment = ByteStr.decodeBase58(attachment).get,
+            timestamp = responseTx.timestamp
+          )
+            .explicitGet()
+            .bodyBytes
+            .value()
 
-    execute(s"let transferTx = transferTransactionById(base58'$transferTxId').value()")
-    assert(
-      "transferTx",
-      s"""
-         |TransferTransaction(
-         |	recipient = Alias(
-         |		alias = "$alias"
-         |	)
-         |	timestamp = ${responseTx.timestamp}
-         |	bodyBytes = base58'${Base58.encode(bodyBytes)}'
-         |	assetId = base58'$assetId'
-         |	feeAssetId = Unit
-         |	amount = 100
-         |	version = 2
-         |	id = base58'$transferTxId'
-         |	senderPublicKey = base58'${alice.publicKey}'
-         |	attachment = base58''
-         |	sender = Address(
-         |		bytes = base58'${responseTx.sender.get}'
-         |	)
-         |	proofs = [base58'${responseTx.proofs.get.head}', base58'', base58'', base58'', base58'', base58'', base58'', base58'']
-         |	fee = ${responseTx.fee}
-         |)
-       """.trim.stripMargin
-    )
+          execute(s"let transferTx$version = transferTransactionById(base58'$transferTxId').value()")
+          assert(
+            s"transferTx$version",
+            s"""
+               |TransferTransaction(
+               |	recipient = Alias(
+               |		alias = "$alias"
+               |	)
+               |	timestamp = ${responseTx.timestamp}
+               |	bodyBytes = base58'${Base58.encode(bodyBytes)}'
+               |	assetId = base58'$assetId'
+               |	feeAssetId = Unit
+               |	amount = 100
+               |	version = $version
+               |	id = base58'$transferTxId'
+               |	senderPublicKey = base58'${alice.publicKey}'
+               |	attachment = base58'$attachment'
+               |	sender = Address(
+               |		bytes = base58'${responseTx.sender.get}'
+               |	)
+               |	proofs = [base58'${responseTx.proofs.get.head}', base58'', base58'', base58'', base58'', base58'', base58'', base58'']
+               |	fee = ${responseTx.fee}
+               |)
+            """.trim.stripMargin
+          )
+      }
   }
 
   test("addressFromPublicKey()") {
@@ -232,7 +256,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
 
   test("addressFromRecipient() with alias") {
     assert(
-      s"""addressFromRecipient(transferTx.recipient).toString()""",
+      s"""addressFromRecipient(transferTx1.recipient).toString()""",
       s""""${bob.toAddress.stringRepr}""""
     )
   }

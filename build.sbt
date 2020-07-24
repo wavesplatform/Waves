@@ -31,8 +31,9 @@ lazy val lang =
       inConfig(Compile)(
         Seq(
           sourceGenerators += Tasks.docSource,
-          PB.targets += scalapb.gen(flatPackage = true) -> (sourceManaged in Compile).value,
-          PB.protoSources := Seq(baseDirectory.value.getParentFile / "shared" / "src" / "main" / "protobuf"),
+          PB.targets += scalapb.gen(flatPackage = true) -> (sourceManaged).value,
+          PB.protoSources := Seq(PB.externalIncludePath.value, baseDirectory.value.getParentFile / "shared" / "src" / "main" / "protobuf"),
+          includeFilter in PB.generate := new SimpleFileFilter((f: File) => f.getName == "DAppMeta.proto" || (f.getName.endsWith(".proto") && f.getParent.endsWith("waves"))),
           PB.deleteTargetDirectory := false
         )
       )

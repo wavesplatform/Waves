@@ -12,16 +12,11 @@ import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxVersion
-import com.wavesplatform.it.util._
-import com.wavesplatform.it.BaseSuite
-import com.wavesplatform.it.api.SyncHttpApi._
-import org.scalatest.Ignore
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-@Ignore
 class ReplTest extends BaseSuite {
   override def nodeConfigs =
     com.wavesplatform.it.NodeConfigs.newBuilder
@@ -139,8 +134,6 @@ class ReplTest extends BaseSuite {
       Right(
         s"""
           |res8: Asset|Unit = Asset(
-          |	name = "asset"
-          |	quantity = 1000
           |	description = "description"
           |	issuer = Address(
           |		bytes = base58'$issuer'
@@ -151,6 +144,8 @@ class ReplTest extends BaseSuite {
           |	id = base58'$assetId'
           |	decimals = 1
           |	reissuable = true
+          |	name = "asset"
+          |	quantity = 1000
           |)
         """.trim.stripMargin
       )
