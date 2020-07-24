@@ -71,7 +71,7 @@ case class AddressApiRoute(
         "address"              -> address.stringRepr,
         "script"               -> scriptInfoOpt.map(_.script.bytes().base64),
         "scriptText"           -> scriptInfoOpt.map(_.script.expr.toString),
-        "complexity"           -> scriptInfoOpt.fold(0L)(_.verifierComplexity),
+        "complexity"           -> (callableComplexities.values.maxOption.getOrElse(0L): Long),
         "verifierComplexity"   -> scriptInfoOpt.fold(0L)(_.verifierComplexity),
         "callableComplexities" -> callableComplexities,
         "extraFee"             -> (if (scriptInfoOpt.isEmpty) 0L else FeeValidation.ScriptExtraFee)
