@@ -15,9 +15,9 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
 import com.wavesplatform.lang.v1.traits.domain._
-import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.DiffsCommon
@@ -251,9 +251,19 @@ object InvokeDiffsCommon {
 
       maxKeySize = ContractLimits.MaxKeySizeInBytesByVersion(stdLibVersion)
       _ <- dataEntries
-        .find(_.key.utf8Bytes.length > maxKeySize)
+        .collectFirst {
+          Function.unlift {
+            entry =>
+              val length = entry.key.utf8Bytes.length
+              if (length > maxKeySize)
+                Some(s"Data entry key size = $length bytes must be less than $maxKeySize")
+              else if (entry.key.isEmpty && stdLibVersion >= V4)
+                Some(s"Data entry key should not be empty")
+              else
+                None
+          }
+        }
         .toLeft(())
-        .leftMap(d => s"Key size = ${d.key.utf8Bytes.length} bytes must be less than $maxKeySize")
 
       totalDataBytes = dataEntries.map(_.toBytes.length).sum
       _ <- Either.cond(

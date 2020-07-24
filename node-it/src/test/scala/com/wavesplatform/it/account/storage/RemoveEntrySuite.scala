@@ -127,7 +127,7 @@ class RemoveEntrySuite extends BaseSuite {
       val tx = miner.waitForTransaction(invokeScript(address, s"write", tooLongKey, "value")).id
 
       miner.transactionStatus(Seq(tx)).head.applicationStatus shouldBe Some("script_execution_failed")
-      miner.debugStateChanges(tx).stateChanges.get.error.get.text should include ("Key size = 401 bytes must be less than 400")
+      miner.debugStateChanges(tx).stateChanges.get.error.get.text should include ("Data entry key size = 401 bytes must be less than 400")
     }
   }
 
