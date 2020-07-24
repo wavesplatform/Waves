@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -15,11 +14,14 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 
 class TransferTxFromProtoSuite extends BaseTransactionSuite {
-  val source    = firstAddress
-  val recipient = secondAddress
-  val dApp      = thirdAddress
-  val scriptText =
-   s"""
+  private def source    = firstKeyPair
+  private def recipient = secondKeyPair
+  private def dApp      = thirdKeyPair
+
+  private lazy val dAppAddress: String = dApp.toAddress.toString
+
+  private val scriptText =
+    s"""
       |{-# STDLIB_VERSION 4 #-}
       |{-# CONTENT_TYPE DAPP #-}
       |{-# SCRIPT_TYPE ACCOUNT #-}
@@ -46,15 +48,15 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
       |}
       |
       |""".stripMargin
-  val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()._1.bytes().base64
+  private val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()._1.bytes().base64
 
   test("TransferTransaction with Waves from proto bytes") {
     sender.setScript(dApp, Some(script), waitForTx = true)
     val transferTx = TransferTransaction
       .selfSigned(
         version = TxVersion.V3,
-        sender = pkByAddress(source),
-        recipient = AddressOrAlias.fromString(recipient).explicitGet(),
+        sender = source,
+        recipient = recipient.toAddress,
         asset = Waves,
         amount = transferAmount,
         feeAsset = Waves,
@@ -70,22 +72,22 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
 
     sender.invokeScript(
       source,
-      dApp,
+      dAppAddress,
       func = Some("foo"),
       args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxBytes)).explicitGet()),
       waitForTx = true
     )
 
-    sender.getDataByKey(dApp, "amount").value shouldBe transferTx.amount
-    sender.getDataByKey(dApp, "fee").value shouldBe transferTx.fee
-    sender.getDataByKey(dApp, "id").value shouldBe transferTx.id().toString
-    sender.getDataByKey(dApp, "assetId").value shouldBe "WAVES"
-    sender.getDataByKey(dApp, "feeAssetId").value shouldBe "WAVES"
-    sender.getDataByKey(dApp, "attachment").value shouldBe Base58.encode("WAVES transfer".getBytes)
-    sender.getDataByKey(dApp, "senderPublicKey").value shouldBe transferTx.sender.toString
-    sender.getDataByKey(dApp, "sender").value shouldBe transferTx.sender.toAddress.toString
-    sender.getDataByKey(dApp, "recipient").value shouldBe transferTx.recipient.toString
-    sender.getDataByKey(dApp, "version").value shouldBe transferTx.version
+    sender.getDataByKey(dAppAddress, "amount").value shouldBe transferTx.amount
+    sender.getDataByKey(dAppAddress, "fee").value shouldBe transferTx.fee
+    sender.getDataByKey(dAppAddress, "id").value shouldBe transferTx.id().toString
+    sender.getDataByKey(dAppAddress, "assetId").value shouldBe "WAVES"
+    sender.getDataByKey(dAppAddress, "feeAssetId").value shouldBe "WAVES"
+    sender.getDataByKey(dAppAddress, "attachment").value shouldBe Base58.encode("WAVES transfer".getBytes)
+    sender.getDataByKey(dAppAddress, "senderPublicKey").value shouldBe transferTx.sender.toString
+    sender.getDataByKey(dAppAddress, "sender").value shouldBe transferTx.sender.toAddress.toString
+    sender.getDataByKey(dAppAddress, "recipient").value shouldBe transferTx.recipient.toString
+    sender.getDataByKey(dAppAddress, "version").value shouldBe transferTx.version
   }
 
   test("TransferTransaction with issued asset from proto bytes") {
@@ -95,8 +97,8 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
     val transferAssetTx = TransferTransaction
       .selfSigned(
         version = TxVersion.V3,
-        sender = pkByAddress(source),
-        recipient = AddressOrAlias.fromString(recipient).explicitGet(),
+        sender = source,
+        recipient = recipient.toAddress,
         asset = IssuedAsset(ByteStr.decodeBase58(assetId).get),
         amount = 10000,
         feeAsset = IssuedAsset(ByteStr.decodeBase58(assetId).get),
@@ -112,22 +114,22 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
 
     sender.invokeScript(
       source,
-      dApp,
+      dAppAddress,
       func = Some("foo"),
       args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxBytes)).explicitGet()),
       waitForTx = true
     )
 
-    sender.getDataByKey(dApp, "assetId").value shouldBe assetId
-    sender.getDataByKey(dApp, "feeAssetId").value shouldBe assetId
+    sender.getDataByKey(dAppAddress, "assetId").value shouldBe assetId
+    sender.getDataByKey(dAppAddress, "feeAssetId").value shouldBe assetId
   }
 
   test("check bodyBytes of transaction returned by transferTransactionFromProto") {
     val transferTx = TransferTransaction
       .selfSigned(
         version = TxVersion.V3,
-        sender = pkByAddress(source),
-        recipient = AddressOrAlias.fromString(recipient).explicitGet(),
+        sender = source,
+        recipient = recipient.toAddress,
         asset = Waves,
         amount = 10000,
         feeAsset = Waves,
@@ -143,12 +145,12 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
 
     sender.invokeScript(
       source,
-      dApp,
+      dAppAddress,
       func = Some("foo"),
       args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxBytes)).explicitGet()),
       waitForTx = true
     )
 
-    sender.getDataByKey(dApp, "bodyBytes").value.asInstanceOf[ByteStr] shouldBe ByteStr(transferTx.bodyBytes())
+    sender.getDataByKey(dAppAddress, "bodyBytes").value.asInstanceOf[ByteStr] shouldBe ByteStr(transferTx.bodyBytes())
   }
 }

@@ -10,6 +10,7 @@ import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.utils.LoggerFacade
+import com.wavesplatform.wallet.Wallet
 import io.grpc.{ManagedChannel, ManagedChannelBuilder}
 import org.asynchttpclient.Dsl.{config => clientConfig, _}
 import org.asynchttpclient._
@@ -32,6 +33,13 @@ abstract class Node(val config: Config) extends AutoCloseable {
     .keepAliveWithoutCalls(true)
     .keepAliveTime(30, TimeUnit.SECONDS)
     .build()
+
+  private[this] val wallet = Wallet(settings.walletSettings.copy(file = None))
+  wallet.generateNewAccounts(1)
+
+  def generateKeyPair(): KeyPair = wallet.synchronized {
+    wallet.generateNewAccount().get
+  }
 
   val keyPair: KeyPair  = KeyPair.fromSeed(config.getString("account-seed")).explicitGet()
   val publicKey: PublicKey = PublicKey.fromBase58String(config.getString("public-key")).explicitGet()
