@@ -26,7 +26,7 @@ object Functions {
     val args = Seq(("addressOrAlias", addressOrAliasType), ("key", STRING))
     NativeFunction.withEnvironment[Environment](
       name,
-      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 25L),
+      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 10L),
       internalName,
       UNION(dataType.innerType, UNIT),
       ("addressOrAlias", addressOrAliasType),
@@ -293,7 +293,7 @@ object Functions {
   val addressFromRecipientF: BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "addressFromRecipient",
-      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 10L),
+      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 5L),
       ADDRESSFROMRECIPIENT,
       addressType,
       ("AddressOrAlias", addressOrAliasType)
@@ -335,7 +335,7 @@ object Functions {
   val assetBalanceF: BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "assetBalance",
-      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 15L),
+      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 10L),
       ACCOUNTASSETBALANCE,
       LONG,
       ("addressOrAlias", addressOrAliasType),
@@ -358,7 +358,7 @@ object Functions {
   val assetBalanceV4F: BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "assetBalance",
-      15,
+      10,
       ACCOUNTASSETONLYBALANCE,
       LONG,
       ("addressOrAlias", addressOrAliasType),
@@ -404,7 +404,7 @@ object Functions {
   def assetInfoF(version: StdLibVersion): BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "assetInfo",
-      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 50L),
+      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 15L),
       GETASSETINFOBYID,
       optionAsset(version),
       ("id", BYTESTR)
@@ -432,7 +432,7 @@ object Functions {
   val txHeightByIdF: BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "transactionHeightById",
-      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 15L),
+      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 20L),
       TRANSACTIONHEIGHTBYID,
       optionLong,
       ("id", BYTESTR)
@@ -471,7 +471,7 @@ object Functions {
       }
     }
 
-  private def withExtract[C[_[_]]](f: BaseFunction[C]): BaseFunction[C] = {
+  private def withExtract[C[_[_]]](f: BaseFunction[C], version: StdLibVersion): BaseFunction[C] = {
     val args = f.signature.args.zip(f.args).map {
       case ((name, ty), _) => ("@" ++ name, ty)
     }
@@ -482,7 +482,8 @@ object Functions {
       f.signature.result.asInstanceOf[UNION].typeList.find(_ != UNIT).get,
       args: _*
     ) {
-      FUNCTION_CALL(PureContext.extract, List(FUNCTION_CALL(f.header, args.map(a => REF(a._1)).toList)))
+      val extractF = if (version >= V4) PureContext.value else PureContext.extract
+      FUNCTION_CALL(extractF, List(FUNCTION_CALL(f.header, args.map(a => REF(a._1)).toList)))
     }
   }
 
@@ -501,7 +502,7 @@ object Functions {
       getBinaryByIndexF(v),
       getStringByIndexF(v),
       if (v >= V4) addressFromStringV4 else addressFromStringF(v)
-    ).map(withExtract)
+    ).map(withExtract(_, v))
 
   def txByIdF(proofsEnabled: Boolean, version: StdLibVersion): BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](

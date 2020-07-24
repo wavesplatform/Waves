@@ -67,11 +67,11 @@ final case class CompositeBlockchain(
       .map(t => (this.height, t.transaction, t.applied))
       .orElse(inner.transactionInfo(id))
 
-  override def transactionHeight(id: ByteStr): Option[Int] =
+  override def transactionMeta(id: ByteStr): Option[(Int, Boolean)] =
     diff.transactions
       .get(id)
-      .map(_ => this.height)
-      .orElse(inner.transactionHeight(id))
+      .map(info => (this.height, info.applied))
+      .orElse(inner.transactionMeta(id))
 
   override def height: Int = inner.height + newBlock.fold(0)(_ => 1)
 

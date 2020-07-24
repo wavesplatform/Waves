@@ -221,11 +221,11 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
 
       val directives = buildDirectives(version, contentType, scriptType)
       val (assigns, conjunctions) = (version, contentType, scriptType) match {
-        case (V3, DApp, Account)       => (155, 15)
-        case (V3, Expression, Account) => (155, 20)
+        case (V3, DApp, Account)       => (103, 9)
+        case (V3, Expression, Account) => (103, 14)
         case (V3, Expression, Asset)   => (209, 7)
-        case (V4, DApp, Account)       => (101, 23)
-        case (V4, Expression, Account) => (101, 28)
+        case (V4, DApp, Account)       => (65, 45)
+        case (V4, Expression, Account) => (65, 50)
         case (V4, Expression, Asset)   => (137, 6)
         case (_, Expression, _)        => (103, 14)
         case _                         => ???
@@ -241,10 +241,10 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
     checkComplexityBorder(V4, Expression, Asset, 4000)
     checkComplexityBorder(V3, Expression, Asset, 4000)
 
-    checkComplexityBorder(V4, DApp, Account, 3000)
-    checkComplexityBorder(V3, DApp, Account, 3000)
-    checkComplexityBorder(V4, Expression, Account, 3000)
-    checkComplexityBorder(V3, Expression, Account, 3000)
+    checkComplexityBorder(V4, DApp, Account, 2000)
+    checkComplexityBorder(V3, DApp, Account, 2000)
+    checkComplexityBorder(V4, Expression, Account, 2000)
+    checkComplexityBorder(V3, Expression, Account, 2000)
 
     checkComplexityBorder(V2, Expression, Asset, 2000)
     checkComplexityBorder(V2, Expression, Account, 2000)
@@ -355,7 +355,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
     )
   }
 
-  property("forbid unused case variables") {
+  ignore("forbid unused case variables") {
     val script =
       """
         | {-# STDLIB_VERSION 3 #-}
@@ -401,6 +401,20 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
     ScriptCompiler.compile(script, estimator) should produce(
       "Compilation failed: Unused case variable(s) `unused1`, `unused2`, `unused3`, `unused4` in 91-920"
     )
+  }
+
+  property("allow unused case variables") {
+    val script =
+      """
+        |
+        | match tx {
+        |   case transfer: TransferTransaction => true
+        |   case other => false
+        | }
+        |
+      """.stripMargin
+
+    ScriptCompiler.compile(script, estimator) shouldBe Symbol("right")
   }
 
   private val expectedExpr = LET_BLOCK(

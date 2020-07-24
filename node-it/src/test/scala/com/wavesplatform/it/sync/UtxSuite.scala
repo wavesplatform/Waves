@@ -17,8 +17,8 @@ import scala.util.{Random, Try}
 class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker with Matchers {
   override protected def nodeConfigs: Seq[Config] = UtxSuite.Configs
 
-  val miner: Node    = nodes.head
-  val notMiner: Node = nodes(1)
+  private def miner    = nodes.head
+  private def notMiner = nodes(1)
 
   val ENOUGH_FEE = 5000000
   val AMOUNT     = ENOUGH_FEE * 10

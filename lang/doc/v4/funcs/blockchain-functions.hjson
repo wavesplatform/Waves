@@ -5,7 +5,7 @@
       params: [ "ByteVector" ]
       doc: "Gets the information about a [token](/blockchain/token.md)."
       paramsDoc: [ "ID of the [token](/blockchain/token.md)." ]
-      complexity: 50
+      complexity: 15
     }
     {
       name: "blockInfoByHeight"
@@ -26,7 +26,7 @@
       params: [ "ByteVector" ]
       doc: "Gets the [block height](/blockchain/block-height.md) of a transaction."
       paramsDoc: [ "ID of the transaction." ]
-      complexity: 15
+      complexity: 20
     }
     {
       name: "transferTransactionById"

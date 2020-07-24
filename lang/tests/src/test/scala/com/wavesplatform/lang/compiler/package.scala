@@ -37,7 +37,7 @@ package object compiler {
   def getTestContext(v: StdLibVersion): CTX[NoContext] = {
     Monoid
       .combine(
-        PureContext.build(Global, v),
+        PureContext.build(v),
         CTX[NoContext](
           Seq(pointType, Common.pointTypeA, Common.pointTypeB, Common.pointTypeC),
           Map(

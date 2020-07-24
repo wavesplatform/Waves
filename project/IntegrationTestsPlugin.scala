@@ -71,20 +71,21 @@ object IntegrationTestsPlugin extends AutoPlugin {
       )
     ) ++ inScope(Global)(
       Seq(
-        dockerCpuCount := {
-          try {
-            val docker = DefaultDockerClient.fromEnv().build()
+        maxParallelSuites := Option(Integer.getInteger("waves.it.max-parallel-suites"))
+          .getOrElse[Integer] {
             try {
-              docker.info().cpus()
-            } finally docker.close()
-          } catch {
-            case NonFatal(_) =>
-              sLog.value.warn(s"Could not connect to Docker, is the daemon running?")
-              EvaluateTask.SystemProcessors
-          }
-        },
+              val docker = DefaultDockerClient.fromEnv().build()
+              try {
+                (docker.info().cpus() * 2).toInt
+              } finally docker.close()
+            } catch {
+              case NonFatal(_) =>
+                sLog.value.warn(s"Could not connect to Docker, is the daemon running?")
+                EvaluateTask.SystemProcessors
+            }
+          },
         concurrentRestrictions := Seq(
-          Tags.limit(Tags.ForkedTestGroup, Integer.getInteger("waves.it.max-parallel-suites", dockerCpuCount.value * 2))
+          Tags.limit(Tags.ForkedTestGroup, maxParallelSuites.value)
         )
       )
     )
@@ -92,6 +93,6 @@ object IntegrationTestsPlugin extends AutoPlugin {
 }
 
 trait ItKeys {
-  val logDirectory   = taskKey[File]("The directory where logs of integration tests are written")
-  val dockerCpuCount = settingKey[Int]("Docker processor count")
+  val logDirectory      = taskKey[File]("The directory where logs of integration tests are written")
+  val maxParallelSuites = settingKey[Int]("Number of test suites to run in parallel")
 }

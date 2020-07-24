@@ -13,9 +13,8 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
 class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionSuite with CancelAfterFailure {
-
-  private val dApp               = firstAddress
-  private val callerAndRecipient = secondAddress
+  private def dApp               = firstKeyPair
+  private def callerAndRecipient = secondKeyPair
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -45,7 +44,7 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
 
     val invokeScriptTx = sender.invokeScript(
       callerAndRecipient,
-      dApp,
+      dApp.toAddress.toString,
       func = Some("sendToCaller"),
       args = List(CONST_LONG(transferAmount)),
       payment = Seq(Payment(pamentAmount, Waves)),
@@ -60,7 +59,7 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
     val firstTransferAssetAmountOpt = txStateChanges.stateChanges.map(_.transfers.head.amount)
 
     transferCountOpt shouldBe Some(1)
-    firstTransferAddrOpt shouldBe Some(callerAndRecipient)
+    firstTransferAddrOpt shouldBe Some(callerAndRecipient.toAddress.toString)
     firstTransferAssetAmountOpt shouldBe Some(transferAmount)
   }
 
@@ -70,7 +69,7 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
 
     val invokeScriptTx = sender.invokeScript(
       callerAndRecipient,
-      dApp,
+      dApp.toAddress.toString,
       func = Some("sendToCaller"),
       args = List(CONST_LONG(transferAmount)),
       payment = Seq(Payment(pamentAmount, Waves)),
@@ -85,17 +84,17 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
     val firstTransferAssetAmountOpt = txStateChanges.stateChanges.map(_.transfers.head.amount)
 
     transferCountOpt shouldBe Some(1)
-    firstTransferAddrOpt shouldBe Some(callerAndRecipient)
+    firstTransferAddrOpt shouldBe Some(callerAndRecipient.toAddress.toString)
     firstTransferAssetAmountOpt shouldBe Some(transferAmount)
   }
 
   test("payment value lower than transfer") {
-    val paymentAmount   = 1
+    val paymentAmount  = 1
     val transferAmount = 4
 
     val invokeScriptTx = sender.invokeScript(
       callerAndRecipient,
-      dApp,
+      dApp.toAddress.toString,
       func = Some("sendToCaller"),
       args = List(CONST_LONG(transferAmount)),
       payment = Seq(Payment(paymentAmount, Waves)),
@@ -110,7 +109,7 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
     val firstTransferAssetAmountOpt = txStateChanges.stateChanges.map(_.transfers.head.amount)
 
     transferCountOpt shouldBe Some(1)
-    firstTransferAddrOpt shouldBe Some(callerAndRecipient)
+    firstTransferAddrOpt shouldBe Some(callerAndRecipient.toAddress.toString)
     firstTransferAssetAmountOpt shouldBe Some(transferAmount)
   }
 
@@ -120,7 +119,7 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
 
     val invokeScriptTx = sender.invokeScript(
       callerAndRecipient,
-      dApp,
+      dApp.toAddress.toString,
       func = Some("sendToCaller"),
       args = List(CONST_LONG(transferAmount)),
       payment = Seq(Payment(paymentAmount, Waves)),
@@ -135,7 +134,7 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
     val firstTransferAssetAmountOpt = txStateChanges.stateChanges.map(_.transfers.head.amount)
 
     transferCountOpt shouldBe Some(1)
-    firstTransferAddrOpt shouldBe Some(callerAndRecipient)
+    firstTransferAddrOpt shouldBe Some(callerAndRecipient.toAddress.toString)
     firstTransferAssetAmountOpt shouldBe Some(transferAmount)
   }
 }

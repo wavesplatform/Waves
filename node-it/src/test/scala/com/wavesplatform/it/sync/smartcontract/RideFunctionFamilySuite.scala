@@ -16,7 +16,7 @@ class RideFunctionFamilySuite extends BaseTransactionSuite with CancelAfterFailu
      |  
      |let a = base58''
      | 
-     |sigVerify_16Kb(a, a, a) && rsaVerify_32Kb(SHA3512, a, a, a) && a == (blake2b256_64Kb(a) + keccak256_128Kb(a) + sha256(a))
+     |sigVerify_8Kb(a, a, a) && sigVerify_16Kb(a, a, a) && rsaVerify_32Kb(SHA3512, a, a, a) && a == (blake2b256_64Kb(a) + keccak256_128Kb(a) + sha256(a))
      |""".stripMargin
 
   def ffDApp(version: Int)(f : String) : String =
@@ -44,15 +44,15 @@ class RideFunctionFamilySuite extends BaseTransactionSuite with CancelAfterFailu
      |""",
        "sig" -> """
      |@Callable(inv)
-     |func sig() = boolean(sigVerify(a, a, a) && sigVerify_16Kb(a, a, a) && sigVerify_32Kb(a, a, a) && sigVerify_64Kb(a, a, a) && sigVerify_128Kb(a, a, a))
+     |func sig() = boolean(sigVerify(a, a, a) && sigVerify_8Kb(a, a, a) && sigVerify_16Kb(a, a, a) && sigVerify_32Kb(a, a, a) && sigVerify_64Kb(a, a, a) && sigVerify_128Kb(a, a, a))
      |""",
-       "rsa" -> """
+       "rsa1" -> """
      |@Verifier(tx)
-     |func rsa() = rsaVerify(NOALG, a, a, a) && rsaVerify_32Kb(SHA256, a, a, a) && rsaVerify_64Kb(SHA3256, a, a, a) && rsaVerify_128Kb(NOALG, a, a, a)
+     |func rsa() = rsaVerify(NOALG, a, a, a) && rsaVerify_16Kb(MD5, a, a, a)
      |""",
-       "rsa16" -> """
+       "rsa2" -> """
      |@Verifier(tx)
-     |func rsa() = rsaVerify_16Kb(MD5, a, a, a) && rsaVerify_32Kb(SHA256, a, a, a) && rsaVerify_64Kb(SHA3256, a, a, a) && rsaVerify_128Kb(NOALG, a, a, a)
+     |func rsa() = rsaVerify_32Kb(SHA256, a, a, a) && rsaVerify_64Kb(SHA3256, a, a, a) && rsaVerify_128Kb(NOALG, a, a, a)
      |"""
    )(f).stripMargin
 
@@ -61,7 +61,7 @@ class RideFunctionFamilySuite extends BaseTransactionSuite with CancelAfterFailu
     val CompiledScript(scr, complexity, _) = sender.scriptCompile(ffAssetScript(4))
     val EstimatedScript(_, _, ecomplexity, _) = sender.scriptEstimate(scr)
     ecomplexity shouldBe complexity
-    ecomplexity shouldBe 1019
+    ecomplexity shouldBe 1027
 
     val DecompiledScript(dec) = sender.scriptDecompile(scr)
     List("sigVerify_16Kb(a, a, a)", "rsaVerify_32Kb(SHA3512, a, a, a)", "blake2b256_64Kb(a)", "keccak256_128Kb(a)", "sha256(a)").forall(dec.contains) shouldBe true
@@ -75,8 +75,6 @@ class RideFunctionFamilySuite extends BaseTransactionSuite with CancelAfterFailu
       error.message should include("Can't find a function")
     }
   }
-
-
 
   test("function family (hashes)") {
     for((hash, names) <- List(
@@ -96,9 +94,9 @@ class RideFunctionFamilySuite extends BaseTransactionSuite with CancelAfterFailu
 
   test("function family (verify)") {
     for(((f, names), c) <- List(
-         "sig" -> List("sigVerify(a, a, a)", "sigVerify_16Kb(a, a, a)", "sigVerify_32Kb(a, a, a)", "sigVerify_64Kb(a, a, a)", "sigVerify_128Kb(a, a, a)") -> 711,
-         "rsa" -> List("rsaVerify(NOALG, a, a, a)", "rsaVerify_32Kb(SHA256, a, a, a)", "rsaVerify_64Kb(SHA3256, a, a, a)", "rsaVerify_128Kb(NOALG, a, a, a)") -> 2945,
-         "rsa16" -> List("rsaVerify_16Kb(MD5, a, a, a)", "rsaVerify_32Kb(SHA256, a, a, a)", "rsaVerify_64Kb(SHA3256, a, a, a)", "rsaVerify_128Kb(NOALG, a, a, a)") -> 2445
+         "sig"  -> List("sigVerify(a, a, a)", "sigVerify_8Kb(a, a, a)", "sigVerify_16Kb(a, a, a)", "sigVerify_32Kb(a, a, a)", "sigVerify_64Kb(a, a, a)", "sigVerify_128Kb(a, a, a)") -> 678,
+         "rsa1" -> List("rsaVerify(NOALG, a, a, a)", "rsaVerify_16Kb(MD5, a, a, a)") -> 1510,
+         "rsa2" -> List("rsaVerify_32Kb(SHA256, a, a, a)", "rsaVerify_64Kb(SHA3256, a, a, a)", "rsaVerify_128Kb(NOALG, a, a, a)") -> 1940
     )) {
       val CompiledScript(scr, complexity, _) = sender.scriptCompile(ffDApp(4)(f))
       val EstimatedScript(_, _, ecomplexity, _) = sender.scriptEstimate(scr)
@@ -111,7 +109,7 @@ class RideFunctionFamilySuite extends BaseTransactionSuite with CancelAfterFailu
   }
 
   test("function family (DAps in V3)") {
-    for(f <- List("blake", "keccak", "sha", "sig", "rsa", "rsa16")) {
+    for(f <- List("blake", "keccak", "sha", "sig", "rsa1", "rsa2")) {
       assertApiError(sender.scriptCompile(ffDApp(3)(f))) { error =>
         error.statusCode shouldBe 400
         error.id shouldBe ScriptCompilerError.Id

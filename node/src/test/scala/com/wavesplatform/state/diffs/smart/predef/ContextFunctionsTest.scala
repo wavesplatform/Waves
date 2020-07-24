@@ -90,8 +90,11 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
   }
 
   property("reading from data transaction array by key") {
-    forAll(preconditionsAndPayments) {
-      case (_, _, _, tx, _, _) =>
+    forAll(for {
+      version       <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3))
+      preconditions <- preconditionsAndPayments
+    } yield (version, preconditions)) {
+      case (version, (_, _, _, tx, _, _)) =>
         val int  = tx.data(0)
         val bool = tx.data(1)
         val bin  = tx.data(2)
@@ -102,10 +105,10 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
                | case tx: DataTransaction => {
                |  let d = tx.data
                |
-               |  let int  = extract(getInteger(d, "${int.key}"))
-               |  let bool = extract(getBoolean(d, "${bool.key}"))
-               |  let bin  = extract(getBinary(d, "${bin.key}"))
-               |  let str  = extract(getString(d, "${str.key}"))
+               |  let int  = value(getInteger(d, "${int.key}"))
+               |  let bool = value(getBoolean(d, "${bool.key}"))
+               |  let bin  = value(getBinary(d, "${bin.key}"))
+               |  let str  = value(getString(d, "${str.key}"))
                |
                |  let intV  = getIntegerValue(d, "${int.key}")
                |  let boolV = getBooleanValue(d, "${bool.key}")
@@ -117,10 +120,10 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
                |  let okBin  = bin  == base58'${Base58.encode(bin.asInstanceOf[BinaryDataEntry].value.arr)}'
                |  let okStr  = str  == "${str.value}"
                |
-               |  let okIntV  = int + 1  == ${int.value} + 1
-               |  let okBoolV = bool || true == ${bool.value} || true
-               |  let okBinV  = bin  == base58'${Base58.encode(bin.asInstanceOf[BinaryDataEntry].value.arr)}'
-               |  let okStrV  = str + ""  == "${str.value}"
+               |  let okIntV  = intV + 1  == ${int.value} + 1
+               |  let okBoolV = boolV || true == ${bool.value} || true
+               |  let okBinV  = binV  == base58'${Base58.encode(bin.asInstanceOf[BinaryDataEntry].value.arr)}'
+               |  let okStrV  = strV + ""  == "${str.value}"
                |
                |  let badInt  = isDefined(getInteger(d, "${bool.key}"))
                |  let badBool = isDefined(getBoolean(d, "${bin.key}"))
@@ -137,7 +140,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
                |}
                |""".stripMargin,
           Coproduct(tx),
-          V3
+          version
         )
         result shouldBe evaluated(true)
     }
@@ -345,7 +348,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
               | {-# SCRIPT_TYPE ACCOUNT #-}
               |
               | let aInfoOpt        = assetInfo(base58'$assetId')
-              | let aInfo           = extract(aInfoOpt)
+              | let aInfo           = aInfoOpt.value()
               | let id              = aInfo.id == base58'$assetId'
               | let quantity        = aInfo.quantity == $quantity
               | let decimals        = aInfo.decimals == $decimals
@@ -460,7 +463,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
                  | let nonExistedBlockZero = !blockInfoByHeight(0).isDefined()
                  | let nonExistedBlockNextPlus = !blockInfoByHeight(6).isDefined()
                  |
-                 | let block = extract(blockInfoByHeight(3))
+                 | let block = blockInfoByHeight(3).value()
                  | let checkHeight = block.height == 3
                  | let checkBaseTarget = block.baseTarget == 2
                  | let checkGenSignature = block.generationSignature == base58'$generationSignature'
@@ -519,7 +522,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
             Monoid
               .combineAll(
                 Seq(
-                  PureContext.build(Global, V3).withEnvironment[Environment],
+                  PureContext.build(V3).withEnvironment[Environment],
                   CryptoContext.build(Global, V3).withEnvironment[Environment],
                   WavesContext.build(
                     DirectiveSet(V3, Account, Expression).explicitGet()

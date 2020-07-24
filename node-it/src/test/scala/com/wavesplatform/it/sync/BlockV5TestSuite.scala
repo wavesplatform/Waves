@@ -94,7 +94,7 @@ class BlockV5TestSuite
         block.transactionsRoot.value shouldBe Base58.encode(Blake2b256.hash(Array(0.toByte)))
       }
 
-      nodes.head.transfer(nodes.head.address, nodes.last.address, transferAmount, minFee, waitForTx = true)
+      nodes.head.transfer(nodes.head.keyPair, nodes.last.address, transferAmount, minFee, waitForTx = true)
 
       nodes.waitForSameBlockHeadersAt(nodes.head.height + 1, conditionAwaitTime = 5.minutes)
     }
