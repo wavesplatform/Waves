@@ -1662,7 +1662,7 @@ class InvokeScriptTransactionDiffTest
             Some(AssetDescription(asset.id(), master.publicKey, ByteString.EMPTY, ByteString.EMPTY, 1, false, BigInt(1), Height(1), None, 0L, false))
           )
         InvokeScriptTransactionDiff
-          .apply(blockchain, invoke.timestamp, runScripts = true, limitedExecution = false)(invoke)
+          .apply(blockchain, invoke.timestamp, limitedExecution = false)(invoke)
           .resultE should produce("is already issued")
     }
   }
