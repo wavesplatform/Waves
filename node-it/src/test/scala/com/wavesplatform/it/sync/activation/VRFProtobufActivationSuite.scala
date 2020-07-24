@@ -28,8 +28,8 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
       .overrideBase(_.raw(s"waves.blockchain.custom.functionality.min-asset-info-update-interval = $updateInterval"))
       .buildNonConflicting()
 
-  private val senderAcc     = pkByAddress(firstAddress)
-  private val recipientAcc  = pkByAddress(secondAddress)
+  private def senderAcc     = firstKeyPair
+  private def recipientAcc  = secondKeyPair
   private var assetId               = ""
   private var otherAssetId          = ""
   private var secondUpdateAssetTxId = ""
@@ -52,7 +52,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   }
 
   test("not able to broadcast tx of new versions before activation") {
-    assertApiError(sender.transfer(senderAcc.toAddress.toString, recipientAcc.toAddress.toString, transferAmount, version = TxVersion.V3)) { error =>
+    assertApiError(sender.transfer(senderAcc, recipientAcc.toAddress.toString, transferAmount, version = TxVersion.V3)) { error =>
       error.statusCode shouldBe 400
       error.message shouldBe "State check failed. Reason: ActivationError(Ride V4, VRF, Protobuf, Failed transactions feature has not been activated yet)"
       error.id shouldBe 112
@@ -133,7 +133,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   test("able to broadcast tx of new version after activation") {
     val senderWavesBalance    = sender.balanceDetails(senderAcc.toAddress.toString)
     val recipientWavesBalance = sender.balanceDetails(recipientAcc.toAddress.toString)
-    sender.transfer(senderAcc.toAddress.toString, recipientAcc.toAddress.toString, transferAmount, version = TxVersion.V3, waitForTx = true)
+    sender.transfer(senderAcc, recipientAcc.toAddress.toString, transferAmount, version = TxVersion.V3, waitForTx = true)
 
     sender.balanceDetails(senderAcc.toAddress.toString).available shouldBe senderWavesBalance.available - transferAmount - minFee
     sender.balanceDetails(recipientAcc.toAddress.toString).available shouldBe recipientWavesBalance.available + transferAmount
