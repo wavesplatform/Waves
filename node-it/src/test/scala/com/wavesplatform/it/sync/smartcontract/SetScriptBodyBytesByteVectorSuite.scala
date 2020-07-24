@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -71,17 +72,17 @@ class SetScriptBodyBytesByteVectorSuite extends BaseTransactionSuite {
   }
 
   test("big SetScript body bytes") {
-    checkByteVectorLimit(firstAddress, verifierV3)
-    checkByteVectorLimit(secondAddress, verifierV4)
+    checkByteVectorLimit(firstKeyPair, verifierV3)
+    checkByteVectorLimit(secondKeyPair, verifierV4)
 
     (the[RuntimeException] thrownBy dApp(1782)).getMessage shouldBe "Script is too large: 32780 bytes > 32768 bytes"
   }
 
-  private def checkByteVectorLimit(address: String, verifier: String) = {
+  private def checkByteVectorLimit(address: KeyPair, verifier: String) = {
     val setScriptId = sender.setScript(address, Some(verifier), setScriptFee, waitForTx = true).id
     sender.transactionInfo[TransactionInfo](setScriptId).script.get.startsWith("base64:") shouldBe true
 
-    val scriptInfo = sender.addressScriptInfo(address)
+    val scriptInfo = sender.addressScriptInfo(address.toAddress.toString)
     scriptInfo.script.isEmpty shouldBe false
     scriptInfo.scriptText.isEmpty shouldBe false
     scriptInfo.script.get.startsWith("base64:") shouldBe true

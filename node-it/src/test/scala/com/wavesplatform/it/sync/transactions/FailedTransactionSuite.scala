@@ -27,28 +27,27 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
   import FailedTransactionSuiteLike._
   import restApi._
 
-  private val acc0 = pkByAddress(firstAddress)
-  private val acc1 = pkByAddress(secondAddress)
-  private val acc2 = pkByAddress(thirdAddress)
-
-  private val contract = sender.createAddress()
-  private val caller   = thirdAddress
+  private lazy val contract = sender.createKeyPair()
+  private def caller   = thirdKeyPair
 
   private val assetAmount    = 1000000000L
   private var smartAsset     = ""
   private var sponsoredAsset = ""
 
-  private val seller         = acc0
-  private val buyer          = acc1
-  private val matcher        = acc2
-  private val sellerAddress  = firstAddress
-  private val buyerAddress   = secondAddress
-  private val matcherAddress = thirdAddress
+  private def seller         = firstKeyPair
+  private def buyer          = secondKeyPair
+  private def matcher        = thirdKeyPair
+
+  private def sellerAddress  = firstKeyPair
+  private def buyerAddress   = secondKeyPair
+  private def matcherAddress = thirdKeyPair
+
+  private lazy val contractAddress: String = contract.toAddress.toString
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
 
-    sender.transfer(sender.address, contract, 100.waves, minFee, waitForTx = true)
+    sender.transfer(sender.keyPair, contractAddress, 100.waves, minFee, waitForTx = true)
 
     smartAsset = sender
       .issue(
@@ -135,16 +134,17 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     val putDataFee   = calcDataFee(priorityData, 1)
     val priorityFee  = putDataFee + invokeFee
 
-    val prevBalance = sender.balance(caller).balance
+    val prevBalance = sender.balance(caller.toAddress.toString).balance
 
     sendPriorityTxAndThenOtherTxs(
-      _ => sender.invokeScript(caller, contract, Some("canThrow"), fee = invokeFee)._1.id,
+      _ => sender.invokeScript(caller, contractAddress, Some("canThrow"), fee = invokeFee)._1.id,
       () => sender.putData(contract, priorityData, priorityFee, waitForTx = true).id
     ) { (txs, priorityTx) =>
       logPriorityTx(priorityTx)
+      waitForHeightArise()
       val failed = assertFailedTxs(txs)
 
-      sender.balance(caller).balance shouldBe prevBalance - txs.size * invokeFee
+      sender.balance(caller.toAddress.toString).balance shouldBe prevBalance - txs.size * invokeFee
 
       failed.foreach { s =>
         checkStateChange(sender.debugStateChanges(s.id), 1, "Crashed by dApp", strict = true)
@@ -164,21 +164,21 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     for (typeName <- Seq("transfer", "issue", "reissue", "burn")) {
       updateTikTok("unknown", setAssetScriptMinFee)
 
-      val prevBalance      = sender.balance(caller).balance
-      val prevAssetBalance = sender.assetBalance(contract, smartAsset)
-      val prevAssets       = sender.assetsBalance(contract)
+      val prevBalance      = sender.balance(caller.toAddress.toString).balance
+      val prevAssetBalance = sender.assetBalance(contractAddress, smartAsset)
+      val prevAssets       = sender.assetsBalance(contractAddress)
 
       sendPriorityTxAndThenOtherTxs(
-        _ => sender.invokeScript(caller, contract, Some("tikTok"), fee = invokeFee)._1.id,
+        _ => sender.invokeScript(caller, contractAddress, Some("tikTok"), fee = invokeFee)._1.id,
         () => updateTikTok(typeName, priorityFee)
       ) { (txs, priorityTx) =>
         logPriorityTx(priorityTx)
 
         val failed = assertFailedTxs(txs)
 
-        sender.balance(caller).balance shouldBe prevBalance - txs.size * invokeFee
-        sender.assetBalance(contract, smartAsset) shouldBe prevAssetBalance
-        sender.assetsBalance(contract).balances should contain theSameElementsAs prevAssets.balances
+        sender.balance(caller.toAddress.toString).balance shouldBe prevBalance - txs.size * invokeFee
+        sender.assetBalance(contractAddress, smartAsset) shouldBe prevAssetBalance
+        sender.assetsBalance(contractAddress).balances should contain theSameElementsAs prevAssets.balances
 
         val minFee        = if (typeName == "issue") invokeFee + issueFee else invokeFee + smartFee
         val scriptInvoked = if (typeName == "issue") 0 else 1
@@ -202,12 +202,12 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     updateTikTok("reissue", setAssetScriptMinFee)
     updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
 
-    val prevBalance      = sender.balance(caller).balance
-    val prevAssetBalance = sender.assetBalance(contract, smartAsset)
-    val prevAssets       = sender.assetsBalance(contract).balances.map(_.assetId)
+    val prevBalance      = sender.balance(caller.toAddress.toString).balance
+    val prevAssetBalance = sender.assetBalance(contractAddress, smartAsset)
+    val prevAssets       = sender.assetsBalance(contractAddress).balances.map(_.assetId)
 
     sendPriorityTxAndThenOtherTxs(
-      _ => sender.invokeScript(caller, contract, Some("tikTok"), fee = invokeFee)._1.id,
+      _ => sender.invokeScript(caller, contractAddress, Some("tikTok"), fee = invokeFee)._1.id,
       () => updateAssetScript(result = false, smartAsset, contract, priorityFee)
     ) { (txs, priorityTx) =>
       logPriorityTx(priorityTx)
@@ -215,9 +215,9 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       val failed   = assertFailedTxs(txs)
       val reissued = 15 * (txs.size - failed.size)
 
-      sender.balance(caller).balance shouldBe prevBalance - txs.size * invokeFee
-      sender.assetBalance(contract, smartAsset) shouldBe prevAssetBalance.copy(balance = prevAssetBalance.balance + reissued)
-      sender.assetsBalance(contract).balances.map(_.assetId) should contain theSameElementsAs prevAssets
+      sender.balance(caller.toAddress.toString).balance shouldBe prevBalance - txs.size * invokeFee
+      sender.assetBalance(contractAddress, smartAsset) shouldBe prevAssetBalance.copy(balance = prevAssetBalance.balance + reissued)
+      sender.assetsBalance(contractAddress).balances.map(_.assetId) should contain theSameElementsAs prevAssets
 
       failed.foreach { s =>
         checkStateChange(sender.debugStateChanges(s.id), 3, "Transaction is not allowed by script of the asset")
@@ -245,17 +245,17 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
     updateTikTok("unknown", setAssetScriptMinFee)
 
-    val prevBalance             = sender.balance(caller).balance
-    val prevAssetBalance        = sender.assetBalance(contract, smartAsset)
-    val prevPaymentAssetBalance = sender.assetBalance(caller, paymentAsset)
-    val prevAssets              = sender.assetsBalance(contract).balances.map(_.assetId)
+    val prevBalance             = sender.balance(caller.toAddress.toString).balance
+    val prevAssetBalance        = sender.assetBalance(contractAddress, smartAsset)
+    val prevPaymentAssetBalance = sender.assetBalance(caller.toAddress.toString, paymentAsset)
+    val prevAssets              = sender.assetsBalance(contractAddress).balances.map(_.assetId)
 
     sendPriorityTxAndThenOtherTxs(
       _ =>
         sender
           .invokeScript(
             caller,
-            contract,
+            contractAddress,
             Some("tikTok"),
             fee = invokeFee,
             payment = Seq(InvokeScriptTransaction.Payment(15, IssuedAsset(ByteStr.decodeBase58(paymentAsset).get)))
@@ -271,15 +271,15 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       val succeedSize  = txs.size - failed.size
       val paymentDelta = -succeedSize * 15
 
-      sender.balance(caller).balance shouldBe prevBalance - txs.size * invokeFee - priorityFee
-      sender.assetBalance(contract, smartAsset) shouldBe prevAssetBalance
+      sender.balance(caller.toAddress.toString).balance shouldBe prevBalance - txs.size * invokeFee - priorityFee
+      sender.assetBalance(contractAddress, smartAsset) shouldBe prevAssetBalance
 
       val includePaymentAsset = if (txs.size > failed.size) List(paymentAsset) else List.empty
       sender
-        .assetsBalance(contract)
+        .assetsBalance(contractAddress)
         .balances
         .map(_.assetId) should contain theSameElementsAs prevAssets ++ includePaymentAsset
-      sender.assetBalance(caller, paymentAsset) shouldBe prevPaymentAssetBalance.copy(balance = prevPaymentAssetBalance.balance + paymentDelta)
+      sender.assetBalance(caller.toAddress.toString, paymentAsset) shouldBe prevPaymentAssetBalance.copy(balance = prevPaymentAssetBalance.balance + paymentDelta)
 
       failed.foreach { s =>
         checkStateChange(sender.debugStateChanges(s.id), 4, "Transaction is not allowed by script of the asset")
@@ -299,19 +299,19 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     updateTikTok("reissue", setAssetScriptMinFee)
 
     sender.sponsorAsset(contract, sponsoredAsset, 1, sponsorReducedFee + smartFee, waitForTx = true)
-    sender.transfer(contract, caller, assetAmount, smartMinFee, assetId = Some(sponsoredAsset), waitForTx = true)
+    sender.transfer(contract, caller.toAddress.toString, assetAmount, smartMinFee, assetId = Some(sponsoredAsset), waitForTx = true)
 
-    val prevBalance = sender.balance(contract).balance
+    val prevBalance = sender.balance(contractAddress).balance
 
     sendPriorityTxAndThenOtherTxs(
-      _ => sender.invokeScript(caller, contract, Some("tikTok"), fee = invokeFeeInAsset, feeAssetId = Some(sponsoredAsset))._1.id,
+      _ => sender.invokeScript(caller, contractAddress, Some("tikTok"), fee = invokeFeeInAsset, feeAssetId = Some(sponsoredAsset))._1.id,
       () => updateAssetScript(result = false, smartAsset, contract, priorityFee)
     ) { (txs, priorityTx) =>
       logPriorityTx(priorityTx)
 
-      sender.assetBalance(caller, sponsoredAsset).balance shouldBe assetAmount - txs.size * invokeFeeInAsset
-      sender.assetBalance(contract, sponsoredAsset).balance shouldBe txs.size * invokeFeeInAsset
-      sender.balance(contract).balance shouldBe prevBalance - invokeFee * txs.size - priorityFee
+      sender.assetBalance(caller.toAddress.toString, sponsoredAsset).balance shouldBe assetAmount - txs.size * invokeFeeInAsset
+      sender.assetBalance(contractAddress, sponsoredAsset).balance shouldBe txs.size * invokeFeeInAsset
+      sender.balance(contractAddress).balance shouldBe prevBalance - invokeFee * txs.size - priorityFee
 
       assertFailedTxs(txs)
     }
@@ -328,11 +328,11 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       BinaryDataEntry("bn", ByteStr(Longs.toByteArray(-1))),
       StringDataEntry("s", "-1")
     )
-    sender.broadcastData(pkByAddress(contract), initialEntries, minFee + smartFee, waitForTx = true)
+    sender.broadcastData(contract, initialEntries, minFee + smartFee, waitForTx = true)
     updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
 
     sendPriorityTxAndThenOtherTxs(
-      i => sender.invokeScript(caller, contract, Some("transferAndWrite"), args = List(Terms.CONST_LONG(i)), fee = invokeFee)._1.id,
+      i => sender.invokeScript(caller, contractAddress, Some("transferAndWrite"), args = List(Terms.CONST_LONG(i)), fee = invokeFee)._1.id,
       () => updateAssetScript(result = false, smartAsset, contract, priorityFee)
     ) { (txs, priorityTx) =>
       logPriorityTx(priorityTx)
@@ -353,13 +353,13 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
           .toMap
       initialEntries.map(entry => entry.key -> entry).toMap.foreach {
         case (key, initial) =>
-          sender.getDataByKey(contract, key) shouldBe lastSuccessWrites.getOrElse(key, initial)
+          sender.getDataByKey(contractAddress, key) shouldBe lastSuccessWrites.getOrElse(key, initial)
       }
 
       failed.foreach(s => checkStateChange(sender.debugStateChanges(s.id), 3, "Transaction is not allowed by script of the asset"))
 
       val failedIds             = failed.map(_.id).toSet
-      val stateChangesByAddress = sender.debugStateChangesByAddress(contract, 10).takeWhile(sc => failedIds.contains(sc.id))
+      val stateChangesByAddress = sender.debugStateChangesByAddress(contractAddress, 10).takeWhile(sc => failedIds.contains(sc.id))
       stateChangesByAddress.size should be > 0
       stateChangesByAddress.foreach(info => checkStateChange(info, 3, "Transaction is not allowed by script of the asset"))
 
@@ -375,11 +375,11 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     updateTikTok("unknown", setAssetScriptMinFee)
     updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
 
-    val prevBalance = sender.balance(caller).balance
+    val prevBalance = sender.balance(caller.toAddress.toString).balance
 
     overflowBlock()
     sendPriorityTxAndThenOtherTxs(
-      _ => sender.invokeScript(caller, contract, Some("tikTok"), fee = invokeFee)._1.id,
+      _ => sender.invokeScript(caller, contractAddress, Some("tikTok"), fee = invokeFee)._1.id,
       () =>
         sender
           .setScript(
@@ -410,7 +410,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     ) { (txs, priorityTx) =>
       logPriorityTx(priorityTx)
       val invalid = assertInvalidTxs(txs)
-      sender.balance(caller).balance shouldBe prevBalance - (txs.size - invalid.size) * invokeFee - priorityFee
+      sender.balance(caller.toAddress.toString).balance shouldBe prevBalance - (txs.size - invalid.size) * invokeFee - priorityFee
       invalid
     }
   }
@@ -425,7 +425,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
 
     val failedTxs = sendPriorityTxAndThenOtherTxs(
-      _ => sender.invokeScript(caller, contract, Some("tikTok"), fee = invokeFee)._1.id,
+      _ => sender.invokeScript(caller, contractAddress, Some("tikTok"), fee = invokeFee)._1.id,
       () => updateAssetScript(result = false, smartAsset, contract, priorityFee)
     ) { (txs, priorityTx) =>
       logPriorityTx(priorityTx)
@@ -437,9 +437,9 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
   test("ExchangeTransaction: failed exchange tx when asset script fails") {
     val init = Seq(
-      sender.setScript(firstAddress, None, setScriptFee + smartFee).id,
-      sender.setScript(secondAddress, None, setScriptFee + smartFee).id,
-      sender.setScript(thirdAddress, None, setScriptFee + smartFee).id
+      sender.setScript(firstKeyPair, None, setScriptFee + smartFee).id,
+      sender.setScript(secondKeyPair, None, setScriptFee + smartFee).id,
+      sender.setScript(thirdKeyPair, None, setScriptFee + smartFee).id
     )
     waitForTxs(init)
 
@@ -553,7 +553,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       fee = setScriptFee + smartFee,
       waitForTx = true
     )
-    assertApiError(sender.transfer(caller, contract, 100, fee = smartMinFee)) { e =>
+    assertApiError(sender.transfer(caller, contractAddress, 100, fee = smartMinFee)) { e =>
       e.message should include("Transaction is not allowed by account-script")
       e.id shouldBe TransactionNotAllowedByAccountScript.Id
     }
@@ -562,14 +562,14 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
   test("InvokeScriptTransaction: revalidate transactions returned to UTXPool because of `min-micro-block-age`") {
     docker.restartNode(dockerNodes().head, configForMinMicroblockAge)
 
-    val caller = sender.createAddress()
-    sender.transfer(sender.address, caller, 100.waves, minFee, waitForTx = true)
+    val caller = sender.createKeyPair()
+    sender.transfer(sender.keyPair, caller.toAddress.toString, 100.waves, minFee, waitForTx = true)
 
     sender.waitFor("even height")(n => n.height, (h: Int) => h % 2 == 0, 500.millis)
 
     var ids = Set.empty[String]
     while (miner.height % 2 == 0) {
-      val tx = sender.invokeScript(caller, contract, Some("blockIsEven"), fee = invokeFee, waitForTx = true)._1
+      val tx = sender.invokeScript(caller, contractAddress, Some("blockIsEven"), fee = invokeFee, waitForTx = true)._1
       ids += tx.id
     }
 
@@ -580,7 +580,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
   }
 
   def updateTikTok(result: String, fee: Long): String =
-    sender.broadcastData(pkByAddress(contract), List(StringDataEntry("tikTok", result)), fee = fee, waitForTx = true).id
+    sender.broadcastData(contract, List(StringDataEntry("tikTok", result)), fee = fee, waitForTx = true).id
 
   private def waitForTxs(txs: Seq[String]): Unit =
     nodes.waitFor("preconditions", 500.millis)(_.transactionStatus(txs).forall(_.status == "confirmed"))(
@@ -605,7 +605,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       sender
         .invokeScript(
           caller,
-          contract,
+          contractAddress,
           Some("defineTxHeight"),
           List(Terms.CONST_BYTESTR(ByteStr.decodeBase58(status.id).get).explicitGet()),
           fee = invokeFee
@@ -616,14 +616,14 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     waitForTxs(defineTxs)
 
-    failedTxs.foreach(status => sender.getDataByKey(contract, status.id) shouldBe BooleanDataEntry(status.id, value = false))
+    failedTxs.foreach(status => sender.getDataByKey(contractAddress, status.id) shouldBe BooleanDataEntry(status.id, value = false))
   }
 
   private def exchangePreconditions(initScript: Option[String]): Precondition = {
     val transfers = Seq(
-      sender.transfer(sender.address, sellerAddress, 100.waves).id,
-      sender.transfer(sender.address, buyerAddress, 100.waves).id,
-      sender.transfer(sender.address, matcherAddress, 100.waves).id
+      sender.transfer(sender.keyPair, sellerAddress.toAddress.toString, 100.waves).id,
+      sender.transfer(sender.keyPair, buyerAddress.toAddress.toString, 100.waves).id,
+      sender.transfer(sender.keyPair, matcherAddress.toAddress.toString, 100.waves).id
     )
 
     val amountAsset  = sender.issue(sellerAddress, "Amount asset", script = initScript, decimals = 8).id
@@ -640,8 +640,8 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     waitForTxs(preconditions)
 
-    val transferToSeller = sender.transfer(matcherAddress, sellerAddress, 1000000000, fee = minFee + smartFee, assetId = Some(sellFeeAsset)).id
-    val transferToBuyer  = sender.transfer(matcherAddress, buyerAddress, 1000000000, fee = minFee + smartFee, assetId = Some(buyFeeAsset)).id
+    val transferToSeller = sender.transfer(matcherAddress, sellerAddress.toAddress.toString, 1000000000, fee = minFee + smartFee, assetId = Some(sellFeeAsset)).id
+    val transferToBuyer  = sender.transfer(matcherAddress, buyerAddress.toAddress.toString, 1000000000, fee = minFee + smartFee, assetId = Some(buyFeeAsset)).id
 
     waitForTxs(Seq(transferToSeller, transferToBuyer))
 
