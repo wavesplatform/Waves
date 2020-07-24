@@ -19,8 +19,8 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.FreeSpec
 
-import scala.util.Random
 import scala.concurrent.duration._
+import scala.util.Random
 
 class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSuiteLike {
   private val initialWavesBalance = 100.waves
@@ -171,7 +171,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
       assertError(
         reissue(acc, method, assetId, 2, reissuable = true, checkStateChanges = false),
         method,
-       "Asset is not reissuable"
+        "Asset is not reissuable"
       )
     }
 

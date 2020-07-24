@@ -15,10 +15,10 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 class SponsorFeeActionSuite extends BaseSuite {
   private val initialWavesBalance = 100.waves
 
-  private var sponsoredAssetId: String = ""
+  private var sponsoredAssetId: String  = ""
   private var globalDAppAddress: String = ""
-  private var dApp: KeyPair = _
-  private val minSponsoredAssetFee = 100
+  private var dApp: KeyPair             = _
+  private val minSponsoredAssetFee      = 100
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -447,8 +447,9 @@ class SponsorFeeActionSuite extends BaseSuite {
         """.stripMargin
       )
 
-      val failedTx = miner.invokeScript(miner.keyPair, dApp.toAddress.toString, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee)
-      val error    = sender.debugStateChanges(failedTx._1.id).stateChanges.get.error.get.text
+      val failedTx = miner.invokeScript(miner.keyPair, dApp.toAddress.toString, Some("sponsorAsset"), fee = smartMinFee)
+      nodes.waitForHeightAriseAndTxPresent(failedTx._1.id)
+      val error = sender.debugStateChanges(failedTx._1.id).stateChanges.get.error.get.text
       error should include(s"SponsorFee assetId=$assetId was not issued from address of current dApp")
     }
 

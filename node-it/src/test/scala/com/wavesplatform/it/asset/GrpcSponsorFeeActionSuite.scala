@@ -499,7 +499,7 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
 
     miner.transfer(sender.keyPair, address.publicKey.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
 
-    nodes.waitForTransaction(
+    nodes.waitForHeightAriseAndTxPresent(
       miner
         .signedBroadcast(
           SetScriptTransaction
