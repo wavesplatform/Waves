@@ -61,15 +61,15 @@ object TransactionDiffer {
       blockchain: Blockchain,
       tx: Transaction
   ): TracedResult[ValidationError, Diff] = {
-    val runScripts = verify || (mayFail(tx) && acceptFailed(blockchain))
+    val verifyAssets = verify || (mayFail(tx) && acceptFailed(blockchain))
     val result = for {
       _               <- validateCommon(blockchain, tx, prevBlockTimestamp, currentBlockTimestamp, verify).traced
       _               <- validateFunds(blockchain, tx).traced
-      verifierDiff    <- verifierDiff(blockchain, tx, verify)
-      transactionDiff <- transactionDiff(blockchain, tx, verifierDiff, currentBlockTimestamp, runScripts, limitedExecution)
+      verifierDiff    <- if (verify) verifierDiff(blockchain, tx) else Right(Diff.empty).traced
+      transactionDiff <- transactionDiff(blockchain, tx, verifierDiff, currentBlockTimestamp, limitedExecution)
       _               <- validateBalance(blockchain, tx.typeId, transactionDiff).traced
       remainingComplexity = if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - transactionDiff.scriptsComplexity.toInt else Int.MaxValue
-      diff <- assetsVerifierDiff(blockchain, tx, runScripts, transactionDiff, remainingComplexity)
+      diff <- assetsVerifierDiff(blockchain, tx, verifyAssets, transactionDiff, remainingComplexity)
     } yield diff
     result.leftMap(TransactionValidationError(_, tx))
   }
@@ -112,9 +112,8 @@ object TransactionDiffer {
         }
       } yield ()
 
-  private def verifierDiff(blockchain: Blockchain, tx: Transaction, verify: Boolean): TracedResult[ValidationError, Diff] =
-    if (verify) Verifier(blockchain)(tx).as(Diff.empty.copy(scriptsComplexity = DiffsCommon.getAccountsComplexity(blockchain, tx)))
-    else Right(Diff.empty).traced
+  private def verifierDiff(blockchain: Blockchain, tx: Transaction) =
+    Verifier(blockchain)(tx).as(Diff.empty.copy(scriptsComplexity = DiffsCommon.getAccountsComplexity(blockchain, tx)))
 
   private def assetsVerifierDiff(
       blockchain: Blockchain,
@@ -142,14 +141,7 @@ object TransactionDiffer {
   private def validateBalance(blockchain: Blockchain, txType: TxType, diff: Diff): Either[ValidationError, Unit] =
     stats.balanceValidation.measureForType(txType)(BalanceDiffValidation(blockchain)(diff).as(()))
 
-  private def transactionDiff(
-      blockchain: Blockchain,
-      tx: Transaction,
-      initDiff: Diff,
-      currentBlockTs: Long,
-      runScripts: Boolean,
-      limitedExecution: Boolean
-  ): TracedResult[ValidationError, Diff] = {
+  private def transactionDiff(blockchain: Blockchain, tx: Transaction, initDiff: Diff, currentBlockTs: TxTimestamp, limitedExecution: Boolean) = {
     val diff = stats.transactionDiffValidation.measureForType(tx.typeId) {
       tx match {
         case gtx: GenesisTransaction           => GenesisTransactionDiff(blockchain.height)(gtx).traced

@@ -19,6 +19,8 @@ import monix.reactive.subjects.PublishSubject
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{FlatSpec, Matchers}
 
+import scala.concurrent.duration._
+
 //noinspection RedundantDefaultArgument
 class UtxFailedTxsSpec extends FlatSpec with Matchers with WithDomain with Eventually {
   val dApp = TxHelpers.signer(1)
@@ -130,6 +132,48 @@ class UtxFailedTxsSpec extends FlatSpec with Matchers with WithDomain with Event
     utx.size shouldBe 1
 
     utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe Some(Seq(tx))
+  }
+
+  it should "cleanup transaction when script result changes" in utxTest { (d, utx) =>
+    val (script, _) = ScriptCompiler
+      .compile(
+        """
+        |{-# STDLIB_VERSION 4 #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |
+        |@Callable(i)
+        |func test1000() = {
+        |  if (height % 2 == 0) then
+        |    []
+        |  else
+        |    if (!sigVerify(base58'', base58'', base58'')
+        |    && !sigVerify(base58'', base58'', base58'')
+        |    && !sigVerify(base58'', base58'', base58'')
+        |    && !sigVerify(base58'', base58'', base58'')) then
+        |      throw("height is odd")
+        |    else [IntegerEntry("h", height)]
+        |  }
+        |  """.stripMargin,
+        ScriptEstimatorV3
+      )
+      .explicitGet()
+
+    d.appendBlock(TxHelpers.setScript(dApp, script))
+    assert(d.blockchainUpdater.height % 2 == 0)
+
+    (1 to 100).foreach { _ =>
+      val invoke = TxHelpers.invoke(dApp.toAddress, "test1000")
+      utx.putIfNew(invoke, forceValidate = true).resultE.explicitGet()
+    }
+
+    utx.size shouldBe 100
+    d.appendBlock() // Height is odd
+    utx.addAndCleanup(Nil)
+    eventually(timeout(10 seconds), interval(500 millis)) {
+      utx.size shouldBe 0
+      utx.all shouldBe Nil
+    }
   }
 
   private[this] def genExpr(targetComplexity: Int, result: Boolean): String = {
