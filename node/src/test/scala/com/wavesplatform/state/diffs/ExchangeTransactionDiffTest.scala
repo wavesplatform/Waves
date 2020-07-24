@@ -321,7 +321,7 @@ class ExchangeTransactionDiffTest
       case (gen1, gen2, gen3, issue1, issue2, exchange) =>
         assertDiffEi(Seq(TestBlock.create(Seq(gen1, gen2, gen3, issue1, issue2))), TestBlock.create(Seq(exchange)), fsWithOrderFeature) {
           blockDiffEi =>
-            blockDiffEi should produce("Assets should be issued")
+            blockDiffEi should produce("AccountBalanceError")
         }
     }
   }
@@ -982,16 +982,57 @@ class ExchangeTransactionDiffTest
         fee  = 100000000L
         itx1 <- issueGen(MATCHER, Some(ENOUGH_AMT), fixedDecimals = Some(8.toByte))
         itx2 <- issueGen(MATCHER, Some(ENOUGH_AMT), fixedDecimals = Some(8.toByte))
-        ttx1 = TransferTransaction.selfSigned(TxVersion.V3, MATCHER, seller.toAddress, IssuedAsset(itx1.assetId), ENOUGH_AMT / 2, Waves, fee, ByteStr.empty, itx1.timestamp + 1)
+        ttx1 = TransferTransaction
+          .selfSigned(
+            TxVersion.V3,
+            MATCHER,
+            seller.toAddress,
+            IssuedAsset(itx1.assetId),
+            ENOUGH_AMT / 2,
+            Waves,
+            fee,
+            ByteStr.empty,
+            itx1.timestamp + 1
+          )
           .explicitGet()
         ttx2 = TransferTransaction
-          .selfSigned(TxVersion.V3, MATCHER, buyer.toAddress, IssuedAsset(itx1.assetId), ENOUGH_AMT / 2, Waves, fee, ByteStr.empty, itx1.timestamp + 1)
+          .selfSigned(
+            TxVersion.V3,
+            MATCHER,
+            buyer.toAddress,
+            IssuedAsset(itx1.assetId),
+            ENOUGH_AMT / 2,
+            Waves,
+            fee,
+            ByteStr.empty,
+            itx1.timestamp + 1
+          )
           .explicitGet()
         ttx3 = TransferTransaction
-          .selfSigned(TxVersion.V3, MATCHER, seller.toAddress, IssuedAsset(itx2.assetId), ENOUGH_AMT / 2, Waves, fee, ByteStr.empty, itx2.timestamp + 1)
+          .selfSigned(
+            TxVersion.V3,
+            MATCHER,
+            seller.toAddress,
+            IssuedAsset(itx2.assetId),
+            ENOUGH_AMT / 2,
+            Waves,
+            fee,
+            ByteStr.empty,
+            itx2.timestamp + 1
+          )
           .explicitGet()
         ttx4 = TransferTransaction
-          .selfSigned(TxVersion.V3, MATCHER, buyer.toAddress, IssuedAsset(itx2.assetId), ENOUGH_AMT / 2, Waves, fee, ByteStr.empty, itx2.timestamp + 1)
+          .selfSigned(
+            TxVersion.V3,
+            MATCHER,
+            buyer.toAddress,
+            IssuedAsset(itx2.assetId),
+            ENOUGH_AMT / 2,
+            Waves,
+            fee,
+            ByteStr.empty,
+            itx2.timestamp + 1
+          )
           .explicitGet()
         assets = Seq(IssuedAsset(itx1.assetId), IssuedAsset(itx2.assetId), Waves)
         amountAsset <- Gen.oneOf(assets)
@@ -1178,7 +1219,7 @@ class ExchangeTransactionDiffTest
         amountAssetIssue,
         order1FeeAssetIssue,
         order2FeeAssetIssue,
-        2 * TestValues.assetScriptComplexity + TestValues.rejectAssetScriptComplexity
+        2 * TestValues.assetScriptComplexity
       )
     }
 
@@ -1193,7 +1234,7 @@ class ExchangeTransactionDiffTest
         amountAssetIssue,
         order1FeeAssetIssue,
         order2FeeAssetIssue,
-        3 * TestValues.assetScriptComplexity + TestValues.rejectAssetScriptComplexity
+        2 * TestValues.assetScriptComplexity
       )
     }
   }
