@@ -317,6 +317,8 @@ class UtxPoolImpl(
         case _                           => true
       }
 
+      def isUnlimited: Boolean = strategy == PackStrategy.Unlimited
+
       def packIteration(prevResult: PackResult, sortedTransactions: Iterator[TxEntry]): PackResult =
         sortedTransactions
           .filterNot(e => prevResult.validatedTransactions(e.tx.id()))
@@ -411,7 +413,7 @@ class UtxPoolImpl(
           } else {
             val continue = try {
               while (!cancelled() && !isTimeEstimateReached && allValidated(newSeed)) Thread.sleep(200)
-              !cancelled() && !isTimeEstimateReached
+              !cancelled() && (!isTimeEstimateReached || isUnlimited)
             } catch {
               case _: InterruptedException =>
                 false
