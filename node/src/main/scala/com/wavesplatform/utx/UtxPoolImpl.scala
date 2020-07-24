@@ -290,19 +290,21 @@ class UtxPoolImpl(
     pack(TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime()))(initialConstraint, strategy, cancelled)
   }
 
-  private def cleanUnconfirmed(): Unit =
+  private def cleanUnconfirmed(): Unit = {
+    log.trace(s"Starting UTX cleanup at height ${blockchain.height}")
+
     pack(TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime()))(
       MultiDimensionalMiningConstraint.unlimited,
       PackStrategy.Unlimited,
       () => false
     )
+  }
 
   private def pack(differ: (Blockchain, Transaction) => TracedResult[ValidationError, Diff])(
       initialConstraint: MultiDimensionalMiningConstraint,
       strategy: PackStrategy,
       cancelled: () => Boolean
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
-
     val packResult = PoolMetrics.packTimeStats.measure {
       val startTime = nanoTimeSource()
 
@@ -419,10 +421,7 @@ class UtxPoolImpl(
                 false
             }
             if (continue) loop(newSeed)
-            else {
-              if (cancelled()) log.trace("Pack cancelled")
-              newSeed
-            }
+            else newSeed
           }
         }
       }
