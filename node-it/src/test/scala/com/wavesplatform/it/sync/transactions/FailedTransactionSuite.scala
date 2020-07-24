@@ -136,7 +136,9 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     val prevBalance = sender.balance(caller.toAddress.toString).balance
 
-    sender.putData(contract, priorityData, priorityFee, waitForTx = true)
+    val dataTx = sender.putData(contract, priorityData, priorityFee)
+    nodes.waitForHeightAriseAndTxPresent(dataTx.id)
+
     assertApiError(
       sender.invokeScript(caller, contractAddress, Some("canThrow"), fee = invokeFee),
       AssertiveApiError(ScriptExecutionError.Id, "Error while executing account-script: Crashed by dApp")
