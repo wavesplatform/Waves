@@ -42,10 +42,8 @@ case class ExchangeTransaction(
   override val json: Coeval[JsObject]         = Coeval.evalOnce(ExchangeTransaction.serializer.toJson(this))
 
   override def checkedAssets: Seq[IssuedAsset] = {
-    import buyOrder.{assetPair => pair}
-    Vector(pair.priceAsset, pair.amountAsset, order1.matcherFeeAssetId, order2.matcherFeeAssetId)
-      .distinct
-      .collect { case a: IssuedAsset => a }
+    val pair = buyOrder.assetPair
+    Seq(pair.priceAsset, pair.amountAsset) collect { case a: IssuedAsset => a }
   }
 }
 

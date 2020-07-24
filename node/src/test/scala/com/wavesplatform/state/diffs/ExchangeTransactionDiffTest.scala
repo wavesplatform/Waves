@@ -1213,13 +1213,17 @@ class ExchangeTransactionDiffTest
         val newBlock = d.createBlock(2.toByte, Seq(exchange))
         val diff     = BlockDiffer.fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited).explicitGet()
         diff.diff.scriptsComplexity shouldBe complexity
+
+        val feeUnits = FeeValidation.getMinFee(d.blockchainUpdater, exchange).explicitGet().minFeeInWaves / FeeValidation.FeeUnit
+        if (complexity > 0) feeUnits shouldBe 7
+        else feeUnits shouldBe 3
       }
     }
 
     withClue("fee") {
       val tradeableAssetIssue = TxHelpers.issue()
       val feeAssetIssue       = TxHelpers.issue(script = TestValues.assetScript)
-      test(tradeableAssetIssue, feeAssetIssue, 1)
+      test(tradeableAssetIssue, feeAssetIssue, 0)
     }
 
     withClue("asset") {
@@ -1231,7 +1235,7 @@ class ExchangeTransactionDiffTest
     withClue("fee and asset") {
       val tradeableAssetIssue = TxHelpers.issue(script = TestValues.assetScript)
       val feeAssetIssue       = TxHelpers.issue(script = TestValues.assetScript)
-      test(tradeableAssetIssue, feeAssetIssue, 2)
+      test(tradeableAssetIssue, feeAssetIssue, 1)
     }
 
     withClue("fee and asset (same asset)") {
