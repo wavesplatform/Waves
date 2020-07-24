@@ -18,11 +18,9 @@ import scala.util.Random
 
 class ScriptLogSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  private val smart = pkByAddress(firstAddress)
-
   val ENOUGH_FEE: Long = 12900000L
 
-  val scriptSrc: String =
+  lazy val scriptSrc: String =
     s"""
        |let self = Address(base58'$firstAddress')
        |
@@ -66,11 +64,11 @@ class ScriptLogSuite extends BaseTransactionSuite with CancelAfterFailure {
         BinaryDataEntry(s"k$i", ByteStr(bytes))
       }).toList
 
-    sender.putData(smart.toAddress.toString, data, ENOUGH_FEE, waitForTx = true).id
+    sender.putData(firstKeyPair, data, ENOUGH_FEE, waitForTx = true).id
 
     val script = ScriptCompiler(scriptSrc, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(1.toByte, smart, Some(script), setScriptFee, System.currentTimeMillis())
+      .selfSigned(1.toByte, firstKeyPair, Some(script), setScriptFee, System.currentTimeMillis())
       .explicitGet()
 
     val sstx = sender.signedBroadcast(setScriptTransaction.json()).id
@@ -83,10 +81,16 @@ class ScriptLogSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     def mkInvData() =
       DataTransaction
-        .selfSigned(1.toByte, smart, List(
-            BinaryDataEntry("pk", smart.publicKey),
-            BinaryDataEntry("sig", ByteStr(signature)),
-          ), ENOUGH_FEE, System.currentTimeMillis())
+        .selfSigned(
+          1.toByte,
+          firstKeyPair,
+          List(
+            BinaryDataEntry("pk", firstKeyPair.publicKey),
+            BinaryDataEntry("sig", ByteStr(signature))
+          ),
+          ENOUGH_FEE,
+          System.currentTimeMillis()
+        )
         .explicitGet()
 
     assertApiErrorRaised(sender.signedBroadcast(mkInvData().json()))

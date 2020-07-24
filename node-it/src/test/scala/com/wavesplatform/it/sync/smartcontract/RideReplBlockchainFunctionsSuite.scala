@@ -29,13 +29,13 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
       .withDefault(entitiesNumber = 1)
       .buildNonConflicting()
 
-  private val alice = pkByAddress(firstAddress)
-  private val bob   = pkByAddress(secondAddress)
+  private def alice = firstKeyPair
+  private def bob   = secondKeyPair
 
-  private val chainId: Char = miner.settings.blockchainSettings.addressSchemeCharacter
+  private lazy val chainId: Char = miner.settings.blockchainSettings.addressSchemeCharacter
 
-  private val settings = NodeConnectionSettings(miner.nodeApiEndpoint.toString, chainId.toByte, alice.toAddress.stringRepr)
-  private val repl     = Repl(Some(settings))
+  private lazy val settings = NodeConnectionSettings(miner.nodeApiEndpoint.toString, chainId.toByte, alice.toAddress.stringRepr)
+  private lazy val repl     = Repl(Some(settings))
 
   private var dataTxId       = ""
   private var assetId        = ""
@@ -54,7 +54,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   test("prepare") {
     dataTxId = sender
       .putData(
-        alice.toAddress.stringRepr,
+        alice,
         List(
           BinaryDataEntry("bin", ByteStr("binary".getBytes)),
           BooleanDataEntry("bool1", true),
@@ -66,15 +66,15 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
       )
       .id
 
-    sender.createAlias(bob.toAddress.stringRepr, alias, minFee).id
-    assetId = sender.issue(alice.toAddress.stringRepr, "Asset", "descr", 1000, 2, waitForTx = true).id
+    sender.createAlias(bob, alias, minFee).id
+    assetId = sender.issue(alice, "Asset", "descr", 1000, 2, waitForTx = true).id
 
     transferTxIds =
       Seq(TxVersion.V1, TxVersion.V2, TxVersion.V3)
           .map {
             version =>
               val tx = sender.transfer(
-                alice.toAddress.stringRepr,
+                alice,
                 s"alias:$chainId:$alias",
                 transferAmount,
                 minFee,

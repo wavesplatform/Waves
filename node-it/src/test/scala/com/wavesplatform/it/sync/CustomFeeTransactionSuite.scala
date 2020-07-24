@@ -10,8 +10,8 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.state.Sponsorship
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.IssueTransaction
-import org.scalatest.CancelAfterFailure
 import com.wavesplatform.utils._
+import org.scalatest.CancelAfterFailure
 
 class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
@@ -32,7 +32,7 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     val issuedAssetId = notMiner.signedIssue(req).id
     nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
 
-    val sponsorAssetId = notMiner.sponsorAsset(senderAddress, issuedAssetId, assetToken, assetFee).id
+    val sponsorAssetId = notMiner.sponsorAsset(senderKeyPair, issuedAssetId, assetToken, assetFee).id
     assert(!sponsorAssetId.isEmpty)
     nodes.waitForHeightAriseAndTxPresent(sponsorAssetId)
 
@@ -41,7 +41,8 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     notMiner.assertAssetBalance(senderAddress, issuedAssetId, defaultAssetQuantity)
 
     // until `feature-check-blocks-period` blocks have been mined, sponsorship does not occur
-    val unsponsoredId = notMiner.transfer(senderAddress, secondAddress, 1, transferFee, Some(issuedAssetId), Some(issuedAssetId)).id
+    val unsponsoredId =
+      notMiner.transfer(senderKeyPair, secondAddress, 1, transferFee, Some(issuedAssetId), Some(issuedAssetId)).id
     nodes.waitForHeightAriseAndTxPresent(unsponsoredId)
     notMiner.assertBalances(senderAddress, balance1 - fees, eff1 - fees)
     notMiner.assertBalances(secondAddress, balance2, eff2)
@@ -53,7 +54,7 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
     // after `feature-check-blocks-period` asset fees should be sponsored
     nodes.waitForSameBlockHeadersAt(featureCheckBlocksPeriod)
-    val sponsoredId = notMiner.transfer(senderAddress, secondAddress, 1, transferFee, Some(issuedAssetId), Some(issuedAssetId)).id
+    val sponsoredId = notMiner.transfer(senderKeyPair, secondAddress, 1, transferFee, Some(issuedAssetId), Some(issuedAssetId)).id
     nodes.waitForHeightAriseAndTxPresent(sponsoredId)
 
     val sponsorship = Sponsorship.toWaves(transferFee, assetToken)
@@ -71,33 +72,31 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 object CustomFeeTransactionSuite {
   private val minerAddress             = Default.head.getString("address")
   private val senderAddress            = Default(2).getString("address")
+  private val seed                     = Default(2).getString("account-seed")
+  private val senderKeyPair            = KeyPair.fromSeed(seed).explicitGet()
   private val defaultAssetQuantity     = 999999999999L
   private val featureCheckBlocksPeriod = 13
 
-  private val seed = Default(2).getString("account-seed")
-  private val pk   = KeyPair.fromSeed(seed).explicitGet()
-  val assetTx = IssueTransaction(
-      TxVersion.V1,
-      sender = pk.publicKey,
-      "asset".utf8Bytes,
-      "asset description".utf8Bytes,
-      quantity = defaultAssetQuantity,
-      decimals = 2,
-      reissuable = false,
-      script = None,
-      fee = 1.waves,
-      timestamp = System.currentTimeMillis()
-    )
-    .signWith(pk.privateKey)
+  private val assetTx = IssueTransaction(
+    TxVersion.V1,
+    sender = senderKeyPair.publicKey,
+    "asset".utf8Bytes,
+    "asset description".utf8Bytes,
+    quantity = defaultAssetQuantity,
+    decimals = 2,
+    reissuable = false,
+    script = None,
+    fee = 1.waves,
+    timestamp = System.currentTimeMillis()
+  ).signWith(senderKeyPair.privateKey)
 
-  val assetId = assetTx.id()
+  private val assetId = assetTx.id()
 
-  private val minerConfig = ConfigFactory.parseString(s"""
-                                                         | waves.fees.transfer.$assetId = 100000
-                                                         | waves.blockchain.custom.functionality {
-                                                         |   feature-check-blocks-period = $featureCheckBlocksPeriod
-                                                         |   blocks-for-feature-activation = $featureCheckBlocksPeriod
-                                                         |   pre-activated-features = { 7 = 0, 14 = 1000000 }
+  private val minerConfig = ConfigFactory.parseString(s"""waves.fees.transfer.$assetId = 100000
+                                                         |waves.blockchain.custom.functionality {
+                                                         |  feature-check-blocks-period = $featureCheckBlocksPeriod
+                                                         |  blocks-for-feature-activation = $featureCheckBlocksPeriod
+                                                         |  pre-activated-features = { 7 = 0, 14 = 1000000 }
                                                          |}""".stripMargin)
 
   private val notMinerConfig = ConfigFactory.parseString("waves.miner.enable=no").withFallback(minerConfig)

@@ -21,14 +21,14 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
       val (firstBalance, firstEffBalance)   = miner.accountBalances(firstAddress)
       val (secondBalance, secondEffBalance) = miner.accountBalances(secondAddress)
 
-      val issuedAssetId = sender.issue(firstAddress, "name", "description", someAssetAmount, 2, reissuable = false, issueFee).id
+      val issuedAssetId = sender.issue(firstKeyPair, "name", "description", someAssetAmount, 2, reissuable = false, issueFee).id
 
       nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
 
       miner.assertBalances(firstAddress, firstBalance - issueFee, firstEffBalance - issueFee)
       miner.assertAssetBalance(firstAddress, issuedAssetId, someAssetAmount)
 
-      val transferTransaction = sender.transfer(firstAddress, secondAddress, someAssetAmount, minFee, Some(issuedAssetId), version = v)
+      val transferTransaction = sender.transfer(firstKeyPair, secondAddress, someAssetAmount, minFee, Some(issuedAssetId), version = v)
       nodes.waitForHeightAriseAndTxPresent(transferTransaction.id)
       if (v > 2) {
         transferTransaction.chainId shouldBe Some(AddressScheme.current.chainId)
@@ -47,7 +47,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
       val (firstBalance, firstEffBalance)   = miner.accountBalances(firstAddress)
       val (secondBalance, secondEffBalance) = miner.accountBalances(secondAddress)
 
-      val transferId = sender.transfer(firstAddress, secondAddress, transferAmount, minFee, version = v).id
+      val transferId = sender.transfer(firstKeyPair, secondAddress, transferAmount, minFee, version = v).id
 
       nodes.waitForHeightAriseAndTxPresent(transferId)
 
@@ -83,7 +83,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
     for (v <- transferTxSupportedVersions) {
       val (secondBalance, secondEffBalance) = miner.accountBalances(secondAddress)
 
-      assertApiErrorRaised(sender.transfer(secondAddress, firstAddress, secondEffBalance, minFee, version = v))
+      assertApiErrorRaised(sender.transfer(secondKeyPair, firstAddress, secondEffBalance, minFee, version = v))
       nodes.waitForHeightArise()
 
       miner.assertBalances(secondAddress, secondBalance, secondEffBalance)
@@ -95,7 +95,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
       val (secondBalance, secondEffBalance) = miner.accountBalances(secondAddress)
 
       assertBadRequestAndResponse(
-        sender.transfer(secondAddress, firstAddress, secondBalance + 1.waves, minFee, version = v),
+        sender.transfer(secondKeyPair, firstAddress, secondBalance + 1.waves, minFee, version = v),
         "Attempt to transfer unavailable funds"
       )
       miner.assertBalances(secondAddress, secondBalance, secondEffBalance)
@@ -107,17 +107,17 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
       val (firstBalance, firstEffBalance)   = miner.accountBalances(firstAddress)
       val (secondBalance, secondEffBalance) = miner.accountBalances(secondAddress)
 
-      val assetId = sender.issue(firstAddress, "second asset", "description", someAssetAmount, 0, reissuable = false, fee = issueFee).id
+      val assetId = sender.issue(firstKeyPair, "second asset", "description", someAssetAmount, 0, reissuable = false, fee = issueFee).id
 
       nodes.waitForHeightAriseAndTxPresent(assetId)
 
       miner.assertBalances(firstAddress, firstBalance - issueFee, firstEffBalance - issueFee)
       miner.assertAssetBalance(firstAddress, assetId, someAssetAmount)
 
-      val tx1 = sender.transfer(firstAddress, firstAddress, someAssetAmount, minFee, Some(assetId), version = v).id
+      val tx1 = sender.transfer(firstKeyPair, firstAddress, someAssetAmount, minFee, Some(assetId), version = v).id
       nodes.waitForHeightAriseAndTxPresent(tx1)
 
-      val tx2 = sender.transfer(firstAddress, secondAddress, someAssetAmount / 2, minFee, Some(assetId), version = v).id
+      val tx2 = sender.transfer(firstKeyPair, secondAddress, someAssetAmount / 2, minFee, Some(assetId), version = v).id
       nodes.waitForHeightAriseAndTxPresent(tx2)
 
       miner.assertBalances(firstAddress, firstBalance - issueFee - 2 * minFee, firstEffBalance - issueFee - 2 * minFee)
