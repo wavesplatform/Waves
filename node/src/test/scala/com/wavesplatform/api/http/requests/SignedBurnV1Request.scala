@@ -11,7 +11,7 @@ object SignedBurnV1Request {
   implicit val reads: Reads[SignedBurnV1Request] = (
     (JsPath \ "senderPublicKey").read[String] and
       (JsPath \ "assetId").read[String] and
-      (JsPath \ "quantity").read[Long].orElse((JsPath \ "amount").read[Long]) and
+      (JsPath \ "amount").read[Long] and
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "signature").read[String]
