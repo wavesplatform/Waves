@@ -23,7 +23,7 @@ object SignedBurnV1Request {
 case class SignedBurnV1Request(
     senderPublicKey: String,
     assetId: String,
-    quantity: Long,
+    amount: Long,
     fee: Long,
     timestamp: Long,
     signature: String
@@ -34,6 +34,6 @@ case class SignedBurnV1Request(
       _sender    <- PublicKey.fromBase58String(senderPublicKey)
       _assetId   <- parseBase58ToIssuedAsset(assetId)
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
-      _t         <- BurnTransaction.create(1.toByte, _sender, _assetId, quantity, fee, timestamp, Proofs(_signature))
+      _t         <- BurnTransaction.create(1.toByte, _sender, _assetId, amount, fee, timestamp, Proofs(_signature))
     } yield _t
 }

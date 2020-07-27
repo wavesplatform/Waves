@@ -151,7 +151,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
         |{
         |"senderPublicKey":"D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5",
         |"assetId":"6eV67ffUPXVGktrmsoWv1ZRKTuKcWZjeCQXJjD26pTGS",
-        |"quantity":10000,
+        |"amount":10000,
         |"fee":100000000,"timestamp":1477302582842,
         |"signature":"H3F8gAsKYeJAPmxCagLaCHycqkr8KiYvzJ4dhophZs31Unmg3dLwVK5k1v1M2Z5zLuQySthpf3DeEyhL6cdpbqp"
         |}
@@ -160,7 +160,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     req.senderPublicKey shouldBe "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5"
     req.signature shouldBe "H3F8gAsKYeJAPmxCagLaCHycqkr8KiYvzJ4dhophZs31Unmg3dLwVK5k1v1M2Z5zLuQySthpf3DeEyhL6cdpbqp"
     req.fee shouldBe 100000000L
-    req.quantity shouldBe 10000
+    req.amount shouldBe 10000
   }
 
   test("SponsorFeeRequest json parsing works") {
