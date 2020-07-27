@@ -110,9 +110,8 @@ trait TransferSending extends ScorexLogging {
   def balanceForNode(n: Node): Future[(String, Long)] = n.balance(n.address).map(b => n.address -> b.balance)
 
   def processRequests(requests: Seq[Req], includeAttachment: Boolean = false): Future[Seq[Transaction]] = {
-    val n     = requests.size
-    val start = System.currentTimeMillis() - n
-    val requestGroups = requests.zipWithIndex
+    val start = System.currentTimeMillis() - requests.size
+    val signedTransfers = requests.zipWithIndex
       .map {
         case (x, i) =>
           createSignedTransferRequest(
@@ -134,21 +133,14 @@ trait TransferSending extends ScorexLogging {
               .explicitGet()
           )
       }
-      .grouped(requests.size / nodes.size + 1)
-      .toSeq
 
-    Future
-      .traverse(nodes.zip(requestGroups)) {
-        case (node, request) =>
-          request.foldLeft(Future.successful(Seq.empty[Transaction])) {
-            case (f, r) =>
-              for {
-                prevTransactions <- f
-                tx               <- node.signedBroadcast(toJson(r).as[JsObject] ++ Json.obj("type" -> TransferTransaction.typeId.toInt))
-              } yield tx +: prevTransactions
-          }
-      }
-      .map(_.flatten)
+    signedTransfers.zip(Iterator.continually(nodes).flatten).foldLeft(Future.successful(Seq.empty[Transaction])) {
+      case (resultFuture, (transferRequest, node)) =>
+        for {
+          result <- resultFuture
+          tx     <- node.signedBroadcast(toJson(transferRequest).as[JsObject] ++ Json.obj("type" -> TransferTransaction.typeId.toInt))
+        } yield tx +: result
+    }
   }
 
   protected def createSignedTransferRequest(tx: TransferTransaction): TransferRequest = {
