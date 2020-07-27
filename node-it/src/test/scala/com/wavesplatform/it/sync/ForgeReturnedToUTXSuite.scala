@@ -17,12 +17,12 @@ class ForgeReturnedToUTXSuite extends FunSuite with CancelAfterFailure with Node
   test("dependent trasactions can be added to UTX if first mined and returned to UTX") {
 
     //asset tx should be mined in first microblock as as new keyblock mined, others microblocks should not be applied due to big microblockInterval
-    val assetId                      = last.issue(last.address, "asset", "descr", issueAmount, 0, reissuable = false, issueFee, waitForTx = true).id
+    val assetId                      = last.issue(last.keyPair, "asset", "descr", issueAmount, 0, reissuable = false, issueFee, waitForTx = true).id
     val issueAssetInitialHeight: Int = last.transactionInfo[TransactionInfo](assetId).height
 
     //all microblocks should returned to utx, assetId should be returned to UTX and no any microblocks will be mined on this height
     //so trasfer tx will stay in utx until new keyblock mined
-    val transferTx = last.transfer(last.address, miner.address, 1L, minFee, Some(assetId), None, waitForTx = true).id
+    val transferTx = last.transfer(last.keyPair, miner.address, 1L, minFee, Some(assetId), None, waitForTx = true).id
 
     val issueAssetHeight = last.transactionInfo[TransactionInfo](assetId).height
     val transferTxHeight = last.transactionInfo[TransactionInfo](transferTx).height

@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.transactions
 
-import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.api.http.ApiError.InvalidIds
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -54,7 +53,7 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
     check(checkData, getResult)
 
     val maxTxList = (1 to 1000).map(_ => txIds.head).toList
-    val result = notMiner.transactionStatus(maxTxList)
+    val result    = notMiner.transactionStatus(maxTxList)
     result.size shouldBe maxTxList.size
     result.forall(_ == result.head)
 
@@ -78,16 +77,17 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
 
   private def mkTransactions: List[ProvenTransaction] =
     (1001 to 1020).map { amount =>
-      TransferTransaction.selfSigned(
+      TransferTransaction
+        .selfSigned(
           2.toByte,
           miner.keyPair,
-          AddressOrAlias.fromString(secondAddress).explicitGet(),
+          secondKeyPair.toAddress,
           Waves,
           amount,
           Waves,
           minFee,
           ByteStr.empty,
-          ntpTime.correctedTime(),
+          ntpTime.correctedTime()
         )
         .explicitGet()
     }.toList

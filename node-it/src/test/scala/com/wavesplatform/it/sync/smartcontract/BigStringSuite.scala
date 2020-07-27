@@ -15,15 +15,15 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
 class BigStringSuite extends BaseTransactionSuite with CancelAfterFailure {
-  private val acc0 = pkByAddress(firstAddress)
-  private val acc1 = pkByAddress(secondAddress)
-  private val acc2 = pkByAddress(thirdAddress)
+  private def acc0 = firstKeyPair
+  private def acc1 = secondKeyPair
+  private def acc2 = thirdKeyPair
 
   test("set contract, make leasing and cancel leasing") {
     val (balance1, eff1) = miner.accountBalances(acc0.toAddress.toString)
     val (balance2, eff2) = miner.accountBalances(thirdAddress)
 
-    val txId = sender.transfer(sender.address, acc0.toAddress.toString, 10 * transferAmount, minFee).id
+    val txId = sender.transfer(sender.keyPair, acc0.toAddress.toString, 10 * transferAmount, minFee).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
     miner.assertBalances(firstAddress, balance1 + 10 * transferAmount, eff1 + 10 * transferAmount)
