@@ -14,15 +14,15 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
 class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfterFailure {
-  private val acc0 = pkByAddress(firstAddress)
-  private val acc1 = pkByAddress(secondAddress)
-  private val acc2 = pkByAddress(thirdAddress)
+  private def acc0 = firstKeyPair
+  private def acc1 = secondKeyPair
+  private def acc2 = thirdKeyPair
 
   test("set contract, make leasing and cancel leasing") {
     val (balance1, eff1) = miner.accountBalances(acc0.toAddress.toString)
-    val (balance2, eff2) = miner.accountBalances(thirdAddress)
+    val (balance2, eff2) = miner.accountBalances(thirdKeyPair.toAddress.toString)
 
-    sender.transfer(sender.address, acc0.toAddress.toString, 10 * transferAmount, minFee, waitForTx = true).id
+    sender.transfer(sender.keyPair, acc0.toAddress.toString, 10 * transferAmount, minFee, waitForTx = true).id
 
     miner.assertBalances(firstAddress, balance1 + 10 * transferAmount, eff1 + 10 * transferAmount)
 
@@ -34,12 +34,12 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
         match tx {
           case ltx: LeaseTransaction => sigVerify(ltx.bodyBytes,ltx.proofs[0],pkA) && sigVerify(ltx.bodyBytes,ltx.proofs[2],pkC)
           case lctx : LeaseCancelTransaction => sigVerify(lctx.bodyBytes,lctx.proofs[1],pkA) && sigVerify(lctx.bodyBytes,lctx.proofs[2],pkB)
-          case other => false
+          case _ => false
         }
         """.stripMargin
 
     val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1.bytes().base64
-    sender.setScript(acc0.toAddress.toString, Some(script), setScriptFee, waitForTx = true).id
+    sender.setScript(acc0, Some(script), setScriptFee, waitForTx = true).id
 
     val unsignedLeasing =
       LeaseTransaction

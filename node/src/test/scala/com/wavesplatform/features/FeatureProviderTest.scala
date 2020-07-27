@@ -1,7 +1,6 @@
 package com.wavesplatform.features
 
 import com.wavesplatform.block.Block
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, RewardsSettings}
 import com.wavesplatform.state.Blockchain
 import org.scalacheck.Gen
@@ -27,8 +26,8 @@ class FeatureProviderTest extends FlatSpec with Matchers with ScalaCheckProperty
     )
 
     val blockchain = mock[Blockchain]
-    (blockchain.activatedFeatures _).expects().anyNumberOfTimes().returning(features)
-    (blockchain.settings _).expects().anyNumberOfTimes()
+    (() => blockchain.activatedFeatures).expects().anyNumberOfTimes().returning(features)
+    (() => blockchain.settings).expects().anyNumberOfTimes()
       .returning(BlockchainSettings('W', fs, GenesisSettings.MAINNET, RewardsSettings.MAINNET, useEvaluatorV2 = false))
 
     forAll(Gen.choose(1, v5ActivationHeight * 2)) { h =>

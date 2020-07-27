@@ -28,9 +28,9 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
       .overrideBase(_.preactivatedFeatures((BlockchainFeatures.BlockV5.id, activationHeight - 1)))
       .buildNonConflicting()
 
-  private val smartAccV4  = firstAddress
-  private val callerAcc = secondAddress
-  private val smartAccV3  = thirdAddress
+  private def smartAccV4  = firstKeyPair
+  private def callerAcc = secondKeyPair
+  private def smartAccV3  = thirdKeyPair
 
   private var asset: Asset = _
 
@@ -134,7 +134,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
   test("can't attach unavailable payment if V3 DApp returns its enough amount") {
     val amount = 20
     assertApiError(
-      sender.invokeScript(callerAcc, smartAccV3, Some("payBack"), payment = Seq(Payment(amount, asset)), waitForTx = true)
+      sender.invokeScript(callerAcc, smartAccV3.toAddress.toString, Some("payBack"), payment = Seq(Payment(amount, asset)), waitForTx = true)
     ) { error =>
       error.statusCode shouldBe 400
       error.message shouldBe
@@ -163,16 +163,16 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
     sender.setScript(smartAccV4, Some(accountV4.compiled), waitForTx = true)
     sender.setScript(smartAccV4, Some(dAppV4.compiled), fee = setScriptFee + smartFee, waitForTx = true)
 
-    sender.invokeScript(callerAcc, smartAccV4, waitForTx = true)
+    sender.invokeScript(callerAcc, smartAccV4.toAddress.toString, waitForTx = true)
   }
 
   test("can invoke V4 contract from V3 scripted account with 0 or 1 payments") {
     sender.setScript(smartAccV3, Some(accountV3.compiled), fee = setScriptFee + smartFee, waitForTx = true)
 
-    sender.invokeScript(smartAccV3, smartAccV4, fee = smartMinFee + smartFee, waitForTx = true)._1.id
+    sender.invokeScript(smartAccV3, smartAccV4.toAddress.toString, fee = smartMinFee + smartFee, waitForTx = true)._1.id
     sender.invokeScript(
       smartAccV3,
-      smartAccV4,
+      smartAccV4.toAddress.toString,
       payment = Seq(Payment(1, Waves)),
       fee = smartMinFee + smartFee,
       waitForTx = true
@@ -185,7 +185,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
     assertApiError(
       sender.invokeScript(
         smartAccV3,
-        smartAccV4,
+        smartAccV4.toAddress.toString,
         payment = Seq(Payment(1, Waves), Payment(1, Waves)),
         fee = smartMinFee + smartFee,
         waitForTx = true
@@ -200,7 +200,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
     sender.setScript(smartAccV3, Some(dAppV3.compiled), fee = setScriptFee + smartFee, waitForTx = true)
 
     assertApiError(
-      sender.invokeScript(callerAcc, smartAccV3, payment = Seq(Payment(1, Waves), Payment(1, Waves)), waitForTx = true)
+      sender.invokeScript(callerAcc, smartAccV3.toAddress.toString, payment = Seq(Payment(1, Waves), Payment(1, Waves)), waitForTx = true)
     ) { error =>
       error.statusCode shouldBe 400
       error.message should include("DApp version 3 < 4 doesn't support multiple payment attachment")
@@ -318,10 +318,10 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
     nodes.waitForHeightAriseAndTxPresent(reissueTxId)
   }
   test("can't attach unavailable payment even if V4 DApp returns its enough amount") {
-    val balance = sender.accountBalances(callerAcc)._1
+    val balance = sender.accountBalances(callerAcc.toAddress.toString)._1
 
     assertApiError(
-      sender.invokeScript(callerAcc, smartAccV4, Some("payBack"), payment = Seq(Payment(40, asset)))
+      sender.invokeScript(callerAcc, smartAccV4.toAddress.toString, Some("payBack"), payment = Seq(Payment(40, asset)))
     ) { error =>
       error.message should include("Transaction application leads to negative asset")
       error.id shouldBe StateCheckFailed.Id
@@ -329,7 +329,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
     }
 
     assertApiError(
-      sender.invokeScript(callerAcc, smartAccV4, Some("payBack"), payment = Seq(Payment(balance + 1, Waves)))
+      sender.invokeScript(callerAcc, smartAccV4.toAddress.toString, Some("payBack"), payment = Seq(Payment(balance + 1, Waves)))
     ) { error =>
       error.message should include("Transaction application leads to negative waves balance")
       error.id shouldBe StateCheckFailed.Id
@@ -338,13 +338,13 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
   }
 
   test("still can't attach unavailable payment if V3 DApp returns its enough amount") {
-    val balance = sender.accountBalances(callerAcc)._1
+    val balance = sender.accountBalances(callerAcc.toAddress.toString)._1
     assertApiError(
-      sender.invokeScript(callerAcc, smartAccV3, Some("payBack"), payment = Seq(Payment(40, asset)), waitForTx = true)
+      sender.invokeScript(callerAcc, smartAccV3.toAddress.toString, Some("payBack"), payment = Seq(Payment(40, asset)), waitForTx = true)
     )(_.statusCode shouldBe 400)
 
     assertApiError(
-      sender.invokeScript(callerAcc, smartAccV3, Some("payBack"), payment = Seq(Payment(balance, Waves)), waitForTx = true)
+      sender.invokeScript(callerAcc, smartAccV3.toAddress.toString, Some("payBack"), payment = Seq(Payment(balance, Waves)), waitForTx = true)
     )(_.statusCode shouldBe 400)
   }
 

@@ -17,7 +17,7 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
   }
 
   private def cleanOffsets(l: LET): LET =
-    l.copy(Pos(0, 0), name = cleanOffsets(l.name), value = cleanOffsets(l.value), types = l.types.map(cleanOffsets(_)))
+    l.copy(Pos(0, 0), name = cleanOffsets(l.name), value = cleanOffsets(l.value))  // , types = l.types.map(cleanOffsets(_))
 
   private def cleanOffsets[T](p: PART[T]): PART[T] = p match {
     case PART.VALID(_, x)   => PART.VALID(AnyPos, x)
@@ -58,9 +58,9 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
           List(Expressions.ANNOTATION(AnyPos, PART.VALID(AnyPos, "Ann"), List(PART.VALID(AnyPos, "foo")))),
           Expressions.FUNC(
             AnyPos,
+            CONST_LONG(AnyPos, 3),
             PART.VALID(AnyPos, "bar"),
-            List((PART.VALID(AnyPos, "arg"), List((PART.VALID(AnyPos, "Baz"), None)))),
-            CONST_LONG(AnyPos, 3)
+            List((PART.VALID(AnyPos, "arg"), Single(PART.VALID(AnyPos, "Baz"), None)))
           )
         )
       )
@@ -87,9 +87,9 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
       List(
         FUNC(
           AnyPos,
+          TRUE(AnyPos),
           PART.VALID(AnyPos, "foo"),
-          List.empty,
-          TRUE(AnyPos)
+          List.empty
         )
       ),
       List(
@@ -101,9 +101,9 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
           ),
           Expressions.FUNC(
             AnyPos,
+            CONST_LONG(AnyPos, 3),
             PART.VALID(AnyPos, "bar"),
-            List((PART.VALID(AnyPos, "arg"), List((PART.VALID(AnyPos, "Baz"), None)))),
-            CONST_LONG(AnyPos, 3)
+            List((PART.VALID(AnyPos, "arg"), Single(PART.VALID(AnyPos, "Baz"), None)))
           )
         )
       )
@@ -131,9 +131,9 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
       List(
         FUNC(
           AnyPos,
+          TRUE(AnyPos),
           PART.VALID(AnyPos, "foo"),
-          List.empty,
-          TRUE(AnyPos)
+          List.empty
         )
       ),
       List(
@@ -142,9 +142,9 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
           List(Expressions.ANNOTATION(AnyPos, PART.VALID(AnyPos, "Ann"), List(PART.VALID(AnyPos, "foo")))),
           Expressions.FUNC(
             AnyPos,
+            CONST_LONG(AnyPos, 3),
             PART.VALID(AnyPos, "bar"),
-            List((PART.VALID(AnyPos, "arg"), List((PART.VALID(AnyPos, "Baz"), None)))),
-            CONST_LONG(AnyPos, 3)
+            List((PART.VALID(AnyPos, "arg"), Single(PART.VALID(AnyPos, "Baz"), None)))
           )
         )
       )
@@ -191,9 +191,9 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
           List(Expressions.ANNOTATION(AnyPos, PART.VALID(AnyPos, "Ann"), List(PART.VALID(AnyPos, "foo")))),
           Expressions.FUNC(
             AnyPos,
+            CONST_LONG(AnyPos, 3),
             PART.VALID(AnyPos, "bar"),
-            List((PART.VALID(AnyPos, "arg"), List((PART.VALID(AnyPos, "Baz"), None)))),
-            CONST_LONG(AnyPos, 3)
+            List((PART.VALID(AnyPos, "arg"), Single(PART.VALID(AnyPos, "Baz"), None)))
           )
         )
       )
@@ -290,4 +290,39 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
         |""".stripMargin
     Parser.parseContract(code).toString.contains("Local functions should be defined before @Callable one") shouldBe true
   }
+
+  property("Unary expr") {
+    val code =
+      """{-# STDLIB_VERSION 4 #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |
+        |let a10 = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+        |
+        |func deleteEntry(acc: List[DeleteEntry], e: String) = DeleteEntry(e) :: acc
+        |
+        |func t() = delateEntry("q") :: FOLD<10>(a10, [], deleteEntry)
+        |
+        |@Callable(i) func f() = []
+        |""".stripMargin
+    ParserV2.parseDAPP(code) shouldBe Symbol("right")
+  }
+
+  property("FOLD expr") {
+    val code =
+      """{-# STDLIB_VERSION 4 #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |
+        |let a10 = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+        |
+        |func deleteEntry(acc: List[DeleteEntry], e: String) = DeleteEntry(e) :: acc
+        |
+        |@Callable(i) func delete100Entries() = FOLD<10>(a10, [], deleteEntry)
+        |
+        |@Callable(i) func delete(k: String) = [DeleteEntry(k)]
+        |""".stripMargin
+    ParserV2.parseDAPP(code) shouldBe Symbol("right")
+  }
+
 }

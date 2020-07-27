@@ -13,11 +13,11 @@ import scala.concurrent.duration._
 class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen with RxScheduler {
   override def testSchedulerName = "test-rx-score-observer"
 
-  def withObserver(f: (Coeval[Seq[SyncWith]], PublishSubject[BigInt], PublishSubject[(Channel, BigInt)], PublishSubject[Channel]) => Any) = {
-    val localScores   = PublishSubject[BigInt]
-    val remoteScores  = PublishSubject[(Channel, BigInt)]
-    val channelClosed = PublishSubject[Channel]
-    val timeout       = PublishSubject[Channel]
+  private def withObserver(f: (Coeval[Seq[SyncWith]], PublishSubject[BigInt], PublishSubject[(Channel, BigInt)], PublishSubject[Channel]) => Any) = {
+    val localScores   = PublishSubject[BigInt]()
+    val remoteScores  = PublishSubject[(Channel, BigInt)]()
+    val channelClosed = PublishSubject[Channel]()
+    val timeout       = PublishSubject[Channel]()
 
     val (syncWith, _) = RxScoreObserver(1.minute, 0.seconds, 0, localScores, remoteScores, channelClosed, timeout, testScheduler)
 
@@ -121,7 +121,7 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen wit
           _ <- send(remoteScores)((ch100, 100))
           _ = newSyncWith()
           _ <- send(remoteScores)((ch100, 100))
-          _ = newSyncWith() shouldBe 'empty
+          _ = newSyncWith() shouldBe empty
         } yield ())
       }
 
@@ -133,7 +133,7 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen wit
           _ <- send(remoteScores)((ch100, 100))
           _ = newSyncWith()
           _ <- send(localScores)(2)
-          _ = newSyncWith() shouldBe 'empty
+          _ = newSyncWith() shouldBe empty
         } yield ())
       }
     }

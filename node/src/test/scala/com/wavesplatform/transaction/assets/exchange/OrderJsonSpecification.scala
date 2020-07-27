@@ -3,7 +3,7 @@ package com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.smart.Verifier
@@ -104,7 +104,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
     json.validate[Order] match {
       case e: JsError =>
         val paths = e.errors.map(_._1)
-        paths should contain allOf (JsPath \ "matcherPublicKey", JsPath \ "senderPublicKey")
+        paths should contain.allOf(JsPath \ "matcherPublicKey", JsPath \ "senderPublicKey")
       case _ =>
         fail("Should be JsError")
     }
@@ -148,7 +148,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         case s: JsSuccess[Order] =>
           val o = s.get
           o.json().toString() should be(json.toString())
-          Verifier.verifyAsEllipticCurveSignature(o) shouldBe 'right
+          Verifier.verifyAsEllipticCurveSignature(o).explicitGet()
       }
     }
   }

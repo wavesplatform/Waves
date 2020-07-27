@@ -1,8 +1,8 @@
 package com.wavesplatform.api.http.requests
 
-import com.wavesplatform.transaction.transfer.Attachment
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import play.api.libs.json.{Json, Reads}
+import play.api.libs.json.Json
 
 case class MassTransferRequest(
     version: Option[Byte],
@@ -10,10 +10,10 @@ case class MassTransferRequest(
     sender: String,
     transfers: List[Transfer],
     fee: Long,
-    attachment: Option[Attachment],
+    attachment: Option[ByteStr] = None,
     timestamp: Option[Long] = None
 )
 
 object MassTransferRequest {
-  implicit val reads: Reads[MassTransferRequest] = Json.reads
+  implicit val jsonFormat = Json.format[MassTransferRequest]
 }

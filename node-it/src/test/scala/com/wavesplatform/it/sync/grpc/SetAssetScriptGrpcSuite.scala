@@ -18,7 +18,7 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
   private val unchangeableScript = ScriptCompiler(
     s"""
        |match tx {
-       |  case s : SetAssetScriptTransaction => false
+       |  case _: SetAssetScriptTransaction => false
        |  case _ => true
        |}
        """.stripMargin,
@@ -60,7 +60,7 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
               ScriptCompiler(
                 s"""
                |match tx {
-               |  case s : SetAssetScriptTransaction => s.sender == addressFromPublicKey(base58'${secondAcc.publicKey}')
+               |  case s: SetAssetScriptTransaction => s.sender == addressFromPublicKey(base58'${secondAcc.publicKey}')
                |  case _ => false
                |}
                """.stripMargin,
@@ -87,7 +87,7 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
     val script2 = ScriptCompiler(
       s"""
          |match tx {
-         |  case s : SetAssetScriptTransaction => true
+         |  case _: SetAssetScriptTransaction => true
          |  case _ => false
          |}
          """.stripMargin,

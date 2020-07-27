@@ -5,30 +5,33 @@ import java.net.{InetSocketAddress, URLEncoder}
 import java.util.concurrent.TimeoutException
 import java.util.{NoSuchElementException, UUID}
 
-import com.wavesplatform.account.{AddressScheme, KeyPair}
+import com.google.protobuf.ByteString
+import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
 import com.wavesplatform.api.http.ConnectReq
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.{IssueRequest, TransferRequest}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.http.DebugMessage._
 import com.wavesplatform.http.{DebugMessage, RollbackParams, `X-Api-Key`}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
+import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
+import com.wavesplatform.state.DataEntry.Format
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EmptyDataEntry, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{Order, ExchangeTransaction => ExchangeTx}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, Proofs, TxVersion}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, TxVersion}
 import org.asynchttpclient.Dsl.{delete => _delete, get => _get, post => _post, put => _put}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants.ResponseStatusCodes.OK_200
@@ -92,7 +95,7 @@ object AsyncHttpApi extends Assertions {
 
     def seed(address: String): Future[String] = getWithApiKey(s"/addresses/seed/$address").as[JsValue].map(v => (v \ "seed").as[String])
 
-    def getWithApiKey(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] = retrying {
+    def getWithApiKey(path: String): Future[Response] = retrying {
       _get(s"${n.nodeApiEndpoint}$path")
         .withApiKey(n.apiKey)
         .build()
@@ -144,6 +147,9 @@ object AsyncHttpApi extends Assertions {
 
     def blacklist(address: InetSocketAddress): Future[Unit] =
       post("/debug/blacklist", s"${address.getHostString}:${address.getPort}").map(_ => ())
+
+    def clearBlacklist(): Future[Unit] =
+      post(s"${n.nodeApiEndpoint}/peers/clearblacklist").map(_ => ())
 
     def printDebugMessage(db: DebugMessage): Future[Response] = postJsonWithApiKey("/debug/print", db)
 
@@ -235,11 +241,6 @@ object AsyncHttpApi extends Assertions {
 
     def status: Future[Status] = get("/node/status").as[Status]
 
-    def blockGenerationSignature(signature: String): Future[GenerationSignatureResponse] =
-      get(s"/consensus/generationsignature/$signature").as[GenerationSignatureResponse]
-
-    def lastBlockGenerationSignature: Future[String] = get(s"/consensus/generationsignature").as[String]
-
     def generatingBalance(address: String, amountsAsStrings: Boolean = false): Future[GeneratingBalance] = {
       get(s"/consensus/generatingbalance/$address", amountsAsStrings).as[GeneratingBalance](amountsAsStrings)
     }
@@ -281,8 +282,8 @@ object AsyncHttpApi extends Assertions {
       case Failure(ex)                                          => Failure(ex)
     }
 
-    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Future[TransactionInfo] = {
-      val condition = waitFor[Option[TransactionInfo]](s"transaction $txId")(
+    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Future[TransactionInfo] =
+      waitFor[Option[TransactionInfo]](s"transaction $txId")(
         _.transactionInfo[TransactionInfo](txId).transform {
           case Success(tx)                                          => Success(Some(tx))
           case Failure(UnexpectedStatusCodeException(_, _, 404, _)) => Success(None)
@@ -291,9 +292,6 @@ object AsyncHttpApi extends Assertions {
         tOpt => tOpt.exists(_.id == txId),
         retryInterval
       ).map(_.get)
-
-      condition
-    }
 
     def waitForUtxIncreased(fromSize: Int): Future[Int] = waitFor[Int](s"utxSize > $fromSize")(
       _.utxSize,
@@ -343,73 +341,67 @@ object AsyncHttpApi extends Assertions {
     }
 
     def transfer(
-        sourceAddress: String,
+        sender: KeyPair,
         recipient: String,
         amount: Long,
         fee: Long,
         assetId: Option[String] = None,
         feeAssetId: Option[String] = None,
         version: TxVersion = TxVersion.V2,
-        typedAttachment: Option[Attachment] = None,
         attachment: Option[String] = None
-    ): Future[Transaction] = {
-      signAndBroadcast(
-        Json.obj(
-          "type"      -> TransferTransaction.typeId,
-          "sender"    -> sourceAddress,
-          "amount"    -> amount,
-          "recipient" -> recipient,
-          "fee"       -> fee,
-          "version"   -> version,
-          "assetId" -> {
-            if (assetId.isDefined) JsString(assetId.get) else JsNull
-          },
-          "feeAssetId" -> {
-            if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull
-          },
-          "attachment" -> {
-            if (attachment.isDefined || typedAttachment.isDefined) {
-              if (attachment.isDefined) {
-                attachment.get
-              } else Json.toJson(typedAttachment.get)
-            } else JsNull
-          }
-        )
+    ): Future[Transaction] =
+      signedBroadcast(
+        TransferTransaction(
+          version,
+          sender.publicKey,
+          AddressOrAlias.fromString(recipient).explicitGet(),
+          Asset.fromString(assetId),
+          amount,
+          Asset.fromString(feeAssetId),
+          fee,
+          attachment.fold(ByteStr.empty)(s => ByteStr(s.getBytes)),
+          System.currentTimeMillis(),
+          Proofs.empty,
+          AddressScheme.current.chainId
+        ).signWith(sender.privateKey)
+          .json()
       )
-    }
 
     def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
       postJson("/waves/payment", PaymentRequest(amount, fee, sourceAddress, recipient)).as[Transaction]
 
-    def lease(sourceAddress: String, recipient: String, amount: Long, fee: Long, version: TxVersion = TxVersion.V2): Future[Transaction] = {
-      signAndBroadcast(
-        Json.obj(
-          "type"      -> LeaseTransaction.typeId,
-          "sender"    -> sourceAddress,
-          "amount"    -> amount,
-          "recipient" -> recipient,
-          "fee"       -> fee,
-          "version"   -> version
-        )
+    def lease(sender: KeyPair, recipient: String, amount: Long, fee: Long, version: TxVersion = TxVersion.V2): Future[Transaction] =
+      signedBroadcast(
+        LeaseTransaction(
+          version,
+          sender.publicKey,
+          AddressOrAlias.fromString(recipient).explicitGet(),
+          amount,
+          fee,
+          System.currentTimeMillis(),
+          Proofs.empty,
+          AddressScheme.current.chainId
+        ).signWith(sender.privateKey)
+          .json()
       )
-    }
 
-    def cancelLease(sourceAddress: String, leaseId: String, fee: Long, version: TxVersion = TxVersion.V2): Future[Transaction] = {
-      signAndBroadcast(
-        Json.obj(
-          "type"    -> LeaseCancelTransaction.typeId,
-          "sender"  -> sourceAddress,
-          "txId"    -> leaseId,
-          "fee"     -> fee,
-          "version" -> version
-        )
+    def cancelLease(sender: KeyPair, leaseId: String, fee: Long, version: TxVersion): Future[Transaction] =
+      signedBroadcast(
+        LeaseCancelTransaction(
+          version,
+          sender.publicKey,
+          ByteStr.decodeBase58(leaseId).get,
+          fee,
+          System.currentTimeMillis(),
+          Proofs.empty,
+          AddressScheme.current.chainId
+        ).signWith(sender.privateKey).json()
       )
-    }
 
     def activeLeases(sourceAddress: String): Future[Seq[Transaction]] = get(s"/leasing/active/$sourceAddress").as[Seq[Transaction]]
 
     def issue(
-        sourceAddress: String,
+        sender: KeyPair,
         name: String,
         description: String,
         quantity: Long,
@@ -418,57 +410,59 @@ object AsyncHttpApi extends Assertions {
         fee: Long,
         version: TxVersion = TxVersion.V2,
         script: Option[String] = None
-    ): Future[Transaction] = {
-      val js = Json.obj(
-        "type"        -> IssueTransaction.typeId,
-        "name"        -> name,
-        "quantity"    -> quantity,
-        "description" -> description,
-        "sender"      -> sourceAddress,
-        "decimals"    -> decimals,
-        "reissuable"  -> reissuable,
-        "fee"         -> fee,
-        "version"     -> version
+    ): Future[Transaction] =
+      signedBroadcast(
+        IssueTransaction(
+          version,
+          sender.publicKey,
+          ByteString.copyFromUtf8(name),
+          ByteString.copyFromUtf8(description),
+          quantity,
+          decimals,
+          reissuable,
+          script.map(s => ScriptReader.fromBytes(Base64.decode(s)).explicitGet()),
+          fee,
+          System.currentTimeMillis(),
+          Proofs.empty,
+          AddressScheme.current.chainId
+        ).signWith(sender.privateKey).json()
       )
 
-      val jsUpdated = if (script.isDefined) js ++ Json.obj("script" -> JsString(script.get)) else js
-      signAndBroadcast(jsUpdated)
-
-    }
-
-    def setScript(sender: String, script: Option[String] = None, fee: Long = 1000000, version: TxVersion = TxVersion.V1): Future[Transaction] = {
-      signAndBroadcast(
-        Json.obj(
-          "type"    -> SetScriptTransaction.typeId,
-          "version" -> version,
-          "sender"  -> sender,
-          "fee"     -> fee,
-          "script"  -> { if (script.isDefined) JsString(script.get) else JsNull }
-        )
+    def setScript(sender: KeyPair, script: Option[String] = None, fee: Long = 1000000, version: TxVersion = TxVersion.V1): Future[Transaction] =
+      signedBroadcast(
+        SetScriptTransaction(
+          version,
+          sender.publicKey,
+          script.map(s => ScriptReader.fromBytes(Base64.decode(s)).explicitGet()),
+          fee,
+          System.currentTimeMillis(),
+          Proofs.empty,
+          AddressScheme.current.chainId
+        ).signWith(sender.privateKey).json()
       )
-    }
 
     def setAssetScript(
         assetId: String,
-        sender: String,
+        sender: KeyPair,
         fee: Long,
         script: Option[String] = None,
         version: TxVersion = TxVersion.V1
-    ): Future[Transaction] = {
-      signAndBroadcast(
-        Json.obj(
-          "type"    -> SetAssetScriptTransaction.typeId,
-          "version" -> version,
-          "assetId" -> assetId,
-          "sender"  -> sender,
-          "fee"     -> fee,
-          "script"  -> { if (script.isDefined) JsString(script.get) else JsNull }
-        )
+    ): Future[Transaction] =
+      signedBroadcast(
+        SetAssetScriptTransaction(
+          version,
+          sender.publicKey,
+          IssuedAsset(ByteStr.decodeBase58(assetId).get),
+          script.map(s => ScriptReader.fromBytes(Base64.decode(s)).explicitGet()),
+          fee,
+          System.currentTimeMillis(),
+          Proofs.empty,
+          AddressScheme.current.chainId
+        ).signWith(sender.privateKey).json()
       )
-    }
 
     def invokeScript(
-        caller: String,
+        caller: KeyPair,
         dappAddress: String,
         func: Option[String],
         args: List[Terms.EXPR] = List.empty,
@@ -476,25 +470,24 @@ object AsyncHttpApi extends Assertions {
         fee: Long = 500000,
         feeAssetId: Option[String] = None,
         version: TxVersion = TxVersion.V1
-    ): Future[(Transaction, JsValue)] = {
-      signAndTraceBroadcast(
-        Json.obj(
-          "type"    -> InvokeScriptTransaction.typeId,
-          "version" -> version,
-          "sender"  -> caller,
-          "dApp"    -> dappAddress,
-          "call" -> {
-            if (func.isDefined) InvokeScriptTransaction.serializer.functionCallToJson(FUNCTION_CALL(FunctionHeader.User(func.get), args)) else JsNull
-          },
-          "payment"    -> payment,
-          "fee"        -> fee,
-          "feeAssetId" -> { if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull }
-        )
+    ): Future[(Transaction, JsValue)] =
+      signedTraceBroadcast(
+        InvokeScriptTransaction(
+          version,
+          caller.publicKey,
+          AddressOrAlias.fromString(dappAddress).explicitGet(),
+          func.map(fn => FUNCTION_CALL(FunctionHeader.User(fn), args)),
+          payment,
+          fee,
+          feeAssetId.map(aid => IssuedAsset(ByteStr.decodeBase58(aid).get)).getOrElse(Asset.Waves),
+          System.currentTimeMillis(),
+          Proofs.empty,
+          AddressScheme.current.chainId
+        ).signWith(caller.privateKey).json()
       )
-    }
 
     def validateInvokeScript(
-        caller: String,
+        caller: KeyPair,
         dappAddress: String,
         func: Option[String],
         args: List[Terms.EXPR] = List.empty,
@@ -503,20 +496,20 @@ object AsyncHttpApi extends Assertions {
         feeAssetId: Option[String] = None,
         version: TxVersion = TxVersion.V1
     ): Future[(JsValue, JsValue)] = {
-      signAndValidate(
-        Json.obj(
-          "type"    -> InvokeScriptTransaction.typeId,
-          "version" -> version,
-          "sender"  -> caller,
-          "dApp"    -> dappAddress,
-          "call" -> {
-            if (func.isDefined) InvokeScriptTransaction.serializer.functionCallToJson(FUNCTION_CALL(FunctionHeader.User(func.get), args)) else JsNull
-          },
-          "payment"    -> payment,
-          "fee"        -> fee,
-          "feeAssetId" -> { if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull }
-        )
-      )
+      val jsObject = InvokeScriptTransaction(
+        version,
+        caller.publicKey,
+        AddressOrAlias.fromString(dappAddress).explicitGet(),
+        func.map(fn => FUNCTION_CALL(FunctionHeader.User(fn), args)),
+        payment,
+        fee,
+        feeAssetId.map(aid => IssuedAsset(ByteStr.decodeBase58(aid).get)).getOrElse(Asset.Waves),
+        System.currentTimeMillis(),
+        Proofs.empty,
+        AddressScheme.current.chainId
+      ).signWith(caller.privateKey)
+        .json()
+      signedValidate(jsObject).map(jsObject -> _)
     }
 
     def updateAssetInfo(
@@ -550,32 +543,34 @@ object AsyncHttpApi extends Assertions {
 
     def scriptEstimate(script: String): Future[EstimatedScript] = post("/utils/script/estimate", script).as[EstimatedScript]
 
-    def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long, version: Byte = 1): Future[Transaction] = {
-      signAndBroadcast(
-        Json.obj(
-          "type"       -> ReissueTransaction.typeId,
-          "sender"     -> sourceAddress,
-          "assetId"    -> assetId,
-          "quantity"   -> quantity,
-          "reissuable" -> reissuable,
-          "fee"        -> fee,
-          "version"    -> version
-        )
+    def reissue(sender: KeyPair, assetId: String, quantity: Long, reissuable: Boolean, fee: Long, version: Byte = 1): Future[Transaction] =
+      signedBroadcast(
+        ReissueTransaction(
+          version,
+          sender.publicKey,
+          IssuedAsset(ByteStr.decodeBase58(assetId).get),
+          quantity,
+          reissuable,
+          fee,
+          System.currentTimeMillis(),
+          Proofs.empty,
+          AddressScheme.current.chainId
+        ).signWith(sender.privateKey).json()
       )
-    }
 
-    def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long, version: TxVersion = TxVersion.V2): Future[Transaction] = {
-      signAndBroadcast(
-        Json.obj(
-          "type"     -> BurnTransaction.typeId,
-          "quantity" -> quantity,
-          "assetId"  -> assetId,
-          "sender"   -> sourceAddress,
-          "fee"      -> fee,
-          "version"  -> version
-        )
+    def burn(sender: KeyPair, assetId: String, quantity: Long, fee: Long, version: TxVersion = TxVersion.V2): Future[Transaction] =
+      signedBroadcast(
+        BurnTransaction(
+          version,
+          sender.publicKey,
+          IssuedAsset(ByteStr.decodeBase58(assetId).get),
+          quantity,
+          fee,
+          System.currentTimeMillis(),
+          Proofs.empty,
+          AddressScheme.current.chainId
+        ).signWith(sender.privateKey).json()
       )
-    }
 
     def debugStateChanges(invokeScriptTransactionId: String, amountsAsStrings: Boolean): Future[DebugStateChanges] =
       get(s"/debug/stateChanges/info/$invokeScriptTransactionId", amountsAsStrings).as[DebugStateChanges](amountsAsStrings)
@@ -599,110 +594,85 @@ object AsyncHttpApi extends Assertions {
     }
 
     def sponsorAsset(
-        sourceAddress: String,
+        sender: KeyPair,
         assetId: String,
-        minSponsoredAssetFee: Long,
+        minSponsoredAssetFee: Option[Long],
         fee: Long,
         version: Byte = 1,
         amountsAsStrings: Boolean = false
     ): Future[Transaction] =
-      signAndBroadcast(
-        Json.obj(
-          "type"                 -> SponsorFeeTransaction.typeId,
-          "assetId"              -> assetId,
-          "sender"               -> sourceAddress,
-          "fee"                  -> fee,
-          "version"              -> version,
-          "minSponsoredAssetFee" -> minSponsoredAssetFee
-        ),
+      signedBroadcast(
+        SponsorFeeTransaction(
+          version,
+          sender.publicKey,
+          IssuedAsset(ByteStr.decodeBase58(assetId).get),
+          minSponsoredAssetFee,
+          fee,
+          System.currentTimeMillis(),
+          Proofs.empty,
+          AddressScheme.current.chainId
+        ).signWith(sender.privateKey)
+          .json(),
         amountsAsStrings
       )
 
-    def cancelSponsorship(sourceAddress: String, assetId: String, fee: Long, version: Byte = 1): Future[Transaction] =
-      signAndBroadcast(
-        Json.obj(
-          "type"                 -> SponsorFeeTransaction.typeId,
-          "assetId"              -> assetId,
-          "sender"               -> sourceAddress,
-          "fee"                  -> fee,
-          "version"              -> version,
-          "minSponsoredAssetFee" -> JsNull
-        )
-      )
+    def cancelSponsorship(sender: KeyPair, assetId: String, fee: Long, version: Byte = 1): Future[Transaction] =
+      sponsorAsset(sender, assetId, None, fee, version)
 
     def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
       postJson(
         "/assets/transfer",
-        TransferRequest(Some(1.toByte), Some(sourceAddress), None, recipient, None, amount, None, fee, None, None, None, None)
+        TransferRequest(Some(1.toByte), Some(sourceAddress), None, recipient, None, amount, None, fee)
       ).as[Transaction]
 
     def massTransfer(
-        sourceAddress: String,
-        transfers: List[Transfer],
+        sender: KeyPair,
+        transfers: Seq[Transfer],
         fee: Long,
         version: TxVersion = TxVersion.V2,
-        typedAttachment: Option[Attachment] = None,
         attachment: Option[String] = None,
         assetId: Option[String] = None,
         amountsAsStrings: Boolean = false
     ): Future[Transaction] = {
-      signAndBroadcast(
-        Json.obj(
-          "type"      -> MassTransferTransaction.typeId,
-          "assetId"   -> { if (assetId.isDefined) JsString(assetId.get) else JsNull },
-          "sender"    -> sourceAddress,
-          "fee"       -> fee,
-          "version"   -> version,
-          "transfers" -> Json.toJson(transfers),
-          "attachment" -> {
-            if (attachment.isDefined || typedAttachment.isDefined) {
-              if (attachment.isDefined) {
-                attachment.get
-              } else Json.toJson(typedAttachment.get)
-            } else JsNull
-          }
-        ),
+      signedBroadcast(
+        MassTransferTransaction(
+          version,
+          sender.publicKey,
+          Asset.fromString(assetId),
+          transfers.map(t => ParsedTransfer(AddressOrAlias.fromString(t.recipient).explicitGet(), t.amount)),
+          fee,
+          System.currentTimeMillis(),
+          attachment.fold(ByteStr.empty)(s => ByteStr(s.getBytes())),
+          Proofs.empty,
+          AddressScheme.current.chainId
+        ).signWith(sender.privateKey).json(),
         amountsAsStrings
       )
     }
-
-    def putData(
-        sourceAddress: String,
-        data: List[DataEntry[_]],
-        fee: Long,
-        version: TxVersion = 1.toByte,
-        amountsAsStrings: Boolean = false
-    ): Future[Transaction] =
-      signAndBroadcast(
-        Json.obj("type" -> DataTransaction.typeId, "sender" -> sourceAddress, "fee" -> fee, "version" -> version, "data" -> data),
-        amountsAsStrings
-      )
 
     def broadcastData(
         sender: KeyPair,
-        data: List[DataEntry[_]],
+        data: Seq[DataEntry[_]],
         fee: Long,
         version: TxVersion = TxVersion.V2,
-        timestamp: Option[Long] = None
-    ): Future[Transaction] = {
-      val tx = DataTransaction(
-        version,
-        sender.publicKey,
-        data,
-        fee,
-        timestamp.getOrElse(System.currentTimeMillis()),
-        Proofs.empty,
-        AddressScheme.current.chainId
-      ).signWith(sender.privateKey)
-      signedBroadcast(tx.json())
-    }
-
-    def removeData(sourceAddress: String, data: Seq[String], fee: Long, version: Byte = 2): Future[Transaction] = {
-      signAndBroadcast(
-        Json
-          .obj("type" -> DataTransaction.typeId, "sender" -> sourceAddress, "fee" -> fee, "version" -> version, "data" -> data.map(EmptyDataEntry(_)))
+        timestamp: Option[Long] = None,
+        amountsAsStrings: Boolean = false
+    ): Future[Transaction] =
+      signedBroadcast(
+        DataTransaction(
+          version,
+          sender.publicKey,
+          data,
+          fee,
+          timestamp.getOrElse(System.currentTimeMillis()),
+          Proofs.empty,
+          AddressScheme.current.chainId
+        ).signWith(sender.privateKey).json(),
+        amountsAsStrings
       )
-    }
+
+    def removeData(sender: KeyPair, data: Seq[String], fee: Long, version: Byte = 2): Future[Transaction] =
+      broadcastData(sender, data.map[DataEntry[_]](EmptyDataEntry), fee, version)
 
     def getData(address: String, amountsAsStrings: Boolean = false): Future[List[DataEntry[_]]] =
       get(s"/addresses/data/$address", amountsAsStrings).as[List[DataEntry[_]]](amountsAsStrings)
@@ -730,9 +700,6 @@ object AsyncHttpApi extends Assertions {
 
     def broadcastTraceRequest[A: Writes](req: A): Future[Transaction] = postJson("/transactions/broadcast?trace=yes", req).as[Transaction]
 
-    def sign(json: JsValue, amountsAsStrings: Boolean = false): Future[JsObject] =
-      postJsObjectWithApiKey("/transactions/sign", json).as[JsObject]
-
     def expectSignedBroadcastRejected(json: JsValue): Future[Int] = {
       post("/transactions/broadcast", stringify(json)).transform {
         case Failure(UnexpectedStatusCodeException(_, _, 400, body)) => Success((Json.parse(body) \ "error").as[Int])
@@ -758,30 +725,19 @@ object AsyncHttpApi extends Assertions {
 
     def signedValidate(json: JsValue): Future[JsValue] = post("/debug/validate", stringify(json)).as[JsValue]
 
-    def signAndBroadcast(json: JsValue, amountsAsStrings: Boolean = false): Future[Transaction] =
-      sign(json, amountsAsStrings).flatMap(signedBroadcast(_, amountsAsStrings))
-
-    def signAndTraceBroadcast(json: JsValue): Future[(Transaction, JsValue)] = sign(json).flatMap(signedTraceBroadcast)
-
-    def signAndValidate(json: JsValue): Future[(JsValue, JsValue)] = sign(json).flatMap(signed => signedValidate(signed).map((signed, _)))
-
     def signedIssue(issue: IssueRequest): Future[Transaction] =
       signedBroadcast(issue.toTx.explicitGet().json())
 
-    def batchSignedTransfer(transfers: Seq[TransferRequest], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
+    def batchSignedTransfer(transfers: Seq[TransferRequest]): Future[Seq[Transaction]] = {
       import TransferRequest.jsonFormat
       Future.sequence(transfers.map(v => signedBroadcast(toJson(v).as[JsObject] ++ Json.obj("type" -> TransferTransaction.typeId.toInt))))
     }
 
-    def createAlias(targetAddress: String, alias: String, fee: Long, version: TxVersion = TxVersion.V2): Future[Transaction] =
-      signAndBroadcast(
-        Json.obj(
-          "type"    -> CreateAliasTransaction.typeId,
-          "version" -> version,
-          "sender"  -> targetAddress,
-          "fee"     -> fee,
-          "alias"   -> alias
-        )
+    def createAlias(target: KeyPair, alias: String, fee: Long, version: TxVersion = TxVersion.V2): Future[Transaction] =
+      signedBroadcast(
+        CreateAliasTransaction(version, target.publicKey, alias, fee, System.currentTimeMillis(), Proofs.empty, AddressScheme.current.chainId)
+          .signWith(target.privateKey)
+          .json()
       )
 
     def broadcastExchange(
@@ -812,7 +768,7 @@ object AsyncHttpApi extends Assertions {
         chainId = AddressScheme.current.chainId
       ).signWith(matcher.privateKey)
 
-      val json = if (validate) tx.validatedEither.right.get.json() else tx.json()
+      val json = if (validate) tx.validatedEither.explicitGet().json() else tx.json()
       signedBroadcast(json, amountsAsStrings)
     }
 
@@ -849,8 +805,13 @@ object AsyncHttpApi extends Assertions {
         })
     }
 
-    def createAddress: Future[String] =
-      post(s"${n.nodeApiEndpoint}/addresses").as[JsValue].map(v => (v \ "address").as[String])
+    def createKeyPair(): Future[KeyPair] = Future.successful(n.generateKeyPair())
+
+    def createKeyPairServerSide(): Future[KeyPair] =
+      for {
+        address <- post(s"${n.nodeApiEndpoint}/addresses").as[JsValue].map(v => (v \ "address").as[String])
+        seed    <- seed(address)
+      } yield KeyPair.fromSeed(seed).explicitGet()
 
     def waitForNextBlock: Future[BlockHeader] =
       for {
@@ -1035,9 +996,8 @@ object AsyncHttpApi extends Assertions {
 
     def waitForHeightAriseAndTxPresent(transactionId: String)(implicit p: Position): Future[Unit] =
       for {
-        allHeights   <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))
-        _            <- traverse(nodes)(_.waitForHeight(allHeights.max + 1))
-        finalHeights <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))
+        allHeights <- traverse(nodes)(_.waitForTransaction(transactionId).map(_.height))
+        _          <- traverse(nodes)(_.waitForHeight(allHeights.max + 1))
         _ <- waitFor("nodes sync")(1 second)(
           _.waitForTransaction(transactionId).map(_.height),
           (finalHeights: Iterable[Int]) => finalHeights.forall(_ == finalHeights.head)

@@ -41,7 +41,7 @@ class InvokeScriptPayAndTransferAssetGrpcSuite extends GrpcBaseTransactionSuite 
       .id()
       .toString
 
-    val scriptText  = "match tx {case t:TransferTransaction => false case _ => true}"
+    val scriptText  = "match tx {case _:TransferTransaction => false case _ => true}"
     val smartScript = Right(Some(ScriptCompiler.compile(scriptText, estimator).explicitGet()._1))
     rejAssetId = PBTransactions
       .vanilla(
@@ -132,7 +132,7 @@ class InvokeScriptPayAndTransferAssetGrpcSuite extends GrpcBaseTransactionSuite 
 
     val tx = invoke("resendPayment", paymentAmount, rejAssetId, fee)
 
-    sender.stateChanges(tx.id)._2.errorMessage.get.text should include("Transaction is not allowed by token-script")
+    sender.stateChanges(tx.id)._2.error.get.text should include("Transaction is not allowed by script of the asset")
 
     sender.wavesBalance(dAppAddress).regular shouldBe dAppInitBalance.regular
     sender.wavesBalance(callerAddress).regular shouldBe callerInitBalance.regular - fee

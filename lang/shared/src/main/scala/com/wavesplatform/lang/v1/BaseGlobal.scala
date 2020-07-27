@@ -4,16 +4,19 @@ import java.math.RoundingMode
 
 import cats.implicits._
 import com.wavesplatform.lang.ValidationError.ScriptParseError
-import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper, MetaMapperStrategyV1}
+import com.wavesplatform.lang.contract.meta.{FunctionSignatures, MetaMapper, ParsedMeta}
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
-import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, DApp => DAppType}
+import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, V1, V2, DApp => DAppType}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
+import com.wavesplatform.lang.v1.BaseGlobal.DAppInfo
+import com.wavesplatform.lang.v1.BaseGlobal.ArrayView
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
-import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.compiler.Types.FINAL
+import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext, ContractCompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
@@ -21,7 +24,9 @@ import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
+import scala.annotation.tailrec
 import scala.concurrent.Future
+import scala.util.Random
 
 /**
   * This is a hack class for IDEA. The Global class is in JS/JVM modules.
@@ -37,7 +42,8 @@ trait BaseGlobal {
   val MaxLiteralLength             = 12 * 1024
   val MaxAddressLength             = 36
   val MaxByteStrSizeForVerifyFuncs = 32 * 1024
-  val MaxByteStrSizeForVerifyFuncs_V4 = 150 * 1024
+
+  val LetBlockVersions = Set[StdLibVersion](V1, V2)
 
   def base58Encode(input: Array[Byte]): Either[String, String]
   def base58Decode(input: String, limit: Int = MaxLiteralLength): Either[String, Array[Byte]]
@@ -63,7 +69,7 @@ trait BaseGlobal {
 
   def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean
 
-  def rsaVerify(alg: DigestAlgorithm, message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean
+  def rsaVerify(alg: DigestAlgorithm, message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Either[String, Boolean]
 
   def keccak256(message: Array[Byte]): Array[Byte]
   def blake2b256(message: Array[Byte]): Array[Byte]
@@ -127,78 +133,118 @@ trait BaseGlobal {
   }
 
   val compileExpression =
-    compile(_, _, _, _, _, _, ExpressionCompiler.compile)
+    compile(_, _, _, _, ExpressionCompiler.compile)
 
   val compileDecls =
-    compile(_, _, _, _, _, _, ExpressionCompiler.compileDecls)
+    compile(_, _, _, _, ExpressionCompiler.compileDecls)
 
   private def compile(
       input: String,
       context: CompilerContext,
-      letBlockOnly: Boolean,
-      stdLibVersion: StdLibVersion,
-      isAsset: Boolean,
+      version: StdLibVersion,
       estimator: ScriptEstimator,
       compiler: (String, CompilerContext) => Either[String, EXPR]
-  ): Either[String, (Array[Byte], Terms.EXPR, Long)] =
+  ): Either[String, (Array[Byte], EXPR, Long)] =
     for {
-      ex <- compiler(input, context)
-      illegalBlockVersionUsage = letBlockOnly && com.wavesplatform.lang.v1.compiler.containsBlockV2(ex)
-      _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3")
-      x = serializeExpression(ex, stdLibVersion)
+      expr <- compiler(input, context)
+      bytes = serializeExpression(expr, version)
+      _ <- ExprScript.validateBytes(bytes)
+      complexity <- ExprScript.estimateExact(expr, version, estimator)
+    } yield (bytes, expr, complexity)
 
-      _          <- ExprScript.estimate(ex, stdLibVersion, ScriptEstimatorV1, !isAsset)
-      complexity <- ExprScript.estimate(ex, stdLibVersion, ScriptEstimatorV2, !isAsset)
-    } yield (x, ex, complexity)
-
-  type ContractInfo = (Array[Byte], DApp, Long, Map[String, Long])
+  def checkExpr(
+      expr: EXPR,
+      complexity: Long,
+      version: StdLibVersion,
+      isAsset: Boolean,
+      estimator: ScriptEstimator
+  ): Either[String, Unit] =
+    for {
+      _ <- if (estimator == ScriptEstimatorV2)
+        ExprScript.estimate(expr, version, ScriptEstimatorV1, !isAsset)
+      else
+        Right(())
+      _ <- ExprScript.checkComplexity(version, complexity, !isAsset)
+      illegalBlockVersionUsage = LetBlockVersions.contains(version) &&
+        com.wavesplatform.lang.v1.compiler.containsBlockV2(expr)
+      _ <- Either.cond(
+        !illegalBlockVersionUsage,
+        (),
+        "UserFunctions are only enabled in STDLIB_VERSION >= 3"
+      )
+    } yield ()
 
   def compileContract(
       input: String,
       ctx: CompilerContext,
       stdLibVersion: StdLibVersion,
       estimator: ScriptEstimator
-  ): Either[String, ContractInfo] =
+  ): Either[String, DAppInfo] =
     for {
-      dapp       <- ContractCompiler.compile(input, ctx, stdLibVersion)
-      _          <- ContractScript.estimateComplexity(stdLibVersion, dapp, ScriptEstimatorV1)
-      complexity <- ContractScript.estimateComplexity(stdLibVersion, dapp, ScriptEstimatorV2)
-      bytes      <- serializeContract(dapp, stdLibVersion)
-    } yield (bytes, dapp, complexity._1, complexity._2)
+      dApp                                   <- ContractCompiler.compile(input, ctx, stdLibVersion)
+      userFunctionComplexities               <- ContractScript.estimateUserFunctions(stdLibVersion, dApp, estimator)
+      globalVariableComplexities             <- ContractScript.estimateGlobalVariables(stdLibVersion, dApp, estimator)
+      (maxComplexity, annotatedComplexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator)
+      (verifierComplexity, callableComplexities) = dApp.verifierFuncOpt.fold(
+        (0L, annotatedComplexities)
+      )(v => (annotatedComplexities(v.u.name), annotatedComplexities - v.u.name))
+      bytes <- serializeContract(dApp, stdLibVersion)
+      _ <- ContractScript.validateBytes(bytes)
+    } yield DAppInfo(
+      bytes,
+      dApp,
+      maxComplexity,
+      annotatedComplexities,
+      verifierComplexity,
+      callableComplexities,
+      userFunctionComplexities.toMap,
+      globalVariableComplexities.toMap
+    )
 
-  def decompile(compiledCode: String): Either[ScriptParseError, (String, Dic)] =
+  def checkContract(
+      version: StdLibVersion,
+      dApp: DApp,
+      maxComplexity: (String, Long),
+      complexities: Map[String, Long],
+      estimator: ScriptEstimator
+  ): Either[String, Unit] =
+    for {
+      _ <-
+        if (estimator == ScriptEstimatorV2)
+          ContractScript.estimateComplexity(version, dApp, ScriptEstimatorV1)
+        else
+          Right(())
+      _ <- ContractScript.checkComplexity(version, dApp, maxComplexity, complexities, useReducedVerifierLimit = true)
+    } yield ()
+
+  def decompile(compiledCode: String): Either[ScriptParseError, String] =
+      Script.fromBase64String(compiledCode.trim)
+        .map(script => Script.decompile(script)._1)
+
+  def dAppFuncTypes(compiledCode: String): Either[ScriptParseError, FunctionSignatures] =
     for {
       script <- Script.fromBase64String(compiledCode.trim)
-      meta   <- scriptMeta(script)
-    } yield (Script.decompile(script)._1, meta)
+      result <- dAppFuncTypes(script)
+    } yield result
 
-  def scriptMeta(compiledCode: String): Either[ScriptParseError, Dic] =
-    for {
-      script <- Script.fromBase64String(compiledCode.trim)
-      meta   <- scriptMeta(script)
-    } yield meta
-
-  def scriptMeta(script: Script): Either[ScriptParseError, Dic] =
-    script match {
-      case ContractScriptImpl(_, dApp) => MetaMapper.dicFromProto(dApp).leftMap(ScriptParseError)
-      case _                           => Right(Dic(Map()))
-    }
-
-  def dAppFuncTypes(script: Script): Either[ScriptParseError, Dic] =
+  def dAppFuncTypes(script: Script): Either[ScriptParseError, FunctionSignatures] =
     script match {
       case ContractScriptImpl(_, dApp) =>
         MetaMapper.dicFromProto(dApp).bimap(ScriptParseError, combineMetaWithDApp(_, dApp))
       case _ => Left(ScriptParseError("Expected DApp"))
     }
 
-  private def combineMetaWithDApp(dic: Dic, dApp: DApp): Dic =
-    dic.m.get(MetaMapperStrategyV1.FieldName).fold(dic) {
-      case Chain(paramTypes) =>
-        val funcsName      = dApp.callableFuncs.map(_.u.name)
-        val paramsWithFunc = Dic((funcsName zip paramTypes).toMap)
-        Dic(dic.m.updated(MetaMapperStrategyV1.FieldName, paramsWithFunc))
-      case _ => Dic(Map())
-    }
+  private def combineMetaWithDApp(meta: ParsedMeta, dApp: DApp): FunctionSignatures = {
+    val argTypesWithFuncName =
+      meta.callableFuncTypes.fold(List.empty[(String, List[(String, FINAL)])])(
+        types =>
+          (types zip dApp.callableFuncs)
+            .map { case (argTypes, func) =>
+              func.u.name -> (func.u.args zip argTypes)
+            }
+      )
+    FunctionSignatures(meta.version, argTypesWithFuncName)
+  }
 
   def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean
 
@@ -223,6 +269,37 @@ trait BaseGlobal {
   def requestNode(url: String): Future[NodeResponse]
 
   def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean
+
+  def bn256Groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean
+
+  def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte]
+
+  def median(seq: Seq[Long]): Long = {
+    @tailrec
+    def findKMedianInPlace(arr: ArrayView, k: Int)(implicit choosePivot: ArrayView => Long): Long = {
+      val a = choosePivot(arr)
+      val (s, b) = arr partitionInPlace (a >)
+      if (s.size == k) a
+      // The following test is used to avoid infinite repetition
+      else if (s.isEmpty) {
+        val (s, b) = arr partitionInPlace (a ==)
+        if (s.size > k) a
+        else findKMedianInPlace(b, k - s.size)
+      } else if (s.size < k) findKMedianInPlace(b, k - s.size)
+      else findKMedianInPlace(s, k)
+    }
+
+    val pivot =
+      (arr: ArrayView) => arr(Random.nextInt(arr.size))
+
+    if (seq.length % 2 == 1)
+      findKMedianInPlace(ArrayView(seq.toArray), (seq.size - 1) / 2)(pivot)
+    else {
+      val r1 = findKMedianInPlace(ArrayView(seq.toArray), seq.size / 2 - 1)(pivot)
+      val r2 = findKMedianInPlace(ArrayView(seq.toArray), seq.size / 2)(pivot)
+      Math.floorDiv(r1 + r2, 2)
+    }
+  }
 }
 
 object BaseGlobal {
@@ -234,4 +311,40 @@ object BaseGlobal {
   case class RoundHalfEven() extends Rounds
   case class RoundCeiling()  extends Rounds
   case class RoundFloor()    extends Rounds
+
+  private case class ArrayView(arr: Array[Long], from: Int, until: Int) {
+    def apply(n: Int): Long =
+      if (from + n < until) arr(from + n)
+      else throw new ArrayIndexOutOfBoundsException(n)
+
+    def partitionInPlace(p: Long => Boolean): (ArrayView, ArrayView) = {
+      var upper = until - 1
+      var lower = from
+      while (lower < upper) {
+        while (lower < until && p(arr(lower))) lower += 1
+        while (upper >= from && !p(arr(upper))) upper -= 1
+        if (lower < upper) { val tmp = arr(lower); arr(lower) = arr(upper); arr(upper) = tmp }
+      }
+      (copy(until = lower), copy(from = lower))
+    }
+
+    def size: Int = until - from
+    def isEmpty: Boolean = size <= 0
+  }
+
+  private object ArrayView {
+    def apply(arr: Array[Long]) =
+      new ArrayView(arr, 0, arr.length)
+  }
+
+  case class DAppInfo(
+      bytes: Array[Byte],
+      dApp: DApp,
+      maxComplexity: (String, Long),
+      annotatedComplexities: Map[String, Long],
+      verifierComplexity: Long,
+      callableComplexities: Map[String, Long],
+      userFunctionComplexities: Map[String, Long],
+      globalVariableComplexities: Map[String, Long]
+  )
 }

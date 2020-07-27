@@ -6,6 +6,7 @@ import com.google.common.primitives.Ints
 import com.typesafe.config.Config
 import com.wavesplatform.account._
 import com.wavesplatform.api.http.requests.TransferRequest
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.TransferSending.Req
 import com.wavesplatform.it.api.AsyncHttpApi._
@@ -109,9 +110,8 @@ trait TransferSending extends ScorexLogging {
   def balanceForNode(n: Node): Future[(String, Long)] = n.balance(n.address).map(b => n.address -> b.balance)
 
   def processRequests(requests: Seq[Req], includeAttachment: Boolean = false): Future[Seq[Transaction]] = {
-    val n     = requests.size
-    val start = System.currentTimeMillis() - n
-    val requestGroups = requests.zipWithIndex
+    val start = System.currentTimeMillis() - requests.size
+    val signedTransfers = requests.zipWithIndex
       .map {
         case (x, i) =>
           createSignedTransferRequest(
@@ -126,29 +126,21 @@ trait TransferSending extends ScorexLogging {
                 fee = x.fee,
                 attachment =
                   if (includeAttachment)
-                    Some(Attachment.Bin(Array.fill(TransferTransaction.MaxAttachmentSize)(ThreadLocalRandom.current().nextInt().toByte)))
-                  else None,
+                    ByteStr(Array.fill(TransferTransaction.MaxAttachmentSize)(ThreadLocalRandom.current().nextInt().toByte))
+                  else ByteStr.empty,
                 timestamp = start + i
               )
-              .right
-              .get
+              .explicitGet()
           )
       }
-      .grouped(requests.size / nodes.size + 1)
-      .toSeq
 
-    Future
-      .traverse(nodes.zip(requestGroups)) {
-        case (node, request) =>
-          request.foldLeft(Future.successful(Seq.empty[Transaction])) {
-            case (f, r) =>
-              for {
-                prevTransactions <- f
-                tx               <- node.signedBroadcast(toJson(r).as[JsObject] ++ Json.obj("type" -> TransferTransaction.typeId.toInt))
-              } yield tx +: prevTransactions
-          }
-      }
-      .map(_.flatten)
+    signedTransfers.zip(Iterator.continually(nodes).flatten).foldLeft(Future.successful(Seq.empty[Transaction])) {
+      case (resultFuture, (transferRequest, node)) =>
+        for {
+          result <- resultFuture
+          tx     <- node.signedBroadcast(toJson(transferRequest).as[JsObject] ++ Json.obj("type" -> TransferTransaction.typeId.toInt))
+        } yield tx +: result
+    }
   }
 
   protected def createSignedTransferRequest(tx: TransferTransaction): TransferRequest = {
@@ -162,7 +154,7 @@ trait TransferSending extends ScorexLogging {
       amount,
       Some(feeAssetId),
       fee,
-      attachment,
+      Some(attachment),
       Some(timestamp),
       None,
       Some(proofs)

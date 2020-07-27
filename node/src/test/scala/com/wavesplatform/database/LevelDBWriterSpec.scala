@@ -2,12 +2,12 @@ package com.wavesplatform.database
 
 import java.nio.BufferUnderflowException
 
-import com.google.common.primitives.{Ints, Shorts}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.database.protobuf.TransactionMeta
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -22,7 +22,7 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.utils.Time
-import com.wavesplatform.{RequestGen, TransactionGen, WithDB, database}
+import com.wavesplatform.{EitherMatchers, RequestGen, TransactionGen, WithDB, database}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
@@ -31,6 +31,7 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 class LevelDBWriterSpec
     extends FreeSpec
     with Matchers
+    with EitherMatchers
     with TransactionGen
     with WithDB
     with DBCacheSettings
@@ -122,12 +123,12 @@ class LevelDBWriterSpec
     val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
-    val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers)
+    val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
     try {
       val (account, blocks) = gen(ntpTime).sample.get
 
       blocks.foreach { block =>
-        bcu.processBlock(block, block.header.generationSignature).explicitGet()
+        bcu.processBlock(block, block.header.generationSignature) should beRight
       }
 
       bcu.shutdown()
@@ -142,12 +143,12 @@ class LevelDBWriterSpec
     val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
-    val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers)
+    val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
     try {
       val (account, blocks) = gen(ntpTime).sample.get
 
       blocks.foreach { block =>
-        bcu.processBlock(block, block.header.generationSignature).explicitGet()
+        bcu.processBlock(block, block.header.generationSignature) should beRight
       }
 
       bcu.shutdown()
@@ -158,11 +159,10 @@ class LevelDBWriterSpec
     }
   }
 
-  def createTransfer(master: KeyPair, recipient: Address, ts: Long): TransferTransaction = {
+  def createTransfer(master: KeyPair, recipient: Address, ts: Long): TransferTransaction =
     TransferTransaction
-      .selfSigned(1.toByte, master, recipient, Waves, ENOUGH_AMT / 10, Waves, 1000000, None, ts)
+      .selfSigned(1.toByte, master, recipient, Waves, ENOUGH_AMT / 10, Waves, 1000000, ByteStr.empty, ts)
       .explicitGet()
-  }
 
   def preconditions(ts: Long): Gen[(KeyPair, List[Block])] = {
     for {
@@ -191,7 +191,7 @@ class LevelDBWriterSpec
     )
     val settings0 = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
-    val bcu       = new BlockchainUpdaterImpl(rw, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers)
+    val bcu       = new BlockchainUpdaterImpl(rw, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
     try {
       val master    = KeyPair(ByteStr("master".getBytes()))
       val recipient = KeyPair(ByteStr("recipient".getBytes()))
@@ -242,12 +242,12 @@ class LevelDBWriterSpec
           version = Block.ProtoBlockVersion
         )
 
-      bcu.processBlock(genesisBlock, genesisBlock.header.generationSignature) shouldBe 'right
-      bcu.processBlock(block1, block1.header.generationSignature) shouldBe 'right
-      bcu.processBlock(block2, block2.header.generationSignature) shouldBe 'right
-      bcu.processBlock(block3, block3.header.generationSignature) shouldBe 'right
-      bcu.processBlock(block4, block4.header.generationSignature) shouldBe 'right
-      bcu.processBlock(block5, block5.header.generationSignature) shouldBe 'right
+      bcu.processBlock(genesisBlock, genesisBlock.header.generationSignature) should beRight
+      bcu.processBlock(block1, block1.header.generationSignature) should beRight
+      bcu.processBlock(block2, block2.header.generationSignature) should beRight
+      bcu.processBlock(block3, block3.header.generationSignature) should beRight
+      bcu.processBlock(block4, block4.header.generationSignature) should beRight
+      bcu.processBlock(block5, block5.header.generationSignature) should beRight
 
       def blockAt(height: Int): Option[Block] =
         bcu.liquidBlockMeta
@@ -279,12 +279,12 @@ class LevelDBWriterSpec
 
       forAll(randomTransactionGen) { tx =>
         val transactionId = tx.id()
-        db.put(Keys.transactionHNById(TransactionId @@ transactionId).keyBytes, Ints.toByteArray(1) ++ Shorts.toByteArray(0))
-        db.put(Keys.transferTransactionAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](1, 2, 3, 4, 5, 6))
+        db.put(Keys.transactionMetaById(TransactionId @@ transactionId).keyBytes, TransactionMeta(1, 0, tx.typeId, true).toByteArray)
+        db.put(Keys.transactionAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](1, 2, 3, 4, 5, 6))
 
         writer.transferById(transactionId) shouldBe None
 
-        db.put(Keys.transferTransactionAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))
+        db.put(Keys.transactionAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))
         intercept[BufferUnderflowException](writer.transferById(transactionId))
       }
     }
@@ -309,7 +309,7 @@ class LevelDBWriterSpec
       forAll(scenario) {
         case (tx, s) =>
           val transactionId = tx.id()
-          db.put(Keys.transactionHNById(TransactionId(transactionId)).keyBytes, database.writeTransactionHN((Height(1), TxNum(0.toShort))))
+          db.put(Keys.transactionMetaById(TransactionId(transactionId)).keyBytes, TransactionMeta(1, 0, tx.typeId, !s).toByteArray)
           db.put(Keys.transactionAt(Height(1), TxNum(0.toShort)).keyBytes, database.writeTransaction((tx, s)))
 
           writer.transactionInfo(transactionId) shouldBe Some((1, tx, s))

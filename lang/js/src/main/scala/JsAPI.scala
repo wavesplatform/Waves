@@ -2,12 +2,12 @@ import JsApiUtils._
 import cats.kernel.Monoid
 import com.wavesplatform.DocSource
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.contract.meta.RecKeyValueFolder
 import com.wavesplatform.lang.directives.Directive.extractDirectives
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveParser, DirectiveSet}
 import com.wavesplatform.lang.script.ScriptPreprocessor
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.BaseGlobal.DAppInfo
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.repl.Repl
@@ -33,8 +33,7 @@ object JsAPI {
     )
 
   private def cryptoContext(version: StdLibVersion) = CryptoContext.build(Global, version).withEnvironment[Environment]
-  private def pureContext(version: StdLibVersion)   = PureContext.build(Global, version).withEnvironment[Environment]
-  private val letBLockVersions: Set[StdLibVersion]  = Set(V1, V2)
+  private def pureContext(version: StdLibVersion)   = PureContext.build(version).withEnvironment[Environment]
 
   private val fullDAppContext: Map[StdLibVersion, CTX[Environment]] =
     DirectiveDictionary[StdLibVersion].all
@@ -57,6 +56,7 @@ object JsAPI {
   @JSExportTopLevel("getVarsDoc")
   def getVarsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
     buildScriptContext(DirectiveDictionary[StdLibVersion].idMap(ver), isTokenContext, isContract).vars
+      .filterNot(_._1.startsWith("_"))
       .map(
         v =>
           js.Dynamic.literal(
@@ -70,14 +70,15 @@ object JsAPI {
   @JSExportTopLevel("getFunctionsDoc")
   def getFunctionsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
     buildScriptContext(DirectiveDictionary[StdLibVersion].idMap(ver), isTokenContext, isContract).functions
+      .filterNot(_.name.startsWith("_"))
       .map(f => {
-        val (funcDoc, paramsDoc) = DocSource.funcData((f.name, f.signature.args.map(_._2.toString).toList, ver))
+        val (funcDoc, paramsDoc, _) = DocSource.funcData((f.name, f.signature.args.map(_._2.toString).toList, ver))
         js.Dynamic.literal(
           "name"       -> f.name,
           "doc"        -> funcDoc,
           "resultType" -> typeRepr(f.signature.result),
-          "args" -> (f.args, f.signature.args, paramsDoc).zipped.toList.map { arg =>
-            js.Dynamic.literal("name" -> arg._1, "type" -> typeRepr(arg._2._2), "doc" -> arg._3)
+          "args" -> (f.args zip f.signature.args zip paramsDoc).map { arg =>
+            js.Dynamic.literal("name" -> arg._1._1, "type" -> typeRepr(arg._1._2._2), "doc" -> arg._2)
           }.toJSArray
         )
       })
@@ -102,7 +103,7 @@ object JsAPI {
   @JSExportTopLevel("scriptInfo")
   def scriptInfo(input: String): js.Dynamic = {
     val info = DirectiveParser(input)
-      .flatMap(extractDirectives)
+      .flatMap(v => extractDirectives(v))
       .map {
         case DirectiveSet(ver, scriptType, contentType, imports) =>
           js.Dynamic.literal(
@@ -121,13 +122,14 @@ object JsAPI {
   @JSExportTopLevel("parseAndCompile")
   def parseAndCompile(
       input: String,
-      libraries: Dictionary[String] = Dictionary.empty
+      estimatorVersion: Int,
+      libraries: Dictionary[String] = Dictionary.empty,
   ): js.Dynamic = {
     val r = for {
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives)
       linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds.imports)
-      compiled    <- parseAndCompileScript(ds, linkedInput)
+      compiled    <- parseAndCompileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVersion - 1))
     } yield compiled
     r.fold(
       e => js.Dynamic.literal("error" -> e),
@@ -135,14 +137,14 @@ object JsAPI {
     )
   }
 
-  private def parseAndCompileScript(ds: DirectiveSet, input: String) = {
+  private def parseAndCompileScript(ds: DirectiveSet, input: String, estimator: ScriptEstimator) = {
     val stdLibVer = ds.stdLibVersion
     val isAsset = ds.scriptType == Asset
     ds.contentType match {
       case Expression =>
         val ctx = buildScriptContext(stdLibVer, isAsset, ds.contentType == DAppType)
         Global
-          .parseAndCompileExpression(input, ctx.compilerContext, letBLockVersions.contains(stdLibVer), stdLibVer, estimator)
+          .parseAndCompileExpression(input, ctx.compilerContext, Global.LetBlockVersions.contains(stdLibVer), stdLibVer, estimator)
           .map {
             case (bytes, complexity, exprScript, compErrorList) =>
               js.Dynamic.literal(
@@ -155,7 +157,7 @@ object JsAPI {
       case Library =>
         val ctx = buildScriptContext(stdLibVer, isAsset, ds.contentType == DAppType)
         Global
-          .compileDecls(input, ctx.compilerContext, letBLockVersions.contains(stdLibVer), stdLibVer, isAsset, estimator)
+          .compileDecls(input, ctx.compilerContext, stdLibVer, estimator)
           .map {
             case (bytes, ast, complexity) =>
               js.Dynamic.literal(
@@ -172,7 +174,7 @@ object JsAPI {
               js.Dynamic.literal(
                 "result"           -> Global.toBuffer(bytes),
                 "complexity"       -> complexityWithMap._1,
-                "complexityByFunc" -> complexityWithMap._2.toJSDictionary,
+                "complexityByFunc" -> complexityWithMap._2.view.mapValues(c => c: Any).toMap.toJSDictionary,
                 "dAppAst"          -> dAppToJs(exprDApp),
                 "errorList"        -> compErrorList.map(compilationErrToJs).toJSArray
               )
@@ -183,13 +185,14 @@ object JsAPI {
   @JSExportTopLevel("compile")
   def compile(
       input: String,
+      estimatorVersion: Int,
       libraries: Dictionary[String] = Dictionary.empty
   ): js.Dynamic = {
     val r = for {
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives)
       linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds.imports)
-      compiled    <- compileScript(ds, linkedInput)
+      compiled    <- compileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVersion - 1))
     } yield compiled
     r.fold(
       e => js.Dynamic.literal("error" -> e),
@@ -197,48 +200,73 @@ object JsAPI {
     )
   }
 
-  val estimator = ScriptEstimatorV2
-
-  private def compileScript(ds: DirectiveSet, input: String) = {
-    val ver = ds.stdLibVersion
+  private def compileScript(ds: DirectiveSet, input: String, estimator: ScriptEstimator): Either[String, js.Object with js.Dynamic] = {
+    val version = ds.stdLibVersion
     val isAsset = ds.scriptType == Asset
     ds.contentType match {
       case Expression =>
-        val ctx = buildScriptContext(ver, isAsset, ds.contentType == DAppType)
+        val ctx = buildScriptContext(version, isAsset, ds.contentType == DAppType)
         Global
-          .compileExpression(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, isAsset, estimator)
+          .compileExpression(input, ctx.compilerContext, version, estimator)
           .map {
-            case (bytes, ast, complexity) =>
-              js.Dynamic.literal(
+            case (bytes, expr, complexity) =>
+              val resultFields: Seq[(String, Any)] = Seq(
                 "result"     -> Global.toBuffer(bytes),
-                "ast"        -> toJs(ast),
+                "ast"        -> toJs(expr),
                 "complexity" -> complexity
               )
+              val errorFieldOpt: Seq[(String, Any)] =
+                Global.checkExpr(expr, complexity, version, isAsset, estimator)
+                  .fold(
+                    error => Seq("error" -> error),
+                    _     => Seq()
+                  )
+              js.Dynamic.literal.applyDynamic("apply")(resultFields ++ errorFieldOpt: _*)
           }
       case Library =>
-        val ctx = buildScriptContext(ver, isAsset, ds.contentType == DAppType)
+        val ctx = buildScriptContext(version, isAsset, ds.contentType == DAppType)
         Global
-          .compileDecls(input, ctx.compilerContext, letBLockVersions.contains(ver), ver, isAsset, estimator)
+          .compileDecls(input, ctx.compilerContext, version, estimator)
           .map {
-            case (bytes, ast, complexity) =>
+            case (bytes, expr, complexity) =>
               js.Dynamic.literal(
                 "result"     -> Global.toBuffer(bytes),
-                "ast"        -> toJs(ast),
+                "ast"        -> toJs(expr),
                 "complexity" -> complexity
               )
           }
       case DAppType =>
         // Just ignore stdlib version here
         Global
-          .compileContract(input, fullDAppContext(ds.stdLibVersion).compilerContext, ver, estimator)
+          .compileContract(input, fullDAppContext(ds.stdLibVersion).compilerContext, version, estimator)
           .map {
-            case (bytes, ast, complexity, complexityByFunc) =>
-              js.Dynamic.literal(
-                "result"           -> Global.toBuffer(bytes),
-                "ast"              -> toJs(ast),
-                "complexity"       -> complexity,
-                "complexityByFunc" -> complexityByFunc.toJSDictionary
+            case DAppInfo(
+              bytes,
+              dApp,
+              maxComplexityFunc @ (_, maxComplexity),
+              annotatedComplexities,
+              verifierComplexity,
+              callableComplexities,
+              userFunctionComplexities,
+              globalVariableComplexities
+            ) =>
+              val resultFields: Seq[(String, Any)] = Seq(
+                "result"                     -> Global.toBuffer(bytes),
+                "ast"                        -> toJs(dApp),
+                "complexity"                 -> maxComplexity,
+                "verifierComplexity"         -> verifierComplexity,
+                "callableComplexities"       -> callableComplexities.view.mapValues(c => c: Any).toMap.toJSDictionary,
+                "userFunctionComplexities"   -> userFunctionComplexities.view.mapValues(c => c: Any).toMap.toJSDictionary,
+                "globalVariableComplexities" -> globalVariableComplexities.view.mapValues(c => c: Any).toMap.toJSDictionary,
               )
+              val errorFieldOpt: Seq[(String, Any)] = {
+                Global.checkContract(version, dApp, maxComplexityFunc, annotatedComplexities, estimator)
+                  .fold(
+                    error => Seq("error" -> error),
+                    _     => Seq()
+                  )
+              }
+              js.Dynamic.literal.applyDynamic("apply")(resultFields ++ errorFieldOpt: _*)
           }
     }
   }
@@ -248,21 +276,9 @@ object JsAPI {
     Global
       .decompile(input)
       .fold(
-        err => js.Dynamic.literal("error" -> err.m), {
-          case (scriptText, meta) =>
-            jObj(
-              "result" -> scriptText,
-              "meta"   -> metaConverter.foldRoot(meta)
-            )
-        }
+        err        => jObj("error" -> err.m),
+        scriptText => jObj("result" -> scriptText)
       )
-
-  lazy val metaConverter: RecKeyValueFolder[Any, js.Object with js.Dynamic] =
-    RecKeyValueFolder(
-      Any.fromString,
-      _.toJSArray,
-      js.Dynamic.literal.applyDynamic("apply")(_: _*)
-    )
 
   @JSExportTopLevel("nodeVersion")
   def nodeVersion(): js.Dynamic = js.Dynamic.literal("version" -> Version.VersionString)
@@ -274,7 +290,7 @@ object JsAPI {
     jObj(
       "evaluate"    -> (repl.execute _ andThen mapResult),
       "info"        -> repl.info _,
-      "totalInfo"   -> repl.totalInfo _,
+      "totalInfo"   -> (() => repl.totalInfo),
       "clear"       -> repl.clear _,
       "reconfigure" -> (repl.reconfigure _ andThen asJs)
     )

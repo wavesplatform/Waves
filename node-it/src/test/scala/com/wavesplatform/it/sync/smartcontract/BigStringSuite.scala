@@ -15,15 +15,15 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
 class BigStringSuite extends BaseTransactionSuite with CancelAfterFailure {
-  private val acc0 = pkByAddress(firstAddress)
-  private val acc1 = pkByAddress(secondAddress)
-  private val acc2 = pkByAddress(thirdAddress)
+  private def acc0 = firstKeyPair
+  private def acc1 = secondKeyPair
+  private def acc2 = thirdKeyPair
 
   test("set contract, make leasing and cancel leasing") {
     val (balance1, eff1) = miner.accountBalances(acc0.toAddress.toString)
     val (balance2, eff2) = miner.accountBalances(thirdAddress)
 
-    val txId = sender.transfer(sender.address, acc0.toAddress.toString, 10 * transferAmount, minFee).id
+    val txId = sender.transfer(sender.keyPair, acc0.toAddress.toString, 10 * transferAmount, minFee).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
     miner.assertBalances(firstAddress, balance1 + 10 * transferAmount, eff1 + 10 * transferAmount)
@@ -39,7 +39,7 @@ class BigStringSuite extends BaseTransactionSuite with CancelAfterFailure {
         a20 == a0 || match tx {
           case ltx: LeaseTransaction => sigVerify(ltx.bodyBytes,ltx.proofs[0],pkA) && sigVerify(ltx.bodyBytes,ltx.proofs[2],pkC)
           case lctx : LeaseCancelTransaction => sigVerify(lctx.bodyBytes,lctx.proofs[1],pkA) && sigVerify(lctx.bodyBytes,lctx.proofs[2],pkB)
-          case other => false
+          case _ => false
         }
         """.stripMargin
 
@@ -73,7 +73,7 @@ class BigStringSuite extends BaseTransactionSuite with CancelAfterFailure {
     val signedLeasing =
       unsignedLeasing.copy(proofs = Proofs(Seq(sigLeasingA, ByteStr.empty, sigLeasingC)))
 
-    assertBadRequestAndMessage(sender.signedBroadcast(signedLeasing.json()).id, "String is too large")
+    assertBadRequestAndMessage(sender.signedBroadcast(signedLeasing.json()).id, "String size=32768 exceeds 32767 bytes")
 
     val leasingId = Base58.encode(unsignedLeasing.id().arr)
 

@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs
 
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.CreateAliasTransaction

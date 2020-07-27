@@ -7,22 +7,22 @@ import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.testing.ScriptGenParser
-import fastparse.core.Parsed.{Failure, Success}
+import fastparse.Parsed.{Failure, Success}
 import org.scalacheck.Gen
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import scorex.crypto.encode.{Base58 => ScorexBase58}
+import scorex.util.encode.{Base58 => ScorexBase58}
 
 class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
 
   private def parse(x: String): EXPR = Parser.parseExpr(x) match {
-    case Success(r, _)    => r
-    case Failure(_, _, _) => throw new TestFailedException("Test failed", 0)
+    case Success(r, _)      => r
+    case f@Failure(_, _, _) => throw new TestFailedException(f.msg, 0)
   }
 
   private def cleanOffsets(l: LET): LET =
-    l.copy(Pos(0, 0), name = cleanOffsets(l.name), value = cleanOffsets(l.value), types = l.types.map(cleanOffsets(_)))
+    l.copy(Pos(0, 0), name = cleanOffsets(l.name), value = cleanOffsets(l.value)) // , types = l.types.map(cleanOffsets(_))
 
   private def cleanOffsets[T](p: PART[T]): PART[T] = p match {
     case PART.VALID(_, x)   => PART.VALID(AnyPos, x)
@@ -219,7 +219,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
         |c""".stripMargin
     parse(s) shouldBe BLOCK(
       AnyPos,
-      LET(AnyPos, PART.VALID(AnyPos, "q"), CONST_LONG(AnyPos, 1), List.empty),
+      LET(AnyPos, PART.VALID(AnyPos, "q"), CONST_LONG(AnyPos, 1)),
       REF(AnyPos, PART.VALID(AnyPos, "c"))
     )
   }
@@ -232,9 +232,9 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
       AnyPos,
       FUNC(
         AnyPos,
+        CONST_LONG(AnyPos, 42),
         PART.VALID(AnyPos, "q"),
-        Seq((PART.VALID(AnyPos, "x"), Seq((PART.VALID(AnyPos, "Int"), None))), (PART.VALID(AnyPos, "y"), Seq((PART.VALID(AnyPos, "Boolean"), None)))),
-        CONST_LONG(AnyPos, 42)
+        Seq((PART.VALID(AnyPos, "x"), Single(PART.VALID(AnyPos, "Int"), None)), (PART.VALID(AnyPos, "y"), Single(PART.VALID(AnyPos, "Boolean"), None)))
       ),
       REF(AnyPos, PART.VALID(AnyPos, "c"))
     )
@@ -248,9 +248,9 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
       AnyPos,
       FUNC(
         AnyPos,
+        CONST_LONG(AnyPos, 42),
         PART.VALID(AnyPos, "q"),
-        Seq((PART.VALID(AnyPos, "x"), Seq((PART.VALID(AnyPos, "Int"), None), (PART.VALID(AnyPos, "String"), None)))),
-        CONST_LONG(AnyPos, 42)
+        Seq((PART.VALID(AnyPos, "x"), Union(Seq(Single(PART.VALID(AnyPos, "Int"), None), Single(PART.VALID(AnyPos, "String"), None)))))
       ),
       REF(AnyPos, PART.VALID(AnyPos, "c"))
     )
@@ -262,7 +262,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
         |c""".stripMargin
     parse(s) shouldBe BLOCK(
       AnyPos,
-      LET(AnyPos, PART.VALID(AnyPos, "q"), CONST_LONG(AnyPos, 1), List.empty),
+      LET(AnyPos, PART.VALID(AnyPos, "q"), CONST_LONG(AnyPos, 1)),
       REF(AnyPos, PART.VALID(AnyPos, "c"))
     )
   }
@@ -273,7 +273,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
         |; c""".stripMargin
     parse(s) shouldBe BLOCK(
       AnyPos,
-      LET(AnyPos, PART.VALID(AnyPos, "q"), CONST_LONG(AnyPos, 1), List.empty),
+      LET(AnyPos, PART.VALID(AnyPos, "q"), CONST_LONG(AnyPos, 1)),
       REF(AnyPos, PART.VALID(AnyPos, "c"))
     )
   }
@@ -282,7 +282,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
     val s = "let q = 1; c"
     parse(s) shouldBe BLOCK(
       AnyPos,
-      LET(AnyPos, PART.VALID(AnyPos, "q"), CONST_LONG(AnyPos, 1), List.empty),
+      LET(AnyPos, PART.VALID(AnyPos, "q"), CONST_LONG(AnyPos, 1)),
       REF(AnyPos, PART.VALID(AnyPos, "c"))
     )
   }
@@ -291,7 +291,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
     val s = "let q = 1 c"
     parse(s) shouldBe BLOCK(
       AnyPos,
-      LET(AnyPos, PART.VALID(AnyPos, "q"), CONST_LONG(AnyPos, 1), List.empty),
+      LET(AnyPos, PART.VALID(AnyPos, "q"), CONST_LONG(AnyPos, 1)),
       INVALID(AnyPos, "expected ';'")
     )
   }
@@ -312,9 +312,8 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
           AnyPos,
           REF(AnyPos, PART.VALID(AnyPos, "a")),
           AND_OP,
-          BLOCK(AnyPos, LET(AnyPos, PART.VALID(AnyPos, "y"), CONST_LONG(AnyPos, 1), List()), TRUE(AnyPos))
-        ),
-        List()
+          BLOCK(AnyPos, LET(AnyPos, PART.VALID(AnyPos, "y"), CONST_LONG(AnyPos, 1)), TRUE(AnyPos))
+        )
       ),
       TRUE(AnyPos)
     )
@@ -326,7 +325,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
          |true""".stripMargin
     parse(script) shouldBe BLOCK(
       AnyPos,
-      LET(AnyPos, PART.INVALID(AnyPos, "keywords are restricted: if"), CONST_LONG(AnyPos, 1), Seq.empty),
+      LET(AnyPos, PART.INVALID(AnyPos, "keywords are restricted: if"), CONST_LONG(AnyPos, 1)),
       TRUE(AnyPos)
     )
   }
@@ -337,7 +336,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
          |true""".stripMargin
     parse(script) shouldBe BLOCK(
       AnyPos,
-      LET(AnyPos, PART.INVALID(AnyPos, "keywords are restricted: let"), CONST_LONG(AnyPos, 1), Seq.empty),
+      LET(AnyPos, PART.INVALID(AnyPos, "keywords are restricted: let"), CONST_LONG(AnyPos, 1)),
       TRUE(AnyPos)
     )
   }
@@ -349,7 +348,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
            |true""".stripMargin
       parse(script) shouldBe BLOCK(
         AnyPos,
-        LET(AnyPos, PART.INVALID(AnyPos, s"keywords are restricted: $keyword"), CONST_LONG(AnyPos, 1), Seq.empty),
+        LET(AnyPos, PART.INVALID(AnyPos, s"keywords are restricted: $keyword"), CONST_LONG(AnyPos, 1)),
         TRUE(AnyPos)
       )
     }
@@ -361,7 +360,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
          |true""".stripMargin
     parse(script) shouldBe BLOCK(
       AnyPos,
-      LET(AnyPos, PART.INVALID(AnyPos, "keywords are restricted: false"), CONST_LONG(AnyPos, 1), Seq.empty),
+      LET(AnyPos, PART.INVALID(AnyPos, "keywords are restricted: false"), CONST_LONG(AnyPos, 1)),
       TRUE(AnyPos)
     )
   }
@@ -370,7 +369,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
     val script = "let + 1"
     parse(script) shouldBe BLOCK(
       AnyPos,
-      LET(AnyPos, PART.INVALID(AnyPos, "expected a variable's name"), INVALID(AnyPos, "expected a value"), List.empty),
+      LET(AnyPos, PART.INVALID(AnyPos, "expected a variable's name"), INVALID(AnyPos, "expected a value")),
       INVALID(AnyPos, "expected ';'")
     )
   }
@@ -504,8 +503,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
         LET(
           AnyPos,
           PART.VALID(AnyPos, "yyy"),
-          FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "aaa"), List(REF(AnyPos, PART.VALID(AnyPos, "bbb")))),
-          Seq.empty
+          FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "aaa"), List(REF(AnyPos, PART.VALID(AnyPos, "bbb"))))
         ),
         FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "xxx"), List(REF(AnyPos, PART.VALID(AnyPos, "yyy"))))
       ),
@@ -568,7 +566,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
         |(bar)""".stripMargin
     parse(text) shouldBe BLOCK(
       AnyPos,
-      LET(AnyPos, PART.VALID(AnyPos, "a"), REF(AnyPos, PART.VALID(AnyPos, "foo")), List.empty),
+      LET(AnyPos, PART.VALID(AnyPos, "a"), REF(AnyPos, PART.VALID(AnyPos, "foo"))),
       REF(AnyPos, PART.VALID(AnyPos, "bar"))
     )
   }
@@ -807,7 +805,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
         MATCH_CASE(
           AnyPos,
           None,
-          Seq(PART.INVALID(AnyPos, "the type for variable should be specified: `case varName: Type => expr`")),
+          Single(PART.INVALID(AnyPos, "the type for variable should be specified: `case varName: Type => expr`")),
           CONST_LONG(AnyPos, 1)
         )
       )
@@ -822,7 +820,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
         MATCH_CASE(
           AnyPos,
           None,
-          Seq(PART.INVALID(AnyPos, "the type for variable should be specified: `case varName: Type => expr`")),
+          Single(PART.INVALID(AnyPos, "the type for variable should be specified: `case varName: Type => expr`")),
           CONST_LONG(AnyPos, 1)
         )
       )
@@ -844,7 +842,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
           MATCH_CASE(
             AnyPos,
             Some(PART.VALID(AnyPos, "a")),
-            List(),
+            Union(List()),
             BINARY_OP(AnyPos, TRUE(AnyPos), AND_OP, INVALID(AnyPos, "expected a second operator"))
           ),
           MATCH_CASE(AnyPos, Some(PART.VALID(AnyPos, "b")), List(), CONST_LONG(AnyPos, 1))
@@ -871,7 +869,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
           List(),
           BLOCK(
             AnyPos,
-            LET(AnyPos, PART.VALID(AnyPos, "x"), TRUE(AnyPos), List.empty),
+            LET(AnyPos, PART.VALID(AnyPos, "x"), TRUE(AnyPos)),
             BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, "x")), AND_OP, INVALID(AnyPos, "expected a second operator"))
           )
         ),
@@ -939,7 +937,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
         |x""".stripMargin
     parse(s) shouldBe BLOCK(
       AnyPos,
-      LET(AnyPos, PART.VALID(AnyPos, "x"), TRUE(AnyPos), List.empty),
+      LET(AnyPos, PART.VALID(AnyPos, "x"), TRUE(AnyPos)),
       REF(AnyPos, PART.VALID(AnyPos, "x"))
     )
   }
@@ -951,7 +949,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
         |x""".stripMargin
     parse(s) shouldBe BLOCK(
       AnyPos,
-      LET(AnyPos, PART.VALID(AnyPos, "x"), TRUE(AnyPos), List.empty),
+      LET(AnyPos, PART.VALID(AnyPos, "x"), TRUE(AnyPos)),
       REF(AnyPos, PART.VALID(AnyPos, "x"))
     )
   }
@@ -964,7 +962,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
 
     parse(code) shouldBe BLOCK(
       AnyPos,
-      LET(AnyPos, PART.VALID(AnyPos, "x"), TRUE(AnyPos), List.empty),
+      LET(AnyPos, PART.VALID(AnyPos, "x"), TRUE(AnyPos)),
       REF(AnyPos, PART.VALID(AnyPos, "x"))
     )
   }
@@ -976,7 +974,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
 
     parse(code) shouldBe BLOCK(
       AnyPos,
-      LET(AnyPos, PART.VALID(AnyPos, "x"), TRUE(AnyPos), List.empty),
+      LET(AnyPos, PART.VALID(AnyPos, "x"), TRUE(AnyPos)),
       REF(AnyPos, PART.VALID(AnyPos, "x"))
     )
   }
@@ -1325,6 +1323,6 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
     }
     val script = s"$manyLets\n$lastStmt"
 
-    Parser.parseExpr(script) shouldBe an[Success[_, _, _]]
+    Parser.parseExpr(script) shouldBe an[Success[_]]
   }
 }

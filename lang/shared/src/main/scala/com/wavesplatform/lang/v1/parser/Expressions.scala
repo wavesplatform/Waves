@@ -75,16 +75,35 @@ object Expressions {
     def allowShadowing: Boolean
   }
 
-  // TODO remove types
-  case class LET(position: Pos, name: PART[String], value: EXPR, types: Seq[PART[String]], allowShadowing: Boolean = false) extends Declaration
+  case class LET(
+    position: Pos,
+    name: PART[String],
+    value: EXPR,
+    types: Option[FINAL] = None,
+    allowShadowing: Boolean = false
+  ) extends Declaration
 
-  type TypeParam = Option[PART[String]]
-  type Type      = (PART[String], TypeParam)
-  type FuncArgs  = Seq[(PART[String], Seq[Type])]
+  sealed trait Type {
+    def isEmpty: Boolean =
+      this match {
+        case _: Single    => false
+        case Union(types) => types.isEmpty
+        case Tuple(types) => types.exists(_.isEmpty)
+      }
+  }
+  case class Single(name: PART[String], parameter: Option[PART[Type]] = None)   extends Type
+  case class Union(types: Seq[Type])                                            extends Type
+  object Union {
+    def apply(types: Seq[Type]): Type = types match {
+      case Seq(t) => t
+      case _ => new Union(types)
+    }
+  }
+  case class Tuple(types: Seq[Type])                                            extends Type
 
   type CtxOpt = Option[Map[String, Pos]]
 
-  case class FUNC(position: Pos, name: PART[String], args: FuncArgs, expr: EXPR) extends Declaration {
+  case class FUNC(position: Pos, expr: EXPR, name: PART[String], args: Seq[(PART[String], Type)]) extends Declaration {
     val allowShadowing = false
   }
 
@@ -121,11 +140,21 @@ object Expressions {
   case class MATCH_CASE(
       position: Pos,
       newVarName: Option[PART[String]],
-      types: Seq[PART[String]],
+      caseType: Type,
       expr: EXPR,
       resultType: Option[FINAL] = None,
       ctxOpt: CtxOpt = None
   )
+
+  object MATCH_CASE {
+    def apply(
+      position: Pos,
+      newVarName: Option[PART[String]],
+      types: Seq[PART[String]],
+      expr: EXPR
+    ): MATCH_CASE =
+      MATCH_CASE(position, newVarName, Union(types.map(Single(_, None))), expr)
+  }
 
   case class MATCH(position: Pos, expr: EXPR, cases: Seq[MATCH_CASE], resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR
 

@@ -28,17 +28,19 @@ package object utils {
     override def inputEntity: Environment.InputEntity                                                            = null
     override val txId: ByteStr                                                                                   = ByteStr.empty
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
-    override def transferTransactionById(id: Array[Byte]): Option[Tx]                                            = ???
+    override def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer]                                   = ???
     override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
     override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
     override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
     override def blockInfoByHeight(height: Int): Option[BlockInfo]                                               = ???
     override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
+    override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails]    = ???
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
-    override def tthis: Recipient.Address                                                                        = ???
+    override def tthis: Environment.Tthis                                                                        = ???
     override def multiPaymentAllowed: Boolean                                                                    = true
     override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
+    override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???
   }
 
   val lazyContexts: Map[DirectiveSet, Coeval[CTX[Environment]]] = {
@@ -55,7 +57,7 @@ package object utils {
         val ctx = Coeval.evalOnce(
           Monoid.combineAll(
             Seq(
-              PureContext.build(Global, version).withEnvironment[Environment],
+              PureContext.build(version).withEnvironment[Environment],
               CryptoContext.build(Global, version).withEnvironment[Environment],
               WavesContext.build(ds)
             )
@@ -76,9 +78,9 @@ package object utils {
     lazyFunctionCosts(ds)()
 
   def estimate(version: StdLibVersion, ctx: EvaluationContext[Environment, Id]): Map[FunctionHeader, Coeval[Long]] = {
-    val costs: mutable.Map[FunctionHeader, Coeval[Long]] = ctx.typeDefs.collect {
+    val costs: mutable.Map[FunctionHeader, Coeval[Long]] = mutable.Map.from(ctx.typeDefs.collect {
       case (typeName, CASETYPEREF(_, fields, hidden)) if (!hidden || version < V4) => FunctionHeader.User(typeName) -> Coeval.now(fields.size.toLong)
-    }(collection.breakOut)
+    })
 
     ctx.functions.values.foreach { func =>
       val cost = func.costByLibVersion(version)

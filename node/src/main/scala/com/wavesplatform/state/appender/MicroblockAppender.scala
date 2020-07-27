@@ -29,6 +29,10 @@ object MicroblockAppender extends ScorexLogging {
       blockchainUpdater
         .processMicroBlock(microBlock, verify)
         .map { totalBlockId =>
+          if (microBlock.transactionData.nonEmpty) log.trace {
+            val ids = microBlock.transactionData.map(_.id())
+            s"Removing mined txs from $microBlock: ${ids.mkString(", ")}"
+          }
           utxStorage.removeAll(microBlock.transactionData)
           totalBlockId
         }
@@ -63,6 +67,6 @@ object MicroblockAppender extends ScorexLogging {
   }
 
   private[this] object metrics {
-    val microblockProcessingTimeStats = Kamon.timer("microblock-appender.processing-time")
+    val microblockProcessingTimeStats = Kamon.timer("microblock-appender.processing-time").withoutTags()
   }
 }

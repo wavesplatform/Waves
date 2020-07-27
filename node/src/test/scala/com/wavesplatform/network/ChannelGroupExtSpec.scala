@@ -9,7 +9,7 @@ import io.netty.util.concurrent.GlobalEventExecutor
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FreeSpec, Matchers}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.util.Random
 
 class ChannelGroupExtSpec extends FreeSpec with Matchers with MockFactory {
@@ -37,7 +37,7 @@ class ChannelGroupExtSpec extends FreeSpec with Matchers with MockFactory {
       val allIds      = (0 to 5).toSet
       val allChannels = allIds.map(receiver)
 
-      val excludedChannels = allChannels.filter(_ => Random.nextBoolean)
+      val excludedChannels = allChannels.filter(_ => Random.nextBoolean())
       val excludedIds      = excludedChannels.map(_.id.asLongText().toInt)
 
       allChannels.foreach(channelGroup.add)

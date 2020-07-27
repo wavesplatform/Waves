@@ -22,7 +22,7 @@ import com.wavesplatform.http.{BroadcastRoute, CustomJson}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.{AssetDescription, Blockchain}
+import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -91,21 +91,21 @@ case class AssetsApiRoute(
               }
           }
         } ~ pathPrefix("details") {
-          (pathEndOrSingleSlash & parameters(('id.*, 'full.as[Boolean] ? false))) { (ids, full) =>
-            multipleDetailsGet(ids.toSeq, full)
-          } ~ (path(AssetId) & parameter('full.as[Boolean] ? false)) { (assetId, full) =>
+          (pathEndOrSingleSlash & parameters(("id".as[String].*, "full".as[Boolean] ? false))) { (ids, full) =>
+            multipleDetailsGet(ids.toSeq.reverse, full)
+          } ~ (path(AssetId) & parameter("full".as[Boolean] ? false)) { (assetId, full) =>
             singleDetails(assetId, full)
           }
-        } ~ (path("nft" / AddrSegment / "limit" / IntNumber) & parameter('after.as[String].?)) { (address, limit, maybeAfter) =>
+        } ~ (path("nft" / AddrSegment / "limit" / IntNumber) & parameter("after".as[String].?)) { (address, limit, maybeAfter) =>
           nft(address, limit, maybeAfter)
         } ~ pathPrefix(AssetId / "distribution") { assetId =>
           pathEndOrSingleSlash(balanceDistribution(assetId)) ~
-            (path(IntNumber / "limit" / IntNumber) & parameter('after.?)) { (height, limit, maybeAfter) =>
+            (path(IntNumber / "limit" / IntNumber) & parameter("after".?)) { (height, limit, maybeAfter) =>
               balanceDistributionAtHeight(assetId, height, limit, maybeAfter)
             }
         }
       } ~ post {
-        (path("details") & parameter('full.as[Boolean] ? false)) { full =>
+        (path("details") & parameter("full".as[Boolean] ? false)) { full =>
           jsonPost[JsObject] { jsv =>
             (jsv \ "ids").validate[List[String]] match {
               case JsSuccess(ids, _) =>
@@ -318,23 +318,24 @@ object AssetsApiRoute {
       desc                = description.description.toStringUtf8
     } yield JsObject(
       Seq(
-        "assetId"        -> JsString(id.id.toString),
-        "issueHeight"    -> JsNumber(height),
-        "issueTimestamp" -> JsNumber(timestamp),
-        "issuer"         -> JsString(description.issuer.toAddress.toString),
-        "name"           -> JsString(name),
-        "description"    -> JsString(desc),
-        "decimals"       -> JsNumber(description.decimals),
-        "reissuable"     -> JsBoolean(description.reissuable),
-        "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
-        "scripted"       -> JsBoolean(description.script.nonEmpty),
+        "assetId"         -> JsString(id.id.toString),
+        "issueHeight"     -> JsNumber(height),
+        "issueTimestamp"  -> JsNumber(timestamp),
+        "issuer"          -> JsString(description.issuer.toAddress.toString),
+        "issuerPublicKey" -> JsString(description.issuer.toString),
+        "name"            -> JsString(name),
+        "description"     -> JsString(desc),
+        "decimals"        -> JsNumber(description.decimals),
+        "reissuable"      -> JsBoolean(description.reissuable),
+        "quantity"        -> JsNumber(BigDecimal(description.totalVolume)),
+        "scripted"        -> JsBoolean(description.script.nonEmpty),
         "minSponsoredAssetFee" -> (description.sponsorship match {
           case 0           => JsNull
           case sponsorship => JsNumber(sponsorship)
         }),
         "originTransactionId" -> JsString(description.source.toString)
       ) ++ script.toSeq.map {
-        case (script, complexity) =>
+        case AssetScriptInfo(script, complexity) =>
           "scriptDetails" -> Json.obj(
             "scriptComplexity" -> JsNumber(BigDecimal(complexity)),
             "script"           -> JsString(script.bytes().base64),

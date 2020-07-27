@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
@@ -14,7 +15,7 @@ import org.scalatest.CancelAfterFailure
 
 class BigLetChain extends BaseTransactionSuite with CancelAfterFailure {
   test("big let assignment chain") {
-    val count = 420
+    val count = 280
     val scriptText =
       s"""
          | {-# STDLIB_VERSION 3    #-}
@@ -30,18 +31,26 @@ class BigLetChain extends BaseTransactionSuite with CancelAfterFailure {
 
     val compiledScript = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1
 
-    val newAddress   = sender.createAddress()
-    val acc0         = pkByAddress(firstAddress)
-    val pkNewAddress = pkByAddress(newAddress)
+    val pkNewAddress = sender.createKeyPair()
 
-    sender.transfer(acc0.toAddress.toString, newAddress, 10.waves, minFee, waitForTx = true)
+    sender.transfer(firstKeyPair, pkNewAddress.toAddress.toString, 10.waves, minFee, waitForTx = true)
 
-    val scriptSet = SetScriptTransaction.selfSigned(1.toByte, pkNewAddress, Some(compiledScript), setScriptFee, System.currentTimeMillis())
-    val scriptSetBroadcast = sender.signedBroadcast(scriptSet.explicitGet().json.value)
+    val scriptSet          = SetScriptTransaction.selfSigned(1.toByte, pkNewAddress, Some(compiledScript), setScriptFee, System.currentTimeMillis())
+    val scriptSetBroadcast = sender.signedBroadcast(scriptSet.explicitGet().json())
     nodes.waitForHeightAriseAndTxPresent(scriptSetBroadcast.id)
 
-    val transfer = TransferTransaction.selfSigned(2.toByte, pkNewAddress, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, None, System.currentTimeMillis())
-    val transferBroadcast = sender.signedBroadcast(transfer.explicitGet().json.value)
+    val transfer = TransferTransaction.selfSigned(
+      2.toByte,
+      pkNewAddress,
+      pkNewAddress.toAddress,
+      Waves,
+      1.waves,
+      Waves,
+      smartMinFee,
+      ByteStr.empty,
+      System.currentTimeMillis()
+    )
+    val transferBroadcast = sender.signedBroadcast(transfer.explicitGet().json())
     nodes.waitForHeightAriseAndTxPresent(transferBroadcast.id)
   }
 }

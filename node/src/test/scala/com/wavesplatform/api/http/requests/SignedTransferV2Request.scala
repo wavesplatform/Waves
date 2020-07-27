@@ -46,6 +46,6 @@ case class SignedTransferV2Request(
       _proofs     <- Proofs.create(_proofBytes)
       _recipient  <- AddressOrAlias.fromString(recipient)
       _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
-      tx          <- TransferTransaction.create(2.toByte, _sender, _recipient, _assetId, amount, _feeAssetId, fee, Some(Attachment.Bin(_attachment.arr)), timestamp, _proofs)
+      tx          <- TransferTransaction.create(2.toByte, _sender, _recipient, _assetId, amount, _feeAssetId, fee, _attachment, timestamp, _proofs)
     } yield tx
 }

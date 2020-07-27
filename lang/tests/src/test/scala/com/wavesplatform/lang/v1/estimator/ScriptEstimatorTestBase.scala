@@ -33,7 +33,7 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*)
   val Gt    = FunctionHeader.Native(GT_LONG)
 
   val customFunctionCosts: Map[FunctionHeader, Coeval[Long]] =
-    Map[FunctionHeader, Long](Plus -> 100, Minus -> 10, Gt -> 10).mapValues(Coeval.now)
+    Map[FunctionHeader, Long](Plus -> 100, Minus -> 10, Gt -> 10).view.mapValues(Coeval.now).toMap
 
   private val v3FunctionCosts = utils.functionCosts(V3)
 
@@ -44,7 +44,7 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*)
     val tx              = CaseObj(transactionType, Map("amount" -> CONST_LONG(100000000L)))
     Monoid
       .combineAll(Seq(
-        PureContext.build(Global, version).withEnvironment[Environment],
+        PureContext.build(version).withEnvironment[Environment],
         CryptoContext.build(Global, version).withEnvironment[Environment],
         WavesContext.build(DirectiveSet.contractDirectiveSet),
         CTX[NoContext](

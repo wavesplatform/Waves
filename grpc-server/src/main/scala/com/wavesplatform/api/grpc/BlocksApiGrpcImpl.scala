@@ -4,12 +4,12 @@ import com.google.protobuf.empty.Empty
 import com.google.protobuf.wrappers.UInt32Value
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
+import com.wavesplatform.api.grpc.BlockRangeRequest.Filter
 import com.wavesplatform.api.grpc.BlockRequest.Request
 import com.wavesplatform.api.http.ApiError.BlockDoesNotExist
 import com.wavesplatform.protobuf.block.PBBlock
 import com.wavesplatform.transaction.Transaction
 import io.grpc.stub.StreamObserver
-import io.grpc.{Status, StatusRuntimeException}
 import monix.execution.Scheduler
 
 import scala.concurrent.Future
@@ -22,8 +22,6 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
   }
 
   override def getBlockRange(request: BlockRangeRequest, responseObserver: StreamObserver[BlockWithHeight]): Unit = responseObserver.interceptErrors {
-    request.filter.generator.foreach(_.toAddress) // exception during conversion will be propagated to the client
-
     val stream =
       if (request.includeTransactions)
         commonApi
@@ -36,9 +34,10 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
             BlockWithHeight(Some(PBBlock(Some(meta.header.toPBHeader), meta.signature)), meta.height)
           }
 
-    responseObserver.completeWith(request.filter.generator match {
-      case Some(generator) => stream.filter(_.block.exists(_.header.exists(h => h.generator.toAddress == generator.toAddress)))
-      case None            => stream
+    responseObserver.completeWith(request.filter match {
+      case Filter.GeneratorPublicKey(publicKey) => stream.filter(_.getBlock.getHeader.generator.toPublicKey == publicKey.toPublicKey)
+      case Filter.GeneratorAddress(address)     => stream.filter(_.getBlock.getHeader.generator.toAddress == address.toAddress)
+      case Filter.Empty                         => stream
     })
   }
 
@@ -55,9 +54,6 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
           .blockAtHeight(actualHeight)
           .map(toBlockWithHeight)
 
-      case Request.Reference(_) =>
-        throw new StatusRuntimeException(Status.UNIMPLEMENTED)
-
       case Request.Empty =>
         None
     }
@@ -68,7 +64,7 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
 }
 
 object BlocksApiGrpcImpl {
-  private def toBlockWithHeight(v: (BlockMeta, Seq[Transaction])) = {
-    BlockWithHeight(Some(PBBlock(Some(v._1.header.toPBHeader), v._1.signature.toPBByteString, v._2.map(_.toPB))), v._1.height)
+  private def toBlockWithHeight(v: (BlockMeta, Seq[(Transaction, Boolean)])) = {
+    BlockWithHeight(Some(PBBlock(Some(v._1.header.toPBHeader), v._1.signature.toPBByteString, v._2.map(_._1.toPB))), v._1.height)
   }
 }

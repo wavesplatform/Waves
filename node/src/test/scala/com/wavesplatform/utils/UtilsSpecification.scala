@@ -15,7 +15,7 @@ import monix.eval.Coeval
 import org.scalatest.{FreeSpec, Matchers}
 
 class UtilsSpecification extends FreeSpec with Matchers {
-  private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(null), DirectiveSet.contractDirectiveSet, ByteStr.empty)
+  private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, null, DirectiveSet.contractDirectiveSet, ByteStr.empty)
 
   "estimate()" - {
     "handles functions that depend on each other" in {

@@ -13,9 +13,10 @@ import cats.kernel.Monoid
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi}
+import com.wavesplatform.api.http.TransactionsApiRoute.applicationStatus
 import com.wavesplatform.api.http._
-import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, _}
@@ -71,7 +72,7 @@ case class DebugApiRoute(
   override val settings: RestAPISettings = ws.restAPISettings
   override lazy val route: Route = pathPrefix("debug") {
     stateChanges ~ balanceHistory ~ withAuth {
-      state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ historyInfo ~ configInfo ~ print ~ validate
+      state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ configInfo ~ print ~ validate
     }
   }
 
@@ -82,7 +83,7 @@ case class DebugApiRoute(
     })
 
   def portfolios: Route = path("portfolios" / AddrSegment) { address =>
-    (get & parameter('considerUnspent.as[Boolean].?)) { considerUnspent =>
+    (get & parameter("considerUnspent".as[Boolean].?)) { considerUnspent =>
       extractScheduler { implicit s =>
         complete(accountsApi.portfolio(address).toListL.runToFuture.map { assetList =>
           val bd   = accountsApi.balanceDetails(address)
@@ -178,11 +179,7 @@ case class DebugApiRoute(
     )
   }
 
-  def historyInfo: Route = (path("historyInfo") & get) {
-    complete(???)
-  }
-
-  def configInfo: Route = (path("configInfo") & get & parameter('full.as[Boolean])) { full =>
+  def configInfo: Route = (path("configInfo") & get & parameter("full".as[Boolean])) { full =>
     complete(if (full) fullConfig else wavesConfig)
   }
 
@@ -244,32 +241,39 @@ case class DebugApiRoute(
 
   def stateChangesById: Route = (get & path("stateChanges" / "info" / TransactionId)) { id =>
     transactionsApi.transactionById(id) match {
-      case Some((height, Right((ist, isr)), _)) => complete(ist.json() ++ Json.obj("height" -> height.toInt, "stateChanges" -> isr))
-      case Some(_)                                 => complete(ApiError.UnsupportedTransactionType)
-      case None                                    => complete(ApiError.TransactionDoesNotExist)
+      case Some((height, Right((ist, isr)), succeeded)) =>
+        complete(ist.json() ++ applicationStatus(isBlockV5(height), succeeded) ++ Json.obj("height" -> height.toInt, "stateChanges" -> isr))
+      case Some(_) => complete(ApiError.UnsupportedTransactionType)
+      case None    => complete(ApiError.TransactionDoesNotExist)
     }
   }
 
   def stateChangesByAddress: Route =
-    (get & path("stateChanges" / "address" / AddrSegment / "limit" / IntNumber) & parameter('after.as[ByteStr].?)) { (address, limit, afterOpt) =>
+    (get & path("stateChanges" / "address" / AddrSegment / "limit" / IntNumber) & parameter("after".as[ByteStr].?)) { (address, limit, afterOpt) =>
       validate(limit <= settings.transactionsByAddressLimit, s"Max limit is ${settings.transactionsByAddressLimit}") {
         extractScheduler { implicit s =>
           complete {
             implicit val ss: JsonEntityStreamingSupport = EntityStreamingSupport.json()
 
-            Source.fromPublisher(
-              transactionsApi
-                .invokeScriptResults(address, None, Set.empty, afterOpt)
-                .map {
-                  case (height, Right((ist, isr)), _) => ist.json() ++ Json.obj("height" -> JsNumber(height), "stateChanges" -> isr)
-                  case (height, Left(tx), _)          => tx.json() ++ Json.obj("height"  -> JsNumber(height))
-                }
-                .toReactivePublisher
-            ).take(limit)
+            Source
+              .fromPublisher(
+                transactionsApi
+                  .invokeScriptResults(address, None, Set.empty, afterOpt)
+                  .map {
+                    case (height, Right((ist, isr)), succeeded) =>
+                      ist.json() ++ applicationStatus(isBlockV5(height), succeeded) ++ Json.obj("height" -> JsNumber(height), "stateChanges" -> isr)
+                    case (height, Left(tx), succeeded) =>
+                      tx.json() ++ applicationStatus(isBlockV5(height), succeeded) ++ Json.obj("height" -> JsNumber(height))
+                  }
+                  .toReactivePublisher
+              )
+              .take(limit)
           }
         }
       }
     }
+
+  private def isBlockV5(height: Int): Boolean = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height)
 }
 
 object DebugApiRoute {
@@ -297,22 +301,7 @@ object DebugApiRoute {
 
   implicit val accountMiningBalanceFormat: Format[AccountMiningInfo] = Json.format
 
-  implicit val addressWrites: Format[Address] = new Format[Address] {
-    override def writes(o: Address): JsValue = JsString(o.stringRepr)
-
-    override def reads(json: JsValue): JsResult[Address] = ???
-  }
-
-  case class HistoryInfo(lastBlockIds: Seq[BlockId], microBlockIds: Seq[BlockId])
-
-  implicit val historyInfoFormat: Format[HistoryInfo] = Format(
-    Reads { json =>
-      ???
-    },
-    Writes { info =>
-      ???
-    }
-  )
+  implicit val addressWrites: Writes[Address] = Writes((a: Address) => JsString(a.stringRepr))
 
   implicit val hrCacheSizesFormat: Format[HistoryReplier.CacheSizes]          = Json.format
   implicit val mbsCacheSizesFormat: Format[MicroBlockSynchronizer.CacheSizes] = Json.format

@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.account.{AddressScheme, Alias}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, setScriptFee, smartFee}
@@ -17,9 +18,6 @@ import com.wavesplatform.transaction.{CreateAliasTransaction, Transaction}
 import org.scalatest.CancelAfterFailure
 
 class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFailure {
-  private val acc0 = pkByAddress(firstAddress)
-  private val acc1 = pkByAddress(secondAddress)
-  private val acc2 = pkByAddress(thirdAddress)
   private val ts   = System.currentTimeMillis()
 
   test("custom throw message") {
@@ -29,19 +27,19 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
         |  case t : TransferTransaction =>
         |    let res = if isDefined(t.assetId) then extract(t.assetId) == base58'' else isDefined(t.assetId) == false
         |    res
-        |  case s : SetScriptTransaction => true
-        |  case other => throw("Your transaction has incorrect type.")
+        |  case _: SetScriptTransaction => true
+        |  case _ => throw("Your transaction has incorrect type.")
         |}
       """.stripMargin
 
     val compiled = ScriptCompiler(scriptSrc, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
 
-    val tx = sender.signedBroadcast(SetScriptTransaction.selfSigned(1.toByte, acc2, Some(compiled), setScriptFee, ts).explicitGet().json())
+    val tx = sender.signedBroadcast(SetScriptTransaction.selfSigned(1.toByte, thirdKeyPair, Some(compiled), setScriptFee, ts).explicitGet().json())
     nodes.waitForHeightAriseAndTxPresent(tx.id)
 
     val alias = Alias.fromString(s"alias:${AddressScheme.current.chainId.toChar}:asdasdasdv").explicitGet()
     assertBadRequestAndResponse(
-      sender.signedBroadcast(CreateAliasTransaction.selfSigned(Transaction.V2, acc2, alias, minFee + smartFee, ts).explicitGet().json()),
+      sender.signedBroadcast(CreateAliasTransaction.selfSigned(Transaction.V2, thirdKeyPair, alias, minFee + smartFee, ts).explicitGet().json()),
       "Your transaction has incorrect type."
     )
   }
@@ -54,9 +52,9 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
       )
     ).explicitGet()
 
-    val tx = sender.signAndBroadcast(
+    val tx = sender.signedBroadcast(
       SetScriptTransaction
-        .selfSigned(1.toByte, acc0, Some(script), setScriptFee, ts)
+        .selfSigned(1.toByte, firstKeyPair, Some(script), setScriptFee, ts)
         .explicitGet()
         .json()
     )
@@ -65,7 +63,7 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
     assertBadRequestAndResponse(
       sender.signedBroadcast(
         TransferTransaction
-          .selfSigned(2.toByte, acc0, acc1.toAddress, Waves, 1000, Waves, minFee + smartFee, None, ts)
+          .selfSigned(2.toByte, firstKeyPair, secondKeyPair.toAddress, Waves, 1000, Waves, minFee + smartFee, ByteStr.empty, ts)
           .explicitGet()
           .json()
       ),

@@ -1,17 +1,18 @@
 package com.wavesplatform.state
 
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
-import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.Block.{BlockId, GenesisBlockVersion, NgBlockVersion, PlainBlockVersion, ProtoBlockVersion, RewardBlockVersion}
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
+import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.traits.domain.Issue
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
-import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 
@@ -41,7 +42,7 @@ trait Blockchain {
 
   def transferById(id: ByteStr): Option[(Int, TransferTransaction)]
   def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)]
-  def transactionHeight(id: ByteStr): Option[Int]
+  def transactionMeta(id: ByteStr): Option[(Int, Boolean)]
 
   def containsTransaction(tx: Transaction): Boolean
 
@@ -53,27 +54,21 @@ trait Blockchain {
 
   def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee
 
+  def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)]
+
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
-  def balanceOnlySnapshots(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)]
   def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot]
 
   def accountScript(address: Address): Option[AccountScriptInfo]
   def hasAccountScript(address: Address): Boolean
 
-  def assetScript(id: IssuedAsset): Option[(Script, Long)]
+  def assetScript(id: IssuedAsset): Option[AssetScriptInfo]
 
   def accountData(acc: Address, key: String): Option[DataEntry[_]]
 
   def leaseBalance(address: Address): LeaseBalance
 
   def balance(address: Address, mayBeAssetId: Asset = Waves): Long
-
-  def collectActiveLeases(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction]
-
-  /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
-    *
-    * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
-  def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A]
 
   def continuationStates: Map[ByteStr, ContinuationState]
 }
@@ -88,7 +83,7 @@ object Blockchain {
         .map(_ - (back - 1).max(0))
         .flatMap(h => blockchain.blockHeader(h).map(_.header))
 
-    def contains(block: Block): Boolean       = blockchain.contains(block.id())
+    def contains(block: Block): Boolean     = blockchain.contains(block.id())
     def contains(blockId: ByteStr): Boolean = blockchain.heightOf(blockId).isDefined
 
     def blockId(atHeight: Int): Option[ByteStr] = blockchain.blockHeader(atHeight).map(_.id())
@@ -118,7 +113,7 @@ object Blockchain {
 
     def balance(address: Address, atHeight: Int, confirmations: Int): Long = {
       val bottomLimit = (atHeight - confirmations + 1).max(1).min(atHeight)
-      val blockId   = blockchain.blockHeader(atHeight).getOrElse(throw new IllegalArgumentException(s"Invalid block height: $atHeight")).id()
+      val blockId     = blockchain.blockHeader(atHeight).getOrElse(throw new IllegalArgumentException(s"Invalid block height: $atHeight")).id()
       val balances    = blockchain.balanceSnapshots(address, bottomLimit, Some(blockId))
       if (balances.isEmpty) 0L else balances.view.map(_.regularBalance).min
     }
@@ -143,8 +138,6 @@ object Blockchain {
     def generatingBalance(account: Address, blockId: Option[BlockId] = None): Long =
       GeneratingBalanceProvider.balance(blockchain, account, blockId)
 
-    def allActiveLeases: Seq[LeaseTransaction] = blockchain.collectActiveLeases(_ => true)
-
     def lastBlockReward: Option[Long] = blockchain.blockReward(blockchain.height)
 
     def hasAssetScript(asset: IssuedAsset): Boolean = blockchain.assetScript(asset).isDefined
@@ -153,5 +146,38 @@ object Blockchain {
       blockchain
         .blockHeader(atHeight)
         .flatMap(header => if (header.header.version >= Block.ProtoBlockVersion) blockchain.hitSource(atHeight) else None)
+
+    def isNFT(issueTransaction: IssueTransaction): Boolean = isNFT(issueTransaction.quantity, issueTransaction.decimals, issueTransaction.reissuable)
+    def isNFT(issueAction: Issue): Boolean                 = isNFT(issueAction.quantity, issueAction.decimals, issueAction.isReissuable)
+    def isNFT(quantity: Long, decimals: Int, reissuable: Boolean): Boolean =
+      isFeatureActivated(BlockchainFeatures.ReduceNFTFee) && quantity == 1 && decimals == 0 && !reissuable
+
+    def isFeatureActivated(feature: BlockchainFeature, height: Int = blockchain.height): Boolean =
+      blockchain.activatedFeatures.get(feature.id).exists(_ <= height)
+
+    def activatedFeaturesAt(height: Int): Set[Short] =
+      blockchain.activatedFeatures.collect {
+        case (featureId, activationHeight) if height >= activationHeight => featureId
+      }.toSet
+
+    def featureStatus(feature: Short, height: Int): BlockchainFeatureStatus =
+      if (blockchain.activatedFeatures.get(feature).exists(_ <= height)) BlockchainFeatureStatus.Activated
+      else if (blockchain.approvedFeatures.get(feature).exists(_ <= height)) BlockchainFeatureStatus.Approved
+      else BlockchainFeatureStatus.Undefined
+
+    def currentBlockVersion: Byte = blockVersionAt(blockchain.height)
+    def nextBlockVersion: Byte    = blockVersionAt(blockchain.height + 1)
+
+    def featureActivationHeight(feature: Short): Option[Int] = blockchain.activatedFeatures.get(feature)
+    def featureApprovalHeight(feature: Short): Option[Int]   = blockchain.approvedFeatures.get(feature)
+
+    def blockVersionAt(height: Int): Byte =
+      if (isFeatureActivated(BlockchainFeatures.BlockV5, height)) ProtoBlockVersion
+      else if (isFeatureActivated(BlockchainFeatures.BlockReward, height)) {
+        if (blockchain.activatedFeatures(BlockchainFeatures.BlockReward.id) == height) NgBlockVersion else RewardBlockVersion
+      }
+      else if (blockchain.settings.functionalitySettings.blockVersion3AfterHeight + 1 < height) NgBlockVersion
+      else if (height > 1) PlainBlockVersion
+      else GenesisBlockVersion
   }
 }

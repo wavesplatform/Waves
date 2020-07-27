@@ -10,10 +10,10 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.state.diffs._
-import org.scalatest.{Inside, Matchers, PropSpec}
+import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers with Inside {
+class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers with Inside with EitherValues {
   private val estimator = ScriptEstimatorV2
 
   property("compile script with specified version") {
@@ -21,9 +21,9 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
     ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Right((ExprScript(V1, expectedExpr).explicitGet(), 13))
   }
 
-  property("use version 2 if not specified") {
+  property("use version 3 if not specified") {
     val script = scriptWithVersion(none)
-    ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Right((ExprScript(V2, expectedExpr).explicitGet(), 13))
+    ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Right((ExprScript(V3, expectedExpr).explicitGet(), 13))
   }
 
   property("fails on unsupported version") {
@@ -83,11 +83,11 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
            |
            |{-# STDLIB_VERSION 3 #-}
            |match tx {
-           |  case tx:TransferTransaction => true
+           |  case _:TransferTransaction => true
            |  case _ => false
            |}""".stripMargin,
         estimator
-      ) shouldBe 'right
+      ).explicitGet()
   }
 
   property("account script with 'this' address link") {
@@ -100,11 +100,11 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
            |let a = this
            |
            |match tx {
-           |  case tx:TransferTransaction => true
+           |  case _:TransferTransaction => true
            |  case _ => false
            |}""".stripMargin,
         estimator
-      ) shouldBe 'right
+      ).explicitGet()
   }
 
   property("asset script with 'this' address link") {
@@ -118,11 +118,11 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
            |let a = this
            |
            |match tx {
-           |  case tx:TransferTransaction => true
+           |  case _:TransferTransaction => true
            |  case _ => false
            |}""".stripMargin,
         estimator
-      ) shouldBe 'right
+      ).explicitGet()
   }
 
   property("binary operations priority && ||") {
@@ -181,7 +181,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
         | a > b == true
       """.stripMargin
 
-    ScriptCompiler.compile(script, estimator) shouldBe 'left
+    ScriptCompiler.compile(script, estimator).left.value
   }
 
   property("complexity border") {
@@ -203,9 +203,9 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
     ): String =
       s"""
          | func script() = {
-         |   let a0 = base58''
+         |   let a0 = ""
          |   ${1 to assigns map (i => s"let a$i = a${i - 1} + a0") mkString " "}
-         |   a$assigns == base58'' ${"&& true " * conjunctions}
+         |   a$assigns == "" ${"&& true " * conjunctions}
          | }
          |
          | ${if (withVerifier) "@Verifier(tx) func verify() = " else ""}
@@ -221,11 +221,14 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
 
       val directives = buildDirectives(version, contentType, scriptType)
       val (assigns, conjunctions) = (version, contentType, scriptType) match {
-        case (V3 | V4, DApp, Account)       => (155, 15)
-        case (V3 | V4, Expression, Account) => (155, 20)
-        case (V3 | V4, Expression, Asset)   => (209, 7)
-        case (_, Expression, _)             => (103, 14)
-        case _                              => ???
+        case (V3, DApp, Account)       => (103, 9)
+        case (V3, Expression, Account) => (103, 14)
+        case (V3, Expression, Asset)   => (209, 7)
+        case (V4, DApp, Account)       => (65, 45)
+        case (V4, Expression, Account) => (65, 50)
+        case (V4, Expression, Asset)   => (137, 6)
+        case (_, Expression, _)        => (103, 14)
+        case _                         => ???
       }
       val withVerifier         = contentType == DApp
       val validScript          = directives + buildScript(assigns, conjunctions, withVerifier)
@@ -238,10 +241,10 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
     checkComplexityBorder(V4, Expression, Asset, 4000)
     checkComplexityBorder(V3, Expression, Asset, 4000)
 
-    checkComplexityBorder(V4, DApp, Account, 3000)
-    checkComplexityBorder(V3, DApp, Account, 3000)
-    checkComplexityBorder(V4, Expression, Account, 3000)
-    checkComplexityBorder(V3, Expression, Account, 3000)
+    checkComplexityBorder(V4, DApp, Account, 2000)
+    checkComplexityBorder(V3, DApp, Account, 2000)
+    checkComplexityBorder(V4, Expression, Account, 2000)
+    checkComplexityBorder(V3, Expression, Account, 2000)
 
     checkComplexityBorder(V2, Expression, Asset, 2000)
     checkComplexityBorder(V2, Expression, Account, 2000)
@@ -295,7 +298,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
         |  [ ScriptTransfer(this, 1, (if id.size() > 0 then id else unit)) ]
         |}
         |""".stripMargin
-    ScriptCompiler.compile(source, estimator) shouldBe 'right
+    ScriptCompiler.compile(source, estimator).explicitGet()
   }
 
   property("library") {
@@ -311,7 +314,107 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
         | func sq(a: Int) = a * a
       """.stripMargin
 
-    ScriptCompiler.compile(script, estimator) shouldBe 'right
+    ScriptCompiler.compile(script, estimator).explicitGet()
+  }
+
+  property("forbid multiple default cases") {
+    val script =
+      """
+        | {-# STDLIB_VERSION 3 #-}
+        | {-# SCRIPT_TYPE ACCOUNT #-}
+        | {-# CONTENT_TYPE EXPRESSION #-}
+        |
+        | match tx {
+        |   case sstx: SetScriptTransaction => true
+        |   case a => false
+        |   case b => false
+        | }
+      """.stripMargin
+
+    ScriptCompiler.compile(script, estimator) should produce("Match should have at most one default case, but 2 found")
+  }
+
+  property("forbid case variables named as types") {
+    val script =
+      """
+        | {-# STDLIB_VERSION 3 #-}
+        | {-# SCRIPT_TYPE ACCOUNT #-}
+        | {-# CONTENT_TYPE EXPRESSION #-}
+        |
+        | match tx {
+        |   case sstx: SetScriptTransaction => true
+        |   case InvokeScriptTransaction => false
+        |   case DataTransaction => false
+        |   case a => true
+        | }
+      """.stripMargin
+
+    ScriptCompiler.compile(script, estimator) should produce(
+      "Compilation failed: Match case variables should not be named as RIDE types, " +
+      "but `InvokeScriptTransaction`, `DataTransaction` found in 91-239"
+    )
+  }
+
+  ignore("forbid unused case variables") {
+    val script =
+      """
+        | {-# STDLIB_VERSION 3 #-}
+        | {-# SCRIPT_TYPE ACCOUNT #-}
+        | {-# CONTENT_TYPE EXPRESSION #-}
+        |
+        | match tx {
+        |   case unused1: SetScriptTransaction =>
+        |     let unused1 = 1
+        |     true
+        |   case unused2: DataTransaction =>
+        |     func unused2() = 1
+        |     true
+        |   case unused3: GenesisTransaction =>
+        |     func f(unused3: Int) = unused3 == unused3
+        |     f(1)
+        |   case unused4: IssueTransaction =>
+        |     let a = if (true) then 1 else ""
+        |     match a {
+        |       case unused4 => unused4 == unused4
+        |     }
+        |
+        |   case used1: BurnTransaction =>
+        |     let a = used1
+        |     a
+        |   case used2: ReissueTransaction =>
+        |     func f() = used2
+        |     f()
+        |   case used3: InvokeScriptTransaction =>
+        |     func f(used3: Int) = used3 == used3
+        |     f(used3)
+        |   case used4: ExchangeTransaction =>
+        |     used4.id == used4.id
+        |   case used5: LeaseTransaction =>
+        |     if (true) then true else used5 == used5
+        |   case used6 =>
+        |     match used6 {
+        |       case used6 => true
+        |     }
+        | }
+      """.stripMargin
+
+    ScriptCompiler.compile(script, estimator) should produce(
+      "Compilation failed: Unused case variable(s) `unused1`, `unused2`, `unused3`, `unused4` in 91-920"
+    )
+  }
+
+  property("allow unused case variables") {
+    val script =
+      """
+        |
+        | match tx {
+        |   case transfer: TransferTransaction => true
+        |   case other => false
+        | }
+        |
+      """.stripMargin
+
+    ScriptCompiler.compile(script, estimator) shouldBe Symbol("right")
   }
 
   private val expectedExpr = LET_BLOCK(

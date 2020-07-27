@@ -22,7 +22,7 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
-  private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(null), DirectiveSet.contractDirectiveSet, ByteStr.empty)
+  private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, null, DirectiveSet.contractDirectiveSet, ByteStr.empty)
 
   private def estimate(expr: EXPR, ctx: CTX[Environment], funcCosts: Map[FunctionHeader, Coeval[Long]]): Either[String, Long] = {
     estimator(ctx.evaluationContext(environment).letDefs.keySet, funcCosts, expr)
@@ -33,7 +33,7 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(Global, V1).withEnvironment[Environment],
+          PureContext.build(V1).withEnvironment[Environment],
           CryptoContext.build(Global, V1).withEnvironment[Environment],
           WavesContext.build(
             DirectiveSet(V1, Account, Expression).explicitGet()
@@ -97,7 +97,7 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(Global, V2).withEnvironment[Environment],
+          PureContext.build(V2).withEnvironment[Environment],
           CryptoContext.build(Global, V2).withEnvironment[Environment],
           WavesContext.build(
             DirectiveSet(V2, Account, Expression).explicitGet()
@@ -161,7 +161,7 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(Global, V3).withEnvironment[Environment],
+          PureContext.build(V3).withEnvironment[Environment],
           CryptoContext.build(Global, V3).withEnvironment[Environment],
           WavesContext.build(
             DirectiveSet(V3, Account, Expression).explicitGet()

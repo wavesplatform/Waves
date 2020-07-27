@@ -18,7 +18,7 @@ class DocExportTest extends PropSpec with PropertyChecks with Matchers {
   def buildFullContext(ds: DirectiveSet): CTX[Environment] = {
     val wavesCtx  = WavesContext.build(ds)
     val cryptoCtx = CryptoContext.build(Global, ds.stdLibVersion).withEnvironment[Environment]
-    val pureCtx = PureContext.build(Global, ds.stdLibVersion).withEnvironment[Environment]
+    val pureCtx = PureContext.build(ds.stdLibVersion).withEnvironment[Environment]
     pureCtx |+| cryptoCtx |+| wavesCtx
   }
 
@@ -57,8 +57,9 @@ class DocExportTest extends PropSpec with PropertyChecks with Matchers {
     ctx.vars.keys
       .map(k => (DocSource.varData.get((k, ver.value.asInstanceOf[Int])), k))
 
-  def funcDoc(ctx: CTX[Environment], ver: StdLibVersion): Array[(Option[(String, List[String])], String)] =
+  def funcDoc(ctx: CTX[Environment], ver: StdLibVersion): Array[(Option[(String, List[String], Int)], String)] =
     ctx.functions
+      .filterNot(_.name.startsWith("_"))
       .map(f => (f.name, f.signature.args.map(_._2.toString).toList))
       .map(k => (DocSource.funcData.get((k._1, k._2, ver.value.asInstanceOf[Int])), k._1))
 }

@@ -109,6 +109,33 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3) {
     estimate(functionCosts(V3), compile(script)) shouldBe Right(1)
   }
 
+  property("different if branches") {
+    val script =
+      """
+        |let a = 1
+        |let b = "b"
+        |if (a == 1) then {
+        |    true
+        |} else {
+        |    if (a > 1) then {
+        |        b == "a"
+        |    } else {
+        |        false
+        |    }
+        |}
+      """.stripMargin
+
+    estimate(functionCosts(V3), compile(script)) shouldBe Right(
+        1 /* let a                      */ +
+        1 /* let b                      */ +
+        1 /* if-then-else               */ +
+        3 /* a == 1         condition   */ +
+        1 /* if-then-else               */ +
+        3 /* a > 1          condition   */ +
+        3 /* b == "a"       condition   */
+    )
+  }
+
   property("getter") {
     val script = "lastBlock.height"
     estimate(functionCosts(V3), compile(script)) shouldBe Right(2) /* ref eval and field access */
@@ -125,5 +152,25 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3) {
   property("groth16Verify") {
     implicit val version : StdLibVersion = V4
     estimate(functionCosts(V4), compile("groth16Verify(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')")) shouldBe Right(2703)
+  }
+
+  property("free declarations") {
+    estimate(
+      functionCosts(V4),
+      compile(
+        """
+          |
+          | let a = 1 + 1 + 1 + 1 + 1
+          | func f() = a
+          | func g() = f()
+          | let b = g()
+          | let c = a
+          | func h() = a + b + c
+          |
+          | 1
+          |
+        """.stripMargin
+      )
+    ) shouldBe Right(1)
   }
 }

@@ -62,10 +62,9 @@
           "addresses"
         ],
         "summary": "Addresses",
-        "description": "Get wallet accounts addresses",
+        "description": "Get the wallet accounts addresses",
         "operationId": "root_1",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -85,8 +84,7 @@
         "summary": "Create",
         "description": "Create a new account in the wallet(if it exists)",
         "operationId": "create_1",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -108,8 +106,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -161,8 +158,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -173,7 +169,7 @@
           "addresses"
         ],
         "summary": "Seq",
-        "description": "Get wallet accounts addresses",
+        "description": "Get the wallet accounts addresses. Max range {from}-{to} is 100 addresses",
         "operationId": "seq_2",
         "parameters": [
           {
@@ -242,8 +238,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -253,8 +248,8 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Address from Public Key",
-        "description": "Generate a address from public key",
+        "summary": "Address from a public key",
+        "description": "Generate an address from a public key. Public key should be Base58-encoded",
         "operationId": "publicKey_1",
         "parameters": [
           {
@@ -288,8 +283,8 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Balance",
-        "description": "Account's balance",
+        "summary": "Regular balance",
+        "description": "Account regular balance",
         "operationId": "balance_2",
         "parameters": [
           {
@@ -315,8 +310,8 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Balance",
-        "description": "Account's balance",
+        "summary": "Effective balance",
+        "description": "Account effective balance",
         "operationId": "effectiveBalance_1",
         "parameters": [
           {
@@ -487,8 +482,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -538,7 +532,7 @@
           "addresses"
         ],
         "summary": "Meta by address",
-        "description": "Account's script meta",
+        "description": "Account script meta",
         "operationId": "scriptMeta_1",
         "parameters": [
           {
@@ -553,22 +547,7 @@
           "200": {
             "description": "successful operation",
             "schema": {
-              "type": "object",
-              "required": [
-                "address",
-                "meta"
-              ],
-              "properties": {
-                "address": {
-                  "type": "string"
-                },
-                "meta": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "string"
-                  }
-                }
-              }
+              "$ref": "#/definitions/ScriptMeta"
             }
           }
         }
@@ -579,8 +558,8 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Details for account",
-        "description": "Account's script",
+        "summary": "Account script info",
+        "description": "Account script with an additional information",
         "operationId": "scriptInfo_1",
         "parameters": [
           {
@@ -663,8 +642,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -708,8 +686,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -761,8 +738,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -772,8 +748,8 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Details for balance",
-        "description": "Account's balances",
+        "summary": "Account balances",
+        "description": "Account available, regular, generating and effective balance",
         "operationId": "balanceDetails_1",
         "parameters": [
           {
@@ -827,8 +803,8 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Confirmed balance",
-        "description": "Balance of {address} after {confirmations}",
+        "summary": "Confirmed regular balance",
+        "description": "Get the regular balance of the address within {confirmations} blocks back from the current height. {confirmations} supports return of balance not more than 2,000 blocks back",
         "operationId": "balanceWithConfirmations_1",
         "parameters": [
           {
@@ -861,8 +837,8 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Confirmed balance",
-        "description": "Balance of {address} after {confirmations}",
+        "summary": "Confirmed effective balance",
+        "description": "Get effective balance at the address of {confirmations} blocks from the current height. {confirmations} supports return of balance not more than 2000 blocks back",
         "operationId": "effectiveBalanceWithConfirmations_1",
         "parameters": [
           {
@@ -896,7 +872,7 @@
           "addresses"
         ],
         "summary": "Data by Key",
-        "description": "Read data associated with an account and a key",
+        "description": "Read data stored in account by key",
         "operationId": "getDataItem_1",
         "parameters": [
           {
@@ -987,8 +963,7 @@
         "summary": "Genesis block",
         "description": "Get genesis block",
         "operationId": "first_1",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1005,7 +980,7 @@
           "blocks"
         ],
         "summary": "Blocks produced by address",
-        "description": "Get list of blocks generated by specified address",
+        "description": "Get list of blocks generated by specified address. Max range {from}-{to} is 100 blocks",
         "operationId": "address_1",
         "parameters": [
           {
@@ -1049,7 +1024,7 @@
           "blocks"
         ],
         "summary": "Block range",
-        "description": "Get blocks at specified heights",
+        "description": "Get blocks at specified heights. Max range {from}-{to} is 100 blocks",
         "operationId": "seq",
         "parameters": [
           {
@@ -1131,8 +1106,7 @@
         "summary": "Blockchain height",
         "description": "Get current blockchain height",
         "operationId": "height_1",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1187,8 +1161,7 @@
         "summary": "Last block",
         "description": "Get last block",
         "operationId": "last_1",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1295,7 +1268,7 @@
           "blocks"
         ],
         "summary": "Block header range",
-        "description": "Get block headers at specified heights",
+        "description": "Get block headers at specified heights. Max range {from}-{to} is 100 blocks",
         "operationId": "seqHeaderOnly_1",
         "parameters": [
           {
@@ -1334,8 +1307,7 @@
         "summary": "Last block header",
         "description": "Get last block header",
         "operationId": "lastHeaderOnly_1",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1405,8 +1377,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -1419,8 +1390,7 @@
         "summary": "Remove all blacklisted peers",
         "description": "Clear blacklist",
         "operationId": "clearBlacklist_1",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1442,8 +1412,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -1456,8 +1425,7 @@
         "summary": "Peer list",
         "description": "Peer list",
         "operationId": "allPeers_1",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1492,8 +1460,7 @@
         "summary": "Connected peers list",
         "description": "Connected peers list",
         "operationId": "connectedPeers_1",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1552,8 +1519,7 @@
         "summary": "Blacklisted peers list",
         "description": "Blacklisted peers list",
         "operationId": "blacklistedPeers_1",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1592,8 +1558,7 @@
         "summary": "Suspended peers list",
         "description": "Suspended peers list",
         "operationId": "suspendedPeers_1",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1632,8 +1597,7 @@
         "summary": "Current reward status",
         "description": "Get current miner’s reward status",
         "operationId": "rewards_1",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1677,7 +1641,7 @@
           "transactions"
         ],
         "summary": "Transaction status",
-        "description": "Get a transaction status by its ID",
+        "description": "Get a transaction status by its ID. Max for 1,000 transactions",
         "operationId": "status_3",
         "parameters": [
           {
@@ -1817,8 +1781,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -1829,10 +1792,9 @@
           "transactions"
         ],
         "summary": "Unconfirmed transactions",
-        "description": "Get list of unconfirmed transactions",
+        "description": "Get a list of unconfirmed transactions",
         "operationId": "unconfirmed_1",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1852,7 +1814,7 @@
           "transactions"
         ],
         "summary": "List of transactions by address",
-        "description": "Get list of transactions where specified address has been involved",
+        "description": "Get list of transactions where specified address has been involved. Max for 1,000 transactions. To get the next 1,000 transactions, use the field {after}.",
         "operationId": "addressLimit_1",
         "parameters": [
           {
@@ -1898,8 +1860,7 @@
         "summary": "Number of unconfirmed transactions",
         "description": "Get the number of unconfirmed transactions in the UTX pool",
         "operationId": "utxSize_1",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -2029,8 +1990,8 @@
         "tags": [
           "transactions"
         ],
-        "summary": "Broadcast a signed transaction",
-        "description": "Broadcast a signed transaction",
+        "summary": "Broadcast transaction",
+        "description": "Broadcast a signed transaction. You should use the JSON transaction format with proofs",
         "operationId": "signedBroadcast_1",
         "parameters": [
           {
@@ -2135,8 +2096,7 @@
         "produces": [
           "application/json"
         ],
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -2209,19 +2169,20 @@
         "summary": "Compile script",
         "description": "Compiles string code to base64 script representation",
         "operationId": "compileCode_1",
-        "produces": [
-          "application/json"
-        ],
+	"consumes": ["text/plain"],
         "parameters": [
           {
             "in": "body",
             "name": "code",
-            "description": "Script code",
-            "required": true,
+            "description": "Script code with imports",
             "schema": {
               "type": "string"
-            }
+            },
+            "required": true
           }
+        ],
+        "produces": [
+          "application/json"
         ],
         "responses": {
           "200": {
@@ -2334,6 +2295,40 @@
         }
       }
     },
+    "/utils/script/meta": {
+      "post": {
+        "tags": [
+          "utils"
+        ],
+        "summary": "DApp meta",
+        "description": "Extract DApp meta from compiled code in Base64 representation",
+        "consumes": [
+          "text/plain"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "code",
+            "description": "A compiled Base64 code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/ScriptMeta"
+            }
+          }
+        }
+      }
+    },
     "/utils/seed": {
       "get": {
         "tags": [
@@ -2345,8 +2340,7 @@
         "produces": [
           "application/json"
         ],
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -2484,8 +2478,7 @@
         "summary": "Seed",
         "description": "Export wallet seed",
         "operationId": "seed",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -2507,8 +2500,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -2584,8 +2576,8 @@
         "tags": [
           "assets"
         ],
-        "summary": "Account's balance",
-        "description": "Account's balances for all assets",
+        "summary": "Account balance",
+        "description": "Account balances for all assets",
         "operationId": "balances_1",
         "parameters": [
           {
@@ -2704,7 +2696,7 @@
         ],
         "summary": "Information about an asset",
         "description": "Provides detailed information about given asset",
-        "operationId": "details_1",
+        "operationId": "asset_details",
         "parameters": [
           {
             "name": "assetId",
@@ -2725,80 +2717,47 @@
           "200": {
             "description": "successful operation",
             "schema": {
-              "type": "object",
-              "required": [
-                "assetId",
-                "decimals",
-                "description",
-                "issueHeight",
-                "issueTimestamp",
-                "issuer",
-                "minSponsoredAssetFee",
-                "name",
-                "quantity",
-                "reissuable",
-                "scriptDetails",
-                "scripted"
-              ],
-              "properties": {
-                "assetId": {
-                  "type": "string"
-                },
-                "issueHeight": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "issueTimestamp": {
-                  "type": "integer",
-                  "format": "int64"
-                },
-                "issuer": {
-                  "type": "string"
-                },
-                "name": {
-                  "type": "string"
-                },
-                "description": {
-                  "type": "string"
-                },
-                "decimals": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "reissuable": {
-                  "type": "boolean"
-                },
-                "quantity": {
-                  "type": "integer",
-                  "format": "int64"
-                },
-                "scripted": {
-                  "type": "boolean"
-                },
-                "minSponsoredAssetFee": {
-                  "type": "integer",
-                  "format": "int64"
-                },
-                "scriptDetails": {
-                  "type": "object",
-                  "required": [
-                    "script",
-                    "scriptComplexity",
-                    "scriptText"
-                  ],
-                  "properties": {
-                    "scriptComplexity": {
-                      "type": "integer",
-                      "format": "int32"
-                    },
-                    "script": {
-                      "type": "string"
-                    },
-                    "scriptText": {
-                      "type": "string"
-                    }
-                  }
-                }
+              "$ref": "#/definitions/AssetDetails"
+            }
+          }
+        }
+      }
+    },
+    "/assets/details": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "Information about the multiple assets",
+        "description": "Provides detailed information about the given assets",
+        "operationId": "asset_details_array",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "ID of the asset",
+            "required": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          },
+          {
+            "name": "full",
+            "in": "query",
+            "description": "false",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/AssetDetails"
               }
             }
           }
@@ -2811,7 +2770,7 @@
           "assets"
         ],
         "summary": "Asset's balance",
-        "description": "Account's balance by given asset",
+        "description": "Account balance by given asset",
         "operationId": "balance",
         "parameters": [
           {
@@ -2890,7 +2849,7 @@
           "assets"
         ],
         "summary": "Asset balance distribution at height",
-        "description": "Asset balance distribution by account at specified height",
+        "description": "Asset balance distribution by account at specified height. Max for 10,000 addresses",
         "operationId": "balanceDistributionAtHeight_1",
         "parameters": [
           {
@@ -2937,8 +2896,8 @@
         "tags": [
           "assets"
         ],
-        "summary": "NFTs",
-        "description": "Account's NFTs balance",
+        "summary": "Account NFTs balance",
+        "description": "Account NFTs balance. Max for 1,000 tokens",
         "operationId": "nft_1",
         "parameters": [
           {
@@ -3021,8 +2980,8 @@
         "tags": [
           "leasing"
         ],
-        "summary": "Get all active leases for an address",
-        "description": "",
+        "summary": "Active leases for an address",
+        "description": "Get all active leases for an address",
         "operationId": "active_1",
         "parameters": [
           {
@@ -3040,41 +2999,13 @@
         }
       }
     },
-    "/consensus/generationsignature": {
-      "get": {
-        "tags": [
-          "consensus"
-        ],
-        "summary": "Generation signature last",
-        "description": "Generation signature of a last block",
-        "operationId": "generationSignature_1",
-        "parameters": [
-        ],
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "schema": {
-              "type": "object",
-              "required": [
-                "generationSignature"
-              ],
-              "properties": {
-                "generationSignature": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/consensus/generatingbalance/{address}": {
       "get": {
         "tags": [
           "consensus"
         ],
         "summary": "Generating balance",
-        "description": "Account's generating balance(the same as balance atm)",
+        "description": "Account generating balance",
         "operationId": "generatingBalance_1",
         "parameters": [
           {
@@ -3101,41 +3032,6 @@
                 "balance": {
                   "type": "integer",
                   "format": "int64"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/consensus/generationsignature/{blockId}": {
-      "get": {
-        "tags": [
-          "consensus"
-        ],
-        "summary": "Generation signature",
-        "description": "Generation signature of a block with specified id",
-        "operationId": "generationSignatureId_1",
-        "parameters": [
-          {
-            "name": "blockId",
-            "in": "path",
-            "description": "Block id",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "schema": {
-              "type": "object",
-              "required": [
-                "generationSignature"
-              ],
-              "properties": {
-                "generationSignature": {
-                  "type": "string"
                 }
               }
             }
@@ -3187,8 +3083,7 @@
         "summary": "Base target last",
         "description": "Base target of a last block",
         "operationId": "basetarget_1",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -3220,8 +3115,7 @@
         "summary": "Consensus algo",
         "description": "Shows which consensus algo being using",
         "operationId": "algo_1",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -3245,11 +3139,10 @@
         "tags": [
           "activation"
         ],
-        "summary": "Status",
-        "description": "Get activation status",
+        "summary": "Activation status",
+        "description": "Activation status of the blockchain features",
         "operationId": "status",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -3367,8 +3260,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -3378,11 +3270,10 @@
         "tags": [
           "debug"
         ],
-        "summary": "State",
-        "description": "Get current state",
+        "summary": "Regular address balance",
+        "description": "Regular address balance at the current height",
         "operationId": "state_1",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -3405,8 +3296,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -3419,8 +3309,7 @@
         "summary": "State",
         "description": "All info you need to debug",
         "operationId": "info",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -3529,8 +3418,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -3562,8 +3450,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -3600,8 +3487,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -3684,8 +3570,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -3728,8 +3613,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -3740,7 +3624,7 @@
           "debug"
         ],
         "summary": "Validate Transaction",
-        "description": "Validates a transaction and measures time spent in milliseconds",
+        "description": "Validates a transaction and measures time spent in milliseconds. You should use the JSON transaction format with proofs",
         "operationId": "validate",
         "parameters": [
           {
@@ -3786,8 +3670,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -3797,8 +3680,8 @@
         "tags": [
           "debug"
         ],
-        "summary": "Waves balance history",
-        "description": "Waves balance history",
+        "summary": "History of the regular balance",
+        "description": "History of the regular balance for the last 3,000 blocks",
         "operationId": "balanceHistory_1",
         "parameters": [
           {
@@ -3841,8 +3724,8 @@
         "tags": [
           "debug"
         ],
-        "summary": "State at block",
-        "description": "Get state at specified height",
+        "summary": "Regular address balance at the height",
+        "description": "Regular address balance at the height. No more than 2,000 blocks back",
         "operationId": "stateWaves_1",
         "parameters": [
           {
@@ -3875,8 +3758,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -3887,7 +3769,7 @@
           "debug"
         ],
         "summary": "Rollback to height",
-        "description": "Removes all blocks after given height",
+        "description": "Removes all blocks after the given height. Max for 2,000 blocks",
         "operationId": "rollback_1",
         "parameters": [
           {
@@ -3934,8 +3816,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -3948,8 +3829,7 @@
         "summary": "State",
         "description": "All miner info you need to debug",
         "operationId": "minerInfo_1",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -3981,55 +3861,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
-          }
-        ]
-      }
-    },
-    "/debug/historyInfo": {
-      "get": {
-        "tags": [
-          "debug"
-        ],
-        "summary": "State",
-        "description": "All history info you need to debug",
-        "operationId": "historyInfo_1",
-        "parameters": [
-        ],
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "schema": {
-              "type": "object",
-              "required": [
-                "lastBlockIds",
-                "microBlockIds"
-              ],
-              "properties": {
-                "lastBlockIds": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "microBlockIds": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "$ref": "#/responses/ApiKeyNotValid"
-          }
-        },
-        "security": [
-          {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -4062,8 +3894,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -4101,7 +3932,7 @@
           "debug"
         ],
         "summary": "List of transactions by address with state changes",
-        "description": "Get list of transactions with state changes where specified address has been involved",
+        "description": "Get list of transactions with state changes where specified address has been involved. Max for 1,000 transactions. To get the next 1,000 transactions, use the field {after}.",
         "operationId": "stateChangesByAddress_1",
         "parameters": [
           {
@@ -4147,8 +3978,7 @@
         "summary": "Stop",
         "description": "Stop the node",
         "operationId": "stop_1",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -4170,8 +4000,7 @@
         },
         "security": [
           {
-            "API Key": [
-            ]
+            "API Key": []
           }
         ]
       }
@@ -4184,8 +4013,7 @@
         "summary": "Status",
         "description": "Get status of the running core",
         "operationId": "status_1",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -4227,8 +4055,7 @@
         "summary": "Version",
         "description": "Get Waves node version",
         "operationId": "version_1",
-        "parameters": [
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "successful operation",
@@ -4310,6 +4137,83 @@
           "example": {
             "assetId1": 0,
             "assetId2": 100
+          }
+        }
+      }
+    },
+    "AssetDetails": {
+      "type": "object",
+      "required": [
+        "assetId",
+        "decimals",
+        "description",
+        "issueHeight",
+        "issueTimestamp",
+        "issuer",
+        "minSponsoredAssetFee",
+        "name",
+        "quantity",
+        "reissuable",
+        "scriptDetails",
+        "scripted"
+      ],
+      "properties": {
+        "assetId": {
+          "type": "string"
+        },
+        "issueHeight": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "issueTimestamp": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "issuer": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "decimals": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "reissuable": {
+          "type": "boolean"
+        },
+        "quantity": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "scripted": {
+          "type": "boolean"
+        },
+        "minSponsoredAssetFee": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "scriptDetails": {
+          "type": "object",
+          "required": [
+            "script",
+            "scriptComplexity",
+            "scriptText"
+          ],
+          "properties": {
+            "scriptComplexity": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "script": {
+              "type": "string"
+            },
+            "scriptText": {
+              "type": "string"
+            }
           }
         }
       }
@@ -4528,6 +4432,42 @@
         "extraFee": {
           "type": "integer",
           "format": "int64"
+        }
+      }
+    },
+    "ScriptMeta": {
+      "type": "object",
+      "required": [
+        "version",
+        "callableFuncTypes"
+      ],
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "isArrayArguments": {
+          "type": "boolean"
+        },
+        "callableFuncTypes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "type"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                }
+              }
+            }
+          }
         }
       }
     },

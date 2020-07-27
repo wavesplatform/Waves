@@ -5,7 +5,6 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{BlockStats, Metrics}
-import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{InvalidBlockStorage, PeerDatabase, formatBlocks, id}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -28,7 +27,6 @@ object ExtensionAppender extends ScorexLogging {
       time: Time,
       invalidBlocks: InvalidBlockStorage,
       peerDatabase: PeerDatabase,
-      miner: Miner,
       scheduler: Scheduler
   )(ch: Channel, extensionBlocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] = {
     def p(blocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] =
@@ -43,7 +41,7 @@ object ExtensionAppender extends ScorexLogging {
             val forkApplicationResultEi = Coeval {
               extension.view
                 .map { b =>
-                  b -> validateAndAppendBlock(blockchainUpdater, utxStorage, pos, time)(b).right
+                  b -> validateAndAppendBlock(blockchainUpdater, utxStorage, pos, time)(b)
                     .map {
                       _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
                     }
@@ -113,7 +111,6 @@ object ExtensionAppender extends ScorexLogging {
     processAndBlacklistOnFailure(
       ch,
       peerDatabase,
-      miner,
       s"${id(ch)} Attempting to append extension ${formatBlocks(extensionBlocks)}",
       s"${id(ch)} Successfully appended extension ${formatBlocks(extensionBlocks)}",
       s"${id(ch)} Error appending extension ${formatBlocks(extensionBlocks)}"

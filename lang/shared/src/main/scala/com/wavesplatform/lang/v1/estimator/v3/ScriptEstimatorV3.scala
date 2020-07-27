@@ -19,8 +19,8 @@ object ScriptEstimatorV3 extends ScriptEstimator {
       funcs: Map[FunctionHeader, Coeval[Long]],
       expr: EXPR
   ): Either[ExecutionError, Long] = {
-    val f = funcs.mapValues(_.value)
-    evalExpr(expr).run(EstimatorContext(f)).value._2
+    val ctxFuncs = funcs.view.mapValues(cost => (cost.value(), Set[String]())).toMap
+    evalExpr(expr).run(EstimatorContext(ctxFuncs)).value._2
   }
 
   private def evalExpr(t: EXPR): EvalM[Long] =
@@ -61,8 +61,19 @@ object ScriptEstimatorV3 extends ScriptEstimator {
 
   private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[Long] =
     for {
-      funcCost <- evalHoldingFuncs(func.body)
-      _        <- update(funcs.modify(_)(_ + (FunctionHeader.User(func.name) -> funcCost)))
+      startCtx    <- get[Id, EstimatorContext, ExecutionError]
+      funcCost    <- evalHoldingFuncs(func.body)
+      bodyEvalCtx <- get[Id, EstimatorContext, ExecutionError]
+      usedRefsInBody = bodyEvalCtx.usedRefs diff startCtx.usedRefs
+      _ <- update(
+        (funcs ~ usedRefs).modify(_) {
+          case (funcs, _) =>
+            (
+              funcs + ((FunctionHeader.User(func.name), (funcCost, usedRefsInBody))),
+              startCtx.usedRefs
+            )
+        }
+      )
       nextCost <- evalExpr(inner)
     } yield nextCost
 
@@ -82,11 +93,20 @@ object ScriptEstimatorV3 extends ScriptEstimator {
   private def evalFuncCall(header: FunctionHeader, args: List[EXPR]): EvalM[Long] =
     for {
       ctx <- get[Id, EstimatorContext, ExecutionError]
-      bodyCost <- funcs
+      (bodyCost, bodyUsedRefs) <- funcs
         .get(ctx)
         .get(header)
         .map(const)
-        .getOrElse(raiseError[Id, EstimatorContext, ExecutionError, Long](s"function '$header' not found"))
+        .getOrElse(raiseError[Id, EstimatorContext, ExecutionError, (Long, Set[String])](s"function '$header' not found"))
+      _ <- update(
+        (funcs ~ usedRefs).modify(_) {
+          case (funcs, usedRefs) =>
+            (
+              funcs + ((header, (bodyCost, Set[String]()))),
+              usedRefs ++ bodyUsedRefs
+            )
+        }
+      )
       argsCost <- args.traverse(evalHoldingFuncs)
     } yield argsCost.sum + bodyCost
 

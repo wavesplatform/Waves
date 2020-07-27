@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction.transfer
 
 import com.wavesplatform.account._
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -22,7 +23,7 @@ case class TransferTransaction(
     amount: TxAmount,
     feeAssetId: Asset,
     fee: TxAmount,
-    attachment: Option[Attachment],
+    attachment: ByteStr,
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
@@ -72,7 +73,7 @@ object TransferTransaction extends TransactionParser {
       amount: TxAmount,
       feeAsset: Asset,
       fee: TxAmount,
-      attachment: Option[Attachment],
+      attachment: ByteStr,
       timestamp: TxTimestamp,
       proofs: Proofs
   ): Either[ValidationError, TransferTransaction] =
@@ -86,7 +87,7 @@ object TransferTransaction extends TransactionParser {
       amount: TxAmount,
       feeAsset: Asset,
       fee: TxAmount,
-      attachment: Option[Attachment],
+      attachment: ByteStr,
       timestamp: TxTimestamp,
       signer: PrivateKey
   ): Either[ValidationError, TransferTransaction] =
@@ -100,7 +101,7 @@ object TransferTransaction extends TransactionParser {
       amount: TxAmount,
       feeAsset: Asset,
       fee: TxAmount,
-      attachment: Option[Attachment],
+      attachment: ByteStr,
       timestamp: TxTimestamp
   ): Either[ValidationError, TransferTransaction] =
     signed(version, sender.publicKey, recipient, asset, amount, feeAsset, fee, attachment, timestamp, sender.privateKey)

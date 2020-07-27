@@ -61,7 +61,7 @@ object Tasks {
         funcs,
         f => (f.name, f.params),
         f => Seq(str(f.name), listStr(f.params.map(str)), ver),
-        f => Seq(str(f.doc), listStr(f.paramsDoc.map(str)))
+        f => Seq(str(f.doc), listStr(f.paramsDoc.map(str)), f.complexity.toString)
       )
 
     def readV1V2Data(): (String, String) =
@@ -90,8 +90,9 @@ object Tasks {
           Seq(
             str(f._1.doc.replace("\n", "\\n")),
             listStr(f._1.paramsDoc.map(str).map(_.replace("\n", "\\n"))),
-            str(f._2)
-        )
+            str(f._2),
+            f._1.complexity.toString
+          )
       )
 
     def readCategorizedData(ver: String): (String, String) = {
@@ -122,7 +123,7 @@ object Tasks {
          |   private val regex = "\\\\[(.+?)\\\\]\\\\(.+?\\\\)".r
          |
          |   lazy val varData  = $vars ++ $varsV3 ++ $varsV4
-         |   lazy val funcData = $funcs ++ (categorizedfuncDataV3 ++ categorizedfuncDataV4).mapValues(v => (regex.replaceAllIn(v._1, _.group(1)), v._2))
+         |   lazy val funcData = $funcs ++ (categorizedfuncDataV3 ++ categorizedfuncDataV4).view.mapValues(v => (regex.replaceAllIn(v._1, _.group(1)), v._2, v._4))
          |   lazy val categorizedfuncDataV3 = $funcsV3
          |   lazy val categorizedfuncDataV4 = $funcsV4
          | }

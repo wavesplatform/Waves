@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1
 
 import cats.implicits._
+import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -9,18 +10,17 @@ import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.{Common, Global}
 import monix.eval.Coeval
 
 package object estimator {
   private val version = V3
   private val ctx =
-    PureContext.build(Global, version).withEnvironment[Environment] |+|
+    PureContext.build(version).withEnvironment[Environment] |+|
     WavesContext.build(DirectiveSet.contractDirectiveSet)
 
   private val environment = Common.emptyBlockchainEnvironment()
   private val evaluator =
-    new EvaluatorV2(LoggedEvaluationContext(_ => _ => Unit, ctx.evaluationContext(environment)), version)
+    new EvaluatorV2(LoggedEvaluationContext(_ => _ => (), ctx.evaluationContext(environment)), version)
 
   val evaluatorV2AsEstimator = new ScriptEstimator {
     override val version: Int = 0

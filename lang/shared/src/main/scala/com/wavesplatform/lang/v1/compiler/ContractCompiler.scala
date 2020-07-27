@@ -123,23 +123,6 @@ object ContractCompiler {
       parsedNodeDecs = decsCompileResult.map(_.parseNodeExpr)
       duplicateVarsErr   <- validateDuplicateVarsInContract(parsedDapp).handleError()
       annFuncArgTypesErr <- validateAnnotatedFuncsArgTypes(ctx, parsedDapp).handleError()
-      funcNameWithWrongSize = parsedDapp.fs
-        .map(af => Expressions.PART.toOption[String](af.name))
-        .filter(fNameOpt => fNameOpt.nonEmpty && fNameOpt.get.getBytes("UTF-8").size > ContractLimits.MaxAnnotatedFunctionNameInBytes)
-        .map(_.get)
-      funcNameSizeErr <- Either
-        .cond(
-          funcNameWithWrongSize.isEmpty,
-          (),
-          Generic(
-            parsedDapp.position.start,
-            parsedDapp.position.end,
-            s"Annotated function name size in bytes must be less than ${ContractLimits.MaxAnnotatedFunctionNameInBytes} for functions with name: ${funcNameWithWrongSize
-              .mkString(", ")}"
-          )
-        )
-        .toCompileM
-        .handleError()
       compiledAnnFuncsWithErr <- parsedDapp.fs
         .traverse[CompileM, (Option[AnnotatedFunction], List[(String, Types.FINAL)], Expressions.ANNOTATEDFUNC, Iterable[CompilationError])](
           af => local(compileAnnotatedFunc(af, version, saveExprContext))
@@ -204,7 +187,6 @@ object ContractCompiler {
 
       errorList = duplicateVarsErr._2 ++
         annFuncArgTypesErr._2 ++
-        funcNameSizeErr._2 ++
         alreadyDefinedErr._2 ++
         funcArgumentCountErr._2 ++
         metaWithErr._2 ++
@@ -230,39 +212,60 @@ object ContractCompiler {
       .traverse { func =>
         for {
           funcName <- handleValid(func.f.name)
-          funcArgs <- func.f.args.flatMap(_._2).toList.traverse(resolveGenericType)
+          funcArgs <- func.f.args.map(_._2).toList.flatTraverse(resolveGenericType(func, funcName, _))
           () <- funcArgs
             .map { case (argType, typeParam) => (argType.v, typeParam.map(_.v)) }
             .find(!checkAnnotatedParamType(_))
-            .map(argTypesError(func, funcName, _))
+            .map(t => argTypesError[Unit](func, funcName, typeStr(t)))
             .getOrElse(().pure[CompileM])
         } yield ()
       }
       .map(_ => ())
 
-  private def argTypesError(
+  private def argTypesError[T](
       func: Expressions.ANNOTATEDFUNC,
       funcName: PART.VALID[String],
-      t: (String, Option[String])
-  ): CompileM[Unit] =
-    raiseError[Id, CompilerContext, CompilationError, Unit](
-      WrongArgumentType(func.f.position.start, func.f.position.end, funcName.v, typeStr(t), allowedCallableTypesV4)
+      typeName: String
+  ): CompileM[T] =
+    raiseError[Id, CompilerContext, CompilationError, T](
+      WrongArgumentType(func.f.position.start, func.f.position.end, funcName.v, typeName, allowedCallableTypesV4)
     )
 
-  private def typeStr(t: (String, Option[String])) =
+  private def typeStr(t: (String, Option[Type])) =
     t._2.fold(t._1)(typeParam => s"${t._1}[$typeParam]")
 
-  private def resolveGenericType(t: Type): CompileM[(PART.VALID[String], Option[PART.VALID[String]])] =
-    for {
-      argType   <- handleValid(t._1)
-      typeParam <- t._2.traverse(handleValid)
-    } yield (argType, typeParam)
-
-  private def checkAnnotatedParamType(t: (String, Option[String])): Boolean =
+  private def resolveGenericType(
+    func: Expressions.ANNOTATEDFUNC,
+    funcName: PART.VALID[String],
+    t: Type
+  ): CompileM[List[(PART.VALID[String], Option[PART.VALID[Type]])]] =
     t match {
-      case (singleType, None)             => primitiveCallableTypes.contains(singleType)
-      case (genericType, Some(typeParam)) => primitiveCallableTypes.contains(typeParam) && genericType == "List"
+      case Expressions.Single(name, parameter) =>
+        for {
+          argType   <- handleValid(name)
+          typeParam <- parameter.traverse(handleValid)
+        } yield List((argType, typeParam))
+
+      case Expressions.Union(types) =>
+        types.toList.flatTraverse(resolveGenericType(func, funcName, _))
+
+      case Expressions.Tuple(types) =>
+        argTypesError(func, funcName, types.mkString("(", ", ", ")"))
     }
+
+  private def checkAnnotatedParamType(t: (String, Option[Type])): Boolean = {
+    t match {
+      case (singleType, None) => primitiveCallableTypes.contains(singleType)
+      case (genericType, Some(Expressions.Single(PART.VALID(_, tp), None))) => primitiveCallableTypes.contains(tp) && genericType == "List"
+      case (genericType, Some(Expressions.Union(u))) => genericType == "List" && u.forall { t => 
+        t match {
+          case Expressions.Single(PART.VALID(_, tp), None) => primitiveCallableTypes.contains(tp)
+          case _ => false
+        }
+      }
+      case _ => false
+    }
+  }
 
   val primitiveCallableTypes: Set[String] =
     Set(LONG, BYTESTR, BOOLEAN, STRING).map(_.name)
@@ -317,12 +320,12 @@ object ContractCompiler {
 
   def compile(input: String, ctx: CompilerContext, version: StdLibVersion): Either[String, DApp] = {
     Parser.parseContract(input) match {
-      case fastparse.core.Parsed.Success(xs, _) =>
+      case fastparse.Parsed.Success(xs, _) =>
         ContractCompiler(ctx, xs, version) match {
           case Left(err) => Left(err.toString)
           case Right(c)  => Right(c)
         }
-      case f @ fastparse.core.Parsed.Failure(_, _, _) => Left(f.toString)
+      case f @ fastparse.Parsed.Failure(_, _, _) => Left(f.toString)
     }
   }
 

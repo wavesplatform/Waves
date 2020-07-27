@@ -4,7 +4,7 @@ import cats.implicits._
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
-import com.wavesplatform.lang.directives.values.{StdLibVersion, _}
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven}
 import com.wavesplatform.lang.v1.traits.domain._
@@ -36,7 +36,7 @@ object RealTransactionWrapper {
   implicit def assetPair(a: AssetPair): APair = APair(a.amountAsset.compatId, a.priceAsset.compatId)
   implicit def ord(o: Order): Ord =
     Ord(
-      id = ByteStr(o.id.value.arr),
+      id = o.id(),
       sender = Recipient.Address(ByteStr(o.sender.toAddress.bytes)),
       senderPublicKey = o.senderPublicKey,
       matcherPublicKey = o.matcherPublicKey,
@@ -68,7 +68,7 @@ object RealTransactionWrapper {
   ): Either[ExecutionError, Tx] =
     tx match {
       case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, g.recipient).asRight
-      case t: TransferTransaction => mapTransferTx(t, stdLibVersion).asRight
+      case t: TransferTransaction => mapTransferTx(t).asRight
       case i: IssueTransaction =>
         Tx.Issue(
             proven(i),
@@ -92,7 +92,7 @@ object RealTransactionWrapper {
             transferCount = ms.transfers.length,
             totalAmount = ms.transfers.map(_.amount).sum,
             transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.domain.Tx.TransferItem(r.address, r.amount)).toIndexedSeq,
-            attachment = convertAttachment(ms.attachment, stdLibVersion)
+            attachment = ms.attachment
           )
           .asRight
       case ss: SetScriptTransaction      => Tx.SetScript(proven(ss), ss.script.map(_.bytes())).asRight
@@ -130,24 +130,14 @@ object RealTransactionWrapper {
         Tx.UpdateAssetInfo(proven(u), u.assetId.id, u.name, u.description).asRight
     }
 
-  def mapTransferTx(t: TransferTransaction, version: StdLibVersion): Tx.Transfer =
+  def mapTransferTx(t: TransferTransaction): Tx.Transfer =
     Tx.Transfer(
       proven(t),
       feeAssetId = t.feeAssetId.compatId,
       assetId = t.assetId.compatId,
       amount = t.amount,
       recipient = t.recipient,
-      attachment = convertAttachment(t.attachment, version)
+      attachment = t.attachment
     )
 
-  private def convertAttachment(attachment: Option[Attachment], version: StdLibVersion): TransferAttachment = version match {
-    case V1 | V2 | V3 => ByteStrValue(ByteStr(attachment.toBytes))
-    case V4 =>
-      attachment.fold[TransferAttachment](EmptyAttachment) {
-        case Attachment.Num(value)  => IntValue(value)
-        case Attachment.Bool(value) => BooleanValue(value)
-        case Attachment.Bin(value)  => ByteStrValue(ByteStr(value))
-        case Attachment.Str(value)  => StringValue(value)
-      }
-  }
 }

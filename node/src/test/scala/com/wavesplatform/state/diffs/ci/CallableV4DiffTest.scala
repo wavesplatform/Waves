@@ -11,10 +11,10 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.EmptyDataEntry
-import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
+import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, _}
+import com.wavesplatform.state.{EmptyDataEntry, SponsorshipValue}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
@@ -22,10 +22,10 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.{EitherValues, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDomain {
+class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDomain with EitherValues {
   property("reissue and burn actions result state") {
     forAll(paymentPreconditions(feeMultiplier = 0)) {
       case (genesis, setScript, invoke, issue, master, reissueAmount, burnAmount) =>
@@ -35,7 +35,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           features
         ) {
           case (_, blockchain) =>
-            val asset        = IssuedAsset(issue.id.value)
+            val asset        = IssuedAsset(issue.id())
             val resultAmount = issue.quantity + reissueAmount - burnAmount
 
             blockchain.assetDescription(asset).get.totalVolume shouldBe resultAmount
@@ -49,7 +49,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       assetVerifier(
         """
           | match tx {
-          |   case r: ReissueTransaction => false
+          |   case _: ReissueTransaction => false
           |   case _ => true
           | }
         """.stripMargin
@@ -61,7 +61,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           Seq(TestBlock.create(genesis :+ setScript :+ issue)),
           TestBlock.create(Seq(invoke)),
           features
-        )(_ should produce("Transaction is not allowed by token-script", requireFailed = true))
+        )(_ should produce("Transaction is not allowed by script of the asset", requireFailed = true))
     }
   }
 
@@ -70,7 +70,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       assetVerifier(
         """
           | match tx {
-          |   case r: BurnTransaction => false
+          |   case _: BurnTransaction => false
           |   case _ => true
           | }
         """.stripMargin
@@ -82,7 +82,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           Seq(TestBlock.create(genesis :+ setScript :+ issue)),
           TestBlock.create(Seq(invoke)),
           features
-        )(_ should produce("Transaction is not allowed by token-script", requireFailed = true))
+        )(_ should produce("Transaction is not allowed by script of the asset", requireFailed = true))
     }
   }
 
@@ -91,7 +91,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       assetVerifier(
         """
           | match tx {
-          |   case t: ReissueTransaction | BurnTransaction => true
+          |   case _: ReissueTransaction | BurnTransaction => true
           |   case _ => false
           | }
         """.stripMargin
@@ -103,7 +103,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           Seq(TestBlock.create(genesis :+ setScript :+ issue)),
           TestBlock.create(Seq(invoke)),
           features
-        )(_ shouldBe 'right)
+        )(_.explicitGet())
     }
   }
 
@@ -116,7 +116,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           features
         ) {
           case (_, blockchain) =>
-            val asset                 = IssuedAsset(issue.id.value)
+            val asset                 = IssuedAsset(issue.id())
             val totalResultAmount     = issue.quantity + (reissueAmount - burnAmount) * 2
             val issuerResultAmount    = issue.quantity + (reissueAmount - burnAmount - transferAmount) * 2
             val recipientResultAmount = transferAmount * 2
@@ -149,11 +149,11 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           features
         ) { r =>
           r.trace.size shouldBe 4
-          r.trace.head.asInstanceOf[InvokeScriptTrace].resultE shouldBe 'right
+          r.trace.head.asInstanceOf[InvokeScriptTrace].resultE.explicitGet()
 
           val assetTrace = r.trace.tail.asInstanceOf[List[AssetVerifierTrace]]
           assetTrace.take(2).foreach(_.errorO shouldBe None)
-          assetTrace.last.errorO.get shouldBe r.resultE.left.get.asInstanceOf[TransactionValidationError].cause
+          assetTrace.last.errorO.get shouldBe r.resultE.left.value.asInstanceOf[TransactionValidationError].cause
         }
     }
   }
@@ -215,7 +215,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       reissueAmount <- positiveLongGen
       burnAmount    <- Gen.choose(0, reissueAmount)
     } yield {
-      val dApp = Some(reissueAndBurnDApp(issue.id.value, reissueAmount, burnAmount))
+      val dApp = Some(reissueAndBurnDApp(issue.id(), reissueAmount, burnAmount))
       for {
         genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
         genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
@@ -224,12 +224,29 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       } yield (List(genesis, genesis2), setDApp, ci, issue, master, reissueAmount, burnAmount)
     }.explicitGet()
 
-  def multiActionDApp(
-    assetId: ByteStr,
-    recipient: Address,
-    reissueAmount: Long,
-    burnAmount: Long,
-    transferAmount: Long
+  private def sponsorFeePreconditions: Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, Option[Long])] =
+    for {
+      master               <- accountGen
+      invoker              <- accountGen
+      ts                   <- timestampGen
+      fee                  <- ciFee(1).map(_ + FeeUnit * FeeConstants(IssueTransaction.typeId))
+      minSponsoredAssetFee <- Gen.oneOf(None, Some(1000L))
+    } yield {
+      val dApp = Some(sponsorFeeDApp(minSponsoredAssetFee))
+      for {
+        genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
+        genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
+        setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, dApp, fee, ts + 2)
+        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3)
+      } yield (List(genesis, genesis2), setDApp, ci, minSponsoredAssetFee)
+    }.explicitGet()
+
+  private def multiActionDApp(
+      assetId: ByteStr,
+      recipient: Address,
+      reissueAmount: Long,
+      burnAmount: Long,
+      transferAmount: Long
   ): Script =
     dApp(
       s"""
@@ -237,14 +254,14 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
            |   IntegerEntry("int", 1),
            |   BooleanEntry("bool", true),
            |
-           |   Reissue(base58'$assetId', true, $reissueAmount),
+           |   Reissue(base58'$assetId', $reissueAmount, true),
            |   Burn(base58'$assetId', $burnAmount),
            |   ScriptTransfer(Address(base58'$recipient'), $transferAmount, base58'$assetId'),
            |
            |   StringEntry("str", "str"),
            |   BinaryEntry("bin", base58'$assetId'),
            |
-           |   Reissue(base58'$assetId', false, $reissueAmount),
+           |   Reissue(base58'$assetId', $reissueAmount, false),
            |   Burn(base58'$assetId', $burnAmount),
            |   ScriptTransfer(Address(base58'$recipient'), $transferAmount, base58'$assetId')
            | ]
@@ -321,7 +338,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       assetScript              = Some(checkStateAsset(startAmount, reissueAmount, burnAmount, assetCheckTransferAmount, invoker.toAddress))
       issue <- issueV2TransactionGen(master, Gen.const(assetScript), reissuableParam = Some(true), quantityParam = Some(startAmount))
     } yield {
-      val dApp = Some(multiActionDApp(issue.id.value, invoker.publicKey.toAddress, reissueAmount, burnAmount, transferAmount))
+      val dApp = Some(multiActionDApp(issue.id(), invoker.publicKey.toAddress, reissueAmount, burnAmount, transferAmount))
       for {
         genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
         genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
@@ -350,8 +367,19 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     dApp(
       s"""
          | [
-         |   Reissue(base58'$assetId', true, $reissueAmount),
+         |   Reissue(base58'$assetId', $reissueAmount, true),
          |   Burn(base58'$assetId', $burnAmount)
+         | ]
+       """.stripMargin
+    )
+
+  private def sponsorFeeDApp(minSponsoredAssetFee: Option[Long]): Script =
+    dApp(
+      s"""
+         | let i0 = Issue("SponsoredAsset0", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
+         | [
+         |   i0,
+         |   SponsorFee(calculateAssetId(i0), ${minSponsoredAssetFee.getOrElse("unit")})
          | ]
        """.stripMargin
     )
@@ -364,8 +392,9 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
          | {-# SCRIPT_TYPE    ACCOUNT #-}
          |
          | @Callable(i)
-         | func default() = $body
-         |
+         | func default() = {
+         |   $body
+         | }
        """.stripMargin
 
     val expr     = Parser.parseContract(script).get.value
@@ -430,7 +459,11 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           d.portfolio(master.toAddress).map(_._2) shouldEqual Seq(amount)
           d.portfolio(invoker.toAddress) shouldEqual Seq()
 
-          d.blockchainUpdater.processBlock(TestBlock.create(System.currentTimeMillis(), tb2.signature, Seq.empty), ByteStr(new Array[Byte](32)), verify = false)
+          d.blockchainUpdater.processBlock(
+            TestBlock.create(System.currentTimeMillis(), tb2.signature, Seq.empty),
+            ByteStr(new Array[Byte](32)),
+            verify = false
+          )
 
           d.portfolio(master.toAddress).map(_._2) shouldEqual Seq(amount)
           d.portfolio(invoker.toAddress) shouldEqual Seq()
@@ -438,4 +471,20 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     }
   }
 
+  property("sponsor fee action results state") {
+    forAll(sponsorFeePreconditions) {
+      case (genesis, setScript, invoke, minSponsoredAssetFee) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(genesis :+ setScript)),
+          TestBlock.create(Seq(invoke)),
+          features
+        ) {
+          case (diff, blockchain) =>
+            val asset            = diff.issuedAssets.head._1
+            val sponsorshipValue = minSponsoredAssetFee.getOrElse(0L)
+            diff.sponsorship shouldBe Map(asset -> SponsorshipValue(sponsorshipValue))
+            blockchain.assetDescription(asset).map(_.sponsorship) shouldBe Some(sponsorshipValue)
+        }
+    }
+  }
 }

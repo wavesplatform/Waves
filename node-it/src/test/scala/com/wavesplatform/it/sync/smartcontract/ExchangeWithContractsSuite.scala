@@ -7,15 +7,14 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.{DataTransaction, TxVersion}
 import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.transaction.{DataTransaction, TxVersion}
 import org.scalatest.CancelAfterFailure
-import scorex.crypto.encode.Base64
 
 class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFailure with NTPTime {
-  private val acc0 = pkByAddress(firstAddress)
-  private val acc1 = pkByAddress(secondAddress)
-  private val acc2 = pkByAddress(thirdAddress)
+  private def acc0 = firstKeyPair
+  private def acc1 = secondKeyPair
+  private def acc2 = thirdKeyPair
 
   var exchAsset: String    = ""
   var dtx: DataTransaction = _
@@ -24,12 +23,12 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
   val sc1: Option[String] = Some(s"true")
   val sc2: Option[String] = Some(s"""
                |match tx {
-               |  case s : SetScriptTransaction => true
+               |  case _: SetScriptTransaction => true
                |  case _ => false
                |}""".stripMargin)
   val sc3: Option[String] = Some(s"""
                |match tx {
-               |  case s : SetScriptTransaction => true
+               |  case _: SetScriptTransaction => true
                |  case _ => throw("Some generic error")
                |}""".stripMargin)
 
@@ -38,7 +37,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
 
     exchAsset = sender
       .issue(
-        acc0.toAddress.toString,
+        acc0,
         "ExchangeCoin",
         "ExchangeCoin for tests with exchange transaction",
         someAssetAmount,
@@ -54,7 +53,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
 
     val entry1 = IntegerDataEntry("int", 24)
     val entry2 = BooleanDataEntry("bool", value = true)
-    val entry3 = BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=")))
+    val entry3 = BinaryDataEntry("blob", ByteStr.decodeBase64("YWxpY2U=").get)
     val entry4 = StringDataEntry("str", "test")
 
     dtx = DataTransaction.selfSigned(1.toByte, acc0, List(entry1, entry2, entry3, entry4), minFee, ntpTime.correctedTime()).explicitGet()

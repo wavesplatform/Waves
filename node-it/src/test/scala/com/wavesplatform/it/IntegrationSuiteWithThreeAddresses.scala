@@ -1,7 +1,7 @@
 package com.wavesplatform.it
 
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
@@ -28,60 +28,48 @@ trait IntegrationSuiteWithThreeAddresses
 
   protected def sender: Node = miner
 
-  protected lazy val firstAddress: String  = sender.createAddress()
-  protected lazy val secondAddress: String = sender.createAddress()
-  protected lazy val thirdAddress: String  = sender.createAddress()
+  protected lazy val firstKeyPair: KeyPair = sender.createKeyPair()
+  protected lazy val firstAddress: String  = firstKeyPair.toAddress.toString
 
-  def pkByAddress(address: String): KeyPair =
-    KeyPair(Base58.decode(sender.seed(address)))
+  protected lazy val secondKeyPair: KeyPair = sender.createKeyPair()
+  protected lazy val secondAddress: String  = secondKeyPair.toAddress.toString
+
+  protected lazy val thirdKeyPair: KeyPair = sender.createKeyPair()
+  protected lazy val thirdAddress: String  = thirdKeyPair.toAddress.toString
 
   abstract protected override def beforeAll(): Unit = {
     super.beforeAll()
 
     val defaultBalance: Long = 100.waves
 
-    def dumpBalances(node: Node, accounts: Seq[String], label: String): Unit = {
-      accounts.foreach(acc => {
-        val (balance, eff) = miner.accountBalances(acc)
+    def dumpBalances(accounts: Seq[KeyPair], label: String): Unit =
+      accounts.foreach { acc =>
+        val (balance, eff) = miner.accountBalances(acc.toAddress.toString)
+        log.debug(s"$label $acc balance: balance = $balance, effective = $eff")
+      }
 
-        val formatted = s"$acc: balance = $balance, effective = $eff"
-        log.debug(s"$label account balance:\n$formatted")
-      })
-    }
-
-    def waitForTxsToReachAllNodes(txIds: Seq[String]) = {
-      val txNodePairs = for {
-        txId <- txIds
-        node <- nodes
-      } yield (node, txId)
-
-      txNodePairs.foreach({ case (node, tx) => node.waitForTransaction(tx) })
-    }
-
-    def makeTransfers(accounts: Seq[String]): Seq[String] = accounts.map { acc =>
-      sender.transfer(sender.address, acc, defaultBalance, sender.fee(TransferTransaction.typeId)).id
-
+    def makeTransfers(accounts: Seq[KeyPair]): Seq[String] = accounts.map { acc =>
+      sender.transfer(sender.keyPair, acc.toAddress.toString, defaultBalance, sender.fee(TransferTransaction.typeId)).id
     }
 
     def correctStartBalancesFuture(): Unit = {
       nodes.waitForHeight(2)
-      val accounts = Seq(firstAddress, secondAddress, thirdAddress)
+      val accounts = Seq(firstKeyPair, secondKeyPair, thirdKeyPair)
 
-      dumpBalances(sender, accounts, "initial")
+      dumpBalances(accounts, "initial")
       val txs = makeTransfers(accounts)
 
-      val height = nodes.map(_.height).max
-
-      withClue(s"waitForHeight(${height + 2})") {
-        nodes.waitForHeight(height + 2)
+      val targetHeight = nodes.map(_.height).max + 1
+      withClue(s"waitForHeight($targetHeight)") {
+        nodes.waitForHeight(targetHeight)
       }
 
       withClue("waitForTxsToReachAllNodes") {
-        waitForTxsToReachAllNodes(txs)
+        txs.foreach(nodes.waitForTransaction)
       }
 
-      dumpBalances(sender, accounts, "after transfer")
-      accounts.foreach(miner.assertBalances(_, defaultBalance, defaultBalance))
+      dumpBalances(accounts, "after transfer")
+      accounts.foreach(a => miner.assertBalances(a.toAddress.toString, defaultBalance, defaultBalance))
     }
 
     withClue("beforeAll") {
@@ -96,8 +84,7 @@ trait IntegrationSuiteWithThreeAddresses
     }
     val setScriptTransaction = SetScriptTransaction
       .selfSigned(1.toByte, acc, script, 0.014.waves, System.currentTimeMillis())
-      .right
-      .get
+      .explicitGet()
     sender
       .signedBroadcast(setScriptTransaction.json(), waitForTx = true)
       .id

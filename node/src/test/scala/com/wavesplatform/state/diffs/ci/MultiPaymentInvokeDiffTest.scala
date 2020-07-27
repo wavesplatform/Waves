@@ -43,7 +43,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
         ) {
           case (diff, blockchain) =>
             val assetBalance = issues
-              .map(_.id.value)
+              .map(_.id())
               .map(IssuedAsset)
               .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
               .toMap
@@ -72,7 +72,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
         ) {
           case (diff, blockchain) =>
             val assetBalance = issues
-              .map(_.id.value)
+              .map(_.id())
               .map(IssuedAsset)
               .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
               .toMap
@@ -102,7 +102,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
           TestBlock.create(Seq(ci)),
           features
         )(_ should matchPattern {
-          case Right(diff: Diff) if diff.transactions.exists(!_._2._3) =>
+          case Right(diff: Diff) if diff.transactions.exists(!_._2.applied) =>
         })
     }
   }
@@ -165,7 +165,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
         ) {
           case (diff, blockchain) =>
             val assetBalance = issues
-              .map(_.id.value)
+              .map(_.id())
               .map(IssuedAsset)
               .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
               .toMap
@@ -227,11 +227,11 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
         setDApp     <- SetScriptTransaction.selfSigned(1.toByte, master, Some(dApp(invoker)), fee, ts + 2)
         (issues, payments) = if (repeatAdditionalAsset) {
           val issues   = specialIssue :: commonIssues.drop(1)
-          val payments = (specialIssue :: issues).map(i => Payment(1, IssuedAsset(i.id.value)))
+          val payments = (specialIssue :: issues).map(i => Payment(1, IssuedAsset(i.id())))
           (issues, payments)
         } else {
           val issues   = specialIssue :: commonIssues
-          val payments = issues.map(i => Payment(1, IssuedAsset(i.id.value)))
+          val payments = issues.map(i => Payment(1, IssuedAsset(i.id())))
           (issues, payments)
         }
         ci <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, payments, fee, Waves, ts + 3)
@@ -255,7 +255,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
           verifier(assetsScriptVersion, Asset)
         )
         oldVersion         = List(dAppVersion, verifierVersion, assetsScriptVersion).filter(_ < V4).head
-        maybeFailedAssetId = issues.find(_.script.nonEmpty).get.id.value
+        maybeFailedAssetId = issues.find(_.script.nonEmpty).get.id()
       } yield (genesis, setVerifier, setDApp, ci, issues, oldVersion, maybeFailedAssetId)
     ) {
       case (genesis, setVerifier, setDApp, ci, issues, oldVersion, maybeFailedAssetId) =>
@@ -265,8 +265,8 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
           features
         ) {
           case Right(diff: Diff) =>
-            val errMsg = diff.scriptResults(diff.transactions.keys.head).errorMessage.get.text
-            ((message(oldVersion.id, maybeFailedAssetId)).r.findFirstIn(errMsg)) should not be empty
+            val errMsg = diff.scriptResults(diff.transactions.keys.head).error.get.text
+            ((message(oldVersion.id, maybeFailedAssetId)).r.findFirstIn(errMsg)) shouldBe defined
 
           case l @ Left(_) =>
             l should produce(message(oldVersion.id, maybeFailedAssetId))

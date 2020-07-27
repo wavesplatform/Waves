@@ -1,7 +1,7 @@
 package com.wavesplatform.lang
 
 import cats.Id
-import cats.syntax.monoid._
+import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.EitherExt2
@@ -13,7 +13,7 @@ import com.wavesplatform.lang.v1.compiler.{ContractCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
 import com.wavesplatform.lang.v1.evaluator._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Bindings, WavesContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
@@ -25,7 +25,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
 
   private val ctx: CTX[Environment] =
-      PureContext.build(Global, V3).withEnvironment[Environment] |+|
+      PureContext.build(V3).withEnvironment[Environment] |+|
       CTX[Environment](sampleTypes, Map.empty, Array.empty) |+|
       WavesContext.build(
         DirectiveSet(V3, Account, DApp).explicitGet()
@@ -66,7 +66,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         |         DataEntry("fee",           invocation.fee),
         |         DataEntry("feeAssetId",    match invocation.feeAssetId  {
         |                                      case custom: ByteVector => custom
-        |                                      case waves:  Unit       => base64''
+        |                                      case _:  Unit           => base64''
         |                                    }
         |         )
         |      ]
@@ -124,7 +124,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
     inside(evalResult) {
       case Left((error, log)) =>
         error shouldBe "exception message"
-        log should contain allOf (
+        log should contain.allOf(
           ("a", Right(CONST_LONG(1))),
           ("b", Right(CONST_LONG(2))),
           ("isError", Right(TRUE))
@@ -174,8 +174,14 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
   def parseCompileAndVerify(script: String, tx: Tx): Either[ExecutionError, EVALUATED] = {
     val parsed   = Parser.parseContract(script).get.value
     val compiled = ContractCompiler(ctx.compilerContext, parsed, V3).explicitGet()
-    val evalm    = ContractEvaluator.verify(compiled.decs, compiled.verifierFuncOpt.get, tx)
-    EvaluatorV1().evalWithLogging(Right(ctx.evaluationContext(environment)), evalm)._2
+    val txObject = Bindings.transactionObject(tx, proofsEnabled = true)
+    ContractEvaluator.verify(
+      compiled.decs,
+      compiled.verifierFuncOpt.get,
+      ctx.evaluationContext(environment),
+      EvaluatorV2.applyCompleted(_, _, V3),
+      txObject
+    ).bimap(_._1, _._1)
   }
 
   property("Simple verify") {
@@ -191,7 +197,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       assetId = None,
       amount = 0,
       recipient = Recipient.Address(ByteStr.empty),
-      attachment = ByteStrValue(ByteStr.empty)
+      attachment = ByteStr.empty
     )
     parseCompileAndVerify(
       """

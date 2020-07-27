@@ -68,10 +68,10 @@ object NxtPoSCalculator extends PoSCalculator {
       val baseTargetGamma = normalize(BaseTargetGamma, targetBlockDelaySeconds)
 
       val baseTarget = (if (meanBlockDelay > targetBlockDelaySeconds) {
-                          prevBaseTarget * Math.min(meanBlockDelay, maxBlockDelay) / targetBlockDelaySeconds
+                          prevBaseTarget * Math.min(meanBlockDelay.toDouble, maxBlockDelay) / targetBlockDelaySeconds
                         } else {
                           prevBaseTarget - prevBaseTarget * baseTargetGamma *
-                            (targetBlockDelaySeconds - Math.max(meanBlockDelay, minBlockDelay)) / (targetBlockDelaySeconds * 100)
+                            (targetBlockDelaySeconds - Math.max(meanBlockDelay.toDouble, minBlockDelay)) / (targetBlockDelaySeconds * 100)
                         }).toLong
 
       normalizeBaseTarget(baseTarget, targetBlockDelaySeconds)
@@ -85,15 +85,15 @@ object NxtPoSCalculator extends PoSCalculator {
 }
 
 object FairPoSCalculator {
-  lazy val V1 = new FairPoSCalculator(5000)
-  lazy val V2 = new FairPoSCalculator(15000)
+  lazy val V1 = new FairPoSCalculator(5000, 0)
+  lazy val V2 = new FairPoSCalculator(15000, 8)
 
   private val MaxHit = BigDecimal(BigInt(1, Array.fill[Byte](HitSize)(-1)))
   private val C1     = 70000
   private val C2     = 5e17
 }
 
-class FairPoSCalculator(minBlockTime: Int) extends PoSCalculator {
+class FairPoSCalculator(minBlockTime: Int, delayDelta: Int) extends PoSCalculator {
   import FairPoSCalculator._
   import PoSCalculator._
 
@@ -111,8 +111,8 @@ class FairPoSCalculator(minBlockTime: Int) extends PoSCalculator {
       maybeGreatGrandParentTimestamp: Option[Long],
       timestamp: Long
   ): Long = {
-    val maxDelay = normalize(90, targetBlockDelaySeconds)
-    val minDelay = normalize(30, targetBlockDelaySeconds)
+    val maxDelay = normalize(90 - delayDelta, targetBlockDelaySeconds)
+    val minDelay = normalize(30 + delayDelta, targetBlockDelaySeconds)
 
     maybeGreatGrandParentTimestamp match {
       case None =>

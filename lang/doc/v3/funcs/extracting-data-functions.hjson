@@ -5,96 +5,112 @@
       params: [ "List[DataEntry]", "String" ]
       doc: "Find and extract data by key"
       paramsDoc: [ "DataEntry list, usually tx.data", "key" ]
+      complexity: 10
     }
 	{
       name: "getBoolean"
       params: [ "List[DataEntry]", "String" ]
       doc: "Find and extract data by key"
       paramsDoc: [ "DataEntry list, usually tx.data", "key" ]
+      complexity: 10
     }
 	{
       name: "getBinary"
       params: [ "List[DataEntry]", "String" ]
       doc: "Find and extract data by key"
       paramsDoc: [ "DataEntry list, usually tx.data", "key" ]
+      complexity: 10
     }
 	{
       name: "getString"
       params: [ "List[DataEntry]", "String" ]
       doc: "Find and extract data by key"
       paramsDoc: [ "DataEntry list, usually tx.data", "key" ]
+      complexity: 10
     }
 	{
       name: "getInteger"
       params: [ "List[DataEntry]", "Int" ]
       doc: "Extract data by index"
       paramsDoc: [ "DataEntry list, usually tx.data", "index" ]
+      complexity: 30
     }
 	{
       name: "getBoolean"
       params: [ "List[DataEntry]", "Int" ]
       doc: "Extract data by index"
       paramsDoc: [ "DataEntry list, usually tx.data", "index" ]
+      complexity: 30
     }
 	{
       name: "getBinary"
       params: [ "List[DataEntry]", "Int" ]
       doc: "Extract data by index"
       paramsDoc: [ "DataEntry list, usually tx.data", "index" ]
+      complexity: 30
     }
 	{
       name: "getString"
       params: [ "List[DataEntry]", "Int" ]
       doc: "Extract data by index"
       paramsDoc: [ "DataEntry list, usually tx.data", "index" ]
+      complexity: 30
     }
 	{
       name: "getIntegerValue"
       params: [ "List[DataEntry]", "String" ]
       doc: "Find and extract data by key (fail on error)"
       paramsDoc: [ "DataEntry list, usually tx.data", "key" ]
+      complexity: 10
     }
 	{
       name: "getBooleanValue"
       params: [ "List[DataEntry]", "String" ]
       doc: "Find and extract data by key (fail on error)"
       paramsDoc: [ "DataEntry list, usually tx.data", "key" ]
+      complexity: 10
     }
 	{
       name: "getBinaryValue"
       params: [ "List[DataEntry]", "String" ]
       doc: "Find and extract data by key (fail on error)"
       paramsDoc: [ "DataEntry list, usually tx.data", "key" ]
+      complexity: 10
     }
 	{
       name: "getStringValue"
       params: [ "List[DataEntry]", "String" ]
       doc: "Find and extract data by key (fail on error)"
       paramsDoc: [ "DataEntry list, usually tx.data", "key" ]
+      complexity: 10
     }
 	{
       name: "getIntegerValue"
       params: [ "List[DataEntry]", "Int" ]
       doc: "Extract data by index (fail on error)"
       paramsDoc: [ "DataEntry list, usually tx.data", "index" ]
+      complexity: 30
     }
 	{
       name: "getBooleanValue"
       params: [ "List[DataEntry]", "Int" ]
       doc: "Extract data by index (fail on error)"
       paramsDoc: [ "DataEntry list, usually tx.data", "index" ]
+      complexity: 30
     }
 	{
       name: "getBinaryValue"
       params: [ "List[DataEntry]", "Int" ]
       doc: "Extract data by index (fail on error)"
       paramsDoc: [ "DataEntry list, usually tx.data", "index" ]
+      complexity: 30
     }
 	{
       name: "getStringValue"
       params: [ "List[DataEntry]", "Int" ]
       doc: "Extract data by index (fail on error)"
       paramsDoc: [ "DataEntry list, usually tx.data", "index" ]
+      complexity: 30
     }
   ]
 }

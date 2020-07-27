@@ -17,12 +17,12 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
   errorTests(
     "can't define LET with the same name as predefined constant" -> "already defined in the scope" -> BLOCK(
       AnyPos,
-      LET(AnyPos, PART.VALID(AnyPos, "unit"), CONST_LONG(AnyPos, 2), Seq.empty),
+      LET(AnyPos, PART.VALID(AnyPos, "unit"), CONST_LONG(AnyPos, 2)),
       TRUE(AnyPos)
     ),
     "can't define LET with the same name as predefined function" -> "function with this name is already defined" -> BLOCK(
       AnyPos,
-      LET(AnyPos, PART.VALID(AnyPos, "drop"), CONST_LONG(AnyPos, 2), Seq.empty),
+      LET(AnyPos, PART.VALID(AnyPos, "drop"), CONST_LONG(AnyPos, 2)),
       TRUE(AnyPos)
     ),
     "BINARY_OP with wrong types" -> "Can't find a function overload '+'" -> BINARY_OP(
@@ -52,9 +52,9 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
         AnyPos,
         Expressions.FUNC(
           AnyPos,
+          Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x")),
           Expressions.PART.VALID(AnyPos, "id"),
-          Seq((Expressions.PART.VALID(AnyPos, "x"), Seq((Expressions.PART.VALID(AnyPos, "Int"), None)))),
-          Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
+          Seq((Expressions.PART.VALID(AnyPos, "x"), Single(Expressions.PART.VALID(AnyPos, "Int"), None)))
         ),
         Expressions.FUNCTION_CALL(AnyPos, Expressions.PART.VALID(AnyPos, "id"), List(Expressions.TRUE(AnyPos)))
       ),
@@ -63,9 +63,9 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
         AnyPos,
         Expressions.FUNC(
           AnyPos,
+          Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x")),
           Expressions.PART.VALID(AnyPos, "id"),
-          Seq((Expressions.PART.VALID(AnyPos, "x"), Seq((Expressions.PART.VALID(AnyPos, "Int"), None)))),
-          Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
+          Seq((Expressions.PART.VALID(AnyPos, "x"), Single(Expressions.PART.VALID(AnyPos, "Int"), None)))
         ),
         Expressions.FUNCTION_CALL(
           AnyPos,
@@ -78,12 +78,12 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
         AnyPos,
         Expressions.FUNC(
           AnyPos,
+          Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x")),
           Expressions.PART.VALID(AnyPos, "id"),
           Seq(
-            (Expressions.PART.VALID(AnyPos, "x"), Seq((Expressions.PART.VALID(AnyPos, "Int"), None))),
-            (Expressions.PART.VALID(AnyPos, "x"), Seq((Expressions.PART.VALID(AnyPos, "Int"), None)))
-          ),
-          Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
+            (Expressions.PART.VALID(AnyPos, "x"), Single(Expressions.PART.VALID(AnyPos, "Int"), None)),
+            (Expressions.PART.VALID(AnyPos, "x"), Single(Expressions.PART.VALID(AnyPos, "Int"), None))
+          )
         ),
         CONST_LONG(AnyPos, 1)
       )

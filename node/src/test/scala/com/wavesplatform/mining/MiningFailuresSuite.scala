@@ -20,9 +20,9 @@ import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.Scheduler.Implicits.global
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.{FlatSpec, Matchers, PrivateMethodTester}
+import org.scalatest.{FlatSpec, Matchers}
 
-class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTester with PathMockFactory with WithDB with TransactionGen {
+class MiningFailuresSuite extends FlatSpec with Matchers with PathMockFactory with WithDB with TransactionGen {
   trait BlockchainUpdaterNG extends Blockchain with BlockchainUpdater with NG
 
   behavior of "Miner"
@@ -53,8 +53,8 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
       val scheduler   = Scheduler.singleThread("appender")
       val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
       val wallet      = Wallet(WalletSettings(None, Some("123"), None))
-      val utxPool     = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, wavesSettings.utxSettings, enablePriorityPool = true)
-      val pos         = new PoSSelector(blockchainUpdater, blockchainSettings, wavesSettings.synchronizationSettings)
+      val utxPool     = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, wavesSettings.utxSettings)
+      val pos         = PoSSelector(blockchainUpdater, wavesSettings.synchronizationSettings)
       new MinerImpl(
         allChannels,
         blockchainUpdater,
@@ -72,11 +72,11 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
     (blockchainUpdater.isLastBlockId _).when(genesis.id()).returning(true)
     (blockchainUpdater.heightOf _).when(genesis.id()).returning(Some(1)).anyNumberOfTimes()
     (blockchainUpdater.heightOf _).when(genesis.header.reference).returning(Some(1)).anyNumberOfTimes()
-    (blockchainUpdater.height _).when().returning(1)
-    (blockchainUpdater.settings _).when().returning(blockchainSettings)
+    (() => blockchainUpdater.height).when().returning(1)
+    (() => blockchainUpdater.settings).when().returning(blockchainSettings)
     (blockchainUpdater.blockHeader _).when(*).returns(Some(SignedBlockHeader(genesis.header, genesis.signature)))
-    (blockchainUpdater.activatedFeatures _).when().returning(Map.empty)
-    (blockchainUpdater.approvedFeatures _).when().returning(Map.empty)
+    (() => blockchainUpdater.activatedFeatures).when().returning(Map.empty)
+    (() => blockchainUpdater.approvedFeatures).when().returning(Map.empty)
     (blockchainUpdater.continuationStates _).when().returning(Map.empty)
     (blockchainUpdater.hitSource _).when(*).returns(Some(ByteStr(new Array[Byte](32))))
     (blockchainUpdater.bestLastBlockInfo _)
@@ -98,7 +98,7 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
       .when(*, *, *)
       .onCall { (block, _, _) =>
         minedBlock = block
-        Right(None)
+        Right(Nil)
       }
       .once()
     (blockchainUpdater.balanceSnapshots _).when(*, *, *).returning(Seq(BalanceSnapshot(1, ENOUGH_AMT, 0, 0)))
@@ -110,5 +110,5 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
   }
 
   private[this] def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] =
-    miner.invokePrivate(PrivateMethod[Task[Unit]]('generateBlockTask)(account))
+    miner.generateBlockTask(account, None)
 }

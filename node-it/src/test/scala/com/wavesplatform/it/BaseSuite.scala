@@ -7,7 +7,7 @@ import com.wavesplatform.it.transactions.NodesFromDocker
 import monix.eval.Coeval
 import org.scalatest._
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.ExecutionContext
 
 class BaseSuite
@@ -41,6 +41,7 @@ class BaseSuite
           .parseFile(new File(filePath))
           .getConfigList("nodes")
           .asScala
+          .toSeq
           .map(cfg => new ExternalNode(cfg.withFallback(defaultConfig).resolve()))
     }
   }
@@ -48,7 +49,7 @@ class BaseSuite
   override protected def nodes: Seq[Node] = theNodes()
 
   protected override def beforeAll(): Unit = {
-    theNodes.run
+    theNodes.run()
     super.beforeAll()
   }
 }

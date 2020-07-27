@@ -32,18 +32,18 @@ package object compiler {
                    ("p1", TYPEPARAM('T')),
                    ("p2", TYPEPARAM('T'))) { case l => Right(l.head) }
 
-  private val arr = ARR(IndexedSeq[EVALUATED](Common.pointAInstance, Common.pointAInstance), false).explicitGet
+  private val arr = ARR(IndexedSeq[EVALUATED](Common.pointAInstance, Common.pointAInstance), false).explicitGet()
 
   def getTestContext(v: StdLibVersion): CTX[NoContext] = {
     Monoid
       .combine(
-        PureContext.build(Global, v),
+        PureContext.build(v),
         CTX[NoContext](
           Seq(pointType, Common.pointTypeA, Common.pointTypeB, Common.pointTypeC),
           Map(
             ("p", (Common.AorB, null)),
             ("tv", (Common.AorBorC, null)),
-            ("l", (LIST(LONG), ContextfulVal.pure[NoContext](ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L)), false).explicitGet))),
+            ("l", (LIST(LONG), ContextfulVal.pure[NoContext](ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L)), false).explicitGet()))),
             ("lpa", (LIST(Common.pointTypeA), ContextfulVal.pure[NoContext](arr))),
             ("lpabc", (LIST(Common.AorBorC), ContextfulVal.pure[NoContext](arr)))
           ),
@@ -53,5 +53,5 @@ package object compiler {
   }
 
   val compilerContext = getTestContext(V3).compilerContext
-
+  val compilerContextV4 = getTestContext(V4).compilerContext
 }

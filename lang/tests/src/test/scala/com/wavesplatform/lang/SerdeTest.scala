@@ -1,12 +1,14 @@
 package com.wavesplatform.lang
 
+import java.nio.charset.StandardCharsets
+
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.Expressions
@@ -142,11 +144,31 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
     measureBase64Deser("AgQAAAABYgEAAAAEAAAAAAkAAAAAAAACCQAB9wAAAAEFAAAAAWIJAAH3AP8AAQUAAAABYpURGZc=")
   }
 
+  "too big string" in {
+    val maxString = "a" * Terms.DataEntryValueMax
+    val expr1     = Serde.serialize(CONST_STRING(maxString, reduceLimit = false).explicitGet())
+    Serde.deserialize(expr1).map(_._1) shouldBe CONST_STRING(maxString)
+
+    val tooBigString = maxString + "a"
+    val expr2        = Serde.serialize(CONST_STRING(tooBigString, reduceLimit = false).explicitGet())
+    Serde.deserialize(expr2) should produce("String size=32768 exceeds 32767 bytes")
+  }
+
+  "too big bytes" in {
+    val maxBytes = ("a" * Terms.DataEntryValueMax).getBytes(StandardCharsets.UTF_8)
+    val expr1    = Serde.serialize(CONST_BYTESTR(ByteStr(maxBytes)).explicitGet())
+    Serde.deserialize(expr1).map(_._1) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
+
+    val tooBigBytes = maxBytes :+ (1: Byte)
+    val expr2       = Serde.serialize(CONST_BYTESTR(ByteStr(tooBigBytes), limit = CONST_BYTESTR.DataTxSize).explicitGet())
+    Serde.deserialize(expr2) should produce("ByteStr size=32768 exceeds 32767 bytes")
+  }
+
   "forbid CaseObj" in {
-    Try(Serde.serialize(caseObj)).toEither shouldBe 'left
+    Try(Serde.serialize(caseObj)).toEither shouldBe Symbol("left")
 
     val objectBytes = Serde.serialize(caseObj, allowObjects = true)
-    Serde.deserialize(objectBytes) shouldBe 'left
+    Serde.deserialize(objectBytes) shouldBe Symbol("left")
   }
 
   def measureTime[A](f: => A): (A, Long) = {
@@ -156,7 +178,7 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
   }
 
   private def roundTripTest(untypedExpr: Expressions.EXPR): Assertion = {
-    val typedExpr = ExpressionCompiler(PureContext.build(Global, V1).compilerContext, untypedExpr).map(_._1).explicitGet()
+    val typedExpr = ExpressionCompiler(PureContext.build(V1).compilerContext, untypedExpr).map(_._1).explicitGet()
     roundTripTest(typedExpr)
   }
 

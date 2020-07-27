@@ -1,9 +1,9 @@
 package com.wavesplatform
 
-import kamon.metric.Metric
+import kamon.metric.Timer
 
 package object metrics {
-  final implicit class TimerExt(private val timer: Metric.Timer) extends AnyVal {
+  final implicit class TimerExt(private val timer: Timer) extends AnyVal {
     def measure[T](f: => T): T =
       measureWithFilter(f)(_ => true)
 
@@ -14,7 +14,7 @@ package object metrics {
       measureWithFilter(f)(_.isDefined)
 
     private[this] def measureWithFilter[T](f: => T)(filter: T => Boolean): T = {
-      val startedTimer = timer.withoutTags().start()
+      val startedTimer = timer.start()
       val result       = f
       if (filter(result)) startedTimer.stop()
       result

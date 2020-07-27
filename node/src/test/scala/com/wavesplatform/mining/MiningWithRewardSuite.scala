@@ -27,12 +27,12 @@ import monix.execution.Scheduler
 import org.iq80.leveldb.DB
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.compatible.Assertion
-import org.scalatest.{AsyncFlatSpec, Matchers, PrivateMethodTester}
+import org.scalatest.{AsyncFlatSpec, Matchers}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with TransactionGen with PrivateMethodTester with DBCacheSettings {
+class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with TransactionGen with DBCacheSettings {
   import MiningWithRewardSuite._
 
   behavior of "Miner with activated reward feature"
@@ -75,10 +75,10 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
         val recipient1 = createAccount.toAddress
         val recipient2 = createAccount.toAddress
         val tx1 = TransferTransaction
-          .selfSigned(2.toByte, account, recipient1, Waves, 10 * Constants.UnitsInWave, Waves, 400000, None, ts)
+          .selfSigned(2.toByte, account, recipient1, Waves, 10 * Constants.UnitsInWave, Waves, 400000, ByteStr.empty, ts)
           .explicitGet()
         val tx2 = TransferTransaction
-          .selfSigned(2.toByte, account, recipient2, Waves, 5 * Constants.UnitsInWave, Waves, 400000, None, ts)
+          .selfSigned(2.toByte, account, recipient2, Waves, 5 * Constants.UnitsInWave, Waves, 400000, ByteStr.empty, ts)
           .explicitGet()
         TestBlock.create(time = ts, ref = reference, txs = Seq(tx1, tx2), version = Block.NgBlockVersion)
       }
@@ -88,7 +88,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
       (ts, account) => {
         val recipient1 = createAccount.toAddress
         TransferTransaction
-          .selfSigned(2.toByte, account, recipient1, Waves, 10 * Constants.UnitsInWave, Waves, 400000, None, ts)
+          .selfSigned(2.toByte, account, recipient1, Waves, 10 * Constants.UnitsInWave, Waves, 400000, ByteStr.empty, ts)
           .explicitGet()
       }
     )
@@ -108,7 +108,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
     // Test for empty key block with NG
     withEnv(bps, txs, settingsWithFeatures(BlockchainFeatures.NG, BlockchainFeatures.SmartAccounts)) {
       case Env(_, account, miner, _) =>
-        val (_, block, _) = forgeBlock(miner)(account).explicitGet()
+        val (block, _) = forgeBlock(miner)(account).explicitGet()
         Task(block.transactionData shouldBe empty)
     }
   }
@@ -120,8 +120,8 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
       case (blockchainUpdater, _) =>
         for {
           _ <- Task.unit
-          pos          = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
-          utxPool      = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, settings.utxSettings, enablePriorityPool = true)
+          pos          = PoSSelector(blockchainUpdater, settings.synchronizationSettings)
+          utxPool      = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, settings.utxSettings)
           scheduler    = Scheduler.singleThread("appender")
           allChannels  = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
           wallet       = Wallet(WalletSettings(None, Some("123"), None))
@@ -144,11 +144,9 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
         } yield r
     }
 
-  private def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] =
-    miner.invokePrivate(PrivateMethod[Task[Unit]]('generateBlockTask)(account))
+  private def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] = miner.generateBlockTask(account, None)
 
-  private def forgeBlock(miner: MinerImpl)(account: KeyPair): Either[String, (MiningConstraints, Block, MiningConstraint)] =
-    miner.invokePrivate(PrivateMethod[Either[String, (MiningConstraints, Block, MiningConstraint)]]('forgeBlock)(account))
+  private def forgeBlock(miner: MinerImpl)(account: KeyPair): Either[String, (Block, MiningConstraint)] = miner.forgeBlock(account)
 
   private def resources(settings: WavesSettings): Resource[Task, (BlockchainUpdaterImpl, DB)] =
     Resource.make {

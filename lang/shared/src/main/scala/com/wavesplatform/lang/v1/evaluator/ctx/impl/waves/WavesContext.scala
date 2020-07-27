@@ -5,7 +5,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.CTX
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Functions._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Functions.{addressFromStringF, _}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Vals._
 import com.wavesplatform.lang.v1.traits._
@@ -21,11 +21,19 @@ object WavesContext {
       getBooleanFromStateF,
       getBinaryFromStateF,
       getStringFromStateF,
-      addressFromPublicKeyF,
-      addressFromStringF,
       addressFromRecipientF,
+      )
+
+  private val balanceV123Functions =
+    Array(
       assetBalanceF,
       wavesBalanceF
+    )
+
+  private val balanceV4Functions =
+    Array(
+      assetBalanceV4F,
+      wavesBalanceV4F
     )
 
   private val invariableCtx =
@@ -70,7 +78,9 @@ object WavesContext {
   private def fromV4Funcs(proofsEnabled: Boolean, version: StdLibVersion) =
     fromV3Funcs(proofsEnabled, version) ++ Array(
       calculateAssetIdF,
-      transactionFromProtoBytesF(proofsEnabled, version)
+      transactionFromProtoBytesF(proofsEnabled, version),
+      simplifiedIssueActionConstructor,
+      detailedIssueActionConstructor
     )
 
   private def variableFuncs(version: StdLibVersion, c: ContentType, proofsEnabled: Boolean) = {
@@ -84,13 +94,15 @@ object WavesContext {
         getBooleanByIndexF(version),
         getBinaryByIndexF(version),
         getStringByIndexF(version),
+        addressFromPublicKeyF(version),
+        if (version >= V4) addressFromStringV4 else addressFromStringF(version),
       )
 
     val versionSpecificFuncs =
       version match {
-        case V1 | V2 => Array(txByIdF(proofsEnabled, version))
-        case V3      => fromV3Funcs(proofsEnabled, version)
-        case V4      => fromV4Funcs(proofsEnabled, version)
+        case V1 | V2 => Array(txByIdF(proofsEnabled, version)) ++ balanceV123Functions
+        case V3      => fromV3Funcs(proofsEnabled, version) ++ balanceV123Functions
+        case V4      => fromV4Funcs(proofsEnabled, version) ++ balanceV4Functions
      }
     commonFuncs ++ versionSpecificFuncs
   }

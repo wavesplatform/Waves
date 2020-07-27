@@ -13,6 +13,15 @@ import scala.scalajs.js.JSConverters._
 
 package object JsApiUtils {
 
+  def serPart[T](f: T => js.Any)(part: PART[T]): js.Object = {
+    val partValue = Expressions.PART.toOption(part).fold(null:Any)(f)
+    jObj.applyDynamic("apply")(
+      "value"    -> partValue,
+      "posStart" -> part.position.start,
+      "posEnd"   -> part.position.end
+    )
+  }
+
   def serPartStr(part: PART[String]): js.Object = {
     val partValue = Expressions.PART.toOption(part).getOrElse("").toString
     jObj.applyDynamic("apply")(
@@ -162,7 +171,7 @@ package object JsApiUtils {
       "posStart"   -> c.position.start,
       "posEnd"     -> c.position.end,
       "varName"    -> c.newVarName.map(serPartStr).orUndefined,
-      "varTypes"   -> c.types.map(serPartStr).toJSArray,
+      "varTypes"   -> serType(c.caseType),
       "resultType" -> c.resultType.getOrElse(NOTHING).toString,
       "expr"       -> serExpr(c.expr),
       "ctx"        -> serCtx(simpleCtx)
@@ -197,19 +206,31 @@ package object JsApiUtils {
     }.toJSArray
   }
 
-  def serDec(dec: Expressions.Declaration): js.Object = {
+  def serType(t: Type): js.Object =
+    t match {
+      case Expressions.Single(name, parameter) =>
+        jObj.applyDynamic("apply")(
+          "typeName"  -> serPartStr(name),
+          "typeParam" -> parameter.map(serPart(serType)).orUndefined
+        )
+      case Expressions.Union(types) =>
+        jObj.applyDynamic("apply")(
+          "isUnion"  -> "true",
+          "typeList" -> types.map(serType).toJSArray
+        )
+      case Expressions.Tuple(types) =>
+        jObj.applyDynamic("apply")(
+          "isTuple"  -> "true",
+          "typeList" -> types.map(serType).toJSArray
+        )
+    }
 
-    def serFuncArg(argName: PART[String], argTypeList: Seq[Type]): js.Object = {
+  def serDec(dec: Expressions.Declaration): js.Object = {
+    def serFuncArg(argName: PART[String], argType: Type): js.Object =
       jObj.applyDynamic("apply")(
         "argName" -> serPartStr(argName),
-        "typeList" -> argTypeList.map { t =>
-          jObj.applyDynamic("apply")(
-            "typeName"  -> serPartStr(t._1),
-            "typeParam" -> t._2.map(serPartStr).orUndefined
-          )
-        }.toJSArray
+        "type"    -> serType(argType)
       )
-    }
 
     dec match {
       case Expressions.LET(p, name, expr, _, _) =>
@@ -220,7 +241,7 @@ package object JsApiUtils {
           "name"     -> serPartStr(name),
           "expr"     -> serExpr(expr)
         )
-      case Expressions.FUNC(p, name, args, expr) =>
+      case Expressions.FUNC(p, expr, name, args) =>
         jObj.applyDynamic("apply")(
           "type"     -> "FUNC",
           "posStart" -> p.start,

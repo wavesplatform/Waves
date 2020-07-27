@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats._
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.{BlockchainFeatures, EstimatorProvider}
@@ -20,7 +21,7 @@ import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.{BlocksTransactionsHelpers, NoShrink, TransactionGen}
-import fastparse.core.Parsed
+import fastparse.Parsed
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -203,8 +204,7 @@ class AssetTransactionsDiffTest
       issue       <- createLegacyIssue(issuer, assetName, description, quantity, decimals, reissuable = true, fee, timestamp)
       assetId = IssuedAsset(issue.assetId)
       attachment <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
-      transfer = TransferTransaction
-        .selfSigned(1.toByte, issuer, holder.toAddress, assetId, quantity - 1, Waves, fee, Some(Attachment.Bin(attachment)), timestamp)
+      transfer = TransferTransaction.selfSigned(1.toByte, issuer, holder.toAddress, assetId, quantity - 1, Waves, fee, ByteStr(attachment), timestamp)
         .explicitGet()
       reissue = ReissueTransaction
         .selfSigned(1.toByte, issuer, assetId, (Long.MaxValue - quantity) + 1, reissuable = true, 1, timestamp)
@@ -267,7 +267,7 @@ class AssetTransactionsDiffTest
       ).signWith(accountA.privateKey)
       assetId = IssuedAsset(issue.id())
       transfer = TransferTransaction
-        .selfSigned(TxVersion.V1, accountA, accountB.toAddress, assetId, issue.quantity, Waves, smallFee, None, timestamp + 2)
+        .selfSigned(TxVersion.V1, accountA, accountB.toAddress, assetId, issue.quantity, Waves, smallFee, ByteStr.empty,  timestamp + 2)
         .explicitGet()
       reissue        = ReissueTransaction.selfSigned(TxVersion.V1, accountA, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
       illegalReissue = ReissueTransaction.selfSigned(TxVersion.V1, accountB, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
@@ -294,15 +294,18 @@ class AssetTransactionsDiffTest
                 Height @@ 2,
                 issue.script.map(
                   s =>
-                    s -> Script
-                      .estimate(s, EstimatorProvider.EstimatorBlockchainExt(newState).estimator, useContractVerifierLimit = false)
-                      .explicitGet()
+                    AssetScriptInfo(
+                      s,
+                      Script
+                        .estimate(s, EstimatorProvider.EstimatorBlockchainExt(newState).estimator, useContractVerifierLimit = false)
+                        .explicitGet()
+                    )
                 ),
                 0L,
                 issue.decimals == 0 && issue.quantity == 1 && !issue.reissuable
               )
             )
-            blockDiff.transactions.get(issue.id()).isDefined shouldBe true
+            blockDiff.transactions.contains(issue.id()) shouldBe true
             newState.transactionInfo(issue.id()).isDefined shouldBe true
             newState.transactionInfo(issue.id()).isDefined shouldEqual true
         }
@@ -370,7 +373,7 @@ class AssetTransactionsDiffTest
 
         assertDiffEi(TestBlock.create(gen :+ issue) +: blocks, TestBlock.create(Seq(update), Block.ProtoBlockVersion), assetInfoUpdateEnabled) { ei =>
           ei should produce(
-            s"Can't update info of asset with id=${issue.id.value} " +
+            s"Can't update info of asset with id=${issue.id()} " +
               s"before ${assetInfoUpdateEnabled.minAssetInfoUpdateInterval + 1} block, " +
               s"current height=${blocks.size + 2}, minUpdateInfoInterval=${assetInfoUpdateEnabled.minAssetInfoUpdateInterval}"
           )
@@ -387,16 +390,14 @@ class AssetTransactionsDiffTest
           )
 
         assertDiffEi(blocks, TestBlock.create(Seq(update), Block.ProtoBlockVersion), assetInfoUpdateEnabled) { ei =>
-          ei shouldBe 'right
-
           val info = ei
             .explicitGet()
             .updatedAssets(update.assetId)
             .left
             .get
 
-          info.name.toStringUtf8 shouldEqual (update.name)
-          info.description.toStringUtf8 shouldEqual (update.description)
+          info.name.toStringUtf8 shouldEqual update.name
+          info.description.toStringUtf8 shouldEqual update.description
         }
     }
   }
@@ -434,7 +435,7 @@ class AssetTransactionsDiffTest
             desc1.lastUpdatedAt shouldBe blockchain.height
           }
 
-          val (keyBlock1, Nil) =
+          val (keyBlock1, _) =
             UnsafeBlocks.unsafeChainBaseAndMicro(microBlockId, Nil, Nil, signer, Block.ProtoBlockVersion, keyBlock.header.timestamp + 100)
           d.appendBlock(keyBlock1)
 
@@ -484,7 +485,7 @@ class AssetTransactionsDiffTest
     forAll(genesisIssueTransferReissue(exprV4WithComplexityBetween3000And4000, V4)) {
       case (gen, issue, _, _, _) =>
         assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue)), rideV4Activated) {
-          case (blockDiff, newState) =>
+          case (blockDiff, _) =>
             val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
             totalPortfolioDiff.assets(IssuedAsset(issue.id())) shouldEqual issue.quantity
         }
@@ -530,12 +531,12 @@ class AssetTransactionsDiffTest
 
   private val genesisIssueUpdateWithSecondAsset = for {
     (gen, issue, _) <- genesisIssueUpdate
-    accountС        <- accountGen
-    genesisTx3 = GenesisTransaction.create(accountС.toAddress, Long.MaxValue / 100, gen.head.timestamp).explicitGet()
+    accountC        <- accountGen
+    genesisTx3 = GenesisTransaction.create(accountC.toAddress, Long.MaxValue / 100, gen.head.timestamp).explicitGet()
     issue1 = IssueTransaction
       .selfSigned(
         TxVersion.V2,
-        accountС,
+        accountC,
         issue.name.toStringUtf8,
         issue.description.toStringUtf8,
         issue.quantity,
@@ -549,7 +550,7 @@ class AssetTransactionsDiffTest
     update1 = UpdateAssetInfoTransaction
       .selfSigned(
         TxVersion.V1,
-        accountС,
+        accountC,
         issue1.assetId,
         "Invalid",
         "Invalid",
@@ -558,5 +559,5 @@ class AssetTransactionsDiffTest
         Waves
       )
       .explicitGet()
-  } yield (gen :+ genesisTx3, Seq(issue, issue1), accountС, update1)
+  } yield (gen :+ genesisTx3, Seq(issue, issue1), accountC, update1)
 }

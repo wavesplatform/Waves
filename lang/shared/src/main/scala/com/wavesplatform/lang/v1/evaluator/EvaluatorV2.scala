@@ -3,6 +3,7 @@ package com.wavesplatform.lang.v1.evaluator
 import cats.Id
 import cats.implicits._
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -12,6 +13,8 @@ import com.wavesplatform.lang.v1.traits.Environment
 import monix.eval.Coeval
 
 import scala.annotation.tailrec
+import scala.collection.mutable.ListBuffer
+import scala.util.Try
 
 class EvaluatorV2(
     val ctx: LoggedEvaluationContext[Environment, Id],
@@ -20,7 +23,7 @@ class EvaluatorV2(
 
   def apply(expr: EXPR, limit: Int): (EXPR, Int) = {
     var ref    = expr.deepCopy.value
-    val unused = root(ref, v => Coeval.delay { ref = v }, limit, Nil).value
+    val unused = root(ref, v => Coeval.delay { ref = v }, limit, Nil).value()
     (ref, unused)
   }
 
@@ -106,7 +109,7 @@ class EvaluatorV2(
       case fc: FUNCTION_CALL =>
         val evaluatedArgs =
           Coeval.defer {
-            fc.args.indices.toStream
+            fc.args.indices.to(LazyList)
               .foldM(limit) {
                 case (unused, argIndex) =>
                   if (unused < 0) throw new Error("Unused < 0")
@@ -122,21 +125,23 @@ class EvaluatorV2(
               }
           }
         evaluatedArgs
-          .flatMap { unusedArgsCoeval =>
+          .flatMap { unusedArgsComplexity =>
             if (fc.args.forall(_.isInstanceOf[EVALUATED])) {
               fc.function match {
                 case FunctionHeader.Native(_) =>
-                  val NativeFunction(_, costByVersion, _, ev, _) = ctx.ec.functions(fc.function).asInstanceOf[NativeFunction[Environment]]
-                  val cost                                       = costByVersion(stdLibVersion).toInt
-                  if (unusedArgsCoeval < cost) {
-                    Coeval.now(unusedArgsCoeval)
-                  } else {
+                  val NativeFunction(_, costByVersion, _, ev, _) =
+                    ctx.ec.functions
+                      .getOrElse(fc.function, throw new RuntimeException(s"function '${fc.function}' not found"))
+                      .asInstanceOf[NativeFunction[Environment]]
+                  val cost = costByVersion(stdLibVersion).toInt
+                  if (unusedArgsComplexity < cost)
+                    Coeval.now(unusedArgsComplexity)
+                  else
                     update(ev[Id]((ctx.ec.environment, fc.args.asInstanceOf[List[EVALUATED]])).explicitGet())
-                      .map(_ => unusedArgsCoeval - cost)
+                      .map(_ => unusedArgsComplexity - cost)
 
-                  }
                 case FunctionHeader.User(_, name) =>
-                  if (unusedArgsCoeval > 0)
+                  if (unusedArgsComplexity > 0)
                     ctx.ec.functions
                       .get(fc.function)
                       .map(_.asInstanceOf[UserFunction[Environment]])
@@ -149,17 +154,23 @@ class EvaluatorV2(
                               case ((argName, argValue), argsWithExpr) =>
                                 BLOCK(LET(argName, argValue), argsWithExpr)
                             }
-                        update(argsWithExpr).flatMap(_ => root(argsWithExpr, update, unusedArgsCoeval, parentBlocks))
+                        update(argsWithExpr).flatMap(_ => root(argsWithExpr, update, unusedArgsComplexity, parentBlocks))
                       }
                       .getOrElse {
-                        val objectType = ctx.ec.typeDefs(name).asInstanceOf[CASETYPEREF] // todo handle absence
-                        val fields     = objectType.fields.map(_._1) zip fc.args.asInstanceOf[List[EVALUATED]]
-                        root(CaseObj(objectType, fields.toMap), update, unusedArgsCoeval, parentBlocks)
+                        val caseType =
+                          ctx.ec.typeDefs.get(name) match {
+                            case Some(caseType: CASETYPEREF) => Coeval.now(caseType)
+                            case _                           => Coeval.raiseError(new NoSuchElementException(s"Function or type '$name' not found"))
+                          }
+                        caseType.flatMap { objectType =>
+                          val fields = objectType.fields.map(_._1) zip fc.args.asInstanceOf[List[EVALUATED]]
+                          root(CaseObj(objectType, fields.toMap), update, unusedArgsComplexity, parentBlocks)
+                        }
                       } else
-                    Coeval.now(unusedArgsCoeval)
+                    Coeval.now(unusedArgsComplexity)
               }
             } else {
-              Coeval.now(unusedArgsCoeval)
+              Coeval.now(unusedArgsComplexity)
             }
           }
       case evaluated: EVALUATED =>
@@ -214,7 +225,8 @@ class EvaluatorV2(
           }
       }
       .onErrorHandle { e =>
-        if (!wasLogged) ctx.l(let.name)(Left(e.getMessage))
+        val error = if (e.getMessage != null) e.getMessage else e.toString
+        if (!wasLogged) ctx.l(let.name)(Left(error))
         throw e
       }
   }
@@ -235,4 +247,38 @@ class EvaluatorV2(
       case _ :: xs                               => findUserFunction(name, xs)
       case Nil                                   => None
     }
+}
+
+object EvaluatorV2 {
+  def applyLimited(
+      expr: EXPR,
+      limit: Int,
+      ctx: EvaluationContext[Environment, Id],
+      stdLibVersion: StdLibVersion
+  ): Either[(ExecutionError, Log[Id]), (EXPR, Int, Log[Id])] = {
+    val log       = ListBuffer[LogItem[Id]]()
+    val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => log.append((name, value)), ctx)
+    val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion)
+    Try(evaluator(expr, limit))
+      .toEither
+      .bimap(
+        err => (err.getMessage, log.toList),
+        { case (expr, unused) => (expr, unused, log.toList) }
+      )
+  }
+
+  def applyCompleted(
+      ctx: EvaluationContext[Environment, Id],
+      expr: EXPR,
+      stdLibVersion: StdLibVersion
+  ): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] =
+    EvaluatorV2
+      .applyLimited(expr, Int.MaxValue, ctx, stdLibVersion)
+      .flatMap {
+        case (expr, _, log) =>
+          expr match {
+            case evaluated: EVALUATED => Right((evaluated, log))
+            case expr: EXPR           => Left((s"Unexpected incomplete evaluation result $expr", log))
+          }
+      }
 }

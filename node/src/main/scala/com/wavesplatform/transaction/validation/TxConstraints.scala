@@ -5,10 +5,11 @@ import cats.data.Validated.{Invalid, Valid}
 import cats.syntax.validated._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, TxValidationError, TxVersion, VersionedTransaction}
 
 import scala.util.Try
@@ -87,14 +88,9 @@ object TxConstraints {
       )
 
   // Transaction specific
-  def transferAttachment(allowTyped: Boolean, attachment: Option[Attachment]): ValidatedV[Option[Attachment]] = {
-    import Attachment.AttachmentExt
+  def transferAttachment(attachment: ByteStr): ValidatedV[ByteStr] = {
     this.seq(attachment)(
-      cond(attachment.toBytes.length <= TransferTransaction.MaxAttachmentSize, TxValidationError.TooBigArray),
-      cond(attachment match {
-        case Some(Attachment.Bin(_)) | None => true
-        case _                              => allowTyped
-      }, GenericError("Typed attachment not allowed"))
+      cond(attachment.size <= TransferTransaction.MaxAttachmentSize, TxValidationError.TooBigArray)
     )
   }
 

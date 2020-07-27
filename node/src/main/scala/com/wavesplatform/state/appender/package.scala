@@ -1,14 +1,11 @@
 package com.wavesplatform.state
 
-import cats.implicits._
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
-import com.wavesplatform.mining._
 import com.wavesplatform.network._
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import com.wavesplatform.transaction._
@@ -33,7 +30,6 @@ package object appender extends ScorexLogging {
   private[appender] def processAndBlacklistOnFailure[A, B](
       ch: Channel,
       peerDatabase: PeerDatabase,
-      miner: Miner,
       start: => String,
       success: => String,
       errorPrefix: String
@@ -42,7 +38,6 @@ package object appender extends ScorexLogging {
     f map {
       case Right(maybeNewScore) =>
         log.debug(success)
-        maybeNewScore.foreach(_ => miner.scheduleMining())
         Right(maybeNewScore)
       case Left(ve) =>
         log.warn(s"$errorPrefix: $ve")
@@ -93,12 +88,10 @@ package object appender extends ScorexLogging {
       block: Block,
       hitSource: ByteStr
   ): Either[ValidationError, Option[Int]] =
-    metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify)).map { maybeDiscardedTxs =>
+    metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify)).map { discDiffs =>
       metrics.utxRemoveAll.measure(utxStorage.removeAll(block.transactionData))
-      maybeDiscardedTxs.map { discarded =>
-        metrics.utxDiscardedPut.measure(utxStorage.addAndCleanup(discarded))
-        blockchainUpdater.height
-      }
+      metrics.utxDiscardedPut.measure(utxStorage.addAndCleanupPriority(discDiffs))
+      Some(blockchainUpdater.height)
     }
 
   private def blockConsensusValidation(blockchain: Blockchain, pos: PoSSelector, currentTs: Long, block: Block)(
@@ -147,10 +140,10 @@ package object appender extends ScorexLogging {
   }
 
   private[this] object metrics {
-    val blockConsensusValidation = Kamon.timer("block-appender.block-consensus-validation")
-    val appendBlock              = Kamon.timer("block-appender.blockchain-append-block")
-    val utxRemoveAll             = Kamon.timer("block-appender.utx-remove-all")
-    val utxDiscardedPut          = Kamon.timer("block-appender.utx-discarded-put")
+    val blockConsensusValidation = Kamon.timer("block-appender.block-consensus-validation").withoutTags()
+    val appendBlock              = Kamon.timer("block-appender.blockchain-append-block").withoutTags()
+    val utxRemoveAll             = Kamon.timer("block-appender.utx-remove-all").withoutTags()
+    val utxDiscardedPut          = Kamon.timer("block-appender.utx-discarded-put").withoutTags()
   }
 
 }

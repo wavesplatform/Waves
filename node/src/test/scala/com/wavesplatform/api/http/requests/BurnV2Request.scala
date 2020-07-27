@@ -9,11 +9,11 @@ object BurnV2Request {
     import play.api.libs.functional.syntax._
     import play.api.libs.json._
 
-    ((JsPath \ 'sender).read[String] ~
-      (JsPath \ 'assetId).read[String] ~
-      ((JsPath \ 'quantity).read[Long] | (JsPath \ 'amount).read[Long]) ~
-      (JsPath \ 'fee).read[Long] ~
-      (JsPath \ 'timestamp).readNullable[Long])(BurnV2Request.apply _)
+    ((JsPath \ "sender").read[String] ~
+      (JsPath \ "assetId").read[String] ~
+      ((JsPath \ "quantity").read[Long] | (JsPath \ "amount").read[Long]) ~
+      (JsPath \ "fee").read[Long] ~
+      (JsPath \ "timestamp").readNullable[Long])(BurnV2Request.apply _)
   }
 
   implicit val burnV2Writes: Writes[BurnV2Request] =

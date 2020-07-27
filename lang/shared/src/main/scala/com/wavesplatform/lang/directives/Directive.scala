@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.directives
 
-import com.wavesplatform.lang.directives.values.DirectiveValue
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.DirectiveKey._
 
 case class Directive(key: DirectiveKey, value: DirectiveValue)
@@ -16,9 +16,9 @@ object Directive {
       })
       .asInstanceOf[key.Value]
 
-  def extractDirectives(directives: Iterable[Directive]): Either[String, DirectiveSet] =
+      def extractDirectives(directives: Iterable[Directive], defaultStdLib: => STDLIB_VERSION.Value = StdLibVersion.VersionDic.default): Either[String, DirectiveSet] =
     DirectiveSet(
-      extractValue(directives, STDLIB_VERSION),
+      directives.find(_.key == STDLIB_VERSION).fold(defaultStdLib)(_.value.asInstanceOf[STDLIB_VERSION.Value]),
       extractValue(directives, SCRIPT_TYPE),
       extractValue(directives, CONTENT_TYPE),
       extractValue(directives, IMPORT)

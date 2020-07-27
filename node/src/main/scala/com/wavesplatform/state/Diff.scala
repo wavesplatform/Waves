@@ -7,7 +7,6 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.state.diffs.FeeValidation
@@ -15,6 +14,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, Transaction}
 import play.api.libs.json._
 
+import scala.collection.mutable
 import scala.collection.mutable.LinkedHashMap
 
 case class LeaseBalance(in: Long, out: Long)
@@ -48,15 +48,15 @@ object VolumeAndFee {
 case class AssetInfo(name: ByteString, description: ByteString, lastUpdatedAt: Height)
 
 object AssetInfo {
-  implicit val sg: Semigroup[AssetInfo] = (x, y) => y
+  implicit val semigroup: Semigroup[AssetInfo] = (_, y) => y
 
   def apply(name: String, description: String, lastUpdatedAt: Height): AssetInfo =
     AssetInfo(ByteString.copyFromUtf8(name), ByteString.copyFromUtf8(description), lastUpdatedAt)
 }
 
 case class AssetStaticInfo(source: TransactionId, issuer: PublicKey, decimals: Int, nft: Boolean)
-case class AssetVolumeInfo(isReissuable: Boolean, volume: BigInt)
 
+case class AssetVolumeInfo(isReissuable: Boolean, volume: BigInt)
 object AssetVolumeInfo {
   implicit val assetInfoMonoid: Monoid[AssetVolumeInfo] = new Monoid[AssetVolumeInfo] {
     override def empty: AssetVolumeInfo = AssetVolumeInfo(isReissuable = true, 0)
@@ -64,6 +64,8 @@ object AssetVolumeInfo {
       AssetVolumeInfo(x.isReissuable && y.isReissuable, x.volume + y.volume)
   }
 }
+
+case class AssetScriptInfo(script: Script, complexity: Long)
 
 case class AssetDescription(
     source: ByteStr,
@@ -74,7 +76,7 @@ case class AssetDescription(
     reissuable: Boolean,
     totalVolume: BigInt,
     lastUpdatedAt: Height,
-    script: Option[(Script, Long)],
+    script: Option[AssetScriptInfo],
     sponsorship: Long,
     nft: Boolean
 )
@@ -138,6 +140,10 @@ object Sponsorship {
     }
 }
 
+case class NewTransactionInfo(transaction: Transaction, affected: Set[Address], applied: Boolean)
+
+case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: AssetVolumeInfo)
+
 sealed trait ContinuationState
 object ContinuationState {
   case class InProgress(expr: EXPR) extends ContinuationState
@@ -145,40 +151,44 @@ object ContinuationState {
 }
 
 case class Diff(
-    transactions: collection.Map[ByteStr, (Transaction, Set[Address], Boolean)],
+    transactions: collection.Map[ByteStr, NewTransactionInfo],
     portfolios: Map[Address, Portfolio],
-    issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)],
+    issuedAssets: Map[IssuedAsset, NewAssetInfo],
     updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
     aliases: Map[Alias, Address],
     orderFills: Map[ByteStr, VolumeAndFee],
     leaseState: Map[ByteStr, Boolean],
     scripts: Map[Address, Option[AccountScriptInfo]],
-    assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
+    assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
     accountData: Map[Address, AccountDataInfo],
     sponsorship: Map[IssuedAsset, Sponsorship],
     scriptsRun: Int,
     scriptsComplexity: Long,
     scriptResults: Map[ByteStr, InvokeScriptResult],
     continuationStates: Map[ByteStr, ContinuationState]
-)
+) {
+  def bindTransaction(tx: Transaction): Diff =
+    copy(transactions = transactions.concat(Map(Diff.toDiffTxData(tx, portfolios, accountData))))
+}
 
 object Diff {
   def stateOps(
       portfolios: Map[Address, Portfolio] = Map.empty,
-      issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)] = Map.empty,
+      issuedAssets: Map[IssuedAsset, NewAssetInfo] = Map.empty,
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map.empty,
       aliases: Map[Alias, Address] = Map.empty,
       orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
       leaseState: Map[ByteStr, Boolean] = Map.empty,
       scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,
-      assetScripts: Map[IssuedAsset, Option[(Script, Long)]] = Map.empty,
+      assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map.empty,
       accountData: Map[Address, AccountDataInfo] = Map.empty,
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
+      scriptsRun: Int = 0,
       continuationStates: Map[ByteStr, ContinuationState] = Map.empty
   ): Diff =
     Diff(
-      transactions = LinkedHashMap(),
+      transactions = mutable.LinkedHashMap(),
       portfolios = portfolios,
       issuedAssets = issuedAssets,
       updatedAssets = updatedAssets,
@@ -189,7 +199,7 @@ object Diff {
       assetScripts = assetScripts,
       accountData = accountData,
       sponsorship = sponsorship,
-      scriptsRun = 0,
+      scriptsRun = scriptsRun,
       scriptResults = scriptResults,
       scriptsComplexity = 0,
       continuationStates = continuationStates
@@ -198,13 +208,13 @@ object Diff {
   def apply(
       tx: Transaction,
       portfolios: Map[Address, Portfolio] = Map.empty,
-      issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)] = Map.empty,
+      issuedAssets: Map[IssuedAsset, NewAssetInfo] = Map.empty,
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map.empty,
       aliases: Map[Alias, Address] = Map.empty,
       orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
       leaseState: Map[ByteStr, Boolean] = Map.empty,
       scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,
-      assetScripts: Map[IssuedAsset, Option[(Script, Long)]] = Map.empty,
+      assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map.empty,
       accountData: Map[Address, AccountDataInfo] = Map.empty,
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptsRun: Int = 0,
@@ -214,7 +224,7 @@ object Diff {
   ): Diff =
     Diff(
       // should be changed to VectorMap after 2.13 https://github.com/scala/scala/pull/6854
-      transactions = LinkedHashMap((tx.id(), (tx, (portfolios.keys ++ accountData.keys).toSet, true))),
+      transactions = LinkedHashMap(toDiffTxData(tx, portfolios, accountData)),
       portfolios = portfolios,
       issuedAssets = issuedAssets,
       updatedAssets = updatedAssets,
@@ -230,6 +240,13 @@ object Diff {
       scriptsComplexity = scriptsComplexity,
       continuationStates = continuationStates
     )
+
+  private def toDiffTxData(
+      tx: Transaction,
+      portfolios: Map[Address, Portfolio],
+      accountData: Map[Address, AccountDataInfo]
+  ): (ByteStr, NewTransactionInfo) =
+    tx.id() -> NewTransactionInfo(tx, (portfolios.keys ++ accountData.keys).toSet, true)
 
   val empty =
     new Diff(
@@ -271,5 +288,13 @@ object Diff {
         scriptsComplexity = older.scriptsComplexity + newer.scriptsComplexity,
         continuationStates = older.continuationStates ++ newer.continuationStates
       )
+  }
+
+  implicit class DiffExt(private val d: Diff) extends AnyVal {
+    def errorMessage(txId: ByteStr): Option[InvokeScriptResult.ErrorMessage] =
+      d.scriptResults.get(txId).flatMap(_.error)
+
+    def hashString: String =
+      Integer.toHexString(d.hashCode())
   }
 }

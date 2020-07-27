@@ -268,14 +268,13 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
       sender.assertAssetBalance(acc, asset2Id, 15)
     }
 
-    // TODO NODE-1968
-    "NFT burning removes it from list" ignore {
+    "NFT burning removes it from list" in {
       val acc     = createDapp(script(nftAsset))
       val txIssue = issue(acc, CallableMethod, nftAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, nftAsset, method = CallableMethod)
-      // sender.nftList(acc, 2).map(_.assetId) shouldBe Seq(assetId)
+      sender.nftList(acc, 2).map(r => Base58.encode(r.assetId.toByteArray)) shouldBe Seq(assetId)
       burn(acc, CallableMethod, assetId, 1)
-      // sender.nftList(acc, 1) shouldBe empty
+      sender.nftList(acc, 1) shouldBe empty
     }
 
     "liquid block works" in {
@@ -290,7 +289,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
         }
         assertQuantity(asset)(simpleReissuableAsset.quantity)
         sender.assertAssetBalance(acc, asset, simpleReissuableAsset.quantity)
-        // sender.nftList(acc, 10) should have size 1
+        sender.nftList(acc, 10) should have size 1
       }
       checks()
       miner.waitForHeightArise()
@@ -554,14 +553,14 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
        |@Callable (i) func process11actions(a: ByteVector) = {
        |  [
        |    Issue($issueParams, 0),
-       |    Reissue(a, true, 1000),
+       |    Reissue(a, 1000, true),
        |    Issue($issueParams, 2),
        |    Issue($issueParams, 3),
-       |    Reissue(a, true, 2000),
-       |    Reissue(a, true, 2000),
-       |    Reissue(a, true, 3000),
+       |    Reissue(a, 2000, true),
+       |    Reissue(a, 2000, true),
+       |    Reissue(a, 3000, true),
        |    Burn(a, 6212),
-       |    Reissue(a, true, 2000),
+       |    Reissue(a, 2000, true),
        |    Issue($issueParams, 1),
        |    Burn(a, 12311)
        |  ]
@@ -571,9 +570,9 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
        |
        |@Callable (i) func burnAsset(a: ByteVector, q: Int) = [Burn(a, q)]
        |
-       |@Callable (i) func reissueAsset(a: ByteVector, r: Boolean, q: Int) = [Reissue(a, r, q)]
+       |@Callable (i) func reissueAsset(a: ByteVector, r: Boolean, q: Int) = [Reissue(a, q, r)]
        |
-       |@Callable (i) func reissueAndReissue(a: ByteVector, rq: Int) = [Reissue(a, false, rq), Reissue(a, false, rq)]
+       |@Callable (i) func reissueAndReissue(a: ByteVector, rq: Int) = [Reissue(a, rq, false), Reissue(a, rq, false)]
        |
        |@Callable(i)
        |func transferAndBurn(a: ByteVector, q: Int) = {
@@ -587,7 +586,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
        |func reissueIssueAndNft(a: ByteVector) = {
        |  [
        |    Issue($issueParams, ${asset.nonce + 1}),
-       |    Reissue(a, true, 100),
+       |    Reissue(a, 100, true),
        |    Burn(a, 100),
        |    Issue(${createIssueParams(nftAsset)}, 1)
        |  ]
@@ -602,7 +601,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
     method match {
       case CallableMethod =>
         val id = f
-        sender.stateChanges(id)._2.errorMessage.get.text should include(msg)
+        sender.stateChanges(id)._2.error.get.text should include(msg)
       case TransactionMethod =>
         assertGrpcError(f, msg)
     }

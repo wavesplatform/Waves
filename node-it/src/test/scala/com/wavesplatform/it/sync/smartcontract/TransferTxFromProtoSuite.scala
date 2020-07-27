@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -12,15 +11,17 @@ import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.Attachment.{Bin, Bool, Num, Str}
-import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 
 class TransferTxFromProtoSuite extends BaseTransactionSuite {
-  val source    = firstAddress
-  val recipient = secondAddress
-  val dApp      = thirdAddress
-  val scriptText =
-    """
+  private def source    = firstKeyPair
+  private def recipient = secondKeyPair
+  private def dApp      = thirdKeyPair
+
+  private lazy val dAppAddress: String = dApp.toAddress.toString
+
+  private val scriptText =
+    s"""
       |{-# STDLIB_VERSION 4 #-}
       |{-# CONTENT_TYPE DAPP #-}
       |{-# SCRIPT_TYPE ACCOUNT #-}
@@ -28,13 +29,7 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
       |@Callable(i)
       |func foo(txProtoBytes: ByteVector) = {
       |    let transferTx = transferTransactionFromProto(txProtoBytes).value()
-      |    let transferTxAttachment = match (transferTx.attachment) {
-      |        case b:ByteVector => b.toBase58String()
-      |        case integer:Int => integer.toString()
-      |        case bool:Boolean => bool.toString()
-      |        case s:String => s
-      |        case _ => throw("Empty description")
-      |      }
+      |    let transferTxAttachment = transferTx.attachment.toBase58String()
       |    let assetId = if (!transferTx.assetId.isDefined()) then {"WAVES"} else {transferTx.assetId.value().toBase58String()}
       |    let feeAssetId = if (!transferTx.feeAssetId.isDefined()) then {"WAVES"} else {transferTx.feeAssetId.value().toBase58String()}
       |[
@@ -53,20 +48,20 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
       |}
       |
       |""".stripMargin
-  val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()._1.bytes().base64
+  private val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()._1.bytes().base64
 
   test("TransferTransaction with Waves from proto bytes") {
     sender.setScript(dApp, Some(script), waitForTx = true)
     val transferTx = TransferTransaction
       .selfSigned(
         version = TxVersion.V3,
-        sender = pkByAddress(source),
-        recipient = AddressOrAlias.fromString(recipient).explicitGet(),
+        sender = source,
+        recipient = recipient.toAddress,
         asset = Waves,
         amount = transferAmount,
         feeAsset = Waves,
         fee = minFee,
-        attachment = Some(Attachment.Str("WAVES transfer")),
+        attachment = ByteStr("WAVES transfer".getBytes),
         timestamp = System.currentTimeMillis()
       )
       .explicitGet()
@@ -77,22 +72,22 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
 
     sender.invokeScript(
       source,
-      dApp,
+      dAppAddress,
       func = Some("foo"),
       args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxBytes)).explicitGet()),
       waitForTx = true
     )
 
-    sender.getDataByKey(dApp, "amount").value shouldBe transferTx.amount
-    sender.getDataByKey(dApp, "fee").value shouldBe transferTx.fee
-    sender.getDataByKey(dApp, "id").value shouldBe transferTx.id().toString
-    sender.getDataByKey(dApp, "assetId").value shouldBe "WAVES"
-    sender.getDataByKey(dApp, "feeAssetId").value shouldBe "WAVES"
-    sender.getDataByKey(dApp, "attachment").value shouldBe "WAVES transfer"
-    sender.getDataByKey(dApp, "senderPublicKey").value shouldBe transferTx.sender.toString
-    sender.getDataByKey(dApp, "sender").value shouldBe transferTx.sender.toAddress.toString
-    sender.getDataByKey(dApp, "recipient").value shouldBe transferTx.recipient.toString
-    sender.getDataByKey(dApp, "version").value shouldBe transferTx.version
+    sender.getDataByKey(dAppAddress, "amount").value shouldBe transferTx.amount
+    sender.getDataByKey(dAppAddress, "fee").value shouldBe transferTx.fee
+    sender.getDataByKey(dAppAddress, "id").value shouldBe transferTx.id().toString
+    sender.getDataByKey(dAppAddress, "assetId").value shouldBe "WAVES"
+    sender.getDataByKey(dAppAddress, "feeAssetId").value shouldBe "WAVES"
+    sender.getDataByKey(dAppAddress, "attachment").value shouldBe Base58.encode("WAVES transfer".getBytes)
+    sender.getDataByKey(dAppAddress, "senderPublicKey").value shouldBe transferTx.sender.toString
+    sender.getDataByKey(dAppAddress, "sender").value shouldBe transferTx.sender.toAddress.toString
+    sender.getDataByKey(dAppAddress, "recipient").value shouldBe transferTx.recipient.toString
+    sender.getDataByKey(dAppAddress, "version").value shouldBe transferTx.version
   }
 
   test("TransferTransaction with issued asset from proto bytes") {
@@ -102,13 +97,13 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
     val transferAssetTx = TransferTransaction
       .selfSigned(
         version = TxVersion.V3,
-        sender = pkByAddress(source),
-        recipient = AddressOrAlias.fromString(recipient).explicitGet(),
+        sender = source,
+        recipient = recipient.toAddress,
         asset = IssuedAsset(ByteStr.decodeBase58(assetId).get),
         amount = 10000,
         feeAsset = IssuedAsset(ByteStr.decodeBase58(assetId).get),
         fee = minFee,
-        attachment = Some(Attachment.Str("Some Attachment")),
+        attachment = ByteStr("Some Attachment".getBytes),
         timestamp = System.currentTimeMillis()
       )
       .explicitGet()
@@ -119,27 +114,27 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
 
     sender.invokeScript(
       source,
-      dApp,
+      dAppAddress,
       func = Some("foo"),
       args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxBytes)).explicitGet()),
       waitForTx = true
     )
 
-    sender.getDataByKey(dApp, "assetId").value shouldBe assetId
-    sender.getDataByKey(dApp, "feeAssetId").value shouldBe assetId
+    sender.getDataByKey(dAppAddress, "assetId").value shouldBe assetId
+    sender.getDataByKey(dAppAddress, "feeAssetId").value shouldBe assetId
   }
 
   test("check bodyBytes of transaction returned by transferTransactionFromProto") {
     val transferTx = TransferTransaction
       .selfSigned(
         version = TxVersion.V3,
-        sender = pkByAddress(source),
-        recipient = AddressOrAlias.fromString(recipient).explicitGet(),
+        sender = source,
+        recipient = recipient.toAddress,
         asset = Waves,
         amount = 10000,
         feeAsset = Waves,
         fee = minFee,
-        attachment = Some(Attachment.Str("Some Attachment")),
+        attachment = ByteStr("Some Attachment".getBytes),
         timestamp = System.currentTimeMillis()
       )
       .explicitGet()
@@ -150,95 +145,12 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
 
     sender.invokeScript(
       source,
-      dApp,
+      dAppAddress,
       func = Some("foo"),
       args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxBytes)).explicitGet()),
       waitForTx = true
     )
 
-    sender.getDataByKey(dApp, "bodyBytes").value.asInstanceOf[ByteStr] shouldBe ByteStr(transferTx.bodyBytes())
-  }
-
-  test("TransferTransaction with different typed attachments from proto bytes") {
-    def transferTx(attachment: Option[Attachment]): TransferTransaction =
-      TransferTransaction
-        .selfSigned(
-          version = TxVersion.V3,
-          sender = pkByAddress(source),
-          recipient = AddressOrAlias.fromString(recipient).explicitGet(),
-          asset = Waves,
-          amount = transferAmount,
-          feeAsset = Waves,
-          fee = minFee,
-          attachment = attachment,
-          timestamp = System.currentTimeMillis()
-        )
-        .explicitGet()
-    val transferTxWithStrAttachment  = transferTx(Some(Attachment.Str("Some String")))
-    val transferTxWithBinAttachment  = transferTx(Some(Attachment.Bin(Array[Byte](127.toByte, 0, 1, 1))))
-    val transferTxWithNumAttachment  = transferTx(Some(Attachment.Num(123)))
-    val transferTxWithBoolAttachment = transferTx(Some(Attachment.Bool(true)))
-    val transferTxWithNoneAttachment = transferTx(None)
-
-    sender.signedBroadcast(transferTxWithStrAttachment.json(), waitForTx = true)
-    sender.signedBroadcast(transferTxWithBinAttachment.json(), waitForTx = true)
-    sender.signedBroadcast(transferTxWithNumAttachment.json(), waitForTx = true)
-    sender.signedBroadcast(transferTxWithBoolAttachment.json(), waitForTx = true)
-    sender.signedBroadcast(transferTxWithNoneAttachment.json(), waitForTx = true)
-
-    val protoTransferTxStrAttBytes  = PBTransactions.protobuf(transferTxWithStrAttachment).toByteArray
-    val protoTransferTxBinAttBytes  = PBTransactions.protobuf(transferTxWithBinAttachment).toByteArray
-    val protoTransferTxNumAttBytes  = PBTransactions.protobuf(transferTxWithNumAttachment).toByteArray
-    val protoTransferTxBoolAttBytes = PBTransactions.protobuf(transferTxWithBoolAttachment).toByteArray
-    val protoTransferTxNoneAttBytes = PBTransactions.protobuf(transferTxWithNoneAttachment).toByteArray
-
-    sender.invokeScript(
-      source,
-      dApp,
-      func = Some("foo"),
-      args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxStrAttBytes)).explicitGet()),
-      waitForTx = true
-    )
-    sender.getDataByKey(dApp, "attachment").value shouldBe transferTxWithStrAttachment.attachment.get.asInstanceOf[Str].value
-
-    sender.invokeScript(
-      source,
-      dApp,
-      func = Some("foo"),
-      args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxBinAttBytes)).explicitGet()),
-      waitForTx = true
-    )
-    sender.getDataByKey(dApp, "attachment").value shouldBe Base58.encode(transferTxWithBinAttachment.attachment.get.asInstanceOf[Bin].value)
-
-    sender.invokeScript(
-      source,
-      dApp,
-      func = Some("foo"),
-      args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxNumAttBytes)).explicitGet()),
-      waitForTx = true
-    )
-    sender.getDataByKey(dApp, "attachment").value shouldBe s"${transferTxWithNumAttachment.attachment.get.asInstanceOf[Num].value}"
-
-    sender.invokeScript(
-      source,
-      dApp,
-      func = Some("foo"),
-      args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxBoolAttBytes)).explicitGet()),
-      waitForTx = true
-    )
-    sender.getDataByKey(dApp, "attachment").value shouldBe s"${transferTxWithBoolAttachment.attachment.get.asInstanceOf[Bool].value}"
-
-    val tx =
-      sender
-        .invokeScript(
-          source,
-          dApp,
-          func = Some("foo"),
-          args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxNoneAttBytes)).explicitGet()),
-          waitForTx = true
-        )
-        ._1
-        .id
-    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("Empty description")
+    sender.getDataByKey(dAppAddress, "bodyBytes").value.asInstanceOf[ByteStr] shouldBe ByteStr(transferTx.bodyBytes())
   }
 }

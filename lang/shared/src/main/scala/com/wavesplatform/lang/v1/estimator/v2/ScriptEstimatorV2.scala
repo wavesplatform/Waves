@@ -20,7 +20,7 @@ object ScriptEstimatorV2 extends ScriptEstimator {
       expr: EXPR
   ): Either[ExecutionError, Long] = {
     val v = vars.map((_, (true, const(0)))).toMap
-    val f = funcs.mapValues(_.value)
+    val f = funcs.view.mapValues(_.value()).toMap
     evalExpr(expr).run(EstimatorContext(v, f)).value._2
   }
 

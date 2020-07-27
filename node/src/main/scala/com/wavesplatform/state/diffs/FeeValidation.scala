@@ -3,7 +3,6 @@ package com.wavesplatform.state.diffs
 import cats.data.Chain
 import cats.implicits._
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._

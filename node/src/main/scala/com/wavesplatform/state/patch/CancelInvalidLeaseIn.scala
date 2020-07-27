@@ -1,32 +1,20 @@
 package com.wavesplatform.state.patch
 
+import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state.{Diff, _}
-import com.wavesplatform.utils.ScorexLogging
 
-object CancelInvalidLeaseIn extends ScorexLogging {
-  def apply(blockchain: Blockchain): Diff = {
-    log.info("Collecting lease in overflows")
+case object CancelInvalidLeaseIn extends DiffPatchFactory {
+  val height: Int = AddressScheme.current.chainId.toChar match {
+    case 'W' => 1060000
+    case _   => 0
+  }
 
-    val allActiveLeases = blockchain.allActiveLeases.toVector
-
-    log.info(s"Collected ${allActiveLeases.length} active leases")
-
-    val leaseInBalances = allActiveLeases
-      .map(lt => blockchain.resolveAlias(lt.recipient).explicitGet() -> lt.amount)
-      .groupBy(_._1)
-      .mapValues(_.map(_._2).sum)
-
-    log.info("Calculated active lease in balances")
-
-    val diff = blockchain.collectLposPortfolios {
-      case (addr, p) if p.lease.in != leaseInBalances.getOrElse(addr, 0L) =>
-        log.info(s"$addr: actual = ${leaseInBalances.getOrElse(addr, 0L)}, stored: ${p.lease.in}")
-        Portfolio(0, LeaseBalance(leaseInBalances.getOrElse(addr, 0L) - p.lease.in, 0), Map.empty)
+  def apply(): Diff = {
+    val pfs = PatchLoader.read[Map[String, LeaseBalance]](this).map {
+      case (address, lb) =>
+        Address.fromString(address).explicitGet() -> Portfolio(lease = lb)
     }
-
-    log.info("Finished collecting lease in overflows")
-
-    Diff.empty.copy(portfolios = diff)
+    Diff.empty.copy(portfolios = pfs)
   }
 }

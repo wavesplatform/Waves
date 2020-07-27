@@ -3,7 +3,7 @@ package com.wavesplatform.transaction.smart.script.estimator
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, _}
@@ -20,16 +20,15 @@ import com.wavesplatform.state.diffs.smart.predef.{chainId, scriptWithAllV1Funct
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.WavesEnvironment
-import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{DataTransaction, Proofs}
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import scorex.crypto.encode.Base64
 
 class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
-  private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(null), DirectiveSet.contractDirectiveSet, ByteStr.empty)
+  private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, null, DirectiveSet.contractDirectiveSet, ByteStr.empty)
 
   private def estimate(
       expr: Terms.EXPR,
@@ -43,7 +42,7 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with P
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(Global, V1).withEnvironment[Environment],
+          PureContext.build(V1).withEnvironment[Environment],
           CryptoContext.build(Global, V1).withEnvironment[Environment],
           WavesContext.build(
             DirectiveSet(V1, Account, Expression).explicitGet()
@@ -57,7 +56,7 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with P
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(Global, V2).withEnvironment[Environment],
+          PureContext.build(V2).withEnvironment[Environment],
           CryptoContext.build(Global, V2).withEnvironment[Environment],
           WavesContext.build(
             DirectiveSet(V2, Account, Expression).explicitGet()
@@ -71,7 +70,7 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with P
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(Global, V3).withEnvironment[Environment],
+          PureContext.build(V3).withEnvironment[Environment],
           CryptoContext.build(Global, V3).withEnvironment[Environment],
           WavesContext.build(
             DirectiveSet(V3, Account, Expression).explicitGet()
@@ -83,31 +82,30 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with P
   private def getAllFuncExpression(version: StdLibVersion): EXPR = {
     val entry1 = IntegerDataEntry("int", 24)
     val entry2 = BooleanDataEntry("bool", true)
-    val entry3 = BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=")))
+    val entry3 = BinaryDataEntry("blob", ByteStr.decodeBase64("YWxpY2U=").get)
     val entry4 = StringDataEntry("str", "test")
 
     val dtx = DataTransaction
       .create(
         1.toByte,
-        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
+        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         List(entry1, entry2, entry3, entry4),
         100000,
         1526911531530L,
         Proofs(Seq(ByteStr.decodeBase58("32mNYSefBTrkVngG5REkmmGAVv69ZvNhpbegmnqDReMTmXNyYqbECPgHgXrX2UwyKGLFS45j7xDFyPXjF8jcfw94").get))
       )
-      .right
-      .get
+      .explicitGet()
 
-    val recipient = Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").right.get
+    val recipient = Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet()
     val ttx = TransferTransaction(
       2.toByte,
-      PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
+      PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
       recipient,
       Waves,
       100000000,
       Waves,
       100000000,
-      Some(Attachment.Bin(Base58.tryDecodeWithLimit("4t2Xazb2SX").get)),
+      ByteStr.decodeBase58("4t2Xazb2SX").get,
       1526641218066L,
       Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)),
       recipient.chainId
@@ -122,18 +120,16 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with P
   }
 
   property("func complexity map size is equal stdLib SupportedVersions count") {
-    val supportedVersionCount = DirectiveDictionary[StdLibVersion].all.size
-
     ctxV1.functions.foreach { func =>
-      func.costByLibVersion.size shouldBe supportedVersionCount
+      func.costByLibVersion.size shouldBe DirectiveDictionary[StdLibVersion].all.size
     }
 
     ctxV2.functions.foreach { func =>
-      func.costByLibVersion.size shouldBe supportedVersionCount
+      func.costByLibVersion.size shouldBe >= (DirectiveDictionary[StdLibVersion].all.count(_ >= V2))
     }
 
     ctxV3.functions.foreach { func =>
-      func.costByLibVersion.size shouldBe supportedVersionCount
+      func.costByLibVersion.size shouldBe >= (DirectiveDictionary[StdLibVersion].all.count(_ >= V3))
     }
   }
 

@@ -21,7 +21,7 @@ class NetworkClient(trafficLoggerSettings: TrafficLogger.Settings, chainId: Char
   private val handshake   = Handshake(Constants.ApplicationName + chainId, Version.VersionTuple, nodeName, nonce, None)
 
   def connect(remoteAddress: InetSocketAddress): Future[Channel] = {
-    val p = Promise[Channel]
+    val p = Promise[Channel]()
 
     val bootstrap = new Bootstrap()
       .group(workerGroup)

@@ -38,7 +38,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
             |let x = 42
             |
             |func some(y: Boolean, x: Boolean) = !x
-            |""") shouldBe 'right
+            |""") shouldBe Symbol("right")
         }
 
         "constant and callable function argument" in {
@@ -47,13 +47,13 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
             |
             |@Callable(i)
             |func some(a: Int, x: String) = WriteSet([DataEntry("a", x)])
-            |""") shouldBe 'right
+            |""") shouldBe Symbol("right")
         }
 
         "user function and its argument" in {
           compileOf("""
             |func sameName(sameName: Boolean) = !sameName
-            |""") shouldBe 'right
+            |""") shouldBe Symbol("right")
         }
 
         "user function and argument; callable annotation bindings and arguments" in {
@@ -65,7 +65,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
             |
             |@Callable(i)
             |func bar(x: Int) = WriteSet([DataEntry("a", this.bytes)])
-            |""") shouldBe 'right
+            |""") shouldBe Symbol("right")
         }
 
       }
@@ -188,7 +188,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
           compileOf("""
             |@Callable(sameName)
             |func sameName() = WriteSet([DataEntry("a", this.bytes)])
-            |""") shouldBe 'right
+            |""") shouldBe Symbol("right")
         }
 
         "callable annotation binding and its function argument" in {
@@ -209,7 +209,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
               s"""
                  | func f(
                  |      sameArg: Int,
-                 |      ${1 to c map (i => s"x$i: Int") mkString("", ", ", ",")}
+                 |      ${(1 to c).map(i => s"x$i: Int").mkString("", ", ", ",")}
                  |      sameArg: Int
                  |    ) = true
              """

@@ -1,20 +1,22 @@
 package com.wavesplatform.lang.v1.compiler
 
+import java.nio.charset.StandardCharsets
+
 import cats.implicits._
 import cats.{Id, Show}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.CompilationError._
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{FINAL, _}
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE, PART, Pos, TypeParam}
+import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE, PART, Pos}
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser, ParserV2}
-import com.wavesplatform.lang.v1.task.TaskM
 import com.wavesplatform.lang.v1.task.imports._
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 
 import scala.util.Try
 
@@ -38,25 +40,25 @@ object ExpressionCompiler {
 
   def compile(input: String, ctx: CompilerContext): Either[String, EXPR] = {
     Parser.parseExpr(input) match {
-      case fastparse.core.Parsed.Success(xs, _) =>
+      case fastparse.Parsed.Success(xs, _) =>
         ExpressionCompiler(ctx, xs) match {
           case Left(err)              => Left(err.toString)
           case Right((expr, BOOLEAN)) => Right(expr)
           case Right((_, _))          => Left("Script should return boolean")
         }
-      case f @ fastparse.core.Parsed.Failure(_, _, _) => Left(f.toString)
+      case f @ fastparse.Parsed.Failure(_, _, _) => Left(f.toString)
     }
   }
 
 
   def compileUntyped(input: String, ctx: CompilerContext): Either[String, EXPR] = {
     Parser.parseExpr(input) match {
-      case fastparse.core.Parsed.Success(xs, _) =>
+      case fastparse.Parsed.Success(xs, _) =>
         ExpressionCompiler(ctx, xs) match {
           case Left(err)              => Left(err.toString)
           case Right((expr, _)) => Right(expr)
         }
-      case f @ fastparse.core.Parsed.Failure(_, _, _) => Left(f.toString)
+      case f @ fastparse.Parsed.Failure(_, _, _) => Left(f.toString)
     }
   }
 
@@ -97,8 +99,8 @@ object ExpressionCompiler {
   def compileDecls(input: String, ctx: CompilerContext): Either[String, EXPR] = {
     val adjustedDecls = s"$input\n${PureContext.unitVarName}"
     Parser.parseExpr(adjustedDecls) match {
-      case fastparse.core.Parsed.Success(xs, _)       => ExpressionCompiler(ctx, xs).map(_._1)
-      case f @ fastparse.core.Parsed.Failure(_, _, _) => Left(f.toString)
+      case fastparse.Parsed.Success(xs, _)       => ExpressionCompiler(ctx, xs).map(_._1)
+      case f @ fastparse.Parsed.Failure(_, _, _) => Left(f.toString)
     }
   }
 
@@ -169,7 +171,7 @@ object ExpressionCompiler {
       ifFalse <- local(compileExprWithCtx(ifFalseExpr, saveExprContext))
 
       ctx = ifFalse.ctx
-      t   = TypeInferrer.findCommonType(ifTrue.t, ifFalse.t)
+      t   = TypeInferrer.findCommonType(ifTrue.t, ifFalse.t, mergeTuples = false)
       parseNodeExpr = Expressions.IF(
         p,
         condWithErr._1.parseNodeExpr,
@@ -192,19 +194,9 @@ object ExpressionCompiler {
       }
     } yield result
 
-  private def flat(
-      pos: Pos,
-      typeDefs: Map[String, FINAL],
-      definedTypes: List[String],
-      expectedTypes: List[String] = List(),
-      varName: Option[String] = None
-  ): Either[CompilationError, List[FINAL]] =
-    definedTypes.flatTraverse(flatSingle(pos, typeDefs, definedTypes, expectedTypes, varName, _))
-
   private def flatSingle(
       pos: Pos,
       typeDefs: Map[String, FINAL],
-      definedTypesStr: List[String],
       expectedTypes: List[String],
       varName: Option[String],
       typeName: String
@@ -214,32 +206,9 @@ object ExpressionCompiler {
       case Some(realType)             => Right(List(realType))
       case None =>
         Left {
-          val messageTypes =
-            if (expectedTypes.nonEmpty) expectedTypes
-            else definedTypesStr
-          TypeNotFound(pos.start, pos.end, typeName, messageTypes, varName)
+          TypeNotFound(pos.start, pos.end, typeName, expectedTypes, varName)
         }
     }
-
-  private def genericFlat(
-      pos: Pos,
-      typeDefs: Map[String, FINAL],
-      definedTypes: List[(String, Option[String])],
-      expectedTypes: List[String] = List(),
-      varName: Option[String] = None
-  ): Either[CompilationError, List[FINAL]] = {
-    def f(t: String) = flatSingle(pos, typeDefs, definedTypes.map(_.toString), expectedTypes, varName, t)
-    definedTypes.flatTraverse {
-      case (typeName, typeParamO) =>
-        typeParamO.fold(f(typeName))(
-          paramName =>
-            for {
-              typeConstr <- findGenericType(pos, typeName)
-              typeParam  <- f(paramName)
-            } yield List(typeConstr(UNION.reduce(UNION.create(typeParam))))
-        )
-    }
-  }
 
   private def findGenericType(p: Pos, t: String): Either[CompilationError, FINAL => FINAL] =
     t match {
@@ -254,7 +223,28 @@ object ExpressionCompiler {
       saveExprContext: Boolean
   ): CompileM[CompilationStepResultExpr] =
     for {
-      ctx       <- get[Id, CompilerContext, CompilationError]
+      ctx <- get[Id, CompilerContext, CompilationError]
+      _   <- {
+        val types = ctx.predefTypes.keySet
+        val typeNamedCases =
+          cases.collect {
+            case MATCH_CASE(_, Some(PART.VALID(_, name)), _, _, _, _) if types.contains(name) => name
+          }
+
+        Either.cond(
+          typeNamedCases.isEmpty,
+          (),
+          TypeNamedCases(p.start, p.end, typeNamedCases)
+        ).toCompileM
+      }
+      _   <- {
+        val defaultCasesCount = cases.count(_.caseType.isEmpty)
+        Either.cond(
+          defaultCasesCount < 2,
+          (),
+          MultipleDefaultCases(p.start, p.end, defaultCasesCount)
+        ).toCompileM
+      }
       typedExpr <- compileExprWithCtx(expr, saveExprContext)
       exprTypesWithErr <- (typedExpr.t match {
         case u: UNION => u.pure[CompileM]
@@ -268,19 +258,16 @@ object ExpressionCompiler {
         case REF(k) => Some(k)
         case _      => None
       }
+      matchTypes <- cases.traverse(c => handleCompositeType(p, c.caseType, Some(exprTypes), allowShadowVarName))
       ifCasesWithErr <- inspectFlat[Id, CompilerContext, CompilationError, Expressions.EXPR](
-        updatedCtx =>
-          mkIfCases(
-            updatedCtx,
-            cases,
-            Expressions.REF(p, PART.VALID(p, refTmpKey), ctxOpt = saveExprContext.toOption(updatedCtx.getSimpleContext())),
-            allowShadowVarName,
-            exprTypes
-          ).toCompileM
+        updatedCtx => {
+          val ref = Expressions.REF(p, PART.VALID(p, refTmpKey), ctxOpt = saveExprContext.toOption(updatedCtx.getSimpleContext()))
+          mkIfCases(cases, matchTypes, ref, allowShadowVarName).toCompileM
+        }
       ).handleError()
       compiledMatch <- compileLetBlock(
         p,
-        Expressions.LET(p, PART.VALID(p, refTmpKey), expr, Seq.empty),
+        Expressions.LET(p, PART.VALID(p, refTmpKey), expr),
         ifCasesWithErr._1.getOrElse(
           Expressions.INVALID(
             p,
@@ -290,21 +277,15 @@ object ExpressionCompiler {
         ),
         saveExprContext
       )
-      checkWithErr <- cases
-        .flatMap(_.types)
-        .traverse[CompileM, String](handlePart)
-        .flatMap(tl => liftEither(flat(p, ctx.predefTypes, tl)))
-        .map(t => UNION.create(t))
-        .flatMap(matchedTypes => {
-          Either
-            .cond(
-              (cases.last.types.isEmpty && (exprTypes >= matchedTypes)) || (exprTypes equivalent matchedTypes),
+      matchedTypesUnion = UNION.create(matchTypes)
+      checkWithErr <-
+          Either.cond(
+              (cases.last.caseType.isEmpty && (exprTypes >= matchedTypesUnion)) || (exprTypes equivalent matchedTypesUnion),
               (),
-              MatchNotExhaustive(p.start, p.end, exprTypes.typeList, matchedTypes.typeList)
+              MatchNotExhaustive(p.start, p.end, exprTypes.typeList, matchTypes)
             )
             .toCompileM
-        })
-        .handleError()
+            .handleError()
       _ <- set[Id, CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = tmpArgId))
 
       errorList = exprTypesWithErr._2 ++ ifCasesWithErr._2 ++ compiledMatch.errors ++ checkWithErr._2
@@ -320,8 +301,63 @@ object ExpressionCompiler {
           errorList ++ typedExpr.errors
         )
       }
-
     } yield result
+
+  private def exprContainsRef(expr: Expressions.EXPR, ref: String): Boolean =
+    expr match {
+      case Expressions.GETTER(_, expr, _, _, _) =>
+        exprContainsRef(expr, ref)
+
+      case Expressions.BLOCK(_, decl, body, _, _) =>
+        val refIsOverlappedByDecl =
+          decl.name match {
+            case PART.VALID(_, name) if name == ref => true
+            case _ => false
+          }
+        if (refIsOverlappedByDecl) false
+        else {
+          val declContainsRef =
+            decl match {
+              case Expressions.LET(_, _, value, _, _) =>
+                exprContainsRef(value, ref)
+              case Expressions.FUNC(_, expr, _, args) =>
+                val refIsOverlappedByArg =
+                  args.exists {
+                    case (PART.VALID(_, name), _) if name == ref => true
+                    case _ => false
+                  }
+                if (!refIsOverlappedByArg) exprContainsRef(expr, ref)
+                else false
+            }
+          declContainsRef || exprContainsRef(body, ref)
+        }
+
+      case Expressions.IF(_, cond, ifTrue, ifFalse, _, _) =>
+        exprContainsRef(cond, ref)   ||
+        exprContainsRef(ifTrue, ref) ||
+        exprContainsRef(ifFalse, ref)
+
+      case Expressions.FUNCTION_CALL(_, _, args, _, _) =>
+        args.exists(exprContainsRef(_, ref))
+
+      case Expressions.REF(_, PART.VALID(_, name), _, _) if name == ref =>
+        true
+
+      case BINARY_OP(_, a, _, b, _, _) =>
+        exprContainsRef(a, ref) || exprContainsRef(b, ref)
+
+      case Expressions.MATCH(_, matchingExpr, cases, _, _) =>
+        exprContainsRef(matchingExpr, ref) ||
+        cases.exists {
+          case MATCH_CASE(_, Some(PART.VALID(_, varName)), _, caseExpr, _, _) if varName != ref =>
+            exprContainsRef(caseExpr, ref)
+          case MATCH_CASE(_, None, _, caseExpr, _, _) =>
+            exprContainsRef(caseExpr, ref)
+          case _ => false
+        }
+
+      case _ => false
+    }
 
   def compileBlock(
       pos: Expressions.Pos,
@@ -334,9 +370,6 @@ object ExpressionCompiler {
       case f: Expressions.FUNC => compileFuncBlock(pos, f, expr, saveExprContext)
     }
 
-  private def handleTypeUnion(types: List[String], f: FINAL, ctx: CompilerContext) =
-    if (types.isEmpty) f else UNION.create(types.map(ctx.predefTypes))
-
   private def validateShadowing(p: Pos, dec: Expressions.Declaration, allowedExceptions: List[String] = List.empty): CompileM[String] = {
     for {
       ctx <- get[Id, CompilerContext, CompilationError]
@@ -348,26 +381,28 @@ object ExpressionCompiler {
     } yield letName
   }
 
+  private def checkDeclarationNameSize(p: Pos, decl: Expressions.Declaration): CompileM[String] =
+    handlePart(decl.name).ensure(
+      TooLongDeclarationName(p.start, p.end, decl)
+    )(
+      _.getBytes(StandardCharsets.UTF_8).length <= ContractLimits.MaxDeclarationNameInBytes
+    )
+
   def compileLet(p: Pos, let: Expressions.LET, saveExprContext: Boolean): CompileM[CompilationStepResultDec] =
     for {
+      _              <- checkDeclarationNameSize(p, let)
       letNameWithErr <- validateShadowing(p, let).handleError()
       compiledLet    <- compileExprWithCtx(let.value, saveExprContext)
       ctx            <- get[Id, CompilerContext, CompilationError]
-      letTypesWithErr <- let.types.toList
-        .traverse[CompileM, String](handlePart)
-        .ensure(NonExistingType(p.start, p.end, letNameWithErr._1.getOrElse("NO_NAME"), ctx.predefTypes.keys.toList))(
-          _.forall(ctx.predefTypes.contains)
-        )
-        .handleError()
 
-      typeUnion     = handleTypeUnion(letTypesWithErr._1.getOrElse(List.empty), compiledLet.t, ctx)
-      errorList     = letNameWithErr._2 ++ letTypesWithErr._2
+      letType = let.types.getOrElse(compiledLet.t)
+      errorList     = letNameWithErr._2
       parseNodeDecl = let.copy(value = compiledLet.parseNodeExpr)
 
       result = if (errorList.isEmpty) {
-        CompilationStepResultDec(ctx, LET(letNameWithErr._1.get, compiledLet.expr), typeUnion, parseNodeDecl, compiledLet.errors)
+        CompilationStepResultDec(ctx, LET(letNameWithErr._1.get, compiledLet.expr), letType, parseNodeDecl, compiledLet.errors)
       } else {
-        CompilationStepResultDec(ctx, FAILED_DEC(), typeUnion, parseNodeDecl, errorList ++ compiledLet.errors)
+        CompilationStepResultDec(ctx, FAILED_DEC(), letType, parseNodeDecl, errorList ++ compiledLet.errors)
       }
     } yield result
 
@@ -378,6 +413,7 @@ object ExpressionCompiler {
       annListVars: List[String] = List.empty
   ): CompileM[(CompilationStepResultDec, List[(String, FINAL)])] = {
     for {
+      _               <- checkDeclarationNameSize(p, func)
       funcNameWithErr <- validateShadowing(p, func, annListVars).handleError()
       argsWithErr <- func.args.toList
         .pure[CompileM]
@@ -392,14 +428,8 @@ object ExpressionCompiler {
           case (argName, argType) =>
             for {
               name <- handlePart(argName)
-              typeDecls <- argType.toList
-                .traverse(handleGenericPart)
-                .ensure(NonExistingType(p.start, p.end, funcNameWithErr._1.getOrElse("NO_NAME"), ctx.predefTypes.keys.toList))(_.forall {
-                  case (t, param) => param.fold(ctx.predefTypes.contains(t))(ctx.predefTypes.contains)
-                })
-              types <- liftEither[Id, CompilerContext, CompilationError, List[FINAL]](genericFlat(p, ctx.predefTypes, typeDecls))
-              union = UNION.reduce(UNION.create(types))
-            } yield (name, VariableInfo(argName.position, union))
+              handledType <- handleCompositeType(p, argType, None, Some(name))
+            } yield (name, VariableInfo(argName.position, handledType))
         }
         .handleError()
       compiledFuncBody <- local {
@@ -615,40 +645,32 @@ object ExpressionCompiler {
   }
 
   def mkIfCases(
-      ctx: CompilerContext,
       cases: List[MATCH_CASE],
+      caseTypes: List[FINAL],
       refTmp: Expressions.REF,
-      allowShadowVarName: Option[String],
-      exprTypes: FINAL
+      allowShadowVarName: Option[String]
   ): Either[CompilationError, Expressions.EXPR] = {
 
-    def f(mc: MATCH_CASE, further: Expressions.EXPR): Either[CompilationError, Expressions.EXPR] = {
+    def f(mc: MATCH_CASE, caseType: FINAL, further: Expressions.EXPR): Either[CompilationError, Expressions.EXPR] = {
       val blockWithNewVar = mc.newVarName.fold(mc.expr) { nv =>
         val allowShadowing = nv match {
           case PART.VALID(_, x) => allowShadowVarName.contains(x)
           case _                => false
         }
-        Expressions.BLOCK(mc.position, Expressions.LET(mc.position, nv, refTmp, mc.types, allowShadowing), mc.expr)
+        Expressions.BLOCK(mc.position, Expressions.LET(mc.position, nv, refTmp, Some(caseType), allowShadowing), mc.expr)
       }
-      mc.types.toList match {
+      UNION(caseType).unfold.typeList match {
         case Nil => Right(blockWithNewVar)
         case types =>
           def isInst(matchType: String): Expressions.EXPR =
             Expressions
               .FUNCTION_CALL(
                 mc.position,
-                PART.VALID(mc.position, PureContext._isInstanceOf.name),
+                PART.VALID(mc.position, "_isInstanceOf"),
                 List(refTmp, Expressions.CONST_STRING(mc.position, PART.VALID(mc.position, matchType)))
               )
 
           for {
-            types <- flat(
-              pos = mc.position,
-              typeDefs = ctx.predefTypes,
-              definedTypes = types.map(_.asInstanceOf[PART.VALID[String]].v),
-              expectedTypes = exprTypes.typeList.map(_.name),
-              allowShadowVarName
-            )
             cases <- types.map(_.name) match {
               case hType :: tTypes =>
                 val typeIf =
@@ -660,14 +682,19 @@ object ExpressionCompiler {
       }
     }
 
-    val default: Either[CompilationError, Expressions.EXPR] = Right(
-      Expressions.FUNCTION_CALL(cases.head.position, PART.VALID(cases.head.position, "throw"), List.empty)
-    )
+    val default: Either[CompilationError, Expressions.EXPR] = Right {
+      val pos = cases.head.position
+      Expressions.FUNCTION_CALL(
+        pos,
+        PART.VALID(pos, "throw"),
+        List(Expressions.CONST_STRING(pos, PART.VALID(pos, "Match error")))
+      )
+    }
 
-    cases.foldRight(default) {
-      case (mc, furtherEi) =>
+    (cases zip caseTypes).foldRight(default) {
+      case ((mc, caseType), furtherEi) =>
         furtherEi match {
-          case Right(further) => f(mc, further)
+          case Right(further) => f(mc, caseType, further)
           case Left(e)        => Left(e)
         }
     }
@@ -697,13 +724,39 @@ object ExpressionCompiler {
       .fold(err)(t => Right((ctx, getter, t)))
   }
 
-  private def handleGenericPart(
-      decl: (PART[String], TypeParam)
-  ): TaskM[CompilerContext, CompilationError, (String, Option[String])] =
-    for {
-      t1 <- handlePart(decl._1)
-      t2 <- decl._2.traverse(handlePart)
-    } yield (t1, t2)
+  private def handleCompositeType(
+    pos: Pos,
+    t: Expressions.Type,
+    expectedType: Option[FINAL],
+    varName: Option[String]
+  ): CompileM[FINAL] =
+    t match {
+      case Expressions.Single(name, parameter) =>
+        for {
+          ctx <- get[Id, CompilerContext, CompilationError]
+          handledName <- handlePart(name)
+          handledParameter <- parameter.traverse(handlePart)
+          expectedTypes = expectedType.fold(ctx.predefTypes.keys.toList)(_.typeList.map(_.name))
+          parameter <- handledParameter.traverse(handleCompositeType(pos, _, expectedType, varName))
+          t <- liftEither[Id, CompilerContext, CompilationError, FINAL](parameter.fold(flatSingle(pos, ctx.predefTypes, expectedTypes, varName, handledName).map(v => UNION.reduce(UNION.create(v, None)))) {
+            p =>
+              for {
+                typeConstr <- findGenericType(pos, handledName)
+              } yield typeConstr(p)
+          })
+        } yield t
+      case Expressions.Union(types) =>
+        types.toList
+          .traverse(handleCompositeType(pos, _, expectedType, varName))
+          .map { types =>
+            val union = UNION.create(types)
+            if (union.typeList.isEmpty) union else UNION.reduce(union)
+          }
+      case Expressions.Tuple(types) =>
+        types.toList
+          .traverse(handleCompositeType(pos, _, expectedType, varName))
+          .map(types => TUPLE(types))
+    }
 
   def handlePart[T](part: PART[T]): CompileM[T] = part match {
     case PART.VALID(_, x)         => x.pure[CompileM]

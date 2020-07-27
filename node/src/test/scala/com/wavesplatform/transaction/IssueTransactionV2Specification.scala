@@ -17,7 +17,7 @@ import com.wavesplatform.state.HistoryTest
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB, crypto}
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.{EitherValues, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 
@@ -28,7 +28,8 @@ class IssueTransactionV2Specification
     with TransactionGen
     with WithDB
     with HistoryTest
-    with NoShrink {
+    with NoShrink
+    with EitherValues {
 
   property("IssueV2 serialization roundtrip") {
     forAll(issueV2TransactionGen()) { tx: IssueTransaction =>
@@ -141,7 +142,7 @@ class IssueTransactionV2Specification
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(Global, V3).withEnvironment[Environment],
+            PureContext.build(V3).withEnvironment[Environment],
             CryptoContext.build(Global, V3).withEnvironment[Environment],
             WavesContext.build(
               DirectiveSet(V3, Account, Expression).explicitGet()
@@ -166,7 +167,7 @@ class IssueTransactionV2Specification
       Proofs(Seq(ByteStr.decodeBase58("43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g").get))
     )
 
-    tx shouldBe 'left
+    tx.left.value
   }
 
   /* property("parses invalid UTF-8 string") {

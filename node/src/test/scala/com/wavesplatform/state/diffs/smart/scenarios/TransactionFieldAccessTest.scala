@@ -33,7 +33,7 @@ class TransactionFieldAccessTest extends PropSpec with PropertyChecks with WithS
       | match tx {
       | case ttx: TransferTransaction =>
       |       isDefined(ttx.assetId)==false
-      |   case other =>
+      | case _ =>
       |       false
       | }
       """.stripMargin

@@ -8,6 +8,7 @@ import com.wavesplatform.block.MicroBlock
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.settings.SynchronizationSettings.MicroblockSynchronizerSettings
+import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel._
 import monix.eval.{Coeval, Task}
 import monix.execution.CancelableFuture
@@ -17,14 +18,16 @@ import monix.reactive.Observable
 import scala.collection.mutable.{Set => MSet}
 import scala.concurrent.duration.FiniteDuration
 
-object MicroBlockSynchronizer {
+object MicroBlockSynchronizer extends ScorexLogging {
 
-  def apply(settings: MicroblockSynchronizerSettings,
-            peerDatabase: PeerDatabase,
-            lastBlockIdEvents: Observable[ByteStr],
-            microblockInvs: ChannelObservable[MicroBlockInv],
-            microblockResponses: ChannelObservable[MicroBlockResponse],
-            scheduler: SchedulerService): (Observable[(Channel, MicroblockData)], Coeval[CacheSizes]) = {
+  def apply(
+      settings: MicroblockSynchronizerSettings,
+      peerDatabase: PeerDatabase,
+      lastBlockIdEvents: Observable[ByteStr],
+      microblockInvs: ChannelObservable[MicroBlockInv],
+      microblockResponses: ChannelObservable[MicroBlockResponse],
+      scheduler: SchedulerService
+  ): (Observable[(Channel, MicroblockData)], Coeval[CacheSizes]) = {
 
     implicit val schdlr: SchedulerService = scheduler
 
@@ -50,44 +53,75 @@ object MicroBlockSynchronizer {
 
       def randomOwner(exclude: Set[Channel]) = random(owners(mbInv.totalBlockId) -- exclude)
 
-      def task(attemptsAllowed: Int, exclude: Set[Channel]): Task[Unit] = Task.unit.flatMap { _ =>
-        if (attemptsAllowed <= 0 || alreadyProcessed(totalBlockId)) Task.unit
-        else
-          randomOwner(exclude).fold(Task.unit) { channel =>
-            if (channel.isOpen) {
-              val request = MicroBlockRequest(totalBlockId)
-              channel.writeAndFlush(request)
-              awaiting.put(totalBlockId, mbInv)
-              task(attemptsAllowed - 1, exclude + channel).delayExecution(settings.waitResponseTimeout)
-            } else task(attemptsAllowed, exclude + channel)
+      def task(attemptsAllowed: Int, exclude: Set[Channel]): Task[Unit] = Task.defer {
+        if (attemptsAllowed <= 0) {
+          log.trace(s"No more attempts left to download $totalBlockId")
+          Task.unit
+        } else if (alreadyProcessed(totalBlockId)) {
+          log.trace(s"Not downloading $totalBlockId because it has already been processed")
+          Task.unit
+        } else
+          randomOwner(exclude) match {
+            case None =>
+              log.trace(s"No owners found for $totalBlockId")
+              Task.unit
+            case Some(channel) =>
+              if (channel.isOpen) {
+                log.trace(s"${id(channel)} Requesting $totalBlockId")
+                val request = MicroBlockRequest(totalBlockId)
+                awaiting.put(totalBlockId, mbInv)
+                channel.writeAndFlush(request)
+                task(attemptsAllowed - 1, exclude + channel).delayExecution(settings.waitResponseTimeout)
+              } else task(attemptsAllowed, exclude + channel)
           }
       }
 
       task(MicroBlockDownloadAttempts, Set.empty).runAsyncLogErr
     }
 
-    def tryDownloadNext(prevBlockId: ByteStr): Unit = Option(nextInvs.getIfPresent(prevBlockId)).foreach(requestMicroBlock)
+    def tryDownloadNext(prevBlockId: ByteStr): Unit = Option(nextInvs.getIfPresent(prevBlockId)) match {
+      case Some(inv) => requestMicroBlock(inv)
+      case None      => log.trace(s"No invs are referencing $prevBlockId")
+    }
 
-    lastBlockIdEvents.mapEval(f => Task(tryDownloadNext(f))).executeOn(scheduler).logErr.subscribe()
+    lastBlockIdEvents
+      .mapEval { f =>
+        log.trace(s"Last block id is now $f")
+        Task(tryDownloadNext(f))
+      }
+      .executeOn(scheduler)
+      .logErr
+      .subscribe()
 
     microblockInvs
       .mapEval {
-        case (ch, mbInv @ MicroBlockInv(_, totalRef, prevRef, _)) =>
-          Task {
-            mbInv.signaturesValid() match {
+        case (ch, mbInv @ MicroBlockInv(_, totalBlockId, reference, _)) =>
+          log.trace(s"Processing newly received $mbInv")
+          Task.evalAsync {
+            log.trace(s"Validating $mbInv signature")
+            val sig = try mbInv.signaturesValid()
+            catch {
+              case t: Throwable =>
+                log.error(s"Error validating signature", t)
+                throw t
+            }
+            sig match {
               case Left(err) =>
                 peerDatabase.blacklistAndClose(ch, err.toString)
               case Right(_) =>
-                microBlockOwners.get(totalRef, () => MSet.empty) += ch
-                nextInvs.get(prevRef, { () =>
+                log.trace(s"$mbInv signature is valid, now updating caches")
+                microBlockOwners.get(totalBlockId, () => MSet.empty) += ch
+                nextInvs.get(reference, { () =>
                   BlockStats.inv(mbInv, ch)
                   mbInv
                 })
-                lastBlockId()
-                  .filter(_ == prevRef && !alreadyRequested(totalRef))
-                  .foreach(tryDownloadNext)
+                lastBlockId() match {
+                  case Some(`reference`) if !alreadyRequested(totalBlockId) => tryDownloadNext(reference)
+                  case other =>
+                    log.trace(s"NOT downloading, lastBlockId=$other, prevRef=$reference, alreadyRequested=${alreadyRequested(totalBlockId)}")
+                }
             }
-          }
+          }.logErr
       }
       .executeOn(scheduler)
       .logErr
@@ -98,8 +132,11 @@ object MicroBlockSynchronizer {
         successfullyReceived.put(totalRef, dummy)
         BlockStats.received(mb, ch)
         Option(awaiting.getIfPresent(totalRef)) match {
-          case None => Observable.empty
+          case None =>
+            log.trace(s"${id(ch)} Got unexpected ${mb.stringRepr(totalRef)}")
+            Observable.empty
           case Some(mi) =>
+            log.trace(s"${id(ch)} Got ${mb.stringRepr(totalRef)}, as expected")
             awaiting.invalidate(totalRef)
             Observable((ch, MicroblockData(Option(mi), mb, Coeval.evalOnce(owners(totalRef)))))
         }

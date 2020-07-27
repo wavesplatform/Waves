@@ -1,17 +1,17 @@
 package com.wavesplatform.lang.v1.evaluator
 
-import cats.implicits._
 import cats.Id
-import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
+import cats.implicits._
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types}
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain._
-import com.wavesplatform.common.state.ByteStr
 
 sealed trait ScriptResult
 case class ScriptResultV3(ds: List[DataItem[_]], ts: List[AssetTransfer]) extends ScriptResult
@@ -155,7 +155,7 @@ object ScriptResult {
       fields.get(FieldNames.IssueDecimals),
       fields.get(FieldNames.IssueName),
       fields.get(FieldNames.IssueDescription),
-      fields.get(FieldNames.IssueScript),
+      fields.get(FieldNames.IssueScriptField),
       fields.get(FieldNames.IssueIsReissuable),
       fields.get(FieldNames.IssueNonce)
     ) match {
@@ -196,12 +196,26 @@ object ScriptResult {
       case other =>
         err(other, V4, FieldNames.Reissue)
     }
+
   private def processBurn(fields: Map[String, EVALUATED]): Either[String, Burn] =
     (fields.get(FieldNames.BurnAssetId), fields.get(FieldNames.BurnQuantity)) match {
       case (Some(CONST_BYTESTR(assetId)), Some(CONST_LONG(quantity))) =>
         Right(Burn(assetId, quantity))
       case other =>
         err(other, V4, FieldNames.Burn)
+    }
+
+  private def processSponsorFee(fields: Map[String, EVALUATED]): Either[String, SponsorFee] =
+    (fields.get(FieldNames.SponsorFeeAssetId), fields.get(FieldNames.SponsorFeeMinFee)) match {
+      case (Some(CONST_BYTESTR(assetId)), Some(minFeeOpt)) =>
+        val minFeeValueOpt = minFeeOpt match {
+          case CONST_LONG(minFee) => Right(Some(minFee))
+          case `unit`             => Right(None)
+          case other              => err(s"can't reconstruct ${FieldNames.SponsorFeeMinFee} from $other", V4)
+        }
+        minFeeValueOpt.map(v => SponsorFee(assetId, v))
+      case other =>
+        err(other, V4, FieldNames.SponsorFee)
     }
 
   private def processScriptResultV4(ctx: EvaluationContext[Environment, Id], txId: ByteStr, actions: Seq[EVALUATED]): Either[String, ScriptResultV4] =
@@ -228,7 +242,8 @@ object ScriptResult {
       FieldNames.DeleteEntry    -> ((_, _, a) => processDeleteEntry(a)),
       FieldNames.Issue          -> processIssue,
       FieldNames.Reissue        -> ((_, _, a) => processReissue(a)),
-      FieldNames.Burn           -> ((_, _, a) => processBurn(a))
+      FieldNames.Burn           -> ((_, _, a) => processBurn(a)),
+      FieldNames.SponsorFee     -> ((_, _, a) => processSponsorFee(a))
     )
 
   def fromObj(ctx: EvaluationContext[Environment, Id], txId: ByteStr, e: EVALUATED, version: StdLibVersion): Either[ExecutionError, ScriptResult] =

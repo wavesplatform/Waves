@@ -12,7 +12,6 @@ import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, Contextful
 import com.wavesplatform.lang.{EvalF, ExecutionError, TrampolinedExecResult}
 
 import scala.annotation.meta.field
-import scala.language.implicitConversions
 import scala.scalajs.js.annotation._
 
 sealed trait BaseFunction[C[_[_]]] {
@@ -54,10 +53,28 @@ object NativeFunction {
       args = args.map(_._1)
     )
 
+  def withEnvironment[C[_[_]]](name: String, costByLibVersion: Map[StdLibVersion, Long], internalName: Short, resultType: TYPE, args: (String, TYPE)*)(
+      ev: ContextfulNativeFunction[C]): NativeFunction[C] =
+    new NativeFunction(
+      name = name,
+      costByLibVersion,
+      signature = FunctionTypeSignature(result = resultType, args = args.map(a => (a._1, a._2)), header = FunctionHeader.Native(internalName)),
+      ev = ev,
+      args = args.map(_._1)
+    )
+
   def apply[C[_[_]]](name: String, cost: Long, internalName: Short, resultType: TYPE, args: (String, TYPE)*)(
     evl: List[EVALUATED] => Either[ExecutionError, EVALUATED]
   ): NativeFunction[C] =
     withEnvironment[C](name, cost, internalName, resultType, args: _*)(new ContextfulNativeFunction[C](name, resultType, args.toSeq) {
+      override def ev[F[_]: Monad](a: (C[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
+        evl(a._2).pure[F]
+    })
+
+  def apply[C[_[_]]](name: String, costByLibVersion: Map[StdLibVersion, Long], internalName: Short, resultType: TYPE, args: (String, TYPE)*)(
+    evl: List[EVALUATED] => Either[ExecutionError, EVALUATED]
+  ): NativeFunction[C] =
+    withEnvironment[C](name, costByLibVersion, internalName, resultType, args: _*)(new ContextfulNativeFunction[C](name, resultType, args.toSeq) {
       override def ev[F[_]: Monad](a: (C[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
         evl(a._2).pure[F]
     })

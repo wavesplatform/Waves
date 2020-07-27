@@ -7,7 +7,7 @@ class DiffProduceError(errorMessage: String, requireFailed: Boolean) extends Mat
   override def apply(ei: Either[_, _]): MatchResult = {
     ei match {
       case r @ Right(diff: Diff) =>
-        diff.scriptResults.values.find(_.errorMessage.exists(_.text.contains(errorMessage))) match {
+        diff.scriptResults.values.find(_.error.exists(_.text.contains(errorMessage))) match {
           case Some(_) => MatchResult(matches = true, "", "", Vector.empty)
           case None    => MatchResult(matches = false, "expecting Left(...{0}...) but got {1}", "got expected error", IndexedSeq(errorMessage, r))
         }

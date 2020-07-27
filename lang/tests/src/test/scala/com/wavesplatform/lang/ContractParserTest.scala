@@ -5,7 +5,7 @@ import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.testing.ScriptGenParser
-import fastparse.core.Parsed.{Failure, Success}
+import fastparse.Parsed.{Failure, Success}
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -13,12 +13,12 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class ContractParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
 
   private def parse(x: String): DAPP = Parser.parseContract(x) match {
-    case Success(r, _)    => r
-    case Failure(_, _, _) => throw new TestFailedException("Test failed", 0)
+    case Success(r, _)      => r
+    case f@Failure(_, _, _) => throw new TestFailedException(f.msg, 0)
   }
 
   private def cleanOffsets(l: LET): LET =
-    l.copy(Pos(0, 0), name = cleanOffsets(l.name), value = cleanOffsets(l.value), types = l.types.map(cleanOffsets(_)))
+    l.copy(Pos(0, 0), name = cleanOffsets(l.name), value = cleanOffsets(l.value)) // , types = l.types.map(cleanOffsets(_))
 
   private def cleanOffsets[T](p: PART[T]): PART[T] = p match {
     case PART.VALID(_, x)   => PART.VALID(AnyPos, x)
@@ -59,9 +59,9 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
           List(Expressions.ANNOTATION(AnyPos, PART.VALID(AnyPos, "Ann"), List(PART.VALID(AnyPos, "foo")))),
           Expressions.FUNC(
             AnyPos,
+            CONST_LONG(AnyPos, 3),
             PART.VALID(AnyPos, "bar"),
-            List((PART.VALID(AnyPos, "arg"), List((PART.VALID(AnyPos, "Baz"), None)))),
-            CONST_LONG(AnyPos, 3)
+            List((PART.VALID(AnyPos, "arg"), Single(PART.VALID(AnyPos, "Baz"), None)))
           )
         )
       )
@@ -88,9 +88,9 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
       List(
         FUNC(
           AnyPos,
+          TRUE(AnyPos),
           PART.VALID(AnyPos, "foo"),
-          List.empty,
-          TRUE(AnyPos)
+          List.empty
         )
       ),
       List(
@@ -102,9 +102,9 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
           ),
           Expressions.FUNC(
             AnyPos,
+            CONST_LONG(AnyPos, 3),
             PART.VALID(AnyPos, "bar"),
-            List((PART.VALID(AnyPos, "arg"), List((PART.VALID(AnyPos, "Baz"), None)))),
-            CONST_LONG(AnyPos, 3)
+            List((PART.VALID(AnyPos, "arg"), Single(PART.VALID(AnyPos, "Baz"), None)))
           )
         )
       )
@@ -132,9 +132,9 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
       List(
         FUNC(
           AnyPos,
+          TRUE(AnyPos),
           PART.VALID(AnyPos, "foo"),
-          List.empty,
-          TRUE(AnyPos)
+          List.empty
         )
       ),
       List(
@@ -143,9 +143,9 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
           List(Expressions.ANNOTATION(AnyPos, PART.VALID(AnyPos, "Ann"), List(PART.VALID(AnyPos, "foo")))),
           Expressions.FUNC(
             AnyPos,
+            CONST_LONG(AnyPos, 3),
             PART.VALID(AnyPos, "bar"),
-            List((PART.VALID(AnyPos, "arg"), List((PART.VALID(AnyPos, "Baz"), None)))),
-            CONST_LONG(AnyPos, 3)
+            List((PART.VALID(AnyPos, "arg"), Single(PART.VALID(AnyPos, "Baz"), None)))
           )
         )
       )
@@ -192,9 +192,9 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
           List(Expressions.ANNOTATION(AnyPos, PART.VALID(AnyPos, "Ann"), List(PART.VALID(AnyPos, "foo")))),
           Expressions.FUNC(
             AnyPos,
+            CONST_LONG(AnyPos, 3),
             PART.VALID(AnyPos, "bar"),
-            List((PART.VALID(AnyPos, "arg"), List((PART.VALID(AnyPos, "Baz"), None)))),
-            CONST_LONG(AnyPos, 3)
+            List((PART.VALID(AnyPos, "arg"), Single(PART.VALID(AnyPos, "Baz"), None)))
           )
         )
       )
@@ -307,4 +307,50 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
     parse(code)
   }
 
+  property("Unary expr") {
+    val code =
+      """{-# STDLIB_VERSION 4 #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |
+        |let a10 = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+        |
+        |func deleteEntry(acc: List[DeleteEntry], e: String) = DeleteEntry(e) :: acc
+        |
+        |func t() = delateEntry("q") :: FOLD<10>(a10, [], deleteEntry)
+        |
+        |@Callable(i) func f() = []
+        |""".stripMargin
+    Parser.parseContract(code) should matchPattern { case Success(_, _) => }
+  }
+
+  property("FOLD expr") {
+    val code =
+      """{-# STDLIB_VERSION 4 #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |
+        |let a10 = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+        |
+        |func deleteEntry(acc: List[DeleteEntry], e: String) = DeleteEntry(e) :: acc
+        |
+        |@Callable(i) func delete100Entries() = FOLD<10>(a10, [], deleteEntry)
+        |
+        |@Callable(i) func delete(k: String) = [DeleteEntry(k)]
+        |""".stripMargin
+    Parser.parseContract(code) should matchPattern { case Success(_, _) => }
+  }
+
+  property("Complex list") {
+    val code =
+      """{-# STDLIB_VERSION 4 #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |
+        |func paySelf(l: List[String | Int], u: List[List[String]], t: List[(Int, String)]) = {
+        |  1
+        |}
+        |""".stripMargin
+    parse(code)
+  }
 }

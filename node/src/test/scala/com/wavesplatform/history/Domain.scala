@@ -11,14 +11,22 @@ import com.wavesplatform.database.{DBExt, LevelDBWriter}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{BlockchainUpdater, DiscardedTransactions, _}
+import com.wavesplatform.transaction.{BlockchainUpdater, _}
 import org.iq80.leveldb.DB
 
 case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter) {
   import Domain._
+
+  def lastBlock: Block = {
+    blockchainUpdater
+      .liquidBlock(blockchainUpdater.lastBlockId.get)
+      .orElse(levelDBWriter.lastBlock)
+      .get
+  }
+
   def effBalance(a: Address): Long = blockchainUpdater.effectiveBalance(a, 1000)
 
-  def appendBlock(b: Block): Option[DiscardedTransactions] = blockchainUpdater.processBlock(b).explicitGet()
+  def appendBlock(b: Block): Seq[Diff] = blockchainUpdater.processBlock(b).explicitGet()
 
   def removeAfter(blockId: ByteStr): DiscardedBlocks = blockchainUpdater.removeAfter(blockId).explicitGet()
 
@@ -52,11 +60,49 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   }
 
   def portfolio(address: Address): Seq[(IssuedAsset, Long)] = Domain.portfolio(address, db, blockchainUpdater)
+
+  def appendBlock(txs: Transaction*): Block = {
+    val block = createBlock(Block.PlainBlockVersion, txs)
+    appendBlock(block)
+    lastBlock
+  }
+
+  def appendKeyBlock(): Block = {
+    val block = createBlock(Block.NgBlockVersion, Nil)
+    appendBlock(block)
+    lastBlock
+  }
+
+  def appendMicroBlock(txs: Transaction*): Unit = {
+    val lastBlock = this.lastBlock
+    val block     = lastBlock.copy(transactionData = lastBlock.transactionData ++ txs)
+    val signature = com.wavesplatform.crypto.sign(defaultSigner.privateKey, block.bodyBytes())
+    val mb        = MicroBlock.buildAndSign(lastBlock.header.version, defaultSigner, txs, blockchainUpdater.lastBlockId.get, signature).explicitGet()
+    blockchainUpdater.processMicroBlock(mb)
+  }
+
+  def createBlock(version: Byte, txs: Seq[Transaction]): Block = {
+    val reference = blockchainUpdater.lastBlockId.getOrElse(randomSig)
+    val timestamp = System.currentTimeMillis()
+    Block
+      .buildAndSign(
+        version = version,
+        timestamp = timestamp,
+        reference = reference,
+        baseTarget = blockchainUpdater.lastBlockHeader.fold(60L)(_.header.baseTarget),
+        generationSignature = com.wavesplatform.history.generationSignature,
+        txs = txs,
+        featureVotes = Nil,
+        rewardVote = -1L,
+        signer = defaultSigner
+      )
+      .explicitGet()
+  }
 }
 
 object Domain {
   implicit class BlockchainUpdaterExt[A <: BlockchainUpdater](bcu: A) {
-    def processBlock(block: Block): Either[ValidationError, Option[DiscardedTransactions]] =
+    def processBlock(block: Block): Either[ValidationError, Seq[Diff]] =
       bcu.processBlock(block, block.header.generationSignature)
   }
 

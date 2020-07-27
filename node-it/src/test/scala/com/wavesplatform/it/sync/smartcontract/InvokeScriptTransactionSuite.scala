@@ -1,7 +1,9 @@
 package com.wavesplatform.it.sync.smartcontract
 
+import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync._
@@ -10,19 +12,38 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
+import scala.concurrent.duration._
 
 class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  private val firstContract  = firstAddress
-  private val secondContract = secondAddress
-  private val thirdContract  = sender.createAddress()
-  private val caller         = thirdAddress
+  val activationHeight = 8
+  override protected def nodeConfigs: Seq[Config] =
+    NodeConfigs
+      .Builder(NodeConfigs.Default, 1, Seq.empty)
+      .overrideBase(_.quorum(0))
+      .overrideBase(
+        _.preactivatedFeatures(
+          (BlockchainFeatures.Ride4DApps.id, 0),
+          (BlockchainFeatures.BlockV5.id, activationHeight)
+        )
+      )
+      .withDefault(1)
+      .buildNonConflicting()
+
+  private def firstContract  = firstKeyPair
+  private def secondContract = secondKeyPair
+  private lazy val thirdContract  = sender.createKeyPair()
+  private def caller         = thirdKeyPair
+
+  private lazy val firstContractAddress: String  = firstContract.toAddress.toString
+  private lazy val secondContractAddress: String = secondContract.toAddress.toString
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -41,6 +62,11 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         | }
         |
         | @Callable(inv)
+        | func baz() = {
+        |  WriteSet([DataEntry("test", this.bytes)])
+        | }
+        |
+        | @Callable(inv)
         | func default() = {
         |  WriteSet([DataEntry("a", "b"), DataEntry("sender", "senderId")])
         | }
@@ -52,6 +78,54 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         |
         |
         """.stripMargin
+    val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
+    sender.transfer(firstKeyPair, thirdContract.toAddress.toString, 10.waves, minFee, waitForTx = true)
+    val setScriptId  = sender.setScript(firstContract, Some(script), setScriptFee, waitForTx = true).id
+    val setScriptId2 = sender.setScript(secondContract, Some(script), setScriptFee, waitForTx = true).id
+
+    val acc0ScriptInfo  = sender.addressScriptInfo(firstContractAddress)
+    val acc0ScriptInfo2 = sender.addressScriptInfo(secondContractAddress)
+    sender.createAlias(firstContract, "alias", fee = 1.waves, waitForTx = true)
+
+    acc0ScriptInfo.script.isEmpty shouldBe false
+    acc0ScriptInfo.scriptText.isEmpty shouldBe false
+    acc0ScriptInfo.script.get.startsWith("base64:") shouldBe true
+    acc0ScriptInfo2.script.isEmpty shouldBe false
+    acc0ScriptInfo2.scriptText.isEmpty shouldBe false
+    acc0ScriptInfo2.script.get.startsWith("base64:") shouldBe true
+
+    sender.transactionInfo[TransactionInfo](setScriptId).script.get.startsWith("base64:") shouldBe true
+    sender.transactionInfo[TransactionInfo](setScriptId2).script.get.startsWith("base64:") shouldBe true
+  }
+
+  test("disable use this with alias") {
+    assertApiErrorRaised(
+      sender.invokeScript(
+        caller,
+        "alias:I:alias",
+        func = Some("baz"),
+        args = List(),
+        payment = Seq(),
+        fee = 1.waves,
+        waitForTx = true
+      )
+    )
+  }
+
+  test("but enable use this with address") {
+    sender.invokeScript(
+      caller,
+      firstContractAddress,
+      func = Some("baz"),
+      args = List(),
+      payment = Seq(),
+      fee = 1.waves,
+      waitForTx = true
+    )
+    sender.getDataByKey(firstContractAddress, "test") shouldBe BinaryDataEntry("test", ByteStr(firstContract.toAddress.bytes))
+  }
+
+  test("Wait for activation") {
     val scriptTextV4 =
       """
         |{-# STDLIB_VERSION 4 #-}
@@ -67,31 +141,16 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         | func biz() = [IntegerEntry("numb", 1)]
         |
         """.stripMargin
-    val script  = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
     val script2 = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3).explicitGet()._1.bytes().base64
-    sender.transfer(firstAddress, thirdContract, 10.waves, minFee, waitForTx = true)
-    val setScriptId  = sender.setScript(firstContract, Some(script), setScriptFee, waitForTx = true).id
-    val setScriptId2 = sender.setScript(secondContract, Some(script), setScriptFee, waitForTx = true).id
-    sender.setScript(thirdContract, Some(script2), setScriptFee, waitForTx = true).id
-
-    val acc0ScriptInfo  = sender.addressScriptInfo(firstContract)
-    val acc0ScriptInfo2 = sender.addressScriptInfo(secondContract)
-
-    acc0ScriptInfo.script.isEmpty shouldBe false
-    acc0ScriptInfo.scriptText.isEmpty shouldBe false
-    acc0ScriptInfo.script.get.startsWith("base64:") shouldBe true
-    acc0ScriptInfo2.script.isEmpty shouldBe false
-    acc0ScriptInfo2.scriptText.isEmpty shouldBe false
-    acc0ScriptInfo2.script.get.startsWith("base64:") shouldBe true
-
-    sender.transactionInfo[TransactionInfo](setScriptId).script.get.startsWith("base64:") shouldBe true
-    sender.transactionInfo[TransactionInfo](setScriptId2).script.get.startsWith("base64:") shouldBe true
+    sender.waitForHeight(activationHeight, 13.minute)
+    val setScriptId3 = sender.setScript(thirdContract, Some(script2), setScriptFee, waitForTx = true).id
+    sender.transactionInfo[TransactionInfo](setScriptId3).script.get.startsWith("base64:") shouldBe true
   }
 
   test("contract caller invokes a function on a contract") {
     val arg = ByteStr(Array(42: Byte))
     for (v <- invokeScrTxSupportedVersions) {
-      val contract = if (v < 2) firstContract else secondContract
+      val contract = (if (v < 2) firstContract else secondContract).toAddress.toString
       val invokeScriptTx = sender.invokeScript(
         caller,
         contract,
@@ -106,13 +165,43 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
       nodes.waitForHeightAriseAndTxPresent(invokeScriptTx._1.id)
 
       sender.getDataByKey(contract, "a") shouldBe BinaryDataEntry("a", arg)
-      sender.getDataByKey(contract, "sender") shouldBe BinaryDataEntry("sender", ByteStr.decodeBase58(caller).get)
+      sender.getDataByKey(contract, "sender") shouldBe BinaryDataEntry("sender", ByteStr(caller.toAddress.bytes))
     }
+  }
+
+  test("contract caller invokes a function on a contract by alias") {
+    val arg = ByteStr(Array(43: Byte))
+
+    val _ = sender.invokeScript(
+      caller,
+      "alias:I:alias",
+      func = Some("foo"),
+      args = List(CONST_BYTESTR(arg).explicitGet()),
+      payment = Seq(),
+      fee = 1.waves,
+      waitForTx = true
+    )
+
+    sender.getDataByKey(firstContractAddress, "a") shouldBe BinaryDataEntry("a", arg)
+    sender.getDataByKey(firstContractAddress, "sender") shouldBe BinaryDataEntry("sender", ByteStr(caller.toAddress.bytes))
+  }
+
+  test("translate alias to the address") {
+    sender.invokeScript(
+      caller,
+      "alias:I:alias",
+      func = Some("baz"),
+      args = List(),
+      payment = Seq(),
+      fee = 1.waves,
+      waitForTx = true
+    )
+    sender.getDataByKey(firstContractAddress, "test") shouldBe BinaryDataEntry("test", ByteStr(firstContract.toAddress.bytes))
   }
 
   test("contract caller invokes a default function on a contract") {
     for (v <- invokeScrTxSupportedVersions) {
-      val contract = if (v < 2) firstContract else secondContract
+      val contract = (if (v < 2) firstContract else secondContract).toAddress.toString
       val _ = sender.invokeScript(
         caller,
         contract,
@@ -134,7 +223,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
 
       nodes.waitForHeightAriseAndTxPresent(dataTxId)
 
-      sender.getDataByKey(contract, "a") shouldBe StringDataEntry("a", "OOO")
+      sender.getDataByKey(contract.toAddress.toString, "a") shouldBe StringDataEntry("a", "OOO")
     }
   }
 
@@ -142,7 +231,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     val tx1 = sender
       .invokeScript(
         caller,
-        secondContract,
+        secondContractAddress,
         func = Some("emptyKey"),
         payment = Seq(),
         fee = 1.waves,
@@ -152,15 +241,15 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
       ._1
       .id
 
-    sender.debugStateChanges(tx1).stateChanges.get.errorMessage.get.text should include("Empty keys aren't allowed in tx version >= 2")
+    sender.debugStateChanges(tx1).stateChanges.get.error.get.text should include("Empty keys aren't allowed in tx version >= 2")
 
     nodes.waitForHeightArise()
-    sender.getData(secondContract).filter(_.key.isEmpty) shouldBe List.empty
+    sender.getData(secondContractAddress).filter(_.key.isEmpty) shouldBe List.empty
 
     val tx2 = sender
       .invokeScript(
         caller,
-        thirdContract,
+        thirdContract.toAddress.toString,
         func = Some("bar"),
         payment = Seq(),
         fee = 1.waves,
@@ -170,18 +259,18 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
       ._1
       .id
 
-    sender.debugStateChanges(tx2).stateChanges.get.errorMessage.get.text should include("Empty keys aren't allowed in tx version >= 2")
+    sender.debugStateChanges(tx2).stateChanges.get.error.get.text should include("Empty keys aren't allowed in tx version >= 2")
 
     nodes.waitForHeightArise()
-    sender.getData(thirdContract).filter(_.key.isEmpty) shouldBe List.empty
+    sender.getData(thirdContract.toAddress.toString).filter(_.key.isEmpty) shouldBe List.empty
   }
 
   test("invoke script via dApp alias") {
     sender.createAlias(thirdContract, "dappalias", smartMinFee, waitForTx = true)
-    val dAppAlias = sender.aliasByAddress(thirdContract).find(_.endsWith("dappalias")).get
+    val dAppAlias = sender.aliasByAddress(thirdContract.toAddress.toString).find(_.endsWith("dappalias")).get
     for (v <- invokeScrTxSupportedVersions) {
       sender.invokeScript(caller, dAppAlias, fee = smartMinFee + smartFee, func = Some("biz"), version = v, waitForTx = true)
-      sender.getDataByKey(thirdContract, "numb") shouldBe IntegerDataEntry("numb", 1)
+      sender.getDataByKey(thirdContract.toAddress.toString, "numb") shouldBe IntegerDataEntry("numb", 1)
     }
   }
 }

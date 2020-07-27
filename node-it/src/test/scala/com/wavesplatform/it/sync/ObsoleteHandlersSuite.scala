@@ -1,7 +1,15 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
-import com.wavesplatform.api.http.requests.{CreateAliasRequest, DataRequest, LeaseCancelRequest, LeaseRequest, MassTransferRequest, SponsorFeeRequest, TransferRequest}
+import com.wavesplatform.api.http.requests.{
+  CreateAliasRequest,
+  DataRequest,
+  LeaseCancelRequest,
+  LeaseRequest,
+  MassTransferRequest,
+  SponsorFeeRequest,
+  TransferRequest
+}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
@@ -14,9 +22,17 @@ import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import org.scalatest.BeforeAndAfterAll
 import play.api.libs.json.{Json, Writes}
 
-class ObsoleteHandlersSuite extends BaseTransactionSuite {
+class ObsoleteHandlersSuite extends BaseTransactionSuite with BeforeAndAfterAll {
+
+  protected override def beforeAll(): Unit = {
+    super.beforeAll()
+    // explicitly create two more addresses in node's wallet
+    sender.postForm("/addresses")
+    sender.postForm("/addresses")
+  }
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
@@ -34,18 +50,17 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
   }
 
   test("assets masstransfer") {
-    val fee                                     = calcMassTransferFee(2)
-    implicit val w: Writes[MassTransferRequest] = Json.writes[MassTransferRequest]
-    val transfers                               = List(Transfer(secondAddress, 1.waves), Transfer(thirdAddress, 2.waves))
-    val json                                    = sender.postJson("/assets/masstransfer", MassTransferRequest(None, None, firstAddress, transfers, fee, None))
-    val tx                                      = Json.parse(json.getResponseBody).as[Transaction].id
+    val fee       = calcMassTransferFee(2)
+    val transfers = List(Transfer(secondAddress, 1.waves), Transfer(thirdAddress, 2.waves))
+    val json      = sender.postJson("/assets/masstransfer", MassTransferRequest(None, None, firstAddress, transfers, fee))
+    val tx        = Json.parse(json.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(tx)
   }
 
   test("assets transfer") {
     val json = sender.postJson(
       "/assets/transfer",
-      TransferRequest(Some(1.toByte), Some(firstAddress), None, secondAddress, None, transferAmount, None, minFee, None, None, None, None)
+      TransferRequest(Some(1.toByte), Some(firstAddress), None, secondAddress, None, transferAmount, None, minFee, None, None, None)
     )
     val tx = Json.parse(json.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(tx)

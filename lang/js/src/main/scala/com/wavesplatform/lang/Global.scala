@@ -3,12 +3,12 @@ package com.wavesplatform.lang
 import java.math.{BigDecimal, BigInteger}
 
 import cats.implicits._
-
-import scala.concurrent.ExecutionContext.Implicits.global
 import com.wavesplatform.lang.v1.BaseGlobal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
+import scala.collection.mutable
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.scalajs.js
 import scala.scalajs.js.JSConverters._
@@ -40,54 +40,42 @@ object Global extends BaseGlobal {
 
   private val hex: Array[Char] = Array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f')
   override def base16EncodeImpl(input: Array[Byte]): Either[String, String] = {
-    val output = new StringBuilder(input.size * 2)
+    val output = new StringBuilder(input.length * 2)
     for (b <- input) {
+      b.toHexString
       output.append(hex((b >> 4) & 0xf))
       output.append(hex(b & 0xf))
     }
-    Right(output.result)
+    Right(output.result())
   }
 
-  private def base16Dig(c: Char): Either[String, Byte] =
-    if ('0' <= c && c <= '9') {
-      Right((c - '0').toByte)
-    } else if ('a' <= c && c <= 'f') {
-      Right((10 + (c - 'a')).toByte)
-    } else if ('A' <= c && c <= 'F') {
-      Right((10 + (c - 'A')).toByte)
-    } else {
-      Left(s"$c isn't base16/hex digit")
-    }
-
   override def base16DecodeImpl(input: String): Either[String, Array[Byte]] = {
-    val size = input.size
+    val size = input.length
     if (size % 2 == 1) {
       Left("Need internal bytes number")
-    } else {
-      val bytes = new Array[Byte](size / 2)
-      for (i <- 0 until size / 2) {
-        (base16Dig(input(i * 2)), base16Dig(input(i * 2 + 1))) match {
-          case (Right(h), Right(l)) => bytes(i) = ((16: Byte) * h + l).toByte
-          case (Left(e), _) => return Left(e)
-          case (_, Left(e)) => return Left(e)
+    } else
+      input.toSeq
+        .sliding(2, 2)
+        .map(s => Try(Integer.parseInt(s.unwrap, 16).toByte).toEither.left.map(_ => s"${s.unwrap} isn't base16/hex digit"))
+        .foldLeft(new mutable.ArrayBuilder.ofByte().asRight[String]) {
+          case (Right(arr), Right(b)) => Right(arr += b)
+          case (l @ Left(_), _)       => l
+          case (_, Left(e))           => Left(e)
         }
-      }
-      Right(bytes)
-    }
+        .map(_.result())
   }
 
   def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean =
     impl.Global.curve25519verify(toBuffer(message), toBuffer(sig), toBuffer(pub))
 
-
-  override def rsaVerify(alg: DigestAlgorithm, message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean =
-    impl.Global.rsaVerify(alg, toBuffer(message), toBuffer(sig), toBuffer(pub))
+  override def rsaVerify(alg: DigestAlgorithm, message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Either[String, Boolean] =
+    impl.Global.rsaVerify(alg, toBuffer(message), toBuffer(sig), toBuffer(pub)).asRight[String]
 
   def keccak256(message: Array[Byte]): Array[Byte]  = hash(message)(impl.Global.keccak256)
   def blake2b256(message: Array[Byte]): Array[Byte] = hash(message)(impl.Global.blake2b256)
   def sha256(message: Array[Byte]): Array[Byte]     = hash(message)(impl.Global.sha256)
 
-  private def toArray(xs: ArrayBuffer): Array[Byte] = new Int8Array(xs).toArray
+  private def toArray(xs: ArrayBuffer): Array[Byte]                                  = new Int8Array(xs).toArray
   private def hash(message: Array[Byte])(f: ArrayBuffer => ArrayBuffer): Array[Byte] = toArray(f(toBuffer(message)))
 
   def toBuffer(xs: Array[Byte]): ArrayBuffer = {
@@ -106,31 +94,30 @@ object Global extends BaseGlobal {
     calcScaled(Math.log(_) / Math.log(_))(b, bp, e, ep, rp, round)
 
   private def calcScaled(calc: (Double, Double) => Double)(
-    base:          Long,
-    baseScale:     Long,
-    exponent:      Long,
-    exponentScale: Long,
-    resultScale:   Long,
-    round:         BaseGlobal.Rounds,
+      base: Long,
+      baseScale: Long,
+      exponent: Long,
+      exponentScale: Long,
+      resultScale: Long,
+      round: BaseGlobal.Rounds
   ): Either[String, Long] =
     tryEi {
       val result = calc(
-        base     * Math.pow(10, -baseScale),
-        exponent * Math.pow(10, -exponentScale)
+        base * Math.pow(10, -baseScale.toDouble),
+        exponent * Math.pow(10, -exponentScale.toDouble)
       )
       unscaled(result, resultScale, round)
     }
 
   private def tryEi[R](r: => Either[String, R]): Either[String, R] =
-    Try(r)
-      .toEither
+    Try(r).toEither
       .leftMap(e => if (e.getMessage != null) e.getMessage else e.toString)
       .flatten
 
   private def unscaled(
-    value: Double,
-    scale: Long,
-    round: BaseGlobal.Rounds
+      value: Double,
+      scale: Long,
+      round: BaseGlobal.Rounds
   ): Either[String, Long] = {
     val decimal =
       if (value.toLong.toDouble == value && value - 1 < Long.MaxValue) BigDecimal.valueOf(value.toLong)
@@ -153,10 +140,17 @@ object Global extends BaseGlobal {
   }
 
   override def requestNode(url: String): Future[NodeResponse] =
-    impl.Global.httpGet(js.Dynamic.literal(url = url))
-     .toFuture
-     .map(r => NodeResponse(r.status.asInstanceOf[Int], r.body.asInstanceOf[String]))
+    impl.Global
+      .httpGet(js.Dynamic.literal(url = url))
+      .toFuture
+      .map(r => NodeResponse(r.status.asInstanceOf[Int], r.body.asInstanceOf[String]))
 
   override def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
+    ???
+
+  override def bn256Groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
+    ???
+
+  override def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte] =
     ???
 }

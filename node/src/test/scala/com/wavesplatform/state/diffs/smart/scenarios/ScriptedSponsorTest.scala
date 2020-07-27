@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
@@ -11,10 +12,9 @@ import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransac
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
-import org.scalacheck.Gen
 import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -25,7 +25,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
   val ENOUGH_FEE: Long  = 100000000
   val SPONSOR_FEE: Long = 100000
 
-  val fs = TestFunctionalitySettings.Enabled
+  private val fs = TestFunctionalitySettings.Enabled
     .copy(
       preActivatedFeatures = Map(
         BlockchainFeatures.BlockV5.id                         -> 0,
@@ -48,19 +48,17 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
 
   property("sponsorship works when used by scripted accounts") {
     forAll(separateContractAndSponsor) {
-      case (setupTxs, transfer) =>
+      case (setupTxs, transfer, assetId) =>
         val setupBlocks   = setupTxs.map(TestBlock.create)
         val transferBlock = TestBlock.create(Seq(transfer))
 
-        val IssuedAsset(assetId) = transfer.feeAssetId
-        val contract             = transfer.sender
-
+        val contract            = transfer.sender
         val contractSpent: Long = ENOUGH_FEE + 1
         val sponsorSpent: Long  = ENOUGH_FEE * 2 + SPONSOR_FEE - 1 + ENOUGH_FEE * FeeValidation.FeeUnit
 
         val sponsor = setupTxs.flatten.collectFirst { case t: SponsorFeeTransaction => t.sender }.get
 
-        assertDiffAndState(setupBlocks :+ TestBlock.create(Nil), transferBlock, fs) { (diff, blck) =>
+        assertDiffAndState(setupBlocks :+ TestBlock.create(Nil), transferBlock, fs) { (_, blck) =>
           blck.balance(contract.toAddress, IssuedAsset(assetId)) shouldEqual ENOUGH_FEE * 2
           blck.balance(contract.toAddress) shouldEqual ENOUGH_AMT - contractSpent
 
@@ -72,18 +70,17 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
 
   property("sponsorship works when sponsored by scripted accounts") {
     forAll(scriptedSponsor) {
-      case (setupTxs, transfer) =>
+      case (setupTxs, transfer, assetId) =>
         val setupBlocks   = setupTxs.map(TestBlock.create)
         val transferBlock = TestBlock.create(Seq(transfer))
 
-        val IssuedAsset(assetId) = transfer.feeAssetId
-        val contract             = setupTxs.flatten.collectFirst { case t: SponsorFeeTransaction => t.sender }.get
-        val recipient            = transfer.sender
+        val contract  = setupTxs.flatten.collectFirst { case t: SponsorFeeTransaction => t.sender }.get
+        val recipient = transfer.sender
 
         val contractSpent: Long  = ENOUGH_FEE * 3 + SPONSOR_FEE + ENOUGH_FEE * FeeValidation.FeeUnit
         val recipientSpent: Long = 1
 
-        assertDiffAndState(setupBlocks :+ TestBlock.create(Nil), transferBlock, fs) { (diff, blck) =>
+        assertDiffAndState(setupBlocks :+ TestBlock.create(Nil), transferBlock, fs) { (_, blck) =>
           blck.balance(contract.toAddress, IssuedAsset(assetId)) shouldEqual Long.MaxValue - ENOUGH_FEE * 2
           blck.balance(contract.toAddress) shouldEqual ENOUGH_AMT - contractSpent
 
@@ -93,7 +90,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
     }
   }
 
-  val scriptedSponsor = {
+  private val scriptedSponsor = {
     val timestamp = System.currentTimeMillis()
     for {
       contract  <- accountGen
@@ -104,7 +101,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
       gen2 = GenesisTransaction
         .create(recipient.toAddress, ENOUGH_AMT, timestamp)
         .explicitGet()
-      (script, _) = ScriptCompiler(s"false", isAssetScript = false, estimator).explicitGet()
+      (script, _) = ScriptCompiler(s"{-# STDLIB_VERSION 2 #-}\n false", isAssetScript = false, estimator).explicitGet()
       issueTx = IssueTransaction(
         TxVersion.V1,
         contract.publicKey,
@@ -129,7 +126,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
           ENOUGH_FEE * 3,
           Waves,
           ENOUGH_FEE,
-          None,
+          ByteStr.empty,
           System.currentTimeMillis() + 4
         )
         .explicitGet()
@@ -145,14 +142,14 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
           1,
           IssuedAsset(issueTx.id()),
           ENOUGH_FEE,
-          None,
+          ByteStr.empty,
           System.currentTimeMillis() + 8
         )
         .explicitGet()
-    } yield (Seq(Seq(gen1, gen2), Seq(issueTx, sponsorTx), Seq(transferToRecipient, setScript)), transferTx)
+    } yield (Seq(Seq(gen1, gen2), Seq(issueTx, sponsorTx), Seq(transferToRecipient, setScript)), transferTx, issueTx.id())
   }
 
-  val separateContractAndSponsor: Gen[(Seq[Seq[Transaction]], TransferTransaction)] = {
+  private val separateContractAndSponsor = {
     val timestamp = System.currentTimeMillis()
     for {
       contract <- accountGen
@@ -163,7 +160,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
       gen2 = GenesisTransaction
         .create(sponsor.toAddress, ENOUGH_AMT, timestamp)
         .explicitGet()
-      (script, _) = ScriptCompiler(s"true", isAssetScript = false, estimator).explicitGet()
+      (script, _) = ScriptCompiler(s"{-# STDLIB_VERSION 2 #-}\n true", isAssetScript = false, estimator).explicitGet()
       issueTx = IssueTransaction(
         TxVersion.V1,
         sponsor.publicKey,
@@ -188,7 +185,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
           ENOUGH_FEE * 3,
           Waves,
           ENOUGH_FEE,
-          None,
+          ByteStr.empty,
           System.currentTimeMillis() + 4
         )
         .explicitGet()
@@ -204,10 +201,10 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
           1,
           IssuedAsset(issueTx.id()),
           ENOUGH_FEE,
-          None,
+          ByteStr.empty,
           System.currentTimeMillis() + 8
         )
         .explicitGet()
-    } yield (Seq(Seq(gen1, gen2), Seq(issueTx, sponsorTx), Seq(transferToContract, setScript)), transferTx)
+    } yield (Seq(Seq(gen1, gen2), Seq(issueTx, sponsorTx), Seq(transferToContract, setScript)), transferTx, issueTx.id())
   }
 }
