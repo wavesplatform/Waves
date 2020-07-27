@@ -341,27 +341,6 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       sender.assetsBalance(addressStr).balances.map(_.assetId).toSet shouldBe Set(assetA)
       sender.nftList(addressStr, 10) shouldBe empty
     }
-
-    "liquid block works" in {
-      val acc   = createDapp(script(simpleReissuableAsset))
-      val asset = issueValidated(acc, simpleReissuableAsset)
-      val tx    = invokeScript(acc, "reissueIssueAndNft", assetId = asset, fee = invocationCost(1))
-      def checks(): Unit = {
-        assertStateChanges(tx) { sd =>
-          sd.issues should have size 2
-          sd.burns should have size 1
-          sd.reissues should have size 1
-        }
-        assertQuantity(asset)(simpleReissuableAsset.quantity + 50)
-        val addressStr = acc.toAddress.toString
-        sender.assertAssetBalance(addressStr, asset, simpleReissuableAsset.quantity + 50)
-        sender.assetsBalance(addressStr).balances should have size 2
-        sender.nftList(addressStr, 10) should have size 1
-      }
-      checks()
-      nodes.waitForHeightArise()
-      checks()
-    }
   }
 
   def createDapp(scriptParts: String*): KeyPair = {
@@ -375,7 +354,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       .explicitGet()
       ._1
 
-    miner.transfer(sender.keyPair, address.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
+    miner.transfer(sender.keyPair, address.toAddress.toString, initialWavesBalance, setScriptFee * 2, waitForTx = true)
 
     nodes.waitForTransaction(
       miner
@@ -422,7 +401,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
         payment = payments
       )
 
-    if (wait) nodes.waitForTransaction(tx._1.id)
+    if (wait) nodes.waitForHeightAriseAndTxPresent(tx._1.id)
     tx._1
   }
 
