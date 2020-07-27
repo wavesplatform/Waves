@@ -388,8 +388,10 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
             dAppBalance.sponsorBalance shouldBe Some(miner.balance(dappAddress).balance)
         }
 
-      val failedTx = miner.invokeScript(miner.keyPair, dappAddress, Some("sponsor11assets"), waitForTx = true, fee = smartMinFee)
-      sender.debugStateChanges(failedTx._1.id).stateChanges.get.error.get.text should include("Too many script actions: max: 10, actual: 11")
+      assertBadRequestAndMessage(
+        miner.invokeScript(miner.keyPair, dappAddress, Some("sponsor11assets"), fee = smartMinFee),
+        "Too many script actions: max: 10, actual: 11"
+      )
     }
 
     "SponsorFee is available for assets issued via transaction" in {

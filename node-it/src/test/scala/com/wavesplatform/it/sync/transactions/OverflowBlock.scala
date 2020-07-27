@@ -19,6 +19,6 @@ trait OverflowBlock { self: IntegrationSuiteWithThreeAddresses =>
     sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
     nodes.waitForHeightArise()
     for (i <- 1 to 8) sender.putData(addr, entries, fee + i)
-    sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
+    // sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
   }
 }

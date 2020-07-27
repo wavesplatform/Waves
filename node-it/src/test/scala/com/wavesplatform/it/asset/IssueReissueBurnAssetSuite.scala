@@ -16,8 +16,6 @@ import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 
-import scala.concurrent.duration._
-
 class IssueReissueBurnAssetSuite extends BaseSuite {
   override val nodeConfigs: Seq[Config] =
     com.wavesplatform.it.NodeConfigs.newBuilder
@@ -166,9 +164,10 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val txIssue = issue(acc, method, simpleReissuableAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
 
-      val id = invokeScript(acc, "transferAndBurn", assetId = assetId, count = (simpleReissuableAsset.quantity / 2 + 1).toInt, wait = false).id
-      sender.waitFor("empty utx")(n => n.utxSize, (n: Int) => n == 0, 100.millis)
-      sender.transactionStatus(Seq(id)).head.status shouldBe "not_found"
+      assertBadRequestAndMessage(
+        invokeScript(acc, "transferAndBurn", assetId = assetId, count = (simpleReissuableAsset.quantity / 2 + 1).toInt, wait = false),
+        "Accounts balance errors"
+      )
     }
 
     "Reissuing NFT asset should produce an error" in {

@@ -122,7 +122,7 @@ class PseudoTxSenderPubKeySuite extends BaseTransactionSuite {
           args = List(Terms.CONST_BYTESTR(ByteStr.decodeBase58(secondAssetId).get).explicitGet(), Terms.CONST_LONG(burnedQuantity)),
           fee = smartMinFee + smartFee
         ),
-      "Transaction is not allowed by script of the asset"
+      "Transaction is not allowed by token-script"
     )
 
     sender.assetsDetails(secondAssetId).quantity shouldBe smartAssetQuantityBefore
@@ -145,7 +145,7 @@ class PseudoTxSenderPubKeySuite extends BaseTransactionSuite {
           ),
           fee = smartMinFee + smartFee
         ),
-      "Transaction is not allowed by script of the asset"
+      "Transaction is not allowed by token-script"
     )
 
     sender.assetsDetails(secondAssetId).quantity shouldBe smartAssetQuantityBefore
@@ -166,7 +166,7 @@ class PseudoTxSenderPubKeySuite extends BaseTransactionSuite {
           ),
           fee = smartMinFee + smartFee
         ),
-      "Transaction is not allowed by script of the asset"
+      "Transaction is not allowed by token-script"
     )
 
     sender.assetBalance(firstDApp.toAddress.toString, secondAssetId).balance shouldBe smartAssetBalanceBefore

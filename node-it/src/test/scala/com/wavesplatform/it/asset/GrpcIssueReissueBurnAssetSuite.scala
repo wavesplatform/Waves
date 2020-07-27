@@ -1,8 +1,7 @@
 package com.wavesplatform.it.asset
 
-import com.google.protobuf.ByteString
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.api.grpc.{AssetInfoResponse, TransactionStatus, TransactionsByIdRequest}
+import com.wavesplatform.api.grpc.AssetInfoResponse
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.SyncGrpcApi._
@@ -19,7 +18,6 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.FreeSpec
 
-import scala.concurrent.duration._
 import scala.util.Random
 
 class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSuiteLike {
@@ -149,12 +147,9 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
       val txIssue = issue(acc, method, simpleReissuableAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
 
-      val id = invokeScript(acc, "transferAndBurn", assetId = assetId, count = (simpleReissuableAsset.quantity / 2 + 1).toInt, wait = false)
-      sender.waitForHeightArise()
-      sender.waitFor("tx was rejected")(
-        n => n.getStatuses(TransactionsByIdRequest(Seq(ByteString.copyFrom(Base58.decode(id))))).head,
-        (ts: TransactionStatus) => ts.status == TransactionStatus.Status.NOT_EXISTS,
-        100.millis
+      assertGrpcError(
+        invokeScript(acc, "transferAndBurn", assetId = assetId, count = (simpleReissuableAsset.quantity / 2 + 1).toInt, wait = false),
+        "Accounts balance errors"
       )
     }
 
