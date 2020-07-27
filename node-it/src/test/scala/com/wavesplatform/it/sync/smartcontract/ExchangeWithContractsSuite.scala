@@ -12,9 +12,9 @@ import com.wavesplatform.transaction.{DataTransaction, TxVersion}
 import org.scalatest.CancelAfterFailure
 
 class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFailure with NTPTime {
-  private val acc0 = pkByAddress(firstAddress)
-  private val acc1 = pkByAddress(secondAddress)
-  private val acc2 = pkByAddress(thirdAddress)
+  private def acc0 = firstKeyPair
+  private def acc1 = secondKeyPair
+  private def acc2 = thirdKeyPair
 
   var exchAsset: String    = ""
   var dtx: DataTransaction = _
@@ -37,7 +37,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
 
     exchAsset = sender
       .issue(
-        acc0.toAddress.toString,
+        acc0,
         "ExchangeCoin",
         "ExchangeCoin for tests with exchange transaction",
         someAssetAmount,

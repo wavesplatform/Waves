@@ -32,9 +32,7 @@ class NFTBalanceSuite extends FreeSpec with BaseTransactionSuiteLike {
       .withSpecial(_.nonMiner)
       .buildNonConflicting()
 
-  override protected def nodes: Seq[Node] = theNodes()
-
-  private val node: Node = nodes.head
+  private def node: Node = nodes.head
 
   private val issuer: KeyPair = KeyPair("issuer#1".getBytes)
 

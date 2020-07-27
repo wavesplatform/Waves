@@ -12,8 +12,8 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 // because of SC-655 bug
 class InvokeSmartAssetFailSuite extends BaseTransactionSuite {
-  private val caller = firstAddress
-  private val dApp   = secondAddress
+  private lazy val caller = firstKeyPair
+  private lazy val dApp   = secondKeyPair
 
   val dAppText =
     """
@@ -62,7 +62,7 @@ class InvokeSmartAssetFailSuite extends BaseTransactionSuite {
     val script = ScriptCompiler.compile(dAppText, ScriptEstimatorV3).explicitGet()._1.bytes().base64
     sender.setScript(dApp, Some(script), setScriptFee, waitForTx = true)
 
-    val tx = sender.invokeScript(caller, dApp, Some("some"), List(CONST_BOOLEAN(true)), waitForTx = true)
+    val tx = sender.invokeScript(caller, dApp.toAddress.toString, Some("some"), List(CONST_BOOLEAN(true)), waitForTx = true)
     sender.debugStateChanges(tx._1.id).stateChanges.get.error.get.text shouldBe "Asset was issued by other address"
   }
 }

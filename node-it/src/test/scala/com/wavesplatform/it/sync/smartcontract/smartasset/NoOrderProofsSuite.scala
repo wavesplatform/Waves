@@ -20,7 +20,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
   test("try to use Order in asset scripts") {
     try {
       sender.issue(
-        firstAddress,
+        firstKeyPair,
         "assetWProofs",
         "Test coin for assetWProofs test",
         someAssetAmount,
@@ -37,7 +37,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
               |}""".stripMargin,
             isAssetScript = true,
             estimator
-          ).explicitGet()._1.bytes.value().base64
+          ).explicitGet()._1.bytes().base64
         )
       )
 
@@ -52,7 +52,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
     val errProofMsg = "Reason: Proof doesn't validate as signature"
     val assetWProofs = sender
       .issue(
-        firstAddress,
+        firstKeyPair,
         "assetWProofs",
         "Test coin for assetWProofs test",
         someAssetAmount,
@@ -70,7 +70,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
                 }""".stripMargin,
             false,
             estimator
-          ).explicitGet()._1.bytes.value().base64
+          ).explicitGet()._1.bytes().base64
         ),
         waitForTx = true
       )
@@ -78,8 +78,8 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
 
     val incorrectTrTx = TransferTransaction(
       2.toByte,
-      pkByAddress(firstAddress).publicKey,
-      pkByAddress(thirdAddress).toAddress,
+      firstKeyPair.publicKey,
+      thirdKeyPair.toAddress,
       IssuedAsset(ByteStr.decodeBase58(assetWProofs).get),
       1,
       Waves,
@@ -97,7 +97,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
     val incorrectBrTx = BurnTransaction
       .create(
         2.toByte,
-        pkByAddress(firstAddress).publicKey,
+        firstKeyPair.publicKey,
         IssuedAsset(ByteStr.decodeBase58(assetWProofs).get),
         1,
         smartMinFee,

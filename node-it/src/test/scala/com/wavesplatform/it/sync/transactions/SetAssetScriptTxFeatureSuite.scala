@@ -36,7 +36,7 @@ class SetAssetScriptTxFeatureSuite extends BaseTransactionSuite {
 
     assetId = sender
       .issue(
-        firstAddress,
+        firstKeyPair,
         "SetAssetScript",
         "Test coin for SetAssetScript tests",
         someAssetAmount,
@@ -53,7 +53,7 @@ class SetAssetScriptTxFeatureSuite extends BaseTransactionSuite {
 
   test("cannot transact without activated feature") {
     assertBadRequestAndResponse(
-      sender.setAssetScript(assetId, firstAddress, setAssetScriptFee, Some(scriptBase64)).id,
+      sender.setAssetScript(assetId, firstKeyPair, setAssetScriptFee, Some(scriptBase64)).id,
       s"${BlockchainFeatures.SmartAssets.description} feature has not been activated yet"
     )
   }
@@ -74,14 +74,13 @@ class SetAssetScriptTxFeatureSuite extends BaseTransactionSuite {
       )
       .explicitGet()
       ._1
-      .bytes
-      .value()
+      .bytes()
       .base64
 
     val txId = sender
       .setAssetScript(
         assetId,
-        firstAddress,
+        firstKeyPair,
         setAssetScriptFee,
         Some(script)
       )
