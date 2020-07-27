@@ -14,9 +14,9 @@ import org.scalatest.CancelAfterFailure
 class InvokeWithTransferSmartassetSuite extends BaseTransactionSuite with CancelAfterFailure {
   private val estimator = ScriptEstimatorV2
 
-  private val dApp      = firstAddress
-  private val callerAcc = secondAddress
-  private val issuerAcc = thirdAddress
+  private def dApp      = firstKeyPair
+  private def callerAcc = secondKeyPair
+  private def issuerAcc = thirdKeyPair
 
   private val accScript = ScriptCompiler
     .compile(
@@ -57,19 +57,19 @@ class InvokeWithTransferSmartassetSuite extends BaseTransactionSuite with Cancel
     val dAppData = List(IntegerDataEntry("y", 1))
     sender.putData(dApp, dAppData, 0.1.waves, waitForTx = true)
 
-    issuedAssetId = sender.issue(thirdAddress, "some", "asset", someAssetAmount, script = Some(assetScript), waitForTx = true).id
-    sender.transfer(issuerAcc, dApp, someAssetAmount, smartMinFee, Some(issuedAssetId), waitForTx = true)
-    sender.setScript(firstAddress, Some(accScript), setScriptFee, waitForTx = true)
+    issuedAssetId = sender.issue(thirdKeyPair, "some", "asset", someAssetAmount, script = Some(assetScript), waitForTx = true).id
+    sender.transfer(issuerAcc, dApp.toAddress.toString, someAssetAmount, smartMinFee, Some(issuedAssetId), waitForTx = true)
+    sender.setScript(firstKeyPair, Some(accScript), setScriptFee, waitForTx = true)
   }
 
   test("can make transfer") {
-    val callerBalance = sender.assetBalance(callerAcc, issuedAssetId).balance
-    val dAppBalance = sender.assetBalance(dApp, issuedAssetId).balance
+    val callerBalance = sender.assetBalance(callerAcc.toAddress.toString, issuedAssetId).balance
+    val dAppBalance = sender.assetBalance(dApp.toAddress.toString, issuedAssetId).balance
 
     sender
       .invokeScript(
         callerAcc,
-        dApp,
+        dApp.toAddress.toString,
         Some("f"),
         args = List(CONST_STRING(issuedAssetId).explicitGet()),
         Seq.empty,
@@ -80,7 +80,7 @@ class InvokeWithTransferSmartassetSuite extends BaseTransactionSuite with Cancel
       ._1
       .id
 
-    sender.assetBalance(callerAcc, issuedAssetId).balance shouldBe callerBalance + 1
-    sender.assetBalance(dApp, issuedAssetId).balance shouldBe dAppBalance - 1
+    sender.assetBalance(callerAcc.toAddress.toString, issuedAssetId).balance shouldBe callerBalance + 1
+    sender.assetBalance(dApp.toAddress.toString, issuedAssetId).balance shouldBe dAppBalance - 1
   }
 }
