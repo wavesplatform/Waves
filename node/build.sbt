@@ -8,8 +8,6 @@ enablePlugins(RunApplicationSettings, JavaServerAppPackaging, UniversalDeployPlu
 
 resolvers ++= Seq(
   Resolver.bintrayRepo("ethereum", "maven"),
-  Resolver.bintrayRepo("dnvriend", "maven"),
-  Resolver.sbtPluginRepo("releases")
 )
 
 libraryDependencies ++= Dependencies.node.value
@@ -112,6 +110,13 @@ inConfig(Linux)(
   )
 )
 
+// Variable options are used in different tasks and configs, so we will specify all of them
+val nameFix = Seq(
+  name := "waves",
+  packageName := s"${name.value}${network.value.packageSuffix}",
+  normalizedName := s"${name.value}${network.value.packageSuffix}"
+)
+
 inConfig(Debian)(
   Seq(
     linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
@@ -147,13 +152,6 @@ V.scalaPackage := "com.wavesplatform"
 
 moduleName := s"waves${network.value.packageSuffix}" // waves-*.jar instead of node-*.jar
 executableScriptName := moduleName.value             // bin/waves instead of bin/node
-
-// Variable options are used in different tasks and configs, so we will specify all of them
-val nameFix = Seq(
-  name := "waves",
-  packageName := s"${name.value}${network.value.packageSuffix}",
-  normalizedName := s"${name.value}${network.value.packageSuffix}"
-)
 
 nameFix
 inScope(Global)(nameFix)
