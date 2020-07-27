@@ -434,9 +434,10 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
         dApp
       )
 
-      val failedTx = miner.invokeScript(miner.keyPair, dApp.toAddress.toString, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee)
-      val error    = sender.debugStateChanges(failedTx._1.id).stateChanges.get.error.get.text
-      error should include("NegativeMinFee")
+      assertBadRequestAndMessage(
+        miner.invokeScript(miner.keyPair, dApp.toAddress.toString, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee),
+        "NegativeMinFee"
+      )
     }
 
     "SponsorFee is available only for assets issuing from current address" in {
@@ -457,9 +458,10 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
         """.stripMargin
       ).toAddress.toString
 
-      val failedTx = miner.invokeScript(miner.keyPair, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee)
-      val error    = sender.debugStateChanges(failedTx._1.id).stateChanges.get.error.get.text
-      error should include(s"SponsorFee assetId=$assetId was not issued from address of current dApp")
+      assertBadRequestAndMessage(
+        miner.invokeScript(miner.keyPair, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee),
+        s"SponsorFee assetId=$assetId was not issued from address of current dApp"
+      )
     }
 
     "SponsorFee is not available for scripted assets" in {
@@ -482,9 +484,11 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
         """.stripMargin,
         dApp
       )
-      val failedTx = miner.invokeScript(miner.keyPair, dApp.toAddress.toString, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee + smartFee)
-      val error    = sender.debugStateChanges(failedTx._1.id).stateChanges.get.error.get.text
-      error should include(s"Sponsorship smart assets is disabled.")
+
+      assertBadRequestAndMessage(
+        miner.invokeScript(miner.keyPair, dApp.toAddress.toString, Some("sponsorAsset"), fee = smartMinFee + smartFee),
+        "Sponsorship smart assets is disabled."
+      )
     }
   }
 

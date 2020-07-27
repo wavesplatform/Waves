@@ -8,6 +8,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values.{V1, V4}
+import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.ScriptEvaluatorBenchmark._
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -16,7 +17,6 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.{FROMBASE58, SIGVERIFY, TOBASE58}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, FunctionIds}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
@@ -283,7 +283,7 @@ class SigVerify32Kb {
 class ListRemoveByIndex {
   val context: EvaluationContext[NoContext, Id] =
     Monoid.combine(
-      PureContext.build(Global, V4).evaluationContext,
+      PureContext.build(V4).evaluationContext,
       CryptoContext.build(Global, V4).evaluationContext
     )
 

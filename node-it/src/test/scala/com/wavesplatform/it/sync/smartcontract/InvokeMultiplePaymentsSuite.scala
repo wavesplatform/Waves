@@ -90,33 +90,30 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
   test("script should sheck if alias not exists") {
     val alias = "unknown"
 
-    val tx1 = sender
-      .invokeScript(
-        caller,
-        dAppAddress,
-        Some("f"),
-        payment = Seq(Payment(1.waves, Waves)),
-        args = List(CONST_STRING(alias).explicitGet()),
-        waitForTx = true
-      )
-      ._1
-      .id
+    assertBadRequestAndMessage(
+      sender
+        .invokeScript(
+          caller,
+          dAppAddress,
+          Some("f"),
+          payment = Seq(Payment(1.waves, Waves)),
+          args = List(CONST_STRING(alias).explicitGet())
+        ),
+      s"Alias 'alias:I:$alias"
+    )
 
-    sender.debugStateChanges(tx1).stateChanges.get.error.get.text should include(s"Alias 'alias:I:$alias")
-
-    val tx2 = sender
-      .invokeScript(
-        caller,
-        dAppAddress,
-        Some("f"),
-        payment = Seq(Payment(1.waves, Waves)),
-        args = List(CONST_STRING(s"alias:I:$alias").explicitGet()),
-        waitForTx = true
-      )
-      ._1
-      .id
-
-    sender.debugStateChanges(tx2).stateChanges.get.error.get.text should include("Alias should contain only following characters")
+    assertBadRequestAndMessage(
+      sender
+        .invokeScript(
+          caller,
+          dAppAddress,
+          Some("f"),
+          payment = Seq(Payment(1.waves, Waves)),
+          args = List(CONST_STRING(s"alias:I:$alias").explicitGet()),
+          waitForTx = true
+        ),
+      "Alias should contain only following characters"
+    )
   }
 
   test("can invoke with no payments") {

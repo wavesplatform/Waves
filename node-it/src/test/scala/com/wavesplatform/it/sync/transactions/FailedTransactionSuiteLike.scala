@@ -34,7 +34,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
       checker: (Seq[T], T) => Seq[S]
   ): Seq[S] = {
     val maxTxsInMicroBlock = sender.config.getInt("waves.miner.max-transactions-in-micro-block")
-    val txs = (1 to maxTxsInMicroBlock * 2).map(i => t(i))
+    val txs                = (1 to maxTxsInMicroBlock * 2).map(i => t(i))
     val priorityTx         = pt()
     waitForEmptyUtx()
     waitForHeightArise()
@@ -111,7 +111,9 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                 s"""
                    |match tx {
                    |  case _: SetAssetScriptTransaction => true
-                   |  case _ => $result
+                   |  case _ =>
+                   |    let check = ${"sigVerify(base58'', base58'', base58'') ||" * 16} false
+                   |    if (check) then false else $result
                    |}
                    |""".stripMargin,
                 ScriptEstimatorV3
@@ -203,27 +205,31 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
       invalid
     }
 
-    def updateAssetScript(result: Boolean, asset: String, owner: KeyPair, fee: Long): PBSignedTransaction = {
+    def updateAssetScript(result: Boolean, asset: String, owner: KeyPair, fee: Long, waitForTx: Boolean = true): PBSignedTransaction = {
       sender
         .setAssetScript(
           owner,
           asset,
           Right(
-            ScriptCompiler
-              .compile(
-                s"""
+            Some(
+              ScriptCompiler
+                .compile(
+                  s"""
                    |match tx {
                    |  case _: SetAssetScriptTransaction => true
-                   |  case _ => $result
+                   |  case _ =>
+                   |    let check = ${"sigVerify(base58'', base58'', base58'') ||" * 16} false
+                   |    if (check) then false else $result
                    |}
                    |""".stripMargin,
-                ScriptEstimatorV3
-              )
-              .toOption
-              .map(_._1)
+                  ScriptEstimatorV3
+                )
+                .explicitGet()
+                ._1
+            )
           ),
           fee,
-          waitForTx = true
+          waitForTx = waitForTx
         )
     }
 
@@ -260,14 +266,6 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
     import com.wavesplatform.it.api.SyncHttpApi._
 
     sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
-  }
-
-  def genExprWithComplexity(targetComplexity: Int, result: Boolean = true): String = {
-    s"""
-       |(if ($result) then
-       |  ${"sigVerify(base58'', base58'', base58'') ||" * (targetComplexity / 200)} true
-       |else
-       |  ${"sigVerify(base58'', base58'', base58'') ||" * (targetComplexity / 200)} false)""".stripMargin
   }
 }
 

@@ -69,9 +69,8 @@ class EvaluatorV2(
             limit = limit,
             parentBlocks = parentBlocks
           ).flatMap { unused =>
-            if (unused < 0) throw new Error("Unused < 0")
             i.cond match {
-              case TRUE | FALSE if unused == 0 =>
+              case TRUE | FALSE if unused <= 0 =>
                 Coeval.now(unused)
               case TRUE if unused > 0 =>
                 update(i.ifTrue).flatMap(
@@ -113,8 +112,7 @@ class EvaluatorV2(
               .to(LazyList)
               .foldM(limit) {
                 case (unused, argIndex) =>
-                  if (unused < 0) throw new Error("Unused < 0")
-                  else if (unused == 0)
+                  if (unused <= 0)
                     Coeval.now(unused)
                   else
                     root(
