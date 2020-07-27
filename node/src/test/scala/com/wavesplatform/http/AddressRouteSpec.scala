@@ -176,15 +176,15 @@ class AddressRouteSpec
   routePath(s"/scriptInfo/${allAddresses(1)}") in {
     val script = ExprScript(TRUE).explicitGet()
 
-    (commonAccountApi.script _).expects(allAccounts(1).toAddress).returning(Some(AccountScriptInfo(allAccounts(1).publicKey, script, 1L))).once()
-    (blockchain.accountScript _).when(allAccounts(1).toAddress).returns(Some(AccountScriptInfo(allAccounts(1).publicKey, script, 1L))).once()
+    (commonAccountApi.script _).expects(allAccounts(1).toAddress).returning(Some(AccountScriptInfo(allAccounts(1).publicKey, script, 123L))).once()
+    (blockchain.accountScript _).when(allAccounts(1).toAddress).returns(Some(AccountScriptInfo(allAccounts(1).publicKey, script, 123L))).once()
 
     Get(routePath(s"/scriptInfo/${allAddresses(1)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(1).toString
       (response \ "script").as[String] shouldBe "base64:AQa3b8tH"
       (response \ "scriptText").as[String] shouldBe "true"
-      (response \ "complexity").as[Long] shouldBe 0
+      (response \ "complexity").as[Long] shouldBe 123
       (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
