@@ -65,8 +65,8 @@ package object sync {
   val reissueTxSupportedVersions: List[Byte]      = List(1, 2, 3)
 
   val script: Script          = ScriptCompiler(s"""true""".stripMargin, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
-  val scriptBase64: String    = script.bytes.value.base64
-  val scriptBase64Raw: String = script.bytes.value.base64Raw
+  val scriptBase64: String    = script.bytes().base64
+  val scriptBase64Raw: String = script.bytes().base64Raw
 
   val errNotAllowedByToken = "Transaction is not allowed by token-script"
   val errNotAllowedByTokenApiError: AssertiveApiError =

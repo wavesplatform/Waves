@@ -23,8 +23,8 @@ class RideUpdateAssetInfoTxSuite extends BaseTransactionSuite with CancelAfterFa
       .overrideBase(_.minAssetInfoUpdateInterval(1))
       .buildNonConflicting()
 
-  private val dApp = firstAddress
-  private val smartAcc = secondAddress
+  private def dApp = firstKeyPair
+  private def smartAcc = secondKeyPair
 
   private var asset1: IssuedAsset = _
   private var asset2: IssuedAsset = _
@@ -47,7 +47,7 @@ class RideUpdateAssetInfoTxSuite extends BaseTransactionSuite with CancelAfterFa
        |      uai.id.size() == 32
        |      && uai.version == 1
        |      && uai.sender == this
-       |      && uai.senderPublicKey == base58'${pkByAddress(firstAddress).publicKey.toString}'
+       |      && uai.senderPublicKey == base58'${firstKeyPair.publicKey.toString}'
        |      && uai.name == "$name"
        |      && uai.description == "$description"
        |      && uai.fee == $fee
@@ -69,7 +69,7 @@ class RideUpdateAssetInfoTxSuite extends BaseTransactionSuite with CancelAfterFa
        |    uai.id.size() == 32
        |    && uai.version == 1
        |    && uai.sender == this
-       |    && uai.senderPublicKey == base58'${pkByAddress(secondAddress).publicKey.toString}'
+       |    && uai.senderPublicKey == base58'${secondKeyPair.publicKey.toString}'
        |    && uai.name == "$name"
        |    && uai.description == "$description"
        |    && uai.fee == $fee
@@ -126,8 +126,8 @@ class RideUpdateAssetInfoTxSuite extends BaseTransactionSuite with CancelAfterFa
     val asset2Height = sender.transactionInfo[TransactionInfo](asset2.id.toString).height
     nodes.waitForHeight(asset2Height + 2)
 
-    sender.updateAssetInfo(pkByAddress(dApp), asset1.id.toString, name, description, fee, timestamp = Some(timestamp), waitForTx = true)
-    sender.updateAssetInfo(pkByAddress(smartAcc), asset2.id.toString, name, description, fee, timestamp = Some(timestamp), waitForTx = true)
+    sender.updateAssetInfo(dApp, asset1.id.toString, name, description, fee, timestamp = Some(timestamp), waitForTx = true)
+    sender.updateAssetInfo(smartAcc, asset2.id.toString, name, description, fee, timestamp = Some(timestamp), waitForTx = true)
   }
 
 }
