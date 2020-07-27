@@ -14,7 +14,7 @@ class FairPoSTestSuite extends FunSuite with CancelAfterFailure with NodesFromDo
   test("blockchain grows with FairPoS activated") {
     nodes.waitForSameBlockHeadersAt(height = 10, conditionAwaitTime = 11.minutes)
 
-    val txId = nodes.head.transfer(nodes.head.address, nodes.last.address, transferAmount, minFee).id
+    val txId = nodes.head.transfer(nodes.head.keyPair, nodes.last.address, transferAmount, minFee).id
     nodes.last.waitForTransaction(txId)
 
     val heightAfterTransfer = nodes.head.height

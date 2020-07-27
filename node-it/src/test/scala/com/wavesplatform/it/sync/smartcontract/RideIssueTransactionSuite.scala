@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync.smartcontract
 import java.nio.charset.StandardCharsets
 
 import com.typesafe.config.Config
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs
@@ -65,26 +66,26 @@ class RideIssueTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     )
 
   test("check issuing asset name and description using V3 and V4 script") {
-    assertSuccessIssue(firstAddress, issueCheckV3)
-    assertSuccessIssue(secondAddress, issueCheckV4)
+    assertSuccessIssue(firstKeyPair, issueCheckV3)
+    assertSuccessIssue(secondKeyPair, issueCheckV4)
   }
 
   def compile(script: String): String =
     ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1.bytes().base64
 
-  def assertSuccessIssue(address: String, script: String): Assertion = {
-    val setScriptId = sender.setScript(address, Some(script), setScriptFee, waitForTx = true).id
+  def assertSuccessIssue(txSender: KeyPair, script: String): Assertion = {
+    val setScriptId = sender.setScript(txSender, Some(script), setScriptFee, waitForTx = true).id
 
-    val scriptInfo = sender.addressScriptInfo(address)
+    val scriptInfo = sender.addressScriptInfo(txSender.toAddress.toString)
     scriptInfo.script.isEmpty shouldBe false
     scriptInfo.scriptText.isEmpty shouldBe false
     scriptInfo.script.get.startsWith("base64:") shouldBe true
 
     sender.transactionInfo[TransactionInfo](setScriptId).script.get.startsWith("base64:") shouldBe true
 
-    val assetId = sender.issue(address, assetName, assetDescription, assetQuantity, fee = issueFee + smartFee, waitForTx = true).id
+    val assetId = sender.issue(txSender, assetName, assetDescription, assetQuantity, fee = issueFee + smartFee, waitForTx = true).id
 
-    sender.assertAssetBalance(address, assetId, assetQuantity)
+    sender.assertAssetBalance(txSender.toAddress.toString, assetId, assetQuantity)
 
     val asset = sender.assetsDetails(assetId)
     asset.name shouldBe assetName

@@ -14,12 +14,12 @@ class LeaseStatusTestSuite extends BaseTransactionSuite with CancelAfterFailure 
   override protected def nodeConfigs: Seq[Config] = Configs
 
   test("verification of leasing status") {
-    val createdLeaseTxId = sender.lease(firstAddress, secondAddress, leasingAmount, leasingFee = minFee).id
+    val createdLeaseTxId = sender.lease(firstKeyPair, secondAddress, leasingAmount, leasingFee = minFee).id
     nodes.waitForHeightAriseAndTxPresent(createdLeaseTxId)
     val status = getStatus(createdLeaseTxId)
     status shouldBe LeaseStatus.Active
 
-    val cancelLeaseTxId = sender.cancelLease(firstAddress, createdLeaseTxId, fee = minFee).id
+    val cancelLeaseTxId = sender.cancelLease(firstKeyPair, createdLeaseTxId, fee = minFee).id
     miner.waitForTransaction(cancelLeaseTxId)
     nodes.waitForHeightArise()
     val status1 = getStatus(createdLeaseTxId)

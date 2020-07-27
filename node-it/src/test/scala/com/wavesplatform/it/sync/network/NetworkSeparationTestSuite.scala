@@ -44,17 +44,17 @@ class NetworkSeparationTestSuite
   }
 
   "after fork node should apply correct subchain" in {
-    val issuedAssetId = nodeA.issue(nodeA.address, "TestAsset", "description", issueAmount, 8, reissuable = true, issueFee).id
+    val issuedAssetId = nodeA.issue(nodeA.keyPair, "TestAsset", "description", issueAmount, 8, reissuable = true, issueFee).id
     nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
 
     nodeA.assertAssetBalance(nodeA.address, issuedAssetId, issueAmount)
 
-    val txId = nodeA.transfer(nodeA.address, nodeB.address, issueAmount / 2, minFee, Some(issuedAssetId)).id
+    val txId = nodeA.transfer(nodeA.keyPair, nodeB.address, issueAmount / 2, minFee, Some(issuedAssetId)).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
     docker.disconnectFromNetwork(dockerNodes().head)
 
-    val burnNoOwnerTxTd = nodeB.burn(nodeB.address, issuedAssetId, issueAmount / 2, minFee).id
+    val burnNoOwnerTxTd = nodeB.burn(nodeB.keyPair, issuedAssetId, issueAmount / 2, minFee).id
     Await.ready(waitForTxsToReachAllNodes(Seq(nodeB), Seq(burnNoOwnerTxTd)), 2.minute)
     val heightAfter = nodeB.height
 
