@@ -92,9 +92,6 @@ lazy val root = (project in file("."))
     `blockchain-updates`
   )
 
-// this a hack to support both `node-it/test` and `it/test` commands
-lazy val it = project.aggregate(`node-it`)
-
 inScope(Global)(
   Seq(
     scalaVersion := "2.13.3",
