@@ -20,7 +20,7 @@ class CommonAccountsApiSpec
     with BlocksTransactionsHelpers
     with ScalaCheckDrivenPropertyChecks {
   "Data stream" - {
-    "handles non-existent address" ignore {
+    "handles non-existent address" in {
       val entry1 = StringDataEntry("test", "test")
       val entry2 = StringDataEntry("test1", "test")
       val entry3 = StringDataEntry("test2", "test")
