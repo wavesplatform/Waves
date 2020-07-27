@@ -161,6 +161,7 @@ checkPRRaw := Def
   .sequential(
     root / clean,
     Def.task {
+      (`lang-jvm` / Compile / PB.generate).value
       (Test / compile).value
       (`lang-tests` / Test / test).value
       (`lang-js` / Compile / fastOptJS).value
