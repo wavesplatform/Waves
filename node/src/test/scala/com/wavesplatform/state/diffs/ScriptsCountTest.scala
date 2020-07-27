@@ -6,12 +6,20 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.{Global, utils}
+import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.script.{Script, ContractScript}
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.CompositeBlockchain
@@ -20,7 +28,8 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.{SetScriptTransaction, InvokeScriptTransaction}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.{NoShrink, TransactionGen}
@@ -32,7 +41,6 @@ object ScriptsCountTest {
     import com.wavesplatform.transaction.Asset.IssuedAsset
     import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
     import com.wavesplatform.transaction.assets.{BurnTransaction, ReissueTransaction, SponsorFeeTransaction}
-    import com.wavesplatform.transaction.smart.InvokeScriptTransaction
     import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
     import com.wavesplatform.transaction.{Authorized, Transaction}
 
@@ -86,7 +94,6 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
       BlockchainFeatures.SmartAccounts.id       -> 0,
       BlockchainFeatures.SmartAssets.id         -> 0,
       BlockchainFeatures.SmartAccountTrading.id -> 0,
-      BlockchainFeatures.Ride4DApps.id          -> 0,
       BlockchainFeatures.DataTransaction.id     -> 0,
       BlockchainFeatures.MassTransfer.id        -> 0,
       BlockchainFeatures.FeeSponsorship.id      -> 0,
@@ -215,7 +222,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
         exchangea,     // 1
         issueScrB,
         setContractB,
-        exchangeB // 4
+        exchangeB      // 4
       )
 
       assertDiffAndState(Nil, TestBlock.create(Seq(genesis)), fs) {
@@ -246,7 +253,6 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
       genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       fee                         = 1000000000L
       setContract                 = SetScriptTransaction.selfSigned(1.toByte, master, Some(allAllowed), fee, ts).explicitGet()
-      resetContract               = SetScriptTransaction.selfSigned(1.toByte, master, Some(allAllowed), fee, ts + 1).explicitGet()
       (_, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
       issueSp = IssueTransaction(
           TxVersion.V2,
@@ -329,11 +335,50 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
         timestamp
       ).signWith(acc.privateKey)
       assetPairB = AssetPair(IssuedAsset(issueScrB.id()), IssuedAsset(issueScr.id()))
-      o1b        = Order.buy(2: Byte, master, master.publicKey, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1)
-      o2b        = Order.sell(2: Byte, acc, master.publicKey, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1)
+      o1b        = Order.buy(2: Byte, master, master.publicKey, assetPairB, 100000000L, 100000000L, timestamp, 10000L, 1)
+      o2b        = Order.sell(2: Byte, acc, master.publicKey, assetPairB, 100000000L, 100000000L, timestamp, 10000L, 1)
       exchangeB = ExchangeTransaction
-        .signed(TxVersion.V2, master.privateKey, o1b, o2b, 100000001L, 100000001L, 1, 1, (1 + 1) / 2, 10000L - 100)
+        .signed(TxVersion.V2, master.privateKey, o1b, o2b, 100000000L, 100000000L, 1, 1, (1 + 1) / 2, 10000L - 100)
         .explicitGet()
+      simpleContract = ContractScript(V4, {
+       val expr = {
+         val script =
+           s"""
+             |{-# STDLIB_VERSION 4 #-}
+             |{-# CONTENT_TYPE DAPP #-}
+             |
+             |@Callable(inv)
+             |func f() = {
+             |    [ScriptTransfer(inv.caller, 1, base58'${issueScr.id()}')]
+             |}
+             |
+             |@Verifier(txx)
+             |func verify() = {
+             |    if false
+             |    then true
+             |    else "q" == "q"
+             |}""".stripMargin
+         Parser.parseContract(script).get.value
+       }
+
+       val ctx = {
+         utils.functionCosts(V4)
+         Monoid
+           .combineAll(
+             Seq(
+               PureContext.build(V4).withEnvironment[Environment],
+               CryptoContext.build(Global, V4).withEnvironment[Environment],
+               WavesContext.build(
+                 DirectiveSet(V4, Account, Expression).explicitGet()
+               )
+             )
+           )
+       }
+
+       compiler.ContractCompiler(ctx.compilerContext, expr, V4)
+      }.explicitGet()).explicitGet()
+      resetContract               = SetScriptTransaction.selfSigned(1.toByte, master, Some(simpleContract), fee, ts + 1).explicitGet()
+      invokeScript = InvokeScriptTransaction.selfSigned(1.toByte, acc, master.toAddress, Some(FUNCTION_CALL(FunctionHeader.User("f"), List())), Seq(Payment(1, IssuedAsset(issueScr.id()))), 10000000L, Waves, timestamp).explicitGet()
     } yield {
       assertDiffAndState(
         Seq(TestBlock.create(Seq(genesis))),
@@ -360,15 +405,17 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
             exchangea,     // 2
             issueScrB,
             setContractB,
-            exchangeB // 5
+            exchangeB,     // 5
+            invokeScript   // 3 + 1
           )
         ),
         fs1
       ) {
         case (blockDiff, _) =>
-          blockDiff.scriptsRun shouldBe 31
-          blockDiff.scriptsComplexity shouldBe (Script.estimate(allAllowed, ScriptEstimatorV2, useContractVerifierLimit = false).explicitGet() * 31)
-          blockDiff.spentComplexity shouldBe (2 * 31)
+          val escripts = 34
+          blockDiff.scriptsRun shouldBe escripts + 1
+          blockDiff.scriptsComplexity shouldBe (Script.estimate(allAllowed, ScriptEstimatorV2, useContractVerifierLimit = false).explicitGet() * escripts + 10)
+          blockDiff.spentComplexity shouldBe (2 * escripts + 2)
       }
     }) { x =>
       x
