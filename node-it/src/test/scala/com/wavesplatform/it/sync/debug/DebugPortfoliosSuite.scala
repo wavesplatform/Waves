@@ -17,21 +17,24 @@ class DebugPortfoliosSuite extends FunSuite with NodesFromDocker {
 
   private def sender: Node = nodes.head
 
-  private val firstAddress  = sender.createAddress()
-  private val secondAddress = sender.createAddress()
+  private lazy val firstAcc  = sender.createKeyPair()
+  private lazy val secondAcc = sender.createKeyPair()
+
+  private lazy val firstAddress: String  = firstAcc.toAddress.toString
+  private lazy val secondAddress: String = secondAcc.toAddress.toString
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    sender.transfer(sender.address, firstAddress, 20.waves, minFee, waitForTx = true)
-    sender.transfer(sender.address, secondAddress, 20.waves, minFee, waitForTx = true)
+    sender.transfer(sender.keyPair, firstAddress, 20.waves, minFee, waitForTx = true)
+    sender.transfer(sender.keyPair, secondAddress, 20.waves, minFee, waitForTx = true)
   }
 
   test("getting a balance considering pessimistic transactions from UTX pool - changed after UTX") {
     val portfolioBefore = sender.debugPortfoliosFor(firstAddress, considerUnspent = true)
     val utxSizeBefore   = sender.utxSize
 
-    sender.transfer(firstAddress, secondAddress, 5.waves, 5.waves)
-    sender.transfer(secondAddress, firstAddress, 7.waves, 5.waves)
+    sender.transfer(firstAcc, secondAddress, 5.waves, 5.waves)
+    sender.transfer(secondAcc, firstAddress, 7.waves, 5.waves)
 
     sender.waitForUtxIncreased(utxSizeBefore)
 
@@ -48,7 +51,7 @@ class DebugPortfoliosSuite extends FunSuite with NodesFromDocker {
     val portfolioBefore = sender.debugPortfoliosFor(firstAddress, considerUnspent = false)
     val utxSizeBefore   = sender.utxSize
 
-    sender.transfer(firstAddress, secondAddress, 5.waves, fee = 5.waves)
+    sender.transfer(firstAcc, secondAddress, 5.waves, fee = 5.waves)
     sender.waitForUtxIncreased(utxSizeBefore)
 
     val portfolioAfter = sender.debugPortfoliosFor(firstAddress, considerUnspent = false)

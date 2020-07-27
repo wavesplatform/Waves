@@ -25,14 +25,12 @@ class RewardsTestSuite
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
-  private val miner = nodes.head
+  private lazy val miner = nodes.head
+  private lazy val initMinerBalance = miner.balanceDetails(miner.address).available
+  private lazy val initialAmount = BigInt(Constants.TotalWaves) * BigInt(Constants.UnitsInWave)
 
   "reward changes accordingly node's votes and miner's balance changes by reward amount after block generation" - {
-    val initMinerBalance = miner.balanceDetails(miner.address).available
-    val initialAmount = BigInt(Constants.TotalWaves) * BigInt(Constants.UnitsInWave)
-
     "when miner votes for increase" in {
-
       assertApiError(miner.rewardStatus(Some(1)), CustomValidationError("Block reward feature is not activated yet"))
       miner.waitForHeight(activationHeight - 1, 5.minutes)
       miner.balanceDetails(miner.address).available shouldBe initMinerBalance

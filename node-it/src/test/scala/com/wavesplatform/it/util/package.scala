@@ -11,7 +11,7 @@ import scala.util.control.NonFatal
 package object util {
   implicit class TimerExt(val timer: Timer) extends AnyVal {
     def schedule[A](f: => Future[A], delay: FiniteDuration): Future[A] = {
-      val p = Promise[A]
+      val p = Promise[A]()
       try {
         timer.newTimeout(_ => p.completeWith(f), delay.length, delay.unit)
       } catch {
