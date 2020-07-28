@@ -11,7 +11,7 @@ import play.api.libs.json._
 case class SignedBurnV2Request(
     senderPublicKey: String,
     assetId: String,
-    quantity: Long,
+    amount: Long,
     fee: Long,
     timestamp: Long,
     proofs: List[String]
@@ -23,7 +23,7 @@ case class SignedBurnV2Request(
       _assetId    <- parseBase58ToIssuedAsset(assetId)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
-      _t          <- BurnTransaction.create(2.toByte, _sender, _assetId, quantity, fee, timestamp, _proofs)
+      _t          <- BurnTransaction.create(2.toByte, _sender, _assetId, amount, fee, timestamp, _proofs)
     } yield _t
 }
 
@@ -31,7 +31,7 @@ object SignedBurnV2Request {
   implicit val reads: Reads[SignedBurnV2Request] = (
     (JsPath \ "senderPublicKey").read[String] and
       (JsPath \ "assetId").read[String] and
-      (JsPath \ "quantity").read[Long].orElse((JsPath \ "amount").read[Long]) and
+      (JsPath \ "amount").read[Long] and
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "proofs").read[List[ProofStr]]
