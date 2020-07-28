@@ -15,10 +15,10 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 class SponsorFeeActionSuite extends BaseSuite {
   private val initialWavesBalance = 100.waves
 
-  private var sponsoredAssetId: String = ""
+  private var sponsoredAssetId: String  = ""
   private var globalDAppAddress: String = ""
-  private var dApp: KeyPair = _
-  private val minSponsoredAssetFee = 100
+  private var dApp: KeyPair             = _
+  private val minSponsoredAssetFee      = 100
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -377,8 +377,10 @@ class SponsorFeeActionSuite extends BaseSuite {
             dAppBalance.sponsorBalance shouldBe Some(miner.balance(dAppAddress).balance)
         }
 
-      val failedTx = miner.invokeScript(miner.keyPair, dAppAddress, Some("sponsor11assets"), waitForTx = true, fee = smartMinFee)
-      sender.debugStateChanges(failedTx._1.id).stateChanges.get.error.get.text should include("Too many script actions: max: 10, actual: 11")
+      assertBadRequestAndMessage(
+        miner.invokeScript(miner.keyPair, dAppAddress, Some("sponsor11assets"), fee = smartMinFee),
+        "Too many script actions: max: 10, actual: 11"
+      )
     }
 
     "SponsorFee is available for assets issued via transaction" in {
@@ -424,9 +426,7 @@ class SponsorFeeActionSuite extends BaseSuite {
         dApp
       )
 
-      val failedTx = miner.invokeScript(miner.keyPair, dAppAddress, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee)
-      val error    = sender.debugStateChanges(failedTx._1.id).stateChanges.get.error.get.text
-      error should include("NegativeMinFee")
+      assertBadRequestAndMessage(miner.invokeScript(miner.keyPair, dAppAddress, Some("sponsorAsset"), fee = smartMinFee), "NegativeMinFee")
     }
 
     "SponsorFee is available only for assets issuing from current address" in {
@@ -447,9 +447,10 @@ class SponsorFeeActionSuite extends BaseSuite {
         """.stripMargin
       )
 
-      val failedTx = miner.invokeScript(miner.keyPair, dApp.toAddress.toString, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee)
-      val error    = sender.debugStateChanges(failedTx._1.id).stateChanges.get.error.get.text
-      error should include(s"SponsorFee assetId=$assetId was not issued from address of current dApp")
+      assertBadRequestAndMessage(
+        miner.invokeScript(miner.keyPair, dApp.toAddress.toString, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee),
+        s"SponsorFee assetId=$assetId was not issued from address of current dApp"
+      )
     }
 
     "SponsorFee is not available for scripted assets" in {
@@ -473,9 +474,10 @@ class SponsorFeeActionSuite extends BaseSuite {
         """.stripMargin,
         dApp
       )
-      val failedTx = miner.invokeScript(miner.keyPair, dAppAddress, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee + smartFee)
-      val error    = sender.debugStateChanges(failedTx._1.id).stateChanges.get.error.get.text
-      error should include(s"Sponsorship smart assets is disabled.")
+      assertBadRequestAndMessage(
+        miner.invokeScript(miner.keyPair, dAppAddress, Some("sponsorAsset"), fee = smartMinFee + smartFee),
+        "Sponsorship smart assets is disabled."
+      )
     }
   }
 

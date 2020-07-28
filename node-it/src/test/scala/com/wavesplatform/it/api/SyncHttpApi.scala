@@ -101,12 +101,13 @@ object SyncHttpApi extends Assertions {
 
   def assertApiError[R](f: => R, expectedError: AssertiveApiError): Assertion =
     assertApiError(f) { error =>
-      error.id shouldBe expectedError.id
-      error.statusCode shouldBe expectedError.code.intValue()
       if (expectedError.matchMessage)
         error.message should include regex expectedError.message
       else
         error.message shouldBe expectedError.message
+
+      error.statusCode shouldBe expectedError.code.intValue()
+      error.id shouldBe expectedError.id
     }
 
   def assertApiError[R](f: => R, expectedError: ApiError): Assertion =
@@ -723,6 +724,8 @@ object SyncHttpApi extends Assertions {
 
     def featureActivationStatus(featureNum: Short): FeatureActivationStatus =
       activationStatus.features.find(_.id == featureNum).get
+
+    def signedValidate(json: JsValue): JsValue = sync(async(n).signedValidate(json))
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {

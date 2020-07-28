@@ -1,7 +1,7 @@
 FROM openjdk:8-jdk-stretch as builder
 ARG SBT_VERSION=1.2.8
 ARG WAVES_VERSION="latest"
-ARG BRANCH="version-0.17.x"
+ARG BRANCH="version-1.1.x"
 ARG DEB_PACKAGE_NETWORKS
 
 RUN                                                                             \
@@ -59,15 +59,13 @@ RUN                                                                             
             -Xmx2g -Dnetwork=${network}" sbt 'packageAll'                   &&  \
         mkdir -p /out/${network}                                            &&  \
         mv node/target/waves*.deb /out/${network}/                          &&  \
-        cp node/target/waves-all*.jar /out/${network}/                      &&  \
-        mv grpc-server/target/universal/grpc-server*.tgz /out/${network}/   &&  \
-        mv grpc-server/target/grpc-server*.deb /out/${network}/             ;   \
+        cp node/target/waves-all*.jar /out/${network}/                      ;   \
     done                                                                        \
 ;}
 
 FROM openjdk:11-jre-slim
 ARG WAVES_VERSION="latest"
-ARG WAVES_LOG_LEVEL="DEBUG"
+ARG WAVES_LOG_LEVEL="INFO"
 ARG WAVES_HEAP_SIZE="2g"
 ARG WAVES_NETWORK="mainnet"
 
@@ -82,7 +80,7 @@ COPY entrypoint.sh /usr/share/waves/bin/
 
 RUN groupadd -g 143 waves                                                   &&  \
     useradd -d /var/lib/waves -g 143 -u 143 -s /bin/bash -M waves           &&  \
-    mkdir -p /var/lib/waves /etc/waves                                      &&  \
+    mkdir -p /var/lib/waves /etc/waves /usr/share/waves/lib/plugins         &&  \
     chown -R 143:143 /var/lib/waves /usr/share/waves /etc/waves             &&  \
     chmod -R 755 /var/lib/waves /usr/share/waves /etc/waves                 &&  \
     ln -fs /var/lib/waves/log /var/log/waves
@@ -92,4 +90,5 @@ EXPOSE 6869 6868 6863 6862
 
 USER waves
 VOLUME /var/lib/waves
+VOLUME /usr/share/waves/lib/plugins
 ENTRYPOINT ["/usr/share/waves/bin/entrypoint.sh"]

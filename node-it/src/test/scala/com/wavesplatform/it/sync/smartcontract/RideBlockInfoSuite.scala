@@ -85,15 +85,17 @@ class RideBlockInfoSuite extends BaseTransactionSuite {
   }
 
   test("not able to retrieve vrf from block V4") {
-    val tx = sender.invokeScript(caller, dAppAddress, func = Some("blockInfoV5"), args = List(CONST_LONG(activationHeight - 1)))._1.id
-    sender.waitForHeight(sender.height + 1)
-    sender.transactionStatus(Seq(tx)).head.status shouldBe "not_found"
+    assertBadRequestAndMessage(
+      sender.invokeScript(caller, dAppAddress, func = Some("blockInfoV5"), args = List(CONST_LONG(activationHeight - 1))),
+      "Error while executing account-script"
+    )
   }
 
   test("not able to retrieve vrf from block V3") {
-    val tx = sender.invokeScript(caller, dAppAddress, func = Some("blockInfoV5"), args = List(CONST_LONG(activationHeight - 2)))._1.id
-    sender.waitForHeight(sender.height + 1)
-    sender.transactionStatus(Seq(tx)).head.status shouldBe "not_found"
+    assertBadRequestAndMessage(
+      sender.invokeScript(caller, dAppAddress, func = Some("blockInfoV5"), args = List(CONST_LONG(activationHeight - 2))),
+      "Error while executing account-script"
+    )
   }
 
   test("able to retrieve block V4 info") {

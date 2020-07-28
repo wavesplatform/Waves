@@ -18,7 +18,6 @@ private[node] case class TransferTransaction(
     version: Byte,
     senderPublicKey: ByteString,
     proofs: List[ByteString],
-    bodyBytes: ByteString,
     succeed: Boolean
 )
 
@@ -29,10 +28,9 @@ object Transaction {
     for {
       applicationStatus <- c.downField("applicationStatus").as[Option[String]]
       succeed = applicationStatus.fold(true)(_ == "succeeded")
-      version   <- c.downField("version").as[Int]
-      height    <- c.downField("height").as[Option[Int]]
-      typeId    <- c.downField("type").as[Int]
-      bodyBytes <- c.downField("bodyBytes").as[ByteString]
+      version <- c.downField("version").as[Int]
+      height  <- c.downField("height").as[Option[Int]]
+      typeId  <- c.downField("type").as[Int]
       proofs <- version match {
         case 1 => c.downField("signature").as[ByteString].map(v => List.apply(v))
         case _ => c.downField("proofs").as[List[ByteString]]
@@ -42,8 +40,7 @@ object Transaction {
         case aliasPattern(alias) => Right(Alias(alias))
         case _                   => c.downField("recipient").as[ByteString].map(b => Address(b.byteStr))
       }
-      af = c.downField("attachment")
-      attachment      <- af.as[ByteString]
+      attachment      <- c.downField("attachment").as[ByteString]
       senderPublicKey <- c.downField("senderPublicKey").as[ByteString]
       amount          <- c.downField("amount").as[Long]
       fee             <- c.downField("fee").as[Long]
@@ -64,7 +61,6 @@ object Transaction {
       version.toByte,
       senderPublicKey,
       proofs,
-      ByteString(),
       succeed
     )
 }

@@ -113,18 +113,17 @@ class PseudoTxSenderPubKeySuite extends BaseTransactionSuite {
   test("not able to burn asset if required senderPublicKey didn't match") {
     val smartAssetQuantityBefore = sender.assetsDetails(firstAssetId).quantity
     val burnedQuantity           = 100000
-    val tx = sender
-      .invokeScript(
-        caller,
-        secondDApp.toAddress.toString,
-        func = Some("burnAsset"),
-        args = List(Terms.CONST_BYTESTR(ByteStr.decodeBase58(secondAssetId).get).explicitGet(), Terms.CONST_LONG(burnedQuantity)),
-        fee = smartMinFee + smartFee,
-        waitForTx = true
-      )
-      ._1
-      .id
-    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include("Transaction is not allowed by script of the asset")
+    assertBadRequestAndMessage(
+      sender
+        .invokeScript(
+          caller,
+          secondDApp.toAddress.toString,
+          func = Some("burnAsset"),
+          args = List(Terms.CONST_BYTESTR(ByteStr.decodeBase58(secondAssetId).get).explicitGet(), Terms.CONST_LONG(burnedQuantity)),
+          fee = smartMinFee + smartFee
+        ),
+      "Transaction is not allowed by token-script"
+    )
 
     sender.assetsDetails(secondAssetId).quantity shouldBe smartAssetQuantityBefore
   }
@@ -132,44 +131,43 @@ class PseudoTxSenderPubKeySuite extends BaseTransactionSuite {
   test("not able to reissue asset if required senderPublicKey didn't match") {
     val smartAssetQuantityBefore = sender.assetsDetails(secondAssetId).quantity
     val addedQuantity            = 100000
-    val tx = sender
-      .invokeScript(
-        caller,
-        secondDApp.toAddress.toString,
-        func = Some("reissueAsset"),
-        args = List(
-          Terms.CONST_BYTESTR(ByteStr.decodeBase58(secondAssetId).get).explicitGet(),
-          Terms.CONST_BOOLEAN(true),
-          Terms.CONST_LONG(addedQuantity)
+
+    assertBadRequestAndMessage(
+      sender
+        .invokeScript(
+          caller,
+          secondDApp.toAddress.toString,
+          func = Some("reissueAsset"),
+          args = List(
+            Terms.CONST_BYTESTR(ByteStr.decodeBase58(secondAssetId).get).explicitGet(),
+            Terms.CONST_BOOLEAN(true),
+            Terms.CONST_LONG(addedQuantity)
+          ),
+          fee = smartMinFee + smartFee
         ),
-        fee = smartMinFee + smartFee,
-        waitForTx = true
-      )
-      ._1
-      .id
-    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include("Transaction is not allowed by script of the asset")
+      "Transaction is not allowed by token-script"
+    )
 
     sender.assetsDetails(secondAssetId).quantity shouldBe smartAssetQuantityBefore
   }
 
   test("not able to transfer asset if required senderPublicKey didn't match") {
     val smartAssetBalanceBefore = sender.assetBalance(firstDApp.toAddress.toString, secondAssetId).balance
-    val tx = sender
-      .invokeScript(
-        caller,
-        secondDApp.toAddress.toString,
-        func = Some("transferAsset"),
-        args = List(
-          Terms.CONST_BYTESTR(ByteStr.decodeBase58(firstDApp.toAddress.toString).get).explicitGet(),
-          Terms.CONST_BYTESTR(ByteStr.decodeBase58(secondAssetId).get).explicitGet(),
-          Terms.CONST_LONG(transferAmount)
+    assertBadRequestAndMessage(
+      sender
+        .invokeScript(
+          caller,
+          secondDApp.toAddress.toString,
+          func = Some("transferAsset"),
+          args = List(
+            Terms.CONST_BYTESTR(ByteStr.decodeBase58(firstDApp.toAddress.toString).get).explicitGet(),
+            Terms.CONST_BYTESTR(ByteStr.decodeBase58(secondAssetId).get).explicitGet(),
+            Terms.CONST_LONG(transferAmount)
+          ),
+          fee = smartMinFee + smartFee
         ),
-        fee = smartMinFee + smartFee,
-        waitForTx = true
-      )
-      ._1
-      .id
-    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include("Transaction is not allowed by script of the asset")
+      "Transaction is not allowed by token-script"
+    )
 
     sender.assetBalance(firstDApp.toAddress.toString, secondAssetId).balance shouldBe smartAssetBalanceBefore
   }
