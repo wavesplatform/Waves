@@ -7,9 +7,13 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 
 object TxHelpers {
@@ -40,6 +44,9 @@ object TxHelpers {
   def orderV3(orderType: OrderType, asset: Asset, feeAsset: Asset): Order = {
     orderV3(orderType, asset, Waves, feeAsset)
   }
+
+  def order(orderType: OrderType, asset: Asset): Order =
+    orderV3(orderType, asset, Waves)
 
   def orderV3(orderType: OrderType, amountAsset: Asset, priceAsset: Asset, feeAsset: Asset): Order = {
     Order.selfSigned(
@@ -72,5 +79,14 @@ object TxHelpers {
         timestamp
       )
       .explicitGet()
+  }
+
+  def setScript(acc: KeyPair, script: Script): SetScriptTransaction = {
+    SetScriptTransaction.selfSigned(TxVersion.V1, acc, Some(script), TestValues.fee, timestamp).explicitGet()
+  }
+
+  def invoke(dApp: AddressOrAlias, func: String, args: Seq[EXPR] = Nil, payments: Seq[Payment] = Nil): InvokeScriptTransaction = {
+    val fc = FUNCTION_CALL(FunctionHeader.User(func), args.toList)
+    InvokeScriptTransaction.selfSigned(TxVersion.V1, defaultSigner, dApp, Some(fc), payments, TestValues.fee, Asset.Waves, timestamp).explicitGet()
   }
 }

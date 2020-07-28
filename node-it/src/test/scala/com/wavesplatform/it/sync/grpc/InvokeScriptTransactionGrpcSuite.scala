@@ -13,7 +13,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
-import com.wavesplatform.protobuf.transaction.{PBTransactions, PBRecipients, Recipient}
+import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions, Recipient}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import io.grpc.Status.Code
@@ -126,26 +126,28 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   }
 
   test("not able to set an empty key by InvokeScriptTransaction with version >= 2") {
-    val tx1 = sender.broadcastInvokeScript(
-      caller,
-      Recipient().withPublicKeyHash(secondContractAddr),
-      Some(FUNCTION_CALL(FunctionHeader.User("emptyKey"), List.empty)),
-      fee = 1.waves,
-      version = TxVersion.V2,
-      waitForTx = true
+
+    assertGrpcError(
+      sender.broadcastInvokeScript(
+        caller,
+        Recipient().withPublicKeyHash(secondContractAddr),
+        Some(FUNCTION_CALL(FunctionHeader.User("emptyKey"), List.empty)),
+        fee = 1.waves,
+        version = TxVersion.V2
+      ),
+      "Empty keys aren't allowed in tx version >= 2"
     )
 
-    sender.stateChanges(tx1.id)._2.error.get.text should include("Empty keys aren't allowed in tx version >= 2")
-
-    val tx2 = sender.broadcastInvokeScript(
-      caller,
-      Recipient().withPublicKeyHash(thirdContractAddr),
-      Some(FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)),
-      fee = 1.waves,
-      version = TxVersion.V2,
-      waitForTx = true
+    assertGrpcError(
+      sender.broadcastInvokeScript(
+        caller,
+        Recipient().withPublicKeyHash(thirdContractAddr),
+        Some(FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)),
+        fee = 1.waves,
+        version = TxVersion.V2,
+        waitForTx = true
+      ),
+      "Empty keys aren't allowed in tx version >= 2"
     )
-
-    sender.stateChanges(tx2.id)._2.error.get.text should include("Empty keys aren't allowed in tx version >= 2")
   }
 }

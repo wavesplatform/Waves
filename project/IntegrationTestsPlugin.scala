@@ -76,11 +76,14 @@ object IntegrationTestsPlugin extends AutoPlugin {
             try {
               val docker = DefaultDockerClient.fromEnv().build()
               try {
-                (docker.info().cpus() * 2).toInt
+                val dockerCpu: Int = docker.info().cpus()
+                sLog.value.info(s"Docker CPU count: $dockerCpu")
+                dockerCpu * 2
               } finally docker.close()
             } catch {
               case NonFatal(_) =>
                 sLog.value.warn(s"Could not connect to Docker, is the daemon running?")
+                sLog.value.info(s"System CPU count: ${EvaluateTask.SystemProcessors}")
                 EvaluateTask.SystemProcessors
             }
           },
