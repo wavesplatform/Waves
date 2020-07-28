@@ -248,6 +248,11 @@ object InvokeDiffsCommon {
         (),
         s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize} entries"
       )
+      _ <- Either.cond(
+        !tx.isProtobufVersion || dataEntries.forall(_.key.nonEmpty),
+        (),
+        s"Empty keys aren't allowed in tx version >= ${tx.protobufVersion}"
+      )
 
       maxKeySize = ContractLimits.MaxKeySizeInBytesByVersion(stdLibVersion)
       _ <- dataEntries
@@ -270,11 +275,6 @@ object InvokeDiffsCommon {
         totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes,
         (),
         s"WriteSet size can't exceed ${ContractLimits.MaxWriteSetSizeInBytes} bytes, actual: $totalDataBytes bytes"
-      )
-      _ <- Either.cond(
-        !tx.isProtobufVersion || dataEntries.forall(_.key.nonEmpty),
-        (),
-        s"Empty keys aren't allowed in tx version >= ${tx.protobufVersion}"
       )
     } yield ()
 
