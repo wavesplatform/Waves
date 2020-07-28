@@ -6,6 +6,8 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.BaseSuite
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.transactions.FailedTransactionSuiteLike
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.repl.Repl
@@ -17,7 +19,12 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class ReplTest extends BaseSuite {
+class ReplTest extends BaseSuite with FailedTransactionSuiteLike[String] {
+  import restApi._
+
+  override protected def waitForHeightArise(): Unit =
+    nodes.waitForHeightArise()
+
   override def nodeConfigs: Seq[Config] =
     com.wavesplatform.it.NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
@@ -43,8 +50,18 @@ class ReplTest extends BaseSuite {
                |
                |@Callable(i)
                |func default() = {
-               | if (${"sigVerify(base58'', base58'', base58'') ||" * 8} true) then throw("") else throw("")
+               |  let action = valueOrElse(getString(this, "crash"), "no")
+               |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 10} true
+               |
+               |  if (action == "yes")
+               |  then {
+               |    if (check)
+               |    then throw("Crashed by dApp")
+               |    else throw("Crashed by dApp")
+               |  }
+               |  else []
                |}
+               |
                |""".stripMargin,
         ScriptEstimatorV3
       )
@@ -99,16 +116,19 @@ class ReplTest extends BaseSuite {
 
     miner.setScript(issuer, Some(failDApp), 1.waves, waitForTx = true)
 
-    val transFailed = miner.invokeScript(
-      issuer,
-      issuer.toAddress.toString,
-      func = None,
-      payment = Seq(),
-      fee = 1.waves,
-      waitForTx = true
-    )
+    // used to fail invoke
+    val priorityData = List(StringDataEntry("crash", "yes"))
+    val putDataFee   = calcDataFee(priorityData, 1)
+    val priorityFee  = putDataFee + invokeFee
 
-    val idFailed = transFailed._1.id
+    val failedTxs = sendPriorityTxAndThenOtherTxs(
+      _ => sender.invokeScript(issuer, issuer.toAddress.toString, None, fee = invokeFee)._1.id,
+      () => sender.putData(issuer, priorityData, priorityFee).id
+    ) {
+      (txs, _) =>
+        assertFailedTxs(txs)
+    }
+    val idFailed = failedTxs.head.id
 
     (miner.rawTransactionInfo(idFailed) \ "applicationStatus").as[String] shouldBe "script_execution_failed"
 

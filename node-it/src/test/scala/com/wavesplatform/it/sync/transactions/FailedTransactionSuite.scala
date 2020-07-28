@@ -267,7 +267,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
             contractAddress,
             Some("tikTok"),
             fee = invokeFee,
-            payment = Seq(InvokeScriptTransaction.Payment(15, IssuedAsset(ByteStr.decodeBase58(paymentAsset).get)))
+            payment = Seq(InvokeScriptTransaction.Payment(15L, IssuedAsset(ByteStr.decodeBase58(paymentAsset).get)))
           )
           ._1
           .id,
