@@ -8,6 +8,7 @@ import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.requests.{SignedTransferV1Request, SignedTransferV2Request}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -191,9 +192,9 @@ class AssetsBroadcastRouteSpec
           senderPrivateKey,
           receiverPrivateKey.toAddress,
           Asset.Waves,
-          1 * Waves,
+          1.waves,
           Asset.Waves,
-          Waves / 3,
+          0.3.waves,
           ByteStr.empty,
           System.currentTimeMillis()
         )
@@ -206,9 +207,9 @@ class AssetsBroadcastRouteSpec
         sender = senderPrivateKey.publicKey,
         recipient = receiverPrivateKey.toAddress,
         assetId = Asset.Waves,
-        amount = 1 * Waves,
+        amount = 1.waves,
         feeAssetId = Asset.Waves,
-        fee = Waves / 3,
+        fee = 0.3.waves,
         attachment = ByteStr.empty,
         timestamp = System.currentTimeMillis(),
         proofs = Proofs(Seq.empty),
