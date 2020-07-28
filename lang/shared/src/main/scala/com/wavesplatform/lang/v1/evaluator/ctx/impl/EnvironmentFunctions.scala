@@ -43,5 +43,7 @@ object EnvironmentFunctions {
   val HashLength           = 20
   val AddressVersion: Byte = 1
   val AddressLength: Int   = 1 + 1 + ChecksumLength + HashLength
+  val AddressStringLength  = 36
   val AddressPrefix        = "address:"
+  val AliasVersion: Byte   = 2
 }
