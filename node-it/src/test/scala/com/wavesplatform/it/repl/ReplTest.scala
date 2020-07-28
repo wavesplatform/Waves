@@ -7,7 +7,8 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.BaseSuite
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
-import com.wavesplatform.it.sync.transactions.FailedTransactionSuiteLike
+import com.wavesplatform.it.sync.transactions.{FailedTransactionSuiteLike, OverflowBlock}
+import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.repl.Repl
@@ -19,7 +20,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class ReplTest extends BaseSuite with FailedTransactionSuiteLike[String] {
+class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[String] with OverflowBlock {
   import restApi._
 
   override protected def waitForHeightArise(): Unit =
@@ -34,7 +35,7 @@ class ReplTest extends BaseSuite with FailedTransactionSuiteLike[String] {
 
   def await[A](f: Future[A]): A = Await.result(f, 2 seconds)
 
-  "waves context" in {
+  test("waves context") {
     val issuer = miner.createKeyPair()
     val sample = miner.createKeyPair()
     val trans  = miner.transfer(miner.keyPair, issuer.toAddress.toString, 100.waves, 1.waves, version = TxVersion.V3, waitForTx = true)
@@ -121,16 +122,14 @@ class ReplTest extends BaseSuite with FailedTransactionSuiteLike[String] {
     val putDataFee   = calcDataFee(priorityData, 1)
     val priorityFee  = putDataFee + invokeFee
 
+    overflowBlock()
     val failedTxs = sendPriorityTxAndThenOtherTxs(
       _ => sender.invokeScript(issuer, issuer.toAddress.toString, None, fee = invokeFee)._1.id,
       () => sender.putData(issuer, priorityData, priorityFee).id
-    ) {
-      (txs, _) =>
-        assertFailedTxs(txs)
+    ) { (failed, _) =>
+      assertFailedTxs(failed)
     }
     val idFailed = failedTxs.head.id
-
-    (miner.rawTransactionInfo(idFailed) \ "applicationStatus").as[String] shouldBe "script_execution_failed"
 
     val settings = NodeConnectionSettings(miner.nodeApiEndpoint.toString, 'I'.toByte, issuer.toAddress.toString)
     val repl     = Repl(Some(settings))
