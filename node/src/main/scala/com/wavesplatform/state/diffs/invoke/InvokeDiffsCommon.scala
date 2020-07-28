@@ -255,23 +255,33 @@ object InvokeDiffsCommon {
         (),
         s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize} entries"
       )
+      _ <- Either.cond(
+        !tx.isProtobufVersion || dataEntries.forall(_.key.nonEmpty),
+        (),
+        s"Empty keys aren't allowed in tx version >= ${tx.protobufVersion}"
+      )
 
       maxKeySize = ContractLimits.MaxKeySizeInBytesByVersion(stdLibVersion)
       _ <- dataEntries
-        .find(_.key.utf8Bytes.length > maxKeySize)
+        .collectFirst {
+          Function.unlift {
+            entry =>
+              val length = entry.key.utf8Bytes.length
+              if (length > maxKeySize)
+                Some(s"Data entry key size = $length bytes must be less than $maxKeySize")
+              else if (entry.key.isEmpty && stdLibVersion >= V4)
+                Some(s"Data entry key should not be empty")
+              else
+                None
+          }
+        }
         .toLeft(())
-        .leftMap(d => s"Key size = ${d.key.utf8Bytes.length} bytes must be less than $maxKeySize")
 
       totalDataBytes = dataEntries.map(_.toBytes.length).sum
       _ <- Either.cond(
         totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes,
         (),
         s"WriteSet size can't exceed ${ContractLimits.MaxWriteSetSizeInBytes} bytes, actual: $totalDataBytes bytes"
-      )
-      _ <- Either.cond(
-        !tx.isProtobufVersion || dataEntries.forall(_.key.nonEmpty),
-        (),
-        s"Empty keys aren't allowed in tx version >= ${tx.protobufVersion}"
       )
     } yield ()
 

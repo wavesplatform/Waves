@@ -11,7 +11,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
-import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
@@ -1364,7 +1364,7 @@ class InvokeScriptTransactionDiffTest
 
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), settings) {
           _ should produce(
-            s"Key size = ${ContractLimits.MaxKeySizeInBytesByVersion(version) + 1} bytes " +
+            s"Data entry key size = ${ContractLimits.MaxKeySizeInBytesByVersion(version) + 1} bytes " +
               s"must be less than ${ContractLimits.MaxKeySizeInBytesByVersion(version)}"
           )
         }
@@ -1383,6 +1383,28 @@ class InvokeScriptTransactionDiffTest
 
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), settings) {
           _.explicitGet()
+        }
+    }
+  }
+
+  property("can't write entry with empty key from V4") {
+    forAll(for {
+      version <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3))
+      r <- preconditionsAndSetContract(
+        s => writeSetWithKeyLength(s, length = 0, version = version),
+        version = version
+      )
+    } yield (r._1, r._2, r._3, version)) {
+      case (genesis, setScript, ci, version) =>
+        val settings =
+          if (version == V3) fs
+          else fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
+
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), settings) {
+          if (version == V3)
+            _ shouldBe Symbol("right")
+          else
+            _ should produce("Data entry key should not be empty")
         }
     }
   }

@@ -125,7 +125,7 @@ class RemoveEntrySuite extends BaseSuite {
       val address    = createDapp(script)
       val tooLongKey = new scala.util.Random().nextPrintableChar().toString * 401
 
-      assertBadRequestAndMessage(invokeScript(address, s"write", tooLongKey, "value"), "Key size = 401 bytes must be less than 400")
+      assertBadRequestAndMessage(invokeScript(address, s"write", tooLongKey, "value"), "Data entry key size = 401 bytes must be less than 400")
     }
   }
 
