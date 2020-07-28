@@ -28,7 +28,9 @@ object ScriptRunner {
       blockchain: Blockchain,
       script: Script,
       isAssetScript: Boolean,
-      scriptContainerAddress: Environment.Tthis
+      scriptContainerAddress: Environment.Tthis,
+      complexityLimit: Int = Int.MaxValue,
+      default: EVALUATED = TRUE
   ): (Log[Id], Either[ExecutionError, EVALUATED]) = {
 
     def evalVerifier(
@@ -61,7 +63,11 @@ object ScriptRunner {
       )
     }
 
-    val evaluate = EvaluatorV2.applyCompleted(_, _, script.stdLibVersion)
+    val evaluate =
+      if (complexityLimit == Int.MaxValue)
+        EvaluatorV2.applyCompleted(_, _, script.stdLibVersion)
+      else
+        EvaluatorV2.applyOrDefault(_, _, script.stdLibVersion, complexityLimit, default)
 
     script match {
       case s: ExprScript =>

@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract
 
+import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
@@ -77,21 +78,21 @@ class InvokeScriptErrorMsgSuite extends BaseTransactionSuite with CancelAfterFai
         " Requires 400000 extra fee. Fee for InvokeScriptTransaction (1000 in WAVES) does not exceed minimal value of 1300000 WAVES."
     )
 
-    val tx = sender
-      .invokeScript(
-        caller,
-        contractAddress,
-        Some("f"),
-        payment = Seq(
-          InvokeScriptTransaction.Payment(10, Asset.fromString(Some(asset1)))
+    assertApiError(
+      sender
+        .invokeScript(
+          caller,
+          contractAddress,
+          Some("f"),
+          payment = Seq(
+            InvokeScriptTransaction.Payment(10, Asset.fromString(Some(asset1)))
+          ),
+          fee = 1300000
         ),
-        fee = 1300000,
-        waitForTx = true
+      AssertiveApiError(
+        ScriptExecutionError.Id,
+        "Error while executing account-script: Fee in WAVES for InvokeScriptTransaction (1300000 in WAVES) with 12 total scripts invoked does not exceed minimal value of 5300000 WAVES."
       )
-      ._1
-      .id
-    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include(
-      "Fee in WAVES for InvokeScriptTransaction (1300000 in WAVES) with 12 total scripts invoked does not exceed minimal value of 5300000 WAVES."
     )
   }
 }

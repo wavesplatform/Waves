@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract
 
+import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -8,7 +9,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_STRING
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import org.scalatest.CancelAfterFailure
@@ -73,12 +74,14 @@ class InvokeSelfPaymentSuite extends BaseTransactionSuite with CancelAfterFailur
 
   test("V4: can't invoke itself with payment") {
     for (payment <- List(
-           Seq(Payment(1, Waves)),
-           Seq(Payment(1, asset1)),
-           Seq(Payment(1, Waves), Payment(1, asset1))
+           Seq(InvokeScriptTransaction.Payment(1, Waves)),
+           Seq(InvokeScriptTransaction.Payment(1, asset1)),
+           Seq(InvokeScriptTransaction.Payment(1, Waves), InvokeScriptTransaction.Payment(1, asset1))
          )) {
-      val tx = sender.invokeScript(dAppV4, dAppV4Address, payment = payment, fee = smartMinFee + smartFee, waitForTx = true)._1.id
-      sender.debugStateChanges(tx).stateChanges.get.error.get.text should include("DApp self-payment is forbidden since V4")
+      assertApiError(
+        sender.invokeScript(dAppV4, dAppV4Address, payment = payment, fee = smartMinFee + smartFee),
+        AssertiveApiError(ScriptExecutionError.Id, "DApp self-payment is forbidden since V4", matchMessage = true)
+      )
     }
   }
 
@@ -91,15 +94,29 @@ class InvokeSelfPaymentSuite extends BaseTransactionSuite with CancelAfterFailur
            List(CONST_STRING("WAVES").explicitGet()),
            List(CONST_STRING(asset1Id).explicitGet())
          )) {
-      val tx = sender.invokeScript(caller, dAppV4Address, Some("paySelf"), args, waitForTx = true)._1.id
-      sender.debugStateChanges(tx).stateChanges.get.error.get.text should include("DApp self-transfer is forbidden since V4")
+      assertApiError(
+        sender.invokeScript(caller, dAppV4Address, Some("paySelf"), args),
+        AssertiveApiError(ScriptExecutionError.Id, "Error while executing account-script: DApp self-transfer is forbidden since V4")
+      )
     }
   }
 
   test("V3: still can invoke itself") {
     sender.invokeScript(dAppV3, dAppV3Address, fee = smartMinFee + smartFee, waitForTx = true)
-    sender.invokeScript(dAppV3, dAppV3Address, payment = Seq(Payment(1, Waves)), fee = smartMinFee + smartFee, waitForTx = true)
-    sender.invokeScript(dAppV3, dAppV3Address, payment = Seq(Payment(1, asset1)), fee = smartMinFee + smartFee, waitForTx = true)
+    sender.invokeScript(
+      dAppV3,
+      dAppV3Address,
+      payment = Seq(InvokeScriptTransaction.Payment(1, Waves)),
+      fee = smartMinFee + smartFee,
+      waitForTx = true
+    )
+    sender.invokeScript(
+      dAppV3,
+      dAppV3Address,
+      payment = Seq(InvokeScriptTransaction.Payment(1, asset1)),
+      fee = smartMinFee + smartFee,
+      waitForTx = true
+    )
   }
 
   test("V3: still can pay itself") {
