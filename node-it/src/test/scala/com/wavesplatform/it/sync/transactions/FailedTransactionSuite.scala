@@ -82,8 +82,10 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
          |
          |@Callable(inv)
          |func tikTok() = {
+         |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 10} false
          |  let action = valueOrElse(getString(this, "tikTok"), "unknown")
-         |  if (action == "transfer") then [ScriptTransfer(inv.caller, 15, asset)]
+         |  if (check) then []
+         |  else if (action == "transfer") then [ScriptTransfer(inv.caller, 15, asset)]
          |  else if (action == "issue") then [Issue("new asset", "", 100, 8, true, unit, 0)]
          |  else if (action == "reissue") then [Reissue(asset, 15, true)]
          |  else if (action == "burn") then [Burn(asset, 15)]
@@ -128,32 +130,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     sender.setScript(contract, Some(script), setScriptFee, waitForTx = true).id
   }
 
-  test("InvokeScriptTransaction: broadcast fails on failed tx") {
-    val invokeFee    = 0.005.waves
-    val priorityData = List(StringDataEntry("crash", "yes"))
-    val putDataFee   = calcDataFee(priorityData, 1)
-    val priorityFee  = putDataFee + invokeFee
-
-    val prevBalance = sender.balance(caller.toAddress.toString).balance
-
-    val dataTx = sender.putData(contract, priorityData, priorityFee)
-    nodes.waitForHeightAriseAndTxPresent(dataTx.id)
-
-    assertApiError(
-      sender.invokeScript(caller, contractAddress, Some("canThrow"), fee = invokeFee),
-      AssertiveApiError(ScriptExecutionError.Id, "Error while executing account-script: Crashed by dApp")
-    )
-    waitForEmptyUtx()
-    sender.balance(caller.toAddress.toString).balance shouldBe prevBalance
-  }
-
   test("InvokeScriptTransaction: dApp error propagates failed transaction") {
-    {
-      val data       = List(StringDataEntry("crash", "no"))
-      val putDataFee = calcDataFee(data, 1)
-      sender.putData(contract, data, putDataFee, waitForTx = true)
-    }
-
     val invokeFee    = 0.005.waves
     val priorityData = List(StringDataEntry("crash", "yes"))
     val putDataFee   = calcDataFee(priorityData, 1)
@@ -176,6 +153,11 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
         checkStateChange(sender.debugStateChanges(s.id), 1, "Crashed by dApp", strict = true)
       }
 
+      assertApiError(
+        sender.invokeScript(caller, contractAddress, Some("canThrow"), fee = invokeFee),
+        AssertiveApiError(ScriptExecutionError.Id, "Error while executing account-script: Crashed by dApp")
+      )
+
       failed
     }
   }
@@ -194,9 +176,10 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       val prevAssetBalance = sender.assetBalance(contractAddress, smartAsset)
       val prevAssets       = sender.assetsBalance(contractAddress)
 
+      overflowBlock()
       sendPriorityTxAndThenOtherTxs(
         _ => sender.invokeScript(caller, contractAddress, Some("tikTok"), fee = invokeFee)._1.id,
-        () => updateTikTok(typeName, priorityFee)
+        () => updateTikTok(typeName, priorityFee, waitForTx = false)
       ) { (txs, priorityTx) =>
         logPriorityTx(priorityTx)
 
@@ -639,8 +622,8 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     assertFailedTxs(blockTxs)
   }
 
-  def updateTikTok(result: String, fee: Long): String =
-    sender.broadcastData(contract, List(StringDataEntry("tikTok", result)), fee = fee, waitForTx = true).id
+  def updateTikTok(result: String, fee: Long, waitForTx: Boolean = true): String =
+    sender.broadcastData(contract, List(StringDataEntry("tikTok", result)), fee = fee, waitForTx = waitForTx).id
 
   private def waitForTxs(txs: Seq[String]): Unit =
     nodes.waitFor("preconditions", 500.millis)(_.transactionStatus(txs).forall(_.status == "confirmed"))(

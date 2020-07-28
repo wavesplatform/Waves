@@ -179,9 +179,9 @@ class UtxFailedTxsSpec extends FlatSpec with Matchers with WithDomain with Event
   private[this] def genExpr(targetComplexity: Int, result: Boolean): String = {
     s"""
          |if ($result) then
-         |  ${"sigVerify(base58'', base58'', base58'') ||" * (targetComplexity / 200)} true
+         |  ${"sigVerify(base58'', base58'', base58'') ||" * ((targetComplexity / 200) - 1)} true
          |else
-         |  ${"sigVerify(base58'', base58'', base58'') ||" * (targetComplexity / 200)} false""".stripMargin
+         |  ${"sigVerify(base58'', base58'', base58'') ||" * ((targetComplexity / 200) - 1)} false""".stripMargin
   }
 
   private[this] def genScript(targetComplexity: Int, result: Boolean = false): Script = {
