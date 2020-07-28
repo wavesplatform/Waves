@@ -23,7 +23,7 @@ class InvokeFailFreeSuite extends BaseTransactionSuite {
           |   let check =
           |     if (reject)
           |       then
-          |         ${"sigVerify(base58'', base58'', base58'') ||" * 7} true
+          |         ${"sigVerify(base58'', base58'', base58'') ||" * 4} true
           |       else
           |         ${"sigVerify(base58'', base58'', base58'') ||" * 8} false
           |

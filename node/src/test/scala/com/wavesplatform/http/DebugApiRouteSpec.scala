@@ -5,6 +5,7 @@ import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.utils._
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.it.util._
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.network.PeerDatabase
@@ -78,6 +79,36 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
       }
       (blockchain.filledVolumeAndFee _).when(*).returns(VolumeAndFee.empty)
       blockchain
+    }
+
+    "valid tx" in {
+      val blockchain = createBlockchainStub()
+      (blockchain.balance _).when(TxHelpers.defaultSigner.publicKey.toAddress, *).returns(Long.MaxValue)
+
+      val route = debugApiRoute.copy(blockchain = blockchain).route
+
+      val tx = TxHelpers.transfer(TxHelpers.defaultSigner, TestValues.address, 1.waves)
+      Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString())) ~> route ~> check {
+        val json = Json.parse(responseAs[String])
+        (json \ "valid").as[Boolean] shouldBe true
+        (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
+      }
+    }
+
+    "invalid tx" in {
+      val blockchain = createBlockchainStub()
+      (blockchain.balance _).when(TxHelpers.defaultSigner.publicKey.toAddress, *).returns(0)
+
+      val route = debugApiRoute.copy(blockchain = blockchain).route
+
+      val tx = TxHelpers.transfer(TxHelpers.defaultSigner, TestValues.address, 1.waves)
+      Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString())) ~> route ~> check {
+        val json = Json.parse(responseAs[String])
+        println(json)
+        (json \ "valid").as[Boolean] shouldBe false
+        (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
+        (json \ "error").as[String] should include("Attempt to transfer unavailable funds")
+      }
     }
 
     "exchange tx with fail script" in {

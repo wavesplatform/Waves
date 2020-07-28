@@ -59,9 +59,17 @@ class SigVerifyBenchmark {
   def sigVerify_150Kb(st: CurveSt150Kb, bh: Blackhole): Unit =
     bh.consume(Curve25519.verify(Signature @@ st.signature, st.message, st.publicKey))
 
+  // For DataTransaction.MaxProtoBytes
+  @Benchmark
+  def sigVerify_162Kb(st: CurveSt162Kb, bh: Blackhole): Unit =
+    bh.consume(Curve25519.verify(Signature @@ st.signature, st.message, st.publicKey))
+
 }
 
 object SigVerifyBenchmark {
+  @State(Scope.Benchmark)
+  class CurveSt162Kb extends CurveSt(162 * 1024)
+
   @State(Scope.Benchmark)
   class CurveSt150Kb extends CurveSt(150 * 1024)
 
