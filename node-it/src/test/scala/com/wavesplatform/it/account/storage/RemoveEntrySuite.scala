@@ -1,6 +1,7 @@
 package com.wavesplatform.it.account.storage
 
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.BaseSuite
@@ -112,10 +113,10 @@ class RemoveEntrySuite extends BaseSuite {
       miner.putData(keyPair, data.toList, 1.waves, true)
       miner.getData(keyPair.toAddress.toString) should have size 101
 
-      val tx = miner.waitForTransaction(invokeScript(keyPair, s"delete101Entries")).id
-
-      miner.transactionStatus(Seq(tx)).head.applicationStatus shouldBe Some("script_execution_failed")
-      miner.debugStateChanges(tx).stateChanges.get.error.get.text should include("WriteSet can't contain more than 100 entries")
+      assertApiError(
+        invokeScript(keyPair, s"delete101Entries"),
+        AssertiveApiError(ScriptExecutionError.Id, "Error while executing account-script: WriteSet can't contain more than 100 entries")
+      )
 
       miner.getData(keyPair.toAddress.toString) should have size 101
     }
@@ -124,10 +125,7 @@ class RemoveEntrySuite extends BaseSuite {
       val address    = createDapp(script)
       val tooLongKey = new scala.util.Random().nextPrintableChar().toString * 401
 
-      val tx = miner.waitForTransaction(invokeScript(address, s"write", tooLongKey, "value")).id
-
-      miner.transactionStatus(Seq(tx)).head.applicationStatus shouldBe Some("script_execution_failed")
-      miner.debugStateChanges(tx).stateChanges.get.error.get.text should include("Key size = 401 bytes must be less than 400")
+      assertBadRequestAndMessage(invokeScript(address, s"write", tooLongKey, "value"), "Key size = 401 bytes must be less than 400")
     }
   }
 

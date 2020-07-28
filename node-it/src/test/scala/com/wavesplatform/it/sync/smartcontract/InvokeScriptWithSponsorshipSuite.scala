@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract
 
+import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -158,19 +159,19 @@ class InvokeScriptWithSponsorshipSuite extends BaseTransactionSuite with CancelA
       ),
       s"does not exceed minimal value of 900000 WAVES or $feeAmount"
     )
-    val tx = sender
-      .invokeScript(
-        caller,
-        dAppAddress,
-        Some("spendMaxFee"),
-        payment = Seq(Payment(paymentAmount, IssuedAsset(ByteStr.decodeBase58(smartAsset).get))),
-        fee = smartFeeAmount - 1,
-        feeAssetId = Some(dAppAsset),
-        waitForTx = true
-      )
-      ._1
-      .id
-    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include("does not exceed minimal value of 5300000 WAVES")
+
+    assertApiError(
+      sender
+        .invokeScript(
+          caller,
+          dAppAddress,
+          Some("spendMaxFee"),
+          payment = Seq(Payment(paymentAmount, IssuedAsset(ByteStr.decodeBase58(smartAsset).get))),
+          fee = smartFeeAmount - 1,
+          feeAssetId = Some(dAppAsset)
+        ),
+      AssertiveApiError(ScriptExecutionError.Id, "with 12 total scripts invoked does not exceed minimal value", matchMessage = true)
+    )
 
     sender
       .invokeScript(
@@ -182,8 +183,7 @@ class InvokeScriptWithSponsorshipSuite extends BaseTransactionSuite with CancelA
         feeAssetId = Some(dAppAsset),
         waitForTx = true
       )
-      ._1
-      .id
+
     sender
       .invokeScript(
         caller,
@@ -194,14 +194,12 @@ class InvokeScriptWithSponsorshipSuite extends BaseTransactionSuite with CancelA
         feeAssetId = Some(dAppAsset),
         waitForTx = true
       )
-      ._1
-      .id
 
-    sender.assetBalance(dAppAddress, dAppAsset).balance shouldBe halfQuantity + (feeAmount - 10) + smartFeeAmount + (smartFeeAmount - 1)
+    sender.assetBalance(dAppAddress, dAppAsset).balance shouldBe halfQuantity + (feeAmount - 10) + smartFeeAmount
     sender.assetBalance(dAppAddress, callerAsset).balance shouldBe halfQuantity + paymentAmount
-    sender.accountBalances(dAppAddress)._1 shouldBe dAppInitBalance - 0.009.waves - 0.053.waves - 0.052.waves
+    sender.accountBalances(dAppAddress)._1 shouldBe dAppInitBalance - 0.009.waves - 0.053.waves
 
-    sender.assetBalance(callerAddress, dAppAsset).balance shouldBe halfQuantity + (-feeAmount + 10) - smartFeeAmount - (smartFeeAmount - 1)
+    sender.assetBalance(callerAddress, dAppAsset).balance shouldBe halfQuantity + (-feeAmount + 10) - smartFeeAmount
     sender.assetBalance(callerAddress, callerAsset).balance shouldBe halfQuantity - paymentAmount
     sender.accountBalances(callerAddress)._1 shouldBe callerInitBalance
   }

@@ -1,8 +1,10 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
+import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
@@ -12,13 +14,13 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
+
 import scala.concurrent.duration._
 
 class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
@@ -37,10 +39,10 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
       .withDefault(1)
       .buildNonConflicting()
 
-  private def firstContract  = firstKeyPair
-  private def secondContract = secondKeyPair
-  private lazy val thirdContract  = sender.createKeyPair()
-  private def caller         = thirdKeyPair
+  private def firstContract      = firstKeyPair
+  private def secondContract     = secondKeyPair
+  private lazy val thirdContract = sender.createKeyPair()
+  private def caller             = thirdKeyPair
 
   private lazy val firstContractAddress: String  = firstContract.toAddress.toString
   private lazy val secondContractAddress: String = secondContract.toAddress.toString
@@ -228,38 +230,33 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
   }
 
   test("not able to set an empty key by InvokeScriptTransaction with version >= 2") {
-    val tx1 = sender
-      .invokeScript(
-        caller,
-        secondContractAddress,
-        func = Some("emptyKey"),
-        payment = Seq(),
-        fee = 1.waves,
-        version = TxVersion.V2,
-        waitForTx = true
-      )
-      ._1
-      .id
-
-    sender.debugStateChanges(tx1).stateChanges.get.error.get.text should include("Empty keys aren't allowed in tx version >= 2")
+    assertApiError(
+      sender
+        .invokeScript(
+          caller,
+          secondContractAddress,
+          func = Some("emptyKey"),
+          payment = Seq(),
+          fee = 1.waves,
+          version = TxVersion.V2
+        ),
+      AssertiveApiError(ScriptExecutionError.Id, "Error while executing account-script: Empty keys aren't allowed in tx version >= 2")
+    )
 
     nodes.waitForHeightArise()
     sender.getData(secondContractAddress).filter(_.key.isEmpty) shouldBe List.empty
 
-    val tx2 = sender
-      .invokeScript(
+    assertApiError(
+      sender.invokeScript(
         caller,
         thirdContract.toAddress.toString,
         func = Some("bar"),
         payment = Seq(),
         fee = 1.waves,
-        version = TxVersion.V2,
-        waitForTx = true
-      )
-      ._1
-      .id
-
-    sender.debugStateChanges(tx2).stateChanges.get.error.get.text should include("Empty keys aren't allowed in tx version >= 2")
+        version = TxVersion.V2
+      ),
+      AssertiveApiError(ScriptExecutionError.Id, "Error while executing account-script: Empty keys aren't allowed in tx version >= 2")
+    )
 
     nodes.waitForHeightArise()
     sender.getData(thirdContract.toAddress.toString).filter(_.key.isEmpty) shouldBe List.empty

@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -87,8 +88,10 @@ class TransferNFTSuite extends BaseTransactionSuite with NTPTime {
     }
     val nftPayment = Seq(InvokeScriptTransaction.Payment(1, Asset.fromString(Some(nftAsset))))
 
-    val tx = invokeTransfer(caller, "nftTransferToDapp", payment = nftPayment)
-    sender.debugStateChanges(tx.id).stateChanges.get.error.get.text should include("DApp self-transfer is forbidden")
+    assertApiError(
+      invokeTransfer(caller, "nftTransferToDapp", payment = nftPayment),
+      AssertiveApiError(ScriptExecutionError.Id, "Error while executing account-script: DApp self-transfer is forbidden since V4")
+    )
 
     sender.transfer(caller, dAppAddress, 1, assetId = Some(nftAsset), waitForTx = true)
 
