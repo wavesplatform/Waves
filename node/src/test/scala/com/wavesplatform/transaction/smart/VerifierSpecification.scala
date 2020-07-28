@@ -144,7 +144,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
   def verify(blockchain: Blockchain, tx: Transaction): ValidationResult[Transaction] =
     (for {
       _ <- Verifier(blockchain)(tx)
-      _ <- Verifier.assets(blockchain)(tx).leftMap { case (_, _, ve) => ve }
+      _ <- Verifier.assets(blockchain, Int.MaxValue)(tx).leftMap { case (_, _, ve) => ve }
     } yield tx).resultE
 
 }

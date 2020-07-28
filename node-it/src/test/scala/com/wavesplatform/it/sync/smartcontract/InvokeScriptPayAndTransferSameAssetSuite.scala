@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract
 
+import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -110,9 +111,9 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
     val paymentAmount = 10
     val fee           = smartMinFee + smartFee * 2
 
-    val tx = invoke("resendPayment", paymentAmount, issued(rejAssetId), fee)
-    sender.debugStateChanges(tx).stateChanges.get.error.get.text should include regex "Transaction is not allowed by script of the asset"
-
+    assertApiError(invoke("resendPayment", paymentAmount, issued(rejAssetId), fee),
+      AssertiveApiError(TransactionNotAllowedByAssetScript.Id, "Transaction is not allowed by token-script")
+    )
   }
 
   test("dApp can transfer payed Waves if its own balance is 0") {

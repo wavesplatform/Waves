@@ -127,7 +127,7 @@ class AssetsBroadcastRouteSpec
           posting(br.copy(senderPublicKey = pk)) should produce(InvalidAddress)
         }
         forAll(nonPositiveLong) { q =>
-          posting(br.copy(quantity = q)) should produce(NegativeAmount(s"$q of assets"))
+          posting(br.copy(amount = q)) should produce(NegativeAmount(s"$q of assets"))
         }
         forAll(nonPositiveLong) { fee =>
           posting(br.copy(fee = fee)) should produce(InsufficientFee())

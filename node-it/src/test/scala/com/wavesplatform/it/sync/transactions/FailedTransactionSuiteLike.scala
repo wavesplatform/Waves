@@ -38,6 +38,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
     val priorityTx         = pt()
     waitForEmptyUtx()
     waitForHeightArise()
+    waitForEmptyUtx()
     checker(txs, priorityTx) // hardened
   }
 
@@ -98,7 +99,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
       invalid
     }
 
-    def updateAssetScript(result: Boolean, asset: String, owner: KeyPair, fee: Long): String = {
+    def updateAssetScript(result: Boolean, asset: String, owner: KeyPair, fee: Long, waitForTx: Boolean = true): String = {
       sender
         .setAssetScript(
           asset,
@@ -110,7 +111,9 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                 s"""
                    |match tx {
                    |  case _: SetAssetScriptTransaction => true
-                   |  case _ => $result
+                   |  case _ =>
+                   |    let check = ${"sigVerify(base58'', base58'', base58'') ||" * 16} false
+                   |    if (check) then false else $result
                    |}
                    |""".stripMargin,
                 ScriptEstimatorV3
@@ -120,7 +123,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
               .bytes()
               .base64
           ),
-          waitForTx = true
+          waitForTx = waitForTx
         )
         .id
     }
@@ -202,27 +205,31 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
       invalid
     }
 
-    def updateAssetScript(result: Boolean, asset: String, owner: KeyPair, fee: Long): PBSignedTransaction = {
+    def updateAssetScript(result: Boolean, asset: String, owner: KeyPair, fee: Long, waitForTx: Boolean = true): PBSignedTransaction = {
       sender
         .setAssetScript(
           owner,
           asset,
           Right(
-            ScriptCompiler
-              .compile(
-                s"""
+            Some(
+              ScriptCompiler
+                .compile(
+                  s"""
                    |match tx {
                    |  case _: SetAssetScriptTransaction => true
-                   |  case _ => $result
+                   |  case _ =>
+                   |    let check = ${"sigVerify(base58'', base58'', base58'') ||" * 16} false
+                   |    if (check) then false else $result
                    |}
                    |""".stripMargin,
-                ScriptEstimatorV3
-              )
-              .toOption
-              .map(_._1)
+                  ScriptEstimatorV3
+                )
+                .explicitGet()
+                ._1
+            )
           ),
           fee,
-          waitForTx = true
+          waitForTx = waitForTx
         )
     }
 

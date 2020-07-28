@@ -27,7 +27,7 @@ trait UtxPoolSynchronizer {
 
 class UtxPoolSynchronizerImpl(
     val settings: UtxSynchronizerSettings,
-    putIfNew: Transaction => TracedResult[ValidationError, Boolean],
+    putIfNew: (Transaction, Boolean) => TracedResult[ValidationError, Boolean],
     broadcast: (Transaction, Option[Channel]) => Unit,
     blockSource: Observable[LastBlockInfo],
     timedScheduler: Scheduler
@@ -79,7 +79,7 @@ class UtxPoolSynchronizerImpl(
       source: Option[Channel]
   ): Future[TracedResult[ValidationError, Boolean]] =
     Schedulers
-      .executeCatchingInterruptedException(timedScheduler)(putIfNew(tx))
+      .executeCatchingInterruptedException(timedScheduler)(putIfNew(tx, source.isEmpty))
       .recover {
         case err =>
           log.warn(s"Error validating transaction ${tx.id()}", err)
@@ -102,6 +102,13 @@ object UtxPoolSynchronizer extends ScorexLogging {
       allChannels: ChannelGroup,
       blockSource: Observable[LastBlockInfo],
       sc: Scheduler
-  ): UtxPoolSynchronizer = new UtxPoolSynchronizerImpl(settings, tx => utx.putIfNew(tx), (tx, ch) => allChannels.broadcast(tx, ch), blockSource, sc)
+  ): UtxPoolSynchronizer =
+    new UtxPoolSynchronizerImpl(
+      settings,
+      (tx, forceValidate) => utx.putIfNew(tx, forceValidate),
+      (tx, ch) => allChannels.broadcast(tx, ch),
+      blockSource,
+      sc
+    )
 
 }

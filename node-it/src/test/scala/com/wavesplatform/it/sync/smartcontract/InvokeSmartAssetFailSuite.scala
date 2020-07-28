@@ -1,4 +1,5 @@
 package com.wavesplatform.it.sync.smartcontract
+import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -61,8 +62,9 @@ class InvokeSmartAssetFailSuite extends BaseTransactionSuite {
 
     val script = ScriptCompiler.compile(dAppText, ScriptEstimatorV3).explicitGet()._1.bytes().base64
     sender.setScript(dApp, Some(script), setScriptFee, waitForTx = true)
-
-    val tx = sender.invokeScript(caller, dApp.toAddress.toString, Some("some"), List(CONST_BOOLEAN(true)), waitForTx = true)
-    sender.debugStateChanges(tx._1.id).stateChanges.get.error.get.text shouldBe "Asset was issued by other address"
+    assertApiError(
+      sender.invokeScript(caller, dApp.toAddress.toString, Some("some"), List(CONST_BOOLEAN(true))),
+      AssertiveApiError(ScriptExecutionError.Id, "Error while executing account-script: Asset was issued by other address")
+    )
   }
 }

@@ -92,11 +92,9 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       val issuedQuantity = issueAmount
       val burnedQuantity = issuedQuantity * 2
 
-      val issuedAssetId = sender.issue(firstKeyPair, s"name+$v", "description", issuedQuantity, decimals, reissuable = false, issueFee).id
+      val issuedAssetId = sender.issue(firstKeyPair, s"name+$v", "description", issuedQuantity, decimals, reissuable = false, issueFee, waitForTx = true).id
 
-      miner.waitForTransaction(issuedAssetId)
       sender.assertAssetBalance(firstAddress, issuedAssetId, issuedQuantity)
-
       assertBadRequestAndMessage(sender.burn(secondKeyPair, issuedAssetId, burnedQuantity, minFee, v).id, "Accounts balance errors")
     }
   }
