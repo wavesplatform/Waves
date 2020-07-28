@@ -148,6 +148,12 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
   }
 
   test("InvokeScriptTransaction: dApp error propagates failed transaction") {
+    {
+      val data       = List(StringDataEntry("crash", "no"))
+      val putDataFee = calcDataFee(data, 1)
+      sender.putData(contract, data, putDataFee, waitForTx = true)
+    }
+
     val invokeFee    = 0.005.waves
     val priorityData = List(StringDataEntry("crash", "yes"))
     val putDataFee   = calcDataFee(priorityData, 1)
@@ -155,7 +161,6 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     val prevBalance = sender.balance(caller.toAddress.toString).balance
 
-    waitForHeightArise()
     overflowBlock()
     sendPriorityTxAndThenOtherTxs(
       _ => sender.invokeScript(caller, contractAddress, Some("canThrow"), fee = invokeFee)._1.id,
