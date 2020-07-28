@@ -283,7 +283,7 @@ class SigVerify32Kb {
 class ListRemoveByIndex {
   val context: EvaluationContext[NoContext, Id] =
     Monoid.combine(
-      PureContext.build(Global, V4).evaluationContext,
+      PureContext.build(V4).evaluationContext,
       CryptoContext.build(Global, V4).evaluationContext
     )
 
