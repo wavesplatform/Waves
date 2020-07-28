@@ -7,6 +7,7 @@ import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.requests.{TransferV1Request, TransferV2Request}
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.wallet.Wallet
@@ -43,8 +44,8 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
       val req = TransferV1Request(
         assetId = None,
         feeAssetId = None,
-        amount = 1 * Waves,
-        fee = Waves / 3,
+        amount = 1.waves,
+        fee = 0.3.waves,
         sender = senderPrivateKey.toAddress.toString,
         attachment = Some("attachment"),
         recipient = receiverPrivateKey.toAddress.toString,
@@ -61,9 +62,9 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
     "accepts VersionedTransferRequest" in {
       val req = TransferV2Request(
         assetId = None,
-        amount = 1 * Waves,
+        amount = 1.waves,
         feeAssetId = None,
-        fee = Waves / 3,
+        fee = 0.3.waves,
         sender = senderPrivateKey.toAddress.toString,
         attachment = None,
         recipient = receiverPrivateKey.toAddress.toString,

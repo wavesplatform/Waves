@@ -12,6 +12,7 @@ import com.wavesplatform.lang.v1.evaluator.{Log, Complexity}
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
+import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -83,8 +84,23 @@ object Verifier extends ScorexLogging {
       blockchain.assetDescription(asset).flatMap(_.script).map(script => (script, asset))
     }.toList
 
+    val additionalAssets = (tx match {
+      case etx: ExchangeTransaction => List(etx.buyOrder.matcherFeeAssetId, etx.sellOrder.matcherFeeAssetId)
+      case _                        => List.empty
+    }).distinct.collect {
+      case ia: IssuedAsset =>
+        blockchain.assetDescription(ia).flatMap(_.script).map(script => (script, ia))
+    }.flatten
+
     val (complexity, real, result) = loop(assets, 0L, 0L, Nil)
-    result.leftMap(ve => (complexity, real, ve)).as(Diff.empty.copy(scriptsComplexity = complexity, spentComplexity = real))
+
+    result
+      .flatMap({_ => 
+         val (_, _, additionalResult) = loop(additionalAssets, 0L, 0L, Nil)
+         additionalResult
+      })
+      .leftMap(ve => (complexity, real, ve))
+      .as(Diff.empty.copy(scriptsComplexity = complexity, spentComplexity = real))
   }
 
   private def logIfNecessary(
@@ -109,8 +125,10 @@ object Verifier extends ScorexLogging {
     val senderAddress = transaction.asInstanceOf[Authorized].sender.toAddress
 
     val txE = Try {
-      val containerAddress = assetIdOpt.fold(Coproduct[Environment.Tthis](Recipient.Address(ByteStr(senderAddress.bytes))))(v => Coproduct[Environment.Tthis](Environment.AssetId(v.arr)))
-      val eval             = ScriptRunner(Coproduct[TxOrd](transaction), blockchain, script, isAsset, containerAddress)
+      val containerAddress = assetIdOpt.fold(Coproduct[Environment.Tthis](Recipient.Address(ByteStr(senderAddress.bytes))))(
+        v => Coproduct[Environment.Tthis](Environment.AssetId(v.arr))
+      )
+      val eval = ScriptRunner(Coproduct[TxOrd](transaction), blockchain, script, isAsset, containerAddress)
       val (realComplexity, scriptResult) = eval match {
         case (log, realComplexity, Left(execError)) => (realComplexity, Left(ScriptExecutionError(execError, log, assetIdOpt)))
         case (log, realComplexity, Right(FALSE))    => (realComplexity, Left(TransactionNotAllowedByScript(log, assetIdOpt)))
@@ -145,7 +163,13 @@ object Verifier extends ScorexLogging {
     for {
       result <- Try {
         val eval =
-          ScriptRunner(Coproduct[ScriptRunner.TxOrd](order), blockchain, script, isAssetScript = false, Coproduct[Environment.Tthis](Recipient.Address(ByteStr(order.sender.toAddress.bytes))))
+          ScriptRunner(
+            Coproduct[ScriptRunner.TxOrd](order),
+            blockchain,
+            script,
+            isAssetScript = false,
+            Coproduct[Environment.Tthis](Recipient.Address(ByteStr(order.sender.toAddress.bytes)))
+          )
         val scriptResult = eval match {
           case (log, real, Left(execError)) => (real, Left(ScriptExecutionError(execError, log, None)))
           case (log, real, Right(FALSE))    => (real, Left(TransactionNotAllowedByScript(log, None)))
