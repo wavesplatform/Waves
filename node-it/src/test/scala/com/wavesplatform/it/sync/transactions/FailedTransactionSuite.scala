@@ -458,13 +458,13 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     val buyMatcherFee  = fee / 100000L
 
     val (assetScript, _) = ScriptCompiler.compile("if true then throw(\"error\") else false", ScriptEstimatorV3).explicitGet()
-    val scriptTx = sender.setAssetScript(priceAsset, buyerAddress, script = Some(assetScript.bytes().base64))
+    val scriptTx         = sender.setAssetScript(priceAsset, buyerAddress, script = Some(assetScript.bytes().base64))
     nodes.waitForHeightAriseAndTxPresent(scriptTx.id)
 
-    val tx = mkExchange(buyer, seller, matcher, assetPair, fee, buyFeeAsset, sellFeeAsset, buyMatcherFee, sellMatcherFee)
+    val tx     = mkExchange(buyer, seller, matcher, assetPair, fee, buyFeeAsset, sellFeeAsset, buyMatcherFee, sellMatcherFee)
     val result = sender.signedValidate(tx.json())
     (result \ "valid").as[Boolean] shouldBe false
-    (result \ "error").as[String] should include ("not allowed by script of the asset")
+    (result \ "error").as[String] should include("not allowed by script of the asset")
   }
 
   test("ExchangeTransaction: failed exchange tx when asset script fails") {
@@ -552,6 +552,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
         sender.signedBroadcast(tx.json()).id
       }
 
+      updateAccountScript(None, invalidAccount, setScriptFee + smartFee)
       overflowBlock()
       sendPriorityTxAndThenOtherTxs(
         txsSend,

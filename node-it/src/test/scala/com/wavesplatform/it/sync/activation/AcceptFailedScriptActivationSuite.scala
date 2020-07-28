@@ -115,7 +115,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     all(sender.lastBlock().transactions.map(_.applicationStatus.isDefined)) shouldBe true
 
     def check(): Unit = {
-      val statuses = sender.transactionStatus(txs).sortWith { case (f, s) => txs.indexOf(f.status) < txs.indexOf(s.status) }
+      val statuses = sender.transactionStatus(txs)
       all(statuses.map(_.status)) shouldBe "confirmed"
       all(statuses.map(_.applicationStatus.isDefined)) shouldBe true
 
@@ -177,24 +177,23 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(true), waitForTx = true)
 
     overflowBlock()
-    sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(false))
 
     val txs =
       (1 to MaxTxsInMicroBlock * 2).map { _ =>
         sender.invokeScript(callerKP, dApp, Some("transfer"), fee = minInvokeFee)._1.id
       }
 
-    sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
+    sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(false))
 
     def check(): Unit = {
-      val failed = sender.transactionStatus(txs).sortWith { case (f, s) => txs.indexOf(f.status) < txs.indexOf(s.status) }
-      failed.size shouldBe MaxTxsInMicroBlock * 2
+      val failed = sender.transactionStatus(txs).dropWhile(_.applicationStatus == "succeeded")
+      failed should not be empty
 
       all(failed.map(_.status)) shouldBe "confirmed"
-      all(failed.map(_.applicationStatus)) shouldBe defined
-      all(failed.flatMap(_.applicationStatus)) shouldBe "script_execution_failed"
+      all(failed.map(_.applicationStatus)) shouldBe Some("script_execution_failed")
     }
 
+    sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
     nodes.waitForHeightArise()
     check() // hardened
   }
@@ -232,12 +231,11 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
 
     def check(): Unit = {
-      val failed = sender.transactionStatus(txs).sortWith { case (f, s) => txs.indexOf(f.status) < txs.indexOf(s.status) }
-      failed.size shouldBe MaxTxsInMicroBlock * 2
+      val failed = sender.transactionStatus(txs).dropWhile(_.applicationStatus == "succeeded")
+      failed should not be empty
 
       all(failed.map(_.status)) shouldBe "confirmed"
-      all(failed.map(_.applicationStatus)) shouldBe defined
-      all(failed.flatMap(_.applicationStatus)) shouldBe "script_execution_failed"
+      all(failed.map(_.applicationStatus)) shouldBe Some("script_execution_failed")
 
       sender.balance(caller).balance shouldBe callerBalance - MaxTxsInMicroBlock * 2 * minInvokeFee
       sender.assetBalance(caller, asset).balance shouldBe callerAssetBalance
