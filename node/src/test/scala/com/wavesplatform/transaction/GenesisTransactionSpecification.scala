@@ -2,6 +2,7 @@ package com.wavesplatform.transaction
 
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -40,8 +41,13 @@ class GenesisTransactionSpecification extends PropSpec with PropertyChecks with 
         val source    = GenesisTransaction.create(recipient.toAddress, amount, time).explicitGet()
         val bytes     = source.bytes()
         val dest      = GenesisTransaction.parseBytes(bytes).get
-
         source should equal(dest)
+
+        val proto           = PBTransactions.protobuf(source)
+        val fromProto       = PBTransactions.vanilla(proto).explicitGet()
+        val fromProtoUnsafe = PBTransactions.vanillaUnsafe(proto)
+        fromProto shouldBe source
+        fromProtoUnsafe shouldBe source
     }
   }
 
