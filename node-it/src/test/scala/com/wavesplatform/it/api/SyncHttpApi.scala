@@ -724,6 +724,8 @@ object SyncHttpApi extends Assertions {
 
     def featureActivationStatus(featureNum: Short): FeatureActivationStatus =
       activationStatus.features.find(_.id == featureNum).get
+
+    def signedValidate(json: JsValue): JsValue = sync(async(n).signedValidate(json))
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {

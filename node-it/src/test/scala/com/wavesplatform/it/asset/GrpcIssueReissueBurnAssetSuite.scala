@@ -18,6 +18,7 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.FreeSpec
 
+import scala.concurrent.duration._
 import scala.util.Random
 
 class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSuiteLike {
@@ -158,7 +159,9 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
       val txIssue = issue(acc, method, nftAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, nftAsset, method = method)
 
-      assertGrpcError(reissue(acc, method, assetId, 2, reissuable = true, checkStateChanges = false), "Asset is not reissuable")
+      assertGrpcError(reissue(acc, method, assetId, 2, reissuable = true, checkStateChanges = false),
+        "Asset is not reissuable"
+      )
     }
 
     "Reissuing after setting isReissuiable to falser inside one invocation should produce an error" ignore /* SC-580 */ {

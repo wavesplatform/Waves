@@ -23,7 +23,7 @@ import com.wavesplatform.network.{PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, Portfolio}
-import com.wavesplatform.transaction.TxValidationError.InvalidRequestSignature
+import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -224,17 +224,21 @@ case class DebugApiRoute(
       val tracedDiff = for {
         tx <- TracedResult(TransactionFactory.fromSignedRequest(jsv))
         ei <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, tx)
-      } yield ei
+      } yield (tx, ei)
+
       val timeSpent = (System.nanoTime - t0) * 1e-6
+      val error = tracedDiff.resultE match {
+        case Right((tx, diff)) => diff.errorMessage(tx.id()).map(em => GenericError(em.text))
+        case Left(err)         => Some(err)
+      }
+      log.error(tracedDiff.resultE.toString)
+
       val response = Json.obj(
-        "valid"          -> tracedDiff.resultE.isRight,
+        "valid"          -> error.isEmpty,
         "validationTime" -> timeSpent.toLong,
         "trace"          -> tracedDiff.trace.map(_.loggedJson)
       )
-      tracedDiff.resultE.fold(
-        err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)),
-        _ => response
-      )
+      error.fold(response)(err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)))
     })
 
   def stateChanges: Route = stateChangesById ~ stateChangesByAddress

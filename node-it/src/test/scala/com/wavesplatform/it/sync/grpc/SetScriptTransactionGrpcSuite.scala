@@ -87,7 +87,6 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         ByteString.copyFrom(crypto.sign(thirdAcc.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsignedTransfer))).explicitGet().bodyBytes()).arr)
 
       sender.broadcast(unsignedTransfer, Seq(sig1, sig2), waitForTx = true)
-
       sender.wavesBalance(contractAddr).available shouldBe firstBalance - transferAmount - transferFee
       sender.wavesBalance(thirdAddress).available shouldBe thirdBalance + transferAmount
     }
