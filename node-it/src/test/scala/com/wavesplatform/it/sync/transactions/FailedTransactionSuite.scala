@@ -155,6 +155,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     val prevBalance = sender.balance(caller.toAddress.toString).balance
 
+    waitForHeightArise()
     overflowBlock()
     sendPriorityTxAndThenOtherTxs(
       _ => sender.invokeScript(caller, contractAddress, Some("canThrow"), fee = invokeFee)._1.id,

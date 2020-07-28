@@ -87,8 +87,21 @@ object Verifier extends ScorexLogging {
       blockchain.assetDescription(asset).flatMap(_.script).map(script => (script, asset))
     }.toList
 
-    val (complexity, result) = loop(assets, 0L, Nil)
-    result.leftMap(ve => (complexity, ve)).as(Diff.empty.copy(scriptsComplexity = complexity))
+    val additionalAssets = (tx match {
+      case etx: ExchangeTransaction => List(etx.buyOrder.matcherFeeAssetId, etx.sellOrder.matcherFeeAssetId)
+      case _                        => List.empty
+    }).distinct.collect {
+      case ia: IssuedAsset =>
+        blockchain.assetDescription(ia).flatMap(_.script).map(script => (script, ia))
+    }.flatten
+
+    val (complexity, result)  = loop(assets, 0L, Nil)
+    val (_, additionalResult) = loop(additionalAssets, 0L, Nil)
+
+    result
+      .flatMap(_ => additionalResult)
+      .leftMap(ve => (complexity, ve))
+      .as(Diff.empty.copy(scriptsComplexity = complexity))
   }
 
   private def logIfNecessary(
