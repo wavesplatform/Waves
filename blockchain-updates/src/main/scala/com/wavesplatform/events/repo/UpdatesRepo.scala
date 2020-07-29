@@ -7,7 +7,7 @@ import scala.util.Try
 
 object UpdatesRepo {
   trait Read {
-    def height: Int
+    def height: Try[Int]
 
     def updateForHeight(height: Int): Try[Option[BlockAppended]]
 

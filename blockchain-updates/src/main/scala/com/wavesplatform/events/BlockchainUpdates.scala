@@ -33,6 +33,14 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   override def start(): Unit = {
     log.info("BlockchainUpdates extension starting")
 
+    // startup check
+    val nodeHeight      = context.blockchain.height
+    val extensionHeight = repo.height.get
+    if (extensionHeight != nodeHeight) {
+      throw new IllegalStateException(s"Blockchain updates extension at height $extensionHeight not equal to node height $nodeHeight at startup")
+    }
+    log.info(s"BlockchainUpdates extension startup check succesful at height $extensionHeight")
+
     // starting gRPC API
     val bindAddress = new InetSocketAddress("0.0.0.0", settings.grpcPort)
 
@@ -53,7 +61,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
   // todo proper shutdown
   override def shutdown(): Future[Unit] = Future {
-    log.info(s"BlockchainUpdates extension shutting down, last persisted height ${repo.height - 1}")
+    log.info(s"BlockchainUpdates extension shutting down, last persisted height ${repo.height.get - 1}")
 
     if (httpServer != null) {
       httpServer.shutdown()
