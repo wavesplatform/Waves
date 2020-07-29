@@ -12,7 +12,7 @@ import com.wavesplatform.utx.UtxPool.PackStrategy
 import scala.concurrent.duration.FiniteDuration
 
 trait UtxPool extends AutoCloseable {
-  def putIfNew(tx: Transaction): TracedResult[ValidationError, Boolean]
+  def putIfNew(tx: Transaction, forceValidate: Boolean = false): TracedResult[ValidationError, Boolean]
   def removeAll(txs: Iterable[Transaction]): Unit
   def spendableBalance(addr: Address, assetId: Asset): Long
   def pessimisticPortfolio(addr: Address): Portfolio

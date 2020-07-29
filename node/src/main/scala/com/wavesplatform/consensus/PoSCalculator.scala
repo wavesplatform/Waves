@@ -4,6 +4,7 @@ import com.wavesplatform.account.{PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSCalculator.HitSize
 import com.wavesplatform.crypto
+import com.wavesplatform.settings.FunctionalitySettings
 
 trait PoSCalculator {
   def calculateBaseTarget(
@@ -85,15 +86,19 @@ object NxtPoSCalculator extends PoSCalculator {
 }
 
 object FairPoSCalculator {
-  lazy val V1 = new FairPoSCalculator(5000, 0)
-  lazy val V2 = new FairPoSCalculator(15000, 8)
+  lazy val V1 = FairPoSCalculator(5000, 0)
+  lazy val V2 = FairPoSCalculator(15000, 8)
+
+  def fromSettings(fs: FunctionalitySettings): PoSCalculator =
+    if (fs.minBlockTime.toSeconds == 15 && fs.delayDelta == 8) V2
+    else FairPoSCalculator(fs.minBlockTime.toMillis.toInt, fs.delayDelta)
 
   private val MaxHit = BigDecimal(BigInt(1, Array.fill[Byte](HitSize)(-1)))
   private val C1     = 70000
   private val C2     = 5e17
 }
 
-class FairPoSCalculator(minBlockTime: Int, delayDelta: Int) extends PoSCalculator {
+case class FairPoSCalculator(minBlockTime: Int, delayDelta: Int) extends PoSCalculator {
   import FairPoSCalculator._
   import PoSCalculator._
 

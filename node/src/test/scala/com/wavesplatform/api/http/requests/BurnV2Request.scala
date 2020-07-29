@@ -2,7 +2,7 @@ package com.wavesplatform.api.http.requests
 
 import play.api.libs.json._
 
-case class BurnV2Request(sender: String, assetId: String, quantity: Long, fee: Long, timestamp: Option[Long] = None)
+case class BurnV2Request(sender: String, assetId: String, amount: Long, fee: Long, timestamp: Option[Long] = None)
 
 object BurnV2Request {
   implicit val burnV2Reads: Reads[BurnV2Request] = {
@@ -11,7 +11,7 @@ object BurnV2Request {
 
     ((JsPath \ "sender").read[String] ~
       (JsPath \ "assetId").read[String] ~
-      ((JsPath \ "quantity").read[Long] | (JsPath \ "amount").read[Long]) ~
+      (JsPath \ "amount").read[Long] ~
       (JsPath \ "fee").read[Long] ~
       (JsPath \ "timestamp").readNullable[Long])(BurnV2Request.apply _)
   }

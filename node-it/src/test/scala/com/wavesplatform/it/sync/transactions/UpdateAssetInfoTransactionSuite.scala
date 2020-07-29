@@ -29,9 +29,9 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
       configWithUpdateIntervalSetting(updateInterval).withFallback(NotMiner)
     )
 
-  val issuer       = pkByAddress(firstAddress)
-  val nonIssuer    = pkByAddress(secondAddress)
-  val dApp         = pkByAddress(thirdAddress)
+  private def issuer       = firstKeyPair
+  private def nonIssuer    = secondKeyPair
+  private def dApp         = thirdKeyPair
   var assetId      = ""
   var otherAssetId = ""
   var smartAssetId = ""
@@ -82,12 +82,12 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
       .id
     nftId = sender.broadcastIssue(issuer, "asset", "description", quantity = 1, decimals = 0, reissuable = false, script = None, waitForTx = true).id
     val script = ScriptCompiler.compile(testDapp, ScriptEstimatorV3).explicitGet()._1.bytes().base64
-    sender.setScript(dApp.toAddress.toString, Some(script), waitForTx = true)
+    sender.setScript(dApp, Some(script), waitForTx = true)
   }
 
   test("DApp can read asset info") {
     sender.invokeScript(
-      issuer.toAddress.toString,
+      issuer,
       dApp.toAddress.toString,
       func = Some("isAssetInfoCorrect"),
       args = List(
@@ -141,7 +141,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
 
   test("DApp can read updated asset info") {
     sender.invokeScript(
-      issuer.toAddress.toString,
+      issuer,
       dApp.toAddress.toString,
       func = Some("isAssetInfoCorrect"),
       args = List(
@@ -318,9 +318,9 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
           |case _ => false
           |}""".stripMargin
     val script1 = ScriptCompiler(scriptText1, isAssetScript = true, ScriptEstimatorV2).explicitGet()._1.bytes().base64
-    sender.setAssetScript(smartAssetId1, issuer.toAddress.toString, setAssetScriptFee, Some(script1),  waitForTx = true)
+    sender.setAssetScript(smartAssetId1, issuer, setAssetScriptFee, Some(script1),  waitForTx = true)
 
-    sender.burn(issuer.toAddress.toString, smartAssetId1, 1, minFee + 2 * smartFee, waitForTx = true)
+    sender.burn(issuer, smartAssetId1, 1, minFee + 2 * smartFee, waitForTx = true)
   }
 
   test("check increased fee for smart sender/asset") {
@@ -334,7 +334,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
       error.message shouldBe s"State check failed. Reason: Transaction involves 1 scripted assets. Requires $smartFee extra fee." +
         s" Fee for UpdateAssetInfoTransaction (${smartMinFee - 1} in WAVES) does not exceed minimal value of $smartMinFee WAVES."
     }
-    sender.setScript(issuer.publicKey.toAddress.toString, Some(script), waitForTx = true)
+    sender.setScript(issuer, Some(script), waitForTx = true)
     assertApiError(sender.updateAssetInfo(issuer, smartAssetId, "updatedName", "updatedDescription", minFee + 2 * smartFee - 1)) { error =>
       error.id shouldBe StateCheckFailed.Id
       error.message shouldBe s"State check failed. Reason: Transaction sent from smart account. Requires $smartFee extra fee." +
@@ -374,13 +374,13 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   }
 
   test("reissue/burn/setassetscript should not affect update interval") {
-    sender.reissue(issuer.toAddress.toString, assetId, 100, reissuable = true, version = TxVersion.V2, waitForTx = true)
+    sender.reissue(issuer, assetId, 100, reissuable = true, version = TxVersion.V2, waitForTx = true)
     sender.updateAssetInfo(issuer, assetId, "afterReissue", "asset after reissue", waitForTx = true)
     sender.assetsDetails(assetId).name shouldBe "afterReissue"
     sender.assetsDetails(assetId).description shouldBe "asset after reissue"
 
     sender.waitForHeight(sender.height + updateInterval + 1, 2.minutes)
-    sender.burn(issuer.toAddress.toString, assetId, 100, version = TxVersion.V2, fee = smartMinFee, waitForTx = true)
+    sender.burn(issuer, assetId, 100, version = TxVersion.V2, fee = smartMinFee, waitForTx = true)
     sender.updateAssetInfo(issuer, assetId, "afterBurn", "asset after burn", waitForTx = true)
     sender.assetsDetails(assetId).name shouldBe "afterBurn"
     sender.assetsDetails(assetId).description shouldBe "asset after burn"
@@ -388,7 +388,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     sender.waitForHeight(sender.height + updateInterval + 1, 2.minutes)
     sender.setAssetScript(
       smartAssetId,
-      issuer.toAddress.toString,
+      issuer,
       script = Some(scriptBase64),
       version = TxVersion.V2,
       fee = setAssetScriptFee + 2 * smartFee,

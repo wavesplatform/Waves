@@ -113,39 +113,39 @@ object AssetInfo {
 //noinspection ScalaStyle
 class Transaction(
     val _type: Int,
-    val  id: String,
-    val  chainId: Option[Byte],
-    val  fee: Long,
-    val  timestamp: Long,
-    val  sender: Option[String],
-    val  version: Option[Byte],
-    val  name: Option[String],
-    val  amount: Option[Long],
-    val  description: Option[String],
-    val  attachment: Option[String],
-    val  price: Option[Long],
-    val  sellMatcherFee: Option[Long],
-    val  buyMatcherFee: Option[Long],
-    val  sellOrderMatcherFee: Option[Long],
-    val  buyOrderMatcherFee: Option[Long],
-    val  data: Option[Seq[DataEntry[_]]],
-    val  minSponsoredAssetFee: Option[Long],
-    val  transfers: Option[Seq[Transfer]],
-    val  totalAmount: Option[Long],
-    val  senderPublicKey: Option[String],
-    val  recipient: Option[String],
-    val  proofs: Option[Seq[String]],
+    val id: String,
+    val chainId: Option[Byte],
+    val fee: Long,
+    val timestamp: Long,
+    val sender: Option[String],
+    val version: Option[Byte],
+    val name: Option[String],
+    val amount: Option[Long],
+    val description: Option[String],
+    val attachment: Option[String],
+    val price: Option[Long],
+    val sellMatcherFee: Option[Long],
+    val buyMatcherFee: Option[Long],
+    val sellOrderMatcherFee: Option[Long],
+    val buyOrderMatcherFee: Option[Long],
+    val data: Option[Seq[DataEntry[_]]],
+    val minSponsoredAssetFee: Option[Long],
+    val transfers: Option[Seq[Transfer]],
+    val totalAmount: Option[Long],
+    val senderPublicKey: Option[String],
+    val recipient: Option[String],
+    val proofs: Option[Seq[String]],
     val applicationStatus: Option[String]
-  ) {
-    import Transaction._
-    override def toString: String = Json.toJson(this).toString
-    override def equals(x: Any): Boolean = {
-      x match {
-        case t: Transaction => id == t.id
-        case _ => false
-      }
+) {
+  import Transaction._
+  override def toString: String = Json.toJson(this).toString
+  override def equals(x: Any): Boolean = {
+    x match {
+      case t: Transaction => id == t.id
+      case _              => false
     }
   }
+}
 //noinspection ScalaStyle
 object Transaction {
   def apply(
@@ -173,7 +173,7 @@ object Transaction {
       recipient: Option[String],
       proofs: Option[Seq[String]],
       applicationStatus: Option[String]
-  ) : Transaction = new Transaction(
+  ): Transaction = new Transaction(
     _type,
     id,
     chainId,
@@ -201,37 +201,37 @@ object Transaction {
   )
 
   implicit val transactionFormat: Format[Transaction] = Format(
-    Reads(jsv =>
-      for {
-        _type <- (jsv \ "type").validate[Int]
-        id <- (jsv \ "id").validate[String]
-        chainId <- (jsv \ "chainId").validateOpt[Byte]
-        fee <- (jsv \ "fee").validate[Long]
-        timestamp <- (jsv \ "timestamp").validate[Long]
-        sender <- (jsv \ "sender").validateOpt[String]
-        version <- (jsv \ "version").validateOpt[Byte]
-        name <- (jsv \ "name").validateOpt[String]
-        amount <- (jsv \ "amount").validateOpt[Long]
-        description <- (jsv \ "description").validateOpt[String]
-        attachment <- version match {
-          case Some(v) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
-          case _ => JsSuccess(None)
-        }
-        price <- (jsv \ "price").validateOpt[Long]
-        sellMatcherFee <- (jsv \ "sellMatcherFee").validateOpt[Long]
-        buyMatcherFee <- (jsv \ "buyMatcherFee").validateOpt[Long]
-        sellOrderMatcherFee <- (jsv \ "order2" \ "matcherFee").validateOpt[Long]
-        buyOrderMatcherFee <- (jsv \ "order1" \  "matcherFee").validateOpt[Long]
-        data <- (jsv \ "data").validateOpt[Seq[DataEntry[_]]]
-        minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
-        transfers <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
-        totalAmount <- (jsv \ "totalAmount").validateOpt[Long]
-        senderPublicKey <- (jsv \ "senderPublicKey").validateOpt[String]
-        recipient <- (jsv \ "recipient").validateOpt[String]
-        proofs <- (jsv \ "proofs").validateOpt[Seq[String]]
-        applicationStatus <- (jsv \ "applicationStatus").validateOpt[String]
-      }
-        yield new Transaction(
+    Reads(
+      jsv =>
+        for {
+          _type       <- (jsv \ "type").validate[Int]
+          id          <- (jsv \ "id").validate[String]
+          chainId     <- (jsv \ "chainId").validateOpt[Byte]
+          fee         <- (jsv \ "fee").validate[Long]
+          timestamp   <- (jsv \ "timestamp").validate[Long]
+          sender      <- (jsv \ "sender").validateOpt[String]
+          version     <- (jsv \ "version").validateOpt[Byte]
+          name        <- (jsv \ "name").validateOpt[String]
+          amount      <- (jsv \ "amount").validateOpt[Long]
+          description <- (jsv \ "description").validateOpt[String]
+          attachment <- version match {
+            case Some(v) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
+            case _                                    => JsSuccess(None)
+          }
+          price                <- (jsv \ "price").validateOpt[Long]
+          sellMatcherFee       <- (jsv \ "sellMatcherFee").validateOpt[Long]
+          buyMatcherFee        <- (jsv \ "buyMatcherFee").validateOpt[Long]
+          sellOrderMatcherFee  <- (jsv \ "order2" \ "matcherFee").validateOpt[Long]
+          buyOrderMatcherFee   <- (jsv \ "order1" \ "matcherFee").validateOpt[Long]
+          data                 <- (jsv \ "data").validateOpt[Seq[DataEntry[_]]]
+          minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
+          transfers            <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
+          totalAmount          <- (jsv \ "totalAmount").validateOpt[Long]
+          senderPublicKey      <- (jsv \ "senderPublicKey").validateOpt[String]
+          recipient            <- (jsv \ "recipient").validateOpt[String]
+          proofs               <- (jsv \ "proofs").validateOpt[Seq[String]]
+          applicationStatus    <- (jsv \ "applicationStatus").validateOpt[String]
+        } yield new Transaction(
           _type,
           id,
           chainId,
@@ -256,33 +256,34 @@ object Transaction {
           recipient,
           proofs,
           applicationStatus
-        )),
+        )
+    ),
     Writes { t =>
       Json.obj(
-        "type" -> t._type,
-        "id" ->  t.id,
-        "chainId" ->  t.chainId,
-        "fee" ->  t.fee,
-        "timestamp" ->  t.timestamp,
-        "sender" ->  t.sender,
-        "version" ->  t.version,
-        "name" ->  t.name,
-        "amount" ->  t.amount,
-        "description" ->  t.description,
-        "attachment" ->  t.attachment,
-        "price" ->  t.price,
-        "sellMatcherFee" ->  t.sellMatcherFee,
-        "buyMatcherFee" ->  t.buyMatcherFee,
-        "sellOrderFee" ->  t.sellOrderMatcherFee,
-        "buyOrderFee" ->  t.buyOrderMatcherFee,
-        "data" ->  t.data,
-        "minSponsoredAssetFee" ->  t.minSponsoredAssetFee,
-        "transfers" ->  t.transfers,
-        "totalAmount" ->  t.totalAmount,
-        "senderPublicKey" ->  t.senderPublicKey,
-        "recipient" ->  t.recipient,
-        "proofs" ->  t.proofs
-        )
+        "type"                 -> t._type,
+        "id"                   -> t.id,
+        "chainId"              -> t.chainId,
+        "fee"                  -> t.fee,
+        "timestamp"            -> t.timestamp,
+        "sender"               -> t.sender,
+        "version"              -> t.version,
+        "name"                 -> t.name,
+        "amount"               -> t.amount,
+        "description"          -> t.description,
+        "attachment"           -> t.attachment,
+        "price"                -> t.price,
+        "sellMatcherFee"       -> t.sellMatcherFee,
+        "buyMatcherFee"        -> t.buyMatcherFee,
+        "sellOrderFee"         -> t.sellOrderMatcherFee,
+        "buyOrderFee"          -> t.buyOrderMatcherFee,
+        "data"                 -> t.data,
+        "minSponsoredAssetFee" -> t.minSponsoredAssetFee,
+        "transfers"            -> t.transfers,
+        "totalAmount"          -> t.totalAmount,
+        "senderPublicKey"      -> t.senderPublicKey,
+        "recipient"            -> t.recipient,
+        "proofs"               -> t.proofs
+      )
     }
   )
 }
@@ -325,35 +326,32 @@ case class TransactionInfo(
 ) extends TxInfo
 object TransactionInfo {
   implicit val transactionFormat: Format[TransactionInfo] = Format(
-    Reads(jsv =>
-      for {
-        _type <- (jsv \ "type").validate[Int]
-        id <- (jsv \ "id").validate[String]
-        fee <- (jsv \ "fee").validate[Long]
-        timestamp <- (jsv \ "timestamp").validate[Long]
-        sender <- (jsv \ "sender").validateOpt[String]
-        height <- (jsv \ "height").validate[Int]
-        minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
-        name <- (jsv \ "name").validateOpt[String]
-        version <- (jsv \ "version").validateOpt[Byte]
-        amount <- version match {
-          case Some(v) if v < 3 => (jsv \ "amount").validateOpt[Long]
-          case _ => (jsv \ "quantity").validateOpt[Long]
-        }
-        description <- (jsv \ "description").validateOpt[String]
-        recipient <- (jsv \ "recipient").validateOpt[String]
-        script <- (jsv \ "script").validateOpt[String]
-        chainId <- (jsv \ "chainId").validateOpt[Byte]
-        price <- (jsv \ "price").validateOpt[Long]
-        sellMatcherFee <- (jsv \ "sellMatcherFee").validateOpt[Long]
-        buyMatcherFee <- (jsv \ "buyMatcherFee").validateOpt[Long]
-        sellOrderMatcherFee <- (jsv \ "order2" \ "matcherFee").validateOpt[Long]
-        buyOrderMatcherFee <- (jsv \ "order1" \  "matcherFee").validateOpt[Long]
-        data <- (jsv \ "data").validateOpt[Seq[DataEntry[_]]]
-        transfers <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
-        totalAmount <- (jsv \ "totalAmount").validateOpt[Long]
-      }
-        yield TransactionInfo(
+    Reads(
+      jsv =>
+        for {
+          _type                <- (jsv \ "type").validate[Int]
+          id                   <- (jsv \ "id").validate[String]
+          fee                  <- (jsv \ "fee").validate[Long]
+          timestamp            <- (jsv \ "timestamp").validate[Long]
+          sender               <- (jsv \ "sender").validateOpt[String]
+          height               <- (jsv \ "height").validate[Int]
+          minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
+          name                 <- (jsv \ "name").validateOpt[String]
+          version              <- (jsv \ "version").validateOpt[Byte]
+          amount               <- (jsv \ "amount").validateOpt[Long].orElse((jsv \ "quantity").validateOpt[Long])
+          description          <- (jsv \ "description").validateOpt[String]
+          recipient            <- (jsv \ "recipient").validateOpt[String]
+          script               <- (jsv \ "script").validateOpt[String]
+          chainId              <- (jsv \ "chainId").validateOpt[Byte]
+          price                <- (jsv \ "price").validateOpt[Long]
+          sellMatcherFee       <- (jsv \ "sellMatcherFee").validateOpt[Long]
+          buyMatcherFee        <- (jsv \ "buyMatcherFee").validateOpt[Long]
+          sellOrderMatcherFee  <- (jsv \ "order2" \ "matcherFee").validateOpt[Long]
+          buyOrderMatcherFee   <- (jsv \ "order1" \ "matcherFee").validateOpt[Long]
+          data                 <- (jsv \ "data").validateOpt[Seq[DataEntry[_]]]
+          transfers            <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
+          totalAmount          <- (jsv \ "totalAmount").validateOpt[Long]
+        } yield TransactionInfo(
           _type,
           id,
           chainId,
@@ -376,7 +374,8 @@ object TransactionInfo {
           data,
           transfers,
           totalAmount
-        )),
+        )
+    ),
     Json.writes[TransactionInfo]
   )
 }
@@ -445,21 +444,21 @@ case class DebugStateChanges(
 ) extends TxInfo
 object DebugStateChanges {
   implicit val debugStateChanges: Reads[DebugStateChanges] =
-    Reads(jsv =>
-      for {
-        _type <- (jsv \ "type").validate[Int]
-        id <- (jsv \ "id").validate[String]
-        fee <- (jsv \ "fee").validate[Long]
-        timestamp <- (jsv \ "timestamp").validate[Long]
-        sender <- (jsv \ "sender").validateOpt[String]
-        height <- (jsv \ "height").validate[Int]
-        minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
-        recipient <- (jsv \ "recipient").validateOpt[String]
-        script <- (jsv \ "script").validateOpt[String]
-        stateChanges <- (jsv \ "stateChanges").validateOpt[StateChangesDetails]
-        applicationStatus <- (jsv \ "applicationStatus").validateOpt[String]
-      }
-        yield DebugStateChanges(
+    Reads(
+      jsv =>
+        for {
+          _type                <- (jsv \ "type").validate[Int]
+          id                   <- (jsv \ "id").validate[String]
+          fee                  <- (jsv \ "fee").validate[Long]
+          timestamp            <- (jsv \ "timestamp").validate[Long]
+          sender               <- (jsv \ "sender").validateOpt[String]
+          height               <- (jsv \ "height").validate[Int]
+          minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
+          recipient            <- (jsv \ "recipient").validateOpt[String]
+          script               <- (jsv \ "script").validateOpt[String]
+          stateChanges         <- (jsv \ "stateChanges").validateOpt[StateChangesDetails]
+          applicationStatus    <- (jsv \ "applicationStatus").validateOpt[String]
+        } yield DebugStateChanges(
           _type,
           id,
           fee,
@@ -475,61 +474,63 @@ object DebugStateChanges {
     )
 }
 
-case class IssueTransactionInfo(`type`: Int,
-                            id: String,
-                            chainId: Option[Byte],
-                            senderPublicKey: String,
-                            quantity: Long,
-                            fee: Long,
-                            description: String,
-                            version: Byte,
-                            sender: String,
-                            feeAssetId: Option[String],
-                            reissuable: Boolean,
-                            assetId: String,
-                            decimals: Byte,
-                            name: String,
-                            timestamp: Long)
+case class IssueTransactionInfo(
+    `type`: Int,
+    id: String,
+    chainId: Option[Byte],
+    senderPublicKey: String,
+    quantity: Long,
+    fee: Long,
+    description: String,
+    version: Byte,
+    sender: String,
+    feeAssetId: Option[String],
+    reissuable: Boolean,
+    assetId: String,
+    decimals: Byte,
+    name: String,
+    timestamp: Long
+)
 object IssueTransactionInfo {
   implicit val issueTransactionFormat: Format[IssueTransactionInfo] = Json.format
 }
 
 case class TransferTransactionInfo(
-                            _type: Int,
-                            id: String,
-                            chainId: Option[Byte],
-                            fee: Long,
-                            timestamp: Long,
-                            sender: Option[String],
-                            amount: Option[Long],
-                            height: Int,
-                            recipient: Option[String],
-                            version: Option[Byte],
-                            attachment: Option[String],
-                            proofs: Option[Seq[String]]
-                          )
+    _type: Int,
+    id: String,
+    chainId: Option[Byte],
+    fee: Long,
+    timestamp: Long,
+    sender: Option[String],
+    amount: Option[Long],
+    height: Int,
+    recipient: Option[String],
+    version: Option[Byte],
+    attachment: Option[String],
+    proofs: Option[Seq[String]]
+)
 object TransferTransactionInfo {
   implicit val transactionFormat: Format[TransferTransactionInfo] = Format(
-    Reads(jsv =>
-      for {
-        _type <- (jsv \ "type").validate[Int]
-        id <- (jsv \ "id").validate[String]
-        chainId <- (jsv \ "chainId").validateOpt[Byte]
-        fee <- (jsv \ "fee").validate[Long]
-        timestamp <- (jsv \ "timestamp").validate[Long]
-        sender <- (jsv \ "sender").validateOpt[String]
-        height <- (jsv \ "height").validate[Int]
-        amount <- (jsv \ "amount").validateOpt[Long]
-        recipient <- (jsv \ "recipient").validateOpt[String]
-        version <- (jsv \ "version").validateOpt[Byte]
-        chainId <- (jsv \ "chainId").validateOpt[Byte]
-        attachment <- version match {
-          case Some(v) if _type == 4  || _type == 11 => (jsv \ "attachment").validateOpt[String]
-          case _ => JsSuccess(None)
-        }
-        proofs <- (jsv \ "proofs").validateOpt[Seq[String]]
-      }
-        yield TransferTransactionInfo(
+    Reads(
+      jsv =>
+        for {
+          _type     <- (jsv \ "type").validate[Int]
+          id        <- (jsv \ "id").validate[String]
+          chainId   <- (jsv \ "chainId").validateOpt[Byte]
+          fee       <- (jsv \ "fee").validate[Long]
+          timestamp <- (jsv \ "timestamp").validate[Long]
+          sender    <- (jsv \ "sender").validateOpt[String]
+          height    <- (jsv \ "height").validate[Int]
+          amount    <- (jsv \ "amount").validateOpt[Long]
+          recipient <- (jsv \ "recipient").validateOpt[String]
+          version   <- (jsv \ "version").validateOpt[Byte]
+          chainId   <- (jsv \ "chainId").validateOpt[Byte]
+          attachment <- version match {
+            case Some(v) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
+            case _                                    => JsSuccess(None)
+          }
+          proofs <- (jsv \ "proofs").validateOpt[Seq[String]]
+        } yield TransferTransactionInfo(
           _type,
           id,
           chainId,
@@ -542,48 +543,49 @@ object TransferTransactionInfo {
           version,
           attachment,
           proofs
-        )),
+        )
+    ),
     Json.writes[TransferTransactionInfo]
   )
 }
 
 case class MassTransferTransactionInfo(
-                                _type: Int,
-                                id: String,
-                                chainId: Option[Byte],
-                                fee: Long,
-                                timestamp: Long,
-                                sender: Option[String],
-                                amount: Option[Long],
-                                height: Int,
-                                recipient: Option[String],
-                                version: Option[Byte],
-                                attachment: Option[String],
-                                transfers: Option[Seq[Transfer]],
-                                totalAmount: Option[Long]
-                              )
+    _type: Int,
+    id: String,
+    chainId: Option[Byte],
+    fee: Long,
+    timestamp: Long,
+    sender: Option[String],
+    amount: Option[Long],
+    height: Int,
+    recipient: Option[String],
+    version: Option[Byte],
+    attachment: Option[String],
+    transfers: Option[Seq[Transfer]],
+    totalAmount: Option[Long]
+)
 object MassTransferTransactionInfo {
   implicit val transactionFormat: Format[MassTransferTransactionInfo] = Format(
-    Reads(jsv =>
-      for {
-        _type <- (jsv \ "type").validate[Int]
-        id <- (jsv \ "id").validate[String]
-        fee <- (jsv \ "fee").validate[Long]
-        timestamp <- (jsv \ "timestamp").validate[Long]
-        sender <- (jsv \ "sender").validateOpt[String]
-        height <- (jsv \ "height").validate[Int]
-        amount <- (jsv \ "amount").validateOpt[Long]
-        recipient <- (jsv \ "recipient").validateOpt[String]
-        version <- (jsv \ "version").validateOpt[Byte]
-        chainId <- (jsv \ "chainId").validateOpt[Byte]
-        attachment <- version match {
-          case Some(v) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
-          case _ => JsSuccess(None)
-        }
-        transfers <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
-        totalAmount <- (jsv \ "totalAmount").validateOpt[Long]
-      }
-        yield MassTransferTransactionInfo(
+    Reads(
+      jsv =>
+        for {
+          _type     <- (jsv \ "type").validate[Int]
+          id        <- (jsv \ "id").validate[String]
+          fee       <- (jsv \ "fee").validate[Long]
+          timestamp <- (jsv \ "timestamp").validate[Long]
+          sender    <- (jsv \ "sender").validateOpt[String]
+          height    <- (jsv \ "height").validate[Int]
+          amount    <- (jsv \ "amount").validateOpt[Long]
+          recipient <- (jsv \ "recipient").validateOpt[String]
+          version   <- (jsv \ "version").validateOpt[Byte]
+          chainId   <- (jsv \ "chainId").validateOpt[Byte]
+          attachment <- version match {
+            case Some(v) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
+            case _                                    => JsSuccess(None)
+          }
+          transfers   <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
+          totalAmount <- (jsv \ "totalAmount").validateOpt[Long]
+        } yield MassTransferTransactionInfo(
           _type,
           id,
           chainId,
@@ -597,46 +599,44 @@ object MassTransferTransactionInfo {
           attachment,
           transfers,
           totalAmount
-        )),
+        )
+    ),
     Json.writes[MassTransferTransactionInfo]
   )
 }
 
 case class BurnTransactionInfo(
-                            _type: Int,
-                            id: String,
-                            chainId: Option[Byte],
-                            fee: Long,
-                            timestamp: Long,
-                            sender: String,
-                            senderPublicKey: String,
-                            amount: Long,
-                            height: Int,
-                            assetId: String,
-                            feeAssetId: Option[String],
-                            version: Option[Byte]
-                          )
+    _type: Int,
+    id: String,
+    chainId: Option[Byte],
+    fee: Long,
+    timestamp: Long,
+    sender: String,
+    senderPublicKey: String,
+    amount: Long,
+    height: Int,
+    assetId: String,
+    feeAssetId: Option[String],
+    version: Option[Byte]
+)
 object BurnTransactionInfo {
   implicit val transactionFormat: Format[BurnTransactionInfo] = Format(
-    Reads(jsv =>
-      for {
-        _type <- (jsv \ "type").validate[Int]
-        id <- (jsv \ "id").validate[String]
-        fee <- (jsv \ "fee").validate[Long]
-        timestamp <- (jsv \ "timestamp").validate[Long]
-        sender <- (jsv \ "sender").validate[String]
-        senderPublicKey <- (jsv \ "senderPublicKey").validate[String]
-        height <- (jsv \ "height").validate[Int]
-        version <- (jsv \ "version").validateOpt[Byte]
-        amount <- version match {
-          case Some(v) if v < 3 => (jsv \ "amount").validate[Long]
-          case _ => (jsv \ "quantity").validate[Long]
-        }
-        assetId <- (jsv \ "assetId").validate[String]
-        feeAssetId <- (jsv \ "feeAssetId").validateOpt[String]
-        chainId <- (jsv \ "chainId").validateOpt[Byte]
-      }
-        yield BurnTransactionInfo(
+    Reads(
+      jsv =>
+        for {
+          _type           <- (jsv \ "type").validate[Int]
+          id              <- (jsv \ "id").validate[String]
+          fee             <- (jsv \ "fee").validate[Long]
+          timestamp       <- (jsv \ "timestamp").validate[Long]
+          sender          <- (jsv \ "sender").validate[String]
+          senderPublicKey <- (jsv \ "senderPublicKey").validate[String]
+          height          <- (jsv \ "height").validate[Int]
+          version         <- (jsv \ "version").validateOpt[Byte]
+          amount          <- (jsv \ "amount").validate[Long]
+          assetId         <- (jsv \ "assetId").validate[String]
+          feeAssetId      <- (jsv \ "feeAssetId").validateOpt[String]
+          chainId         <- (jsv \ "chainId").validateOpt[Byte]
+        } yield BurnTransactionInfo(
           _type,
           id,
           chainId,
@@ -649,16 +649,17 @@ object BurnTransactionInfo {
           assetId,
           feeAssetId,
           version
-        )),
+        )
+    ),
     Json.writes[BurnTransactionInfo]
   )
 }
-sealed trait DataResponse extends Product with Serializable
+sealed trait DataResponse                                           extends Product with Serializable
 case class PutDataResponse(`type`: String, value: Any, key: String) extends DataResponse
-case class DeleteDataResponse(key: String) extends DataResponse
+case class DeleteDataResponse(key: String)                          extends DataResponse
 object DataResponse {
   def put(`type`: String, value: Any, key: String): PutDataResponse = PutDataResponse(`type`, value, key)
-  def delete(key: String): DeleteDataResponse = DeleteDataResponse(key)
+  def delete(key: String): DeleteDataResponse                       = DeleteDataResponse(key)
   implicit val dataResponseFormat: Reads[DataResponse] = Reads {
     case JsObject(fields) if fields.get("key").exists(_.isInstanceOf[JsString]) && fields.get("type").exists(_.isInstanceOf[JsString]) =>
       val key    = fields("key").asInstanceOf[JsString].value
@@ -770,50 +771,51 @@ object Block {
   import PublicKey._
 
   implicit val blockFormat: Format[Block] = Format(
-    Reads( jsv =>
-      for {
-        id <- (jsv \ "id").validate[String]
-        signature <- (jsv \ "signature").validate[String]
-        reference <- (jsv \ "reference").validate[String]
-        height <- (jsv \ "height").validate[Int]
-        timestamp <- (jsv \ "timestamp").validate[Long]
-        generator <- (jsv \ "generator").validate[String]
-        generatorPublicKey <- (jsv \ "generatorPublicKey").validate[PublicKey]
-        transactionCount <- (jsv \ "transactionCount").validate[Int]
-        blocksize <- (jsv \ "blocksize").validate[Int]
-        features <- (jsv \ "features").validateOpt[Set[Short]]
-        reward <- (jsv \ "reward").validateOpt[Long]
-        desiredReward <- (jsv \ "desiredReward").validateOpt[Long]
-        totalFee <- (jsv \ "totalFee").validateOpt[Long]
-        fee <- (jsv \ "fee").validate[Long]
-        transactions <- (jsv \ "transactions").validate[Seq[Transaction]]
-        version <- (jsv \ "version").validateOpt[Byte]
-        generationSignature <- (jsv \ "nxt-consensus" \ "generation-signature").validateOpt[String]
-        baseTarget <- (jsv \ "nxt-consensus" \ "base-target").validateOpt[Int]
-        transactionsRoot <- (jsv \ "transactionsRoot").validateOpt[String]
-        vrf <- (jsv \ "VRF").validateOpt[String]
-      } yield Block(
-        id,
-        signature,
-        reference,
-        height,
-        timestamp,
-        generator,
-        generatorPublicKey,
-        transactionCount,
-        generationSignature,
-        transactionsRoot,
-        baseTarget,
-        blocksize,
-        transactions,
-        fee,
-        totalFee,
-        features,
-        reward,
-        desiredReward,
-        vrf,
-        version
-      )
+    Reads(
+      jsv =>
+        for {
+          id                  <- (jsv \ "id").validate[String]
+          signature           <- (jsv \ "signature").validate[String]
+          reference           <- (jsv \ "reference").validate[String]
+          height              <- (jsv \ "height").validate[Int]
+          timestamp           <- (jsv \ "timestamp").validate[Long]
+          generator           <- (jsv \ "generator").validate[String]
+          generatorPublicKey  <- (jsv \ "generatorPublicKey").validate[PublicKey]
+          transactionCount    <- (jsv \ "transactionCount").validate[Int]
+          blocksize           <- (jsv \ "blocksize").validate[Int]
+          features            <- (jsv \ "features").validateOpt[Set[Short]]
+          reward              <- (jsv \ "reward").validateOpt[Long]
+          desiredReward       <- (jsv \ "desiredReward").validateOpt[Long]
+          totalFee            <- (jsv \ "totalFee").validateOpt[Long]
+          fee                 <- (jsv \ "fee").validate[Long]
+          transactions        <- (jsv \ "transactions").validate[Seq[Transaction]]
+          version             <- (jsv \ "version").validateOpt[Byte]
+          generationSignature <- (jsv \ "nxt-consensus" \ "generation-signature").validateOpt[String]
+          baseTarget          <- (jsv \ "nxt-consensus" \ "base-target").validateOpt[Int]
+          transactionsRoot    <- (jsv \ "transactionsRoot").validateOpt[String]
+          vrf                 <- (jsv \ "VRF").validateOpt[String]
+        } yield Block(
+          id,
+          signature,
+          reference,
+          height,
+          timestamp,
+          generator,
+          generatorPublicKey,
+          transactionCount,
+          generationSignature,
+          transactionsRoot,
+          baseTarget,
+          blocksize,
+          transactions,
+          fee,
+          totalFee,
+          features,
+          reward,
+          desiredReward,
+          vrf,
+          version
+        )
     ),
     Json.writes[Block]
   )
@@ -839,42 +841,43 @@ case class BlockHeader(
 )
 object BlockHeader {
   implicit val blockHeadersFormat: Format[BlockHeader] = Format(
-    Reads( jsv =>
-      for {
-        id <- (jsv \ "id").validate[String]
-        signature <- (jsv \ "signature").validate[String]
-        height <- (jsv \ "height").validate[Int]
-        timestamp <- (jsv \ "timestamp").validate[Long]
-        generator <- (jsv \ "generator").validate[String]
-        transactionCount <- (jsv \ "transactionCount").validate[Int]
-        blocksize <- (jsv \ "blocksize").validate[Int]
-        features <- (jsv \ "features").validateOpt[Set[Short]]
-        reward <- (jsv \ "reward").validateOpt[Long]
-        desiredReward <- (jsv \ "desiredReward").validateOpt[Long]
-        totalFee <- (jsv \ "totalFee").validate[Long]
-        version <- (jsv \ "version").validateOpt[Byte]
-        generationSignature <- (jsv \ "nxt-consensus" \ "generation-signature").validateOpt[String]
-        baseTarget <- (jsv \ "nxt-consensus" \ "base-target").validateOpt[Int]
-        transactionsRoot <- (jsv \ "transactionsRoot").validateOpt[String]
-        vrf <- (jsv \ "VRF").validateOpt[String]
-      } yield BlockHeader(
-        id,
-        signature,
-        height,
-        timestamp,
-        generator,
-        transactionCount,
-        generationSignature,
-        transactionsRoot,
-        baseTarget,
-        blocksize,
-        features,
-        reward,
-        desiredReward,
-        totalFee,
-        vrf,
-        version
-      )
+    Reads(
+      jsv =>
+        for {
+          id                  <- (jsv \ "id").validate[String]
+          signature           <- (jsv \ "signature").validate[String]
+          height              <- (jsv \ "height").validate[Int]
+          timestamp           <- (jsv \ "timestamp").validate[Long]
+          generator           <- (jsv \ "generator").validate[String]
+          transactionCount    <- (jsv \ "transactionCount").validate[Int]
+          blocksize           <- (jsv \ "blocksize").validate[Int]
+          features            <- (jsv \ "features").validateOpt[Set[Short]]
+          reward              <- (jsv \ "reward").validateOpt[Long]
+          desiredReward       <- (jsv \ "desiredReward").validateOpt[Long]
+          totalFee            <- (jsv \ "totalFee").validate[Long]
+          version             <- (jsv \ "version").validateOpt[Byte]
+          generationSignature <- (jsv \ "nxt-consensus" \ "generation-signature").validateOpt[String]
+          baseTarget          <- (jsv \ "nxt-consensus" \ "base-target").validateOpt[Int]
+          transactionsRoot    <- (jsv \ "transactionsRoot").validateOpt[String]
+          vrf                 <- (jsv \ "VRF").validateOpt[String]
+        } yield BlockHeader(
+          id,
+          signature,
+          height,
+          timestamp,
+          generator,
+          transactionCount,
+          generationSignature,
+          transactionsRoot,
+          baseTarget,
+          blocksize,
+          features,
+          reward,
+          desiredReward,
+          totalFee,
+          vrf,
+          version
+        )
     ),
     Json.writes[BlockHeader]
   )
@@ -985,7 +988,7 @@ object OrderBookResponse {
 }
 
 case class MerkleProofResponse(id: String, transactionIndex: Int, merkleProof: Seq[String])
-object  MerkleProofResponse {
+object MerkleProofResponse {
   implicit val merkleProofResponseFormat: Format[MerkleProofResponse] = Json.format
 }
 

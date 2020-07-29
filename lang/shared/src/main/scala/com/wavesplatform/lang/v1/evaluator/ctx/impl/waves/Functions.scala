@@ -471,7 +471,7 @@ object Functions {
       }
     }
 
-  private def withExtract[C[_[_]]](f: BaseFunction[C]): BaseFunction[C] = {
+  private def withExtract[C[_[_]]](f: BaseFunction[C], version: StdLibVersion): BaseFunction[C] = {
     val args = f.signature.args.zip(f.args).map {
       case ((name, ty), _) => ("@" ++ name, ty)
     }
@@ -482,7 +482,8 @@ object Functions {
       f.signature.result.asInstanceOf[UNION].typeList.find(_ != UNIT).get,
       args: _*
     ) {
-      FUNCTION_CALL(PureContext.extract, List(FUNCTION_CALL(f.header, args.map(a => REF(a._1)).toList)))
+      val extractF = if (version >= V4) PureContext.value else PureContext.extract
+      FUNCTION_CALL(extractF, List(FUNCTION_CALL(f.header, args.map(a => REF(a._1)).toList)))
     }
   }
 
@@ -501,7 +502,7 @@ object Functions {
       getBinaryByIndexF(v),
       getStringByIndexF(v),
       if (v >= V4) addressFromStringV4 else addressFromStringF(v)
-    ).map(withExtract)
+    ).map(withExtract(_, v))
 
   def txByIdF(proofsEnabled: Boolean, version: StdLibVersion): BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](

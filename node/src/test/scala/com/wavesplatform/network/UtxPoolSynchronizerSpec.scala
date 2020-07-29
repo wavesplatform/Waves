@@ -41,7 +41,8 @@ class UtxPoolSynchronizerSpec extends FreeSpec with Matchers with BeforeAndAfter
   }
 
   private def withUPS(putIfNew: Transaction => TracedResult[ValidationError, Boolean])(f: UtxPoolSynchronizer => Unit): Unit = {
-    val ups = new UtxPoolSynchronizerImpl(UtxSynchronizerSettings(1000, 2, 1000, true), putIfNew, (_, _) => (), Observable.empty, scheduler)
+    val ups =
+      new UtxPoolSynchronizerImpl(UtxSynchronizerSettings(1000, 2, 1000, true), (tx, _) => putIfNew(tx), (_, _) => (), Observable.empty, scheduler)
     f(ups)
     ups.close()
   }
