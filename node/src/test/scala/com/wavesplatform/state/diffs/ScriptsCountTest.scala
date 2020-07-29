@@ -17,6 +17,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -340,7 +341,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
       exchangeB = ExchangeTransaction
         .signed(TxVersion.V2, master.privateKey, o1b, o2b, 100000000L, 100000000L, 1, 1, (1 + 1) / 2, 10000L - 100)
         .explicitGet()
-      simpleContract = ContractScript(V4, {
+      simpleDApp = {
        val expr = {
          val script =
            s"""
@@ -376,7 +377,8 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
        }
 
        compiler.ContractCompiler(ctx.compilerContext, expr, V4)
-      }.explicitGet()).explicitGet()
+      }.explicitGet()
+      simpleContract = ContractScript(V4,simpleDApp).explicitGet()
       resetContract               = SetScriptTransaction.selfSigned(1.toByte, master, Some(simpleContract), fee, ts + 1).explicitGet()
       invokeScript = InvokeScriptTransaction.selfSigned(1.toByte, acc, master.toAddress, Some(FUNCTION_CALL(FunctionHeader.User("f"), List())), Seq(Payment(1, IssuedAsset(issueScr.id()))), 10000000L, Waves, timestamp).explicitGet()
     } yield {
@@ -413,8 +415,9 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
       ) {
         case (blockDiff, _) =>
           val escripts = 34
+          val fc = ContractScript.estimateComplexity(V4, simpleDApp, ScriptEstimatorV3).explicitGet()._2("f")
           blockDiff.scriptsRun shouldBe escripts + 1
-          blockDiff.scriptsComplexity shouldBe (Script.estimate(allAllowed, ScriptEstimatorV2, useContractVerifierLimit = false).explicitGet() * escripts + 10)
+          blockDiff.scriptsComplexity shouldBe (Script.estimate(allAllowed, ScriptEstimatorV2, useContractVerifierLimit = false).explicitGet() * escripts + fc)
           blockDiff.spentComplexity shouldBe (2 * escripts + 2)
       }
     }) { x =>
