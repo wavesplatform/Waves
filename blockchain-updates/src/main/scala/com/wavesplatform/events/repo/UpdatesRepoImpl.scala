@@ -109,9 +109,16 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
 
   override def updatesRange(from: Int, to: Int): Try[Seq[BlockAppended]] = withReadLock {
     // todo error handling, limits and timeouts
-    log.info("Requesting updatesRange")
+    log.info(s"BlockchainUpdates request updatesRange from $from to $to")
     val cnt = to - from + 1
     Try(Await.result(stream(from).collect { case u: BlockAppended => u }.take(cnt).bufferTumbling(cnt).runAsyncGetLast, Duration.Inf).get)
+      .flatMap { appends =>
+        if (appends.nonEmpty && appends.length < (appends.last.toHeight - appends.head.toHeight + 1)) {
+          Failure(new IllegalStateException(s"Missing blocks found in range $from, $to"))
+        } else {
+          Success(appends)
+        }
+      }
   }
 
   // UpdatesRepo.Write impl
