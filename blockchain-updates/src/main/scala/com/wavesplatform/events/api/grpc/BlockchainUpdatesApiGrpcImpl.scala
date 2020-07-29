@@ -55,7 +55,6 @@ class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo.Read with UpdatesRepo.Strea
           log.info(s"BlockchainUpdates started streaming updates from ${request.fromHeight}")
           new Observer[BlockchainUpdated] {
             override def onNext(elem: BlockchainUpdated): Future[Ack] = Future {
-              log.info(s"Sending update ${elem.toHeight}, ${elem.toId}")
               try {
                 responseObserver.onNext(SubscribeEvent(update = Some(elem.protobuf)))
                 Continue
