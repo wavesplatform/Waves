@@ -76,8 +76,20 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
   }
 
   // UpdatesRepo.Read impl
-  override def height: Int = withReadLock {
-    liquidState.map(_.keyBlock.toHeight).getOrElse(0)
+  override def height: Try[Int] = Try {
+    withReadLock {
+      liquidState.map(_.keyBlock.toHeight).getOrElse {
+        val iter = db.iterator()
+        iter.seekToLast()
+        if (iter.hasNext) {
+          val blockBytes = iter.next.getValue
+          val lastUpdate = PBBlockchainUpdated.parseFrom(blockBytes).vanilla.get
+          lastUpdate.toHeight
+        } else {
+          0
+        }
+      }
+    }
   }
 
   override def updateForHeight(height: Int): Try[Option[BlockAppended]] = withReadLock {
@@ -147,52 +159,59 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
   }
 
   override def rollback(rollback: RollbackCompleted): Try[Unit] =
-    if (rollback.toHeight > height) {
-      Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback to a height higher than current"))
-    } else if (rollback.toHeight <= 0) {
-      Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback to a non-positive height"))
-    } else if (rollback.toHeight == height) {
-      Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback to current height"))
-    } else if (rollback.toHeight == height - 1) {
-      liquidState = None
-      Success(())
-    } else
-      withWriteLock {
-        val iter  = db.iterator()
-        val batch = db.createWriteBatch()
-        try {
-          iter.seek(key(rollback.toHeight))
-          iter.next
-          while (iter.hasNext) { batch.delete(iter.next.getKey) }
-          db.write(batch)
+    withWriteLock {
+      height.flatMap { h =>
+        if (rollback.toHeight > h) {
+          Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback to a height higher than current"))
+        } else if (rollback.toHeight <= 0) {
+          Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback to a non-positive height"))
+        } else if (rollback.toHeight == h) {
+          Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback to current height"))
+        } else if (rollback.toHeight == h - 1) {
+          liquidState = None
           Success(())
-        } catch {
-          case t: Throwable => Failure(t)
-        } finally {
-          iter.close()
-          batch.close()
+        } else {
+          val iter  = db.iterator()
+          val batch = db.createWriteBatch()
+          try {
+            iter.seek(key(rollback.toHeight))
+            iter.next
+            while (iter.hasNext) {
+              batch.delete(iter.next.getKey)
+            }
+            db.write(batch)
+            Success(())
+          } catch {
+            case t: Throwable => Failure(t)
+          } finally {
+            iter.close()
+            batch.close()
+          }
         }
       }
+    }
 
   override def rollbackMicroBlock(microBlockRollback: MicroBlockRollbackCompleted): Try[Unit] = withWriteLock {
-    if (microBlockRollback.toHeight != height) {
-      Failure(new IllegalArgumentException("BlockchainUpdates microblock rollback height was not equal to current height"))
-    } else {
-      liquidState match {
-        case Some(ls) =>
-          if (microBlockRollback.toId == ls.keyBlock.toId) {
-            liquidState = Some(ls.copy(microBlocks = Seq.empty))
-            Success(())
-          } else {
-            val remainingMicroBlocks = ls.microBlocks.reverse.dropWhile(_.toId != microBlockRollback.toId).reverse
-            if (remainingMicroBlocks.isEmpty) {
-              Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback a non-existing microblock"))
-            } else {
-              liquidState = Some(ls.copy(microBlocks = remainingMicroBlocks))
+    height.flatMap { h =>
+      if (microBlockRollback.toHeight != h) {
+        Failure(new IllegalArgumentException("BlockchainUpdates microblock rollback height was not equal to current height"))
+      } else {
+        liquidState match {
+          case Some(ls) =>
+            if (microBlockRollback.toId == ls.keyBlock.toId) {
+              liquidState = Some(ls.copy(microBlocks = Seq.empty))
               Success(())
+            } else {
+              val remainingMicroBlocks = ls.microBlocks.reverse.dropWhile(_.toId != microBlockRollback.toId).reverse
+              if (remainingMicroBlocks.isEmpty) {
+                Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback a non-existing microblock"))
+              } else {
+                liquidState = Some(ls.copy(microBlocks = remainingMicroBlocks))
+                Success(())
+              }
             }
-          }
-        case None => Failure(new IllegalStateException("BlockchainUpdates attempted to rollback microblock without liquid state present"))
+          case None => Failure(new IllegalStateException("BlockchainUpdates attempted to rollback microblock without liquid state present"))
+        }
       }
     }
   }
