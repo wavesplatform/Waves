@@ -59,7 +59,9 @@ RUN                                                                             
             -Xmx2g -Dnetwork=${network}" sbt 'packageAll'                   &&  \
         mkdir -p /out/${network}                                            &&  \
         mv node/target/waves*.deb /out/${network}/                          &&  \
-        cp node/target/waves-all*.jar /out/${network}/                      ;   \
+        cp node/target/waves-all*.jar /out/${network}/                      &&  \
+        mv grpc-server/target/universal/grpc-server*.tgz /out/${network}/   &&  \
+        mv grpc-server/target/grpc-server*.deb /out/${network}/             ;   \
     done                                                                        \
 ;}
 
