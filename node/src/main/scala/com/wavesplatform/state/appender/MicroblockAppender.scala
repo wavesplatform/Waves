@@ -30,8 +30,7 @@ object MicroblockAppender extends ScorexLogging {
         .processMicroBlock(microBlock, verify)
         .map { totalBlockId =>
           if (microBlock.transactionData.nonEmpty) log.trace {
-            val ids = microBlock.transactionData.map(_.id())
-            s"Removing mined txs from $microBlock: ${ids.mkString(", ")}"
+            s"Removing mined txs from ${microBlock.stringRepr(totalBlockId)}: ${microBlock.transactionData.map(_.id()).mkString(", ")}"
           }
           utxStorage.removeAll(microBlock.transactionData)
           totalBlockId

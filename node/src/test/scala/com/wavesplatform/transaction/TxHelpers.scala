@@ -37,10 +37,6 @@ object TxHelpers {
       .selfSigned(TxVersion.V2, defaultSigner, "test", "", amount, 0, reissuable = true, Option(script), 1.waves, timestamp)
       .explicitGet()
 
-  def order(orderType: OrderType, asset: Asset): Order = {
-    orderV3(orderType, asset, Waves)
-  }
-
   def orderV3(orderType: OrderType, asset: Asset, feeAsset: Asset): Order = {
     orderV3(orderType, asset, Waves, feeAsset)
   }
@@ -52,11 +48,11 @@ object TxHelpers {
       defaultSigner.publicKey,
       AssetPair(amountAsset, priceAsset),
       orderType,
-      1,
-      1,
+      1L,
+      1L,
       timestamp,
       timestamp + 100000,
-      1,
+      1L,
       feeAsset
     )
   }
