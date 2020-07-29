@@ -163,9 +163,9 @@ class UtxPoolImpl(
 
     val tracedIsNew = TracedResult(checks).flatMap(_ => addTransaction(tx, verify, forceValidate))
     tracedIsNew.resultE match {
-      case Right(isNew) => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = $isNew")
+      case Right(isNew) => log.trace(s"putIfNew(${tx.id()}) succeeded, isNew = $isNew")
       case Left(err) =>
-        log.debug(s"UTX putIfNew(${tx.id()}) failed with ${extractErrorMessage(err)}")
+        log.debug(s"putIfNew(${tx.id()}) failed with ${extractErrorMessage(err)}")
         traceLogger.trace(err.toString)
     }
     tracedIsNew
