@@ -14,9 +14,17 @@ import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import org.scalatest.BeforeAndAfterAll
 import play.api.libs.json.{Json, Writes}
 
-class ObsoleteHandlersSuite extends BaseTransactionSuite {
+class ObsoleteHandlersSuite extends BaseTransactionSuite with BeforeAndAfterAll {
+
+  protected override def beforeAll(): Unit = {
+    super.beforeAll()
+    // explicitly create two more addresses in node's wallet
+    sender.postForm("/addresses")
+    sender.postForm("/addresses")
+  }
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
@@ -68,10 +76,10 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
     val burnJson = sender.postJson(
       "/assets/burn",
       Json.obj(
-        "sender"   -> firstAddress,
-        "assetId"  -> issue,
-        "quantity" -> someAssetAmount / 2,
-        "fee"      -> issueFee
+        "sender"  -> firstAddress,
+        "assetId" -> issue,
+        "amount"  -> someAssetAmount / 2,
+        "fee"     -> issueFee
       )
     )
     val burn = Json.parse(burnJson.getResponseBody).as[Transaction].id

@@ -75,7 +75,7 @@ class MicroBlockMinerImpl(
         val packStrategy =
           if (accumulatedBlock.transactionData.isEmpty) PackStrategy.Limit(settings.microBlockInterval)
           else PackStrategy.Estimate(settings.microBlockInterval)
-        log.info(s"Starting pack for ${accumulatedBlock.id()} with $packStrategy, initial constraint is $mdConstraint")
+        log.trace(s"Starting pack for ${accumulatedBlock.id()} with $packStrategy, initial constraint is $mdConstraint")
         val (unconfirmed, updatedMdConstraint) =
           concurrent.blocking(
             Instrumented.logMeasure(log, "packing unconfirmed transactions for microblock")(
@@ -86,12 +86,11 @@ class MicroBlockMinerImpl(
               )
             )
           )
-        log.info("Finished pack")
+        log.trace(s"Finished pack for ${accumulatedBlock.id()}")
         val updatedTotalConstraint = updatedMdConstraint.constraints.head
         cb.onSuccess(unconfirmed -> updatedTotalConstraint)
       }
       Task.eval {
-        log.trace("Cancelling execution")
         cancelled = true
       }
     }

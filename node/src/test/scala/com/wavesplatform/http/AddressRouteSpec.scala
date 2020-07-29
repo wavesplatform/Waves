@@ -176,15 +176,15 @@ class AddressRouteSpec
   routePath(s"/scriptInfo/${allAddresses(1)}") in {
     val script = ExprScript(TRUE).explicitGet()
 
-    (commonAccountApi.script _).expects(allAccounts(1).toAddress).returning(Some(AccountScriptInfo(allAccounts(1).publicKey, script, 1L))).once()
-    (blockchain.accountScript _).when(allAccounts(1).toAddress).returns(Some(AccountScriptInfo(allAccounts(1).publicKey, script, 1L))).once()
+    (commonAccountApi.script _).expects(allAccounts(1).toAddress).returning(Some(AccountScriptInfo(allAccounts(1).publicKey, script, 123L))).once()
+    (blockchain.accountScript _).when(allAccounts(1).toAddress).returns(Some(AccountScriptInfo(allAccounts(1).publicKey, script, 123L))).once()
 
     Get(routePath(s"/scriptInfo/${allAddresses(1)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(1).toString
       (response \ "script").as[String] shouldBe "base64:AQa3b8tH"
       (response \ "scriptText").as[String] shouldBe "true"
-      (response \ "complexity").as[Long] shouldBe 1
+      (response \ "complexity").as[Long] shouldBe 123
       (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
@@ -228,7 +228,7 @@ class AddressRouteSpec
     )
 
     val contractScript       = ContractScript(V3, contractWithMeta).explicitGet()
-    val callableComplexities = Map("a" -> 1L, "b" -> 2L, "c" -> 3L, "verify" -> 10L)
+    val callableComplexities = Map("a" -> 1L, "b" -> 2L, "c" -> 3L, "d" -> 100L, "verify" -> 11L)
     (commonAccountApi.script _).expects(allAccounts(3).toAddress).returning(Some(AccountScriptInfo(allAccounts(3).publicKey, contractScript, 11L))).once()
     (blockchain.accountScript _)
       .when(allAccounts(3).toAddress)
@@ -243,7 +243,7 @@ class AddressRouteSpec
       // [WAIT]                                           Decompiler(
       //      testContract,
       //      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
-      (response \ "complexity").as[Long] shouldBe 11
+      (response \ "complexity").as[Long] shouldBe 100
       (response \ "verifierComplexity").as[Long] shouldBe 11
       (response \ "callableComplexities").as[Map[String, Long]] shouldBe callableComplexities - "verify"
       (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
@@ -306,7 +306,7 @@ class AddressRouteSpec
     Get(routePath(s"/scriptInfo/${allAddresses(6)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(6).toString
-      (response \ "complexity").as[Long] shouldBe 0
+      (response \ "complexity").as[Long] shouldBe 3
       (response \ "verifierComplexity").as[Long] shouldBe 0
       (response \ "callableComplexities").as[Map[String, Long]] shouldBe contractWithoutVerifierComplexities
       (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee

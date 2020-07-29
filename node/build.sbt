@@ -8,8 +8,6 @@ enablePlugins(RunApplicationSettings, JavaServerAppPackaging, UniversalDeployPlu
 
 resolvers ++= Seq(
   Resolver.bintrayRepo("ethereum", "maven"),
-  Resolver.bintrayRepo("dnvriend", "maven"),
-  Resolver.sbtPluginRepo("releases")
 )
 
 libraryDependencies ++= Dependencies.node.value
@@ -17,8 +15,7 @@ coverageExcludedPackages := ""
 
 inConfig(Compile)(
   Seq(
-    PB.protoSources in Compile := Seq(PB.externalIncludePath.value, sourceDirectory.value / "protobuf"),
-    includeFilter in PB.generate := new SimpleFileFilter((f: File) => f.getName.endsWith(".proto") && f.getParent.endsWith("waves")),
+    PB.protoSources in Compile := Seq(sourceDirectory.value / "protobuf"),
     PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
     PB.deleteTargetDirectory := false,
     packageDoc / publishArtifact := false,
@@ -112,6 +109,13 @@ inConfig(Linux)(
   )
 )
 
+// Variable options are used in different tasks and configs, so we will specify all of them
+val nameFix = Seq(
+  name := "waves",
+  packageName := s"${name.value}${network.value.packageSuffix}",
+  normalizedName := s"${name.value}${network.value.packageSuffix}"
+)
+
 inConfig(Debian)(
   Seq(
     linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
@@ -147,13 +151,6 @@ V.scalaPackage := "com.wavesplatform"
 
 moduleName := s"waves${network.value.packageSuffix}" // waves-*.jar instead of node-*.jar
 executableScriptName := moduleName.value             // bin/waves instead of bin/node
-
-// Variable options are used in different tasks and configs, so we will specify all of them
-val nameFix = Seq(
-  name := "waves",
-  packageName := s"${name.value}${network.value.packageSuffix}",
-  normalizedName := s"${name.value}${network.value.packageSuffix}"
-)
 
 nameFix
 inScope(Global)(nameFix)
