@@ -56,7 +56,7 @@ object KeyTags extends Enumeration {
   BloomFilterChecksum,
   IssuedAssets,
   UpdatedAssets,
-  SponsoredAssets = Value,
+  SponsoredAssets,
   ContinuationStates = Value
 
   final implicit class KeyTagExt(val t: KeyTag) extends AnyVal {

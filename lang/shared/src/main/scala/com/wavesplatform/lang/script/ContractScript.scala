@@ -122,11 +122,12 @@ object ContractScript {
       version: StdLibVersion,
       dApp: DApp,
       estimator: ScriptEstimator,
-      useReducedVerifierLimit: Boolean = true
+      useReducedVerifierLimit: Boolean = true,
+      allowContinuation: Boolean = false
   ): Either[String, (Long, Map[String, Long])] =
     for {
       (maxComplexity, complexities) <- estimateComplexityExact(version, dApp, estimator)
-      _                             <- checkComplexity(version, dApp, maxComplexity, complexities, useReducedVerifierLimit)
+      _                             <- checkComplexity(version, dApp, maxComplexity, complexities, useReducedVerifierLimit, allowContinuation)
     } yield (maxComplexity._2, complexities)
 
   def checkComplexity(
@@ -134,11 +135,16 @@ object ContractScript {
       dApp: DApp,
       maxComplexity: (String, Long),
       complexities: Map[String, Long],
-      useReducedVerifierLimit: Boolean
+      useReducedVerifierLimit: Boolean,
+      allowContinuation: Boolean = false
   ): Either[String, Unit] =
     for {
       _ <- if (useReducedVerifierLimit) estimateVerifierReduced(dApp, complexities, version) else Right(())
-      limit = MaxComplexityByVersion(version)
+      limit =
+        if (allowContinuation)
+          MaxComplexityByVersion(version) * MaxContinuationSteps
+        else
+          MaxComplexityByVersion(version)
       _ <- Either.cond(
         maxComplexity._2 <= limit,
         (),
