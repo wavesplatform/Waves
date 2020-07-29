@@ -51,7 +51,7 @@ object serde {
           val txsUpdates  = transactionStateUpdates.map(_.protobuf)
 
           BlockchainUpdated(
-            id = block.id.value.toByteString,
+            id = block.id.value().toByteString,
             height = height,
             update = BlockchainUpdated.Update.Append(
               Append(
