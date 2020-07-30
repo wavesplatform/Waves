@@ -19,6 +19,7 @@ import monix.execution.Scheduler
 import net.ceedubs.ficus.Ficus._
 
 import scala.concurrent.Future
+import scala.util.Success
 
 class BlockchainUpdates(private val context: Context) extends Extension with ScorexLogging with BlockchainUpdateTriggers {
   implicit val scheduler: Scheduler = Scheduler(context.actorSystem.dispatcher)
@@ -36,10 +37,31 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     // startup check
     val nodeHeight      = context.blockchain.height
     val extensionHeight = repo.height.get
-    if (extensionHeight != nodeHeight) {
-      throw new IllegalStateException(s"Blockchain updates extension at height $extensionHeight not equal to node height $nodeHeight at startup")
+    if (extensionHeight < nodeHeight) {
+      throw new IllegalStateException(
+        s"BlockchainUpdates at height $extensionHeight is lower than node at height $nodeHeight, startup check failed"
+      )
+    } else if (extensionHeight > nodeHeight) {
+      // attempt to recover
+      (repo.updateForHeight(nodeHeight), context.blockchain.blockHeader(nodeHeight)) match {
+        case (Success(Some(extensionBlockAtNodeHeight)), Some(lastNodeBlockHeader)) =>
+          val lastNodeBlockId = lastNodeBlockHeader.id.value()
+          if (extensionBlockAtNodeHeight.toId == lastNodeBlockId) {
+            log.warn(s"BlockchainUpdates at height $extensionHeight is higher than node at height $nodeHeight, rolling back BlockchainUpdates")
+            repo.rollback(RollbackCompleted(extensionBlockAtNodeHeight.toId, extensionBlockAtNodeHeight.toHeight)).get
+          } else {
+            val errMsg =
+              s"BlockchainUpdates has block id ${extensionBlockAtNodeHeight.toId} at node height $nodeHeight while node has ${lastNodeBlockId}"
+            log.error(s"$errMsg. Startup check failed.")
+            throw new IllegalStateException(errMsg)
+          }
+        case _ =>
+          throw new IllegalStateException(
+            s"BlockchainUpdates at height $extensionHeight is lower than node at height $nodeHeight, failed to rollback extension"
+          )
+      }
     }
-    log.info(s"BlockchainUpdates extension startup check succesful at height $extensionHeight")
+    log.info(s"BlockchainUpdates startup check succesful at height $extensionHeight")
 
     // starting gRPC API
     val bindAddress = new InetSocketAddress("0.0.0.0", settings.grpcPort)
