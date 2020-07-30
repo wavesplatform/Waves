@@ -103,7 +103,7 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
       case _ if height <= 0 =>
         Failure(new IllegalArgumentException("BlockchainUpdates asked for an update at a non-positive height"))
       case _ =>
-        val bytes = db.get(key(height + 100000000))
+        val bytes = db.get(key(height))
         if (bytes == null || bytes.isEmpty) {
           Success(None)
         } else {
