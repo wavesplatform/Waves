@@ -19,7 +19,7 @@ import monix.execution.Scheduler
 import net.ceedubs.ficus.Ficus._
 
 import scala.concurrent.Future
-import scala.util.Success
+import scala.util.{Failure, Success}
 
 class BlockchainUpdates(private val context: Context) extends Extension with ScorexLogging with BlockchainUpdateTriggers {
   implicit val scheduler: Scheduler = Scheduler(context.actorSystem.dispatcher)
@@ -34,34 +34,42 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   override def start(): Unit = {
     log.info("BlockchainUpdates extension starting")
 
-    // startup check
+    // startup checks
     val nodeHeight      = context.blockchain.height
     val extensionHeight = repo.height.get
     if (extensionHeight < nodeHeight) {
-      throw new IllegalStateException(
-        s"BlockchainUpdates at height $extensionHeight is lower than node at height $nodeHeight, startup check failed"
-      )
-    } else if (extensionHeight > nodeHeight) {
-      // attempt to recover
+      val exception = new IllegalStateException(s"BlockchainUpdates at height $extensionHeight is lower than node at height $nodeHeight")
+      log.error("BlockchainUpdates startup check failed", exception)
+      throw exception
+    } else if (nodeHeight > 0) {
       (repo.updateForHeight(nodeHeight), context.blockchain.blockHeader(nodeHeight)) match {
         case (Success(Some(extensionBlockAtNodeHeight)), Some(lastNodeBlockHeader)) =>
           val lastNodeBlockId = lastNodeBlockHeader.id.value()
-          if (extensionBlockAtNodeHeight.toId == lastNodeBlockId) {
+
+          // check if extension is on fork. Block ids must be equal at node height
+          if (extensionBlockAtNodeHeight.toId != lastNodeBlockId) {
+            val exception = new IllegalStateException(
+              s"BlockchainUpdates extension has forked: at node height $nodeHeight node block id is $lastNodeBlockId, extension's is ${extensionBlockAtNodeHeight.toId}"
+            )
+            log.error("BlockchainUpdates startup check failed", exception)
+            throw exception
+          }
+
+          // if not on fork, but extension moved higher than node, rollback the extension to recover
+          if (extensionHeight > nodeHeight) {
             log.warn(s"BlockchainUpdates at height $extensionHeight is higher than node at height $nodeHeight, rolling back BlockchainUpdates")
-            repo.rollback(RollbackCompleted(extensionBlockAtNodeHeight.toId, extensionBlockAtNodeHeight.toHeight)).get
-          } else {
-            val errMsg =
-              s"BlockchainUpdates has block id ${extensionBlockAtNodeHeight.toId} at node height $nodeHeight while node has ${lastNodeBlockId}"
-            log.error(s"$errMsg. Startup check failed.")
-            throw new IllegalStateException(errMsg)
+            repo
+              .rollback(RollbackCompleted(extensionBlockAtNodeHeight.toId, extensionBlockAtNodeHeight.toHeight))
+              .recoverWith { case _: Throwable => Failure(new RuntimeException("BlockchainUpdates failed to rollback at startup")) }
+              .get
           }
         case _ =>
-          throw new IllegalStateException(
-            s"BlockchainUpdates at height $extensionHeight is lower than node at height $nodeHeight, failed to rollback extension"
-          )
+          val exception = new RuntimeException(s"BlockchainUpdates failed to get node or extension block info at startup")
+          log.error("BlockchainUpdates startup check failed", exception)
+          throw exception
       }
     }
-    log.info(s"BlockchainUpdates startup check succesful at height $extensionHeight")
+    log.info(s"BlockchainUpdates startup check successful at height $extensionHeight")
 
     // starting gRPC API
     val bindAddress = new InetSocketAddress("0.0.0.0", settings.grpcPort)
@@ -81,7 +89,6 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     log.info(s"BlockchainUpdates extension started HTTP API on port ${settings.restPort}")
   }
 
-  // todo proper shutdown
   override def shutdown(): Future[Unit] = Future {
     log.info(s"BlockchainUpdates extension shutting down, last persisted height ${repo.height.get - 1}")
 
@@ -103,7 +110,6 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     // todo log.debug, and make it every 100 blocks, like in BlockchainUpdater
     if (newBlock.toHeight % 100 == 0) {
       log.info(s"BlockchainUpdates extension appended blocks up to ${newBlock.toHeight}")
-//      Thread.sleep(5000)
     }
   }
 
