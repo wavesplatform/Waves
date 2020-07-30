@@ -11,12 +11,9 @@ import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
-import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal, LoggedEvaluationContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.{AttachedPayments, Recipient}
-
-import scala.collection.mutable.ListBuffer
-import scala.util.Try
 
 object ContractEvaluator {
 
