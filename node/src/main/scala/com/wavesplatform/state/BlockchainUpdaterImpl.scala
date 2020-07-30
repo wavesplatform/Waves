@@ -308,6 +308,8 @@ class BlockchainUpdaterImpl(
                           val tempBlockchain = CompositeBlockchain(referencedBlockchain, Some(differResult.diff), Some(block), differResult.carry, reward, Some(hitSource))
                           miner.scheduleMining(Some(tempBlockchain))
 
+                          blockchainUpdateTriggers.onProcessBlock(block, differResult.detailedDiff, reward, referencedBlockchain)
+
                           leveldb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
                           BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
                           TxsInBlockchainStats.record(ng.transactions.size)
@@ -326,7 +328,7 @@ class BlockchainUpdaterImpl(
                   }
             }).map {
               _ map {
-                case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, detailedDiff), discDiffs, reward, hitSource) =>
+                case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, _), discDiffs, reward, hitSource) =>
                   val newHeight   = leveldb.height + 1
                   val prevNgState = ngState
 
@@ -350,8 +352,6 @@ class BlockchainUpdaterImpl(
                         .getTimestamp() - wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (newHeight % 100 == 0)) {
                     log.info(s"New height: $newHeight")
                   }
-
-                  blockchainUpdateTriggers.onProcessBlock(block, detailedDiff, reward, leveldb)
 
                   discDiffs
               } getOrElse Nil
