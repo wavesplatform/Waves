@@ -2,11 +2,11 @@ package com.wavesplatform.state
 
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.v1.traits.domain.{Burn, Issue, Reissue, SponsorFee}
 import com.wavesplatform.protobuf.Amount
-import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
+import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
 import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
@@ -82,7 +82,7 @@ object InvokeScriptResult {
       isr.transfers.map(
         payment =>
           PBInvokeScriptResult.Payment(
-            ByteString.copyFrom(payment.address.bytes),
+            ByteString.copyFrom(PBRecipients.publicKeyHash(payment.address)),
             Some(PBAmounts.fromAssetAndAmount(payment.asset, payment.amount))
           )
       ),
@@ -144,7 +144,7 @@ object InvokeScriptResult {
       pbValue.data.map(PBTransactions.toVanillaDataEntry),
       pbValue.transfers.map { p =>
         val (asset, amount) = PBAmounts.toAssetAndAmount(p.getAmount)
-        InvokeScriptResult.Payment(Address.fromBytes(p.address.toByteArray).explicitGet(), asset, amount)
+        InvokeScriptResult.Payment(PBRecipients.toAddress(p.address.toByteArray, AddressScheme.current.chainId).explicitGet(), asset, amount)
       },
       pbValue.issues.map(toVanillaIssue),
       pbValue.reissues.map(toVanillaReissue),

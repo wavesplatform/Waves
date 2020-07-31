@@ -57,7 +57,8 @@ object AsyncGrpcApi {
       result.runToFuture.map { r =>
         import com.wavesplatform.state.{InvokeScriptResult => VISR}
         r.map { r =>
-          val tx     = PBTransactions.vanillaUnsafe(r.getTransaction)
+          val tx = PBTransactions.vanillaUnsafe(r.getTransaction)
+          assert(r.getResult.transfers.forall(_.address.size() == 20))
           val result = Json.toJson(VISR.fromPB(r.getResult)).as[StateChangesDetails]
           (tx, result)
         }
@@ -95,7 +96,8 @@ object AsyncGrpcApi {
       script match {
         case Left(_) => transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.EMPTY)))
         case _ =>
-          val proofs = crypto.sign(source.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
+          val proofs =
+            crypto.sign(source.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
           transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs.arr))))
       }
     }
@@ -263,7 +265,8 @@ object AsyncGrpcApi {
       script match {
         case Left(_) => transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.EMPTY)))
         case _ =>
-          val proofs = crypto.sign(sender.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
+          val proofs =
+            crypto.sign(sender.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
           transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs.arr))))
       }
     }
@@ -451,7 +454,8 @@ object AsyncGrpcApi {
       script match {
         case Left(_) => transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.EMPTY)))
         case _ =>
-          val proofs = crypto.sign(sender.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
+          val proofs =
+            crypto.sign(sender.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
           transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs.arr))))
       }
     }
