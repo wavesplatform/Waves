@@ -2169,7 +2169,9 @@
         "summary": "Compile script",
         "description": "Compiles string code to base64 script representation",
         "operationId": "compileCode_1",
-	"consumes": ["text/plain"],
+        "consumes": [
+          "text/plain"
+        ],
         "parameters": [
           {
             "in": "body",
@@ -3667,12 +3669,7 @@
           "403": {
             "$ref": "#/responses/ApiKeyNotValid"
           }
-        },
-        "security": [
-          {
-            "API Key": []
-          }
-        ]
+        }
       }
     },
     "/debug/balances/history/{address}": {
