@@ -105,7 +105,7 @@ object Dependencies {
       "com.wavesplatform"     % "zwaves" % "0.1.0-SNAPSHOT",
       "com.wavesplatform"     % "zwaves-bn256" % "0.1.5-SNAPSHOT",
       "org.web3j" % "crypto" % "4.5.18"
-    ) ++ scalapbRuntime.value ++ circe.value
+    ) ++ scalapbRuntime.value ++ circe.value ++ protobuf.value
   )
 
   lazy val it = scalaTest +: Seq(
@@ -162,7 +162,7 @@ object Dependencies {
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test,
       ("org.iq80.leveldb" % "leveldb" % "0.12").exclude("com.google.guava", "guava") % Test
-    ) ++ protobuf.value ++ test ++ console ++ logDeps ++ levelDBJNA
+    ) ++ test ++ console ++ logDeps ++ levelDBJNA
   )
 
   private[this] val protoSchemasLib =

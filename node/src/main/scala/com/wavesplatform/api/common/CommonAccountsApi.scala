@@ -91,8 +91,10 @@ object CommonAccountsApi extends ScorexLogging {
       blockchain.accountData(address, key)
 
     override def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[_]] = {
-      val entriesFromDiff = diff.accountData.get(address).fold[Map[String, DataEntry[_]]](Map.empty)(_.data)
-      val entries         = mutable.ArrayBuffer[DataEntry[_]](entriesFromDiff.values.toSeq: _*)
+      val entriesFromDiff = diff.accountData
+        .get(address)
+        .fold[Map[String, DataEntry[_]]](Map.empty)(_.data.filter { case (k, _) => regex.forall(_.r.pattern.matcher(k).matches()) })
+      val entries = mutable.ArrayBuffer[DataEntry[_]](entriesFromDiff.values.toSeq: _*)
 
       db.readOnly { ro =>
         db.get(Keys.addressId(address)).foreach { addressId =>

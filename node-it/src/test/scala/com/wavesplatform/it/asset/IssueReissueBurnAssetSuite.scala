@@ -16,8 +16,6 @@ import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 
-import scala.concurrent.duration._
-
 class IssueReissueBurnAssetSuite extends BaseSuite {
   override val nodeConfigs: Seq[Config] =
     com.wavesplatform.it.NodeConfigs.newBuilder
@@ -109,7 +107,9 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val acc     = createDapp(script(simpleNonreissuableAsset))
       val txIssue = issue(acc, method, simpleNonreissuableAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, simpleNonreissuableAsset, method = method)
-      assertError(reissue(acc, method, assetId, 100500, reissuable = false, checkStateChanges = false).id, method, "Asset is not reissuable")
+      assertApiError(reissue(acc, method, assetId, 100500, reissuable = false, checkStateChanges = false).id) { e =>
+        e.message should include("Asset is not reissuable")
+      }
     }
 
     "Issued asset could be sponsored" in {
@@ -135,7 +135,9 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
 
     "Issue two identical assets with the same nonce (one invocation) should produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
-      assertError(invokeScript(acc, "issue2Assets", fee = invocationCost(2)).id, CallableMethod, " is already issued")
+      assertApiError(invokeScript(acc, "issue2Assets", fee = invocationCost(2)).id) { e =>
+        e.message should include(" is already issued")
+      }
     }
 
     "Issue two identical assets with the same nonce (different invocations) should not produce an error" in {
@@ -152,11 +154,9 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val assetId         = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
       val initialQuantity = simpleReissuableAsset.quantity
 
-      assertError(
-        reissue(acc, method, assetId, Long.MaxValue - initialQuantity + 1, reissuable = true, checkStateChanges = false).id,
-        method,
-        "Asset total value overflow"
-      )
+      assertApiError(reissue(acc, method, assetId, Long.MaxValue - initialQuantity + 1, reissuable = true, checkStateChanges = false).id) { e =>
+        e.message should include("Asset total value overflow")
+      }
     }
 
     "Burning more than current asset count should produce an error" in {
@@ -164,9 +164,10 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val txIssue = issue(acc, method, simpleReissuableAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
 
-      val id = invokeScript(acc, "transferAndBurn", assetId = assetId, count = (simpleReissuableAsset.quantity / 2 + 1).toInt, wait = false).id
-      sender.waitFor("empty utx")(n => n.utxSize, (n: Int) => n == 0, 100.millis)
-      sender.transactionStatus(Seq(id)).head.status shouldBe "not_found"
+      assertBadRequestAndMessage(
+        invokeScript(acc, "transferAndBurn", assetId = assetId, count = (simpleReissuableAsset.quantity / 2 + 1).toInt, wait = false),
+        "Accounts balance errors"
+      )
     }
 
     "Reissuing NFT asset should produce an error" in {
@@ -174,11 +175,9 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val txIssue = issue(acc, method, nftAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, nftAsset, method = method)
 
-      assertError(
-        reissue(acc, method, assetId, 2, reissuable = true, checkStateChanges = false).id,
-        method,
-        "Asset is not reissuable"
-      )
+      assertApiError(reissue(acc, method, assetId, 2, reissuable = true, checkStateChanges = false).id) { e =>
+        e.message should include("Asset is not reissuable")
+      }
     }
 
     "Reissuing after setting isReissuiable to falser inside one invocation should produce an error" in {
@@ -186,11 +185,9 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val txIssue = issue(acc, method, simpleReissuableAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
 
-      assertError(
-        invokeScript(acc, "reissueAndReissue", assetId = assetId, count = 1000, fee = invocationCost(1)).id,
-        CallableMethod,
-        "Asset is not reissuable"
-      )
+      assertApiError(invokeScript(acc, "reissueAndReissue", assetId = assetId, count = 1000, fee = invocationCost(1)).id) { e =>
+        e.message should include("Asset is not reissuable")
+      }
 
       sender.assetsDetails(assetId).quantity should be(simpleReissuableAsset.quantity)
     }
@@ -207,11 +204,9 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
 
     "Issue more than 10 assets should produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
-      assertError(
-        invokeScript(acc, "issue11Assets").id,
-        CallableMethod,
-        "Too many script actions: max: 10, actual: 11"
-      )
+      assertApiError(invokeScript(acc, "issue11Assets").id) { e =>
+        e.message should include("Too many script actions: max: 10, actual: 11")
+      }
     }
 
     "More than 10 actions Issue/Reissue/Burn should produce an error" in {
@@ -219,20 +214,16 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val txIssue = issue(acc, method, simpleReissuableAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
 
-      assertError(
-        invokeScript(acc, "process11actions", assetId = assetId).id,
-        CallableMethod,
-        "Too many script actions: max: 10, actual: 11"
-      )
+      assertApiError(invokeScript(acc, "process11actions", assetId = assetId).id) { e =>
+        e.message should include("Too many script actions: max: 10, actual: 11")
+      }
     }
 
     "More than 10 issue action in one invocation should produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
-      assertError(
-        invokeScript(acc, "issue11Assets").id,
-        CallableMethod,
-        "Too many script actions: max: 10, actual: 11"
-      )
+      assertApiError(invokeScript(acc, "issue11Assets").id) { e =>
+        e.message should include("Too many script actions: max: 10, actual: 11")
+      }
     }
   }
 
@@ -349,27 +340,6 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       sender.assetsBalance(addressStr).balances.map(_.assetId).toSet shouldBe Set(assetA)
       sender.nftList(addressStr, 10) shouldBe empty
     }
-
-    "liquid block works" in {
-      val acc   = createDapp(script(simpleReissuableAsset))
-      val asset = issueValidated(acc, simpleReissuableAsset)
-      val tx    = invokeScript(acc, "reissueIssueAndNft", assetId = asset, fee = invocationCost(1))
-      def checks(): Unit = {
-        assertStateChanges(tx) { sd =>
-          sd.issues should have size 2
-          sd.burns should have size 1
-          sd.reissues should have size 1
-        }
-        assertQuantity(asset)(simpleReissuableAsset.quantity + 50)
-        val addressStr = acc.toAddress.toString
-        sender.assertAssetBalance(addressStr, asset, simpleReissuableAsset.quantity + 50)
-        sender.assetsBalance(addressStr).balances should have size 2
-        sender.nftList(addressStr, 10) should have size 1
-      }
-      checks()
-      nodes.waitForHeightArise()
-      checks()
-    }
   }
 
   def createDapp(scriptParts: String*): KeyPair = {
@@ -383,7 +353,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       .explicitGet()
       ._1
 
-    miner.transfer(sender.keyPair, address.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
+    miner.transfer(sender.keyPair, address.toAddress.toString, initialWavesBalance, setScriptFee * 2, waitForTx = true)
 
     nodes.waitForTransaction(
       miner
@@ -430,7 +400,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
         payment = payments
       )
 
-    if (wait) nodes.waitForTransaction(tx._1.id)
+    if (wait) nodes.waitForHeightAriseAndTxPresent(tx._1.id)
     tx._1
   }
 
@@ -675,15 +645,4 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
        |
        """.stripMargin
   }
-
-  def assertError(f: => String, method: String, msg: String): Unit =
-    method match {
-      case CallableMethod =>
-        val id = f
-        sender.debugStateChanges(id).stateChanges.get.error.get.text should include(msg)
-      case TransactionMethod =>
-        assertApiError(f) { e =>
-          e.message should include(msg)
-        }
-    }
 }

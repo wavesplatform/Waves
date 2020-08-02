@@ -11,7 +11,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
-import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
@@ -474,7 +474,9 @@ class InvokeScriptTransactionDiffTest
       feeGen: Gen[Long] = ciFee(1),
       sponsored: Boolean = false,
       isCIDefaultFunc: Boolean = false
-  ): Gen[(List[GenesisTransaction], SetScriptTransaction, SetScriptTransaction, InvokeScriptTransaction, KeyPair, IssueTransaction, SponsorFeeTransaction)] =
+  ): Gen[
+    (List[GenesisTransaction], SetScriptTransaction, SetScriptTransaction, InvokeScriptTransaction, KeyPair, IssueTransaction, SponsorFeeTransaction)
+  ] =
     for {
       master  <- masterGen
       invoker <- invokerGen
@@ -1156,7 +1158,8 @@ class InvokeScriptTransactionDiffTest
     } yield (a, am, r._1, r._2, r._3, asset, master, ts)) {
       case (acc, _, genesis, setScript, ci, asset, master, ts) =>
         val t =
-          TransferTransaction.selfSigned(2.toByte, master, acc.toAddress, IssuedAsset(asset.id()), asset.quantity / 10, Waves, enoughFee, ByteStr.empty,  ts)
+          TransferTransaction
+            .selfSigned(2.toByte, master, acc.toAddress, IssuedAsset(asset.id()), asset.quantity / 10, Waves, enoughFee, ByteStr.empty, ts)
             .explicitGet()
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(asset, t, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
           blockDiffEi should produce("Negative amount")
@@ -1285,14 +1288,16 @@ class InvokeScriptTransactionDiffTest
     } yield (ts, a, am, r._1, r._2, r._3, r._4, r._5, r._6)) {
       case (ts, acc, amount, genesis, setScript, ci, master, sponsoredAsset, setSponsorship) =>
         val t =
-          TransferTransaction.selfSigned(
+          TransferTransaction
+            .selfSigned(
               2.toByte,
               master,
               ci.sender.toAddress,
               IssuedAsset(sponsoredAsset.id()),
               sponsoredAsset.quantity / 10,
               Waves,
-              enoughFee, ByteStr.empty,
+              enoughFee,
+              ByteStr.empty,
               ts
             )
             .explicitGet()
@@ -1358,7 +1363,7 @@ class InvokeScriptTransactionDiffTest
 
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), settings) {
           _ should produce(
-            s"Key size = ${ContractLimits.MaxKeySizeInBytesByVersion(version) + 1} bytes " +
+            s"Data entry key size = ${ContractLimits.MaxKeySizeInBytesByVersion(version) + 1} bytes " +
               s"must be less than ${ContractLimits.MaxKeySizeInBytesByVersion(version)}"
           )
         }
@@ -1377,6 +1382,28 @@ class InvokeScriptTransactionDiffTest
 
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), settings) {
           _.explicitGet()
+        }
+    }
+  }
+
+  property("can't write entry with empty key from V4") {
+    forAll(for {
+      version <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3))
+      r <- preconditionsAndSetContract(
+        s => writeSetWithKeyLength(s, length = 0, version = version),
+        version = version
+      )
+    } yield (r._1, r._2, r._3, version)) {
+      case (genesis, setScript, ci, version) =>
+        val settings =
+          if (version == V3) fs
+          else fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
+
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), settings) {
+          if (version == V3)
+            _ shouldBe Symbol("right")
+          else
+            _ should produce("Data entry key should not be empty")
         }
     }
   }
@@ -1667,7 +1694,7 @@ class InvokeScriptTransactionDiffTest
             Some(AssetDescription(asset.id(), master.publicKey, ByteString.EMPTY, ByteString.EMPTY, 1, false, BigInt(1), Height(1), None, 0L, false))
           )
         InvokeScriptTransactionDiff
-          .apply(blockchain, invoke.timestamp)(invoke)
+          .apply(blockchain, invoke.timestamp, limitedExecution = false)(invoke)
           .resultE should produce("is already issued")
     }
   }
@@ -1930,7 +1957,8 @@ class InvokeScriptTransactionDiffTest
         i2Tx = IssueTransaction
           .selfSigned(TxVersion.V2, invoker, "Asset", "", 1000000, 8, false, Some(throwingAsset), enoughFee, ts)
           .explicitGet()
-        tTx = TransferTransaction.selfSigned(TxVersion.V3, other, invoker.toAddress, sTx.asset, i1Tx.quantity, Waves, enoughFee, ByteStr.empty,  ts)
+        tTx = TransferTransaction
+          .selfSigned(TxVersion.V3, other, invoker.toAddress, sTx.asset, i1Tx.quantity, Waves, enoughFee, ByteStr.empty, ts)
           .explicitGet()
         funcBinding                     <- funcNameGen
         (fee, feeAsset, contract, args) <- failInvariant(funcBinding, sTx, i2Tx)
@@ -1968,7 +1996,7 @@ class InvokeScriptTransactionDiffTest
         (iTx, sTx, _, _) <- sponsorFeeCancelSponsorFeeGen(other)
         sponsoredAsset = IssuedAsset(iTx.assetId)
         tTx = TransferTransaction
-          .selfSigned(TxVersion.V3, other, master.toAddress, sponsoredAsset, iTx.quantity / 2, Waves, enoughFee, ByteStr.empty,  ts)
+          .selfSigned(TxVersion.V3, other, master.toAddress, sponsoredAsset, iTx.quantity / 2, Waves, enoughFee, ByteStr.empty, ts)
           .explicitGet()
         wavesFee <- ciFee(1)
         sponsoredFee = Sponsorship.fromWaves(wavesFee, sTx.minSponsoredAssetFee.get)

@@ -346,7 +346,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
       else
         crypto.verifyVRF(genSig, lastBlockVRF.getOrElse(lastBlockCData.generationSignature).arr, signerPK.publicKey).explicitGet()
 
-    val posCalculator = if (height + 1 < vrfActivationHeight) FairPoSCalculator.V1 else FairPoSCalculator.V2
+    val posCalculator = FairPoSCalculator.V1
     val version       = if (height + 1 < vrfActivationHeight) 3.toByte else 5.toByte
 
     val validBlockDelay: Long = updateDelay(

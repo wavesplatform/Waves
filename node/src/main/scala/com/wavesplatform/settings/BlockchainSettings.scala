@@ -71,7 +71,9 @@ case class FunctionalitySettings(
     lastTimeBasedForkParameter: Long = 0L,
     leaseExpiration: Int = 1000000,
     estimatorPreCheckHeight: Int = 0,
-    minAssetInfoUpdateInterval: Int = 100000
+    minAssetInfoUpdateInterval: Int = 100000,
+    minBlockTime: FiniteDuration = 15.seconds,
+    delayDelta: Int = 8
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int        = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil                       = lastTimeBasedForkParameter
@@ -230,11 +232,12 @@ object BlockchainSettings {
       case BlockchainType.MAINNET =>
         ('W', FunctionalitySettings.MAINNET, GenesisSettings.MAINNET, RewardsSettings.MAINNET)
       case BlockchainType.CUSTOM =>
-        val addressSchemeCharacter = config.as[String](s"custom.address-scheme-character").charAt(0)
-        val functionalitySettings  = config.as[FunctionalitySettings](s"custom.functionality")
-        val genesisSettings        = config.as[GenesisSettings](s"custom.genesis")
-        val rewardsSettings        = config.as[RewardsSettings](s"custom.rewards")
-        (addressSchemeCharacter, functionalitySettings, genesisSettings, rewardsSettings)
+        val networkId     = config.as[String](s"custom.address-scheme-character").charAt(0)
+        val functionality = config.as[FunctionalitySettings](s"custom.functionality")
+        val genesis       = config.as[GenesisSettings](s"custom.genesis")
+        val rewards       = config.as[RewardsSettings](s"custom.rewards")
+        require(functionality.minBlockTime <= genesis.averageBlockDelay, "minBlockTime should be <= averageBlockDelay")
+        (networkId, functionality, genesis, rewards)
     }
     val useEvaluatorV2 = config.getAs[Boolean]("use-evaluator-v2").getOrElse(false)
 
