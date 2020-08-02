@@ -12,6 +12,8 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v1.traits.Environment.Tthis
+import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, ContinuationState, Diff}
 import com.wavesplatform.transaction.Transaction
@@ -23,7 +25,7 @@ import monix.eval.Coeval
 import shapeless.Coproduct
 
 object ContinuationTransactionDiff {
-  def apply(blockchain: Blockchain, blockTime: Long)(tx: ContinuationTransaction): TracedResult[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain, blockTime: Long, verifyAssets: Boolean = true)(tx: ContinuationTransaction): TracedResult[ValidationError, Diff] = {
     val (invokeHeight, foundTx, status) = blockchain.transactionInfo(tx.invokeScriptTransactionId).get
     val invokeScriptTransaction         = foundTx.asInstanceOf[InvokeScriptTransaction]
     for {
@@ -41,8 +43,9 @@ object ContinuationTransactionDiff {
         DirectiveSet(script.stdLibVersion, Account, DApp).left.map(GenericError(_))
       )
 
+      rideAddress = Coproduct[Tthis](Recipient.Address(ByteStr(dAppAddress.bytes)))
       input <- TracedResult(
-        buildThisValue(Coproduct[TxOrd](invokeScriptTransaction: Transaction), blockchain, directives, None).left.map(GenericError(_))
+        buildThisValue(Coproduct[TxOrd](invokeScriptTransaction: Transaction), blockchain, directives, rideAddress).left.map(GenericError(_))
       )
 
       environment = new WavesEnvironment(
@@ -50,13 +53,13 @@ object ContinuationTransactionDiff {
         Coeval.evalOnce(input),
         Coeval(invokeHeight),
         blockchain,
-        Coeval(ByteStr(dAppAddress.bytes)),
+        rideAddress,
         directives,
         tx.invokeScriptTransactionId
       )
       scriptResult <- {
         val ctx =
-          PureContext.build(Global, script.stdLibVersion).withEnvironment[Environment] |+|
+          PureContext.build(script.stdLibVersion).withEnvironment[Environment] |+|
           CryptoContext.build(Global, script.stdLibVersion).withEnvironment[Environment] |+|
           WavesContext.build(directives).copy(vars = Map())
 
@@ -64,7 +67,7 @@ object ContinuationTransactionDiff {
         val limit = ContractLimits.MaxComplexityByVersion(script.stdLibVersion)
         val r = ContractEvaluator
           .applyV2(ctx.evaluationContext(environment), Map[String, LazyVal[Id]](), expr, script.stdLibVersion, tx.invokeScriptTransactionId, limit)
-          .leftMap { case (error, log) => ScriptExecutionError.dApp(error, log) }
+          .leftMap { case (error, log) => ScriptExecutionError.dAppExecution(error, log) }
         TracedResult(
           r,
           List(InvokeScriptTrace(invokeScriptTransaction.dAppAddressOrAlias, invokeScriptTransaction.funcCall, r.map(_._1), r.fold(_.log, _._2)))
@@ -86,10 +89,10 @@ object ContinuationTransactionDiff {
         dAppPublicKey,
         feeInfo,
         invocationComplexity,
-        verifierComplexity,
         invokeScriptTransaction,
         blockchain,
-        blockTime
+        blockTime,
+        verifyAssets
       )
 
       continuationStopDiff = Diff.stateOps(continuationStates = Map(tx.invokeScriptTransactionId -> ContinuationState.Finished))

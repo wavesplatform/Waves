@@ -34,7 +34,7 @@ object ScriptCompiler extends ScorexLogging {
       libraries: Map[String, String] = Map(),
       defaultStdLib: => StdLibVersion = StdLibVersion.VersionDic.default
   ): Either[String, (Script, Script.ComplexityInfo)] =
-    compileAndEstimate(scriptText, estimator, libraries, Script.complexityInfo, defaultStdLib)
+    compileAndEstimate(scriptText, estimator, libraries, Script.complexityInfo(_, _, _), defaultStdLib)
 
   def compileAndEstimate[C](
       scriptText: String,

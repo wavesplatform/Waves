@@ -4,7 +4,6 @@ import cats.implicits._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.ComplexityCheckPolicyProvider._
 import com.wavesplatform.features.EstimatorProvider._
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values.StdLibVersion

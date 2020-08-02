@@ -12,7 +12,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
-import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
 import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.state.diffs.invoke.{ContinuationTransactionDiff, InvokeScriptTransactionDiff}
@@ -145,7 +144,7 @@ object TransactionDiffer {
         case gtx: GenesisTransaction       => GenesisTransactionDiff(blockchain.height)(gtx).traced
         case ptx: PaymentTransaction       => PaymentTransactionDiff(blockchain)(ptx).traced
         case ci: InvokeScriptTransaction   => InvokeScriptTransactionDiff(blockchain, currentBlockTs, skipFailing, verifyAssets)(ci)
-        case cont: ContinuationTransaction => ContinuationTransactionDiff(blockchain, currentBlockTs)(cont)
+        case cont: ContinuationTransaction => ContinuationTransactionDiff(blockchain, currentBlockTs, verifyAssets)(cont)
         case etx: ExchangeTransaction      => ExchangeTransactionDiff(blockchain)(etx).traced
         case itx: IssueTransaction             => AssetTransactionsDiff.issue(blockchain)(itx).traced
         case rtx: ReissueTransaction           => AssetTransactionsDiff.reissue(blockchain, currentBlockTs)(rtx).traced
