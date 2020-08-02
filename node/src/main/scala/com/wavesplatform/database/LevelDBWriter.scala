@@ -272,7 +272,7 @@ abstract class LevelDBWriter private[database] (
     stateFeatures ++ settings.functionalitySettings.preActivatedFeatures
   }
 
-  override protected def loadContinuationStates: Map[ByteStr, ContinuationState] =
+  override protected def loadContinuationStates(): Map[ByteStr, ContinuationState] =
     readOnly(_.get(Keys.continuationStates))
 
   override def wavesAmount(height: Int): BigInt = readOnly { db =>
