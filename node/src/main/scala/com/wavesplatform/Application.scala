@@ -116,12 +116,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       triggers.foreach(_.onProcessBlock(block, diff, minerReward, blockchainBefore))
 
     override def onProcessMicroBlock(
-        microBlock: MicroBlock,
-        diff: BlockDiffer.DetailedDiff,
-        blockchainBefore: Blockchain,
-        totalBlockId: ByteStr
+                                      microBlock: MicroBlock,
+                                      diff: BlockDiffer.DetailedDiff,
+                                      blockchainBefore: Blockchain,
+                                      totalResId: ByteStr,
+                                      totalResTransactionsRoot: ByteStr
     ): Unit =
-      triggers.foreach(_.onProcessMicroBlock(microBlock, diff, blockchainBefore, totalBlockId))
+      triggers.foreach(_.onProcessMicroBlock(microBlock, diff, blockchainBefore, totalResId, totalResTransactionsRoot))
 
     override def onRollback(toBlockId: ByteStr, toHeight: Int): Unit =
       triggers.foreach(_.onRollback(toBlockId, toHeight))

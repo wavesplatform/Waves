@@ -46,12 +46,12 @@ object serde {
 
     override def protobuf: BlockchainUpdated =
       self match {
-        case VanillaBlockAppended(sig, height, block, updatedWavesAmount, blockStateUpdate, transactionStateUpdates) =>
+        case VanillaBlockAppended(id, height, block, updatedWavesAmount, blockStateUpdate, transactionStateUpdates) =>
           val blockUpdate = Some(blockStateUpdate).filterNot(_.isEmpty).map(_.protobuf)
           val txsUpdates  = transactionStateUpdates.map(_.protobuf)
 
           BlockchainUpdated(
-            id = block.id.value().toByteString,
+            id = id.toByteString,
             height = height,
             update = BlockchainUpdated.Update.Append(
               Append(
@@ -67,7 +67,7 @@ object serde {
               )
             )
           )
-        case VanillaMicroBlockAppended(totalBlockId, height, microBlock, microBlockStateUpdate, transactionStateUpdates) =>
+        case VanillaMicroBlockAppended(totalBlockId, height, microBlock, microBlockStateUpdate, transactionStateUpdates, totalResTransactionsRoot) =>
           val microBlockUpdate = Some(microBlockStateUpdate).filterNot(_.isEmpty).map(_.protobuf)
           val txsUpdates       = transactionStateUpdates.map(_.protobuf)
 
@@ -81,7 +81,8 @@ object serde {
                 transactionStateUpdates = txsUpdates,
                 body = Append.Body.MicroBlock(
                   Append.MicroBlockAppend(
-                    microBlock = Some(PBMicroBlocks.protobuf(microBlock, totalBlockId))
+                    microBlock = Some(PBMicroBlocks.protobuf(microBlock, totalBlockId)),
+                    updatedTransactionsRoot = totalResTransactionsRoot.toByteString
                   )
                 )
               )
@@ -136,7 +137,8 @@ object serde {
                   toHeight = self.height,
                   microBlock = PBMicroBlocks.vanilla(body.microBlock.get).get.microblock,
                   microBlockStateUpdate = append.stateUpdate.map(_.vanilla.get).getOrElse(Monoid[VanillaStateUpdate].empty),
-                  transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get)
+                  transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get),
+                  totalResTransactionsRoot = ByteStr(body.updatedTransactionsRoot.toByteArray)
                 )
               case Body.Empty => throw error
             }
