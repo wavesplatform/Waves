@@ -11,8 +11,8 @@ trait BlockchainUpdateTriggers {
       microBlock: MicroBlock,
       diff: DetailedDiff,
       blockchainBefore: Blockchain,
-      totalResId: ByteStr,
-      totalResTransactionsRoot: ByteStr
+      totalBlockId: ByteStr,
+      totalTransactionsRoot: ByteStr
   ): Unit
   def onRollback(toBlockId: ByteStr, toHeight: Int): Unit
   def onMicroBlockRollback(toBlockId: ByteStr, height: Int): Unit
@@ -25,8 +25,8 @@ object BlockchainUpdateTriggers {
         microBlock: MicroBlock,
         diff: DetailedDiff,
         blockchainBefore: Blockchain,
-        totalResId: ByteStr,
-        totalResTransactionsRoot: ByteStr
+        totalBlockId: ByteStr,
+        totalTransactionsRoot: ByteStr
     ): Unit                                                                  = {}
     override def onRollback(toBlockId: ByteStr, toHeight: Int): Unit         = {}
     override def onMicroBlockRollback(toBlockId: ByteStr, height: Int): Unit = {}

@@ -117,10 +117,10 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
       microBlock: MicroBlock,
       diff: BlockDiffer.DetailedDiff,
       blockchainBefore: Blockchain,
-      totalResId: ByteStr,
-      totalResTransactionsRoot: ByteStr
+      totalBlockId: ByteStr,
+      totalTransactionsRoot: ByteStr
   ): Unit = {
-    val newMicroBlock = MicroBlockAppended.from(microBlock, diff, blockchainBefore, totalResId, totalResTransactionsRoot)
+    val newMicroBlock = MicroBlockAppended.from(microBlock, diff, blockchainBefore, totalBlockId, totalTransactionsRoot)
     repo.appendMicroBlock(newMicroBlock)
   }
 

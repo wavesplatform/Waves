@@ -119,10 +119,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
                                       microBlock: MicroBlock,
                                       diff: BlockDiffer.DetailedDiff,
                                       blockchainBefore: Blockchain,
-                                      totalResId: ByteStr,
-                                      totalResTransactionsRoot: ByteStr
+                                      totalBlockId: ByteStr,
+                                      totalTransactionsRoot: ByteStr
     ): Unit =
-      triggers.foreach(_.onProcessMicroBlock(microBlock, diff, blockchainBefore, totalResId, totalResTransactionsRoot))
+      triggers.foreach(_.onProcessMicroBlock(microBlock, diff, blockchainBefore, totalBlockId, totalTransactionsRoot))
 
     override def onRollback(toBlockId: ByteStr, toHeight: Int): Unit =
       triggers.foreach(_.onRollback(toBlockId, toHeight))
