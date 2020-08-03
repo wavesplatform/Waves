@@ -67,7 +67,7 @@ object serde {
               )
             )
           )
-        case VanillaMicroBlockAppended(totalBlockId, height, microBlock, microBlockStateUpdate, transactionStateUpdates, totalResTransactionsRoot) =>
+        case VanillaMicroBlockAppended(totalBlockId, height, microBlock, microBlockStateUpdate, transactionStateUpdates, totalTransactionsRoot) =>
           val microBlockUpdate = Some(microBlockStateUpdate).filterNot(_.isEmpty).map(_.protobuf)
           val txsUpdates       = transactionStateUpdates.map(_.protobuf)
 
@@ -82,7 +82,7 @@ object serde {
                 body = Append.Body.MicroBlock(
                   Append.MicroBlockAppend(
                     microBlock = Some(PBMicroBlocks.protobuf(microBlock, totalBlockId)),
-                    updatedTransactionsRoot = totalResTransactionsRoot.toByteString
+                    updatedTransactionsRoot = totalTransactionsRoot.toByteString
                   )
                 )
               )
@@ -138,7 +138,7 @@ object serde {
                   microBlock = PBMicroBlocks.vanilla(body.microBlock.get).get.microblock,
                   microBlockStateUpdate = append.stateUpdate.map(_.vanilla.get).getOrElse(Monoid[VanillaStateUpdate].empty),
                   transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get),
-                  totalResTransactionsRoot = ByteStr(body.updatedTransactionsRoot.toByteArray)
+                  totalTransactionsRoot = ByteStr(body.updatedTransactionsRoot.toByteArray)
                 )
               case Body.Empty => throw error
             }
