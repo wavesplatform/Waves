@@ -3,8 +3,8 @@ package com.wavesplatform.events.api.grpc
 import com.wavesplatform.events.BlockchainUpdated
 import com.wavesplatform.events.api.grpc.protobuf.{
   BlockchainUpdatesApiGrpc,
-  GetBlockRangeUpdatesRequest,
-  GetBlockRangeUpdatesResponse,
+  GetBlockUpdatesRangeRequest,
+  GetBlockUpdatesRangeResponse,
   GetBlockUpdateRequest,
   GetBlockUpdateResponse,
   SubscribeEvent,
@@ -35,10 +35,10 @@ class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo.Read with UpdatesRepo.Strea
     }
   }
 
-  override def getBlockRangeUpdates(request: GetBlockRangeUpdatesRequest): Future[GetBlockRangeUpdatesResponse] = Future {
+  override def getBlockUpdatesRange(request: GetBlockUpdatesRangeRequest): Future[GetBlockUpdatesRangeResponse] = Future {
     // todo validation
     repo.updatesRange(request.fromHeight, request.toHeight) match {
-      case Success(updates) => GetBlockRangeUpdatesResponse(updates.map(_.protobuf))
+      case Success(updates) => GetBlockUpdatesRangeResponse(updates.map(_.protobuf))
       case Failure(exception) =>
         log.error(s"BlockchainUpdates gRPC failed to get block range updates for range ${request.fromHeight} to ${request.toHeight}", exception)
         throw new StatusRuntimeException(Status.INTERNAL)
