@@ -24,9 +24,8 @@ class InvokeCalcIssueSuite extends BaseTransactionSuite with Matchers with Cance
       .overrideBase(_.preactivatedFeatures((BlockchainFeatures.BlockV5.id, 0), (BlockchainFeatures.BlockV5.id, 0)))
       .buildNonConflicting()
 
-  private val smartAcc  = firstAddress
-  private val callerAcc = secondAddress
-
+  private def smartAcc  = firstKeyPair
+  private def callerAcc = secondKeyPair
 
   test("calculateAssetId should return right unique id for each invoke") {
 
@@ -36,30 +35,31 @@ class InvokeCalcIssueSuite extends BaseTransactionSuite with Matchers with Cance
       fee = setScriptFee + smartFee,
       waitForTx = true
     )
+    val smartAccAddress = smartAcc.toAddress.toString
     sender
       .invokeScript(
         callerAcc,
-        smartAcc,
+        smartAccAddress,
         Some("i"),
         args = List.empty,
         fee = invokeFee + issueFee, // dAppV4 contains 1 Issue action
         waitForTx = true
       )
-    val assetId = sender.getDataByKey(smartAcc, "id").as[BinaryDataEntry].value.toString
+    val assetId = sender.getDataByKey(smartAccAddress, "id").as[BinaryDataEntry].value.toString
 
     sender
       .invokeScript(
         callerAcc,
-        smartAcc,
+        smartAccAddress,
         Some("i"),
         args = List.empty,
         fee = invokeFee + issueFee, // dAppV4 contains 1 Issue action
         waitForTx = true
       )
-    val secondAssetId = sender.getDataByKey(smartAcc, "id").as[BinaryDataEntry].value.toString
+    val secondAssetId = sender.getDataByKey(smartAccAddress, "id").as[BinaryDataEntry].value.toString
 
-    sender.assetBalance(smartAcc, assetId).balance shouldBe 100
-    sender.assetBalance(smartAcc, secondAssetId).balance shouldBe 100
+    sender.assetBalance(smartAccAddress, assetId).balance shouldBe 100
+    sender.assetBalance(smartAccAddress, secondAssetId).balance shouldBe 100
 
     val assetDetails = sender.assetsDetails(assetId)
     assetDetails.decimals shouldBe decimals
@@ -73,10 +73,10 @@ class InvokeCalcIssueSuite extends BaseTransactionSuite with Matchers with Cance
 
 object InvokeCalcIssueSuite {
 
-  val assetName = "InvokeAsset"
+  val assetName  = "InvokeAsset"
   val assetDescr = "Invoke asset descr"
-  val amount = 100
-  val decimals = 0
+  val amount     = 100
+  val decimals   = 0
   val reissuable = true
 
   private val dAppV4: String =

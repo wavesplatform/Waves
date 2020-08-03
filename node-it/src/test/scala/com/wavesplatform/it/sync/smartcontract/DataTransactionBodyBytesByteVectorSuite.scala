@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs
@@ -77,15 +78,15 @@ class DataTransactionBodyBytesByteVectorSuite extends BaseTransactionSuite {
     maxDataEntriesV1 :+ BinaryDataEntry("f", ByteStr.fill(12378)(1))
 
   test("filled data transaction body bytes") {
-    checkByteVectorLimit(firstAddress, maxDataEntriesV1, scriptV3, TxVersion.V1)
-    checkByteVectorLimit(secondAddress, maxDataEntriesV2, scriptV4, TxVersion.V2)
+    checkByteVectorLimit(firstKeyPair, maxDataEntriesV1, scriptV3, TxVersion.V1)
+    checkByteVectorLimit(secondKeyPair, maxDataEntriesV2, scriptV4, TxVersion.V2)
   }
 
-  private def checkByteVectorLimit(address: String, data: List[BinaryDataEntry], script: String, version: TxVersion) = {
+  private def checkByteVectorLimit(address: KeyPair, data: List[BinaryDataEntry], script: String, version: TxVersion) = {
     val setScriptId = sender.setScript(address, Some(script), setScriptFee, waitForTx = true).id
     sender.transactionInfo[TransactionInfo](setScriptId).script.get.startsWith("base64:") shouldBe true
 
-    val scriptInfo = sender.addressScriptInfo(address)
+    val scriptInfo = sender.addressScriptInfo(address.toAddress.toString)
     scriptInfo.script.isEmpty shouldBe false
     scriptInfo.scriptText.isEmpty shouldBe false
     scriptInfo.script.get.startsWith("base64:") shouldBe true

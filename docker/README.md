@@ -152,3 +152,12 @@ docker run -v /docker/waves/waves-data:/var/lib/waves -v /docker/waves/waves-con
 
 Check that REST API is up by navigating to the following URL from the host side:
 http://localhost:6870/api-docs/index.html
+
+### Extensions
+You can run custom extensions in this way:
+1. Copy all lib/*.jar files from extension to any directory, lets say `plugins`
+2. Add extension class to configuration file, lets say `local.conf`:
+```hocon
+waves.extensions += com.johndoe.WavesExtension
+```
+3. Run `docker run -v "$(pwd)/plugins:/usr/share/waves/lib/plugins" -v "$(pwd)/local.conf:/etc/waves/local.conf" -i wavesplatform/wavesnode`

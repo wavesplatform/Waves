@@ -33,7 +33,7 @@ class BurnTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     }
   }
 
-  test("non-issuer able to burn assets that he own") {
+  test("non-issuer able to burn assets that they own") {
     for (v <- burnTxSupportedVersions) {
       val issuedQuantity      = issueAmount
       val transferredQuantity = issuedQuantity / 2
@@ -46,6 +46,8 @@ class BurnTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       sender.broadcastBurn(secondAcc, issuedAssetId, transferredQuantity, minFee, version = v, waitForTx = true)
       sender.assetsBalance(secondAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe 0L
 
+      sender.waitForHeightArise()
+
       assertGrpcError(
         sender.broadcastTransfer(secondAcc, Recipient().withPublicKeyHash(firstAddress), transferredQuantity, minFee, assetId = issuedAssetId),
         "Attempt to transfer unavailable funds",
@@ -54,7 +56,7 @@ class BurnTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     }
   }
 
-  test("issuer can't burn more tokens than he own") {
+  test("issuer can't burn more tokens than they own") {
     for (v <- burnTxSupportedVersions) {
       val issuedQuantity = issueAmount
       val burnedQuantity = issuedQuantity + 1
@@ -62,6 +64,8 @@ class BurnTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val issuedAssetId = PBTransactions.vanilla(
         sender.broadcastIssue(firstAcc, s"name+$v", issuedQuantity, decimals, reissuable = false, issueFee, waitForTx = true)
       ).explicitGet().id().toString
+
+      sender.waitForHeightArise()
 
       assertGrpcError(
         sender.broadcastBurn(firstAcc, issuedAssetId, burnedQuantity, minFee, version = v),
@@ -71,7 +75,7 @@ class BurnTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     }
   }
 
-  test("user can't burn more tokens than he own") {
+  test("user can't burn more tokens than they own") {
     for (v <- burnTxSupportedVersions) {
       val issuedQuantity      = issueAmount
       val transferredQuantity = issuedQuantity / 2

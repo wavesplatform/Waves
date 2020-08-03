@@ -1,8 +1,7 @@
 package com.wavesplatform.it.asset
 
-import com.google.protobuf.ByteString
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.api.grpc.{AssetInfoResponse, TransactionStatus, TransactionsByIdRequest}
+import com.wavesplatform.api.grpc.AssetInfoResponse
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.SyncGrpcApi._
@@ -19,8 +18,8 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.FreeSpec
 
-import scala.util.Random
 import scala.concurrent.duration._
+import scala.util.Random
 
 class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSuiteLike {
   private val initialWavesBalance = 100.waves
@@ -108,11 +107,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
       val acc     = createDapp(script(simpleNonreissuableAsset))
       val txIssue = issue(acc, method, simpleNonreissuableAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, simpleNonreissuableAsset, method = method)
-      assertError(
-        reissue(acc, method, assetId, 100500, reissuable = false, checkStateChanges = false),
-        method,
-        "Asset is not reissuable"
-      )
+      assertGrpcError(reissue(acc, method, assetId, 100500, reissuable = false, checkStateChanges = false), "Asset is not reissuable")
     }
   }
 
@@ -142,9 +137,8 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
       val assetId         = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
       val initialQuantity = simpleReissuableAsset.quantity
 
-      assertError(
+      assertGrpcError(
         reissue(acc, method, assetId, Long.MaxValue - initialQuantity + 1, reissuable = true, checkStateChanges = false),
-        method,
         "Asset total value overflow"
       )
     }
@@ -154,12 +148,9 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
       val txIssue = issue(acc, method, simpleReissuableAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
 
-      val id = invokeScript(acc, "transferAndBurn", assetId = assetId, count = (simpleReissuableAsset.quantity / 2 + 1).toInt, wait = false)
-      sender.waitForHeightArise()
-      sender.waitFor("tx was rejected")(
-        n => n.getStatuses(TransactionsByIdRequest(Seq(ByteString.copyFrom(Base58.decode(id))))).head,
-        (ts: TransactionStatus) => ts.status == TransactionStatus.Status.NOT_EXISTS,
-        100.millis
+      assertGrpcError(
+        invokeScript(acc, "transferAndBurn", assetId = assetId, count = (simpleReissuableAsset.quantity / 2 + 1).toInt, wait = false),
+        "Accounts balance errors"
       )
     }
 
@@ -168,10 +159,8 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
       val txIssue = issue(acc, method, nftAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, nftAsset, method = method)
 
-      assertError(
-        reissue(acc, method, assetId, 2, reissuable = true, checkStateChanges = false),
-        method,
-       "Asset is not reissuable"
+      assertGrpcError(reissue(acc, method, assetId, 2, reissuable = true, checkStateChanges = false),
+        "Asset is not reissuable"
       )
     }
 
@@ -197,11 +186,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
 
     "Issue more than 10 assets should produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
-      assertError(
-        invokeScript(acc, "issue11Assets"),
-        CallableMethod,
-        "Too many script actions: max: 10, actual: 11"
-      )
+      assertGrpcError(invokeScript(acc, "issue11Assets"), "Too many script actions: max: 10, actual: 11")
     }
 
     "More than 10 actions Issue/Reissue/Burn should produce an error" in {
@@ -209,20 +194,12 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
       val txIssue = issue(acc, method, simpleReissuableAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
 
-      assertError(
-        invokeScript(acc, "process11actions", assetId = assetId),
-        CallableMethod,
-        "Too many script actions: max: 10, actual: 11"
-      )
+      assertGrpcError(invokeScript(acc, "process11actions", assetId = assetId), "Too many script actions: max: 10, actual: 11")
     }
 
     "More than 10 issue action in one invocation should produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
-      assertError(
-        invokeScript(acc, "issue11Assets", fee = invocationCost(1)),
-        CallableMethod,
-        "Too many script actions: max: 10, actual: 11"
-      )
+      assertGrpcError(invokeScript(acc, "issue11Assets", fee = invocationCost(1)), "Too many script actions: max: 10, actual: 11")
     }
   }
 
@@ -596,13 +573,4 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
        |
        """.stripMargin
   }
-
-  def assertError(f: => String, method: String, msg: String): Unit =
-    method match {
-      case CallableMethod =>
-        val id = f
-        sender.stateChanges(id)._2.error.get.text should include(msg)
-      case TransactionMethod =>
-        assertGrpcError(f, msg)
-    }
 }

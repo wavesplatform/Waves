@@ -19,10 +19,10 @@
       params: [ "Int", "Int", "Int", "Int", "Int", "Ceiling|Down|Floor|HalfDown|HalfEven|HalfUp|Up" ]
       doc: "Returns the logarithm of a number."
       paramsDoc: [
-        "The number which logarithm should be calculated."
-        "The number of decimals of the number."
-        "The base of the logarithm."
+        "The base."
         "The number of decimals of the base."
+        "The exponent."
+        "The number of decimals of the exponent."
         "The number of decimals of the resulting value."
         '''
         The rounding function.

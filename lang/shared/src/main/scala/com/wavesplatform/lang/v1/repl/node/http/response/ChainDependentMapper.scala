@@ -2,6 +2,7 @@ package com.wavesplatform.lang.v1.repl.node.http.response
 
 import java.nio.ByteBuffer
 
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.v1.repl.global
@@ -32,9 +33,24 @@ private[node] class ChainDependentMapper(chainId: Byte) {
     Proven(
       Header(tx.id.byteStr, tx.fee, tx.timestamp, tx.version),
       Address(pkToAddress(tx.senderPublicKey)),
-      tx.bodyBytes.byteStr,
+      ByteStr(bodyBytes(tx)),
       tx.senderPublicKey.byteStr,
       tx.proofs.map(_.byteStr).toIndexedSeq
+    )
+
+  private def bodyBytes(tx: TransferTransaction): Array[Byte] =
+    TransferTxSerializer.bodyBytes(
+      tx.senderPublicKey.bytes,
+      tx.assetId.map(_.bytes),
+      tx.feeAssetId.map(_.bytes),
+      tx.timestamp,
+      tx.amount,
+      tx.fee,
+      tx.recipient,
+      tx.attachment.bytes,
+      tx.version,
+      chainId,
+      tx.proofs.map(_.bytes)
     )
 
   def toRideModel(a: AssetInfoResponse): ScriptAssetInfo =
@@ -61,14 +77,6 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       generatorPublicKey = b.generatorPublicKey.byteStr,
       vrf = b.VRF.map(_.byteStr)
     )
-
-
-  private val AddressPrefix: String = "address:"
-  private val AddressVersion       = 1
-  private val ChecksumLength       = 4
-  private val HashLength           = 20
-  private val AddressLength        = 1 + 1 + HashLength + ChecksumLength
-  private val AddressStringLength  = 36
 
   private def pkToAddress(publicKey: ByteString): ByteStr = {
     val withoutChecksum =
@@ -103,7 +111,7 @@ private[node] class ChainDependentMapper(chainId: Byte) {
     } yield address
   }
 
-  def addressFromBytes(addressBytes: Array[Byte]): Either[String, Address] = {
+  private def addressFromBytes(addressBytes: Array[Byte]): Either[String, Address] = {
     val Array(version, network, _*) = addressBytes
     for {
       _ <- Either.cond(
@@ -123,7 +131,11 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       )
       checkSum          = addressBytes.takeRight(ChecksumLength)
       checkSumGenerated = global.secureHash(addressBytes.dropRight(ChecksumLength)).take(ChecksumLength)
-      _ <- Either.cond(java.util.Arrays.equals(checkSum, checkSumGenerated), (), s"Bad address checksum")
+      _ <- Either.cond(
+        java.util.Arrays.equals(checkSum, checkSumGenerated),
+        (),
+        s"Bad address checksum"
+      )
     } yield Address(ByteStr(addressBytes))
   }
 }
