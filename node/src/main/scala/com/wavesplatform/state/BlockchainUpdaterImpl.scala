@@ -294,7 +294,8 @@ class BlockchainUpdaterImpl(
 
                         val liquidDiffWithCancelledLeases = ng.cancelExpiredLeases(referencedLiquidDiff)
 
-                        val referencedBlockchain = CompositeBlockchain(leveldb, Some(liquidDiffWithCancelledLeases), Some(referencedForgedBlock), carry, reward)
+                        val referencedBlockchain =
+                          CompositeBlockchain(leveldb, Some(liquidDiffWithCancelledLeases), Some(referencedForgedBlock), carry, reward)
                         val maybeDiff = BlockDiffer
                           .fromBlock(
                             referencedBlockchain,
@@ -304,21 +305,29 @@ class BlockchainUpdaterImpl(
                             verify
                           )
 
-                        maybeDiff.map { differResult =>
-                          val tempBlockchain = CompositeBlockchain(referencedBlockchain, Some(differResult.diff), Some(block), differResult.carry, reward, Some(hitSource))
-                          miner.scheduleMining(Some(tempBlockchain))
+                        maybeDiff.map {
+                          differResult =>
+                            val tempBlockchain = CompositeBlockchain(
+                              referencedBlockchain,
+                              Some(differResult.diff),
+                              Some(block),
+                              differResult.carry,
+                              reward,
+                              Some(hitSource)
+                            )
+                            miner.scheduleMining(Some(tempBlockchain))
 
-                          blockchainUpdateTriggers.onProcessBlock(block, differResult.detailedDiff, reward, referencedBlockchain)
+                            blockchainUpdateTriggers.onProcessBlock(block, differResult.detailedDiff, reward, referencedBlockchain)
 
-                          leveldb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
-                          BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
-                          TxsInBlockchainStats.record(ng.transactions.size)
-                          val (discardedMbs, discardedDiffs) = discarded.unzip
-                          if (discardedMbs.nonEmpty) {
-                            log.trace(s"Discarded microblocks: $discardedMbs")
-                          }
+                            leveldb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
+                            BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
+                            TxsInBlockchainStats.record(ng.transactions.size)
+                            val (discardedMbs, discardedDiffs) = discarded.unzip
+                            if (discardedMbs.nonEmpty) {
+                              log.trace(s"Discarded microblocks: $discardedMbs")
+                            }
 
-                          Some((differResult, discardedDiffs, reward, hitSource))
+                            Some((differResult, discardedDiffs, reward, hitSource))
                         }
                       } else {
                         val errorText = s"Forged block has invalid signature. Base: ${ng.base}, requested reference: ${block.header.reference}"
@@ -472,8 +481,12 @@ class BlockchainUpdaterImpl(
               val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint, detailedDiff) = blockDifferResult
               restTotalConstraint = updatedMdConstraint
               val blockId = ng.createBlockId(microBlock)
-              blockchainUpdateTriggers.onProcessMicroBlock(microBlock, detailedDiff, this, blockId)
+
+              val transactionsRoot = ng.createTransactionsRoot(microBlock)
+              blockchainUpdateTriggers.onProcessMicroBlock(microBlock, detailedDiff, this, blockId, transactionsRoot)
+
               ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis, Some(blockId))
+
               log.info(s"${microBlock.stringRepr(blockId)} appended, diff=${diff.hashString}")
               internalLastBlockInfo.onNext(LastBlockInfo(blockId, height, score, ready = true))
 

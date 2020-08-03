@@ -8,17 +8,19 @@ case class LiquidState(
     microBlocks: Seq[MicroBlockAppended]
 ) {
   def solidify(): BlockAppended = {
-    val totalResBlockSig        = microBlocks.lastOption.fold(keyBlock.block.signature)(_.microBlock.totalResBlockSig)
+    val toId             = microBlocks.lastOption.fold(keyBlock.toId)(_.toId)
+    val totalResBlockSig = microBlocks.lastOption.fold(keyBlock.block.signature)(_.microBlock.totalResBlockSig)
+    val transactionsRoot = microBlocks.lastOption.fold(keyBlock.block.header.transactionsRoot)(_.totalResTransactionsRoot)
+
     val transactionData         = microBlocks.foldLeft(keyBlock.block.transactionData)((txs, mb) => txs ++ mb.microBlock.transactionData)
     val blockStateUpdate        = microBlocks.foldLeft(keyBlock.blockStateUpdate)((upd, mb) => upd.combine(mb.microBlockStateUpdate))
     val transactionStateUpdates = microBlocks.foldLeft(keyBlock.transactionStateUpdates)((upds, mb) => upds ++ mb.transactionStateUpdates)
 
-    // todo make sure generationSignature and transactionsRoot are correct in Block
-    // not touching them for now
     BlockAppended(
-      toId = totalResBlockSig,
+      toId = toId,
       toHeight = keyBlock.toHeight,
       block = keyBlock.block.copy(
+        header = keyBlock.block.header.copy(transactionsRoot = transactionsRoot),
         signature = totalResBlockSig,
         transactionData = transactionData
       ),

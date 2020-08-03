@@ -190,13 +190,20 @@ final case class MicroBlockAppended(
     toHeight: Int,
     microBlock: MicroBlock,
     microBlockStateUpdate: StateUpdate,
-    transactionStateUpdates: Seq[StateUpdate]
+    transactionStateUpdates: Seq[StateUpdate],
+    totalResTransactionsRoot: ByteStr
 ) extends BlockchainUpdated
 
 object MicroBlockAppended {
-  def from(microBlock: MicroBlock, diff: DetailedDiff, blockchainBefore: Blockchain, totalBlockId: ByteStr): MicroBlockAppended = {
+  def from(
+      microBlock: MicroBlock,
+      diff: DetailedDiff,
+      blockchainBefore: Blockchain,
+      totalResId: ByteStr,
+      totalResTransactionsRoot: ByteStr
+  ): MicroBlockAppended = {
     val (microBlockStateUpdate, txsStateUpdates) = StateUpdate.container(blockchainBefore, diff, microBlock.transactionData)
-    MicroBlockAppended(totalBlockId, blockchainBefore.height, microBlock, microBlockStateUpdate, txsStateUpdates)
+    MicroBlockAppended(totalResId, blockchainBefore.height, microBlock, microBlockStateUpdate, txsStateUpdates, totalResTransactionsRoot)
   }
 }
 

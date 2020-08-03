@@ -18,6 +18,7 @@ message BlockchainUpdated {
 
         message MicroBlockAppend {
             SignedMicroBlock micro_block = 1;
+            bytes updated_transactions_root = 2;
         }
 
         oneof body {
