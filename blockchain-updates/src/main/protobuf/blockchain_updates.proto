@@ -7,7 +7,7 @@ import "events_temp.proto";
 
 service BlockchainUpdatesApi {
     rpc GetBlockUpdate (GetBlockUpdateRequest) returns (GetBlockUpdateResponse);
-    rpc GetBlockRangeUpdates (GetBlockRangeUpdatesRequest) returns (GetBlockRangeUpdatesResponse);
+    rpc GetBlockUpdatesRange (GetBlockUpdatesRangeRequest) returns (GetBlockUpdatesRangeResponse);
     rpc Subscribe (SubscribeRequest) returns (stream SubscribeEvent);
 }
 
@@ -19,13 +19,13 @@ message GetBlockUpdateResponse {
     waves.events.BlockchainUpdated update = 1;
 }
 
-message GetBlockRangeUpdatesRequest {
+message GetBlockUpdatesRangeRequest {
     // both required, inclusive
     int32 from_height = 1;
     int32 to_height = 2;
 }
 
-message GetBlockRangeUpdatesResponse {
+message GetBlockUpdatesRangeResponse {
     repeated waves.events.BlockchainUpdated updates = 1;
 }
 
