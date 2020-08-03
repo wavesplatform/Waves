@@ -147,7 +147,7 @@ object TransactionDiffer {
         case gtx: GenesisTransaction       => GenesisTransactionDiff(blockchain.height)(gtx).traced
         case ptx: PaymentTransaction       => PaymentTransactionDiff(blockchain)(ptx).traced
         case ci: InvokeScriptTransaction   => InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(ci)
-        case cont: ContinuationTransaction => ContinuationTransactionDiff(blockchain, currentBlockTs, verifyAssets)(cont)
+        case cont: ContinuationTransaction => ContinuationTransactionDiff(blockchain, currentBlockTs, limitedExecution)(cont)
         case etx: ExchangeTransaction      => ExchangeTransactionDiff(blockchain)(etx).traced
         case itx: IssueTransaction             => AssetTransactionsDiff.issue(blockchain)(itx).traced
         case rtx: ReissueTransaction           => AssetTransactionsDiff.reissue(blockchain, currentBlockTs)(rtx).traced
