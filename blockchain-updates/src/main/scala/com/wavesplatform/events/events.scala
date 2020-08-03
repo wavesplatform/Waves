@@ -181,7 +181,7 @@ object BlockAppended {
       case _ => blockchainBefore.wavesAmount(blockchainBefore.height).toLong + minerReward.getOrElse(0L)
     }
 
-    BlockAppended(block.signature, blockchainBefore.height + 1, block, updatedWavesAmount, blockStateUpdate, txsStateUpdates)
+    BlockAppended(block.id.value(), blockchainBefore.height + 1, block, updatedWavesAmount, blockStateUpdate, txsStateUpdates)
   }
 }
 
