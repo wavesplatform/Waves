@@ -106,7 +106,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
   override def onProcessBlock(block: Block, diff: BlockDiffer.DetailedDiff, minerReward: Option[Long], blockchainBefore: Blockchain): Unit = {
     val newBlock = BlockAppended.from(block, diff, minerReward, blockchainBefore)
-    repo.appendBlock(newBlock)
+    repo.appendBlock(newBlock).get
     // todo log.debug, and make it every 100 blocks, like in BlockchainUpdater
     if (newBlock.toHeight % 100 == 0) {
       log.info(s"BlockchainUpdates extension appended blocks up to ${newBlock.toHeight}")
@@ -121,16 +121,16 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
       totalTransactionsRoot: ByteStr
   ): Unit = {
     val newMicroBlock = MicroBlockAppended.from(microBlock, diff, blockchainBefore, totalBlockId, totalTransactionsRoot)
-    repo.appendMicroBlock(newMicroBlock)
+    repo.appendMicroBlock(newMicroBlock).get
   }
 
   override def onRollback(toBlockId: ByteStr, toHeight: Int): Unit = {
     val rollbackCompleted = RollbackCompleted(toBlockId, toHeight)
-    repo.rollback(rollbackCompleted)
+    repo.rollback(rollbackCompleted).get
   }
 
   override def onMicroBlockRollback(toBlockId: ByteStr, height: Int): Unit = {
     val microBlockRollbackCompleted = MicroBlockRollbackCompleted(toBlockId, height)
-    repo.rollbackMicroBlock(microBlockRollbackCompleted)
+    repo.rollbackMicroBlock(microBlockRollbackCompleted).get
   }
 }
