@@ -45,11 +45,13 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
     def newOffsetTask: Task[Option[(InetAddress, Long, Long)]] = Task {
       try {
         client.open()
-        val beforeRequest = System.nanoTime()
-        val info          = client.getTime(InetAddress.getByName(ntpServer))
-        val ntpTime       = info.getMessage.getTransmitTimeStamp.getTime
-        val roundripTime  = System.nanoTime() - beforeRequest
-        val corrected     = ntpTime + (roundripTime / 2 / 1000000)
+        val beforeRequest   = System.nanoTime()
+        val info            = client.getTime(InetAddress.getByName(ntpServer))
+        val message         = info.getMessage
+        val ntpTime         = message.getTransmitTimeStamp.getTime
+        val serverSpentTime = message.getTransmitTimeStamp.getTime - message.getReceiveTimeStamp.getTime
+        val roundripTime    = (System.nanoTime() - beforeRequest) / 1000000 - serverSpentTime
+        val corrected       = ntpTime + roundripTime / 2
         Some((info.getAddress, corrected, System.nanoTime()))
       } catch {
         case _: SocketTimeoutException =>
