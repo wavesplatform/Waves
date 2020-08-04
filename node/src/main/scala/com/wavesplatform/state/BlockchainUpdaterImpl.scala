@@ -222,7 +222,7 @@ class BlockchainUpdaterImpl(
                     val height            = leveldb.unsafeHeightOf(ng.base.header.reference)
                     val miningConstraints = MiningConstraints(leveldb, height)
 
-                    blockchainUpdateTriggers.onMicroBlockRollback(block.header.reference, this.height)
+                    blockchainUpdateTriggers.onRollback(ng.base.header.reference, leveldb.height)
 
                     BlockDiffer
                       .fromBlock(
