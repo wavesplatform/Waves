@@ -300,7 +300,10 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
           if (recentUpdate.toHeight > lastHistorical.toHeight) {
             (Some(lastHistorical), Some(recentUpdate))
           } else (Some(lastHistorical), None)
-        case _ => ???
+        case illegalState =>
+          val err = new IllegalStateException(s"Historical and recent state updates are in invalid state: $illegalState")
+          log.error("Historical and recent state updates are in invalid state", err)
+          throw err
       }
       .collect { case Some(value) => value }
   }
