@@ -11,36 +11,42 @@ import scala.concurrent.duration.DurationInt
 
 trait Time {
   def correctedTime(): Long
-
   def getTimestamp(): Long
 }
 
 class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable {
+  private[this] val ExpirationTimeout = 60.seconds
+  private[this] val RetryDelay        = 10.seconds
+  private[this] val ResponseTimeout   = 10.seconds
 
-  log.info("Initializing time")
-
-  private val offsetPanicThreshold = 1000000L
-  private val ExpirationTimeout    = 60.seconds
-  private val RetryDelay           = 10.seconds
-  private val ResponseTimeout      = 10.seconds
-
-  private implicit val scheduler: SchedulerService =
+  private[this] implicit val scheduler: SchedulerService =
     Schedulers.singleThread(name = "time-impl", reporter = log.error("Error in NTP", _), ExecutionModel.AlwaysAsyncExecution)
 
-  private val client = new NTPUDPClient()
+  private[this] val client = new NTPUDPClient()
   client.setDefaultTimeout(ResponseTimeout.toMillis.toInt)
 
-  @volatile private var offset = 0L
-  private val updateTask: Task[Unit] = {
-    def newOffsetTask: Task[Option[(InetAddress, java.lang.Long)]] = Task {
+  @volatile private[this] var ntpTimestamp = System.currentTimeMillis()
+  @volatile private[this] var nanoTime     = System.nanoTime()
+
+  def correctedTime(): Long = {
+    val timestamp = ntpTimestamp
+    val offset    = (System.nanoTime() - nanoTime) / 1000000
+    timestamp + offset
+  }
+
+  @volatile private[this] var txTime: Long = 0
+
+  def getTimestamp(): Long = {
+    txTime = Math.max(correctedTime(), txTime + 1)
+    txTime
+  }
+
+  private[this] val updateTask: Task[Unit] = {
+    def newOffsetTask: Task[Option[(InetAddress, Long, Long)]] = Task {
       try {
         client.open()
         val info = client.getTime(InetAddress.getByName(ntpServer))
-        info.computeDetails()
-        Option(info.getOffset).map { offset =>
-          val r = if (Math.abs(offset) > offsetPanicThreshold) throw new Exception("Offset is suspiciously large") else offset
-          (info.getAddress, r)
-        }
+        Some((info.getAddress, info.getMessage.getTransmitTimeStamp.getTime, System.nanoTime()))
       } catch {
         case _: SocketTimeoutException =>
           None
@@ -54,24 +60,16 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
 
     newOffsetTask.flatMap {
       case None if !scheduler.isShutdown => updateTask.delayExecution(RetryDelay)
-      case Some((server, newOffset)) if !scheduler.isShutdown =>
-        log.trace(s"Adjusting time with $newOffset milliseconds, source: ${server.getHostAddress}.")
-        offset = newOffset
+      case Some((server, ntpTimestamp, nanoTime)) if !scheduler.isShutdown =>
+        log.info(s"Adjusting time with ${ntpTimestamp - System.currentTimeMillis()} milliseconds, source: ${server.getHostName}.")
+        this.ntpTimestamp = ntpTimestamp
+        this.nanoTime = nanoTime
         updateTask.delayExecution(ExpirationTimeout)
       case _ => Task.unit
     }
   }
 
-  def correctedTime(): Long = System.currentTimeMillis() + offset
-
-  private var txTime: Long = 0
-
-  def getTimestamp(): Long = {
-    txTime = Math.max(correctedTime(), txTime + 1)
-    txTime
-  }
-
-  private val taskHandle = updateTask.runAsyncLogErr
+  private[this] val taskHandle = updateTask.runAsyncLogErr
 
   override def close(): Unit = {
     log.info("Shutting down Time")
