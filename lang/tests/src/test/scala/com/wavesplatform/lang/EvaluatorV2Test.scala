@@ -1,49 +1,14 @@
 package com.wavesplatform.lang
 
-import cats.implicits._
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common.NoShrink
-import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompiler}
-import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, FunctionIds}
-import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.testing.ScriptGen
-import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import org.scalacheck.Gen
-import org.scalatest.{Inside, Matchers, PropSpec}
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.annotation.tailrec
 import scala.util.Random
 
-class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
-  private val version = V4
-  private val ctx =
-    PureContext.build(version).withEnvironment[Environment] |+|
-    WavesContext.build(DirectiveSet.contractDirectiveSet)
-
-  private val environment = Common.emptyBlockchainEnvironment()
-  private val evaluator =
-    new EvaluatorV2(LoggedEvaluationContext(_ => _ => (), ctx.evaluationContext(environment)), version)
-
-  private def eval(expr: EXPR, limit: Int): (EXPR, String, Int) = {
-    val (result, unusedComplexity) = evaluator(expr, limit)
-    (result, Decompiler(result, ctx.decompilerContext), limit - unusedComplexity)
-  }
-
-  private def eval(script: String, limit: Int): (EXPR, String, Int) =
-    eval(compile(script), limit)
-
-  private def compile(script: String): EXPR = {
-    val parsed = Parser.parseExpr(script).get.value
-    ExpressionCompiler(ctx.compilerContext, parsed).explicitGet()._1
-  }
+class EvaluatorV2Test extends EvaluatorV2TestBase {
 
   property("multiple lets by step") {
     val script =
@@ -499,7 +464,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
       y + x              # 1 (y ref) + 1 (+) + 1 (x ref) + 2 (x value) + 1 (y value)
     */
 
-    val (_, decompiled, cost) = eval(expr, limit = 6)
+    val (_, decompiled, cost) = evalExpr(expr, limit = 6)
     cost shouldBe 6
     decompiled shouldBe "4"
   }
@@ -514,7 +479,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
         )
       )
 
-    (the[NoSuchElementException] thrownBy eval(expr, limit = 100)).getMessage shouldBe "A definition of 'b' not found"
+    (the[NoSuchElementException] thrownBy evalExpr(expr, limit = 100)).getMessage shouldBe "A definition of 'b' not found"
 
     val expr2 =
       BLOCK(
@@ -525,7 +490,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
         )
       )
 
-    (the[NoSuchElementException] thrownBy eval(expr2, limit = 100)).getMessage shouldBe "Function or type 'b' not found"
+    (the[NoSuchElementException] thrownBy evalExpr(expr2, limit = 100)).getMessage shouldBe "Function or type 'b' not found"
   }
 
   property("function context leak") {
@@ -548,7 +513,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
       f() + x
     */
 
-    (the[NoSuchElementException] thrownBy eval(expr, limit = 100)).getMessage shouldBe "A definition of 'x' not found"
+    (the[NoSuchElementException] thrownBy evalExpr(expr, limit = 100)).getMessage shouldBe "A definition of 'x' not found"
 
     val expr2 = BLOCK(
       FUNC("f", Nil, BLOCK(FUNC("g", Nil, CONST_LONG(1)), FUNCTION_CALL(FunctionHeader.User("g"), Nil))),
@@ -569,7 +534,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
       f() + g()
     */
 
-    (the[NoSuchElementException] thrownBy eval(expr2, limit = 100)).getMessage shouldBe "Function or type 'g' not found"
+    (the[NoSuchElementException] thrownBy evalExpr(expr2, limit = 100)).getMessage shouldBe "Function or type 'g' not found"
   }
 
   property("if block by step") {
@@ -729,7 +694,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
                                   # Total: 12   Result: 16
       */
 
-    val (_, result, cost) = eval(expr, 100)
+    val (_, result, cost) = evalExpr(expr, 100)
     result shouldBe "16"
     cost shouldBe 12
   }
@@ -823,7 +788,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
         pieces.foldLeft((expr(), startCost)) {
           case ((currentExpr, costSum), nextCostLimit) =>
             currentExpr should not be an[EVALUATED]
-            val (nextExpr, _, cost) = eval(currentExpr, nextCostLimit)
+            val (nextExpr, _, cost) = evalExpr(currentExpr, nextCostLimit)
             (nextExpr, cost + costSum)
         }
       summarizedCost shouldBe precalculatedComplexity

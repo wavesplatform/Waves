@@ -100,7 +100,7 @@ object ContractScript {
   ): EXPR = {
     val declExpr =
       decl match {
-        case let@LET(name, _) =>
+        case let@LET(name, _,_) =>
           BLOCK(let, REF(name))
         case func@FUNC(name, args, _) =>
           BLOCK(
