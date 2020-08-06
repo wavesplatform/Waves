@@ -61,7 +61,7 @@ inTask(assembly)(
 scriptClasspath += "*" // adds "$lib_dir/*" to app_classpath in the executable file
 // Logback creates a "waves.directory_UNDEFINED" without this option.
 bashScriptExtraDefines ++= Seq(
-  s"""addJava "-Dwaves.defaults.network-name=${network.value}"""",
+  s"""addJava "-Dwaves.defaults.blockchain.type=${network.value}"""",
   s"""addJava "-Dwaves.defaults.directory=/var/lib/${(Universal / normalizedName).value}"""",
   s"""addJava "-Dwaves.defaults.config.directory=/etc/${(Universal / normalizedName).value}""""
 )
@@ -99,7 +99,7 @@ inConfig(Universal)(
       // JVM default charset for proper and deterministic getBytes behaviour
       "-J-Dfile.encoding=UTF-8",
       "-J-XX:+UseStringDeduplication",
-      s"-J-Dwaves.network-name=${network.value}"
+      s"-J-Dwaves.blockchain.type=${network.value}"
     )
   )
 )

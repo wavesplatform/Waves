@@ -65,17 +65,17 @@ package object settings {
         .getOrElse(ConfigFactory.empty())
         .atPath("waves")
 
+    val withApp = external.withFallback(cmdDefaults).withFallback(ConfigFactory.defaultApplication())
+
     val networkDefaults = {
-      val network = external.withFallback(cmdDefaults).getString("waves.network-name")
-      external.withFallback(ConfigFactory.defaultApplication()).getConfig(s"waves.defaults.$network")
+      val network = withApp.getString("waves.blockchain.type").toLowerCase
+      withApp.getConfig(s"waves.defaults.$network")
     }
 
-    val cfg = external
+    external
       .withFallback(cmdDefaults)
       .withFallback(networkDefaults.atKey("waves"))
-
-    cfg
-      .withFallback(ConfigFactory.parseString(s"waves.directory = ${defaultDirectory(cfg)}"))
+      .withFallback(ConfigFactory.parseString(s"waves.directory = ${defaultDirectory(withApp)}"))
       .withFallback(ConfigFactory.defaultApplication())
       .withFallback(ConfigFactory.defaultReference())
       .resolve()
