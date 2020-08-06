@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
@@ -31,8 +32,8 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
       .overrideBase(_.raw("waves.blockchain.use-evaluator-v2 = true"))
       .buildNonConflicting()
 
-  private val dApp   = firstKeyPair
-  private val caller = secondKeyPair
+  private var dApp: KeyPair   = _
+  private var caller: KeyPair = _
 
   private val dummyEstimator = new ScriptEstimator {
     override val version: Int = 0
@@ -65,6 +66,10 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
+
+    dApp   = firstKeyPair
+    caller = secondKeyPair
+
     lazy val setScriptTx = sender.setScript(dApp, Some(script), setScriptFee)
 
     assertBadRequestAndMessage(
