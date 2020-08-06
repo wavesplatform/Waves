@@ -31,10 +31,10 @@ import com.wavesplatform.utils.{LoggerFacade, Schedulers, ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool.PackStrategy
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
-import monix.execution.ExecutionModel
-import monix.execution.atomic.AtomicBoolean
+import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
-import monix.reactive.Observer
+import monix.execution.{AsyncQueue, Cancelable, ExecutionModel, Scheduler}
+import monix.reactive.{Observable, Observer}
 import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
@@ -291,7 +291,7 @@ class UtxPoolImpl(
   }
 
   private def cleanUnconfirmed(): Unit = {
-    log.trace(s"Starting UTX cleanup at height ${blockchain.height}")
+    log.debug(s"Starting UTX cleanup at height ${blockchain.height}")
 
     pack(TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime()))(
       MultiDimensionalMiningConstraint.unlimited,
@@ -473,15 +473,21 @@ class UtxPoolImpl(
   }
 
   private[this] object TxCleanup {
-    private[this] val scheduled = AtomicBoolean(false)
+    private[this] val queue = AsyncQueue.bounded[Unit](16)(Scheduler.Implicits.global)
 
-    def runCleanupAsync(): Unit =
-      if ((!transactions.isEmpty || priorityTransactions.nonEmpty) && scheduled.compareAndSet(false, true)) {
-        cleanupScheduler.execute { () =>
-          try cleanUnconfirmed()
-          finally scheduled.set(false)
-        }
+    val cleanupLoop: Cancelable = Observable
+      .repeatEvalF(Task.deferFuture(queue.poll()))
+      .observeOn(cleanupScheduler)
+      .map(_ => cleanUnconfirmed())
+      .doOnComplete(Task(log.debug("UTX pool cleanup stopped")))
+      .doOnError(e => Task(log.error("UTX pool cleanup stopped abnormally", e)))
+      .subscribe()(Scheduler.Implicits.global)
+
+    def runCleanupAsync(): Unit = {
+      if (!queue.tryOffer(())) {
+        log.debug(s"UTX pool cleanup queue reached max capacity")
       }
+    }
   }
 
   /** DOES NOT verify transactions */
@@ -512,11 +518,13 @@ class UtxPoolImpl(
 
   override def close(): Unit = {
     import scala.concurrent.duration._
+    TxCleanup.cleanupLoop.cancel()
     cleanupScheduler.shutdown()
     cleanupScheduler.awaitTermination(10 seconds)
   }
 
   override def finalize(): Unit = {
+    TxCleanup.cleanupLoop.cancel()
     cleanupScheduler.shutdown()
   }
 
