@@ -17,8 +17,9 @@ import monix.reactive.subjects.ConcurrentSubject
 
 import scala.annotation.tailrec
 import scala.concurrent.Await
-import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}
+
+import scala.concurrent.duration._
 
 class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
     extends UpdatesRepo.Read
@@ -66,7 +67,6 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
   On average, there are 12 microblocks per block. Add one microfork, get 13 events per block.
   100 * 13 = 1300. 2048 should to be enough.
    */
-  val RECENT_UPDATES_BUFFER_SIZE  = 2048
   private[this] val recentUpdates = ConcurrentSubject.replayLimited[BlockchainUpdated](RECENT_UPDATES_BUFFER_SIZE)
   private[this] def sendToRecentUpdates(ba: BlockchainUpdated): Try[Unit] = {
     recentUpdates.onNext(ba) match {
@@ -121,18 +121,29 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
     }
 
   override def updatesRange(from: Int, to: Int): Try[Seq[BlockAppended]] =
-    readLock {
-      // todo error handling, limits and timeouts
-      log.info(s"BlockchainUpdates request updatesRange from $from to $to")
-      val cnt = to - from + 1
-      Try(Await.result(stream(from).collect { case u: BlockAppended => u }.take(cnt).bufferTumbling(cnt).runAsyncGetLast, Duration.Inf).get)
-        .flatMap { appends =>
-          if (appends.nonEmpty && appends.length < (appends.last.toHeight - appends.head.toHeight + 1)) {
-            Failure(new IllegalStateException(s"Missing blocks found in range $from, $to"))
-          } else {
-            Success(appends)
+    if (to - from > RANGE_REQUEST_MAX_SIZE) {
+      Failure(new IllegalArgumentException(s"Maximum range length of $RANGE_REQUEST_MAX_SIZE exceeded"))
+    } else {
+      readLock {
+        height.flatMap { h =>
+          log.info(s"BlockchainUpdates request updatesRange from $from to $to")
+          val cnt = to - from + 1
+          Try(
+            Await
+              .result(
+                stream(from).collect { case u: BlockAppended => u }.take(cnt).takeWhile(_.toHeight < h).bufferTumbling(cnt).runAsyncGetLast,
+                RANGE_REQUEST_TIMEOUT
+              )
+              .get
+          ).flatMap { appends =>
+            if (appends.nonEmpty && appends.length < (appends.last.toHeight - appends.head.toHeight + 1)) {
+              Failure(new IllegalStateException(s"Missing blocks found in range $from, $to"))
+            } else {
+              Success(appends)
+            }
           }
         }
+      }
     }
 
   // UpdatesRepo.Write impl
@@ -224,8 +235,6 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
     }
 
   // UpdatesRepo.Stream impl
-  val LEVELDB_READ_BATCH_SIZE = 1024
-
   // todo detect out-or-order events and throw an exception, or at least log an error
   override def stream(fromHeight: Int): Observable[BlockchainUpdated] = {
 
@@ -314,5 +323,13 @@ private[repo] case object Historical extends UpdateType
 private[repo] case object Recent     extends UpdateType
 
 object UpdatesRepoImpl {
+  // see 'Buffer size reasoning in the class'
+  private val RECENT_UPDATES_BUFFER_SIZE = 2048
+
+  private val LEVELDB_READ_BATCH_SIZE = 1024
+
+  private val RANGE_REQUEST_MAX_SIZE = 1000
+  private val RANGE_REQUEST_TIMEOUT  = 1.minute
+
   private def key(height: Int): Array[Byte] = ByteBuffer.allocate(8).putInt(height).array()
 }
