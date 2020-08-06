@@ -36,7 +36,7 @@ if [ "$1" = configure ]; then
 
     if [ ! -f "$config_file" ]; then
         echo Creating default config file ...
-        touch "$config_file"
+        cp /usr/share/${{app_name}}/doc/waves.conf.sample "$config_file"
         chmod 600 "$config_file"
         chown ${{app_name}}:${{app_name}} "$config_file"
     fi
