@@ -59,8 +59,8 @@ class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo.Read with UpdatesRepo.Strea
                 responseObserver.onNext(SubscribeEvent(update = Some(elem.protobuf)))
                 Continue
               } catch {
-                case ex: StatusRuntimeException if ex.getStatus == Status.CANCELLED =>
-                  log.info("BlockchainUpdates stream cancelled by client")
+                case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.CANCELLED =>
+                  log.info(s"BlockchainUpdates stream cancelled by client")
                   responseObserver.onError(ex)
                   Stop
                 case ex: Throwable =>
