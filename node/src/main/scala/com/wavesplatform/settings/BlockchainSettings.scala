@@ -204,8 +204,7 @@ case class BlockchainSettings(
     addressSchemeCharacter: Char,
     functionalitySettings: FunctionalitySettings,
     genesisSettings: GenesisSettings,
-    rewardsSettings: RewardsSettings,
-    useEvaluatorV2: Boolean
+    rewardsSettings: RewardsSettings
 )
 
 object BlockchainType extends Enumeration {
@@ -239,14 +238,12 @@ object BlockchainSettings {
         require(functionality.minBlockTime <= genesis.averageBlockDelay, "minBlockTime should be <= averageBlockDelay")
         (networkId, functionality, genesis, rewards)
     }
-    val useEvaluatorV2 = config.getAs[Boolean]("use-evaluator-v2").getOrElse(false)
 
     BlockchainSettings(
       addressSchemeCharacter = addressSchemeCharacter,
       functionalitySettings = functionalitySettings,
       genesisSettings = genesisSettings,
-      rewardsSettings = rewardsSettings,
-      useEvaluatorV2
+      rewardsSettings = rewardsSettings
     )
   }
 }

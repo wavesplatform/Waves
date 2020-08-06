@@ -74,12 +74,5 @@ case object EmptyBlockchain extends Blockchain {
 
   override def leaseBalance(address: Address): LeaseBalance = LeaseBalance.empty
 
-  override def collectActiveLeases(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = Seq.empty
-
-  /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
-    *
-    * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
-  override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = Map.empty
-
-  override def continuationStates: Map[ByteStr, ContinuationState] = Map.empty
+  override def continuationStates: Map[ByteStr, ContinuationState] = Map()
 }

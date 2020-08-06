@@ -165,7 +165,7 @@ class EvaluatorV2(
                   if (unusedArgsComplexity < cost)
                     Coeval.now(unusedArgsComplexity)
                   else {
-                    //println(s"${fc.function}")
+                    ////println(s"${fc.function}")
                     update(ev[Id]((ctx.ec.environment, fc.args.asInstanceOf[List[EVALUATED]])).explicitGet())
                       .map(_ => unusedArgsComplexity - cost)
                   }
@@ -183,7 +183,7 @@ class EvaluatorV2(
                               case ((argName, argValue), argsWithExpr) =>
                                 BLOCK(LET(argName, argValue), argsWithExpr)
                             }
-                        //println(s"expanding $expr")
+                        ////println(s"expanding $expr")
                         _update(argsWithExpr).flatMap(_ =>
                           if (unusedArgsComplexity > 0)
                             root(argsWithExpr, _update, unusedArgsComplexity, parentBlocks, evaluateAll)
@@ -213,7 +213,7 @@ class EvaluatorV2(
             } else {
                 fc.function match {
                   case FunctionHeader.Native(name)  =>
-                    //println(s"$name here unusedArgsComplexity=$unusedArgsComplexity")
+                    ////println(s"$name here unusedArgsComplexity=$unusedArgsComplexity")
                     Coeval.now(unusedArgsComplexity)
                   case FunctionHeader.User(_, name) =>
                     ctx.ec.functions
@@ -228,7 +228,7 @@ class EvaluatorV2(
                               case ((argName, argValue), argsWithExpr) =>
                                 BLOCK(LET(argName, argValue), argsWithExpr)
                             }
-                        //println(s"expanding $expr, unused = $unusedArgsComplexity")
+                        ////println(s"expanding $expr, unused = $unusedArgsComplexity")
                         _update(argsWithExpr).flatMap(_ =>
                           if (unusedArgsComplexity > 0)
                             root(argsWithExpr, _update, unusedArgsComplexity, parentBlocks, evaluateAll)
@@ -268,9 +268,10 @@ class EvaluatorV2(
       case evaluated: EVALUATED if evaluated.wasLogged => true
       case _                                           => false
     }
-    if(!evaluateAll && let.checked)
+    if(!evaluateAll && let.checked) {
+      //println(s"------------ skip $let")
       Coeval.now(limit)
-    else root(
+    } else root(
       expr = let.value,
       _update = v =>
         Coeval
@@ -290,7 +291,7 @@ class EvaluatorV2(
     )
       .flatMap { unused =>
         let.checked = true
-        // //println(s"------------ persisted $let")
+        //println(s"------------ persisted $let")
         if (unused < 0) throw new Error("Unused < 0")
         else
           let.value match {

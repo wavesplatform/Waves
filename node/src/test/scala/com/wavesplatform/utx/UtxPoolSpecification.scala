@@ -98,8 +98,7 @@ class UtxPoolSpecification
           )
         ),
         genesisSettings,
-        RewardsSettings.TESTNET,
-        useEvaluatorV2 = false
+        RewardsSettings.TESTNET
       ),
       featuresSettings = origSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
     )
@@ -671,7 +670,6 @@ class UtxPoolSpecification
             (() => blockchain.settings).when().returning(WavesSettings.default().blockchainSettings)
             (() => blockchain.height).when().returning(1)
             (() => blockchain.activatedFeatures).when().returning(Map.empty)
-            (blockchain.continuationStates _).when().returning(Map.empty)
 
             val utx =
               new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
@@ -746,7 +744,6 @@ class UtxPoolSpecification
         (() => blockchain.settings).when().returning(settings.blockchainSettings)
         (() => blockchain.height).when().returning(1)
         (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SmartAccounts.id -> 0))
-        (blockchain.continuationStates _).when().returning(Map.empty)
 
         if (setBalance) (blockchain.balance _).when(*, *).returning(ENOUGH_AMT)
         (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))

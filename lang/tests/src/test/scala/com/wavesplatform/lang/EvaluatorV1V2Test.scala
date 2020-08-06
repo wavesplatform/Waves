@@ -35,9 +35,6 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
 import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
-import scala.collection.mutable.ListBuffer
-import scala.util.Try
-
 class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink with EitherValues {
 
   implicit val version: StdLibVersion = V4
