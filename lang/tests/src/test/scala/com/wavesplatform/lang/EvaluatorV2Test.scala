@@ -200,7 +200,11 @@ class EvaluatorV2Test extends EvaluatorV2TestBase {
             |    ((c * d) - 1)
             |    }
             |
-            |f(1, 2)
+            |let a = 1
+            |let b = 2
+            |let c = (a + b)
+            |let d = (a - b)
+            |((c * d) - 1)
           """.stripMargin.trim
     }
 
