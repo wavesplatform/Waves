@@ -7,7 +7,7 @@ import sbtassembly.MergeStrategy
 enablePlugins(RunApplicationSettings, JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning, VersionObject)
 
 resolvers ++= Seq(
-  Resolver.bintrayRepo("ethereum", "maven"),
+  Resolver.bintrayRepo("ethereum", "maven")
 )
 
 libraryDependencies ++= Dependencies.node.value
@@ -64,8 +64,7 @@ bashScriptExtraDefines ++= Seq(
   s"""addJava "-Dwaves.defaults.blockchain.type=${network.value}"""",
   s"""addJava "-Dwaves.defaults.directory=/var/lib/${(Universal / normalizedName).value}"""",
   s"""addJava "-Dwaves.defaults.config.directory=/etc/${(Universal / normalizedName).value}""""
-)
-;
+);
 inConfig(Universal)(
   Seq(
     mappings += (baseDirectory.value / s"waves-sample.conf" -> "doc/waves.conf.sample"),
@@ -98,8 +97,7 @@ inConfig(Universal)(
       "-J-XX:+UseStringDeduplication",
       // JVM default charset for proper and deterministic getBytes behaviour
       "-J-Dfile.encoding=UTF-8",
-      "-J-XX:+UseStringDeduplication",
-      s"-J-Dwaves.blockchain.type=${network.value}"
+      "-J-XX:+UseStringDeduplication"
     )
   )
 )
