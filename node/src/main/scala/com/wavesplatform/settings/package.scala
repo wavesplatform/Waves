@@ -12,6 +12,7 @@ import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import org.apache.commons.lang3.SystemUtils
 
 import scala.jdk.CollectionConverters._
+import scala.util.Try
 
 package object settings {
   implicit val hyphenCase: NameMapper = HyphenNameMapper
@@ -59,13 +60,18 @@ package object settings {
     val sysProps = ConfigFactory.defaultOverrides()
     val external = maybeUserConfig.fold(sysProps)(sysProps.withFallback)
 
+    val cmdDefaults =
+      Try(external.getConfig("waves.defaults"))
+        .getOrElse(ConfigFactory.empty())
+        .atPath("waves")
+
     val networkDefaults = {
-      val withAppConf = external.withFallback(ConfigFactory.defaultApplication())
-      val network     = withAppConf.getString("waves.network-name")
-      withAppConf.getConfig(s"waves.defaults.$network")
+      val network = external.withFallback(cmdDefaults).getString("waves.network-name")
+      external.withFallback(ConfigFactory.defaultApplication()).getConfig(s"waves.defaults.$network")
     }
 
     val cfg = external
+      .withFallback(cmdDefaults)
       .withFallback(networkDefaults.atKey("waves"))
 
     cfg
