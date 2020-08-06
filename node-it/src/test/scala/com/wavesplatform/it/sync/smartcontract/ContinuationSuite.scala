@@ -31,8 +31,8 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
       .overrideBase(_.raw("waves.blockchain.use-evaluator-v2 = true"))
       .buildNonConflicting()
 
-  private val dApp   = firstAddress
-  private val caller = secondAddress
+  private val dApp   = firstKeyPair
+  private val caller = secondKeyPair
 
   private val dummyEstimator = new ScriptEstimator {
     override val version: Int = 0
@@ -77,7 +77,7 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
     nodes.waitForHeight(activationHeight)
     sender.setScript(dApp, Some(script), setScriptFee, waitForTx = true).id
 
-    val scriptInfo = sender.addressScriptInfo(dApp)
+    val scriptInfo = sender.addressScriptInfo(dApp.toAddress.toString)
     scriptInfo.script.isEmpty shouldBe false
     scriptInfo.scriptText.isEmpty shouldBe false
     scriptInfo.script.get.startsWith("base64:") shouldBe true
@@ -87,7 +87,7 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
   test("successful continuation") {
     val invokeScriptTx = sender.invokeScript(
       caller,
-      dApp,
+      dApp.toAddress.toString,
       func = Some("foo"),
       args = Nil,
       payment = Seq(Payment(1.waves, Waves)),
@@ -98,15 +98,15 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
     nodes.waitForHeightAriseAndTxPresent(invokeScriptTx._1.id)
     nodes.waitForHeight(sender.height + 2)
     nodes.foreach { node =>
-      node.getDataByKey(dApp, "a") shouldBe BooleanDataEntry("a", true)
-      node.getDataByKey(dApp, "sender") shouldBe BinaryDataEntry("sender", ByteStr(Base58.decode(caller)))
+      node.getDataByKey(dApp.toAddress.toString, "a") shouldBe BooleanDataEntry("a", true)
+      node.getDataByKey(dApp.toAddress.toString, "sender") shouldBe BinaryDataEntry("sender", ByteStr(Base58.decode(caller.toAddress.toString)))
     }
   }
 
   test("insufficient fee") {
     lazy val invokeScriptTx = sender.invokeScript(
       caller,
-      dApp,
+      dApp.toAddress.toString,
       func = Some("foo"),
       args = Nil,
       payment = Seq(Payment(1.waves, Waves)),
