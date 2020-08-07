@@ -475,8 +475,7 @@ class UtxPoolImpl(
   private[this] object TxCleanup {
     private[this] val scheduled = AtomicBoolean(false)
 
-    def runCleanupAsync(): Unit = {
-      scheduled.set(true)
+    def runCleanupAsync(): Unit = if (scheduled.compareAndSet(false, true)) {
       cleanupLoop()
     }
 
