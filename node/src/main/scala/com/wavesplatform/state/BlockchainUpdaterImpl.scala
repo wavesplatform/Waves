@@ -202,17 +202,20 @@ class BlockchainUpdaterImpl(
                     val height            = lastBlockId.fold(0)(leveldb.unsafeHeightOf)
                     val miningConstraints = MiningConstraints(leveldb, height)
                     val reward            = nextReward()
+
+                    val referencedBlockchain = CompositeBlockchain(leveldb, carry = leveldb.carryFee, reward = reward)
                     BlockDiffer
                       .fromBlock(
-                        CompositeBlockchain(leveldb, carry = leveldb.carryFee, reward = reward),
+                        referencedBlockchain,
                         leveldb.lastBlock,
                         block,
                         miningConstraints.total,
                         verify
                       )
                       .map { r =>
-                        val refBlockchain = CompositeBlockchain(leveldb, Some(r.diff), Some(block), r.carry, reward, Some(hitSource))
-                        miner.scheduleMining(Some(refBlockchain))
+                        val updatedBlockchain = CompositeBlockchain(leveldb, Some(r.diff), Some(block), r.carry, reward, Some(hitSource))
+                        miner.scheduleMining(Some(updatedBlockchain))
+                        blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, reward, referencedBlockchain)
                         Option((r, Nil, reward, hitSource))
                       }
                 }
@@ -224,9 +227,10 @@ class BlockchainUpdaterImpl(
 
                     blockchainUpdateTriggers.onRollback(ng.base.header.reference, leveldb.height)
 
+                    val referencedBlockchain = CompositeBlockchain(leveldb, carry = leveldb.carryFee, reward = ng.reward)
                     BlockDiffer
                       .fromBlock(
-                        CompositeBlockchain(leveldb, carry = leveldb.carryFee, reward = ng.reward),
+                        referencedBlockchain,
                         leveldb.lastBlock,
                         block,
                         miningConstraints.total,
@@ -238,6 +242,7 @@ class BlockchainUpdaterImpl(
                         )
                         val (mbs, diffs) = ng.allDiffs.unzip
                         log.trace(s"Discarded microblocks = $mbs, diffs = ${diffs.map(_.hashString)}")
+                        blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, referencedBlockchain)
                         Some((r, diffs, ng.reward, hitSource))
                       }
                   } else if (areVersionsOfSameBlock(block, ng.base)) {
@@ -249,17 +254,21 @@ class BlockchainUpdaterImpl(
                       val height            = leveldb.unsafeHeightOf(ng.base.header.reference)
                       val miningConstraints = MiningConstraints(leveldb, height)
 
-                      blockchainUpdateTriggers.onMicroBlockRollback(block.header.reference, this.height)
+                      blockchainUpdateTriggers.onRollback(ng.base.header.reference, leveldb.height)
 
+                      val referencedBlockchain = CompositeBlockchain(leveldb, carry = leveldb.carryFee, reward = ng.reward)
                       BlockDiffer
                         .fromBlock(
-                          CompositeBlockchain(leveldb, carry = leveldb.carryFee, reward = ng.reward),
+                          referencedBlockchain,
                           leveldb.lastBlock,
                           block,
                           miningConstraints.total,
                           verify
                         )
-                        .map(r => Some((r, Nil, ng.reward, hitSource)))
+                        .map { r =>
+                          blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, referencedBlockchain)
+                          Some((r, Nil, ng.reward, hitSource))
+                        }
                     }
                   } else
                     Left(
