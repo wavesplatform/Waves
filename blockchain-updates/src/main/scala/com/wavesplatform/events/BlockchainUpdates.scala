@@ -61,8 +61,24 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
               .recoverWith { case _: Throwable => Failure(new RuntimeException("BlockchainUpdates failed to rollback at startup")) }
               .get
           }
+        case (Success(None), Some(_)) =>
+          val exception = new RuntimeException(
+            s"BlockchainUpdates has no block at height $nodeHeight, while node has one at startup. Extension height: $extensionHeight, node height: $nodeHeight"
+          )
+          log.error("BlockchainUpdates startup check failed", exception)
+          throw exception
+        case (Failure(ex), _) =>
+          val exception = new RuntimeException(s"BlockchainUpdates failed to get extension block info at node height at startup", ex)
+          log.error("BlockchainUpdates startup check failed", ex)
+          throw exception
+        case (Success(_), None) =>
+          val exception = new RuntimeException(s"Incorrect node state: missing block at height $nodeHeight")
+          log.error("BlockchainUpdates startup check failed", exception)
+          throw exception
         case _ =>
-          val exception = new RuntimeException(s"BlockchainUpdates failed to get node or extension block info at startup")
+          val exception = new RuntimeException(
+            s"BlockchainUpdates failed to perform a startup check. Extension height: $extensionHeight, node height: $nodeHeight"
+          )
           log.error("BlockchainUpdates startup check failed", exception)
           throw exception
       }
