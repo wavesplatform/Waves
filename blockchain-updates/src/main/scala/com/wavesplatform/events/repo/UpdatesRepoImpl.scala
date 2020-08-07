@@ -241,7 +241,6 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
     /**
       * reads from level db by synchronous batches each using one iterator
       * each batch gets a read lock
-      * last batch also includes liquid state appended at the end
       * @param startingFrom batch start height
       * @return Task to be consumed by Observable.unfoldEval
       */
@@ -277,8 +276,6 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
           }
 
           if (isLastBatch) {
-            // send all liquid state to the stream
-            liquidState.foreach(res ++= _.toSeq)
             (res.result(), None)
           } else {
             val result       = res.result()
