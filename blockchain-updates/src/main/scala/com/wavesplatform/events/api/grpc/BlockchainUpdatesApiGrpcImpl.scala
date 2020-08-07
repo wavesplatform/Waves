@@ -29,6 +29,8 @@ class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo.Read with UpdatesRepo.Strea
     repo.updateForHeight(request.height) match {
       case Success(Some(upd)) => GetBlockUpdateResponse(Some(upd.protobuf))
       case Success(None)      => throw new StatusRuntimeException(Status.NOT_FOUND)
+      case Failure(e: IllegalArgumentException) =>
+        throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription(e.getMessage))
       case Failure(exception) =>
         log.error(s"BlockchainUpdates gRPC failed to get block update for height ${request.height}", exception)
         throw new StatusRuntimeException(Status.INTERNAL)
@@ -70,10 +72,14 @@ class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo.Read with UpdatesRepo.Strea
                   Stop
               }
             }
-            override def onError(ex: Throwable): Unit = {
-              log.error("BlockchainUpdates gRPC streaming error", ex)
-              responseObserver.onError(new StatusRuntimeException(Status.INTERNAL))
-            }
+            override def onError(ex: Throwable): Unit =
+              ex match {
+                case e: IllegalArgumentException =>
+                  responseObserver.onError(new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription(e.getMessage)))
+                case e =>
+                  log.error("BlockchainUpdates gRPC streaming error", e)
+                  responseObserver.onError(new StatusRuntimeException(Status.INTERNAL))
+              }
             override def onComplete(): Unit = responseObserver.onCompleted()
           }
         })
