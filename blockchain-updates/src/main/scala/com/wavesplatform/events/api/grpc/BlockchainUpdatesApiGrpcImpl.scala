@@ -36,11 +36,12 @@ class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo.Read with UpdatesRepo.Strea
   }
 
   override def getBlockUpdatesRange(request: GetBlockUpdatesRangeRequest): Future[GetBlockUpdatesRangeResponse] = Future {
-    // todo validation
     repo.updatesRange(request.fromHeight, request.toHeight) match {
       case Success(updates) => GetBlockUpdatesRangeResponse(updates.map(_.protobuf))
-      case Failure(exception) =>
-        log.error(s"BlockchainUpdates gRPC failed to get block range updates for range ${request.fromHeight} to ${request.toHeight}", exception)
+      case Failure(e: IllegalArgumentException) =>
+        throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription(e.getMessage))
+      case Failure(e) =>
+        log.error(s"BlockchainUpdates gRPC failed to get block range updates for range ${request.fromHeight} to ${request.toHeight}", e)
         throw new StatusRuntimeException(Status.INTERNAL)
     }
   }

@@ -6,7 +6,6 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.api.grpc.BlockchainUpdatesApiGrpcImpl
 import com.wavesplatform.events.api.grpc.protobuf.BlockchainUpdatesApiGrpc
-import com.wavesplatform.events.api.rest.HttpServer
 import com.wavesplatform.events.repo.UpdatesRepoImpl
 import com.wavesplatform.events.settings.BlockchainUpdatesSettings
 import com.wavesplatform.extensions.{Context, Extension}
@@ -28,8 +27,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
   private[this] val repo = new UpdatesRepoImpl(s"${context.settings.directory}/blockchain-updates")
 
-  private[this] var grpcServer: Server     = null
-  private[this] var httpServer: HttpServer = null
+  private[this] var grpcServer: Server = null
 
   override def start(): Unit = {
     log.info("BlockchainUpdates extension starting")
@@ -81,20 +79,10 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
       .start()
 
     log.info(s"BlockchainUpdates extension started gRPC API on port ${settings.grpcPort}")
-
-    // starting HTTP API
-    httpServer = new HttpServer(settings.restPort, repo)(context.actorSystem)
-    httpServer.start()
-
-    log.info(s"BlockchainUpdates extension started HTTP API on port ${settings.restPort}")
   }
 
   override def shutdown(): Future[Unit] = Future {
     log.info(s"BlockchainUpdates extension shutting down, last persisted height ${repo.height.get - 1}")
-
-    if (httpServer != null) {
-      httpServer.shutdown()
-    }
 
     if (grpcServer != null) {
       grpcServer.shutdown()
@@ -107,9 +95,8 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   override def onProcessBlock(block: Block, diff: BlockDiffer.DetailedDiff, minerReward: Option[Long], blockchainBefore: Blockchain): Unit = {
     val newBlock = BlockAppended.from(block, diff, minerReward, blockchainBefore)
     repo.appendBlock(newBlock).get
-    // todo log.debug, and make it every 100 blocks, like in BlockchainUpdater
     if (newBlock.toHeight % 100 == 0) {
-      log.info(s"BlockchainUpdates extension appended blocks up to ${newBlock.toHeight}")
+      log.debug(s"BlockchainUpdates appended blocks up to ${newBlock.toHeight}")
     }
   }
 

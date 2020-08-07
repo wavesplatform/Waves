@@ -15,7 +15,6 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-// todo decide what to do with name and description
 final case class AssetStateUpdate(
     asset: IssuedAsset,
     decimals: Int,
@@ -61,7 +60,6 @@ object StateUpdate {
       }
       val leases = leasesMap.toList
 
-      // todo deletion of data entries
       // merge data entries, preserving order
       val dataEntriesMap = mutable.LinkedHashMap.empty[(Address, String), DataEntry[_]]
       (x.dataEntries ++ y.dataEntries).foreach {
