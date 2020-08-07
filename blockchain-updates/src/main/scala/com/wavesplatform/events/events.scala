@@ -10,7 +10,7 @@ import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{AccountDataInfo, AssetDescription, AssetScriptInfo, Blockchain, DataEntry, Diff, DiffToStateApplier, LeaseBalance}
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, Transaction}
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -86,10 +86,10 @@ object StateUpdate {
     }
   }
 
-  def atomic(blockchainBefore: Blockchain, diff: Diff, byTransaction: Option[Transaction]): StateUpdate = {
-    val blockchainAfter = CompositeBlockchain(blockchainBefore, Some(diff))
+  def atomic(blockchainBeforeWithMinerReward: Blockchain, diff: Diff, byTransaction: Option[Transaction]): StateUpdate = {
+    val blockchainAfter = CompositeBlockchain(blockchainBeforeWithMinerReward, Some(diff))
 
-    val PortfolioUpdates(updatedBalances, updatedLeases) = DiffToStateApplier.portfolios(blockchainBefore, diff)
+    val PortfolioUpdates(updatedBalances, updatedLeases) = DiffToStateApplier.portfolios(blockchainBeforeWithMinerReward, diff)
 
     val balances = ArrayBuffer.empty[(Address, Asset, Long)]
     for ((address, assetMap) <- updatedBalances; (asset, balance) <- assetMap) balances += ((address, asset, balance))
@@ -132,24 +132,35 @@ object StateUpdate {
   }
 
   def container(
-      blockchainBefore: Blockchain,
+      blockchainBeforeWithMinerReward: Blockchain,
       diff: DetailedDiff,
-      transactions: Seq[Transaction]
+      transactions: Seq[Transaction],
+      minerAddress: Address
   ): (StateUpdate, Seq[StateUpdate]) = {
     val DetailedDiff(parentDiff, txsDiffs) = diff
-    val parentStateUpdate                  = atomic(blockchainBefore, parentDiff, None)
+    val parentStateUpdate                  = atomic(blockchainBeforeWithMinerReward, parentDiff, None)
+
+    // miner reward is already in the blockchainBeforeWithMinerReward
+    // if miner balance has been changed in parentDiff, it is already included in balance updates
+    // if it has not, it needs to be manually requested from the blockchain and added to balance updates
+    val parentStateUpdateWithMinerReward = parentStateUpdate.balances.find(_._1 == minerAddress) match {
+      case Some(_) => parentStateUpdate
+      case None =>
+        val minerBalance = blockchainBeforeWithMinerReward.balance(minerAddress, Waves)
+        parentStateUpdate.copy(balances = parentStateUpdate.balances :+ (minerAddress, Waves, minerBalance))
+    }
 
     val (txsStateUpdates, _) = txsDiffs
       .zip(transactions)
       .foldLeft((ArrayBuffer.empty[StateUpdate], parentDiff)) {
         case ((updates, accDiff), (txDiff, tx)) =>
           (
-            updates += atomic(CompositeBlockchain(blockchainBefore, Some(accDiff)), txDiff, Some(tx)),
+            updates += atomic(CompositeBlockchain(blockchainBeforeWithMinerReward, Some(accDiff)), txDiff, Some(tx)),
             accDiff.combine(txDiff)
           )
       }
 
-    (parentStateUpdate, txsStateUpdates.toSeq)
+    (parentStateUpdateWithMinerReward, txsStateUpdates.toSeq)
   }
 }
 
@@ -168,18 +179,19 @@ final case class BlockAppended(
 ) extends BlockchainUpdated
 
 object BlockAppended {
-  def from(block: Block, diff: DetailedDiff, minerReward: Option[Long], blockchainBefore: Blockchain): BlockAppended = {
-    val (blockStateUpdate, txsStateUpdates) = StateUpdate.container(blockchainBefore, diff, block.transactionData)
+  def from(block: Block, diff: DetailedDiff, minerReward: Option[Long], blockchainBeforeWithMinerReward: Blockchain): BlockAppended = {
+    val (blockStateUpdate, txsStateUpdates) =
+      StateUpdate.container(blockchainBeforeWithMinerReward, diff, block.transactionData, block.sender.toAddress)
 
     // updatedWavesAmount can change as a result of either genesis transactions or miner rewards
-    val updatedWavesAmount = blockchainBefore.height match {
+    val updatedWavesAmount = blockchainBeforeWithMinerReward.height match {
       // genesis case
       case 0 => block.transactionData.collect { case GenesisTransaction(_, amount, _, _, _) => amount }.sum
       // miner reward case
-      case _ => blockchainBefore.wavesAmount(blockchainBefore.height).toLong + minerReward.getOrElse(0L)
+      case _ => blockchainBeforeWithMinerReward.wavesAmount(blockchainBeforeWithMinerReward.height).toLong + minerReward.getOrElse(0L)
     }
 
-    BlockAppended(block.id.value(), blockchainBefore.height + 1, block, updatedWavesAmount, blockStateUpdate, txsStateUpdates)
+    BlockAppended(block.id.value(), blockchainBeforeWithMinerReward.height + 1, block, updatedWavesAmount, blockStateUpdate, txsStateUpdates)
   }
 }
 
@@ -196,12 +208,21 @@ object MicroBlockAppended {
   def from(
       microBlock: MicroBlock,
       diff: DetailedDiff,
-      blockchainBefore: Blockchain,
+      blockchainBeforeWithMinerReward: Blockchain,
       totalBlockId: ByteStr,
       totalTransactionsRoot: ByteStr
   ): MicroBlockAppended = {
-    val (microBlockStateUpdate, txsStateUpdates) = StateUpdate.container(blockchainBefore, diff, microBlock.transactionData)
-    MicroBlockAppended(totalBlockId, blockchainBefore.height, microBlock, microBlockStateUpdate, txsStateUpdates, totalTransactionsRoot)
+    val (microBlockStateUpdate, txsStateUpdates) =
+      StateUpdate.container(blockchainBeforeWithMinerReward, diff, microBlock.transactionData, microBlock.sender.toAddress)
+    
+    MicroBlockAppended(
+      totalBlockId,
+      blockchainBeforeWithMinerReward.height,
+      microBlock,
+      microBlockStateUpdate,
+      txsStateUpdates,
+      totalTransactionsRoot
+    )
   }
 }
 

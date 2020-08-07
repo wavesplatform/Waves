@@ -108,8 +108,8 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     repo.shutdown()
   }
 
-  override def onProcessBlock(block: Block, diff: BlockDiffer.DetailedDiff, minerReward: Option[Long], blockchainBefore: Blockchain): Unit = {
-    val newBlock = BlockAppended.from(block, diff, minerReward, blockchainBefore)
+  override def onProcessBlock(block: Block, diff: BlockDiffer.DetailedDiff, minerReward: Option[Long], blockchainBeforeWithMinerReward: Blockchain): Unit = {
+    val newBlock = BlockAppended.from(block, diff, minerReward, blockchainBeforeWithMinerReward)
     repo.appendBlock(newBlock).get
     if (newBlock.toHeight % 100 == 0) {
       log.debug(s"BlockchainUpdates appended blocks up to ${newBlock.toHeight}")
@@ -117,13 +117,13 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   }
 
   override def onProcessMicroBlock(
-      microBlock: MicroBlock,
-      diff: BlockDiffer.DetailedDiff,
-      blockchainBefore: Blockchain,
-      totalBlockId: ByteStr,
-      totalTransactionsRoot: ByteStr
+                                    microBlock: MicroBlock,
+                                    diff: BlockDiffer.DetailedDiff,
+                                    blockchainBeforeWithMinerReward: Blockchain,
+                                    totalBlockId: ByteStr,
+                                    totalTransactionsRoot: ByteStr
   ): Unit = {
-    val newMicroBlock = MicroBlockAppended.from(microBlock, diff, blockchainBefore, totalBlockId, totalTransactionsRoot)
+    val newMicroBlock = MicroBlockAppended.from(microBlock, diff, blockchainBeforeWithMinerReward, totalBlockId, totalTransactionsRoot)
     repo.appendMicroBlock(newMicroBlock).get
   }
 
