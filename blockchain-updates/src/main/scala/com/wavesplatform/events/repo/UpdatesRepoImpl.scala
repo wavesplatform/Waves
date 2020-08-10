@@ -80,13 +80,17 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
     readLock {
       liquidState.map(_.keyBlock.toHeight).getOrElse {
         val iter = db.iterator()
-        iter.seekToLast()
-        if (iter.hasNext) {
-          val blockBytes = iter.next.getValue
-          val lastUpdate = PBBlockchainUpdated.parseFrom(blockBytes).vanilla.get
-          lastUpdate.toHeight
-        } else {
-          0
+        try {
+          iter.seekToLast()
+          if (iter.hasNext) {
+            val blockBytes = iter.next.getValue
+            val lastUpdate = PBBlockchainUpdated.parseFrom(blockBytes).vanilla.get
+            lastUpdate.toHeight
+          } else {
+            0
+          }
+        } finally {
+          iter.close()
         }
       }
     }
