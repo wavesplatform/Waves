@@ -21,7 +21,7 @@ import scala.util.{Failure, Success, Try}
 
 import scala.concurrent.duration._
 
-class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
+class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val scheduler: Scheduler)
     extends UpdatesRepo.Read
     with UpdatesRepo.Write
     with UpdatesRepo.Stream
@@ -67,7 +67,7 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
   On average, there are 12 microblocks per block. Add one microfork, get 13 events per block.
   100 * 13 = 1300. 2048 should to be enough.
    */
-  private[this] val recentUpdates = ConcurrentSubject.replayLimited[BlockchainUpdated](RECENT_UPDATES_BUFFER_SIZE)
+  private[this] val recentUpdates = ConcurrentSubject.replayLimited[BlockchainUpdated](streamBufferSize)
   private[this] def sendToRecentUpdates(ba: BlockchainUpdated): Try[Unit] = {
     recentUpdates.onNext(ba) match {
       case Ack.Continue => Success(())
@@ -320,9 +320,6 @@ private[repo] case object Historical extends UpdateType
 private[repo] case object Recent     extends UpdateType
 
 object UpdatesRepoImpl {
-  // see 'Buffer size reasoning in the class'
-  private val RECENT_UPDATES_BUFFER_SIZE = 2048
-
   private val LEVELDB_READ_BATCH_SIZE = 1024
 
   private val RANGE_REQUEST_MAX_SIZE = 1000

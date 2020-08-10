@@ -25,7 +25,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
   private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("blockchain-updates")
 
-  private[this] val repo = new UpdatesRepoImpl(s"${context.settings.directory}/blockchain-updates")
+  private[this] val repo = new UpdatesRepoImpl(s"${context.settings.directory}/blockchain-updates", settings.streamBufferSize)
 
   private[this] var grpcServer: Server = null
 
@@ -108,7 +108,12 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     repo.shutdown()
   }
 
-  override def onProcessBlock(block: Block, diff: BlockDiffer.DetailedDiff, minerReward: Option[Long], blockchainBeforeWithMinerReward: Blockchain): Unit = {
+  override def onProcessBlock(
+      block: Block,
+      diff: BlockDiffer.DetailedDiff,
+      minerReward: Option[Long],
+      blockchainBeforeWithMinerReward: Blockchain
+  ): Unit = {
     val newBlock = BlockAppended.from(block, diff, minerReward, blockchainBeforeWithMinerReward)
     repo.appendBlock(newBlock).get
     if (newBlock.toHeight % 100 == 0) {
@@ -117,11 +122,11 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   }
 
   override def onProcessMicroBlock(
-                                    microBlock: MicroBlock,
-                                    diff: BlockDiffer.DetailedDiff,
-                                    blockchainBeforeWithMinerReward: Blockchain,
-                                    totalBlockId: ByteStr,
-                                    totalTransactionsRoot: ByteStr
+      microBlock: MicroBlock,
+      diff: BlockDiffer.DetailedDiff,
+      blockchainBeforeWithMinerReward: Blockchain,
+      totalBlockId: ByteStr,
+      totalTransactionsRoot: ByteStr
   ): Unit = {
     val newMicroBlock = MicroBlockAppended.from(microBlock, diff, blockchainBeforeWithMinerReward, totalBlockId, totalTransactionsRoot)
     repo.appendMicroBlock(newMicroBlock).get

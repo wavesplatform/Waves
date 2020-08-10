@@ -112,17 +112,17 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   // update triggers combined into one instance
   private var triggers = Seq.empty[BlockchainUpdateTriggers]
   private val triggersCombined = new BlockchainUpdateTriggers {
-    override def onProcessBlock(block: Block, diff: BlockDiffer.DetailedDiff, minerReward: Option[Long], blockchainBefore: Blockchain): Unit =
-      triggers.foreach(_.onProcessBlock(block, diff, minerReward, blockchainBefore))
+    override def onProcessBlock(block: Block, diff: BlockDiffer.DetailedDiff, minerReward: Option[Long], blockchainBeforeWithMinerReward: Blockchain): Unit =
+      triggers.foreach(_.onProcessBlock(block, diff, minerReward, blockchainBeforeWithMinerReward))
 
     override def onProcessMicroBlock(
                                       microBlock: MicroBlock,
                                       diff: BlockDiffer.DetailedDiff,
-                                      blockchainBefore: Blockchain,
+                                      blockchainBeforeWithMinerReward: Blockchain,
                                       totalBlockId: ByteStr,
                                       totalTransactionsRoot: ByteStr
     ): Unit =
-      triggers.foreach(_.onProcessMicroBlock(microBlock, diff, blockchainBefore, totalBlockId, totalTransactionsRoot))
+      triggers.foreach(_.onProcessMicroBlock(microBlock, diff, blockchainBeforeWithMinerReward, totalBlockId, totalTransactionsRoot))
 
     override def onRollback(toBlockId: ByteStr, toHeight: Int): Unit =
       triggers.foreach(_.onRollback(toBlockId, toHeight))
