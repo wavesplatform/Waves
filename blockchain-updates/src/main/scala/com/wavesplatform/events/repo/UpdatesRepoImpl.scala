@@ -1,6 +1,6 @@
 package com.wavesplatform.events.repo
 
-import java.nio.ByteBuffer
+import java.nio.{ByteBuffer, ByteOrder}
 import java.util.concurrent.locks.{ReadWriteLock, ReentrantReadWriteLock}
 
 import cats.implicits._
@@ -18,7 +18,6 @@ import monix.reactive.subjects.ConcurrentSubject
 import scala.annotation.tailrec
 import scala.concurrent.Await
 import scala.util.{Failure, Success, Try}
-
 import scala.concurrent.duration._
 
 class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val scheduler: Scheduler)
@@ -329,5 +328,6 @@ object UpdatesRepoImpl {
   private val RANGE_REQUEST_MAX_SIZE = 1000
   private val RANGE_REQUEST_TIMEOUT  = 1.minute
 
-  private def key(height: Int): Array[Byte] = ByteBuffer.allocate(8).putInt(height).array()
+  private def key(height: Int): Array[Byte] =
+    ByteBuffer.allocate(8).order(ByteOrder.BIG_ENDIAN).putInt(height).array()
 }
