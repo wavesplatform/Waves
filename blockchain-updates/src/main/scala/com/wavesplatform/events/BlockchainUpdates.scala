@@ -30,7 +30,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   private[this] var grpcServer: Server = null
 
   override def start(): Unit = {
-    log.info("BlockchainUpdates extension starting")
+    log.info(s"BlockchainUpdates extension starting with settings $settings")
 
     // startup checks
     val nodeHeight      = context.blockchain.height
