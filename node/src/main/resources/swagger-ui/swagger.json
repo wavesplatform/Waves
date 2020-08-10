@@ -305,6 +305,47 @@
         }
       }
     },
+    "/addresses/balance": {
+      "get": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Multiple accounts balances",
+        "description": "Multiple accounts balances",
+        "operationId": "balance_3",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "query",
+            "description": "Address",
+            "required": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          },
+          {
+            "name": "height",
+            "in": "query",
+            "description": "For balance at height requests",
+            "required": false,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Balance"
+              }
+            }
+          }
+        }
+      }
+    },
     "/addresses/effectiveBalance/{address}": {
       "get": {
         "tags": [
@@ -2169,7 +2210,9 @@
         "summary": "Compile script",
         "description": "Compiles string code to base64 script representation",
         "operationId": "compileCode_1",
-	"consumes": ["text/plain"],
+        "consumes": [
+          "text/plain"
+        ],
         "parameters": [
           {
             "in": "body",
