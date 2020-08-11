@@ -56,7 +56,6 @@ class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo.Read with UpdatesRepo.Strea
     } else {
       val updatesPB = repo
         .stream(request.fromHeight)
-        .doOnNext(evt => Task.eval(log.info(s"Repo sent event ${evt.toHeight}")))
         .map(elem => SubscribeEvent(update = Some(elem.protobuf)))
       responseObserver.completeWith(updatesPB)
     }
