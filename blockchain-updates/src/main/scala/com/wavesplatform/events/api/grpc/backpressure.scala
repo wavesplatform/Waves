@@ -1,5 +1,7 @@
 package com.wavesplatform.events.api.grpc
 import java.util.concurrent.LinkedBlockingQueue
+
+import com.wavesplatform.utils.ScorexLogging
 import io.grpc.{Status, StatusRuntimeException}
 import io.grpc.stub.{CallStreamObserver, ServerCallStreamObserver, StreamObserver}
 import monix.eval.Task
@@ -7,7 +9,7 @@ import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.Observable
 
 object backpressure {
-  implicit class StreamObserverMonixOps[T](streamObserver: StreamObserver[T])(implicit sc: Scheduler) {
+  implicit class StreamObserverMonixOps[T](streamObserver: StreamObserver[T])(implicit sc: Scheduler) extends ScorexLogging {
     // TODO: More convenient back-pressure implementation
     def toSubscriber: monix.reactive.observers.Subscriber[T] = {
       import org.reactivestreams.{Subscriber, Subscription}
@@ -67,7 +69,10 @@ object backpressure {
           }
         }
 
-        override def onError(t: Throwable): Unit = streamObserver.onError(toStatusException(t))
+        override def onError(t: Throwable): Unit = {
+          log.error("gRPC streaming error", t)
+          streamObserver.onError(toStatusException(t))
+        }
         override def onComplete(): Unit          = streamObserver.onCompleted()
         def cancel(): Unit                       = Option(subscription).foreach(_.cancel())
       }
@@ -78,9 +83,11 @@ object backpressure {
     def completeWith(obs: Observable[T]): Cancelable = {
       streamObserver match {
         case _: CallStreamObserver[T] =>
+          log.info("Subscribed with backpressure")
           obs.subscribe(this.toSubscriber)
 
         case _ => // No back-pressure
+          log.warn("Subscribed without backpressure")
           obs
             .doOnError(exception => Task(streamObserver.onError(toStatusException(exception))))
             .doOnComplete(Task(streamObserver.onCompleted()))
