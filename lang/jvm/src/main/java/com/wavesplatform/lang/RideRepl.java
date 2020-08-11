@@ -28,9 +28,13 @@ public class RideRepl {
         return internal.totalInfo();
     }
 
-    public String execute(String expression) throws TimeoutException, InterruptedException {
+    public String execute(String expression) {
         Future<Either<String, String>> execution = internal.execute(expression);
-        return Await.result(execution, new FiniteDuration(5, TimeUnit.SECONDS))
-                .fold(error -> { throw new RideException(error); }, r -> r);
+        try {
+            return Await.result(execution, new FiniteDuration(5, TimeUnit.SECONDS))
+                    .fold(error -> { throw new RideException(error); }, r -> r);
+        } catch (InterruptedException | TimeoutException e) {
+            throw new RideException(e);
+        }
     }
 }
