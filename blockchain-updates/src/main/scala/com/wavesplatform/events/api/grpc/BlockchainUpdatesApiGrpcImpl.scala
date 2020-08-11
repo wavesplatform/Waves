@@ -1,28 +1,16 @@
 package com.wavesplatform.events.api.grpc
 
-import com.wavesplatform.events.BlockchainUpdated
-import com.wavesplatform.events.api.grpc.protobuf.{
-  BlockchainUpdatesApiGrpc,
-  GetBlockUpdateRequest,
-  GetBlockUpdateResponse,
-  GetBlockUpdatesRangeRequest,
-  GetBlockUpdatesRangeResponse,
-  SubscribeEvent,
-  SubscribeRequest
-}
+import com.wavesplatform.events.api.grpc.backpressure._
+import com.wavesplatform.events.api.grpc.protobuf._
 import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.events.repo.UpdatesRepo
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.StreamObserver
-import monix.execution.{Ack, Scheduler}
 import io.grpc.{Status, StatusRuntimeException}
-import monix.execution.Ack.{Continue, Stop}
-import monix.reactive.Observer
+import monix.execution.Scheduler
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
-import backpressure._
-import monix.eval.Task
 
 class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo.Read with UpdatesRepo.Stream)(implicit sc: Scheduler)
     extends BlockchainUpdatesApiGrpc.BlockchainUpdatesApi
@@ -57,7 +45,8 @@ class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo.Read with UpdatesRepo.Strea
       val updatesPB = repo
         .stream(request.fromHeight)
         .map(elem => SubscribeEvent(update = Some(elem.protobuf)))
-      responseObserver.completeWith(updatesPB)
+
+      wrapObservable(updatesPB, responseObserver)(identity)
     }
   }
 
