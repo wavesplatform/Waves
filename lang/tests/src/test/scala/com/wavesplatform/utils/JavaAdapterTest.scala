@@ -1,7 +1,6 @@
 package com.wavesplatform.utils
 import com.wavesplatform.lang.ScriptMeta.FunctionArgument
-import com.wavesplatform.lang.directives.values.V4
-import com.wavesplatform.lang.{Ride, RideException, Script}
+import com.wavesplatform.lang.{Ride, RideException, RideVersion, Script}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -15,7 +14,6 @@ class JavaAdapterTest extends PropSpec with PropertyChecks with Matchers {
         |
         | true || false
       """.stripMargin
-
 
     val script = Ride.compile(expr)
     script.isDApp shouldBe false
@@ -46,7 +44,6 @@ class JavaAdapterTest extends PropSpec with PropertyChecks with Matchers {
         |
         | true || false
       """.stripMargin
-
 
     val script = Ride.compile(expr)
     script.isDApp shouldBe false
@@ -84,7 +81,6 @@ class JavaAdapterTest extends PropSpec with PropertyChecks with Matchers {
         | func verify() = true || false
       """.stripMargin
 
-
     val script = Ride.compile(dApp)
     script.isDApp shouldBe true
     script.isAsset shouldBe false
@@ -117,7 +113,7 @@ class JavaAdapterTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("repl") {
-    val repl = Ride.repl(V4)
+    val repl = Ride.repl(RideVersion.V4)
     repl.execute("let a = 1")
     repl.execute("let b = 2")
     repl.execute("a + b") shouldBe "res1: Int = 3"

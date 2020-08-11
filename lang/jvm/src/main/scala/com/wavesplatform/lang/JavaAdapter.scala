@@ -155,17 +155,17 @@ object JavaAdapter {
       }
       .fold(error => throw new RideException(error.m), identity)
 
-  def repl(version: StdLibVersion): RideRepl =
+  def repl(version: RideVersion): RideRepl =
     repl(version, None)
 
-  def repl(version: StdLibVersion, settings: NodeConnectionSettings): RideRepl =
+  def repl(version: RideVersion, settings: NodeConnectionSettings): RideRepl =
     repl(version, Some(settings))
 
-  def repl(version: StdLibVersion, settings: Option[NodeConnectionSettings]): RideRepl = {
-    val directiveSet = DirectiveSet(version, Account, Expression).explicitGet()
-    val ctx          = buildCtx(directiveSet)
-    val environment  = buildEnvironment(settings)
-    val replCtx      = (ctx.compilerContext, ctx.evaluationContext(environment))
+  def repl(version: RideVersion, settings: Option[NodeConnectionSettings]): RideRepl = {
+    val directiveSet  = DirectiveSet(version.internal, Account, Expression).explicitGet()
+    val ctx           = buildCtx(directiveSet)
+    val environment   = buildEnvironment(settings)
+    val replCtx       = (ctx.compilerContext, ctx.evaluationContext(environment))
     new RideRepl(Repl(settings, replCtx))
   }
 }

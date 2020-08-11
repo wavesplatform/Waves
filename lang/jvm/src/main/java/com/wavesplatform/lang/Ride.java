@@ -1,6 +1,5 @@
 package com.wavesplatform.lang;
 
-import com.wavesplatform.lang.directives.values.StdLibVersion;
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings;
 
 public class Ride {
@@ -20,11 +19,11 @@ public class Ride {
         return JavaAdapter.extractMeta(script);
     }
 
-    public static RideRepl repl(StdLibVersion stdLibVersion) {
-        return JavaAdapter.repl(stdLibVersion);
+    public static RideRepl repl(RideVersion version) {
+        return JavaAdapter.repl(version);
     }
 
-    public static RideRepl repl(StdLibVersion stdLibVersion, NodeConnectionSettings settings) {
-        return JavaAdapter.repl(stdLibVersion, settings);
+    public static RideRepl repl(RideVersion version, NodeConnectionSettings settings) {
+        return JavaAdapter.repl(version, settings);
     }
 }
