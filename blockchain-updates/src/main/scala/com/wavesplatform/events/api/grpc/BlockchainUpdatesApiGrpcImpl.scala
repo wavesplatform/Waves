@@ -3,10 +3,10 @@ package com.wavesplatform.events.api.grpc
 import com.wavesplatform.events.BlockchainUpdated
 import com.wavesplatform.events.api.grpc.protobuf.{
   BlockchainUpdatesApiGrpc,
-  GetBlockUpdatesRangeRequest,
-  GetBlockUpdatesRangeResponse,
   GetBlockUpdateRequest,
   GetBlockUpdateResponse,
+  GetBlockUpdatesRangeRequest,
+  GetBlockUpdatesRangeResponse,
   SubscribeEvent,
   SubscribeRequest
 }
@@ -21,6 +21,8 @@ import monix.reactive.Observer
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
+import backpressure._
+import monix.eval.Task
 
 class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo.Read with UpdatesRepo.Stream)(implicit sc: Scheduler)
     extends BlockchainUpdatesApiGrpc.BlockchainUpdatesApi
@@ -52,37 +54,11 @@ class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo.Read with UpdatesRepo.Strea
     if (request.fromHeight <= 0) {
       responseObserver.onError(new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("height must be a positive integer")))
     } else {
-      repo
+      val updatesPB = repo
         .stream(request.fromHeight)
-        .subscribe({
-          log.info(s"BlockchainUpdates started streaming updates from ${request.fromHeight}")
-          new Observer[BlockchainUpdated] {
-            override def onNext(elem: BlockchainUpdated): Future[Ack] = Future {
-              try {
-                responseObserver.onNext(SubscribeEvent(update = Some(elem.protobuf)))
-                Continue
-              } catch {
-                case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.CANCELLED =>
-                  log.info(s"BlockchainUpdates stream cancelled by client")
-                  responseObserver.onError(ex)
-                  Stop
-                case ex: Throwable =>
-                  log.error("BlockchainUpdates gRPC streaming error", ex)
-                  responseObserver.onError(ex)
-                  Stop
-              }
-            }
-            override def onError(ex: Throwable): Unit =
-              ex match {
-                case e: IllegalArgumentException =>
-                  responseObserver.onError(new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription(e.getMessage)))
-                case e =>
-                  log.error("BlockchainUpdates gRPC streaming error", e)
-                  responseObserver.onError(new StatusRuntimeException(Status.INTERNAL))
-              }
-            override def onComplete(): Unit = responseObserver.onCompleted()
-          }
-        })
+        .doOnNext(evt => Task.eval(log.info(s"Repo sent event ${evt.toHeight}")))
+        .map(elem => SubscribeEvent(update = Some(elem.protobuf)))
+      responseObserver.completeWith(updatesPB)
     }
   }
 
