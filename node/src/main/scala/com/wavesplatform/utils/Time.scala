@@ -67,7 +67,7 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
     newOffsetTask.flatMap {
       case None if !scheduler.isShutdown => updateTask.delayExecution(RetryDelay)
       case Some((server, ntpTimestamp, nanoTime)) if !scheduler.isShutdown =>
-        log.info(s"Adjusting time with ${ntpTimestamp - System.currentTimeMillis()} milliseconds, source: ${server.getHostName}.")
+        log.trace(s"Adjusting time with ${ntpTimestamp - System.currentTimeMillis()} milliseconds, source: ${server.getHostName}.")
         this.ntpTimestamp = ntpTimestamp
         this.nanoTime = nanoTime
         updateTask.delayExecution(ExpirationTimeout)
@@ -78,7 +78,7 @@ class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable 
   private[this] val taskHandle = updateTask.runAsyncLogErr
 
   override def close(): Unit = {
-    log.info("Shutting down Time")
+    log.trace("Shutting down Time")
     taskHandle.cancel()
     scheduler.shutdown()
   }
