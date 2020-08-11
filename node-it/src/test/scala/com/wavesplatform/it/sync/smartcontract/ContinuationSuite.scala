@@ -74,7 +74,7 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     assertBadRequestAndMessage(
       setScriptTx,
-      "State check failed. Reason: Contract function (foo) is too complex: 30624 > 4000"
+      "State check failed. Reason: Contract function (foo) is too complex: 30622 > 4000"
     )
   }
 
