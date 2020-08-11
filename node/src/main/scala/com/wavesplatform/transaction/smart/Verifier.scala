@@ -6,12 +6,13 @@ import com.google.common.base.Throwables
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.TermPrinter
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
 import com.wavesplatform.lang.v1.evaluator.Log
-import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
+import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -36,7 +37,7 @@ object Verifier extends ScorexLogging {
 
   type ValidationResult[T] = Either[ValidationError, T]
 
-  def apply(blockchain: Blockchain)(tx: Transaction): TracedResult[ValidationError, Transaction] = tx match {
+  def apply(blockchain: Blockchain, limitedExecution: Boolean = false)(tx: Transaction): TracedResult[ValidationError, Transaction] = tx match {
     case _: GenesisTransaction => Right(tx)
     case pt: ProvenTransaction =>
       (pt, blockchain.accountScript(pt.sender.toAddress).map(_.script)) match {
@@ -44,7 +45,7 @@ object Verifier extends ScorexLogging {
           stats.signatureVerification
             .measureForType(stx.typeId)(stx.signaturesValid())
         case (et: ExchangeTransaction, scriptOpt) =>
-          verifyExchange(et, blockchain, scriptOpt)
+          verifyExchange(et, blockchain, scriptOpt, if (limitedExecution) ContractLimits.FailFreeInvokeComplexity else Int.MaxValue)
         case (tx: SigProofsSwitch, Some(_)) if tx.usesLegacySignature =>
           Left(GenericError("Can't process transaction with signature from scripted account"))
         case (_: SignedTransaction, Some(_)) =>
@@ -59,7 +60,7 @@ object Verifier extends ScorexLogging {
   }
 
   /** Verifies asset scripts and returns diff with complexity. In case of error returns spent complexity */
-  def assets(blockchain: Blockchain)(tx: Transaction): TracedResult[(Long, ValidationError), Diff] = {
+  def assets(blockchain: Blockchain, remainingComplexity: Int)(tx: Transaction): TracedResult[(Long, ValidationError), Diff] = {
     @tailrec
     def loop(
         assets: List[(AssetScriptInfo, IssuedAsset)],
@@ -68,9 +69,13 @@ object Verifier extends ScorexLogging {
     ): (Long, TracedResult[ValidationError, Transaction]) = {
       assets match {
         case (AssetScriptInfo(script, complexity), asset) :: remaining =>
+          val complexityLimit =
+            if (remainingComplexity == Int.MaxValue) remainingComplexity
+            else remainingComplexity - fullComplexity.toInt
+
           val spentComplexity = fullComplexity + complexity
           stats.assetScriptExecution
-            .measureForType(tx.typeId)(verifyTx(blockchain, script, tx, Some(asset.id))) match {
+            .measureForType(tx.typeId)(verifyTx(blockchain, script, tx, Some(asset.id), complexityLimit)) match {
             case TracedResult(e @ Left(_), trace) => (spentComplexity, TracedResult(e, fullTrace ::: trace))
             case TracedResult(Right(_), trace)    => loop(remaining, spentComplexity, fullTrace ::: trace)
           }
@@ -82,8 +87,21 @@ object Verifier extends ScorexLogging {
       blockchain.assetDescription(asset).flatMap(_.script).map(script => (script, asset))
     }.toList
 
-    val (complexity, result) = loop(assets, 0L, Nil)
-    result.leftMap(ve => (complexity, ve)).as(Diff.empty.copy(scriptsComplexity = complexity))
+    val additionalAssets = (tx match {
+      case etx: ExchangeTransaction => List(etx.buyOrder.matcherFeeAssetId, etx.sellOrder.matcherFeeAssetId)
+      case _                        => List.empty
+    }).distinct.collect {
+      case ia: IssuedAsset =>
+        blockchain.assetDescription(ia).flatMap(_.script).map(script => (script, ia))
+    }.flatten
+
+    val (complexity, result)  = loop(assets, 0L, Nil)
+    val (_, additionalResult) = loop(additionalAssets, 0L, Nil)
+
+    result
+      .flatMap(_ => additionalResult)
+      .leftMap(ve => (complexity, ve))
+      .as(Diff.empty.copy(scriptsComplexity = complexity))
   }
 
   private def logIfNecessary(
@@ -101,15 +119,18 @@ object Verifier extends ScorexLogging {
       blockchain: Blockchain,
       script: Script,
       transaction: Transaction,
-      assetIdOpt: Option[ByteStr]
+      assetIdOpt: Option[ByteStr],
+      complexityLimit: Int = Int.MaxValue
   ): TracedResult[ValidationError, Transaction] = {
 
     val isAsset       = assetIdOpt.nonEmpty
     val senderAddress = transaction.asInstanceOf[Authorized].sender.toAddress
 
     val txE = Try {
-      val containerAddress = assetIdOpt.fold(Coproduct[Environment.Tthis](Recipient.Address(ByteStr(senderAddress.bytes))))(v => Coproduct[Environment.Tthis](Environment.AssetId(v.arr)))
-      val eval             = ScriptRunner(Coproduct[TxOrd](transaction), blockchain, script, isAsset, containerAddress)
+      val containerAddress = assetIdOpt.fold(Coproduct[Environment.Tthis](Recipient.Address(ByteStr(senderAddress.bytes))))(
+        v => Coproduct[Environment.Tthis](Environment.AssetId(v.arr))
+      )
+      val eval = ScriptRunner(Coproduct[TxOrd](transaction), blockchain, script, isAsset, containerAddress, complexityLimit)
       val scriptResult = eval match {
         case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, assetIdOpt))
         case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, assetIdOpt))
@@ -140,11 +161,18 @@ object Verifier extends ScorexLogging {
     }
   }
 
-  private def verifyOrder(blockchain: Blockchain, script: Script, order: Order): ValidationResult[Order] =
+  private def verifyOrder(blockchain: Blockchain, script: Script, order: Order, complexityLimit: Int): ValidationResult[Order] =
     for {
       result <- Try {
         val eval =
-          ScriptRunner(Coproduct[ScriptRunner.TxOrd](order), blockchain, script, isAssetScript = false, Coproduct[Environment.Tthis](Recipient.Address(ByteStr(order.sender.toAddress.bytes))))
+          ScriptRunner(
+            Coproduct[ScriptRunner.TxOrd](order),
+            blockchain,
+            script,
+            isAssetScript = false,
+            Coproduct[Environment.Tthis](Recipient.Address(ByteStr(order.sender.toAddress.bytes))),
+            complexityLimit
+          )
         val scriptResult = eval match {
           case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, None))
           case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, None))
@@ -163,7 +191,8 @@ object Verifier extends ScorexLogging {
   private def verifyExchange(
       et: ExchangeTransaction,
       blockchain: Blockchain,
-      matcherScriptOpt: Option[Script]
+      matcherScriptOpt: Option[Script],
+      complexityLimit: Int
   ): TracedResult[ValidationError, Transaction] = {
 
     val typeId    = et.typeId
@@ -175,7 +204,7 @@ object Verifier extends ScorexLogging {
         .map { script =>
           if (et.version != 1) {
             stats.accountScriptExecution
-              .measureForType(typeId)(verifyTx(blockchain, script, et, None))
+              .measureForType(typeId)(verifyTx(blockchain, script, et, None, complexityLimit))
           } else {
             TracedResult(Left(GenericError("Can't process transaction with signature from scripted account")))
           }
@@ -187,7 +216,7 @@ object Verifier extends ScorexLogging {
         .accountScript(order.sender.toAddress)
         .map { asi =>
           if (order.version != 1) {
-            stats.orderValidation.withoutTags().measure(verifyOrder(blockchain, asi.script, order))
+            stats.orderValidation.withoutTags().measure(verifyOrder(blockchain, asi.script, order, complexityLimit))
           } else {
             Left(GenericError("Can't process order with signature from scripted account"))
           }

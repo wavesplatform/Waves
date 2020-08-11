@@ -900,7 +900,7 @@ object PureContext {
     }
 
   val log: BaseFunction[NoContext] =
-    NativeFunction("log", 100, LOG, LONG, ("exponent", LONG), ("ep", LONG), ("base", LONG), ("bp", LONG), ("rp", LONG), ("round", rounds)) {
+    NativeFunction("log", 100, LOG, LONG, ("base", LONG), ("bp", LONG), ("exponent", LONG), ("ep", LONG), ("rp", LONG), ("round", rounds)) {
       case CONST_LONG(b) :: CONST_LONG(bp) :: CONST_LONG(e) :: CONST_LONG(ep) :: CONST_LONG(rp) :: round :: Nil =>
         if (bp < 0
           || bp > 8

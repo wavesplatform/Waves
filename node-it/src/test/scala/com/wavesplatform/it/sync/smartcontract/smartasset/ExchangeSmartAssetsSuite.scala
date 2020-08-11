@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract.smartasset
 
+import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NTPTime
@@ -50,7 +51,8 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
            |case _ => false}""".stripMargin,
         isAssetScript = true,
         estimator
-      ).explicitGet()._1.bytes().base64)
+      ).explicitGet()._1.bytes().base64
+    )
 
     val sAsset = sender
       .issue(firstKeyPair, "SmartAsset", "TestCoin", someAssetAmount, 0, reissuable = false, issueFee, 2, s, waitForTx = true)
@@ -65,8 +67,10 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
 
       setContracts((contr1, acc0), (contr2, acc1), (mcontr, acc2))
 
-      sender.signedBroadcast(exchangeTx(smartPair, smartMatcherFee + smartFee, smartMatcherFee + smartFee, ntpTime, 2, 3, acc1, acc0, acc2),
-                             waitForTx = true)
+      sender.signedBroadcast(
+        exchangeTx(smartPair, smartMatcherFee + smartFee, smartMatcherFee + smartFee, ntpTime, 2, 3, acc1, acc0, acc2),
+        waitForTx = true
+      )
     }
 
     val sUpdated = Some(
@@ -78,16 +82,15 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
            |case _ => false}""".stripMargin,
         isAssetScript = true,
         estimator
-      ).explicitGet()._1.bytes().base64)
+      ).explicitGet()._1.bytes().base64
+    )
 
     sender.setAssetScript(sAsset, firstKeyPair, setAssetScriptFee, sUpdated, waitForTx = true)
 
-    val tx =
-      sender.signedBroadcast(exchangeTx(smartPair, smartMatcherFee + smartFee, smartMatcherFee + smartFee, ntpTime, 3, 2, acc1, acc0, acc2), waitForTx = true).id
-
-    val status = sender.transactionStatus(Seq(tx)).head
-    status.status shouldBe "confirmed"
-    status.applicationStatus.get shouldBe "script_execution_failed"
+    assertApiError(
+      sender.signedBroadcast(exchangeTx(smartPair, smartMatcherFee + smartFee, smartMatcherFee + smartFee, ntpTime, 3, 2, acc1, acc0, acc2)),
+      AssertiveApiError(TransactionNotAllowedByAssetScript.Id, "Transaction is not allowed by token-script")
+    )
 
     setContracts((None, acc0), (None, acc1), (None, acc2))
   }
@@ -115,7 +118,8 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
                                         |case _ => false}""".stripMargin,
         isAssetScript = true,
         estimator
-      ).explicitGet()._1.bytes().base64)
+      ).explicitGet()._1.bytes().base64
+    )
 
     sender.setAssetScript(assetA, firstKeyPair, setAssetScriptFee, script, waitForTx = true)
     sender.setAssetScript(assetB, secondKeyPair, setAssetScriptFee, script, waitForTx = true)
@@ -125,8 +129,10 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
       priceAsset = IssuedAsset(ByteStr.decodeBase58(assetB).get)
     )
 
-    sender.signedBroadcast(exchangeTx(smartAssetPair, matcherFee + 2 * smartFee, matcherFee + 2 * smartFee, ntpTime, 3, 2, acc1, acc0, acc2),
-                           waitForTx = true)
+    sender.signedBroadcast(
+      exchangeTx(smartAssetPair, matcherFee + 2 * smartFee, matcherFee + 2 * smartFee, ntpTime, 3, 2, acc1, acc0, acc2),
+      waitForTx = true
+    )
 
     withClue("check fee for smart accounts and smart AssetPair - extx.fee == 0.015.waves") {
       setContracts((sc1, acc0), (sc1, acc1), (sc1, acc2))
@@ -138,7 +144,8 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
 
       sender.signedBroadcast(
         exchangeTx(smartAssetPair, smartMatcherFee + 2 * smartFee, smartMatcherFee + 2 * smartFee, ntpTime, 2, 3, acc1, acc0, acc2),
-        waitForTx = true)
+        waitForTx = true
+      )
       setContracts((None, acc0), (None, acc1), (None, acc2))
     }
 
@@ -148,13 +155,12 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
         priceAsset = Waves
       )
 
-      val tx =
-        sender.signedBroadcast(exchangeTx(incorrectSmartAssetPair, smartMatcherFee, smartMatcherFee, ntpTime, 3, 2, acc1, acc0, acc2), waitForTx = true).id
-      val status = sender.transactionStatus(Seq(tx)).head
-      status.status shouldBe "confirmed"
-      status.applicationStatus.get shouldBe "script_execution_failed"
+      assertApiError(
+        sender
+          .signedBroadcast(exchangeTx(incorrectSmartAssetPair, smartMatcherFee, smartMatcherFee, ntpTime, 3, 2, acc1, acc0, acc2)),
+        AssertiveApiError(TransactionNotAllowedByAssetScript.Id, "Transaction is not allowed by token-script")
+      )
     }
-
   }
 
   test("use all functions from RIDE for asset script") {

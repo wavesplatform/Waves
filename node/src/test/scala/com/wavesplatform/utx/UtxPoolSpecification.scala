@@ -832,7 +832,7 @@ class UtxPoolSpecification
           val utx =
             new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
           utx.addPriorityTxs(Seq(tx1))
-          utx.putNewTx(tx2, false).resultE should beRight
+          utx.putNewTx(tx2, false, false).resultE should beRight
           utx.nonPriorityTransactions shouldBe Seq(tx2)
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(tx1 :: tx2 :: Nil)
       }
@@ -937,7 +937,7 @@ class UtxPoolSpecification
           val utx =
             new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
           utx.addPriorityTxs(Seq(tx1))
-          utx.putNewTx(tx2, true).resultE.explicitGet()
+          utx.putNewTx(tx2, true, false).resultE.explicitGet()
           utx.nonPriorityTransactions shouldBe Seq(tx2)
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(tx1 :: tx2 :: Nil)
       }

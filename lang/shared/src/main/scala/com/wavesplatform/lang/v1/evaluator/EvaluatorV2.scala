@@ -69,9 +69,8 @@ class EvaluatorV2(
             limit = limit,
             parentBlocks = parentBlocks
           ).flatMap { unused =>
-            if (unused < 0) throw new Error("Unused < 0")
             i.cond match {
-              case TRUE | FALSE if unused == 0 =>
+              case TRUE | FALSE if unused <= 0 =>
                 Coeval.now(unused)
               case TRUE if unused > 0 =>
                 update(i.ifTrue).flatMap(
@@ -109,11 +108,11 @@ class EvaluatorV2(
       case fc: FUNCTION_CALL =>
         val evaluatedArgs =
           Coeval.defer {
-            fc.args.indices.to(LazyList)
+            fc.args.indices
+              .to(LazyList)
               .foldM(limit) {
                 case (unused, argIndex) =>
-                  if (unused < 0) throw new Error("Unused < 0")
-                  else if (unused == 0)
+                  if (unused <= 0)
                     Coeval.now(unused)
                   else
                     root(
@@ -259,13 +258,29 @@ object EvaluatorV2 {
     val log       = ListBuffer[LogItem[Id]]()
     val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => log.append((name, value)), ctx)
     val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion)
-    Try(evaluator(expr, limit))
-      .toEither
+    Try(evaluator(expr, limit)).toEither
       .bimap(
         err => (err.getMessage, log.toList),
         { case (expr, unused) => (expr, unused, log.toList) }
       )
   }
+
+  def applyOrDefault(
+      ctx: EvaluationContext[Environment, Id],
+      expr: EXPR,
+      stdLibVersion: StdLibVersion,
+      complexityLimit: Int,
+      default: EVALUATED
+  ): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] =
+    EvaluatorV2
+      .applyLimited(expr, complexityLimit, ctx, stdLibVersion)
+      .flatMap {
+        case (expr, _, log) =>
+          expr match {
+            case evaluated: EVALUATED => Right((evaluated, log))
+            case _                    => Right((default, log))
+          }
+      }
 
   def applyCompleted(
       ctx: EvaluationContext[Environment, Id],

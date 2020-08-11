@@ -84,10 +84,10 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite with BeforeAndAfterAll 
     val burnJson = sender.postJson(
       "/assets/burn",
       Json.obj(
-        "sender"   -> firstAddress,
-        "assetId"  -> issue,
-        "quantity" -> someAssetAmount / 2,
-        "fee"      -> issueFee
+        "sender"  -> firstAddress,
+        "assetId" -> issue,
+        "amount"  -> someAssetAmount / 2,
+        "fee"     -> issueFee
       )
     )
     val burn = Json.parse(burnJson.getResponseBody).as[Transaction].id
