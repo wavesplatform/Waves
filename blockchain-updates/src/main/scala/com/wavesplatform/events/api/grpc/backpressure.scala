@@ -14,14 +14,23 @@ object backpressure {
   def wrapObservable[A, B](source: Observable[A], dest: StreamObserver[B])(f: A => B)(implicit s: Scheduler): Unit = dest match {
     case cso: CallStreamObserver[B] @unchecked =>
       val queue = new LinkedBlockingQueue[B](32)
-      cso.setOnReadyHandler { () =>
-        while (cso.isReady && !queue.isEmpty) {
-          cso.onNext(queue.poll())
-        }
+
+      def pushNext(): Unit = while (cso.isReady && !queue.isEmpty) {
+        cso.onNext(queue.poll())
       }
 
+      cso.setOnReadyHandler(pushNext _)
+
       source.subscribe(
-        (elem: A) => if (queue.offer(f(elem))) Ack.Continue else Future(queue.put(f(elem))).flatMap(_ => Ack.Continue),
+        (elem: A) =>
+          if (queue.offer(f(elem))) {
+            pushNext()
+            Ack.Continue
+          } else
+            Future {
+              queue.put(f(elem))
+              pushNext()
+            }.flatMap(_ => Ack.Continue),
         cso.onError,
         cso.onCompleted
       )
