@@ -124,13 +124,14 @@ object JavaAdapter {
                 .getOrElse(0)
             new EstimateResult(
               verifierComplexity,
+              complexities._1.toInt,
               complexities._2.view.mapValues(cost => new Integer(cost.toInt)).toMap.asJava
             )
           }
       case expression: Expression =>
         ExprScript
           .estimate(expression.internal, version, ScriptEstimatorV3, useContractVerifierLimit = !script.isAsset)
-          .map(cost => new EstimateResult(cost.toInt, new java.util.HashMap()))
+          .map(cost => new EstimateResult(cost.toInt, cost.toInt, new java.util.HashMap()))
       case _ => ???
     }
     cost.fold(error => throw new RideException(error), identity)
@@ -162,10 +163,10 @@ object JavaAdapter {
     repl(version, Some(settings))
 
   def repl(version: RideVersion, settings: Option[NodeConnectionSettings]): RideRepl = {
-    val directiveSet  = DirectiveSet(version.internal, Account, Expression).explicitGet()
-    val ctx           = buildCtx(directiveSet)
-    val environment   = buildEnvironment(settings)
-    val replCtx       = (ctx.compilerContext, ctx.evaluationContext(environment))
+    val directiveSet = DirectiveSet(version.internal, Account, Expression).explicitGet()
+    val ctx          = buildCtx(directiveSet)
+    val environment  = buildEnvironment(settings)
+    val replCtx      = (ctx.compilerContext, ctx.evaluationContext(environment))
     new RideRepl(Repl(settings, replCtx))
   }
 }

@@ -29,7 +29,8 @@ class JavaAdapterTest extends PropSpec with PropertyChecks with Matchers {
         |    else false""".stripMargin
 
     val estimateResult = Ride.estimate(script)
-    estimateResult.getComplexity shouldBe 3
+    estimateResult.getVerifierComplexity shouldBe 3
+    estimateResult.getMaxComplexity shouldBe 3
     estimateResult.getCallableComplexities.isEmpty shouldBe true
 
     (the[RideException] thrownBy Ride.meta(script)).getMessage shouldBe "Expected DApp"
@@ -59,7 +60,8 @@ class JavaAdapterTest extends PropSpec with PropertyChecks with Matchers {
         |    else false""".stripMargin
 
     val estimateResult = Ride.estimate(script)
-    estimateResult.getComplexity shouldBe 3
+    estimateResult.getVerifierComplexity shouldBe 3
+    estimateResult.getMaxComplexity shouldBe 3
     estimateResult.getCallableComplexities.isEmpty shouldBe true
 
     (the[RideException] thrownBy Ride.meta(script)).getMessage shouldBe "Expected DApp"
@@ -103,7 +105,8 @@ class JavaAdapterTest extends PropSpec with PropertyChecks with Matchers {
         |""".stripMargin
 
     val estimateResult = Ride.estimate(script)
-    estimateResult.getComplexity shouldBe 3
+    estimateResult.getVerifierComplexity shouldBe 3
+    estimateResult.getMaxComplexity shouldBe 7
     estimateResult.getCallableComplexities.get("paySelf") shouldBe 7
     estimateResult.getCallableComplexities.get("verify") shouldBe 3
 
