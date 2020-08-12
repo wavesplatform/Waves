@@ -100,10 +100,11 @@ class UtxPoolImpl(
                   (),
                   GenericError("transactions from scripted accounts are denied from UTX pool")
                 )
+                scripted = if (skipSizeCheck) 0 else transactions.values().asScala.count(TxCheck.isScripted)
                 _ <- Either.cond(
-                  skipSizeCheck || transactions.values().asScala.count(TxCheck.isScripted) < utxSettings.maxScriptedSize,
+                  skipSizeCheck || scripted < utxSettings.maxScriptedSize,
                   (),
-                  GenericError("Transaction pool scripted txs size limit is reached")
+                  GenericError(s"Transaction pool scripted txs size limit is reached. Limit: ${utxSettings.maxScriptedSize} <= Scripted: $scripted")
                 )
               } yield tx
           )
