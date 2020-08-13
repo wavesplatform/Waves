@@ -10,14 +10,16 @@ import monix.reactive.Observable
 
 import scala.concurrent.Future
 
+//noinspection ScalaStyle
 object backpressure {
   def wrapObservable[A, B](source: Observable[A], dest: StreamObserver[B])(f: A => B)(implicit s: Scheduler): Unit = dest match {
     case cso: CallStreamObserver[B] @unchecked =>
       val queue = new LinkedBlockingQueue[B](32)
 
-      def pushNext(): Unit = while (cso.isReady && !queue.isEmpty) {
-        cso.onNext(queue.poll())
-      }
+      def pushNext(): Unit =
+        cso.synchronized(while (cso.isReady && !queue.isEmpty) {
+          cso.onNext(queue.poll())
+        })
 
       cso.setOnReadyHandler(pushNext _)
 
