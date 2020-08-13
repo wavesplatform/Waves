@@ -137,10 +137,19 @@ object Expressions {
   }
   case class FUNCTION_CALL(position: Pos, name: PART[String], args: List[EXPR], resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR
 
+  trait PVal {
+    def accessor: PART[String]
+  }
+  case class PBind(name: Option[PART[String]], override val accessor: PART[String]) extends PVal
+  case class PConst(consts: Seq[EXPR], override val accessor: PART[String]) extends PVal
+
+  case class Pattern(name: Option[PART[String]], ty: Option[Type], fields: Seq[PVal], consts: Seq[EXPR])
+
   case class MATCH_CASE(
       position: Pos,
-      newVarName: Option[PART[String]],
-      caseType: Type,
+      //newVarName: Option[PART[String]],
+      //caseType: Type,
+      pattern: Pattern,
       expr: EXPR,
       resultType: Option[FINAL] = None,
       ctxOpt: CtxOpt = None
@@ -153,7 +162,7 @@ object Expressions {
       types: Seq[PART[String]],
       expr: EXPR
     ): MATCH_CASE =
-      MATCH_CASE(position, newVarName, Union(types.map(Single(_, None))), expr)
+      MATCH_CASE(position, Pattern(newVarName, Some(Union(types.map(Single(_, None)))), Seq(), Seq()), expr)
   }
 
   case class MATCH(position: Pos, expr: EXPR, cases: Seq[MATCH_CASE], resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR

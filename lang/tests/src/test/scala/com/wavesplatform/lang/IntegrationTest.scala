@@ -2055,4 +2055,65 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       "Can't find a function 'removeByIndex'(List[Int], Int)"
     )
   }
+
+  property("integer case") {
+    val sampleScript =
+      """match 2 {
+        |  case 1 => 7
+        |  case 3 | 2 => 8
+        |  case _ => 9
+        |}""".stripMargin
+    eval[EVALUATED](sampleScript, None) shouldBe evaluated(8)
+  }
+
+  property("string case") {
+    val sampleScript =
+      """match "qq" {
+        |  case "1" => 7
+        |  case "qq" | "2" => 8
+        |  case _ => 9
+        |}""".stripMargin
+    eval[EVALUATED](sampleScript, None) shouldBe evaluated(8)
+  }
+
+  property("binary case") {
+    val sampleScript =
+      """match base64'TElLRQ==' {
+        |  case base64'TElLRQ==' => 7
+        |  case base64'ZGdnZHMK' | base64'ZGdnZHMJ' => 8
+        |  case _ => 9
+        |}""".stripMargin
+    eval[EVALUATED](sampleScript, None) shouldBe evaluated(7)
+  }
+
+  property("caseType destruct") {
+    val sampleScript =
+      """|
+         |match p {
+         |  case _: PointA => 0
+         |  case PointC(YB=n) => n
+         |  case _  => 1
+         |}
+         |
+      """.stripMargin
+    eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
+    eval[EVALUATED](sampleScript, Some(pointCInstance)) shouldBe evaluated(42)
+  }
+
+  property("caseType constant field") {
+    val sampleScript =
+      """|
+         |match p {
+         |  case _: PointA => 0
+         |  case PointC(YB=24) => 2
+         |  case PointC(YB=42) => 6
+         |  case _  => 1
+         |}
+         |
+      """.stripMargin
+    eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
+    eval[EVALUATED](sampleScript, Some(pointCInstance)) shouldBe evaluated(6)
+  }
+
+
 }

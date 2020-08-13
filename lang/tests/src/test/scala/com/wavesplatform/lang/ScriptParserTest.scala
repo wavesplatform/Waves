@@ -782,7 +782,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
     )
   }
 
-  property("pattern matching with invalid case - expression in variable definition") {
+  ignore("pattern matching with invalid case - expression in variable definition") {
     parse("match tx { case 1 + 1 => 1 } ") shouldBe MATCH(
       AnyPos,
       REF(AnyPos, PART.VALID(AnyPos, "tx")),
@@ -804,8 +804,10 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
       List(
         MATCH_CASE(
           AnyPos,
-          None,
-          Single(PART.INVALID(AnyPos, "the type for variable should be specified: `case varName: Type => expr`")),
+          Pattern(None,
+                  Some(Single(PART.INVALID(AnyPos, "the type for variable should be specified: `case varName: Type => expr`"))),
+                  Seq(),
+                  Seq()),
           CONST_LONG(AnyPos, 1)
         )
       )
@@ -819,8 +821,10 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
       List(
         MATCH_CASE(
           AnyPos,
-          None,
-          Single(PART.INVALID(AnyPos, "the type for variable should be specified: `case varName: Type => expr`")),
+          Pattern(None,
+                  Some(Single(PART.INVALID(AnyPos, "the type for variable should be specified: `case varName: Type => expr`"))),
+                  Seq(),
+                  Seq()),
           CONST_LONG(AnyPos, 1)
         )
       )
@@ -841,8 +845,10 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
         List(
           MATCH_CASE(
             AnyPos,
-            Some(PART.VALID(AnyPos, "a")),
-            Union(List()),
+            Pattern(Some(PART.VALID(AnyPos, "a")),
+                    Some(Union(List())),
+                    Seq(),
+                    Seq()),
             BINARY_OP(AnyPos, TRUE(AnyPos), AND_OP, INVALID(AnyPos, "expected a second operator"))
           ),
           MATCH_CASE(AnyPos, Some(PART.VALID(AnyPos, "b")), List(), CONST_LONG(AnyPos, 1))
@@ -1324,5 +1330,10 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
     val script = s"$manyLets\n$lastStmt"
 
     Parser.parseExpr(script) shouldBe an[Success[_]]
+  }
+
+  property("integer case") {
+    val c = parse("match 1 { case 1 | 4 => true case 2 => false case _ => false } ")
+    println(c)
   }
 }

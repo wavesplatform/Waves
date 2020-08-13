@@ -272,28 +272,58 @@ object Parser {
         })
     ).?.map(_.getOrElse(Union(Seq())))
 
+    trait ConstOrVar
+    case class Const(c: Seq[EXPR]) extends ConstOrVar
+    case class Var(v: REF) extends ConstOrVar
+
     P(
       Index ~~ "case" ~~ &(border) ~ comment ~/ (
-        (varDefP ~ comment ~ typesDefP) |
+        ((Index ~ numberP.rep(1, "|") ~ Index).map {
+          case (start, n, end) => Pattern(None, Some(Single(PART.VALID(Pos(start, end), "Int"), None)), Seq(), n)
+        }) |
+        ((Index ~ stringP.rep(1, "|") ~ Index).map {
+          case (start, n, end) => Pattern(None, Some(Single(PART.VALID(Pos(start, end), "String"), None)), Seq(), n)
+        }) |
+        ((Index ~ byteVectorP.rep(1, "|") ~ Index).map {
+          case (start, n, end) => Pattern(None, Some(Single(PART.VALID(Pos(start, end), "ByteVector"), None)), Seq(), n)
+        }) |
+        ((Index ~ trueP ~ Index).map {
+          case (start, n, end) => Pattern(None, Some(Single(PART.VALID(Pos(start, end), "Boolean"), None)), Seq(), Seq(n))
+        }) |
+        ((Index ~ falseP ~ Index).map {
+          case (start, n, end) => Pattern(None, Some(Single(PART.VALID(Pos(start, end), "Boolean"), None)), Seq(), Seq(n))
+        }) | 
+        ((Index ~ anyVarName ~ "(" ~ (anyVarName ~ "=" ~ ((numberP | stringP | byteVectorP | trueP | falseP).rep(1, "|").map(Const.apply) |  refP.map(Var.apply))).rep(0, ",") ~ ")" ~ Index).map {
+          case (start, caseType, p, end) =>
+            val pats = p.flatMap {
+              case (field, Const(c)) => Seq(PConst(c, field))
+              case (field, Var(REF(_, v, _, _))) => Seq(PBind(Some(v), field))
+            }
+            Pattern(None, Some(Union(Seq(Single(caseType, None)))), pats, Seq())
+        })|
+        (varDefP ~ comment ~ typesDefP).map(p => Pattern(p._1, Some(p._2), Seq(), Seq())) |
           (Index ~~ restMatchCaseInvalidP ~~ Index).map {
             case (start, _, end) =>
-              (
+              Pattern(
                 Some(PART.INVALID(Pos(start, end), "invalid syntax, should be: `case varName: Type => expr` or `case _ => expr`")),
-                Union(Seq())
+                Some(Union(List())),
+                Seq(),
+                Seq()
               )
           }
       ) ~ comment ~ "=>" ~/ baseExpr.? ~~ Index
     ).map {
-      case (caseStart, (v, types), e, end) =>
-        checkForGenericAndGetLastPos(types)
+      case (caseStart, p /*TypedVar(v, types)*/, e, end) =>
+        p.ty.fold(Right[INVALID, Option[Pos]](Option.empty[Pos]) : Either[INVALID, Option[Pos]])(checkForGenericAndGetLastPos(_))
           .fold(
-            error => MATCH_CASE(error.position, newVarName = v, caseType = types, expr = error),
+            error => MATCH_CASE(error.position, pattern = p, expr = error),
             { pos =>
-              val exprStart = pos.orElse(v.map(_.position)).fold(caseStart)(_.end)
+              val exprStart = pos.orElse(p.name.map(_.position)).fold(caseStart)(_.end)
               MATCH_CASE(
                 Pos(caseStart, end),
-                newVarName = v,
-                caseType = types,
+                //newVarName = v,
+                //caseType = types,
+                pattern = p,
                 expr = e.getOrElse(INVALID(Pos(exprStart, end), "expected expression"))
               )
             }
