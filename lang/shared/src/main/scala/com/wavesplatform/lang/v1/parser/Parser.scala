@@ -272,7 +272,7 @@ object Parser {
         })
     ).?.map(_.getOrElse(Union(Seq())))
 
-    trait ConstOrVar
+    sealed trait ConstOrVar
     case class Const(c: Seq[EXPR]) extends ConstOrVar
     case class Var(v: REF) extends ConstOrVar
 
@@ -293,11 +293,11 @@ object Parser {
         ((Index ~ falseP ~ Index).map {
           case (start, n, end) => Pattern(None, Some(Single(PART.VALID(Pos(start, end), "Boolean"), None)), Seq(), Seq(n))
         }) | 
-        ((Index ~ anyVarName ~ "(" ~ (anyVarName ~ "=" ~ ((numberP | stringP | byteVectorP | trueP | falseP).rep(1, "|").map(Const.apply) |  refP.map(Var.apply))).rep(0, ",") ~ ")" ~ Index).map {
+      ((Index ~ anyVarName ~ "(" ~ (anyVarName ~ "=" ~ ((numberP | stringP | byteVectorP | trueP | falseP).rep(1, "|").map(v => Const.apply(v):ConstOrVar) |  refP.map(v => Var.apply(v):ConstOrVar))).rep(0, ",") ~ ")" ~ Index).map {
           case (start, caseType, p, end) =>
-            val pats = p.flatMap {
-              case (field, Const(c)) => Seq(PConst(c, field))
-              case (field, Var(REF(_, v, _, _))) => Seq(PBind(Some(v), field))
+            val pats = p.map {
+              case (field, Const(c)) => PConst(c, field)
+              case (field, Var(REF(_, v, _, _))) => PBind(Some(v), field)
             }
             Pattern(None, Some(Union(Seq(Single(caseType, None)))), pats, Seq())
         })|
