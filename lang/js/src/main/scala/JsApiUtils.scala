@@ -170,8 +170,8 @@ package object JsApiUtils {
       "type"       -> "MATCH_CASE",
       "posStart"   -> c.position.start,
       "posEnd"     -> c.position.end,
-      "varName"    -> c.newVarName.map(serPartStr).orUndefined,
-      "varTypes"   -> serType(c.caseType),
+      "varName"    -> c.pattern.name.map(serPartStr).orUndefined,
+      "varTypes"   -> serType(c.pattern.ty.getOrElse(Expressions.Union(Seq()))),
       "resultType" -> c.resultType.getOrElse(NOTHING).toString,
       "expr"       -> serExpr(c.expr),
       "ctx"        -> serCtx(simpleCtx)
