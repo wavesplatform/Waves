@@ -93,4 +93,5 @@ EXPOSE 6869 6868 6863 6862
 USER waves
 VOLUME /var/lib/waves
 VOLUME /usr/share/waves/lib/plugins
+STOPSIGNAL SIGINT
 ENTRYPOINT ["/usr/share/waves/bin/entrypoint.sh"]
