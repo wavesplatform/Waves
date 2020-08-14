@@ -301,6 +301,14 @@ object Parser {
             }
             Pattern(None, Some(Union(Seq(Single(caseType, None)))), pats, Seq())
         })|
+        ((Index ~ "(" ~ (Index ~ ((numberP | stringP | byteVectorP | trueP | falseP).rep(1, "|").map(v => Const.apply(v):ConstOrVar) |  refP.map(v => Var.apply(v):ConstOrVar)) ~ Index).rep(0, ",") ~ ")" ~ Index).map {
+          case (start, p, end) =>
+            val pats = p.zipWithIndex.map {
+              case ((s, Const(c), e), i) => PConst(c, PART.VALID(Pos(s,e), s"_${i+1}"))
+              case ((s, Var(REF(_, v, _, _)), e), i) => PBind(Some(v), PART.VALID(Pos(s,e), s"_${i+1}"))
+            }
+            Pattern(None, None, pats, Seq())
+        }) | 
         (varDefP ~ comment ~ typesDefP).map(p => Pattern(p._1, Some(p._2), Seq(), Seq())) |
           (Index ~~ restMatchCaseInvalidP ~~ Index).map {
             case (start, _, end) =>

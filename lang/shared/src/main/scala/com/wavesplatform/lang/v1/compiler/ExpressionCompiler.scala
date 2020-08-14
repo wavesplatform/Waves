@@ -237,8 +237,10 @@ object ExpressionCompiler {
         ).toCompileM
       }
       _   <- {
-        val defaultCasesCount = cases.count({ case Expressions.MATCH_CASE(_, Expressions.Pattern(None, None, Seq(), Seq()), _, _, _) => true; case _ => false } )
-        //if(defaultCasesCount >= 2) { println(cases) }
+        val defaultCasesCount = cases.count({ case Expressions.MATCH_CASE(_, Expressions.Pattern(_, Some(Expressions.Union(Seq())), Seq(), Seq()), _, _, _) => true; case _ => false } )
+//        println(cases)
+//        println(cases.filter({ case Expressions.MATCH_CASE(_, Expressions.Pattern(_, Some(Expressions.Union(Seq())), Seq(), Seq()), _, _, _) => true; case _ => false } ))
+//        if(defaultCasesCount >= 2) { println(cases) }
         Either.cond(
           defaultCasesCount < 2,
           (),
