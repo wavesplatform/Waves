@@ -41,6 +41,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
 
   private val invalidBlockId = ByteStr(new Array[Byte](32))
   (blocksApi.block _).expects(invalidBlockId).returning(None).anyNumberOfTimes()
+  (blocksApi.meta _).expects(invalidBlockId).returning(None).anyNumberOfTimes()
 
   routePath("/first") in {
     (blocksApi.blockAtHeight _).expects(1).returning(Some(testBlock1Meta -> Seq.empty)).once()
@@ -152,6 +153,11 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
     Get(routePath(s"/headers/${testBlock2.id()}")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock2HeaderJson
+    }
+
+    Get(routePath(s"/headers/$invalidBlockId")) ~> route ~> check {
+      response.status.isFailure() shouldBe true
+      responseAs[String] should include ("block does not exist")
     }
   }
 
