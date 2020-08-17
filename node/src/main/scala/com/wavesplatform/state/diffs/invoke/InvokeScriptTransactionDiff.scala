@@ -156,8 +156,7 @@ object InvokeScriptTransactionDiff {
             resultDiff <- scriptResult._1 match {
               case ScriptResultV3(dataItems, transfers)    => doProcessActions(dataItems ::: transfers)
               case ScriptResultV4(actions)                 => doProcessActions(actions)
-              case _: IncompleteResult if limitedExecution => doProcessActions(Nil)
-              case _: IncompleteResult                     => TracedResult(Left(GenericError("Unexpected IncompleteResult")))
+              case ir: IncompleteResult                    => TracedResult.wrapValue(Diff.stateOps(continuationStates = Map(tx.id.value() -> ContinuationState.InProgress(ir.expr))))
             }
           } yield resultDiff
         } yield result
