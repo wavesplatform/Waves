@@ -29,7 +29,7 @@ class EvaluatorV2(
 
   private def root(expr: EXPR, _update: EXPR => Coeval[Unit], limit: Int, parentBlocks: List[BLOCK_DEF], evaluateAll: Boolean): Coeval[Int] = {
     val update =
-      if (evaluateAll || (expr.isInstanceOf[FUNCTION_CALL] && expr.asInstanceOf[FUNCTION_CALL].function.isExternal()))
+      if (evaluateAll || (expr.isInstanceOf[FUNCTION_CALL] && expr.asInstanceOf[FUNCTION_CALL].function.isExternal))
         _update
       else (_: EXPR) => Coeval.now(())
     expr match {
@@ -136,7 +136,7 @@ class EvaluatorV2(
         }
 
       case fc: FUNCTION_CALL =>
-        val forceEvaluateArgs = evaluateAll || fc.function.isExternal()
+        val forceEvaluateArgs = evaluateAll || fc.function.isExternal
         val evaluatedArgs =
           Coeval.defer {
             fc.args.indices
@@ -159,7 +159,7 @@ class EvaluatorV2(
           .flatMap { unusedArgsComplexity =>
             if (fc.args.forall(_.isInstanceOf[EVALUATED])) {
               fc.function match {
-                case FunctionHeader.Native(_) if (fc.function.isExternal() || evaluateAll) =>
+                case FunctionHeader.Native(_) if (fc.function.isExternal || evaluateAll) =>
                   val NativeFunction(_, costByVersion, _, ev, _) =
                     ctx.ec.functions
                       .getOrElse(fc.function, throw new RuntimeException(s"function '${fc.function}' not found"))

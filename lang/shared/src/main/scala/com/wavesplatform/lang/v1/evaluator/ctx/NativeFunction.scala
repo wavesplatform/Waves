@@ -9,7 +9,6 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction}
-import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{EvalF, ExecutionError, TrampolinedExecResult}
 
 import scala.annotation.meta.field

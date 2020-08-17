@@ -23,7 +23,7 @@ case class ScriptEstimatorV3(private val continuationFirstStepMode: Boolean) ext
     val ctxFuncs =
       funcs.view
         .map { case (header, cost) =>
-          val nativeCost = if (header.isExternal()) cost.value() else 0
+          val nativeCost = if (header.isExternal) cost.value() else 0
           header -> FunctionInfo(cost.value(), Set[String](), nativeCost)
         }
         .toMap
@@ -40,7 +40,7 @@ case class ScriptEstimatorV3(private val continuationFirstStepMode: Boolean) ext
       funcCostWithExpr.view
         .map { case (header, (cost, exprOpt)) =>
           val nativeCost =
-            if (header.isExternal())
+            if (header.isExternal)
               cost
             else
               exprOpt.map(apply(vars, baseCosts, _).explicitGet()).getOrElse(0L)
@@ -54,7 +54,7 @@ case class ScriptEstimatorV3(private val continuationFirstStepMode: Boolean) ext
 
   private def evalExpr(t: EXPR, checkContinuationFirstStep: Boolean): EvalM[Long] = {
     val localCheckContinuationFirstStep =
-      checkContinuationFirstStep && !(t.isInstanceOf[FUNCTION_CALL] && t.asInstanceOf[FUNCTION_CALL].function.isExternal())
+      checkContinuationFirstStep && !(t.isInstanceOf[FUNCTION_CALL] && t.asInstanceOf[FUNCTION_CALL].function.isExternal)
     if (Thread.currentThread().isInterrupted)
       raiseError("Script estimation was interrupted")
     else {

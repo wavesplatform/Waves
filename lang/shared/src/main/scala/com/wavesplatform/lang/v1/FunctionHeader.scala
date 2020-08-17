@@ -20,7 +20,7 @@ object FunctionHeader {
   }
 
   implicit class FunctionHeaderExt(f: FunctionHeader) {
-    def isExternal() = f match {
+    val isExternal: Boolean = f match {
       case Native(name)             => FunctionIds.ExternalFunctionIds.contains(name)
       case User(internalName, name) => false
     }
