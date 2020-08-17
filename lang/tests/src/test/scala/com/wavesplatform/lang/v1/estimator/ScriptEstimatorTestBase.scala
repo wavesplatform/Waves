@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.v1.estimator
 
+import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
@@ -39,14 +40,14 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*)
 
   implicit val version : StdLibVersion = V3
 
-  private def ctx(implicit version: StdLibVersion) = {
+  protected def ctx(implicit version: StdLibVersion): CTX[Environment] = {
     val transactionType = Types.buildTransferTransactionType(true, version)
     val tx              = CaseObj(transactionType, Map("amount" -> CONST_LONG(100000000L)))
     Monoid
       .combineAll(Seq(
         PureContext.build(version).withEnvironment[Environment],
         CryptoContext.build(Global, version).withEnvironment[Environment],
-        WavesContext.build(DirectiveSet.contractDirectiveSet),
+        WavesContext.build(DirectiveSet(version, Account, DApp).explicitGet()),
         CTX[NoContext](
           Seq(transactionType),
           Map(("tx", (transactionType, ContextfulVal.pure[NoContext](tx)))),
@@ -55,8 +56,8 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*)
       ))
   }
 
-  private val env = Common.emptyBlockchainEnvironment()
-  private val lets: Set[String] =
+  protected val env: Environment[Id] = Common.emptyBlockchainEnvironment()
+  protected val lets: Set[String] =
     ctx.evaluationContext(env).letDefs.keySet
 
   protected def compile(code: String)(implicit version: StdLibVersion): EXPR = {

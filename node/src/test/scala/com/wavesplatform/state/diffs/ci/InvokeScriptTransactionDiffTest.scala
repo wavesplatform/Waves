@@ -2066,7 +2066,7 @@ class InvokeScriptTransactionDiffTest
         fee     <- ciFee(1)
         gTx1             = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2             = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-        (assetScript, _) = ScriptCompiler.compile("false", ScriptEstimatorV3).explicitGet()
+        (assetScript, _) = ScriptCompiler.compile("false", ScriptEstimatorV3.instance).explicitGet()
         iTx = IssueTransaction
           .selfSigned(2.toByte, master, "False asset", "", ENOUGH_AMT, 8, reissuable = true, Some(assetScript), fee, ts + 1)
           .explicitGet()
@@ -2101,7 +2101,7 @@ class InvokeScriptTransactionDiffTest
          |{-# CONTENT_TYPE EXPRESSION #-}
          |
          |true""".stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()
+      ScriptCompiler.compile(script, ScriptEstimatorV3.instance).explicitGet()
     }
 
     val (falseScript, falseComplexity) = {
@@ -2110,7 +2110,7 @@ class InvokeScriptTransactionDiffTest
          |{-# CONTENT_TYPE EXPRESSION #-}
          |
          |false""".stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()
+      ScriptCompiler.compile(script, ScriptEstimatorV3.instance).explicitGet()
     }
 
     def contract(assets: Seq[String]): DApp = {

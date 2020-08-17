@@ -68,7 +68,7 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         |
         """.stripMargin
     val script  = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1
-    val script2 = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3).explicitGet()._1
+    val script2 = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3.instance).explicitGet()._1
     sender.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(thirdContractAddr), 10.waves, minFee, waitForTx = true)
     sender.setScript(firstContract, Right(Some(script)), setScriptFee, waitForTx = true)
     sender.setScript(secondContract, Right(Some(script)), setScriptFee, waitForTx = true)

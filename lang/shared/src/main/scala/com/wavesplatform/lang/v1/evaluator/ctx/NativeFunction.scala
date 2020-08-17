@@ -9,6 +9,7 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction}
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{EvalF, ExecutionError, TrampolinedExecResult}
 
 import scala.annotation.meta.field
@@ -21,6 +22,12 @@ sealed trait BaseFunction[C[_[_]]] {
   @JSExport def name: String
   @JSExport def args: Seq[String]
   @JSExport def deprecated: Boolean = false
+
+  def expr: Option[ContextfulUserFunction[C]] =
+    this match {
+      case _: NativeFunction[C]            => None
+      case UserFunction(_, _, _, _, ev, _) => Some(ev)
+    }
 }
 
 object BaseFunction {

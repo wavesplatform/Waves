@@ -155,7 +155,7 @@ class UtxFailedTxsSpec extends FlatSpec with Matchers with WithDomain with Event
         |    else [IntegerEntry("h", height)]
         |  }
         |  """.stripMargin,
-        ScriptEstimatorV3
+        ScriptEstimatorV3.instance
       )
       .explicitGet()
 
@@ -198,7 +198,7 @@ class UtxFailedTxsSpec extends FlatSpec with Matchers with WithDomain with Event
         |  if ($expr) then [] else throw("reached err")
         |}
         |""".stripMargin
-    val (script, complexity) = ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()
+    val (script, complexity) = ScriptCompiler.compile(scriptText, ScriptEstimatorV3.instance).explicitGet()
     println(complexity)
     // complexity shouldBe targetComplexity
     script
@@ -215,7 +215,7 @@ class UtxFailedTxsSpec extends FlatSpec with Matchers with WithDomain with Event
          |
          |if ($expr) then true else throw("reached err")
          |""".stripMargin
-    val (script, complexity) = ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()
+    val (script, complexity) = ScriptCompiler.compile(scriptText, ScriptEstimatorV3.instance).explicitGet()
     println(complexity)
     // complexity shouldBe targetComplexity
     script

@@ -4,7 +4,7 @@ import cats.implicits._
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.V4
+import com.wavesplatform.lang.directives.values.{Account, DApp, V4}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
@@ -21,7 +21,7 @@ class EvaluatorV2TestBase extends PropSpec with PropertyChecks with ScriptGen wi
   private val version = V4
   private val ctx =
     PureContext.build(version).withEnvironment[Environment] |+|
-    WavesContext.build(DirectiveSet.contractDirectiveSet)
+    WavesContext.build(DirectiveSet(version, Account, DApp).explicitGet())
 
   private val environment = Common.emptyBlockchainEnvironment()
   private val evaluator =

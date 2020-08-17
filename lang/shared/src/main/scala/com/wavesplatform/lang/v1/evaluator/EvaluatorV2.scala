@@ -28,9 +28,10 @@ class EvaluatorV2(
   }
 
   private def root(expr: EXPR, _update: EXPR => Coeval[Unit], limit: Int, parentBlocks: List[BLOCK_DEF], evaluateAll: Boolean): Coeval[Int] = {
-    //println(s"Evaluating $expr, evalAll = $evaluateAll, limit = $limit, evaluateAll = $evaluateAll")
-    val update = if(evaluateAll || (expr.isInstanceOf[FUNCTION_CALL] && expr.asInstanceOf[FUNCTION_CALL].function.isExternal() ))
-      (_update) else (_:EXPR) => Coeval.now(())
+    val update =
+      if (evaluateAll || (expr.isInstanceOf[FUNCTION_CALL] && expr.asInstanceOf[FUNCTION_CALL].function.isExternal()))
+        _update
+      else (_: EXPR) => Coeval.now(())
     expr match {
       case b: BLOCK_DEF =>
         Coeval.defer(
@@ -41,7 +42,8 @@ class EvaluatorV2(
               case nonEvaluated  => Coeval.delay(b.body = nonEvaluated)
             },
             limit = limit,
-            parentBlocks = b :: parentBlocks, evaluateAll
+            parentBlocks = b :: parentBlocks,
+            evaluateAll
           )
         )
       case g: GETTER =>
@@ -50,7 +52,8 @@ class EvaluatorV2(
             expr = g.expr,
             _update = v => Coeval.delay(g.expr = v),
             limit = limit,
-            parentBlocks = parentBlocks, evaluateAll
+            parentBlocks = parentBlocks,
+            evaluateAll
           ).flatMap { unused =>
             g.expr match {
               case co: CaseObj if unused > 0 =>
@@ -68,7 +71,7 @@ class EvaluatorV2(
         Coeval.defer(
           root(
             expr = i.cond,
-            _update = (v:EXPR) => Coeval.delay(i.cond = v),
+            _update = (v: EXPR) => Coeval.delay(i.cond = v),
             limit = limit,
             parentBlocks = parentBlocks,
             evaluateAll
@@ -94,31 +97,30 @@ class EvaluatorV2(
                       expr = i.ifFalse,
                       _update = update,
                       limit = unused - 1,
-                      parentBlocks = parentBlocks, evaluateAll
-                    )
-                )
-              case _ if !evaluateAll && unused > 0 =>
-                    root(
-                      expr = i.ifTrue,
-                      _update = (v:EXPR) => Coeval.delay(i.ifTrue = v),
-                      limit = unused,
                       parentBlocks = parentBlocks,
                       evaluateAll
                     )
-                .flatMap(
-                  unusedAfterIfTrue =>
-                    if (unusedAfterIfTrue > 0)
+                )
+              case _ if !evaluateAll && unused > 0 =>
+                root(
+                  expr = i.ifTrue,
+                  _update = (v: EXPR) => Coeval.delay(i.ifTrue = v),
+                  limit = unused,
+                  parentBlocks = parentBlocks,
+                  evaluateAll
+                ).flatMap(
+                    unusedAfterIfTrue =>
+                      if (unusedAfterIfTrue > 0)
                         root(
                           expr = i.ifFalse,
-                          _update = (v:EXPR) => Coeval.delay(i.ifFalse = v),
+                          _update = (v: EXPR) => Coeval.delay(i.ifFalse = v),
                           limit = unusedAfterIfTrue,
                           parentBlocks = parentBlocks,
                           evaluateAll
                         )
-                    else
-                      Coeval.now(unusedAfterIfTrue)
-
-                )
+                      else
+                        Coeval.now(unusedAfterIfTrue)
+                  )
 
               case _: EVALUATED => throw new IllegalArgumentException("Non-boolean result in cond")
               case _            => Coeval.now(unused)
@@ -148,7 +150,8 @@ class EvaluatorV2(
                       expr = fc.args(argIndex),
                       _update = argValue => Coeval.delay(fc.args = fc.args.updated(argIndex, argValue)),
                       limit = unused,
-                      parentBlocks, forceEvaluateArgs
+                      parentBlocks,
+                      forceEvaluateArgs
                     )
               }
           }
@@ -165,80 +168,78 @@ class EvaluatorV2(
                   if (unusedArgsComplexity < cost)
                     Coeval.now(unusedArgsComplexity)
                   else {
-                    ////println(s"${fc.function}")
                     update(ev[Id]((ctx.ec.environment, fc.args.asInstanceOf[List[EVALUATED]])).explicitGet())
                       .map(_ => unusedArgsComplexity - cost)
                   }
 
                 case FunctionHeader.User(_, name) =>
-                    ctx.ec.functions
-                      .get(fc.function)
-                      .map(_.asInstanceOf[UserFunction[Environment]])
-                      .map(f => FUNC(f.name, f.args.toList, f.ev[Id](ctx.ec.environment)))
-                      .orElse(findUserFunction(name, parentBlocks))
-                      .map { signature =>
-                        val argsWithExpr =
-                          (signature.args zip fc.args)
-                            .foldRight(signature.body.deepCopy.value) {
-                              case ((argName, argValue), argsWithExpr) =>
-                                BLOCK(LET(argName, argValue), argsWithExpr)
-                            }
-                        ////println(s"expanding $expr")
-                        _update(argsWithExpr).flatMap(_ =>
+                  ctx.ec.functions
+                    .get(fc.function)
+                    .map(_.asInstanceOf[UserFunction[Environment]])
+                    .map(f => FUNC(f.name, f.args.toList, f.ev[Id](ctx.ec.environment)))
+                    .orElse(findUserFunction(name, parentBlocks))
+                    .map { signature =>
+                      val argsWithExpr =
+                        (signature.args zip fc.args)
+                          .foldRight(signature.body.deepCopy.value) {
+                            case ((argName, argValue), argsWithExpr) =>
+                              BLOCK(LET(argName, argValue), argsWithExpr)
+                          }
+                      _update(argsWithExpr).flatMap(
+                        _ =>
                           if (unusedArgsComplexity > 0)
                             root(argsWithExpr, _update, unusedArgsComplexity, parentBlocks, evaluateAll)
                           else
                             Coeval.now(unusedArgsComplexity)
-                        )
-                      }
-                      .getOrElse {
-                        if (unusedArgsComplexity > 0) {
-                          val caseType =
-                            ctx.ec.typeDefs.get(name) match {
-                              case Some(caseType: CASETYPEREF) => Coeval.now(caseType)
-                              case _                           => Coeval.raiseError(new NoSuchElementException(s"Function or type '$name' not found"))
-                            }
-                          caseType.flatMap { objectType =>
-                            val fields = objectType.fields.map(_._1) zip fc.args.asInstanceOf[List[EVALUATED]]
-                            root(CaseObj(objectType, fields.toMap), update, unusedArgsComplexity, parentBlocks, evaluateAll)
+                      )
+                    }
+                    .getOrElse {
+                      if (unusedArgsComplexity > 0) {
+                        val caseType =
+                          ctx.ec.typeDefs.get(name) match {
+                            case Some(caseType: CASETYPEREF) => Coeval.now(caseType)
+                            case _                           => Coeval.raiseError(new NoSuchElementException(s"Function or type '$name' not found"))
                           }
+                        caseType.flatMap { objectType =>
+                          val fields = objectType.fields.map(_._1) zip fc.args.asInstanceOf[List[EVALUATED]]
+                          root(CaseObj(objectType, fields.toMap), update, unusedArgsComplexity, parentBlocks, evaluateAll)
                         }
-                        else
-                          Coeval.now(unusedArgsComplexity)
-                      }
+                      } else
+                        Coeval.now(unusedArgsComplexity)
+                    }
                 case _ =>
                   Coeval.now(limit)
 
               }
             } else {
-                fc.function match {
-                  case FunctionHeader.Native(name)  =>
-                    ////println(s"$name here unusedArgsComplexity=$unusedArgsComplexity")
-                    Coeval.now(unusedArgsComplexity)
-                  case FunctionHeader.User(_, name) =>
-                    ctx.ec.functions
-                      .get(fc.function)
-                      .map(_.asInstanceOf[UserFunction[Environment]])
-                      .map(f => FUNC(f.name, f.args.toList, f.ev[Id](ctx.ec.environment)))
-                      .orElse(findUserFunction(name, parentBlocks))
-                      .map { signature =>
-                        val argsWithExpr =
-                          (signature.args zip fc.args)
-                            .foldRight(signature.body.deepCopy.value) {
-                              case ((argName, argValue), argsWithExpr) =>
-                                BLOCK(LET(argName, argValue), argsWithExpr)
-                            }
-                        ////println(s"expanding $expr, unused = $unusedArgsComplexity")
-                        _update(argsWithExpr).flatMap(_ =>
+              fc.function match {
+                case FunctionHeader.Native(name) =>
+                  Coeval.now(unusedArgsComplexity)
+                case FunctionHeader.User(_, name) =>
+                  ctx.ec.functions
+                    .get(fc.function)
+                    .map(_.asInstanceOf[UserFunction[Environment]])
+                    .map(f => FUNC(f.name, f.args.toList, f.ev[Id](ctx.ec.environment)))
+                    .orElse(findUserFunction(name, parentBlocks))
+                    .map { signature =>
+                      val argsWithExpr =
+                        (signature.args zip fc.args)
+                          .foldRight(signature.body.deepCopy.value) {
+                            case ((argName, argValue), argsWithExpr) =>
+                              BLOCK(LET(argName, argValue), argsWithExpr)
+                          }
+                      _update(argsWithExpr).flatMap(
+                        _ =>
                           if (unusedArgsComplexity > 0)
                             root(argsWithExpr, _update, unusedArgsComplexity, parentBlocks, evaluateAll)
                           else
                             Coeval.now(unusedArgsComplexity)
-                        )
-                      }.getOrElse {
-                        Coeval.now(unusedArgsComplexity)
+                      )
                     }
-                }
+                    .getOrElse {
+                      Coeval.now(unusedArgsComplexity)
+                    }
+              }
             }
           }
       case evaluated: EVALUATED =>
@@ -249,7 +250,13 @@ class EvaluatorV2(
   }
 
   @tailrec
-  private def visitRef(key: String, update: EVALUATED => Coeval[Unit], limit: Int, parentBlocks: List[BLOCK_DEF], evaluateAll: Boolean): Option[Coeval[Int]] =
+  private def visitRef(
+      key: String,
+      update: EVALUATED => Coeval[Unit],
+      limit: Int,
+      parentBlocks: List[BLOCK_DEF],
+      evaluateAll: Boolean
+  ): Option[Coeval[Int]] =
     parentBlocks match {
       case LET_BLOCK(l @ LET(`key`, _, _), _) :: nextParentBlocks => Some(evaluateRef(update, limit, l, nextParentBlocks, evaluateAll))
       case BLOCK(l @ LET(`key`, _, _), _) :: nextParentBlocks     => Some(evaluateRef(update, limit, l, nextParentBlocks, evaluateAll))
@@ -268,47 +275,45 @@ class EvaluatorV2(
       case evaluated: EVALUATED if evaluated.wasLogged => true
       case _                                           => false
     }
-    if(!evaluateAll && let.checked) {
-      //println(s"------------ skip $let")
+    if (!evaluateAll && let.checked) {
       Coeval.now(limit)
-    } else root(
-      expr = let.value,
-      _update = v =>
-        Coeval
-          .delay(let.value = v)
-          .map(
-            _ =>
-              let.value match {
-                case evaluated: EVALUATED if !wasLogged =>
-                  ctx.l(let.name)(Right(evaluated))
-                  evaluated.wasLogged = true
-                case _ => ()
-              }
-          ),
-      limit = limit,
-      parentBlocks = nextParentBlocks,
-      evaluateAll
-    )
-      .flatMap { unused =>
-        let.checked = true
-        //println(s"------------ persisted $let")
-        if (unused < 0) throw new Error("Unused < 0")
-        else
-          let.value match {
-            case ev: EVALUATED if unused > 0 =>
-              if (evaluateAll)
-                update(ev).map(_ => unused - 1)
-              else
+    } else
+      root(
+        expr = let.value,
+        _update = v =>
+          Coeval
+            .delay(let.value = v)
+            .map(
+              _ =>
+                let.value match {
+                  case evaluated: EVALUATED if !wasLogged =>
+                    ctx.l(let.name)(Right(evaluated))
+                    evaluated.wasLogged = true
+                  case _ => ()
+                }
+            ),
+        limit = limit,
+        parentBlocks = nextParentBlocks,
+        evaluateAll
+      ).flatMap { unused =>
+          let.checked = true
+          if (unused < 0) throw new Error("Unused < 0")
+          else
+            let.value match {
+              case ev: EVALUATED if unused > 0 =>
+                if (evaluateAll)
+                  update(ev).map(_ => unused - 1)
+                else
+                  Coeval.now(unused)
+              case _ =>
                 Coeval.now(unused)
-            case _ =>
-              Coeval.now(unused)
-          }
-      }
-      .onErrorHandle { e =>
-        val error = if (e.getMessage != null) e.getMessage else e.toString
-        if (!wasLogged) ctx.l(let.name)(Left(error))
-        throw e
-      }
+            }
+        }
+        .onErrorHandle { e =>
+          val error = if (e.getMessage != null) e.getMessage else e.toString
+          if (!wasLogged) ctx.l(let.name)(Left(error))
+          throw e
+        }
   }
 
   private def findGlobalVar(key: String, update: EVALUATED => Coeval[Unit], limit: Int): Option[Coeval[Int]] =

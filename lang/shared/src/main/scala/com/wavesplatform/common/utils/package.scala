@@ -7,9 +7,7 @@ package object utils {
 
   implicit class EitherExt2[A, B](ei: Either[A, B]) {
     def explicitGet(): B = ei match {
-      case Left(value)  =>
-        Thread.currentThread().getStackTrace.foreach(println)
-        throw new RuntimeException(value.toString)
+      case Left(value)  => throw makeException(value)
       case Right(value) => value
     }
 

@@ -33,7 +33,7 @@ class PseudoTxSenderPubKeySuite extends BaseTransactionSuite {
          |  }
          """.stripMargin,
       isAssetScript = true,
-      ScriptEstimatorV3
+      ScriptEstimatorV3.instance
     ).explicitGet()._1.bytes().base64
     firstAssetId = sender.issue(firstDApp, fee = issueFee, script = Some(smartAssetScript), waitForTx = true).id
     secondAssetId = sender.issue(secondDApp, fee = issueFee, script = Some(smartAssetScript), waitForTx = true).id
@@ -54,7 +54,7 @@ class PseudoTxSenderPubKeySuite extends BaseTransactionSuite {
          |func transferAsset(r: ByteVector, a: ByteVector, q: Int) = [ScriptTransfer(Address(r), q, a)]
          """.stripMargin,
       isAssetScript = false,
-      ScriptEstimatorV3
+      ScriptEstimatorV3.instance
     ).explicitGet()._1.bytes().base64
 
     sender.setScript(firstDApp, Some(dAppScript), waitForTx = true)

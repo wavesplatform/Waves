@@ -31,7 +31,7 @@ class InvokeCalcIssueSuite extends BaseTransactionSuite with Matchers with Cance
 
     sender.setScript(
       smartAcc,
-      Some(ScriptCompiler.compile(dAppV4, ScriptEstimatorV3).explicitGet()._1.bytes().base64),
+      Some(ScriptCompiler.compile(dAppV4, ScriptEstimatorV3.instance).explicitGet()._1.bytes().base64),
       fee = setScriptFee + smartFee,
       waitForTx = true
     )
