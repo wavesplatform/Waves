@@ -18,6 +18,9 @@ class PseudoTxSenderPubKeySuite extends BaseTransactionSuite {
   private var secondAssetId = ""
   protected override def beforeAll(): Unit = {
     super.beforeAll()
+    firstAssetId = sender.issue(firstDApp, fee = issueFee, script = Some(scriptBase64), waitForTx = true).id
+    secondAssetId = sender.issue(secondDApp, fee = issueFee, script = Some(scriptBase64), waitForTx = true).id
+
     val smartAssetScript = ScriptCompiler(
       s"""
          |{-# STDLIB_VERSION 4 #-}
@@ -25,18 +28,41 @@ class PseudoTxSenderPubKeySuite extends BaseTransactionSuite {
          |{-# SCRIPT_TYPE ASSET #-}
          |
          |  match tx {
-         |    case t: TransferTransaction => t.senderPublicKey == base58'${firstDApp.publicKey.toString}'
-         |    case r: ReissueTransaction => r.senderPublicKey == base58'${firstDApp.publicKey.toString}'
-         |    case b: BurnTransaction => b.senderPublicKey == base58'${firstDApp.publicKey.toString}'
-         |
+         |    case t: TransferTransaction => t.senderPublicKey.toBase58String() == "${firstDApp.publicKey.toString}"
+         |     && t.assetId.value().toBase58String() == "$firstAssetId"
+         |     && toBase64String(t.attachment) == ""
+         |     && t.bodyBytes.size() == 0
+         |     && t.fee == 0
+         |     && t.id.size() != 0
+         |     && toBase58String(addressFromRecipient(t.recipient).bytes) == "${secondDApp.toAddress.toString}"
+         |     && toBase58String(t.sender.bytes) == "${firstDApp.toAddress.toString}"
+         |     && t.version == 0
+         |    case r: ReissueTransaction => r.senderPublicKey.toBase58String() == "${firstDApp.publicKey.toString}"
+         |     && r.assetId.value().toBase58String() == "$firstAssetId"
+         |     && r.bodyBytes.size() == 0
+         |     && r.fee == 0
+         |     && r.id.size() != 0
+         |     && toBase58String(r.sender.bytes) == "${firstDApp.toAddress.toString}"
+         |     && r.version == 0
+         |     && r.quantity == 100000
+         |     && r.reissuable == true
+         |    case b: BurnTransaction => b.senderPublicKey.toBase58String() == "${firstDApp.publicKey.toString}"
+         |     && b.assetId.value().toBase58String() == "$firstAssetId"
+         |     && b.bodyBytes.size() == 0
+         |     && b.fee == 0
+         |     && b.id.size() != 0
+         |     && toBase58String(b.sender.bytes) == "${firstDApp.toAddress.toString}"
+         |     && b.version == 0
+         |     && b.quantity == 100000
          |    case _ => throw(tx.senderPublicKey.toBase58String())
          |  }
          """.stripMargin,
       isAssetScript = true,
       ScriptEstimatorV3
     ).explicitGet()._1.bytes().base64
-    firstAssetId = sender.issue(firstDApp, fee = issueFee, script = Some(smartAssetScript), waitForTx = true).id
-    secondAssetId = sender.issue(secondDApp, fee = issueFee, script = Some(smartAssetScript), waitForTx = true).id
+
+    sender.setAssetScript(firstAssetId, firstDApp, script = Some(smartAssetScript), waitForTx = true)
+    sender.setAssetScript(secondAssetId, secondDApp, script = Some(smartAssetScript), waitForTx = true)
 
     val dAppScript = ScriptCompiler(
       s"""
