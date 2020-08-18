@@ -14,6 +14,7 @@ import com.wavesplatform.protobuf.{Amount, transaction}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.NonPositiveAmount
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, Verifier}
 import com.wavesplatform.{EitherMatchers, TransactionGen, crypto}
 import org.scalatest._
@@ -336,7 +337,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
           List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get).explicitGet())
         )
       ),
-      payment = Some(Seq(Payment(-1, Waves))),
+      payment = Some(Seq(Payment(-1L, Waves))),
       dApp = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,
       proofs =
