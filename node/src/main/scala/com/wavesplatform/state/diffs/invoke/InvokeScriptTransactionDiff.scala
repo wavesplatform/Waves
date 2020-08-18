@@ -102,11 +102,10 @@ object InvokeScriptTransactionDiff {
                 val height = blockchain.height
 
                 val disableThisWhenCalledByAlias = tx.dAppAddressOrAlias match {
+                  case _: Alias if AddressScheme.current.chainId == 'T'.toByte =>
+                    !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5) && blockchain.height > 1100000
                   case _: Alias =>
-                    AddressScheme.current.chainId == 'T'.toByte &&
-                      !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5) &&
-                      blockchain.height > 1100000
-
+                    !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)
                   case _ => false
                 }
 
