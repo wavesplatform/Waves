@@ -31,16 +31,16 @@ object ScriptRunner {
       scriptContainerAddress: Environment.Tthis,
       complexityLimit: Int = Int.MaxValue,
       default: EVALUATED = TRUE
-  ): (Log[Id], Either[ExecutionError, EVALUATED]) = {
+  ): (Log[Id], Complexity, Either[ExecutionError, EVALUATED]) = {
 
     def evalVerifier(
         isContract: Boolean,
-        partialEvaluate: (DirectiveSet, EvaluationContext[Environment, Id]) => Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])]
-    ) = {
+        partialEvaluate: (DirectiveSet, EvaluationContext[Environment, Id]) => Either[(ExecutionError, Complexity, Log[Id]), (EVALUATED, Complexity, Log[Id])]
+    ): (Log[Id], Complexity, Either[ExecutionError, EVALUATED]) = {
       val txId = in.eliminate(_.id(), _ => ByteStr.empty)
       val eval = for {
-        ds <- DirectiveSet(script.stdLibVersion, if (isAssetScript) Asset else Account, Expression).leftMap((_, Nil))
-        mi <- buildThisValue(in, blockchain, ds, scriptContainerAddress).leftMap((_, Nil))
+        ds <- DirectiveSet(script.stdLibVersion, if (isAssetScript) Asset else Account, Expression).leftMap((_, 0L, Nil))
+        mi <- buildThisValue(in, blockchain, ds, scriptContainerAddress).leftMap((_, 0L, Nil))
         ctx <- BlockchainContext
           .build(
             script.stdLibVersion,
@@ -53,13 +53,13 @@ object ScriptRunner {
             scriptContainerAddress,
             txId
           )
-          .leftMap((_, Nil))
+          .leftMap((_, 0L, Nil))
         result <- partialEvaluate(ds, ctx)
       } yield result
 
       eval.fold(
-        { case (error, log)  => (log, error.asLeft[EVALUATED]) },
-        { case (result, log) => (log, result.asRight[ExecutionError]) }
+        { case (error, unusedComplexity, log)  => (log, unusedComplexity, error.asLeft[EVALUATED]) },
+        { case (result, unusedComplexity, log) => (log, unusedComplexity, result.asRight[ExecutionError]) }
       )
     }
 
@@ -74,13 +74,13 @@ object ScriptRunner {
         evalVerifier(isContract = false, (_, ctx) => evaluate(ctx, s.expr))
 
       case ContractScript.ContractScriptImpl(_, DApp(_, decls, _, Some(vf))) =>
-        val partialEvaluate: (DirectiveSet, EvaluationContext[Environment, Id]) => Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] = {
+        val partialEvaluate: (DirectiveSet, EvaluationContext[Environment, Id]) => Either[(ExecutionError, Complexity, Log[Id]), (EVALUATED, Complexity, Log[Id])] = {
           (directives, ctx) =>
             val verify = ContractEvaluator.verify(decls, vf, ctx, evaluate, _)
             in.eliminate(
               t =>
                 RealTransactionWrapper(t, blockchain, directives.stdLibVersion, DAppTarget)
-                  .leftMap((_, Nil))
+                  .leftMap((_, 0L, Nil))
                   .flatMap(tx => verify(Bindings.transactionObject(tx, proofsEnabled = true))),
               _.eliminate(
                 t => verify(Bindings.orderObject(RealTransactionWrapper.ord(t), proofsEnabled = true)),
@@ -99,10 +99,10 @@ object ScriptRunner {
               _ => ???
             )
           )
-        (Nil, Verifier.verifyAsEllipticCurveSignature(proven).bimap(_.err, _ => TRUE))
+        (Nil, 0L, Verifier.verifyAsEllipticCurveSignature(proven).bimap(_.err, _ => TRUE))
 
       case other =>
-        (Nil, s"$other: Unsupported script version".asLeft[EVALUATED])
+        (Nil, 0L, s"$other: Unsupported script version".asLeft[EVALUATED])
     }
   }
 }

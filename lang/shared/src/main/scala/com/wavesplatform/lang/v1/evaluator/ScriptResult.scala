@@ -13,10 +13,12 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain._
 
-sealed trait ScriptResult
-case class ScriptResultV3(ds: List[DataItem[_]], ts: List[AssetTransfer]) extends ScriptResult
-case class ScriptResultV4(actions: List[CallableAction])                  extends ScriptResult
-case class IncompleteResult(expr: EXPR, unusedComplexity: Int)            extends ScriptResult
+sealed trait ScriptResult {
+  def spentComplexity: Complexity = 0
+}
+case class ScriptResultV3(ds: List[DataItem[_]], ts: List[AssetTransfer], override val spentComplexity: Complexity) extends ScriptResult
+case class ScriptResultV4(actions: List[CallableAction], override val spentComplexity: Complexity)                  extends ScriptResult
+case class IncompleteResult(expr: EXPR, unusedComplexity: Complexity, override val spentComplexity: Complexity)     extends ScriptResult
 
 object ScriptResult {
   type E[A] = Either[String, A]
@@ -134,7 +136,7 @@ object ScriptResult {
       case other => err(other, V3, s"List(${FieldNames.Transfers})")
     }
 
-  private def processScriptResultV3(ctx: EvaluationContext[Environment, Id], fields: Map[String, EVALUATED]): Either[String, ScriptResultV3] = {
+  private def processScriptResultV3(ctx: EvaluationContext[Environment, Id], fields: Map[String, EVALUATED], spentComplexity: Complexity): Either[String, ScriptResultV3] = {
     val writes = fields(FieldNames.ScriptWriteSet) match {
       case CaseObj(tpe, fields) if tpe.name == FieldNames.WriteSet => processWriteSetV3(fields)
       case other                                                   => err(other, V3, FieldNames.Data)
@@ -146,7 +148,7 @@ object ScriptResult {
     for {
       w <- writes
       p <- payments
-    } yield ScriptResultV3(w, p)
+    } yield ScriptResultV3(w, p, spentComplexity)
   }
 
   private def processIssue(ctx: EvaluationContext[Environment, Id], parentId: ByteStr, fields: Map[String, EVALUATED]): Either[String, Issue] = {
@@ -218,7 +220,7 @@ object ScriptResult {
         err(other, V4, FieldNames.SponsorFee)
     }
 
-  private def processScriptResultV4(ctx: EvaluationContext[Environment, Id], txId: ByteStr, actions: Seq[EVALUATED]): Either[String, ScriptResultV4] =
+  private def processScriptResultV4(ctx: EvaluationContext[Environment, Id], txId: ByteStr, actions: Seq[EVALUATED], spentComplexity: Complexity): Either[String, ScriptResultV4] =
     actions.toList
       .traverse {
         case obj @ CaseObj(actionType, fields) =>
@@ -229,7 +231,7 @@ object ScriptResult {
 
         case other => err(other, V4)
       }
-      .map(ScriptResultV4)
+      .map(ScriptResultV4(_, spentComplexity))
 
   private val v4ActionHandlers
       : Map[String, (EvaluationContext[Environment, Id], ByteStr, Map[String, EVALUATED]) => Either[ExecutionError, CallableAction]] =
@@ -246,16 +248,16 @@ object ScriptResult {
       FieldNames.SponsorFee     -> ((_, _, a) => processSponsorFee(a))
     )
 
-  def fromObj(ctx: EvaluationContext[Environment, Id], txId: ByteStr, e: EVALUATED, version: StdLibVersion): Either[ExecutionError, ScriptResult] =
+  def fromObj(ctx: EvaluationContext[Environment, Id], txId: ByteStr, e: EVALUATED, version: StdLibVersion, spentComplexity: Complexity): Either[ExecutionError, ScriptResult] =
     (e, version) match {
       case (CaseObj(tpe, fields), V3) =>
         tpe.name match {
-          case FieldNames.WriteSet     => processWriteSetV3(fields).map(ScriptResultV3(_, List.empty))
-          case FieldNames.TransferSet  => processTransferSetV3(ctx, fields).map(ScriptResultV3(List.empty, _))
-          case FieldNames.ScriptResult => processScriptResultV3(ctx, fields)
+          case FieldNames.WriteSet     => processWriteSetV3(fields).map(ScriptResultV3(_, List.empty, spentComplexity))
+          case FieldNames.TransferSet  => processTransferSetV3(ctx, fields).map(ScriptResultV3(List.empty, _, spentComplexity))
+          case FieldNames.ScriptResult => processScriptResultV3(ctx, fields, spentComplexity)
           case f                       => err(f, version)
         }
-      case (ARR(actions), V4) => processScriptResultV4(ctx, txId, actions)
+      case (ARR(actions), V4) => processScriptResultV4(ctx, txId, actions, spentComplexity)
 
       case c => err(c.toString, version)
     }

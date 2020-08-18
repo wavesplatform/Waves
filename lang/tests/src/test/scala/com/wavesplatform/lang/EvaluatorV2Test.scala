@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, FunctionIds}
+import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, NoSuchElementException, FunctionIds, Complexity}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
@@ -32,12 +32,12 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
   private val evaluator =
     new EvaluatorV2(LoggedEvaluationContext(_ => _ => (), ctx.evaluationContext(environment)), version)
 
-  private def eval(expr: EXPR, limit: Int): (EXPR, String, Int) = {
+  private def eval(expr: EXPR, limit: Complexity): (EXPR, String, Complexity) = {
     val (result, unusedComplexity) = evaluator(expr, limit)
     (result, Decompiler(result, ctx.decompilerContext), limit - unusedComplexity)
   }
 
-  private def eval(script: String, limit: Int): (EXPR, String, Int) =
+  private def eval(script: String, limit: Complexity): (EXPR, String, Complexity) =
     eval(compile(script), limit)
 
   private def compile(script: String): EXPR = {
@@ -797,25 +797,25 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
       a(n) = a - (a1 + ... + a(i-1))
     */
     @tailrec def randomPieces(
-      expectedSum: Int,
-      piecesNumber: Int,
-      generatedSum: Int = 0,
-      acc: List[Int] = Nil
-    ): List[Int] =
+      expectedSum: Complexity,
+      piecesNumber: Complexity,
+      generatedSum: Complexity = 0,
+      acc: List[Complexity] = Nil
+    ): List[Complexity] =
       if (acc.size + 1 == piecesNumber)
         expectedSum - generatedSum :: acc
       else {
         val max = expectedSum - generatedSum - piecesNumber + acc.size + 1
-        val distributionCoefficient = random.nextInt(Math.min(max, piecesNumber)) + 1
-        val next = random.nextInt(max / distributionCoefficient) + 1
+        val distributionCoefficient = random.nextLong(Math.min(max, piecesNumber)) + 1
+        val next = random.nextLong(max / distributionCoefficient) + 1
         randomPieces(expectedSum, piecesNumber, generatedSum + next, next :: acc)
       }
 
     val (evaluated, _, precalculatedComplexity) = eval(script, 1500)
-    val startCost = 0
+    val startCost = 0L
     def expr() = compile(script)
 
-    val piecesGen = Gen.choose(2, 100)
+    val piecesGen = Gen.choose(2L, 100L)
       .map(randomPieces(precalculatedComplexity, _))
 
     forAll(piecesGen) { pieces =>

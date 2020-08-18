@@ -113,7 +113,9 @@ object TransactionDiffer {
       } yield ()
 
   private def verifierDiff(blockchain: Blockchain, tx: Transaction) =
-    Verifier(blockchain)(tx).as(Diff.empty.copy(scriptsComplexity = DiffsCommon.getAccountsComplexity(blockchain, tx)))
+    Verifier(blockchain)(tx) match {
+      case (complexity, ttx) => ttx.as(Diff.empty.copy(scriptsComplexity = DiffsCommon.getAccountsComplexity(blockchain, tx), spentComplexity = complexity))
+    }
 
   private def assetsVerifierDiff(
       blockchain: Blockchain,
@@ -124,16 +126,16 @@ object TransactionDiffer {
   ): TracedResult[ValidationError, Diff] = {
     val diff = if (verify) {
       Verifier.assets(blockchain, remainingComplexity)(tx).leftMap {
-        case (spentComplexity, ScriptExecutionError(error, log, Some(assetId))) if mayFail(tx) && acceptFailed(blockchain) =>
-          FailedTransactionError.assetExecution(error, spentComplexity, log, assetId)
-        case (spentComplexity, TransactionNotAllowedByScript(log, Some(assetId))) if mayFail(tx) && acceptFailed(blockchain) =>
-          FailedTransactionError.notAllowedByAsset(spentComplexity, log, assetId)
-        case (_, ve) => ve
+        case (spentComplexity, real, ScriptExecutionError(error, log, Some(assetId))) if mayFail(tx) && acceptFailed(blockchain) =>
+          FailedTransactionError.assetExecution(error, spentComplexity, real, log, assetId)
+        case (spentComplexity, real, TransactionNotAllowedByScript(log, Some(assetId))) if mayFail(tx) && acceptFailed(blockchain) =>
+          FailedTransactionError.notAllowedByAsset(spentComplexity, real, log, assetId)
+        case (_, _, ve) => ve
       }
     } else Diff.empty.asRight[ValidationError].traced
 
     diff.map(Monoid.combine(initDiff, _)).leftMap {
-      case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity)
+      case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity, initDiff.spentComplexity)
       case ve                          => ve
     }
   }
@@ -168,7 +170,7 @@ object TransactionDiffer {
     diff
       .map(d => Monoid.combine(initDiff, d))
       .leftMap {
-        case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity)
+        case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity, initDiff.spentComplexity)
         case ve                          => ve
       }
   }

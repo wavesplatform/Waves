@@ -28,7 +28,7 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
       compileResult <- ExpressionCompiler(compilerContext(version, Expression, isAssetScript = false), expr)
       (typedExpr, _) = compileResult
       s <- ExprScript(version, typedExpr, checkSize = false)
-      r <- ScriptRunner(Coproduct(tx), blockchain, s, isAssetScript = false, null)._2
+      r <- ScriptRunner(Coproduct(tx), blockchain, s, isAssetScript = false, null)._3
     } yield r
 
   }
