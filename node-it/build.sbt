@@ -9,6 +9,7 @@ def stageFiles(ref: ProjectReference): TaskKey[File] =
   ref / Universal / stage
 
 (Test / test) := (Test / test).dependsOn(Docker / docker).value
+(Test / testOptions) := Seq(Tests.Filter(s => s.contains("MassTransferTransactionGrpcSuite")))
 
 inTask(docker)(
   Seq(

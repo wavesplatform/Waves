@@ -21,6 +21,7 @@ import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.{Asset, TxVersion}
+import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
 import monix.execution.Scheduler
@@ -30,7 +31,7 @@ import play.api.libs.json.Json
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-object AsyncGrpcApi {
+object AsyncGrpcApi extends ScorexLogging {
   implicit class NodeAsyncGrpcApi(val n: Node) {
 
     import com.wavesplatform.protobuf.transaction.{Transaction => PBTransaction, _}
@@ -503,7 +504,10 @@ object AsyncGrpcApi {
     val subj = ConcurrentSubject.publishToOne[T]
 
     val observer = new StreamObserver[T] {
-      override def onNext(value: T): Unit      = subj.onNext(value)
+      override def onNext(value: T): Unit      = {
+        log.info(s"NODE-2180: value received: $value")
+        subj.onNext(value)
+      }
       override def onError(t: Throwable): Unit = subj.onError(t)
       override def onCompleted(): Unit         = subj.onComplete()
     }

@@ -3,14 +3,16 @@ package com.wavesplatform.api.grpc
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.transaction.Authorized
+import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.StreamObserver
 import io.grpc.{Status, StatusRuntimeException}
+import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.Observable
 
 import scala.concurrent.Future
 
-class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Scheduler) extends TransactionsApiGrpc.TransactionsApi {
+class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Scheduler) extends TransactionsApiGrpc.TransactionsApi with ScorexLogging {
 
   override def getTransactions(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit =
     responseObserver.interceptErrors {
@@ -95,7 +97,7 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
           }
           .getOrElse(TransactionStatus(txId, TransactionStatus.Status.NOT_EXISTS))
       }
-      responseObserver.completeWith(result)
+      responseObserver.completeWith(result.doOnNext(s => Task(log.info(s"NODE-2180: value sent: $s"))))
     }
 
   override def sign(request: SignRequest): Future[PBSignedTransaction] = Future {
