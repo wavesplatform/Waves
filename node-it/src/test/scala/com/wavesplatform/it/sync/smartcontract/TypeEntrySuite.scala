@@ -145,7 +145,6 @@ class TypeEntrySuite extends BaseTransactionSuite {
   }
 
   test("check dApp getEntry") {
-    val currentHeight = sender.height
     sender.invokeScript(
       caller,
       firstDApp.toAddress.toString,
