@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract
 
+import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.sync.{issueFee, scriptBase64, smartMinFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -133,16 +134,14 @@ class TypeEntrySuite extends BaseTransactionSuite {
       caller,
       firstDApp.toAddress.toString,
       func = Some("deleteEntries"),
-      fee = issueFee,
-      waitForTx = true
-    ))
+      fee = issueFee
+    ), AssertiveApiError(TransactionNotAllowedByAssetScript.Id, "value() called on unit value", matchMessage = true))
     assertApiError(sender.invokeScript(
       caller,
       firstDApp.toAddress.toString,
       func = Some("writeDeleteEntries"),
       fee = issueFee,
-      waitForTx = true
-    ))
+    ), AssertiveApiError(TransactionNotAllowedByAssetScript.Id, "value() called on unit value", matchMessage = true))
   }
 
   test("check dApp getEntry") {
