@@ -191,8 +191,8 @@ class ScriptEstimatorV3ContinuationFirstStepTest extends ScriptEstimatorTestBase
       (ctx(V4)
         .evaluationContext(env)
         .functions
-        .map(f => f._1 -> (f._2.costByLibVersion(V4), f._2.expr.map(_(env))))
-        + (User("Address") -> (1L, None)))
+        .map(f => (f._1, (f._2.costByLibVersion(V4), f._2.expr.map(_(env)))))
+        + ((User("Address"), (1L, None))))
 
     val estimate = ScriptEstimatorV3(continuationFirstStepMode = true)
     estimate(lets, functionsCostWithExprs, functionCosts(V4), compile(script)(V4)) shouldBe Right(37)
