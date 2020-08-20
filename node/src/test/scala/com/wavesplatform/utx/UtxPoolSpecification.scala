@@ -670,6 +670,7 @@ class UtxPoolSpecification
             (() => blockchain.settings).when().returning(WavesSettings.default().blockchainSettings)
             (() => blockchain.height).when().returning(1)
             (() => blockchain.activatedFeatures).when().returning(Map.empty)
+            (() => blockchain.continuationStates).when().returning(Map.empty)
 
             val utx =
               new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
@@ -753,6 +754,7 @@ class UtxPoolSpecification
         val tb = TestBlock.create(Nil)
         (blockchain.blockHeader _).when(*).returning(Some(SignedBlockHeader(tb.header, tb.signature)))
         (blockchain.transactionMeta _).when(*).returning(None)
+        (() => blockchain.continuationStates).when().returning(Map.empty)
         blockchain
       }
 
