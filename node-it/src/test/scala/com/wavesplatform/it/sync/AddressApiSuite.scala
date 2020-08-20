@@ -14,6 +14,19 @@ import play.api.libs.json._
 import scala.util.Random
 
 class AddressApiSuite extends BaseTransactionSuite with NTPTime {
+  test("balance at height") {
+    val address = sender.createKeyPair().toAddress.stringRepr
+    sender.transfer(sender.keyPair, address, 1, waitForTx = true)
+    nodes.waitForHeightArise()
+    sender.transfer(sender.keyPair, address, 1, waitForTx = true)
+    nodes.waitForHeightArise()
+    sender.transfer(sender.keyPair, address, 1, waitForTx = true)
+    nodes.waitForHeightArise()
+
+    val Seq(_, h2, _) = sender.debugBalanceHistory(address)
+    val Seq((_, balance)) = sender.accountsBalances(Some(h2.height), Seq(address))
+    balance shouldBe 2
+  }
 
   test("filter accounts data by regexp") {
     val dataKeys = List("1aB1cD!@#$", "\"\\", "\u0000qweqwe", "\t\r\n", "reeeee", "rerere", "rerrre", "rre", "eeeee")

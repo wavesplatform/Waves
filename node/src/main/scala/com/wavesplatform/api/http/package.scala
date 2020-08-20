@@ -63,20 +63,21 @@ package object http extends ApiMarshallers with ScorexLogging {
               case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
               case Some(x) =>
                 x match {
-                  case TransferTransaction       => txJson.as[TransferRequest].toTxFrom(senderPk)
-                  case CreateAliasTransaction    => txJson.as[CreateAliasRequest].toTxFrom(senderPk)
-                  case LeaseTransaction          => txJson.as[LeaseRequest].toTxFrom(senderPk)
-                  case LeaseCancelTransaction    => txJson.as[LeaseCancelRequest].toTxFrom(senderPk)
-                  case ExchangeTransaction       => txJson.as[ExchangeRequest].toTxFrom(senderPk)
-                  case IssueTransaction          => txJson.as[IssueRequest].toTxFrom(senderPk)
-                  case ReissueTransaction        => txJson.as[ReissueRequest].toTxFrom(senderPk)
-                  case BurnTransaction           => txJson.as[BurnRequest].toTxFrom(senderPk)
-                  case MassTransferTransaction   => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], senderPk)
-                  case DataTransaction           => TransactionFactory.data(txJson.as[DataRequest], senderPk)
-                  case InvokeScriptTransaction   => TransactionFactory.invokeScript(txJson.as[InvokeScriptRequest], senderPk)
-                  case SetScriptTransaction      => TransactionFactory.setScript(txJson.as[SetScriptRequest], senderPk)
-                  case SetAssetScriptTransaction => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], senderPk)
-                  case SponsorFeeTransaction     => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], senderPk)
+                  case TransferTransaction        => txJson.as[TransferRequest].toTxFrom(senderPk)
+                  case CreateAliasTransaction     => txJson.as[CreateAliasRequest].toTxFrom(senderPk)
+                  case LeaseTransaction           => txJson.as[LeaseRequest].toTxFrom(senderPk)
+                  case LeaseCancelTransaction     => txJson.as[LeaseCancelRequest].toTxFrom(senderPk)
+                  case ExchangeTransaction        => txJson.as[ExchangeRequest].toTxFrom(senderPk)
+                  case IssueTransaction           => txJson.as[IssueRequest].toTxFrom(senderPk)
+                  case ReissueTransaction         => txJson.as[ReissueRequest].toTxFrom(senderPk)
+                  case BurnTransaction            => txJson.as[BurnRequest].toTxFrom(senderPk)
+                  case MassTransferTransaction    => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], senderPk)
+                  case DataTransaction            => TransactionFactory.data(txJson.as[DataRequest], senderPk)
+                  case InvokeScriptTransaction    => TransactionFactory.invokeScript(txJson.as[InvokeScriptRequest], senderPk)
+                  case SetScriptTransaction       => TransactionFactory.setScript(txJson.as[SetScriptRequest], senderPk)
+                  case SetAssetScriptTransaction  => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], senderPk)
+                  case SponsorFeeTransaction      => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], senderPk)
+                  case UpdateAssetInfoTransaction => txJson.as[UpdateAssetInfoRequest].toTxFrom(senderPk)
                 }
             }
           }
@@ -96,7 +97,7 @@ package object http extends ApiMarshallers with ScorexLogging {
   private def base58Segment(requiredLength: Option[Int], error: String => ApiError): PathMatcher1[ByteStr] = Segment.map { str =>
     ByteStr.decodeBase58(str) match {
       case Success(value) if requiredLength.forall(_ == value.arr.length) => value
-      case _                                                          => throw ApiException(error(str))
+      case _                                                              => throw ApiException(error(str))
     }
   }
 
@@ -104,14 +105,17 @@ package object http extends ApiMarshallers with ScorexLogging {
     ByteStr.decodeBase58(str) match {
       case Success(value) =>
         if (value.arr.length == crypto.DigestLength || value.arr.length == crypto.SignatureLength) value
-        else throw ApiException(error(s"$str has invalid length ${value.arr.length}. Length can either be ${crypto.DigestLength} or ${crypto.SignatureLength}"))
+        else
+          throw ApiException(
+            error(s"$str has invalid length ${value.arr.length}. Length can either be ${crypto.DigestLength} or ${crypto.SignatureLength}")
+          )
       case Failure(exception) =>
         throw ApiException(error(exception.getMessage))
     }
   }
 
   val TransactionId: PathMatcher1[ByteStr] = idOrHash(InvalidTransactionId)
-  val BlockId: PathMatcher1[ByteStr] = idOrHash(InvalidBlockId)
+  val BlockId: PathMatcher1[ByteStr]       = idOrHash(InvalidBlockId)
 
   val AssetId: PathMatcher1[IssuedAsset] = base58Segment(Some(crypto.DigestLength), _ => InvalidAssetId).map(IssuedAsset)
 

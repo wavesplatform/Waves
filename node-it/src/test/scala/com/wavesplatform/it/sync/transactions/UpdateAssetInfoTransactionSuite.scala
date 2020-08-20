@@ -1,7 +1,9 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http.ApiError.{InvalidName, StateCheckFailed, TooBigArrayAllocation}
+import com.wavesplatform.api.http.requests.UpdateAssetInfoRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs.{Miners, NotMiner}
@@ -13,9 +15,11 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 import org.scalatest.prop.TableDrivenPropertyChecks
+import play.api.libs.json.{JsObject, Json}
 
 import scala.concurrent.duration._
 import scala.util.Random
@@ -29,15 +33,16 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
       configWithUpdateIntervalSetting(updateInterval).withFallback(NotMiner)
     )
 
-  private def issuer       = firstKeyPair
-  private def nonIssuer    = secondKeyPair
-  private def dApp         = thirdKeyPair
-  var assetId      = ""
-  var otherAssetId = ""
-  var smartAssetId = ""
-  var nftId        = ""
+  private def issuer    = firstKeyPair
+  private def nonIssuer = secondKeyPair
+  private def dApp      = thirdKeyPair
+  var assetId           = ""
+  var otherAssetId      = ""
+  var smartAssetId      = ""
+  var nftId             = ""
 
-  val testDapp = """
+  val testDapp =
+    """
     {-# STDLIB_VERSION 4 #-}
     {-# CONTENT_TYPE DAPP #-}
     {-# SCRIPT_TYPE ACCOUNT #-}
@@ -100,11 +105,35 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
         Terms.CONST_BYTESTR(ByteStr(issuer.publicKey.arr)).explicitGet(),
         Terms.CONST_BOOLEAN(true),
         Terms.CONST_BOOLEAN(false)
-        ),
+      ),
       waitForTx = true
     )
     val res = sender.getDataByKey(dApp.toAddress.toString, "isAssetInfoCorrect")
     res.value shouldBe true
+  }
+
+  test("able to calculate fee for an update asset tx") {
+    val txJson = Json
+      .toJson(
+        UpdateAssetInfoRequest(
+          TxVersion.V1,
+          AddressScheme.current.chainId,
+          None,
+          Some(issuer.publicKey.toString),
+          assetId,
+          "test",
+          "test",
+          None,
+          0L,
+          None,
+          None
+        )
+      )
+      .as[JsObject] ++ Json.obj("type" -> UpdateAssetInfoTransaction.typeId)
+
+    val fee = sender.calculateFee(txJson)
+    fee.feeAmount shouldBe 1e5.toLong
+    fee.feeAssetId shouldBe None
   }
 
   test("able to update name/description of issued asset") {
@@ -154,7 +183,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
         Terms.CONST_BYTESTR(ByteStr(issuer.publicKey.arr)).explicitGet(),
         Terms.CONST_BOOLEAN(true),
         Terms.CONST_BOOLEAN(false)
-        ),
+      ),
       waitForTx = true
     )
     val res = sender.getDataByKey(dApp.toAddress.toString, "isAssetInfoCorrect")
@@ -317,8 +346,8 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
           | this.minSponsoredFee == unit
           |case _ => false
           |}""".stripMargin
-    val script1 = ScriptCompiler(scriptText1, isAssetScript = true, ScriptEstimatorV2).explicitGet()._1.bytes().base64
-    sender.setAssetScript(smartAssetId1, issuer, setAssetScriptFee, Some(script1),  waitForTx = true)
+    val script1     = ScriptCompiler(scriptText1, isAssetScript = true, ScriptEstimatorV2).explicitGet()._1.bytes().base64
+    sender.setAssetScript(smartAssetId1, issuer, setAssetScriptFee, Some(script1), waitForTx = true)
 
     sender.burn(issuer, smartAssetId1, 1, minFee + 2 * smartFee, waitForTx = true)
   }
@@ -345,7 +374,6 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     sender.updateAssetInfo(issuer, smartAssetId, "updatedName", "updatedDescription", minFee + 2 * smartFee, waitForTx = true)
     nodes.waitForHeightArise()
   }
-
 
   test("able to update name/description of nft") {
     val updateAssetInfoTxId = sender.updateAssetInfo(issuer, nftId, "updatedName", "updatedDescription", minFee + smartFee)._1.id
