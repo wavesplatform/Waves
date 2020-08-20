@@ -1,11 +1,11 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
+import com.wavesplatform.api.http.ApiError.{ScriptExecutionError, TransactionNotAllowedByAssetScript}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.sync.{issueFee, scriptBase64, smartMinFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state
@@ -16,11 +16,10 @@ class TypeEntrySuite extends BaseTransactionSuite {
   private def firstDApp     = firstKeyPair
   private def secondDApp    = secondKeyPair
   private def caller        = thirdKeyPair
+  private val base58String  = "49ReVPc83oQRqoWuuTkBC"
   private var firstAssetId  = ""
-  private var secondAssetId = ""
   protected override def beforeAll(): Unit = {
     super.beforeAll()
-    firstAssetId = sender.issue(firstDApp, fee = issueFee, script = Some(scriptBase64), waitForTx = true).id
 
     val smartAssetScript = ScriptCompiler(
       s"""
@@ -28,7 +27,7 @@ class TypeEntrySuite extends BaseTransactionSuite {
          |{-# CONTENT_TYPE EXPRESSION #-}
          |{-# SCRIPT_TYPE ASSET #-}
          |
-         |getBinaryValue(addressFromStringValue(""), "bin") == base58''
+         |getBinaryValue(addressFromStringValue(""), "bin") == fromBase58String("$base58String").value()
          |  && getIntegerValue(addressFromStringValue(""), "int") == 1
          |  && getBooleanValue(addressFromStringValue(""), "bool") == true
          |  && getStringValue(addressFromStringValue(""), "str") == "string"
@@ -38,14 +37,13 @@ class TypeEntrySuite extends BaseTransactionSuite {
     ).explicitGet()._1.bytes().base64
 
     firstAssetId = sender.issue(firstDApp, fee = issueFee, script = Some(smartAssetScript), waitForTx = true).id
-    sender.setAssetScript(firstAssetId, firstDApp, script = Some(smartAssetScript), waitForTx = true)
 
     val dAppScript = ScriptCompiler(
       s"""
          |{-# STDLIB_VERSION 4 #-}
          |{-# CONTENT_TYPE DAPP #-}
          |{-# SCRIPT_TYPE ACCOUNT #-}
-         |let binary = base58''
+         |let binary = fromBase58String("$base58String").value()
          |let boolean = true
          |let integer = 1
          |let string = "string"
@@ -107,10 +105,10 @@ class TypeEntrySuite extends BaseTransactionSuite {
          |{-# CONTENT_TYPE EXPRESSION #-}
          |{-# SCRIPT_TYPE ACCOUNT #-}
          |
-         |getBinaryValue(this, "bin") == base58''
-         |  && getIntegerValue(this, "int") == 1
-         |  && getBooleanValue(this, "bool") == true
-         |  && getStringValue(this, "str") == "string"
+         |getBinaryValue(addressFromStringValue("${firstDApp.toAddress.toString}"), "bin") == fromBase58String("$base58String").value()
+         |  && getIntegerValue(addressFromStringValue("${firstDApp.toAddress.toString}"), "int") == 1
+         |  && getBooleanValue(addressFromStringValue("${firstDApp.toAddress.toString}"), "bool") == true
+         |  && getStringValue(addressFromStringValue("${firstDApp.toAddress.toString}"), "str") == "string"
          |
          """.stripMargin,
       isAssetScript = false,
@@ -135,13 +133,21 @@ class TypeEntrySuite extends BaseTransactionSuite {
       firstDApp.toAddress.toString,
       func = Some("deleteEntries"),
       fee = issueFee
-    ), AssertiveApiError(TransactionNotAllowedByAssetScript.Id, "value() called on unit value", matchMessage = true))
+    )) {
+      err =>
+        err.message should include regex "called on unit"
+        err.id shouldBe ScriptExecutionError.Id
+    }
     assertApiError(sender.invokeScript(
       caller,
       firstDApp.toAddress.toString,
       func = Some("writeDeleteEntries"),
       fee = issueFee,
-    ), AssertiveApiError(TransactionNotAllowedByAssetScript.Id, "value() called on unit value", matchMessage = true))
+    )) {
+      err =>
+        err.message should include regex "called on unit"
+        err.id shouldBe ScriptExecutionError.Id
+    }
   }
 
   test("check dApp getEntry") {
@@ -160,7 +166,7 @@ class TypeEntrySuite extends BaseTransactionSuite {
       waitForTx = true
     )
     sender.getDataByKey(firstDApp.toAddress.toString, "str").value shouldBe "string"
-    sender.getDataByKey(firstDApp.toAddress.toString, "bin").value shouldBe Array.emptyByteArray
+    s"${sender.getDataByKey(firstDApp.toAddress.toString, "bin").value}" shouldBe base58String
     sender.getDataByKey(firstDApp.toAddress.toString, "bool").value shouldBe true
     sender.getDataByKey(firstDApp.toAddress.toString, "int").value shouldBe 1
     sender.getDataByKey(firstDApp.toAddress.toString, "check").value shouldBe true

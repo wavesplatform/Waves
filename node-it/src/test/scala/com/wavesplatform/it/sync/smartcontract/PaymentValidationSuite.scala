@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
+import com.wavesplatform.api.http.ApiError.{ScriptExecutionError, TransactionNotAllowedByAssetScript}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.sync.{issueFee, setAssetScriptFee, setScriptFee, smartFee, smartMinFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -47,9 +47,12 @@ class PaymentValidationSuite extends BaseTransactionSuite {
     val smartAssetId = sender.issue(caller, script = Some(scr), fee = issueFee + smartFee, waitForTx = true).id
 
     assertApiError(
-      sender.invokeScript(caller, dApp.toAddress.toString, func = Some("write"), payment = Seq(Payment(1000L, IssuedAsset(ByteStr(Base58.decode(smartAssetId))))), fee = issueFee),
-      AssertiveApiError(TransactionNotAllowedByAssetScript.Id, "value() called on unit value", matchMessage = true)
-    )
+      sender.invokeScript(caller, dApp.toAddress.toString, func = Some("write"),
+        payment = Seq(Payment(1000L, IssuedAsset(ByteStr(Base58.decode(smartAssetId))))), fee = issueFee)) {
+      err =>
+        err.message should include regex "called on unit"
+        err.id shouldBe ScriptExecutionError.Id
+    }
 
   }
 }
