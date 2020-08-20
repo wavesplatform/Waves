@@ -190,8 +190,8 @@ object InvokeDiffsCommon {
 
   def paymentsPart(
       tx: InvokeScriptTransaction,
-    dAppAddress: Address,
-    feePart: Map[Address, Portfolio]
+      dAppAddress: Address,
+      feePart: Map[Address, Portfolio]
   ): Diff = {
     val payablePart = tx.payments
       .map {
@@ -264,15 +264,14 @@ object InvokeDiffsCommon {
       maxKeySize = ContractLimits.MaxKeySizeInBytesByVersion(stdLibVersion)
       _ <- dataEntries
         .collectFirst {
-          Function.unlift {
-            entry =>
-              val length = entry.key.utf8Bytes.length
-              if (length > maxKeySize)
-                Some(s"Data entry key size = $length bytes must be less than $maxKeySize")
-              else if (entry.key.isEmpty && stdLibVersion >= V4)
-                Some(s"Data entry key should not be empty")
-              else
-                None
+          Function.unlift { entry =>
+            val length = entry.key.utf8Bytes.length
+            if (length > maxKeySize)
+              Some(s"Data entry key size = $length bytes must be less than $maxKeySize")
+            else if (entry.key.isEmpty && stdLibVersion >= V4)
+              Some(s"Data entry key should not be empty")
+            else
+              None
           }
         }
         .toLeft(())
