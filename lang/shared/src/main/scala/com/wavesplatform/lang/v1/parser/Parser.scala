@@ -307,7 +307,7 @@ object Parser {
               case ((s, Const(c), e), i) => PConst(c, PART.VALID(Pos(s,e), s"_${i+1}"))
               case ((s, Var(REF(_, v, _, _)), e), i) => PBind(Some(v), PART.VALID(Pos(s,e), s"_${i+1}"))
             }
-            Pattern(None, None, pats, Seq())
+            Pattern(None, Some(Tuple(Seq())), pats, Seq())
         }) | 
         (varDefP ~ comment ~ typesDefP).map(p => Pattern(p._1, Some(p._2), Seq(), Seq())) |
           (Index ~~ restMatchCaseInvalidP ~~ Index).map {

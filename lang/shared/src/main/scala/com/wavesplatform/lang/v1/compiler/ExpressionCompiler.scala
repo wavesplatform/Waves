@@ -238,9 +238,6 @@ object ExpressionCompiler {
       }
       _   <- {
         val defaultCasesCount = cases.count({ case Expressions.MATCH_CASE(_, Expressions.Pattern(_, Some(Expressions.Union(Seq())), Seq(), Seq()), _, _, _) => true; case _ => false } )
-//        println(cases)
-//        println(cases.filter({ case Expressions.MATCH_CASE(_, Expressions.Pattern(_, Some(Expressions.Union(Seq())), Seq(), Seq()), _, _, _) => true; case _ => false } ))
-//        if(defaultCasesCount >= 2) { println(cases) }
         Either.cond(
           defaultCasesCount < 2,
           (),
@@ -267,6 +264,10 @@ object ExpressionCompiler {
           mkIfCases(cases, matchTypes, ref, allowShadowVarName).toCompileM
         }
       ).handleError()
+      typesReducers <- cases.filter(c => c.pattern.consts.isEmpty && c.pattern.fields.forall({
+        case Expressions.PBind(_,_) => true
+        case Expressions.PConst(_,_) => false
+      })).traverse(c => handleCompositeType(p, (c.pattern match { case Expressions.Pattern(_, Some(t), _, _) => t ; case _ => ??? }), Some(exprTypes), allowShadowVarName))
       compiledMatch <- compileLetBlock(
         p,
         Expressions.LET(p, Expressions.PART.VALID(p, refTmpKey), expr),
@@ -279,15 +280,14 @@ object ExpressionCompiler {
         ),
         saveExprContext
       )
-      matchedTypesUnion = UNION.create(matchTypes)
-//      _ = if((cases.last.pattern.ty.isEmpty && (exprTypes >= matchedTypesUnion)) || (exprTypes equivalent matchedTypesUnion)) {
-//           ()
-//          } else {
-//            println((cases.last.pattern.ty, exprTypes, matchedTypesUnion))
-//          }
+      matchedTypesUnion = UNION.create(typesReducers)
+
       checkWithErr <-
           Either.cond(
-            cases.last.pattern.consts.isEmpty && ((cases.last.pattern.ty.fold(false)(_.isEmpty) && (exprTypes >= matchedTypesUnion)) || (exprTypes equivalent matchedTypesUnion)),
+            cases.last.pattern.consts.isEmpty &&
+              ((cases.last.pattern.ty.fold(false)(_.isEmpty) &&
+                (exprTypes >= matchedTypesUnion)) ||
+              (exprTypes equivalent matchedTypesUnion)),
               (),
               MatchNotExhaustive(p.start, p.end, exprTypes.typeList, matchTypes)
             )
@@ -669,11 +669,12 @@ object ExpressionCompiler {
           mc.pattern.fields.foldLeft(mc.expr) {
             (e, v) => v match {
               case Expressions.PBind(Some(v@Expressions.PART.VALID(pos, name)), Expressions.PART.VALID(_, a)) =>
-                val ty = caseType.fields.find(_._1 == a) match {
+                val ty = caseType.fields.find(_._1 == a).map(_._2)
+                /*match {
                   case Some((_,ty)) => ty
-                   case _ => ???
-                }
-                Expressions.BLOCK(pos, Expressions.LET(pos, v, Expressions.GETTER(pos, retyped, Expressions.PART.VALID(pos, a)), Some(ty), allowShadowVarName.contains(name)), e)
+                  case _ => ???
+                }*/
+                Expressions.BLOCK(pos, Expressions.LET(pos, v, Expressions.GETTER(pos, retyped, Expressions.PART.VALID(pos, a)), ty, allowShadowVarName.contains(name)), e)
               case Expressions.PBind(Some(Expressions.PART.INVALID(pos, str)), _) => ???
               case Expressions.PBind(_, Expressions.PART.INVALID(pos, str)) => ???
               case _ => e
@@ -694,41 +695,43 @@ object ExpressionCompiler {
         case Seq() => Seq()
         case f => Seq(f.reduce((a,b) =>  Expressions.BINARY_OP(mc.position, a, BinaryOperation.AND_OP, b)))
       })
-      //println(checkConsts)
-      UNION(caseType).unfold.typeList match {
-        case Nil => Right((if(checkConsts.isEmpty) blockWithNewVar else Expressions.IF(mc.position, checkConsts.reduce((a,b) => Expressions.BINARY_OP(mc.position, a, BinaryOperation.OR_OP, b)), blockWithNewVar, further)))
-        case types =>
-          def isInst(matchType: String): Expressions.EXPR =
-            Expressions
-              .FUNCTION_CALL(
-                mc.position,
-                Expressions.PART.VALID(mc.position, "_isInstanceOf"),
-                List(refTmp, Expressions.CONST_STRING(mc.position, Expressions.PART.VALID(mc.position, matchType)))
-              )
+      if(mc.pattern.ty == Some(Expressions.Tuple(Seq())) && mc.pattern.fields.nonEmpty) {
+        Right((if(checkConsts.isEmpty) blockWithNewVar else Expressions.IF(mc.position, checkConsts.reduce((a,b) => Expressions.BINARY_OP(mc.position, a, BinaryOperation.OR_OP, b)), blockWithNewVar, further)))
+      } else {
+        UNION(caseType).unfold.typeList match {
+          case Nil => Right((if(checkConsts.isEmpty) blockWithNewVar else Expressions.IF(mc.position, checkConsts.reduce((a,b) => Expressions.BINARY_OP(mc.position, a, BinaryOperation.OR_OP, b)), blockWithNewVar, further)))
+          case types =>
+            def isInst(matchType: String): Expressions.EXPR =
+              Expressions
+                .FUNCTION_CALL(
+                  mc.position,
+                  Expressions.PART.VALID(mc.position, "_isInstanceOf"),
+                  List(refTmp, Expressions.CONST_STRING(mc.position, Expressions.PART.VALID(mc.position, matchType)))
+                )
 
-          for {
-            cases <- types.map(_.name) match {
-              case hType :: tTypes =>
-                val typeIf =
-                  tTypes.foldLeft(isInst(hType))((other, matchType) => Expressions.BINARY_OP(mc.position, isInst(matchType), BinaryOperation.OR_OP, other))
-                val fullIf =
-                  if(checkConsts.isEmpty) {
-                    typeIf
-                  } else if(mc.pattern.consts.nonEmpty) {
-                    checkConsts.reduce((a,b) =>  Expressions.BINARY_OP(mc.position, a, BinaryOperation.OR_OP, b))
-                  } else {
-                    Expressions.BINARY_OP(mc.position, typeIf, BinaryOperation.AND_OP, checkConsts.reduce((a,b) =>  Expressions.BINARY_OP(mc.position, a, BinaryOperation.OR_OP, b)))
-                  }
-                //println(fullIf)
-                Right(Expressions.IF(mc.position, fullIf, blockWithNewVar, further))
-              case Nil => ???
-            }
-          } yield
-             if(mc.pattern.fields.isEmpty) {
-               cases
-             } else {
-               Expressions.BLOCK(mc.position, Expressions.LET(mc.position, retyped.key, retyped, Some(caseType), true), cases)
-             }
+            for {
+              cases <- types.map(_.name) match {
+                case hType :: tTypes =>
+                  val typeIf =
+                    tTypes.foldLeft(isInst(hType))((other, matchType) => Expressions.BINARY_OP(mc.position, isInst(matchType), BinaryOperation.OR_OP, other))
+                  val fullIf =
+                    if(checkConsts.isEmpty) {
+                      typeIf
+                    } else if(mc.pattern.consts.nonEmpty) {
+                      checkConsts.reduce((a,b) =>  Expressions.BINARY_OP(mc.position, a, BinaryOperation.OR_OP, b))
+                    } else {
+                      Expressions.BINARY_OP(mc.position, typeIf, BinaryOperation.AND_OP, checkConsts.reduce((a,b) =>  Expressions.BINARY_OP(mc.position, a, BinaryOperation.OR_OP, b)))
+                    }
+                  Right(Expressions.IF(mc.position, fullIf, blockWithNewVar, further))
+                case Nil => ???
+              }
+            } yield
+               if(mc.pattern.fields.isEmpty) {
+                 cases
+               } else {
+                 Expressions.BLOCK(mc.position, Expressions.LET(mc.position, retyped.key, retyped, Some(caseType), true), cases)
+               }
+        }
       }
     }
 

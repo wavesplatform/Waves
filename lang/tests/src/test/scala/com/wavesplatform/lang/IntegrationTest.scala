@@ -2115,5 +2115,18 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](sampleScript, Some(pointCInstance)) shouldBe evaluated(6)
   }
 
+  property("tuple destruct") {
+    val sampleScript =
+      """|
+         |match (5, "qqq") {
+         |  case (n, "qqq") => n
+         |  case _  => (1, "ggg")
+         |}
+         |
+      """.stripMargin
+    eval[EVALUATED](sampleScript, version=V4) shouldBe evaluated(5)
+  }
+
+
 
 }

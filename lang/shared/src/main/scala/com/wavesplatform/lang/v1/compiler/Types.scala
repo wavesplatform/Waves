@@ -76,7 +76,7 @@ object Types {
           } yield TUPLE(a.types :+ b)
 
       UNION.reduce(UNION.create(
-        types.map(_.typeList).foldLeft(List.empty[TUPLE])(combine)
+        types.map(_.typeList).foldLeft(List(TUPLE(List())))(combine)
       ))
     }
   }
