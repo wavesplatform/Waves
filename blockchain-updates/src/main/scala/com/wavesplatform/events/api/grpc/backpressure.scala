@@ -35,7 +35,7 @@ object backpressure extends ScorexLogging {
           log.info(s"[$csoHash] Ending poll, cso ready = ${cso.isReady}")
         }
 
-      source.subscribe(
+      val cancelable = source.subscribe(
         (elem: A) => {
           log.info(s"[$csoHash] Offering new element: ${elem.getClass.getSimpleName}#${Integer.toHexString(System.identityHashCode(elem))}")
           queue
@@ -55,6 +55,15 @@ object backpressure extends ScorexLogging {
           cso.onCompleted()
         }
       )
+
+      cso match {
+        case scso: ServerCallStreamObserver[B] @unchecked =>
+          scso.setOnCancelHandler(cancelable.cancel _)
+
+        case _ =>
+          log.warn("Couldn't bind onCancel handler")
+      }
+
     case _ =>
       log.warn(s"Connecting without back-pressure: $dest")
       source.subscribe(
