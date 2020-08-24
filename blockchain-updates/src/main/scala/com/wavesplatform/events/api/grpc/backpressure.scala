@@ -25,18 +25,19 @@ object backpressure extends ScorexLogging {
         cso.synchronized {
           if (!cso.isReady) return
           log.info(s"[$csoHash] Starting poll")
-          while (cso.isReady) queue.tryPoll() match {
+          var exit = false
+          while (cso.isReady && !exit) queue.tryPoll() match {
             case Some(elem) =>
-              log.info(s"[$csoHash] Sending element: ${elem.getClass.getSimpleName}")
+              log.info(s"[$csoHash] Sending element: ${elem.getClass.getSimpleName}#${Integer.toHexString(System.identityHashCode(elem))}")
               cso.onNext(elem)
-            case None       => return
+            case None       => exit = true
           }
           log.info(s"[$csoHash] Ending poll, cso ready = ${cso.isReady}")
         }
 
       source.subscribe(
         (elem: A) => {
-          log.info(s"[$csoHash] Offering new element: ${elem.getClass.getSimpleName}")
+          log.info(s"[$csoHash] Offering new element: ${elem.getClass.getSimpleName}#${Integer.toHexString(System.identityHashCode(elem))}")
           queue
             .offer(f(elem))
             .flatMap { _ =>

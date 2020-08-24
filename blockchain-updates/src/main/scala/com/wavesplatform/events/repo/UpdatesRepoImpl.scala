@@ -6,9 +6,9 @@ import java.util.concurrent.locks.{ReadWriteLock, ReentrantReadWriteLock}
 import cats.implicits._
 import com.wavesplatform.Shutdownable
 import com.wavesplatform.database.openDB
+import com.wavesplatform.events._
 import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
-import com.wavesplatform.events._
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.{Ack, Scheduler}
@@ -17,8 +17,8 @@ import monix.reactive.subjects.ConcurrentSubject
 
 import scala.annotation.tailrec
 import scala.concurrent.Await
-import scala.util.{Failure, Success, Try}
 import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
 
 class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val scheduler: Scheduler)
     extends UpdatesRepo.Read
@@ -66,11 +66,15 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
   On average, there are 12 microblocks per block. Add one microfork, get 13 events per block.
   100 * 13 = 1300. 2048 should to be enough.
    */
-  private[this] val recentUpdates = ConcurrentSubject.replayLimited[BlockchainUpdated](streamBufferSize)
+  private[this] val recentUpdates = ConcurrentSubject.replayLimited[BlockchainUpdated](3)
   private[this] def sendToRecentUpdates(ba: BlockchainUpdated): Try[Unit] = {
     recentUpdates.onNext(ba) match {
-      case Ack.Continue => Success(())
-      case Ack.Stop     => Failure(new IllegalStateException("recentUpdates stream sent Ack.Stop"))
+      case Ack.Continue =>
+        log.info(s"Sent to recent updates: ${ba.toHeight}")
+        Success(())
+      case Ack.Stop     =>
+        sys.error("Should not happen")
+        Failure(new IllegalStateException("recentUpdates stream sent Ack.Stop"))
     }
   }
 
@@ -303,12 +307,17 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
     and, based on it, to decide when to append recent events.
      */
     (historical ++ recent)
+      .map { v =>
+        log.info("Events stream: " + v._1.toString + " at " + v._2.toHeight)
+        v
+      }
       .mapAccumulate(none[BlockchainUpdated]) {
         case (_, (Historical, ba)) => (Some(ba), Some(ba))
         case (Some(lastHistorical), (Recent, recentUpdate)) =>
           if (recentUpdate.toHeight > lastHistorical.toHeight) {
             (Some(lastHistorical), Some(recentUpdate))
-          } else (Some(lastHistorical), None)
+          } else
+            (Some(lastHistorical), None)
         case illegalState =>
           val err = new IllegalStateException(s"Historical and recent state updates are in invalid state: $illegalState")
           log.error("Historical and recent state updates are in invalid state", err)
