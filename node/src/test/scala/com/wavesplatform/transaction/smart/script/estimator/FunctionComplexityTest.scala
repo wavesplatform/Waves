@@ -121,15 +121,15 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with P
 
   property("func complexity map size is equal stdLib SupportedVersions count") {
     ctxV1.functions.foreach { func =>
-      func.costByLibVersion.size shouldBe DirectiveDictionary[StdLibVersion].all.size
+      func.costByLibVersionMap.size shouldBe DirectiveDictionary[StdLibVersion].all.size
     }
 
     ctxV2.functions.foreach { func =>
-      func.costByLibVersion.size shouldBe >= (DirectiveDictionary[StdLibVersion].all.count(_ >= V2))
+      func.costByLibVersionMap.size shouldBe >= (DirectiveDictionary[StdLibVersion].all.count(_ >= V2))
     }
 
     ctxV3.functions.foreach { func =>
-      func.costByLibVersion.size shouldBe >= (DirectiveDictionary[StdLibVersion].all.count(_ >= V3))
+      func.costByLibVersionMap.size shouldBe >= (DirectiveDictionary[StdLibVersion].all.count(_ >= V3))
     }
   }
 
