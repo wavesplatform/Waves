@@ -56,23 +56,13 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
   }
 
   // Recent updates stream
-  /*
-  A limited buffered replayable stream of recent updates for synchronization.
-  A streaming subscriber will real leveldb + liquid state fully, then find exact place
-  in recent updates to start from, and continue from there.
-
-  Buffer size reasoning:
-  Let's assume max rollback to be a 100 blocks (current mainnet assumption).
-  On average, there are 12 microblocks per block. Add one microfork, get 13 events per block.
-  100 * 13 = 1300. 2048 should to be enough.
-   */
-  private[this] val recentUpdates = ConcurrentSubject.replayLimited[BlockchainUpdated](3)
+  private[this] val recentUpdates = ConcurrentSubject.publish[BlockchainUpdated]
   private[this] def sendToRecentUpdates(ba: BlockchainUpdated): Try[Unit] = {
     recentUpdates.onNext(ba) match {
       case Ack.Continue =>
         log.info(s"Sent to recent updates: ${ba.toHeight}")
         Success(())
-      case Ack.Stop     =>
+      case Ack.Stop =>
         sys.error("Should not happen")
         Failure(new IllegalStateException("recentUpdates stream sent Ack.Stop"))
     }
@@ -244,6 +234,7 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
   // UpdatesRepo.Stream impl
   // todo detect out-or-order events and throw an exception, or at least log an error
   override def stream(fromHeight: Int): Observable[BlockchainUpdated] = {
+    val recentUpdatesForCurrentSubscription = ConcurrentSubject.replay[BlockchainUpdated]
 
     /**
       * reads from level db by synchronous batches each using one iterator
@@ -283,7 +274,12 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
           }
 
           if (isLastBatch) {
-            (res.result(), None)
+            recentUpdates.subscribe(recentUpdatesForCurrentSubscription)
+            val liquidUpdates = liquidState match {
+              case None                                     => Seq.empty
+              case Some(LiquidState(keyBlock, microBlocks)) => Seq(keyBlock) ++ microBlocks
+            }
+            (res.result() ++ liquidUpdates, None)
           } else {
             val result       = res.result()
             val nextTickFrom = result.lastOption.map(_.toHeight + 1)
@@ -296,34 +292,8 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
     val historical = Observable
       .unfoldEval(fromHeight.some)(readBatch)
       .flatMap(Observable.fromIterable)
-      .map((Historical, _))
 
-    val recent = recentUpdates.map((Recent, _))
-
-    /*
-    Recent events is a buffered stream, so they overlap with historical.
-    Some of the recent events need to be dropped.
-    The construct below is used to get lastHistorical event
-    and, based on it, to decide when to append recent events.
-     */
-    (historical ++ recent)
-      .map { v =>
-        log.info("Events stream: " + v._1.toString + " at " + v._2.toHeight)
-        v
-      }
-      .mapAccumulate(none[BlockchainUpdated]) {
-        case (_, (Historical, ba)) => (Some(ba), Some(ba))
-        case (Some(lastHistorical), (Recent, recentUpdate)) =>
-          if (recentUpdate.toHeight > lastHistorical.toHeight) {
-            (Some(lastHistorical), Some(recentUpdate))
-          } else
-            (Some(lastHistorical), None)
-        case illegalState =>
-          val err = new IllegalStateException(s"Historical and recent state updates are in invalid state: $illegalState")
-          log.error("Historical and recent state updates are in invalid state", err)
-          throw err
-      }
-      .collect { case Some(value) => value }
+    historical ++ recentUpdatesForCurrentSubscription
   }
 }
 
