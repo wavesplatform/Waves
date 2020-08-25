@@ -293,37 +293,43 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
       }
     }
 
-    val historical = Observable
-      .unfoldEval(fromHeight.some)(readBatch)
-      .flatMap(Observable.fromIterable)
-      .map((Historical, _))
+    Observable.fromTry(height).flatMap { h =>
+      if (h < fromHeight) {
+        Observable.raiseError(new IllegalArgumentException("Start height exceeds current blockchain height"))
+      } else {
+        val historical = Observable
+          .unfoldEval(fromHeight.some)(readBatch)
+          .flatMap(Observable.fromIterable)
+          .map((Historical, _))
 
-    val recent = recentUpdates.map((Recent, _))
+        val recent = recentUpdates.map((Recent, _))
 
-    /*
-    Recent events is a buffered stream, so they overlap with historical.
-    Some of the recent events need to be dropped.
-    The construct below is used to get lastHistorical event
-    and, based on it, to decide when to append recent events.
-     */
-    (historical ++ recent)
-      .map { v =>
-        log.info("Events stream: " + v._1.toString + " at " + v._2.toHeight)
-        v
+        /*
+        Recent events is a buffered stream, so they overlap with historical.
+        Some of the recent events need to be dropped.
+        The construct below is used to get lastHistorical event
+        and, based on it, to decide when to append recent events.
+         */
+        (historical ++ recent)
+          .map { v =>
+            log.info("Events stream: " + v._1.toString + " at " + v._2.toHeight)
+            v
+          }
+          .mapAccumulate(none[BlockchainUpdated]) {
+            case (_, (Historical, ba)) => (Some(ba), Some(ba))
+            case (Some(lastHistorical), (Recent, recentUpdate)) =>
+              if (recentUpdate.toHeight > lastHistorical.toHeight) {
+                (Some(lastHistorical), Some(recentUpdate))
+              } else
+                (Some(lastHistorical), None)
+            case illegalState =>
+              val err = new IllegalStateException(s"Historical and recent state updates are in invalid state: $illegalState")
+              log.error("Historical and recent state updates are in invalid state", err)
+              throw err
+          }
+          .collect { case Some(value) => value }
       }
-      .mapAccumulate(none[BlockchainUpdated]) {
-        case (_, (Historical, ba)) => (Some(ba), Some(ba))
-        case (Some(lastHistorical), (Recent, recentUpdate)) =>
-          if (recentUpdate.toHeight > lastHistorical.toHeight) {
-            (Some(lastHistorical), Some(recentUpdate))
-          } else
-            (Some(lastHistorical), None)
-        case illegalState =>
-          val err = new IllegalStateException(s"Historical and recent state updates are in invalid state: $illegalState")
-          log.error("Historical and recent state updates are in invalid state", err)
-          throw err
-      }
-      .collect { case Some(value) => value }
+    }
   }
 }
 
