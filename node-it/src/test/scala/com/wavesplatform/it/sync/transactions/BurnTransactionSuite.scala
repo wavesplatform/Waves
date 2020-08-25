@@ -2,15 +2,31 @@ package com.wavesplatform.it.sync.transactions
 
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils._
 import com.wavesplatform.it.api.BurnTransactionInfo
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{issueAmount, issueFee, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.BurnTransaction
+import play.api.libs.json.Json
 
 class BurnTransactionSuite extends BaseTransactionSuite {
 
   private val decimals: Byte = 2
+
+  test("send burn with quantity field") {
+    val issuedAssetId =
+      sender.issue(firstKeyPair, "name", "description", issueAmount, decimals, reissuable = false, fee = issueFee, waitForTx = true).id
+
+    val tx = BurnTransaction
+      .selfSigned(TxVersion.V1, firstKeyPair, IssuedAsset(ByteStr.decodeBase58(issuedAssetId).get), 1, minFee, System.currentTimeMillis())
+      .explicitGet()
+    val json = tx.json() - "amount" ++ Json.obj("quantity" -> 1L)
+    sender.signedBroadcast(json, waitForTx = true).id
+  }
 
   test("burning assets changes issuer's asset balance; issuer's waves balance is decreased by fee") {
     for (v <- burnTxSupportedVersions) {
@@ -54,7 +70,8 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       assert(assetOptRest.isEmpty)
     }
 
-    miner.transactionsByAddress(firstAddress, limit = 100)
+    miner
+      .transactionsByAddress(firstAddress, limit = 100)
       .count(_._type == BurnTransaction.typeId) shouldBe burnTxSupportedVersions.length * 2
   }
 
@@ -92,7 +109,8 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       val issuedQuantity = issueAmount
       val burnedQuantity = issuedQuantity * 2
 
-      val issuedAssetId = sender.issue(firstKeyPair, s"name+$v", "description", issuedQuantity, decimals, reissuable = false, issueFee, waitForTx = true).id
+      val issuedAssetId =
+        sender.issue(firstKeyPair, s"name+$v", "description", issuedQuantity, decimals, reissuable = false, issueFee, waitForTx = true).id
 
       sender.assertAssetBalance(firstAddress, issuedAssetId, issuedQuantity)
       assertBadRequestAndMessage(sender.burn(secondKeyPair, issuedAssetId, burnedQuantity, minFee, v).id, "Accounts balance errors")
