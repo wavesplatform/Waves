@@ -1087,6 +1087,6 @@ object PureContext {
     version match {
       case V1 | V2 => v1V2Ctx
       case V3      => v3Ctx
-      case V4      => v4Ctx
+      case V4 | V5 => v4Ctx
     }
 }
