@@ -1,6 +1,7 @@
 package com.wavesplatform.events
 
 import java.net.InetSocketAddress
+import java.util.concurrent.TimeUnit
 
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
@@ -102,7 +103,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
     if (grpcServer != null) {
       grpcServer.shutdown()
-      grpcServer.awaitTermination()
+      grpcServer.awaitTermination(10L, TimeUnit.SECONDS)
     }
 
     repo.shutdown()
