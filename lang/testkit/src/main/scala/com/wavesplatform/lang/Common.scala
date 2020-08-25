@@ -84,18 +84,12 @@ object Common {
     override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
     override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
     override def blockInfoByHeight(height: Int): Option[BlockInfo]                                               = ???
-    override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        =
-        Some(dataType match {
-          case DataType.Boolean   => true
-          case DataType.Long      => 42L
-          case DataType.ByteArray => ByteStr.fill(8)(1)
-          case DataType.String    => "foo"
-        })
+    override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = ???
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
     override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails]    = ???
     override def tthis: Environment.Tthis                                                                        = ???
-    override def multiPaymentAllowed: Boolean                                                                    =  true
+    override def multiPaymentAllowed: Boolean                                                                    = true
     override def txId: ByteStr                                                                                   = ???
     override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
     override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???
