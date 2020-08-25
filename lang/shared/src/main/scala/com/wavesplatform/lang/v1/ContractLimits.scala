@@ -5,8 +5,8 @@ import com.wavesplatform.lang.v1.compiler.Terms
 
 object ContractLimits {
   val MaxComplexityByVersion: StdLibVersion => Int = {
-    case V1 | V2 => 2000
-    case V3 | V4 => 4000
+    case V1 | V2      => 2000
+    case V3 | V4 | V5 => 4000
   }
 
   // used after activation of BlockV5
