@@ -259,23 +259,30 @@ package object database extends ScorexLogging {
         val exprBytesLength = input.readInt()
         val exprBytes       = input.readBytes(exprBytesLength)
         val expr            = Serde.deserialize(exprBytes).explicitGet()._1
-        (invokeTxId, ContinuationState.InProgress(expr))
+
+        val residualComplexity = input.readInt()
+        (invokeTxId, ContinuationState.InProgress(expr, residualComplexity))
       }.toMap
     }
   }
 
   def writeContinuationStates(states: Map[ByteStr, ContinuationState]): Array[Byte] = {
     val output     = newDataOutput()
-    val unfinished = states.collect { case (invokeTxId, ContinuationState.InProgress(expr)) => (invokeTxId, expr) }
+    val unfinished = states.collect {
+        case (invokeTxId, ContinuationState.InProgress(expr, residualComplexity)) =>
+          (invokeTxId, expr, residualComplexity)
+      }
     output.writeInt(unfinished.size)
     unfinished.foreach {
-      case (invokeTxId, expr) =>
+      case (invokeTxId, expr, residualComplexity) =>
         output.writeByte(invokeTxId.size)
         output.writeByteStr(invokeTxId)
 
         val exprBytes = Serde.serialize(expr, allowObjects = true)
         output.writeInt(exprBytes.length)
         output.write(exprBytes)
+
+        output.writeInt(residualComplexity)
     }
     output.toByteArray
   }
