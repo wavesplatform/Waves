@@ -31,7 +31,7 @@ class EvaluatorV2TestBase extends PropSpec with PropertyChecks with ScriptGen wi
   private val environment = new Environment[Id] {
     override def chainId: Byte                                                                                       = ???
     override def inputEntity: InputEntity                                                                            = ???
-    override def height: Id[Long]                                                                                    = ???
+    override def height: Long                                                                                        = 1
     override def transactionById(id: Array[Byte]): Id[Option[Tx]]                                                    = ???
     override def transferTransactionById(id: Array[Byte]): Id[Option[Tx.Transfer]]                                   = ???
     override def transactionHeightById(id: Array[Byte]): Id[Option[Long]]                                            = ???
