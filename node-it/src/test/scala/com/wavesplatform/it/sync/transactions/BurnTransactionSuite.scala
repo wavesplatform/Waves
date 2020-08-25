@@ -17,17 +17,6 @@ class BurnTransactionSuite extends BaseTransactionSuite {
 
   private val decimals: Byte = 2
 
-  test("send burn with quantity field") {
-    val issuedAssetId =
-      sender.issue(firstKeyPair, "name", "description", issueAmount, decimals, reissuable = false, fee = issueFee, waitForTx = true).id
-
-    val tx = BurnTransaction
-      .selfSigned(TxVersion.V1, firstKeyPair, IssuedAsset(ByteStr.decodeBase58(issuedAssetId).get), 1, minFee, System.currentTimeMillis())
-      .explicitGet()
-    val json = tx.json() - "amount" ++ Json.obj("quantity" -> 1L)
-    sender.signedBroadcast(json, waitForTx = true).id
-  }
-
   test("burning assets changes issuer's asset balance; issuer's waves balance is decreased by fee") {
     for (v <- burnTxSupportedVersions) {
       val (balance, effectiveBalance) = miner.accountBalances(firstAddress)
@@ -192,5 +181,16 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       )
 
     }
+  }
+
+  test("send burn with quantity field") {
+    val issuedAssetId =
+      sender.issue(firstKeyPair, "name", "description", issueAmount, decimals, reissuable = false, fee = issueFee, waitForTx = true).id
+
+    val tx = BurnTransaction
+      .selfSigned(TxVersion.V1, firstKeyPair, IssuedAsset(ByteStr.decodeBase58(issuedAssetId).get), 1, minFee, System.currentTimeMillis())
+      .explicitGet()
+    val json = tx.json() - "amount" ++ Json.obj("quantity" -> 1L)
+    sender.signedBroadcast(json, waitForTx = true).id
   }
 }
