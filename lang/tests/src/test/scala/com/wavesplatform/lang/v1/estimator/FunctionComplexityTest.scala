@@ -2,8 +2,8 @@ package com.wavesplatform.lang.v1.estimator
 import com.wavesplatform.DocSource
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.NoShrink
-import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
@@ -15,8 +15,8 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers with NoShrink {
-  val directives: Iterable[DirectiveSet] =
-  DirectiveDictionary[StdLibVersion].all
+  private val directives: Iterable[DirectiveSet] =
+    DirectiveDictionary[StdLibVersion].all
       .flatMap(
         version =>
           Seq(
@@ -26,16 +26,16 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
                 else Seq())
       )
 
-  def docCost(function: BaseFunction[Environment], version: StdLibVersion): Int =
+  private def docCost(function: BaseFunction[Environment], version: StdLibVersion): Option[Int] =
     DocSource
-      .funcData(
+      .funcData.get(
         (
           function.name,
           function.signature.args.map(_._2.toString).toList,
           version.id
         )
       )
-      ._3
+      .map(_._3)
 
   property("all functions complexities") {
     directives.foreach { ds =>
@@ -44,13 +44,16 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
         .filterNot(_.name.startsWith("_"))
         .foreach { function =>
           val expr = FUNCTION_CALL(function.header, List.fill(function.args.size)(Terms.TRUE))
-          val estimatedCost = ScriptEstimatorV3.instance(
-            varNames(ds.stdLibVersion, ds.contentType),
-            functionCosts(ds.stdLibVersion),
-            expr
-          ).explicitGet() - function.args.size
+          val estimatedCost = ScriptEstimatorV3
+            .instance(
+              varNames(ds.stdLibVersion, ds.contentType),
+              functionCosts(ds.stdLibVersion),
+              expr
+            )
+            .explicitGet() - function.args.size
 
           val expectedCost = docCost(function, ds.stdLibVersion)
+            .getOrElse(throw new TestFailedException(s"$function complexity is not defined in doc files", 0))
 
           if (estimatedCost != expectedCost)
             throw new TestFailedException(
