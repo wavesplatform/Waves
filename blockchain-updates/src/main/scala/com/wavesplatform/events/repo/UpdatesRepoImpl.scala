@@ -1,7 +1,6 @@
 package com.wavesplatform.events.repo
 
 import java.nio.{ByteBuffer, ByteOrder}
-import java.util.concurrent.locks.{ReadWriteLock, ReentrantReadWriteLock}
 
 import cats.implicits._
 import com.wavesplatform.Shutdownable
@@ -25,45 +24,23 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
     with UpdatesRepo.Write
     with UpdatesRepo.Stream
     with ScorexLogging
-    with Shutdownable {
+    with Shutdownable
+    with Lockable {
   import UpdatesRepoImpl._
 
-  // State with locks
   private[this] val db                               = openDB(directory)
   private[this] var liquidState: Option[LiquidState] = None
-  private val lock: ReadWriteLock                    = new ReentrantReadWriteLock()
 
   log.info(s"BlockchainUpdates extension opened db at ${directory}")
 
   override def shutdown(): Unit = db.close()
 
-  private[this] def readLock[A](a: => A): A = {
-    lock.readLock().lock()
-    try {
-      a
-    } finally {
-      lock.readLock().unlock()
-    }
-  }
-
-  private[this] def writeLock[A](a: => A): A = {
-    lock.writeLock().lock()
-    try {
-      a
-    } finally {
-      lock.writeLock().unlock()
-    }
-  }
-
-  // realtime updates stream
   private[this] val realTimeUpdates = ConcurrentSubject.publish[BlockchainUpdated]
-  private[this] def sendToRealTimeUpdates(ba: BlockchainUpdated): Try[Unit] = {
+  private[this] def sendRealTimeUpdate(ba: BlockchainUpdated): Try[Unit] = {
     realTimeUpdates.onNext(ba) match {
       case Ack.Continue =>
-        log.info(s"Sent to realtime updates: ${ba.toHeight}")
         Success(())
       case Ack.Stop =>
-        sys.error("Should not happen")
         Failure(new IllegalStateException("realTimeUpdates stream sent Ack.Stop"))
     }
   }
@@ -154,7 +131,7 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
         )
       }
       liquidState = Some(LiquidState(blockAppended, Seq.empty))
-      sendToRealTimeUpdates(blockAppended)
+      sendRealTimeUpdate(blockAppended)
     }
   }
 
@@ -162,7 +139,7 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
     liquidState match {
       case Some(LiquidState(keyBlock, microBlocks)) =>
         liquidState = Some(LiquidState(keyBlock, microBlocks :+ microBlockAppended))
-        sendToRealTimeUpdates(microBlockAppended)
+        sendRealTimeUpdate(microBlockAppended)
       case None =>
         Failure(new IllegalStateException("BlockchainUpdates attempted to insert a microblock without a keyblock"))
     }
@@ -200,7 +177,7 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
             }
           }
         }
-        .flatMap(_ => sendToRealTimeUpdates(rollback))
+        .flatMap(_ => sendRealTimeUpdate(rollback))
     }
 
   override def rollbackMicroBlock(microBlockRollback: MicroBlockRollbackCompleted): Try[Unit] =
@@ -228,11 +205,10 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
             }
           }
         }
-        .flatMap(_ => sendToRealTimeUpdates(microBlockRollback))
+        .flatMap(_ => sendRealTimeUpdate(microBlockRollback))
     }
 
   // UpdatesRepo.Stream impl
-  // todo detect out-or-order events and throw an exception, or at least log an error
   override def stream(fromHeight: Int): Observable[BlockchainUpdated] = {
     val realTimeUpdatesForCurrentSubscription = ConcurrentSubject.replay[BlockchainUpdated]
 
@@ -289,11 +265,17 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
       }
     }
 
-    val historical = Observable
-      .unfoldEval(fromHeight.some)(readBatch)
-      .flatMap(Observable.fromIterable)
+    Observable.fromTry(height).flatMap { h =>
+      if (h < fromHeight) {
+        Observable.raiseError(new IllegalArgumentException("Requested start height exceeds current blockchain height"))
+      } else {
+        val historical = Observable
+          .unfoldEval(fromHeight.some)(readBatch)
+          .flatMap(Observable.fromIterable)
 
-    historical ++ realTimeUpdatesForCurrentSubscription
+        historical ++ realTimeUpdatesForCurrentSubscription
+      }
+    }
   }
 }
 
