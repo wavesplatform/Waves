@@ -11,7 +11,7 @@ object PasswordProvider extends ScorexLogging {
         log.error("CANNOT GET CONSOLE TO ASK WALLET PASSWORD")
         log.error(
           "Probably, it happens because you trying to start Waves node using supervisor service (like systemd) without specified wallet password.")
-        forceStopApplication(PasswordNotSpecified)
+        forceStopApplication(Misconfiguration)
         ""
 
       case Some(console) =>

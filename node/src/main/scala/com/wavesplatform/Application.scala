@@ -312,7 +312,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         log.error(
           "Usage of the default api key hash (H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu) is prohibited, please change it in the waves.conf"
         )
-        forceStopApplication(InvalidApiKey)
+        forceStopApplication(Misconfiguration)
       }
 
       def loadBalanceHistory(address: Address): Seq[(Int, Long)] = db.readOnly { rdb =>
@@ -472,9 +472,11 @@ object Application extends ScorexLogging {
     val config = {
       val maybeExternal = Try(external.map(ConfigFactory.parseFile(_, ConfigParseOptions.defaults().setAllowMissing(false))))
       maybeExternal match {
-        case Success(None)      => log.warn("Config file not defined, TESTNET config will be used")
-        case Failure(exception) => log.warn(s"Couldn't read ${external.get.toPath.toAbsolutePath}, TESTNET config will be used", exception)
-        case _                  => // Pass
+        case Success(None) => log.warn("Config file not defined, TESTNET config will be used")
+        case Failure(exception) =>
+          log.error(s"Couldn't read ${external.get.toPath.toAbsolutePath}", exception)
+          forceStopApplication(Misconfiguration)
+        case _ => // Pass
       }
       loadConfig(maybeExternal.getOrElse(None))
     }
