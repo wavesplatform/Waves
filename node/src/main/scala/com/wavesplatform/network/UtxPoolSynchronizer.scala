@@ -83,6 +83,7 @@ class UtxPoolSynchronizerImpl(
       .recover {
         case _: ExecutionException =>
           log.trace(s"Transaction took too long to validate: ${tx.id()}")
+          TracedResult(Left(GenericError("Transaction took too long to validate")))
 
         case err =>
           log.warn(s"Error validating transaction ${tx.id()}", err)
