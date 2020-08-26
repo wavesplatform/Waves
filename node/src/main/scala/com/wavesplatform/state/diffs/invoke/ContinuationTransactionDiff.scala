@@ -63,7 +63,7 @@ object ContinuationTransactionDiff {
           CryptoContext.build(Global, script.stdLibVersion).withEnvironment[Environment] |+|
           WavesContext.build(directives).copy(vars = Map())
 
-        val ContinuationState.InProgress(expr, residualComplexity) =
+        val ContinuationState.InProgress(_, expr, residualComplexity) =
           blockchain.continuationStates(tx.invokeScriptTransactionId).asInstanceOf[ContinuationState.InProgress]
 
         val limit = ContractLimits.MaxComplexityByVersion(script.stdLibVersion) + residualComplexity
@@ -106,7 +106,7 @@ object ContinuationTransactionDiff {
           doProcessActions(actions).map(_.copy(transactions = Map()) |+| continuationStopDiff)
         case ir: IncompleteResult =>
           TracedResult.wrapValue[Diff, ValidationError](
-            Diff.stateOps(continuationStates = Map(tx.invokeScriptTransactionId -> ContinuationState.InProgress(ir.expr, ir.unusedComplexity)))
+            Diff.stateOps(continuationStates = Map(tx.invokeScriptTransactionId -> ContinuationState.InProgress(tx.nonce + 1, ir.expr, ir.unusedComplexity)))
           )
       }
 

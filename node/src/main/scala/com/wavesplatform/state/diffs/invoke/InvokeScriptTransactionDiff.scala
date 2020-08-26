@@ -154,9 +154,15 @@ object InvokeScriptTransactionDiff {
             )
 
             resultDiff <- scriptResult._1 match {
-              case ScriptResultV3(dataItems, transfers)    => doProcessActions(dataItems ::: transfers)
-              case ScriptResultV4(actions)                 => doProcessActions(actions)
-              case ir: IncompleteResult                    => TracedResult.wrapValue(Diff(tx = tx, continuationStates = Map(tx.id.value() -> ContinuationState.InProgress(ir.expr, 0))))
+              case ScriptResultV3(dataItems, transfers) => doProcessActions(dataItems ::: transfers)
+              case ScriptResultV4(actions)              => doProcessActions(actions)
+              case ir: IncompleteResult =>
+                TracedResult.wrapValue(
+                  Diff(
+                    tx = tx,
+                    continuationStates = Map(tx.id.value() -> ContinuationState.InProgress(nonce = 0, ir.expr, residualComplexity = 0))
+                  )
+                )
             }
           } yield resultDiff
         } yield result

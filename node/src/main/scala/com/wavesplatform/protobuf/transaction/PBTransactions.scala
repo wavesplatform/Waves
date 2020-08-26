@@ -295,8 +295,8 @@ object PBTransactions {
           chainId
         )
 
-      case Data.Continuation(ContinuationTransactionData(invokeTransactionId)) =>
-        Right(ContinuationTransaction(invokeTransactionId.toByteStr, timestamp))
+      case Data.Continuation(ContinuationTransactionData(invokeTransactionId, nonce)) =>
+        Right(ContinuationTransaction(invokeTransactionId.toByteStr, nonce))
 
       case _ =>
         Left(TxValidationError.UnsupportedTransactionType)
@@ -608,10 +608,10 @@ object PBTransactions {
 
         PBTransactions.create(sender, chainId, feeAmount, feeAsset, timestamp, version, proofs, Data.UpdateAssetInfo(data))
 
-      case tx @ vt.smart.ContinuationTransaction(invokeScriptTransactionId, _) =>
+      case tx @ vt.smart.ContinuationTransaction(invokeScriptTransactionId, nonce) =>
         val data =
-          Data.Continuation(ContinuationTransactionData(invokeScriptTransactionId.toByteString))
-        PBTransactions.create(sender = PublicKey(new Array[Byte](32)), chainId = tx.chainId, timestamp = tx.timestamp, version = tx.version, data = data)
+          Data.Continuation(ContinuationTransactionData(invokeScriptTransactionId.toByteString, nonce))
+        PBTransactions.create(sender = PublicKey(new Array[Byte](32)), chainId = tx.chainId, version = tx.version, data = data)
 
       case _ =>
         throw new IllegalArgumentException(s"Unsupported transaction: $tx")

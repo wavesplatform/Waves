@@ -260,8 +260,10 @@ package object database extends ScorexLogging {
         val exprBytes       = input.readBytes(exprBytesLength)
         val expr            = Serde.deserialize(exprBytes).explicitGet()._1
 
+        val nonce = input.readInt()
         val residualComplexity = input.readInt()
-        (invokeTxId, ContinuationState.InProgress(expr, residualComplexity))
+
+        (invokeTxId, ContinuationState.InProgress(nonce, expr, residualComplexity))
       }.toMap
     }
   }
@@ -269,12 +271,12 @@ package object database extends ScorexLogging {
   def writeContinuationStates(states: Map[ByteStr, ContinuationState]): Array[Byte] = {
     val output     = newDataOutput()
     val unfinished = states.collect {
-        case (invokeTxId, ContinuationState.InProgress(expr, residualComplexity)) =>
-          (invokeTxId, expr, residualComplexity)
+        case (invokeTxId, ContinuationState.InProgress(nonce, expr, residualComplexity)) =>
+          (invokeTxId, nonce, expr, residualComplexity)
       }
     output.writeInt(unfinished.size)
     unfinished.foreach {
-      case (invokeTxId, expr, residualComplexity) =>
+      case (invokeTxId, nonce, expr, residualComplexity) =>
         output.writeByte(invokeTxId.size)
         output.writeByteStr(invokeTxId)
 
@@ -282,6 +284,7 @@ package object database extends ScorexLogging {
         output.writeInt(exprBytes.length)
         output.write(exprBytes)
 
+        output.writeInt(nonce)
         output.writeInt(residualComplexity)
     }
     output.toByteArray

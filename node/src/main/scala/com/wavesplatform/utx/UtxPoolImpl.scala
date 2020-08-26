@@ -428,7 +428,7 @@ class UtxPoolImpl(
 
       val continuationTransactions =
         blockchain.continuationStates
-          .collect { case (invokeTxId, _: ContinuationState.InProgress) => ContinuationTransaction(invokeTxId, time.getTimestamp()) }
+          .collect { case (invokeTxId, ContinuationState.InProgress(nonce, _, _)) => ContinuationTransaction(invokeTxId, nonce) }
 
       val startTransactions =
         if (continuationTransactions.isEmpty) None
