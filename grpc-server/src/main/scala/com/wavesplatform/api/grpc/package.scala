@@ -1,44 +1,58 @@
 package com.wavesplatform.api
 
-import java.util.concurrent.LinkedBlockingQueue
-
 import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.Blockchain
-import io.grpc.stub.{CallStreamObserver, StreamObserver}
+import io.grpc.stub.{CallStreamObserver, ServerCallStreamObserver, StreamObserver}
 import monix.eval.Task
-import monix.execution.{Ack, Cancelable, Scheduler}
+import monix.execution.{Ack, AsyncQueue, Cancelable, Scheduler}
 import monix.reactive.Observable
 
-import scala.concurrent.Future
 import scala.util.control.NonFatal
 
 package object grpc extends PBImplicitConversions {
-  def wrapObservable[A, B](source: Observable[A], dest: StreamObserver[B])(f: A => B)(implicit s: Scheduler): Cancelable = dest match {
+  def wrapObservable[A, B](source: Observable[A], dest: StreamObserver[B])(f: A => B)(implicit s: Scheduler): Unit = dest match {
     case cso: CallStreamObserver[B] @unchecked =>
-      val queue = new LinkedBlockingQueue[B](32)
+      val queue = AsyncQueue.bounded[B](32)
+
+      cso.setOnReadyHandler { () =>
+        pushNext()
+      }
 
       def pushNext(): Unit =
-        cso.synchronized(while (cso.isReady && !queue.isEmpty) {
-          cso.onNext(queue.poll())
-        })
+        cso.synchronized {
+          while (cso.isReady) queue.tryPoll() match {
+            case Some(elem) =>
+              cso.onNext(elem)
+            case None => return
+          }
+        }
 
-      cso.setOnReadyHandler(pushNext _)
-
-      source.subscribe(
-        (elem: A) =>
-          if (queue.offer(f(elem))) {
-            pushNext()
-            Ack.Continue
-          } else
-            Future {
-              queue.put(f(elem))
+      val cancelable = source.subscribe(
+        (elem: A) => {
+          queue
+            .offer(f(elem))
+            .flatMap { _ =>
               pushNext()
-            }.flatMap(_ => Ack.Continue),
-        cso.onError,
-        cso.onCompleted
+              Ack.Continue
+            }
+        },
+        err => {
+          cso.onError(err)
+        },
+        () => {
+          cso.onCompleted()
+        }
       )
+
+      cso match {
+        case scso: ServerCallStreamObserver[B] @unchecked =>
+          scso.setOnCancelHandler(cancelable.cancel _)
+
+        case _ =>
+      }
+
     case _ =>
       source.subscribe(
         { (elem: A) =>
@@ -47,8 +61,8 @@ package object grpc extends PBImplicitConversions {
         dest.onError,
         dest.onCompleted
       )
-  }
 
+  }
   implicit class StreamObserverMonixOps[T](streamObserver: StreamObserver[T])(implicit sc: Scheduler) {
     def completeWith(obs: Observable[T]): Cancelable = {
       streamObserver match {
