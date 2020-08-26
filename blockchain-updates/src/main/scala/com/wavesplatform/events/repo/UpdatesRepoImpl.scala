@@ -55,16 +55,16 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
     }
   }
 
-  // Recent updates stream
-  private[this] val recentUpdates = ConcurrentSubject.publish[BlockchainUpdated]
-  private[this] def sendToRecentUpdates(ba: BlockchainUpdated): Try[Unit] = {
-    recentUpdates.onNext(ba) match {
+  // realtime updates stream
+  private[this] val realTimeUpdates = ConcurrentSubject.publish[BlockchainUpdated]
+  private[this] def sendToRealTimeUpdates(ba: BlockchainUpdated): Try[Unit] = {
+    realTimeUpdates.onNext(ba) match {
       case Ack.Continue =>
-        log.info(s"Sent to recent updates: ${ba.toHeight}")
+        log.info(s"Sent to realtime updates: ${ba.toHeight}")
         Success(())
       case Ack.Stop =>
         sys.error("Should not happen")
-        Failure(new IllegalStateException("recentUpdates stream sent Ack.Stop"))
+        Failure(new IllegalStateException("realTimeUpdates stream sent Ack.Stop"))
     }
   }
 
@@ -154,7 +154,7 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
         )
       }
       liquidState = Some(LiquidState(blockAppended, Seq.empty))
-      sendToRecentUpdates(blockAppended)
+      sendToRealTimeUpdates(blockAppended)
     }
   }
 
@@ -162,7 +162,7 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
     liquidState match {
       case Some(LiquidState(keyBlock, microBlocks)) =>
         liquidState = Some(LiquidState(keyBlock, microBlocks :+ microBlockAppended))
-        sendToRecentUpdates(microBlockAppended)
+        sendToRealTimeUpdates(microBlockAppended)
       case None =>
         Failure(new IllegalStateException("BlockchainUpdates attempted to insert a microblock without a keyblock"))
     }
@@ -200,7 +200,7 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
             }
           }
         }
-        .flatMap(_ => sendToRecentUpdates(rollback))
+        .flatMap(_ => sendToRealTimeUpdates(rollback))
     }
 
   override def rollbackMicroBlock(microBlockRollback: MicroBlockRollbackCompleted): Try[Unit] =
@@ -228,13 +228,13 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
             }
           }
         }
-        .flatMap(_ => sendToRecentUpdates(microBlockRollback))
+        .flatMap(_ => sendToRealTimeUpdates(microBlockRollback))
     }
 
   // UpdatesRepo.Stream impl
   // todo detect out-or-order events and throw an exception, or at least log an error
   override def stream(fromHeight: Int): Observable[BlockchainUpdated] = {
-    val recentUpdatesForCurrentSubscription = ConcurrentSubject.replay[BlockchainUpdated]
+    val realTimeUpdatesForCurrentSubscription = ConcurrentSubject.replay[BlockchainUpdated]
 
     /**
       * reads from level db by synchronous batches each using one iterator
@@ -274,7 +274,7 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
           }
 
           if (isLastBatch) {
-            recentUpdates.subscribe(recentUpdatesForCurrentSubscription)
+            realTimeUpdates.subscribe(realTimeUpdatesForCurrentSubscription)
             val liquidUpdates = liquidState match {
               case None                                     => Seq.empty
               case Some(LiquidState(keyBlock, microBlocks)) => Seq(keyBlock) ++ microBlocks
@@ -293,13 +293,9 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
       .unfoldEval(fromHeight.some)(readBatch)
       .flatMap(Observable.fromIterable)
 
-    historical ++ recentUpdatesForCurrentSubscription
+    historical ++ realTimeUpdatesForCurrentSubscription
   }
 }
-
-private[repo] sealed trait UpdateType
-private[repo] case object Historical extends UpdateType
-private[repo] case object Recent     extends UpdateType
 
 object UpdatesRepoImpl {
   private val LEVELDB_READ_BATCH_SIZE = 1024
