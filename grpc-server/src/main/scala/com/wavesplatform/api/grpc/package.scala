@@ -5,8 +5,7 @@ import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.Blockchain
 import io.grpc.stub.{CallStreamObserver, ServerCallStreamObserver, StreamObserver}
-import monix.eval.Task
-import monix.execution.{Ack, AsyncQueue, Cancelable, Scheduler}
+import monix.execution.{Ack, AsyncQueue, Scheduler}
 import monix.reactive.Observable
 
 import scala.util.control.NonFatal
@@ -64,17 +63,8 @@ package object grpc extends PBImplicitConversions {
 
   }
   implicit class StreamObserverMonixOps[T](streamObserver: StreamObserver[T])(implicit sc: Scheduler) {
-    def completeWith(obs: Observable[T]): Cancelable = {
-      streamObserver match {
-        case _: CallStreamObserver[T] =>
-          wrapObservable(obs, streamObserver)(identity)
-
-        case _ => // No back-pressure
-          obs
-            .doOnError(exception => Task(streamObserver.onError(GRPCErrors.toStatusException(exception))))
-            .doOnComplete(Task(streamObserver.onCompleted()))
-            .foreach(value => streamObserver.onNext(value))
-      }
+    def completeWith(obs: Observable[T]): Unit = {
+      wrapObservable(obs, streamObserver)(identity)
     }
 
     def failWith(error: ApiError): Unit = {
