@@ -121,10 +121,10 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     assertBadRequestAndMessage(
       invokeScriptTx,
-      "State check failed. Reason: " +
-        "Fee in WAVES for InvokeScriptTransaction (900000 in WAVES) " +
-        "with 8 invocation steps " +
-        "does not exceed minimal value of 4000000 WAVES."
+      "Fee in WAVES for InvokeScriptTransaction (900000 in WAVES) " +
+      "with 0 total scripts invoked " +
+      "with 8 invocation steps " +
+      "does not exceed minimal value of 4000000 WAVES."
     )
   }
 }
