@@ -24,7 +24,9 @@ import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult,
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.metrics._
+import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
@@ -61,6 +63,26 @@ object InvokeScriptTransactionDiff {
 
           invocationComplexity <- TracedResult {
             InvokeDiffsCommon.getInvocationComplexity(blockchain, tx, callableComplexities, dAppAddress)
+          }
+
+          stepLimit = ContractLimits.MaxComplexityByVersion(version)
+          stepsNumber = if (invocationComplexity % stepLimit == 0)
+            invocationComplexity / stepLimit
+          else
+            invocationComplexity / stepLimit + 1
+
+          _ <- TracedResult {
+            val minFee    = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber
+            val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
+            val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
+            Either.cond(
+              feeInfo._1 >= minFee,
+              (),
+              GenericError(
+                s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
+                  s" does not exceed minimal value of $minFee WAVES."
+              )
+            )
           }
 
           result <- for {
