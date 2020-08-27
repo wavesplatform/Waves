@@ -426,15 +426,11 @@ class UtxPoolImpl(
         }
       }
 
-      val continuationTransactions =
-        blockchain.continuationStates
-          .collect { case (invokeTxId, ContinuationState.InProgress(nonce, _, _)) => ContinuationTransaction(invokeTxId, nonce) }
+      blockchain.continuationStates
+        .collect { case (invokeTxId, ContinuationState.InProgress(nonce, _, _)) => ContinuationTransaction(invokeTxId, time.getTimestamp(), nonce) }
+        .foreach(putIfNew(_))
 
-      val startTransactions =
-        if (continuationTransactions.isEmpty) None
-        else Some(continuationTransactions.toSeq)
-
-      loop(PackResult(startTransactions, Monoid[Diff].empty, initialConstraint, 0, Set.empty, Set.empty, Set.empty))
+      loop(PackResult(None, Monoid[Diff].empty, initialConstraint, 0, Set.empty, Set.empty, Set.empty))
     }
 
     log.trace(

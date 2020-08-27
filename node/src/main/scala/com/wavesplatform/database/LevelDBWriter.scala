@@ -248,7 +248,7 @@ abstract class LevelDBWriter private[database] (
   override protected def loadLeaseBalance(address: Address): LeaseBalance = readOnly { db =>
     addressId(address).fold(LeaseBalance.empty)(loadLeaseBalance(db, _))
   }
-;
+
   private[database] def loadLposPortfolio(db: ReadOnlyDB, addressId: AddressId) = Portfolio(
     db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L),
     loadLeaseBalance(db, addressId),
@@ -272,8 +272,8 @@ abstract class LevelDBWriter private[database] (
     stateFeatures ++ settings.functionalitySettings.preActivatedFeatures
   }
 
-  override protected def loadContinuationStates(): Map[ByteStr, ContinuationState] =
-    readOnly(_.get(Keys.continuationStates))
+  override protected def loadContinuationStates(invokeTxId: TransactionId): ContinuationState =
+    readOnly(_.get(Keys.continuationState(invokeTxId)))
 
   override def wavesAmount(height: Int): BigInt = readOnly { db =>
     if (db.has(Keys.wavesAmount(height))) db.get(Keys.wavesAmount(height))
@@ -559,7 +559,10 @@ abstract class LevelDBWriter private[database] (
           }
       }
 
-      rw.put(Keys.continuationStates, continuationStates)
+      continuationStates
+        .foreach { case (invokeTxId, state) =>
+          rw.put(Keys.continuationState(TransactionId(invokeTxId)), state)
+        }
 
       expiredKeys.foreach(rw.delete(_, "expired-keys"))
 

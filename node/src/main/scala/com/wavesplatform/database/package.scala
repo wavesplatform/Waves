@@ -246,48 +246,34 @@ package object database extends ScorexLogging {
     b.array()
   }
 
-  def readContinuationStates(bytes: Array[Byte]): Map[ByteStr, ContinuationState] = {
-    if (bytes == null || bytes.isEmpty)
-      Map()
-    else {
-      val input = newDataInput(bytes)
-      val size  = input.readInt()
-      (1 to size).map { _ =>
-        val invokeTxIdLength = input.readByte()
-        val invokeTxId       = input.readByteStr(invokeTxIdLength)
+  def readContinuationState(bytes: Array[Byte]): ContinuationState = {
+    val input = newDataInput(bytes)
 
-        val exprBytesLength = input.readInt()
-        val exprBytes       = input.readBytes(exprBytesLength)
-        val expr            = Serde.deserialize(exprBytes).explicitGet()._1
+    val exprBytesLength = input.readInt()
+    val exprBytes       = input.readBytes(exprBytesLength)
+    val expr            = Serde.deserialize(exprBytes).explicitGet()._1
 
-        val nonce = input.readInt()
-        val residualComplexity = input.readInt()
+    val nonce = input.readInt()
+    val residualComplexity = input.readInt()
 
-        (invokeTxId, ContinuationState.InProgress(nonce, expr, residualComplexity))
-      }.toMap
-    }
+    ContinuationState.InProgress(nonce, expr, residualComplexity)
   }
 
-  def writeContinuationStates(states: Map[ByteStr, ContinuationState]): Array[Byte] = {
-    val output     = newDataOutput()
-    val unfinished = states.collect {
-        case (invokeTxId, ContinuationState.InProgress(nonce, expr, residualComplexity)) =>
-          (invokeTxId, nonce, expr, residualComplexity)
-      }
-    output.writeInt(unfinished.size)
-    unfinished.foreach {
-      case (invokeTxId, nonce, expr, residualComplexity) =>
-        output.writeByte(invokeTxId.size)
-        output.writeByteStr(invokeTxId)
-
+  def writeContinuationState(continuationState: ContinuationState): Array[Byte] = {
+    continuationState match {
+      case ContinuationState.InProgress(nonce, expr, residualComplexity) =>
+        val output    = newDataOutput()
         val exprBytes = Serde.serialize(expr, allowObjects = true)
         output.writeInt(exprBytes.length)
         output.write(exprBytes)
 
         output.writeInt(nonce)
         output.writeInt(residualComplexity)
+        output.toByteArray
+
+      case ContinuationState.Finished =>
+        Array.empty
     }
-    output.toByteArray
   }
 
   def readSponsorship(data: Array[Byte]): SponsorshipValue = {
