@@ -71,6 +71,8 @@ object InvokeScriptTransactionDiff {
           else
             invocationComplexity / stepLimit + 1
 
+          stepsInfo = if (stepsNumber > 1) s" with $stepsNumber invocation steps" else ""
+
           _ <- TracedResult {
             val minFee    = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber
             val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
@@ -80,6 +82,7 @@ object InvokeScriptTransactionDiff {
               (),
               GenericError(
                 s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
+                  stepsInfo +
                   s" does not exceed minimal value of $minFee WAVES."
               )
             )
