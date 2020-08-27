@@ -14,6 +14,7 @@ import scala.util.Try
 
 case class ContinuationTransaction(
     invokeScriptTransactionId: ByteStr,
+    timestamp: TxTimestamp,
     nonce: Int
 ) extends Transaction
     with VersionedTransaction {
@@ -34,9 +35,6 @@ case class ContinuationTransaction(
 
   override def assetFee: (Asset, Long) =
     (Waves, 0)
-
-  override def timestamp: TxTimestamp =
-    0L
 }
 
 object ContinuationTransaction extends TransactionParser {

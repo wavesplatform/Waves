@@ -11,6 +11,7 @@ object ContinuationTxSerializer {
       "id"                        -> id().toString,
       "fee"                       -> 0,
       "timestamp"                 -> timestamp,
+      "nonce"                     -> nonce,
       "invokeScriptTransactionId" -> invokeScriptTransactionId.toString
     )
   }
