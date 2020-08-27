@@ -469,21 +469,20 @@ object Application extends ScorexLogging {
   private[wavesplatform] def loadApplicationConfig(external: Option[File] = None): WavesSettings = {
     import com.wavesplatform.settings._
 
-    val config = {
-      val maybeExternal = Try(external.map(ConfigFactory.parseFile(_, ConfigParseOptions.defaults().setAllowMissing(false))))
-      maybeExternal match {
-        case Success(None) => log.warn("Config file not defined, TESTNET config will be used")
-        case Failure(exception) =>
-          log.error(s"Couldn't read ${external.get.toPath.toAbsolutePath}", exception)
-          forceStopApplication(Misconfiguration)
-        case _ => // Pass
-      }
-      loadConfig(maybeExternal.getOrElse(None))
-    }
+    val maybeExternalConfig = Try(external.map(ConfigFactory.parseFile(_, ConfigParseOptions.defaults().setAllowMissing(false))))
+    val config              = loadConfig(maybeExternalConfig.getOrElse(None))
 
     // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
     System.setProperty("waves.directory", config.getString("waves.directory"))
     if (config.hasPath("waves.config.directory")) System.setProperty("waves.config.directory", config.getString("waves.config.directory"))
+
+    maybeExternalConfig match {
+      case Success(None) => log.warn("Config file not defined, TESTNET config will be used")
+      case Failure(exception) =>
+        log.error(s"Couldn't read ${external.get.toPath.toAbsolutePath}", exception)
+        forceStopApplication(Misconfiguration)
+      case _ => // Pass
+    }
 
     val settings = WavesSettings.fromRootConfig(config)
 
