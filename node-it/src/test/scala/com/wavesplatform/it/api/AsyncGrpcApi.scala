@@ -500,7 +500,7 @@ object AsyncGrpcApi {
   }
 
   private def createCallObserver[T](implicit s: Scheduler): (StreamObserver[T], Task[List[T]]) = {
-    val subj = ConcurrentSubject.publishToOne[T]
+    val subj = ConcurrentSubject.replay[T]
 
     val observer = new StreamObserver[T] {
       override def onNext(value: T): Unit      = subj.onNext(value)
