@@ -609,9 +609,10 @@ object PBTransactions {
         PBTransactions.create(sender, chainId, feeAmount, feeAsset, timestamp, version, proofs, Data.UpdateAssetInfo(data))
 
       case tx @ vt.smart.ContinuationTransaction(invokeScriptTransactionId, timestamp, nonce) =>
-        val data =
-          Data.Continuation(ContinuationTransactionData(invokeScriptTransactionId.toByteString, nonce))
-        PBTransactions.create(sender = PublicKey(new Array[Byte](32)), chainId = tx.chainId, timestamp = timestamp, version = tx.version, data = data)
+        val data = Data.Continuation(ContinuationTransactionData(invokeScriptTransactionId.toByteString, nonce))
+        new SignedTransaction(
+          Some(Transaction(tx.chainId, timestamp = timestamp, version = tx.version, data = data))
+        )
 
       case _ =>
         throw new IllegalArgumentException(s"Unsupported transaction: $tx")
