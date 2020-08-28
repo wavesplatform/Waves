@@ -68,7 +68,15 @@ object ContinuationTransactionDiff {
 
         val limit = ContractLimits.MaxComplexityByVersion(script.stdLibVersion) + residualComplexity
         val r = ContractEvaluator
-          .applyV2(ctx.evaluationContext(environment), Map[String, LazyVal[Id]](), expr, script.stdLibVersion, tx.invokeScriptTransactionId, limit)
+          .applyV2(
+            ctx.evaluationContext(environment),
+            Map[String, LazyVal[Id]](),
+            expr,
+            script.stdLibVersion,
+            tx.invokeScriptTransactionId,
+            limit,
+            evaluateAllNatives = false
+          )
           .leftMap { case (error, log) => ScriptExecutionError.dAppExecution(error, log) }
         TracedResult(
           r,
@@ -81,8 +89,6 @@ object ContinuationTransactionDiff {
       )
 
       feeInfo <- TracedResult(InvokeDiffsCommon.calcFee(blockchain, invokeScriptTransaction))
-
-      verifierComplexity = blockchain.accountScript(invokeScriptTransaction.sender.toAddress).map(_.verifierComplexity).getOrElse(0L)
 
       doProcessActions = InvokeDiffsCommon.processActions(
         _,

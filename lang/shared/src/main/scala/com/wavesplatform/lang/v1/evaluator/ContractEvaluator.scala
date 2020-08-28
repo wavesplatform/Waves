@@ -99,11 +99,12 @@ object ContractEvaluator {
       dApp: DApp,
       i: Invocation,
       version: StdLibVersion,
-      limit: Int
+      limit: Int,
+      evaluateAllNatives: Boolean
   ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] =
     buildExprFromInvocation(dApp, i, version)
       .leftMap((_, Nil))
-      .flatMap(applyV2(ctx, freezingLets, _, version, i.transactionId, limit))
+      .flatMap(applyV2(ctx, freezingLets, _, version, i.transactionId, limit, evaluateAllNatives))
 
   def applyV2(
       ctx: EvaluationContext[Environment, Id],
@@ -111,14 +112,15 @@ object ContractEvaluator {
       expr: EXPR,
       version: StdLibVersion,
       transactionId: ByteStr,
-      limit: Int
+      limit: Int,
+      evaluateAllNatives: Boolean
   ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] = {
     val exprWithLets =
       freezingLets.foldLeft(expr) {
         case (buildingExpr, (letName, letValue)) =>
           BLOCK(LET(letName, letValue.value.value.explicitGet()), buildingExpr)
       }
-    EvaluatorV2.applyLimited(exprWithLets, limit, ctx, version)
+    EvaluatorV2.applyLimited(exprWithLets, limit, ctx, version, evaluateAllNatives)
       .flatMap {
         case (expr, unusedComplexity, log) =>
           val result =

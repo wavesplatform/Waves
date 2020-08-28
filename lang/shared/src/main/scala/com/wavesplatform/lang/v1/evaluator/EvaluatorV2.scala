@@ -339,12 +339,13 @@ object EvaluatorV2 {
       expr: EXPR,
       limit: Int,
       ctx: EvaluationContext[Environment, Id],
-      stdLibVersion: StdLibVersion
+      stdLibVersion: StdLibVersion,
+      evaluateAllNatives: Boolean
   ): Either[(ExecutionError, Log[Id]), (EXPR, Int, Log[Id])] = {
     val log       = ListBuffer[LogItem[Id]]()
     val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => log.append((name, value)), ctx)
     val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion)
-    Try(evaluator(expr, limit)).toEither
+    Try(evaluator(expr, limit, evaluateAllNatives)).toEither
       .bimap(
         err => (err.getMessage, log.toList),
         { case (expr, unused) => (expr, unused, log.toList) }
@@ -359,7 +360,7 @@ object EvaluatorV2 {
       default: EVALUATED
   ): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] =
     EvaluatorV2
-      .applyLimited(expr, complexityLimit, ctx, stdLibVersion)
+      .applyLimited(expr, complexityLimit, ctx, stdLibVersion, evaluateAllNatives = true)
       .flatMap {
         case (expr, _, log) =>
           expr match {
@@ -374,7 +375,7 @@ object EvaluatorV2 {
       stdLibVersion: StdLibVersion
   ): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] =
     EvaluatorV2
-      .applyLimited(expr, Int.MaxValue, ctx, stdLibVersion)
+      .applyLimited(expr, Int.MaxValue, ctx, stdLibVersion, evaluateAllNatives = true)
       .flatMap {
         case (expr, _, log) =>
           expr match {
