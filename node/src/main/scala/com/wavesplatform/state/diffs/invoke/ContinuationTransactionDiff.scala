@@ -75,7 +75,7 @@ object ContinuationTransactionDiff {
             script.stdLibVersion,
             tx.invokeScriptTransactionId,
             limit,
-            evaluateAllNatives = false
+            evaluateAll = false
           )
           .leftMap { case (error, log) => ScriptExecutionError.dAppExecution(error, log) }
         TracedResult(

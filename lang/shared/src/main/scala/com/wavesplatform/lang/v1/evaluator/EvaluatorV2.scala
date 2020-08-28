@@ -21,17 +21,18 @@ class EvaluatorV2(
     val stdLibVersion: StdLibVersion
 ) {
 
-  def apply(expr: EXPR, limit: Int, evaluateAllNatives: Boolean = true): (EXPR, Int) = {
+  def apply(expr: EXPR, limit: Int, evaluateAll: Boolean = true): (EXPR, Int) = {
     var ref    = expr.deepCopy.value
-    val unused = root(ref, v => Coeval.delay { ref = v }, limit, Nil, evaluateAllNatives).value()
+    val unused = root(ref, v => Coeval.delay { ref = v }, limit, Nil, evaluateAll).value()
     (ref, unused)
   }
 
-  private def root(expr: EXPR, _update: EXPR => Coeval[Unit], limit: Int, parentBlocks: List[BLOCK_DEF], evaluateAllNatives: Boolean): Coeval[Int] = {
+  private def root(expr: EXPR, _update: EXPR => Coeval[Unit], limit: Int, parentBlocks: List[BLOCK_DEF], evaluateAll: Boolean): Coeval[Int] = {
     val update =
-      if (evaluateAllNatives || (expr.isInstanceOf[FUNCTION_CALL] && expr.asInstanceOf[FUNCTION_CALL].function.isExternal))
+      if (evaluateAll || (expr.isInstanceOf[FUNCTION_CALL] && expr.asInstanceOf[FUNCTION_CALL].function.isExternal))
         _update
-      else (_: EXPR) => Coeval.now(())
+      else
+        (_: EXPR) => Coeval.now(())
     expr match {
       case b: BLOCK_DEF =>
         Coeval.defer(
@@ -43,7 +44,7 @@ class EvaluatorV2(
             },
             limit = limit,
             parentBlocks = b :: parentBlocks,
-            evaluateAllNatives
+            evaluateAll
           )
         )
       case g: GETTER =>
@@ -53,7 +54,7 @@ class EvaluatorV2(
             _update = v => Coeval.delay(g.expr = v),
             limit = limit,
             parentBlocks = parentBlocks,
-            evaluateAllNatives
+            evaluateAll
           ).flatMap { unused =>
             g.expr match {
               case co: CaseObj if unused > 0 =>
@@ -74,7 +75,7 @@ class EvaluatorV2(
             _update = (v: EXPR) => Coeval.delay(i.cond = v),
             limit = limit,
             parentBlocks = parentBlocks,
-            evaluateAllNatives
+            evaluateAll
           ).flatMap { unused =>
             i.cond match {
               case TRUE | FALSE if unused <= 0 =>
@@ -87,7 +88,7 @@ class EvaluatorV2(
                       _update = update,
                       limit = unused - 1,
                       parentBlocks = parentBlocks,
-                      evaluateAllNatives
+                      evaluateAll
                     )
                 )
               case FALSE if unused > 0 =>
@@ -98,16 +99,16 @@ class EvaluatorV2(
                       _update = update,
                       limit = unused - 1,
                       parentBlocks = parentBlocks,
-                      evaluateAllNatives
+                      evaluateAll
                     )
                 )
-              case _ if !evaluateAllNatives && unused > 0 =>
+              case _ if !evaluateAll && unused > 0 =>
                 root(
                   expr = i.ifTrue,
                   _update = (v: EXPR) => Coeval.delay(i.ifTrue = v),
                   limit = unused,
                   parentBlocks = parentBlocks,
-                  evaluateAllNatives
+                  evaluateAll
                 ).flatMap(
                     unusedAfterIfTrue =>
                       if (unusedAfterIfTrue > 0)
@@ -116,7 +117,7 @@ class EvaluatorV2(
                           _update = (v: EXPR) => Coeval.delay(i.ifFalse = v),
                           limit = unusedAfterIfTrue,
                           parentBlocks = parentBlocks,
-                        evaluateAllNatives
+                        evaluateAll
                         )
                       else
                         Coeval.now(unusedAfterIfTrue)
@@ -130,13 +131,13 @@ class EvaluatorV2(
 
       case REF(key) =>
         Coeval.defer {
-          visitRef(key, update, limit, parentBlocks, evaluateAllNatives)
-            .orElse(if (evaluateAllNatives) findGlobalVar(key, update, limit) else Some(Coeval.now(limit)))
+          visitRef(key, update, limit, parentBlocks, evaluateAll)
+            .orElse(if (evaluateAll) findGlobalVar(key, update, limit) else Some(Coeval.now(limit)))
             .getOrElse(throw new NoSuchElementException(s"A definition of '$key' not found"))
         }
 
       case fc: FUNCTION_CALL =>
-        val forceEvaluateArgs = evaluateAllNatives || fc.function.isExternal
+        val forceEvaluateArgs = evaluateAll || fc.function.isExternal
         val evaluatedArgs =
           Coeval.defer {
             fc.args.indices
@@ -159,7 +160,7 @@ class EvaluatorV2(
           .flatMap { unusedArgsComplexity =>
             if (fc.args.forall(_.isInstanceOf[EVALUATED])) {
               fc.function match {
-                case FunctionHeader.Native(_) if (fc.function.isExternal || evaluateAllNatives) =>
+                case FunctionHeader.Native(_) if (fc.function.isExternal || evaluateAll) =>
                   val function =
                     ctx.ec.functions
                       .getOrElse(fc.function, throw new RuntimeException(s"function '${fc.function}' not found"))
@@ -188,7 +189,7 @@ class EvaluatorV2(
                       _update(argsWithExpr).flatMap(
                         _ =>
                           if (unusedArgsComplexity > 0)
-                            root(argsWithExpr, _update, unusedArgsComplexity, parentBlocks, evaluateAllNatives)
+                            root(argsWithExpr, _update, unusedArgsComplexity, parentBlocks, evaluateAll)
                           else
                             Coeval.now(unusedArgsComplexity)
                       )
@@ -202,7 +203,7 @@ class EvaluatorV2(
                           }
                         caseType.flatMap { objectType =>
                           val fields = objectType.fields.map(_._1) zip fc.args.asInstanceOf[List[EVALUATED]]
-                          root(CaseObj(objectType, fields.toMap), update, unusedArgsComplexity, parentBlocks, evaluateAllNatives)
+                          root(CaseObj(objectType, fields.toMap), update, unusedArgsComplexity, parentBlocks, evaluateAll)
                         }
                       } else
                         Coeval.now(unusedArgsComplexity)
@@ -231,7 +232,7 @@ class EvaluatorV2(
                       _update(argsWithExpr).flatMap(
                         _ =>
                           if (unusedArgsComplexity > 0)
-                            root(argsWithExpr, _update, unusedArgsComplexity, parentBlocks, evaluateAllNatives)
+                            root(argsWithExpr, _update, unusedArgsComplexity, parentBlocks, evaluateAll)
                           else
                             Coeval.now(unusedArgsComplexity)
                       )
@@ -340,12 +341,12 @@ object EvaluatorV2 {
       limit: Int,
       ctx: EvaluationContext[Environment, Id],
       stdLibVersion: StdLibVersion,
-      evaluateAllNatives: Boolean
+      evaluateAll: Boolean
   ): Either[(ExecutionError, Log[Id]), (EXPR, Int, Log[Id])] = {
     val log       = ListBuffer[LogItem[Id]]()
     val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => log.append((name, value)), ctx)
     val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion)
-    Try(evaluator(expr, limit, evaluateAllNatives)).toEither
+    Try(evaluator(expr, limit, evaluateAll)).toEither
       .bimap(
         err => (err.getMessage, log.toList),
         { case (expr, unused) => (expr, unused, log.toList) }
@@ -360,7 +361,7 @@ object EvaluatorV2 {
       default: EVALUATED
   ): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] =
     EvaluatorV2
-      .applyLimited(expr, complexityLimit, ctx, stdLibVersion, evaluateAllNatives = true)
+      .applyLimited(expr, complexityLimit, ctx, stdLibVersion, evaluateAll = true)
       .flatMap {
         case (expr, _, log) =>
           expr match {
@@ -375,7 +376,7 @@ object EvaluatorV2 {
       stdLibVersion: StdLibVersion
   ): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] =
     EvaluatorV2
-      .applyLimited(expr, Int.MaxValue, ctx, stdLibVersion, evaluateAllNatives = true)
+      .applyLimited(expr, Int.MaxValue, ctx, stdLibVersion, evaluateAll = true)
       .flatMap {
         case (expr, _, log) =>
           expr match {

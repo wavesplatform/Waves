@@ -192,7 +192,7 @@ object InvokeScriptTransactionDiff {
     val freezingLets  = wavesContext.evaluationContext(environment).letDefs
     val evaluationCtx = ctx.evaluationContext(environment)
 
-    Try(ContractEvaluator.applyV2(evaluationCtx, freezingLets, contract, invocation, version, limit, evaluateAllNatives = true))
+    Try(ContractEvaluator.applyV2(evaluationCtx, freezingLets, contract, invocation, version, limit, evaluateAll = true))
       .fold(
         e => Left((e.getMessage, Nil)),
         _.map { case (result, log) => (result, evaluationCtx, log) }
@@ -210,7 +210,7 @@ object InvokeScriptTransactionDiff {
       transactionId: ByteStr,
       failComplexity: Long
   ): Either[FailedTransactionError, (ScriptResult, Log[Id])] =
-    Try(ContractEvaluator.applyV2(evaluationCtx, Map[String, LazyVal[Id]](), expr, version, transactionId, limit, evaluateAllNatives = true))
+    Try(ContractEvaluator.applyV2(evaluationCtx, Map[String, LazyVal[Id]](), expr, version, transactionId, limit, evaluateAll = true))
       .fold(e => Left((e.getMessage, Nil)), identity)
       .leftMap { case (error, log) => FailedTransactionError.dAppExecution(error, failComplexity, log) }
 
