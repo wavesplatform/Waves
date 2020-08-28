@@ -55,6 +55,7 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
          | func foo() = {
          |  let a =
          |    height == $activationHeight                                                  &&
+         |    getInteger(Address(base58''), "key") == unit                                 &&
          |    !(${List.fill(150)("sigVerify(base64'',base64'',base64'')").mkString("||")}) &&
          |    height == $activationHeight
          |  [BooleanEntry("a", a), BinaryEntry("sender", inv.caller.bytes)]
@@ -74,7 +75,7 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     assertBadRequestAndMessage(
       setScriptTx,
-      "State check failed. Reason: Contract function (foo) is too complex: 30622 > 4000"
+      "State check failed. Reason: Contract function (foo) is too complex: 30638 > 4000"
     )
   }
 

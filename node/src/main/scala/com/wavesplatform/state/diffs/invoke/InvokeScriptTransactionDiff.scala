@@ -128,10 +128,10 @@ object InvokeScriptTransactionDiff {
                     fullLimit
 
                 for {
-                  (failFreeResult, evaluationCtx, failFreeLog) <- evaluateV2(version, contract, directives, invocation, environment, failFreeLimit)
+                  (failFreeResult, evaluationCtx, failFreeLog) <- evaluateV2(version, contract, directives, invocation, environment, failFreeLimit, evaluateAll = stepsNumber == 1)
                   (result, log) <- failFreeResult match {
                     case IncompleteResult(expr, unusedComplexity) if !limitedExecution =>
-                      continueEvaluation(version, expr, evaluationCtx, fullLimit - failFreeLimit + unusedComplexity, tx.id(), invocationComplexity)
+                      continueEvaluation(version, expr, evaluationCtx, fullLimit - failFreeLimit + unusedComplexity, tx.id(), invocationComplexity, evaluateAll = stepsNumber == 1)
                     case _ =>
                       Right((failFreeResult, Nil))
                   }
@@ -181,7 +181,8 @@ object InvokeScriptTransactionDiff {
       directives: DirectiveSet,
       invocation: ContractEvaluator.Invocation,
       environment: WavesEnvironment,
-      limit: Int
+      limit: Int,
+      evaluateAll: Boolean
   ): Either[ScriptExecutionError, (ScriptResult, EvaluationContext[Environment, Id], Log[Id])] = {
     val wavesContext = WavesContext.build(directives)
     val ctx =
@@ -192,7 +193,7 @@ object InvokeScriptTransactionDiff {
     val freezingLets  = wavesContext.evaluationContext(environment).letDefs
     val evaluationCtx = ctx.evaluationContext(environment)
 
-    Try(ContractEvaluator.applyV2(evaluationCtx, freezingLets, contract, invocation, version, limit, evaluateAll = true))
+    Try(ContractEvaluator.applyV2(evaluationCtx, freezingLets, contract, invocation, version, limit, evaluateAll))
       .fold(
         e => Left((e.getMessage, Nil)),
         _.map { case (result, log) => (result, evaluationCtx, log) }
@@ -208,9 +209,10 @@ object InvokeScriptTransactionDiff {
       evaluationCtx: EvaluationContext[Environment, Id],
       limit: Int,
       transactionId: ByteStr,
-      failComplexity: Long
+      failComplexity: Long,
+      evaluateAll: Boolean
   ): Either[FailedTransactionError, (ScriptResult, Log[Id])] =
-    Try(ContractEvaluator.applyV2(evaluationCtx, Map[String, LazyVal[Id]](), expr, version, transactionId, limit, evaluateAll = true))
+    Try(ContractEvaluator.applyV2(evaluationCtx, Map[String, LazyVal[Id]](), expr, version, transactionId, limit, evaluateAll))
       .fold(e => Left((e.getMessage, Nil)), identity)
       .leftMap { case (error, log) => FailedTransactionError.dAppExecution(error, failComplexity, log) }
 
