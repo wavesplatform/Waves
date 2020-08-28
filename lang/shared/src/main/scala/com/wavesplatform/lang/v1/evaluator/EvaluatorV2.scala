@@ -21,15 +21,15 @@ class EvaluatorV2(
     val stdLibVersion: StdLibVersion
 ) {
 
-  def apply(expr: EXPR, limit: Int, evaluateAll: Boolean = true): (EXPR, Int) = {
+  def apply(expr: EXPR, limit: Int, evaluateAllNatives: Boolean = true): (EXPR, Int) = {
     var ref    = expr.deepCopy.value
-    val unused = root(ref, v => Coeval.delay { ref = v }, limit, Nil, evaluateAll).value()
+    val unused = root(ref, v => Coeval.delay { ref = v }, limit, Nil, evaluateAllNatives).value()
     (ref, unused)
   }
 
-  private def root(expr: EXPR, _update: EXPR => Coeval[Unit], limit: Int, parentBlocks: List[BLOCK_DEF], evaluateAll: Boolean): Coeval[Int] = {
+  private def root(expr: EXPR, _update: EXPR => Coeval[Unit], limit: Int, parentBlocks: List[BLOCK_DEF], evaluateAllNatives: Boolean): Coeval[Int] = {
     val update =
-      if (evaluateAll || (expr.isInstanceOf[FUNCTION_CALL] && expr.asInstanceOf[FUNCTION_CALL].function.isExternal))
+      if (evaluateAllNatives || (expr.isInstanceOf[FUNCTION_CALL] && expr.asInstanceOf[FUNCTION_CALL].function.isExternal))
         _update
       else (_: EXPR) => Coeval.now(())
     expr match {
@@ -43,7 +43,7 @@ class EvaluatorV2(
             },
             limit = limit,
             parentBlocks = b :: parentBlocks,
-            evaluateAll
+            evaluateAllNatives
           )
         )
       case g: GETTER =>
@@ -53,7 +53,7 @@ class EvaluatorV2(
             _update = v => Coeval.delay(g.expr = v),
             limit = limit,
             parentBlocks = parentBlocks,
-            evaluateAll
+            evaluateAllNatives
           ).flatMap { unused =>
             g.expr match {
               case co: CaseObj if unused > 0 =>
@@ -74,7 +74,7 @@ class EvaluatorV2(
             _update = (v: EXPR) => Coeval.delay(i.cond = v),
             limit = limit,
             parentBlocks = parentBlocks,
-            evaluateAll
+            evaluateAllNatives
           ).flatMap { unused =>
             i.cond match {
               case TRUE | FALSE if unused <= 0 =>
@@ -87,7 +87,7 @@ class EvaluatorV2(
                       _update = update,
                       limit = unused - 1,
                       parentBlocks = parentBlocks,
-                      evaluateAll
+                      evaluateAllNatives
                     )
                 )
               case FALSE if unused > 0 =>
@@ -98,16 +98,16 @@ class EvaluatorV2(
                       _update = update,
                       limit = unused - 1,
                       parentBlocks = parentBlocks,
-                      evaluateAll
+                      evaluateAllNatives
                     )
                 )
-              case _ if !evaluateAll && unused > 0 =>
+              case _ if !evaluateAllNatives && unused > 0 =>
                 root(
                   expr = i.ifTrue,
                   _update = (v: EXPR) => Coeval.delay(i.ifTrue = v),
                   limit = unused,
                   parentBlocks = parentBlocks,
-                  evaluateAll
+                  evaluateAllNatives
                 ).flatMap(
                     unusedAfterIfTrue =>
                       if (unusedAfterIfTrue > 0)
@@ -116,7 +116,7 @@ class EvaluatorV2(
                           _update = (v: EXPR) => Coeval.delay(i.ifFalse = v),
                           limit = unusedAfterIfTrue,
                           parentBlocks = parentBlocks,
-                          evaluateAll
+                        evaluateAllNatives
                         )
                       else
                         Coeval.now(unusedAfterIfTrue)
@@ -130,13 +130,13 @@ class EvaluatorV2(
 
       case REF(key) =>
         Coeval.defer {
-          visitRef(key, update, limit, parentBlocks, evaluateAll)
-            .orElse(if (evaluateAll) findGlobalVar(key, update, limit) else Some(Coeval.now(limit)))
+          visitRef(key, update, limit, parentBlocks, evaluateAllNatives)
+            .orElse(if (evaluateAllNatives) findGlobalVar(key, update, limit) else Some(Coeval.now(limit)))
             .getOrElse(throw new NoSuchElementException(s"A definition of '$key' not found"))
         }
 
       case fc: FUNCTION_CALL =>
-        val forceEvaluateArgs = evaluateAll || fc.function.isExternal
+        val forceEvaluateArgs = evaluateAllNatives || fc.function.isExternal
         val evaluatedArgs =
           Coeval.defer {
             fc.args.indices
@@ -159,7 +159,7 @@ class EvaluatorV2(
           .flatMap { unusedArgsComplexity =>
             if (fc.args.forall(_.isInstanceOf[EVALUATED])) {
               fc.function match {
-                case FunctionHeader.Native(_) if (fc.function.isExternal || evaluateAll) =>
+                case FunctionHeader.Native(_) if (fc.function.isExternal || evaluateAllNatives) =>
                   val function =
                     ctx.ec.functions
                       .getOrElse(fc.function, throw new RuntimeException(s"function '${fc.function}' not found"))
@@ -188,7 +188,7 @@ class EvaluatorV2(
                       _update(argsWithExpr).flatMap(
                         _ =>
                           if (unusedArgsComplexity > 0)
-                            root(argsWithExpr, _update, unusedArgsComplexity, parentBlocks, evaluateAll)
+                            root(argsWithExpr, _update, unusedArgsComplexity, parentBlocks, evaluateAllNatives)
                           else
                             Coeval.now(unusedArgsComplexity)
                       )
@@ -202,7 +202,7 @@ class EvaluatorV2(
                           }
                         caseType.flatMap { objectType =>
                           val fields = objectType.fields.map(_._1) zip fc.args.asInstanceOf[List[EVALUATED]]
-                          root(CaseObj(objectType, fields.toMap), update, unusedArgsComplexity, parentBlocks, evaluateAll)
+                          root(CaseObj(objectType, fields.toMap), update, unusedArgsComplexity, parentBlocks, evaluateAllNatives)
                         }
                       } else
                         Coeval.now(unusedArgsComplexity)
@@ -231,7 +231,7 @@ class EvaluatorV2(
                       _update(argsWithExpr).flatMap(
                         _ =>
                           if (unusedArgsComplexity > 0)
-                            root(argsWithExpr, _update, unusedArgsComplexity, parentBlocks, evaluateAll)
+                            root(argsWithExpr, _update, unusedArgsComplexity, parentBlocks, evaluateAllNatives)
                           else
                             Coeval.now(unusedArgsComplexity)
                       )
