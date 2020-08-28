@@ -456,7 +456,8 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
         txsSend,
         () => updateAssetScript(result = false, invalidScriptAsset, owner, priorityFee, waitForTx = false)
       )((txs, _) => assertFailedTxs(txs))
-      updateAssetScript(result = true, invalidScriptAsset, owner, priorityFee * 2, waitForTx = false)
+
+      updateAssetScript(result = true, invalidScriptAsset, owner, priorityFee * 2)
     }
   }
 

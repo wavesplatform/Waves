@@ -2,9 +2,10 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{LoadTest, Node, NodeConfigs, ReportingTestName, TransferSending}
+import com.wavesplatform.it._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.{BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.TxVersion
@@ -12,7 +13,6 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
-import com.wavesplatform.common.utils.EitherExt2
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -55,6 +55,8 @@ class RollbackSuite
 
     nodes.rollback(startHeight)
 
+    nodes.waitForHeightArise()
+
     nodes.waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
 
     nodes.waitForHeightArise()
@@ -63,7 +65,7 @@ class RollbackSuite
 
     assert(stateAfterSecondTry.size == stateAfterFirstTry.size)
 
-    stateAfterSecondTry should contain theSameElementsAs stateAfterFirstTry
+    stateAfterSecondTry.toSet shouldBe stateAfterFirstTry.toSet
   }
 
   test("Just rollback transactions") {
