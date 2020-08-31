@@ -3,9 +3,9 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.it._
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.{BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.TxVersion
@@ -45,26 +45,18 @@ class RollbackSuite
     val startHeight = sender.height
 
     Await.result(processRequests(generateTransfersToRandomAddresses(190, nodeAddresses)), 2.minutes)
-
     nodes.waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
-
     nodes.waitForHeightArise()
 
     val stateHeight        = sender.height
     val stateAfterFirstTry = nodes.head.debugStateAt(stateHeight)
 
     nodes.rollback(startHeight)
-
     nodes.waitForHeightArise()
-
     nodes.waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
-
     nodes.waitForHeightArise()
 
-    val stateAfterSecondTry = nodes.head.debugStateAt(stateHeight)
-
-    assert(stateAfterSecondTry.size == stateAfterFirstTry.size)
-
+    val stateAfterSecondTry = nodes.head.debugStateAt(nodes.head.height)
     stateAfterSecondTry.toSet shouldBe stateAfterFirstTry.toSet
   }
 
