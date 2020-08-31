@@ -82,14 +82,11 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
           if (bytes == null || bytes.isEmpty) {
             Success(None)
           } else {
-            Try {
-              log.debug(s"BlockchainUpdates extension parsing bytes from leveldb for height $height")
-              PBBlockchainUpdated
-                .parseFrom(bytes)
-                .vanilla
-                .toOption
-                .collect { case ba: BlockAppended => ba }
-            }
+            for {
+              pbParseResult <- Try(PBBlockchainUpdated.parseFrom(bytes))
+              vanillaUpdate <- pbParseResult.vanilla
+              blockAppended <- Try(vanillaUpdate.asInstanceOf[BlockAppended])
+            } yield Some(blockAppended)
           }
       }
     }
@@ -125,10 +122,15 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
     Try {
       liquidState.foreach { ls =>
         val solidBlock = ls.solidify()
+        val k          = key(solidBlock.toHeight)
+        val v          = solidBlock.protobuf.toByteArray
         db.put(
-          key(solidBlock.toHeight),
-          solidBlock.protobuf.toByteArray
+          k,
+          v
         )
+
+        val bytes = db.get(k)
+        println(bytes)
       }
       liquidState = Some(LiquidState(blockAppended, Seq.empty))
       sendRealTimeUpdate(blockAppended)
