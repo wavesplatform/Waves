@@ -82,7 +82,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
          |
          |@Callable(inv)
          |func tikTok() = {
-         |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 20} false
+         |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 16} false
          |  let action = valueOrElse(getString(this, "tikTok"), "unknown")
          |  if (check) then []
          |  else if (action == "transfer") then [ScriptTransfer(inv.caller, 15, asset)]
@@ -104,7 +104,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
          |@Callable(inv)
          |func canThrow() = {
          |  let action = valueOrElse(getString(this, "crash"), "no")
-         |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 20} true
+         |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 16} true
          |
          |  if (action == "yes")
          |  then {
@@ -120,7 +120,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
          |
          |@Callable(inv)
          |func blockIsEven() =
-         |  if (${"sigVerify(base58'', base58'', base58'') ||" * 20} height % 2 == 0)
+         |  if (${"sigVerify(base58'', base58'', base58'') ||" * 16} height % 2 == 0)
          |  then []
          |  else throw("block height is odd")
          |

@@ -93,7 +93,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
          |@Callable(inv)
          |func tikTok() = {
          |  let action = valueOrElse(getString(this, "tikTok"), "unknown")
-         |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 20} false
+         |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 16} false
          |  if (check) then []
          |  else if (action == "transfer") then [ScriptTransfer(inv.caller, 15, asset)]
          |  else if (action == "issue") then [Issue("new asset", "", 100, 8, true, unit, 0)]
@@ -104,7 +104,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
          |
          |@Callable(inv)
          |func transferAndWrite(x: Int) = {
-         |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 20} false
+         |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 16} false
          |  if (check) then []
          |  else if (x % 4 == 0) then [ScriptTransfer(inv.caller, 15, asset), IntegerEntry("n", x)]
          |  else if (x % 4 == 1) then [ScriptTransfer(inv.caller, 15, asset), BooleanEntry("b", x % 2 == 0)]
@@ -116,7 +116,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
          |@Callable(inv)
          |func canThrow() = {
          |  let action = valueOrElse(getString(this, "crash"), "no")
-         |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 20} true
+         |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 16} true
          |
          |  if (action == "yes")
          |  then {

@@ -50,7 +50,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
          |
          |@Callable(i)
          |func error() = {
-         |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 20} true
+         |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 16} true
          |  if (check)
          |    then throw("Error in DApp")
          |    else throw("Error in DApp")
