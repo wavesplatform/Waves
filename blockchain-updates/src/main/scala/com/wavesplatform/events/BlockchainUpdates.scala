@@ -26,7 +26,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
   private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("blockchain-updates")
 
-  private[this] val repo = new UpdatesRepoImpl(s"${context.settings.directory}/blockchain-updates", settings.streamBufferSize)
+  private[this] val repo = new UpdatesRepoImpl(s"${context.settings.directory}/blockchain-updates")
 
   private[this] var grpcServer: Server = null
 

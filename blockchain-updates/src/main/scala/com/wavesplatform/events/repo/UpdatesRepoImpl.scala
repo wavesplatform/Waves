@@ -19,7 +19,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val scheduler: Scheduler)
+class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
     extends UpdatesRepo.Read
     with UpdatesRepo.Write
     with UpdatesRepo.Stream
