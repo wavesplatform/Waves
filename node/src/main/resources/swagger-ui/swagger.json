@@ -2958,7 +2958,11 @@
             }
           }
         },
-        "deprecated": true
+        "security": [
+          {
+            "API Key": []
+          }
+        ]
       }
     },
     "/assets/{assetId}/distribution/{height}/limit/{limit}": {

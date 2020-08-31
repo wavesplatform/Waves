@@ -37,7 +37,7 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     val distributionHeight = node.height
 
-    nodes.waitForHeightArise()
+    nodes.waitForHeightArise()FAIL
 
     node.assetDistributionAtHeight(issueTx, initialHeight, 100).items shouldBe Map.empty
 
@@ -47,7 +47,7 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     assetDis should be equals node.assetDistribution(issueTx)
 
-    val issuerAssetDis = assetDis.view.filterKeys(_ == issuer.toAddress).values
+    val issuerAssetDis = assetDi.view.filterKeys(_ == issuer.toAddress).values
 
     issuerAssetDis.size shouldBe 1
     issuerAssetDis.head shouldBe (issueAmount - addresses.length * transferAmount)
