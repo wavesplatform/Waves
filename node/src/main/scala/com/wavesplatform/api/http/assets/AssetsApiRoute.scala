@@ -122,35 +122,32 @@ case class AssetsApiRoute(
     }
 
   def balances(address: Address): Route = extractScheduler { implicit s =>
-    implicit val jsonStreamingSupport: ToResponseMarshaller[Source[JsValue, NotUsed]] =
+    implicit val jsonStreamingSupport: ToResponseMarshaller[Source[JsObject, NotUsed]] =
       jsonStreamMarshaller(s"""{"address":"$address","balances":[""", ",", "]}")
-    val value = Source.fromPublisher(
-      commonAccountApi
-        .portfolio(address)
-        .flatMap {
-          case (assetId, balance) =>
-            Observable.fromIterable(commonAssetsApi.fullInfo(assetId).map {
-              case CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance) =>
-                Json.obj(
-                  "assetId"    -> assetId.id.toString,
-                  "balance"    -> balance,
-                  "reissuable" -> assetInfo.reissuable,
-                  "minSponsoredAssetFee" -> (assetInfo.sponsorship match {
-                    case 0           => JsNull
-                    case sponsorship => JsNumber(sponsorship)
-                  }),
-                  "sponsorBalance"   -> sponsorBalance,
-                  "quantity"         -> JsNumber(BigDecimal(assetInfo.totalVolume)),
-                  "issueTransaction" -> issueTransaction.map(_.json())
-                )
-            })
 
-        }
-        .toReactivePublisher
-    )
-    complete(
-      value
-    )
+    complete(commonAccountApi.portfolio(address).toListL.runToFuture.map { balances =>
+      Source.fromIterator(
+        () =>
+          balances.iterator.flatMap {
+            case (assetId, balance) =>
+              commonAssetsApi.fullInfo(assetId).map {
+                case CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance) =>
+                  Json.obj(
+                    "assetId"    -> assetId.id.toString,
+                    "balance"    -> balance,
+                    "reissuable" -> assetInfo.reissuable,
+                    "minSponsoredAssetFee" -> (assetInfo.sponsorship match {
+                      case 0           => JsNull
+                      case sponsorship => JsNumber(sponsorship)
+                    }),
+                    "sponsorBalance"   -> sponsorBalance,
+                    "quantity"         -> JsNumber(BigDecimal(assetInfo.totalVolume)),
+                    "issueTransaction" -> issueTransaction.map(_.json())
+                  )
+              }
+          }
+      )
+    })
   }
 
   def balance(address: Address, assetId: IssuedAsset): Route = complete(balanceJson(address, assetId))
@@ -301,7 +298,10 @@ object AssetsApiRoute {
     // (timestamp, height)
     def additionalInfo(id: ByteStr): Either[String, (Long, Int)] =
       for {
-        tt <- blockchain.transactionInfo(id).filter { case (_, _, confirmed) => confirmed }.toRight("Failed to find issue/invokeScript transaction by ID")
+        tt <- blockchain
+          .transactionInfo(id)
+          .filter { case (_, _, confirmed) => confirmed }
+          .toRight("Failed to find issue/invokeScript transaction by ID")
         (h, mtx, _) = tt
         ts <- (mtx match {
           case tx: IssueTransaction        => Some(tx.timestamp)

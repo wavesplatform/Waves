@@ -90,8 +90,9 @@ object AddressTransactions {
       val (maxHeight, maxTxNum) =
         fromId
           .flatMap(id => resource.get(Keys.transactionMetaById(TransactionId(id))))
-          .map { case pb.TransactionMeta(h, n, _, _) => (Height(h), TxNum(n.toShort)) }
-          .getOrElse(Height(Int.MaxValue) -> TxNum(Short.MaxValue))
+          .fold[(Height, TxNum)](Height(Int.MaxValue) -> TxNum(Short.MaxValue)) { tm =>
+            Height(tm.height) -> TxNum(tm.num.toShort)
+          }
 
       (for {
         seqNr                    <- (resource.get(Keys.addressTransactionSeqNr(addressId)) to 0 by -1).view
@@ -119,4 +120,5 @@ object AddressTransactions {
       .dropWhile { case (_, tx, _) => fromId.contains(tx.id()) }
       .filter { case (_, tx, _) => types.isEmpty || types.contains(tx.typeId) }
       .collect { case v @ (_, tx: Authorized, _) if sender.forall(_ == tx.sender.toAddress) => v }
+      .view
 }
