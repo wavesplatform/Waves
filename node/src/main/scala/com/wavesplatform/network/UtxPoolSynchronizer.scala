@@ -81,7 +81,7 @@ class UtxPoolSynchronizerImpl(
     Schedulers
       .executeCatchingInterruptedException(timedScheduler)(putIfNew(tx, source.isEmpty))
       .recover {
-        case _: ExecutionException =>
+        case err: ExecutionException if err.getCause.isInstanceOf[InterruptedException]  =>
           log.trace(s"Transaction took too long to validate: ${tx.id()}")
           TracedResult(Left(GenericError("Transaction took too long to validate")))
 
