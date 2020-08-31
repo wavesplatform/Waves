@@ -122,15 +122,10 @@ class UpdatesRepoImpl(directory: String, streamBufferSize: Int)(implicit val sch
     Try {
       liquidState.foreach { ls =>
         val solidBlock = ls.solidify()
-        val k          = key(solidBlock.toHeight)
-        val v          = solidBlock.protobuf.toByteArray
         db.put(
-          k,
-          v
+          key(solidBlock.toHeight),
+          solidBlock.protobuf.toByteArray
         )
-
-        val bytes = db.get(k)
-        println(bytes)
       }
       liquidState = Some(LiquidState(blockAppended, Seq.empty))
       sendRealTimeUpdate(blockAppended)
