@@ -99,7 +99,7 @@ case class AssetsApiRoute(
         } ~ (path("nft" / AddrSegment / "limit" / IntNumber) & parameter("after".as[String].?)) { (address, limit, maybeAfter) =>
           nft(address, limit, maybeAfter)
         } ~ pathPrefix(AssetId / "distribution") { assetId =>
-          pathEndOrSingleSlash(withAuth(balanceDistribution(assetId))) ~
+          pathEndOrSingleSlash(balanceDistribution(assetId)) ~
             (path(IntNumber / "limit" / IntNumber) & parameter("after".?)) { (height, limit, maybeAfter) =>
               balanceDistributionAtHeight(assetId, height, limit, maybeAfter)
             }

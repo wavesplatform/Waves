@@ -332,7 +332,7 @@ object AsyncHttpApi extends Assertions {
 
     def assetDistribution(asset: String, amountsAsStrings: Boolean = false): Future[AssetDistribution] = {
       val req = s"/assets/$asset/distribution"
-      get(req, amountsAsStrings, withApiKey = true).as[AssetDistribution](amountsAsStrings)
+      get(req, amountsAsStrings).as[AssetDistribution](amountsAsStrings)
     }
 
     def effectiveBalance(address: String, confirmations: Option[Int] = None, amountsAsStrings: Boolean = false): Future[Balance] = {
