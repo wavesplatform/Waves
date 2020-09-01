@@ -179,8 +179,8 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     overflowBlock()
 
     val txs =
-      (1 to MaxTxsInMicroBlock * 2).map { _ =>
-        sender.invokeScript(callerKP, dApp, Some("transfer"), fee = minInvokeFee)._1.id
+      (1 to MaxTxsInMicroBlock * 2).map { i =>
+        sender.invokeScript(callerKP, dApp, Some("transfer"), fee = minInvokeFee + i)._1.id
       }
 
     sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(false))
@@ -193,7 +193,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       all(failed.map(_.applicationStatus)) shouldBe Some("script_execution_failed")
     }
 
-    sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
+    sender.waitFor("empty utx")(n => n.utxSize, (_: Int) == 0, 100.millis)
     nodes.waitForHeightArise()
     check() // hardened
   }
