@@ -169,7 +169,7 @@ case class AssetsApiRoute(
     }
 
   def balanceDistribution(assetId: IssuedAsset): Route =
-    balanceDistribution(assetId, blockchain.height, settings.distributionAddressLimit, None) { l =>
+    balanceDistribution(assetId, blockchain.height, Int.MaxValue, None) { l =>
       Json.toJson(l.map { case (a, b) => a.stringRepr -> b }.toMap)
     }
 
