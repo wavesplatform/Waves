@@ -169,8 +169,8 @@ case class AssetsApiRoute(
     }
 
   def balanceDistribution(assetId: IssuedAsset): Route =
-    balanceDistribution(assetId, blockchain.height, settings.distributionAddressLimit, None) { l =>
-      Json.toJson(l.map { case (a, b) => a.stringRepr -> b }.toMap)
+    balanceDistribution(assetId, blockchain.height, Int.MaxValue, None) { l =>
+      JsObject(l.map { case (a, b) => a.stringRepr -> JsNumber(b) })
     }
 
   def balanceDistributionAtHeight(assetId: IssuedAsset, heightParam: Int, limitParam: Int, afterParam: Option[String]): Route =
@@ -185,13 +185,13 @@ case class AssetsApiRoute(
             Json.obj(
               "hasNext"  -> (l.length == limit),
               "lastItem" -> l.lastOption.map(_._1),
-              "items" -> Json.toJson(l.map {
+              "items" -> JsObject(l.map {
                 case (a, b) =>
                   a.stringRepr -> accept.fold[JsValue](JsNumber(b)) {
                     case a if a.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings) => JsString(b.toString)
                     case _                                                             => JsNumber(b)
                   }
-              }.toMap)
+              })
             )
           }
         case Left(error) => complete(error)
