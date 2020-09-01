@@ -137,7 +137,7 @@ object PureFunctionsRebenchmark {
       CryptoContext.build(Global, V4).evaluationContext
     ).asInstanceOf[EvaluationContext[Environment, Id]]
 
-  val eval: EXPR => Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] =
+  val eval =
     EvaluatorV2.applyCompleted(context, _, V4)
 
   def randomBytes(length: Int): Array[Byte] = {
