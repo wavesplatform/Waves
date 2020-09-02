@@ -2,12 +2,14 @@ package com.wavesplatform.lang.v1.repl.node.http.response
 
 import java.nio.ByteBuffer
 
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.v1.repl.global
-import com.wavesplatform.lang.v1.repl.node.http.response.model.{AssetInfoResponse, BlockInfoResponse, ByteString, TransferTransaction, TransferTransactionV1, TransferTransactionV2}
+import com.wavesplatform.lang.v1.repl.node.http.response.model._
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven, Transfer}
-import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, ScriptAssetInfo}
+import com.wavesplatform.lang.v1.traits.domain._
 
 private[node] class ChainDependentMapper(chainId: Byte) {
   def toRideModel(tx: TransferTransaction): Transfer =
@@ -16,9 +18,16 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       tx.feeAssetId.map(_.byteStr),
       tx.assetId.map(_.byteStr),
       tx.amount,
-      Address(tx.recipient.byteStr),
+      tx.recipient,
       tx.attachment.byteStr
     )
+
+  def toRideModelO(tx: TransferTransaction): Option[Transfer] =
+    if(tx.succeed) {
+      Some(toRideModel(tx))
+    } else {
+      None
+    }
 
   private def proven(tx: TransferTransaction): Proven =
     Proven(
@@ -29,33 +38,45 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       tx.proofs.map(_.byteStr).toIndexedSeq
     )
 
+  private def bodyBytes(tx: TransferTransaction): Array[Byte] =
+    TransferTxSerializer.bodyBytes(
+      tx.senderPublicKey.bytes,
+      tx.assetId.map(_.bytes),
+      tx.feeAssetId.map(_.bytes),
+      tx.timestamp,
+      tx.amount,
+      tx.fee,
+      tx.recipient,
+      tx.attachment.bytes,
+      tx.version,
+      chainId,
+      tx.proofs.map(_.bytes)
+    )
+
   def toRideModel(a: AssetInfoResponse): ScriptAssetInfo =
     ScriptAssetInfo(
       a.assetId.byteStr,
+      a.name,
+      a.description,
       a.quantity,
       a.decimals,
       Address(a.issuer.byteStr),
-      pkToAddress(a.issuer),
+      a.issuerPublicKey.byteStr,
       a.reissuable,
       a.scripted,
-      a.sponsored
+      a.minSponsoredAssetFee
     )
 
   def toRideModel(b: BlockInfoResponse): BlockInfo =
     BlockInfo(
-      b.timestamp,
-      b.height,
-      b.`nxt-consensus`.`base-target`,
-      b.`nxt-consensus`.`generation-signature`.byteStr,
-      pkToAddress(b.generator),
-      b.generator.byteStr
+      timestamp = b.timestamp,
+      height = b.height,
+      baseTarget = b.`nxt-consensus`.`base-target`,
+      generationSignature = b.`nxt-consensus`.`generation-signature`.byteStr,
+      generator = b.generator.byteStr,
+      generatorPublicKey = b.generatorPublicKey.byteStr,
+      vrf = b.VRF.map(_.byteStr)
     )
-
-
-  private val AddressVersion = 1
-  private val ChecksumLength = 4
-  private val HashLength     = 20
-  private val AddressLength  = 1 + 1 + HashLength + ChecksumLength
 
   private def pkToAddress(publicKey: ByteString): ByteStr = {
     val withoutChecksum =
@@ -77,35 +98,44 @@ private[node] class ChainDependentMapper(chainId: Byte) {
     ByteStr(bytes)
   }
 
-  private val typeId: Byte = 4
+  def addressFromString(addressStr: String): Either[String, Address] = {
+    val base58String = if (addressStr.startsWith(AddressPrefix)) addressStr.drop(AddressPrefix.length) else addressStr
+    for {
+      _ <- Either.cond(
+        base58String.length <= AddressStringLength,
+        (),
+        s"Wrong address string length: max=$AddressStringLength, actual: ${base58String.length}"
+      )
+      byteArray <- Base58.tryDecodeWithLimit(base58String).toEither.left.map(ex => s"Unable to decode base58: ${ex.getMessage}")
+      address   <- addressFromBytes(byteArray)
+    } yield address
+  }
 
-  private def bodyBytes(tx: TransferTransaction): Array[Byte] =
-    tx match {
-      case _: TransferTransactionV1 => typeId +: bytesBase(tx)
-      case _: TransferTransactionV2 => Array(typeId, tx.version) ++ bytesBase(tx)
-    }
-
-  private def bytesBase(tx: TransferTransaction): Array[Byte] =
-    Seq(
-      tx.senderPublicKey.bytes,
-      bytes(tx.assetId),
-      bytes(tx.feeAssetId),
-      bytes(tx.timestamp),
-      bytes(tx.amount),
-      bytes(tx.fee),
-      tx.recipient.bytes,
-      serializeArray(tx.attachment.bytes)
-    ).reduce(_ ++ _)
-
-  private def bytes(id: Option[ByteString]): Array[Byte] =
-    id.map(_.bytes).getOrElse(Array[Byte](0))
-
-  private def bytes(l: Long): Array[Byte] =
-    ByteBuffer.allocate(8).putLong(l).array()
-
-  private def bytes(s: Short): Array[Byte] =
-    ByteBuffer.allocate(2).putShort(s).array()
-
-  private def serializeArray(b: Array[Byte]): Array[Byte] =
-    bytes(b.length.toShort) ++ b
+  private def addressFromBytes(addressBytes: Array[Byte]): Either[String, Address] = {
+    val Array(version, network, _*) = addressBytes
+    for {
+      _ <- Either.cond(
+        addressBytes.length == AddressLength,
+        (),
+        s"Wrong addressBytes length: expected: $AddressLength, actual: ${addressBytes.length}"
+      )
+      _ <- Either.cond(
+        version == AddressVersion,
+        (),
+        s"Unknown address version: $version"
+      )
+      _ <- Either.cond(
+        network == chainId,
+        (),
+        s"Data from other network: expected: $chainId(${chainId.toChar}), actual: $network(${network.toChar})"
+      )
+      checkSum          = addressBytes.takeRight(ChecksumLength)
+      checkSumGenerated = global.secureHash(addressBytes.dropRight(ChecksumLength)).take(ChecksumLength)
+      _ <- Either.cond(
+        java.util.Arrays.equals(checkSum, checkSumGenerated),
+        (),
+        s"Bad address checksum"
+      )
+    } yield Address(ByteStr(addressBytes))
+  }
 }

@@ -1,45 +1,54 @@
 package com.wavesplatform.it.sync.transactions
 
+import com.google.protobuf.ByteString
+import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidName, NonPositiveAmount, TooBigArrayAllocation}
+import com.wavesplatform.it.api.IssueTransactionInfo
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.{Proofs, TxVersion}
 import org.scalatest.prop.TableDrivenPropertyChecks
+import play.api.libs.json.{JsNull, JsString, JsValue, Json}
 
 class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
   test("asset issue changes issuer's asset balance; issuer's waves balance is decreased by fee") {
-    for (v <- supportedVersions) {
+    for (v <- issueTxSupportedVersions) {
       val assetName        = "myasset"
       val assetDescription = "my asset description"
       val (balance1, eff1) = miner.accountBalances(firstAddress)
 
-      val issuedAssetId =
+      val issueTx =
         sender
-          .issue(firstAddress, assetName, assetDescription, someAssetAmount, 2, reissuable = true, issueFee, version = v, script = scriptText(v))
-          .id
-      nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
+          .issue(firstKeyPair, assetName, assetDescription, someAssetAmount, 2, reissuable = true, issueFee, version = v, script = scriptText(v))
+      nodes.waitForHeightAriseAndTxPresent(issueTx.id)
+      if (v > 2) {
+        issueTx.chainId shouldBe Some(AddressScheme.current.chainId)
+        sender.transactionInfo[IssueTransactionInfo](issueTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
+      }
 
       miner.assertBalances(firstAddress, balance1 - issueFee, eff1 - issueFee)
-      miner.assertAssetBalance(firstAddress, issuedAssetId, someAssetAmount)
+      miner.assertAssetBalance(firstAddress, issueTx.id, someAssetAmount)
     }
   }
 
   test("Able to create asset with the same name") {
-    for (v <- supportedVersions) {
+    for (v <- issueTxSupportedVersions) {
       val assetName        = "myasset1"
       val assetDescription = "my asset description 1"
       val (balance1, eff1) = miner.accountBalances(firstAddress)
 
       val issuedAssetId =
         sender
-          .issue(firstAddress, assetName, assetDescription, someAssetAmount, 2, reissuable = false, issueFee, version = v, script = scriptText(v))
+          .issue(firstKeyPair, assetName, assetDescription, someAssetAmount, 2, reissuable = false, issueFee, version = v, script = scriptText(v))
           .id
       nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
 
       val issuedAssetIdSameAsset =
         sender
-          .issue(firstAddress, assetName, assetDescription, someAssetAmount, 2, reissuable = true, issueFee, version = v, script = scriptText(v))
+          .issue(firstKeyPair, assetName, assetDescription, someAssetAmount, 2, reissuable = true, issueFee, version = v, script = scriptText(v))
           .id
       nodes.waitForHeightAriseAndTxPresent(issuedAssetIdSameAsset)
 
@@ -48,14 +57,46 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     }
   }
 
-  test("Not able to create asset when insufficient funds") {
-    val assetName        = "myasset"
-    val assetDescription = "my asset description"
-    val eff1             = miner.accountBalances(firstAddress)._2
-    val bigAssetFee      = eff1 + 1.waves
+  private def broadcastIssueTxJson(
+      source: KeyPair,
+      name: String,
+      description: String,
+      quantity: Long,
+      decimals: Int,
+      reissuable: Boolean,
+      fee: Long,
+      scriptOpt: Option[String] = None,
+      version: Byte
+  ) =
+    sender.signedBroadcast(
+      Json.obj(
+        "type"            -> IssueTransaction.typeId,
+        "name"            -> name,
+        "quantity"        -> quantity,
+        "description"     -> description,
+        "sender"          -> source.toAddress,
+        "senderPublicKey" -> source.publicKey,
+        "decimals"        -> decimals,
+        "reissuable"      -> reissuable,
+        "fee"             -> fee,
+        "version"         -> version,
+        "timestamp"       -> System.currentTimeMillis(),
+        "proofs"          -> Json.arr(),
+        "script"          -> scriptOpt.fold[JsValue](JsNull)(JsString)
+      )
+    )
 
-    assertApiError(sender.issue(firstAddress, assetName, assetDescription, someAssetAmount, 2, reissuable = false, bigAssetFee)) { error =>
-      error.message should include("negative waves balance")
+  test("Not able to create asset when insufficient funds") {
+    for (v <- issueTxSupportedVersions) {
+      val assetName        = "myasset"
+      val assetDescription = "my asset description"
+      val eff1             = miner.accountBalances(firstAddress)._2
+      val bigAssetFee      = eff1 + 1.waves
+
+      assertApiError(sender.issue(firstKeyPair, assetName, assetDescription, someAssetAmount, 2, reissuable = false, bigAssetFee, version = v)) {
+        error =>
+          error.message should include("Accounts balance errors")
+      }
     }
   }
 
@@ -66,23 +107,40 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       ("base64:", "Can't parse empty script bytes"),
       ("base64:AA==", "Illegal length of script: 1"),
       ("base64:AAQB", "Invalid content type of script: 4"),
-      ("base64:AAEE", "Invalid version of script: 4"),
-      ("base64:BAEE", "Invalid version of script: 4")
+      ("base64:AAEF", "Invalid version of script: 5"),
+      ("base64:CAEF", "Invalid version of script: 8")
     )
 
   forAll(invalidScript) { (script: String, error: String) =>
     test(s"Try to put incorrect script=$script") {
-      val assetName        = "myasset"
-      val assetDescription = "my asset description"
+      for (v <- issueTxSupportedVersions) {
+        val json = {
+          val tx = IssueTransaction(
+            TxVersion.V1,
+            firstKeyPair.publicKey,
+            ByteString.copyFromUtf8("123"),
+            ByteString.EMPTY,
+            1,
+            2,
+            false,
+            None,
+            issueFee,
+            System.currentTimeMillis(),
+            Proofs.empty,
+            AddressScheme.current.chainId
+          )
+          tx.json() ++ Json.obj("script" -> script)
+        }
 
-      assertApiError(
-        sender.issue(firstAddress, assetName, assetDescription, someAssetAmount, 2, reissuable = false, issueFee, script = Some(script)),
-        CustomValidationError(s"ScriptParseError($error)")
-      )
+        assertApiError(
+          sender.signedBroadcast(json),
+          CustomValidationError(s"ScriptParseError($error)")
+        )
+      }
     }
   }
 
-  val invalidAssetValue =
+  private val invalidAssetValue =
     Table(
       ("assetVal", "decimals", "message"),
       (0L, 2, NonPositiveAmount("0 of assets").assertive(true)),
@@ -93,24 +151,27 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
   forAll(invalidAssetValue) { (assetVal: Long, decimals: Int, message: AssertiveApiError) =>
     test(s"Not able to create asset total token='$assetVal', decimals='$decimals' ") {
-      val assetName          = "myasset2"
-      val assetDescription   = "my asset description 2"
-      val decimalBytes: Byte = decimals.toByte
-      assertApiError(
-        sender.issue(firstAddress, assetName, assetDescription, assetVal, decimalBytes, reissuable = false, issueFee),
-        message
-      )
+      for (v <- issueTxSupportedVersions) {
+        val assetName          = "myasset2"
+        val assetDescription   = "my asset description 2"
+        val decimalBytes: Byte = decimals.toByte
+        assertApiError(
+          broadcastIssueTxJson(firstKeyPair, assetName, assetDescription, assetVal, decimalBytes, reissuable = false, issueFee, version = v),
+          message
+        )
+      }
     }
   }
 
   test(s"Not able to create asset without name") {
-    assertApiError(sender.issue(firstAddress, null, null, someAssetAmount, 2, reissuable = false, issueFee)) { error =>
-      error.message should include regex "failed to parse json message"
-      error.json.fields.map(_._1) should contain("validationErrors")
+    for (v <- issueTxSupportedVersions) {
+      assertApiError(sender.issue(firstKeyPair, "", "", someAssetAmount, 2, reissuable = false, issueFee, version = v)) { error =>
+        error.message should include("invalid name")
+      }
     }
   }
 
-  val invalid_assets_names =
+  private val invalid_assets_names =
     Table(
       "abc",
       "UpperCaseAssetCoinTest",
@@ -119,10 +180,12 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
   forAll(invalid_assets_names) { assetName: String =>
     test(s"Not able to create asset named $assetName") {
-      assertApiError(
-        sender.issue(firstAddress, assetName, assetName, someAssetAmount, 2, reissuable = false, issueFee),
-        InvalidName
-      )
+      for (v <- issueTxSupportedVersions) {
+        assertApiError(
+          broadcastIssueTxJson(firstKeyPair, assetName, assetName, someAssetAmount, 2, reissuable = false, issueFee, version = v),
+          InvalidName
+        )
+      }
     }
   }
 

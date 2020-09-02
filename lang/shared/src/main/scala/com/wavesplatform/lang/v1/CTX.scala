@@ -2,12 +2,14 @@ package com.wavesplatform.lang.v1
 
 import cats.{Id, Monad, Monoid}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
+import com.wavesplatform.lang.v1.compiler.CompilerContext.{FunctionInfo, VariableInfo}
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal}
 import com.wavesplatform.lang.v1.parser.BinaryOperation
+import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 
 import scala.annotation.meta.field
 import scala.scalajs.js.annotation._
@@ -28,7 +30,7 @@ case class CTX[C[_[_]]](
     EvaluationContext(
       env,
       typeDefs,
-      vars.mapValues(v => LazyVal.fromEval(v._2(env))),
+      vars.view.mapValues(v => LazyVal.fromEval(v._2(env))).toMap,
       functions.map(f => f.header -> f).toMap
     )
   }
@@ -41,8 +43,8 @@ case class CTX[C[_[_]]](
 
   lazy val compilerContext: CompilerContext = CompilerContext(
     typeDefs,
-    vars.mapValues(_._1),
-    functions.groupBy(_.name).map { case (k, v) => k -> v.map(_.signature).toList }
+    vars.view.mapValues(v => VariableInfo(AnyPos, v._1)).toMap,
+    functions.groupBy(_.name).map { case (k, v) => k -> FunctionInfo(AnyPos, v.map(_.signature).toList) }
   )
 
   val opsNames = BinaryOperation.opsByPriority
@@ -55,14 +57,14 @@ case class CTX[C[_[_]]](
 
   lazy val decompilerContext: DecompilerContext = DecompilerContext(
     opCodes = compilerContext.functionDefs
-      .mapValues(_.map(_.header).filter(_.isInstanceOf[Native]).map(_.asInstanceOf[Native].name))
+      .view.mapValues(_.fSigList.map(_.header).filter(_.isInstanceOf[Native]).map(_.asInstanceOf[Native].name))
       .toList
       .flatMap { case (name, codes) => codes.map((_, name)) }
       .toMap,
     binaryOps = compilerContext.functionDefs
-      .filterKeys(opsNames(_))
+      .view.filterKeys(opsNames(_))
       .mapValues(
-        _.map(_.header)
+        _.fSigList.map(_.header)
           .filter(_.isInstanceOf[Native])
           .map(_.asInstanceOf[Native].name))
       .toList

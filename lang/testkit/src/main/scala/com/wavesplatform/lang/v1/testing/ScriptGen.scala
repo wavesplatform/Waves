@@ -1,13 +1,13 @@
 package com.wavesplatform.lang.v1.testing
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.Parser.keywords
 import org.scalacheck._
-import scorex.crypto.encode.Base58
 
 import scala.reflect.ClassTag
 
@@ -103,7 +103,7 @@ trait ScriptGen {
     for {
       name       <- Gen.identifier.filter(!keywords(_))
       (value, _) <- BOOLgen((gas - 3) / 3)
-    } yield LET(AnyPos, PART.VALID(AnyPos, name), value, Seq.empty)
+    } yield LET(AnyPos, PART.VALID(AnyPos, name), value)
 
   def REFgen: Gen[EXPR] =
     Gen.identifier.filter(!keywords(_)).map(PART.VALID[String](AnyPos, _)).map(REF(AnyPos, _))
@@ -135,24 +135,24 @@ trait ScriptGen {
   }
 
   def toString(expr: EXPR): Gen[String] = expr match {
-    case CONST_LONG(_, x)    => withWhitespaces(s"$x")
-    case REF(_, x)           => withWhitespaces(toString(x))
-    case CONST_STRING(_, x)  => withWhitespaces(s"""\"${toString(x)}\"""")
-    case CONST_BYTESTR(_, x) => withWhitespaces(s"""base58'${toString(x)}'""")
+    case CONST_LONG(_, x, _)    => withWhitespaces(s"$x")
+    case REF(_, x, _, _)           => withWhitespaces(toString(x))
+    case CONST_STRING(_, x, _)  => withWhitespaces(s"""\"${toString(x)}\"""")
+    case CONST_BYTESTR(_, x, _) => withWhitespaces(s"""base58'${toString(x)}'""")
     case _: TRUE             => withWhitespaces("true")
     case _: FALSE            => withWhitespaces("false")
-    case BINARY_OP(_, x, op: BinaryOperation, y) =>
+    case BINARY_OP(_, x, op: BinaryOperation, y, _, _) =>
       for {
         arg1 <- toString(x)
         arg2 <- toString(y)
       } yield s"($arg1${opsToFunctions(op)}$arg2)"
-    case IF(_, cond, x, y) =>
+    case IF(_, cond, x, y, _, _) =>
       for {
         c <- toString(cond)
         t <- toString(x)
         f <- toString(y)
       } yield s"(if ($c) then $t else $f)"
-    case BLOCK(_, let: LET, body) =>
+    case BLOCK(_, let: LET, body, _, _) =>
       for {
         v         <- toString(let.value)
         b         <- toString(body)
@@ -160,9 +160,9 @@ trait ScriptGen {
         sep       <- if (isNewLine) Gen.const("\n") else withWhitespaces(";")
       } yield s"let ${toString(let.name)} = $v$sep$b"
 
-    case FUNCTION_CALL(_, PART.VALID(_, "-"), List(CONST_LONG(_, v))) if v >= 0 =>
+    case FUNCTION_CALL(_, PART.VALID(_, "-"), List(CONST_LONG(_, v, _)), _, _) if v >= 0 =>
       s"-($v)"
-    case FUNCTION_CALL(_, op, List(e)) => toString(e).map(e => s"${toString(op)}$e")
+    case FUNCTION_CALL(_, op, List(e), _, _) => toString(e).map(e => s"${toString(op)}$e")
 
     case x => throw new NotImplementedError(s"toString for ${x.getClass.getSimpleName}")
   }

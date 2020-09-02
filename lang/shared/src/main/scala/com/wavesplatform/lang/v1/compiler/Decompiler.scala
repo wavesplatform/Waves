@@ -40,6 +40,7 @@ object Decompiler {
               out(fb + NEWLINE, ctx.ident))
       case Terms.LET(name, value) =>
         expr(pure(value), ctx, BracesWhenNeccessary, DontIndentFirstLine).map(e => out("let " + name + " = " + e, ctx.ident))
+      case _: FAILED_DEC => Coeval.now("FAILED_DEC")
     }
 
   private def extrTypes(Name: String, e: EXPR): Coeval[Option[List[String]]] = {
@@ -146,7 +147,7 @@ object Decompiler {
       case Terms.FALSE                   => pureOut("false", i)
       case Terms.CONST_BOOLEAN(b)        => pureOut(b.toString.toLowerCase(), i)
       case Terms.CONST_LONG(t)           => pureOut(t.toLong.toString, i)
-      case Terms.CONST_STRING(s)         => pureOut('"' + s + '"', i)
+      case Terms.CONST_STRING(s)         => pureOut("\"" ++ s ++ "\"", i)
       case Terms.CONST_BYTESTR(bs)       => pureOut(if(bs.size <= 128) { "base58'" ++ bs.toString ++ "'" } else { "base64'" ++ bs.base64Raw ++ "'" }, i)
       case Terms.REF(ref)                => pureOut(ref, i)
       case Terms.GETTER(getExpr, fld)    => expr(pure(getExpr), ctx, BracesWhenNeccessary, firstLinePolicy).map(a => a + "." + fld)
@@ -173,12 +174,15 @@ object Decompiler {
           case FunctionHeader.Native(id) if ctx.binaryOps.contains(id) =>
             argsCoeval.map(as => out(s"(${as(0)} ${ctx.binaryOps(id)} ${as(1)})", i))
 
+          case FunctionHeader.User(internalName, _) if internalName == "!=" =>
+            argsCoeval.map(as => out(s"(${as(0)} != ${as(1)})", i))
+
           case header =>
             val name = extractFunctionName(ctx, header)
             argsCoeval.map(as => out(s"$name(${as.mkString(", ")})", i))
         }
-      case _: Terms.ARR     => ??? // never happens
-      case _: Terms.CaseObj => ??? // never happens
+      case _: Terms.ARR       => ??? // never happens
+      case obj: Terms.CaseObj => pureOut(obj.toString, i) // never happens
     }
   }
 

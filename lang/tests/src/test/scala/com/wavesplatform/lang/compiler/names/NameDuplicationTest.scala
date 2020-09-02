@@ -1,20 +1,20 @@
 package com.wavesplatform.lang.compiler.names
+
 import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.compiler.compilerContext
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
-import com.wavesplatform.lang.Common
 import org.scalacheck.Gen
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import org.scalatest.{FreeSpec, Matchers}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
@@ -38,7 +38,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
             |let x = 42
             |
             |func some(y: Boolean, x: Boolean) = !x
-            |""") shouldBe 'right
+            |""") shouldBe Symbol("right")
         }
 
         "constant and callable function argument" in {
@@ -47,13 +47,13 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
             |
             |@Callable(i)
             |func some(a: Int, x: String) = WriteSet([DataEntry("a", x)])
-            |""") shouldBe 'right
+            |""") shouldBe Symbol("right")
         }
 
         "user function and its argument" in {
           compileOf("""
             |func sameName(sameName: Boolean) = !sameName
-            |""") shouldBe 'right
+            |""") shouldBe Symbol("right")
         }
 
         "user function and argument; callable annotation bindings and arguments" in {
@@ -65,7 +65,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
             |
             |@Callable(i)
             |func bar(x: Int) = WriteSet([DataEntry("a", this.bytes)])
-            |""") shouldBe 'right
+            |""") shouldBe Symbol("right")
         }
 
       }
@@ -188,7 +188,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
           compileOf("""
             |@Callable(sameName)
             |func sameName() = WriteSet([DataEntry("a", this.bytes)])
-            |""") shouldBe 'right
+            |""") shouldBe Symbol("right")
         }
 
         "callable annotation binding and its function argument" in {
@@ -209,7 +209,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
               s"""
                  | func f(
                  |      sameArg: Int,
-                 |      ${1 to c map (i => s"x$i: Int") mkString("", ", ", ",")}
+                 |      ${(1 to c).map(i => s"x$i: Int").mkString("", ", ", ",")}
                  |      sameArg: Int
                  |    ) = true
              """
@@ -223,7 +223,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
 
   def compileOf(script: String): Either[String, DApp] = {
     val expr = Parser.parseContract(script.stripMargin).get.value
-    compiler.ContractCompiler(ctx, expr)
+    compiler.ContractCompiler(ctx, expr, V3)
   }
 
 }

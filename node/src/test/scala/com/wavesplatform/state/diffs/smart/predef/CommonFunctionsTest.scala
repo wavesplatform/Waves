@@ -24,7 +24,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
           """
             |match tx {
             | case ttx : TransferTransaction  =>  extract(ttx.assetId)
-            | case other => throw()
+            | case _ => throw()
             | }
             |""".stripMargin,
           Coproduct(transfer)
@@ -43,7 +43,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
           """
                                           |match tx {
                                           | case ttx : TransferTransaction  =>  isDefined(ttx.assetId)
-                                          | case other => throw()
+                                          | case _ => throw()
                                           | }
                                           |""".stripMargin,
           Coproduct(transfer)
@@ -66,7 +66,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
   property("size()") {
     val arr = Array(1: Byte, 2: Byte, 3: Byte)
     runScript("size(base58'')".stripMargin) shouldBe evaluated(0L)
-    runScript(s"size(base58'${ByteStr(arr).base58}')".stripMargin) shouldBe evaluated(3L)
+    runScript(s"size(base58'${ByteStr(arr).toString}')".stripMargin) shouldBe evaluated(3L)
   }
 
   property("getTransfer should extract MassTransfer transfers") {
@@ -77,7 +77,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
           """
             |match tx {
             | case mttx : MassTransferTransaction  =>  mttx.transfers[0].amount
-            | case other => throw()
+            | case _ => throw()
             | }
             |""".stripMargin,
           Coproduct(massTransfer)
@@ -89,19 +89,19 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
                                                       | case mttx : MassTransferTransaction  =>
                                                       |       match mttx.transfers[0].recipient {
                                                       |           case address : Address => address.bytes
-                                                      |           case other => throw()
+                                                      |           case _ => throw()
                                                       |       }
-                                                      | case other => throw()
+                                                      | case _ => throw()
                                                       | }
                                                       |""".stripMargin,
           Coproduct(massTransfer)
         )
-        resultAddress shouldBe evaluated(massTransfer.transfers(0).address.bytes)
+        resultAddress shouldBe evaluated(ByteStr(massTransfer.transfers(0).address.bytes))
         val resultLen = runScript(
           """
                                            |match tx {
                                            | case mttx : MassTransferTransaction  =>  size(mttx.transfers)
-                                           | case other => throw()
+                                           | case _ => throw()
                                            | }
                                            |""".stripMargin,
           Coproduct(massTransfer)
@@ -120,13 +120,13 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
       case (transfer) =>
         val result = runScript(
           s"""
-            |match tx {
-            | case tx : TransferTransaction  => tx.id == base58'${transfer.id().base58}'
-            | case tx : IssueTransaction => tx.fee == ${transfer.assetFee._2}
-            | case tx : MassTransferTransaction => tx.timestamp == ${transfer.timestamp}
-            | case other => throw()
-            | }
-            |""".stripMargin,
+             |match tx {
+             | case tx : TransferTransaction  => tx.id == base58'${transfer.id().toString}'
+             | case tx : IssueTransaction => tx.fee == ${transfer.assetFee._2}
+             | case tx : MassTransferTransaction => tx.timestamp == ${transfer.timestamp}
+             | case _ => throw()
+             | }
+             |""".stripMargin,
           Coproduct(transfer)
         )
         result shouldBe evaluated(true)
@@ -141,10 +141,10 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
             s"""
                |let t = 100
                |match tx {
-               | case t: TransferTransaction  => t.id == base58'${transfer.id().base58}'
+               | case t: TransferTransaction  => t.id == base58'${transfer.id().toString}'
                | case t: IssueTransaction => t.fee == ${transfer.assetFee._2}
                | case t: MassTransferTransaction => t.timestamp == ${transfer.timestamp}
-               | case other => throw()
+               | case _ => throw()
                | }
                |""".stripMargin,
             Coproduct(transfer)
@@ -162,8 +162,8 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
       runScript(
         s"""
                |match p {
-               | case tx: TransferTransaction  => true
-               | case other => throw()
+               | case _: TransferTransaction  => true
+               | case _ => throw()
                | }
                |""".stripMargin
       )
@@ -182,11 +182,11 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
                |match tx {
                | case tx: TransferTransaction | IssueTransaction => {
                |  match tx {
-               |    case tx: TransferTransaction  => tx.id == base58'${transfer.id().base58}'
+               |    case tx: TransferTransaction  => tx.id == base58'${transfer.id().toString}'
                |    case tx: IssueTransaction => tx.fee == ${transfer.assetFee._2}
                |  }
                |  }
-               | case other => throw()
+               | case _ => throw()
                |}
                |""".stripMargin,
             Coproduct(transfer)
@@ -202,8 +202,8 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
            |  let aaa = 1
            |  tx
            |} {
-           |     case tx: TransferTransaction  => true
-           |     case other => throw()
+           |     case tx: TransferTransaction => tx == tx
+           |     case _ => throw()
            | }
            |""".stripMargin
     ) should produce("already defined")
@@ -232,7 +232,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
       )
       transferResult shouldBe evaluated(true)
 
-      val dataTx = DataTransaction.create(t.sender, List(entry), 100000L, t.timestamp, Proofs(Seq.empty)).explicitGet()
+      val dataTx = DataTransaction.create(1.toByte, t.sender, List(entry), 100000L, t.timestamp, Proofs(Seq.empty)).explicitGet()
       val dataResult = runScript(
         s"""
            |match tx {
@@ -268,7 +268,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
         runScript(
           s"""
              |match tx {
-             |  case tx: TransferTransaction =>
+             |  case _: TransferTransaction =>
              |    let dza = $clause
              |    throw()
              |  case _ => throw()

@@ -2,24 +2,23 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.transfer.TransferTransactionV1
-import monix.eval.Task
-import monix.execution.Scheduler
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
 
-import scala.concurrent.duration._
 import scala.util.{Random, Try}
 
 class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker with Matchers {
   override protected def nodeConfigs: Seq[Config] = UtxSuite.Configs
 
-  val miner: Node    = nodes.head
-  val notMiner: Node = nodes(1)
+  private def miner    = nodes.head
+  private def notMiner = nodes(1)
 
   val ENOUGH_FEE = 5000000
   val AMOUNT     = ENOUGH_FEE * 10
@@ -31,26 +30,46 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
 
     val account = KeyPair(seed)
 
-    val transferToAccount = TransferTransactionV1
-      .selfSigned(Waves, miner.privateKey, account, AMOUNT, System.currentTimeMillis(), Waves, ENOUGH_FEE, Array.emptyByteArray)
+    val transferToAccount = TransferTransaction
+      .selfSigned(1.toByte, miner.keyPair, account.toAddress, Waves, AMOUNT, Waves, ENOUGH_FEE, ByteStr.empty, System.currentTimeMillis())
       .explicitGet()
 
     miner.signedBroadcast(transferToAccount.json())
 
-    nodes.waitForHeightAriseAndTxPresent(transferToAccount.id().base58)
+    nodes.waitForHeightAriseAndTxPresent(transferToAccount.id().toString)
 
-    val firstTransfer = TransferTransactionV1
-      .selfSigned(Waves, account, miner.privateKey, AMOUNT - ENOUGH_FEE, System.currentTimeMillis(), Waves, ENOUGH_FEE, Array.emptyByteArray)
+    val firstTransfer = TransferTransaction
+      .selfSigned(
+        1.toByte,
+        account,
+        miner.keyPair.toAddress,
+        Waves,
+        AMOUNT - ENOUGH_FEE,
+        Waves,
+        ENOUGH_FEE,
+        ByteStr.empty,
+        System.currentTimeMillis()
+      )
       .explicitGet()
 
-    val secondTransfer = TransferTransactionV1
-      .selfSigned(Waves, account, notMiner.privateKey, AMOUNT - ENOUGH_FEE, System.currentTimeMillis(), Waves, ENOUGH_FEE, Array.emptyByteArray)
+    val secondTransfer = TransferTransaction
+      .selfSigned(
+        1.toByte,
+        account,
+        notMiner.keyPair.toAddress,
+        Waves,
+        AMOUNT - ENOUGH_FEE,
+        Waves,
+        ENOUGH_FEE,
+        ByteStr.empty,
+        System.currentTimeMillis()
+      )
       .explicitGet()
 
     val tx2Id = notMiner.signedBroadcast(secondTransfer.json()).id
     val tx1Id = miner.signedBroadcast(firstTransfer.json()).id
 
-    waitForEmptyUtx(nodes)
+    nodes.waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
 
     val exactlyOneTxInBlockchain =
       txInBlockchain(tx1Id, nodes) ^ txInBlockchain(tx2Id, nodes)
@@ -58,27 +77,9 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
     assert(exactlyOneTxInBlockchain, "Only one tx should be in blockchain")
   }
 
-  def waitForEmptyUtx(nodes: Seq[Node]): Unit = {
-    implicit val sch: Scheduler = monix.execution.Scheduler.global
-
-    def loop(): Task[Unit] = {
-      val utxIds = nodes.map(_.utx.size)
-
-      if (utxIds.sum != 0) {
-        Task
-          .sleep(1.second)
-          .flatMap(_ => loop())
-      } else {
-        Task.pure(())
-      }
-    }
-
-    loop().runSyncUnsafe(6.minutes)
-  }
-
   def txInBlockchain(txId: String, nodes: Seq[Node]): Boolean = {
     nodes.forall { node =>
-      Try(node.transactionInfo(txId)).isSuccess
+      Try(node.transactionInfo[TransactionInfo](txId)).isSuccess
     }
   }
 }
@@ -107,7 +108,7 @@ object UtxSuite {
 
   val Configs: Seq[Config] = Seq(
     minerConfig.withFallback(Default.head),
-    notMinerConfig.withFallback(Default(1)),
+    notMinerConfig.withFallback(Default(1))
   )
 
 }

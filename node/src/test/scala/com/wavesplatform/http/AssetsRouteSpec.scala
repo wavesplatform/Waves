@@ -3,8 +3,11 @@ package com.wavesplatform.http
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.http.assets.{AssetsApiRoute, TransferV1Request, TransferV2Request}
+import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
+import com.wavesplatform.api.http.assets.AssetsApiRoute
+import com.wavesplatform.api.http.requests.{TransferV1Request, TransferV2Request}
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.wallet.Wallet
@@ -16,7 +19,7 @@ import play.api.libs.json.Writes
 class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMockFactory with Eventually with RestAPISettingsHelper {
 
   private val wallet = stub[Wallet]
-  private val state = stub[Blockchain]
+  private val state  = stub[Blockchain]
 
   private val seed               = "seed".getBytes("UTF-8")
   private val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)
@@ -25,7 +28,15 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
   (wallet.privateKeyAccount _).when(senderPrivateKey.toAddress).onCall((_: Address) => Right(senderPrivateKey)).anyNumberOfTimes()
 
   "/transfer" - {
-    val route: Route = AssetsApiRoute(restAPISettings, wallet, DummyUtxPoolSynchronizer.accepting, state, new TestTime()).route
+    val route: Route = AssetsApiRoute(
+      restAPISettings,
+      wallet,
+      DummyUtxPoolSynchronizer.accepting,
+      state,
+      new TestTime(),
+      mock[CommonAccountsApi],
+      mock[CommonAssetsApi]
+    ).route
 
     def posting[A: Writes](v: A): RouteTestResult = Post(routePath("/transfer"), v).addHeader(ApiKeyHeader) ~> route
 
@@ -33,29 +44,30 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
       val req = TransferV1Request(
         assetId = None,
         feeAssetId = None,
-        amount = 1 * Waves,
-        fee = Waves / 3,
-        sender = senderPrivateKey.stringRepr,
+        amount = 1.waves,
+        fee = 0.3.waves,
+        sender = senderPrivateKey.toAddress.toString,
         attachment = Some("attachment"),
-        recipient = receiverPrivateKey.stringRepr,
+        recipient = receiverPrivateKey.toAddress.toString,
         timestamp = Some(System.currentTimeMillis())
       )
 
       posting(req) ~> check {
         status shouldBe StatusCodes.OK
-        responseAs[TransferTransactionV1]
+
+        responseAs[TransferTransaction]
       }
     }
 
     "accepts VersionedTransferRequest" in {
       val req = TransferV2Request(
         assetId = None,
-        amount = 1 * Waves,
+        amount = 1.waves,
         feeAssetId = None,
-        fee = Waves / 3,
-        sender = senderPrivateKey.stringRepr,
+        fee = 0.3.waves,
+        sender = senderPrivateKey.toAddress.toString,
         attachment = None,
-        recipient = receiverPrivateKey.stringRepr,
+        recipient = receiverPrivateKey.toAddress.toString,
         timestamp = Some(System.currentTimeMillis())
       )
 

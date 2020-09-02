@@ -5,11 +5,12 @@ import java.util.concurrent.TimeUnit
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.{KeyPair, PublicKey}
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.utils.LoggerFacade
+import com.wavesplatform.wallet.Wallet
 import io.grpc.{ManagedChannel, ManagedChannelBuilder}
 import org.asynchttpclient.Dsl.{config => clientConfig, _}
 import org.asynchttpclient._
@@ -33,7 +34,14 @@ abstract class Node(val config: Config) extends AutoCloseable {
     .keepAliveTime(30, TimeUnit.SECONDS)
     .build()
 
-  val privateKey: KeyPair  = KeyPair.fromSeed(config.getString("account-seed")).explicitGet()
+  private[this] val wallet = Wallet(settings.walletSettings.copy(file = None))
+  wallet.generateNewAccounts(1)
+
+  def generateKeyPair(): KeyPair = wallet.synchronized {
+    wallet.generateNewAccount().get
+  }
+
+  val keyPair: KeyPair  = KeyPair.fromSeed(config.getString("account-seed")).explicitGet()
   val publicKey: PublicKey = PublicKey.fromBase58String(config.getString("public-key")).explicitGet()
   val address: String      = config.getString("address")
 
@@ -50,7 +58,7 @@ abstract class Node(val config: Config) extends AutoCloseable {
 object Node {
   implicit class NodeExt(val n: Node) extends AnyVal {
     def name: String               = n.settings.networkSettings.nodeName
-    def publicKeyStr: String       = Base58.encode(n.publicKey)
+    def publicKeyStr: String       = n.publicKey.toString
     def fee(txTypeId: Byte): Long  = FeeValidation.FeeConstants(txTypeId) * FeeValidation.FeeUnit
     def blockDelay: FiniteDuration = n.settings.blockchainSettings.genesisSettings.averageBlockDelay
   }

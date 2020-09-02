@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.BinaryDataEntry
 import com.wavesplatform.transaction.DataTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -18,11 +18,9 @@ import scala.util.Random
 
 class ScriptLogSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  private val smart = pkByAddress(firstAddress)
-
   val ENOUGH_FEE: Long = 12900000L
 
-  val scriptSrc: String =
+  lazy val scriptSrc: String =
     s"""
        |let self = Address(base58'$firstAddress')
        |
@@ -66,22 +64,11 @@ class ScriptLogSuite extends BaseTransactionSuite with CancelAfterFailure {
         BinaryDataEntry(s"k$i", ByteStr(bytes))
       }).toList
 
-    val initialData = DataTransaction
-      .selfSigned(
-        smart,
-        data,
-        ENOUGH_FEE,
-        System.currentTimeMillis()
-      )
-      .explicitGet()
-
-    val dtx1_id = sender.signedBroadcast(initialData.json()).id
-
-    nodes.waitForHeightAriseAndTxPresent(dtx1_id)
+    sender.putData(firstKeyPair, data, ENOUGH_FEE, waitForTx = true).id
 
     val script = ScriptCompiler(scriptSrc, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(smart, Some(script), setScriptFee, System.currentTimeMillis())
+      .selfSigned(1.toByte, firstKeyPair, Some(script), setScriptFee, System.currentTimeMillis())
       .explicitGet()
 
     val sstx = sender.signedBroadcast(setScriptTransaction.json()).id
@@ -95,10 +82,11 @@ class ScriptLogSuite extends BaseTransactionSuite with CancelAfterFailure {
     def mkInvData() =
       DataTransaction
         .selfSigned(
-          smart,
+          1.toByte,
+          firstKeyPair,
           List(
-            BinaryDataEntry("pk", ByteStr(smart.publicKey)),
-            BinaryDataEntry("sig", ByteStr(signature)),
+            BinaryDataEntry("pk", firstKeyPair.publicKey),
+            BinaryDataEntry("sig", ByteStr(signature))
           ),
           ENOUGH_FEE,
           System.currentTimeMillis()

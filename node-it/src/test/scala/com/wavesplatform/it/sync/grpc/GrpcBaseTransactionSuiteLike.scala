@@ -9,7 +9,7 @@ import monix.eval.Coeval
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Suite}
 
 import scala.concurrent.ExecutionContext
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 trait GrpcBaseTransactionSuiteLike
   extends GrpcWaitForHeight
@@ -27,7 +27,7 @@ trait GrpcBaseTransactionSuiteLike
       .buildNonConflicting()
 
   // protected because https://github.com/sbt/zinc/issues/292
-  protected val theNodes: Coeval[Seq[Node]] = Coeval.evalOnce {
+  protected lazy val theNodes: Coeval[Seq[Node]] = Coeval.evalOnce {
     Option(System.getProperty("waves.it.config.file")) match {
       case None => dockerNodes()
       case Some(filePath) =>
@@ -36,12 +36,13 @@ trait GrpcBaseTransactionSuiteLike
           .parseFile(new File(filePath))
           .getConfigList("nodes")
           .asScala
+          .toSeq
           .map(cfg => new ExternalNode(cfg.withFallback(defaultConfig).resolve()))
     }
   }
 
   protected override def beforeAll(): Unit = {
-    theNodes.run
+    theNodes.run()
     super.beforeAll()
   }
 }

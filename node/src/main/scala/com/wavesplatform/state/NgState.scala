@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit
 import cats.kernel.Monoid
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.account.Address
+import com.wavesplatform.block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
@@ -20,37 +21,41 @@ class NgState(
     baseBlockTotalFee: Long,
     val approvedFeatures: Set[Short],
     val reward: Option[Long],
+    val hitSource: ByteStr,
     leasesToCancel: Map[ByteStr, Diff]
 ) {
+
+  private[this] case class MicroBlockInfo(totalBlockId: BlockId, microBlock: MicroBlock) {
+    def idEquals(id: ByteStr): Boolean = totalBlockId == id
+  }
 
   private[this] case class CachedMicroDiff(diff: Diff, carryFee: Long, totalFee: Long, timestamp: Long)
   private[this] val MaxTotalDiffs = 15
 
   private[this] val microDiffs: MMap[BlockId, CachedMicroDiff] = MMap.empty
-  private[this] val microBlocks: MList[MicroBlock]             = MList.empty // fresh head
+  private[this] val microBlocks: MList[MicroBlockInfo]         = MList.empty // fresh head
 
   def cancelExpiredLeases(diff: Diff): Diff =
-      leasesToCancel
-        .collect { case (id, ld) if diff.leaseState.getOrElse(id, true) => ld }
-        .foldLeft(diff) {
-          case (d, ld) =>
-            Monoid.combine(d, ld)
-        }
+    leasesToCancel
+      .collect { case (id, ld) if diff.leaseState.getOrElse(id, true) => ld }
+      .foldLeft(diff) {
+        case (d, ld) =>
+          Monoid.combine(d, ld)
+      }
 
-  def microBlockIds: Seq[BlockId] =
-    microBlocks.map(_.totalResBlockSig)
+  def microBlockIds: Seq[BlockId] = microBlocks.map(_.totalBlockId).toSeq
 
-  def diffFor(totalResBlockSig: BlockId): (Diff, Long, Long) = {
+  def diffFor(totalResBlockRef: BlockId): (Diff, Long, Long) = {
     val (diff, carry, totalFee) =
-      if (totalResBlockSig == base.uniqueId)
+      if (totalResBlockRef == base.id())
         (baseBlockDiff, baseBlockCarry, baseBlockTotalFee)
       else
         internalCaches.blockDiffCache.get(
-          totalResBlockSig, { () =>
-            microBlocks.find(_.totalResBlockSig == totalResBlockSig) match {
-              case Some(current) =>
-                val (prevDiff, prevCarry, prevTotalFee)                   = this.diffFor(current.prevResBlockSig)
-                val CachedMicroDiff(currDiff, currCarry, currTotalFee, _) = this.microDiffs(totalResBlockSig)
+          totalResBlockRef, { () =>
+            microBlocks.find(_.idEquals(totalResBlockRef)) match {
+              case Some(MicroBlockInfo(blockId, current)) =>
+                val (prevDiff, prevCarry, prevTotalFee)                   = this.diffFor(current.reference)
+                val CachedMicroDiff(currDiff, currCarry, currTotalFee, _) = this.microDiffs(blockId)
                 (Monoid.combine(prevDiff, currDiff), prevCarry + currCarry, prevTotalFee + currTotalFee)
 
               case None =>
@@ -62,13 +67,13 @@ class NgState(
   }
 
   def bestLiquidBlockId: BlockId =
-    microBlocks.headOption.map(_.totalResBlockSig).getOrElse(base.uniqueId)
+    microBlocks.headOption.fold(base.id())(_.totalBlockId)
 
   def lastMicroBlock: Option[MicroBlock] =
-    microBlocks.headOption
+    microBlocks.headOption.map(_.microBlock)
 
   def transactions: Seq[Transaction] =
-    base.transactionData.toVector ++ microBlocks.view.map(_.transactionData).reverse.flatten
+    base.transactionData.toVector ++ microBlocks.view.map(_.microBlock.transactionData).reverse.flatten
 
   def bestLiquidBlock: Block =
     if (microBlocks.isEmpty)
@@ -79,7 +84,7 @@ class NgState(
           cachedBlock
 
         case None =>
-          val block = base.copy(signerData = base.signerData.copy(signature = microBlocks.head.totalResBlockSig), transactionData = transactions)
+          val block = Block.create(base, transactions, microBlocks.head.microBlock.totalResBlockSig)
           internalCaches.bestBlockCache = Some(block)
           block
       }
@@ -94,54 +99,88 @@ class NgState(
   /** HACK: this method returns LPOS portfolio as though expired leases have already been cancelled.
     * It was added to make sure miner gets proper generating balance when scheduling next mining attempt.
     */
-  def balanceDiffAt(address: Address, blockId: BlockId): Portfolio = cancelExpiredLeases(diffFor(blockId)._1).portfolios.getOrElse(address, Portfolio.empty)
+  def balanceDiffAt(address: Address, blockId: BlockId): Portfolio =
+    cancelExpiredLeases(diffFor(blockId)._1).portfolios.getOrElse(address, Portfolio.empty)
 
-  def bestLiquidDiffAndFees: (Diff, Long, Long) = diffFor(microBlocks.headOption.fold(base.uniqueId)(_.totalResBlockSig))
+  def bestLiquidDiffAndFees: (Diff, Long, Long) = diffFor(microBlocks.headOption.fold(base.id())(_.totalBlockId))
 
   def bestLiquidDiff: Diff = bestLiquidDiffAndFees._1
 
-  def contains(blockId: BlockId): Boolean = base.uniqueId == blockId || microDiffs.contains(blockId)
+  def allDiffs: Seq[(MicroBlock, Diff)] =
+    microBlocks.toVector.map(mb => mb.microBlock -> microDiffs(mb.totalBlockId).diff).reverse
 
-  def microBlock(id: BlockId): Option[MicroBlock] = microBlocks.find(_.totalResBlockSig == id)
+  def contains(blockId: BlockId): Boolean =
+    base.id() == blockId || microBlocks.exists(_.idEquals(blockId))
+
+  def microBlock(id: BlockId): Option[MicroBlock] =
+    microBlocks.find(_.idEquals(id)).map(_.microBlock)
 
   def bestLastBlockInfo(maxTimeStamp: Long): BlockMinerInfo = {
     val blockId = microBlocks
-      .find(micro => microDiffs(micro.totalResBlockSig).timestamp <= maxTimeStamp)
-      .map(_.totalResBlockSig)
-      .getOrElse(base.uniqueId)
-    BlockMinerInfo(base.consensusData, base.timestamp, blockId)
+      .find(mi => microDiffs(mi.totalBlockId).timestamp <= maxTimeStamp)
+      .fold(base.id())(_.totalBlockId)
+
+    BlockMinerInfo(base.header.baseTarget, base.header.generationSignature, base.header.timestamp, blockId)
   }
 
-  def append(m: MicroBlock, diff: Diff, microblockCarry: Long, microblockTotalFee: Long, timestamp: Long): Unit = {
-    microDiffs.put(m.totalResBlockSig, CachedMicroDiff(diff, microblockCarry, microblockTotalFee, timestamp))
-    microBlocks.prepend(m)
-    internalCaches.invalidate(m.totalResBlockSig)
+  def append(
+      microBlock: MicroBlock,
+      diff: Diff,
+      microblockCarry: Long,
+      microblockTotalFee: Long,
+      timestamp: Long,
+      totalBlockId: Option[BlockId] = None
+  ): BlockId = {
+    val blockId = totalBlockId.getOrElse(this.createBlockId(microBlock))
+    microDiffs.put(blockId, CachedMicroDiff(diff, microblockCarry, microblockTotalFee, timestamp))
+    microBlocks.prepend(MicroBlockInfo(blockId, microBlock))
+    internalCaches.invalidate(blockId)
+    blockId
   }
 
   def carryFee: Long =
     baseBlockCarry + microDiffs.values.map(_.carryFee).sum
+
+  def createBlockId(microBlock: MicroBlock): BlockId = {
+    val newTransactions  = this.transactions ++ microBlock.transactionData
+    val transactionsRoot = block.mkTransactionsRoot(base.header.version, newTransactions)
+    val fullBlock =
+      base.copy(
+        transactionData = newTransactions,
+        signature = microBlock.totalResBlockSig,
+        header = base.header.copy(transactionsRoot = transactionsRoot)
+      )
+    fullBlock.id()
+  }
 
   private[this] def forgeBlock(blockId: BlockId): Option[(Block, DiscardedMicroBlocks)] =
     internalCaches.forgedBlockCache.get(
       blockId, { () =>
         val microBlocksAsc = microBlocks.reverse
 
-        if (base.uniqueId == blockId) {
-          Some((base, microBlocksAsc))
-        } else if (!microBlocksAsc.exists(_.totalResBlockSig == blockId)) None
+        if (base.id() == blockId) {
+          Some((base, microBlocksAsc.toVector.map { mb =>
+            val diff = microDiffs(mb.totalBlockId).diff
+            (mb.microBlock, diff)
+          }))
+        } else if (!microBlocksAsc.exists(_.idEquals(blockId))) None
         else {
           val (accumulatedTxs, maybeFound) = microBlocksAsc.foldLeft((Vector.empty[Transaction], Option.empty[(ByteStr, DiscardedMicroBlocks)])) {
-            case ((accumulated, Some((sig, discarded))), micro) =>
-              (accumulated, Some((sig, micro +: discarded)))
+            case ((accumulated, Some((sig, discarded))), MicroBlockInfo(mbId, micro)) =>
+              val discDiff = microDiffs(mbId).diff
+              (accumulated, Some((sig, discarded :+ (micro -> discDiff))))
 
-            case ((accumulated, None), micro) =>
-              val found = Some((micro.totalResBlockSig, Seq.empty[MicroBlock])).filter(_._1 == blockId)
-              (accumulated ++ micro.transactionData, found)
+            case ((accumulated, None), mb) if mb.idEquals(blockId) =>
+              val found = Some((mb.microBlock.totalResBlockSig, Seq.empty[(MicroBlock, Diff)]))
+              (accumulated ++ mb.microBlock.transactionData, found)
+
+            case ((accumulated, None), MicroBlockInfo(_, mb)) =>
+              (accumulated ++ mb.transactionData, None)
           }
 
           maybeFound.map {
             case (sig, discarded) =>
-              (base.copy(signerData = base.signerData.copy(signature = sig), transactionData = base.transactionData ++ accumulatedTxs), discarded)
+              (Block.create(base, base.transactionData ++ accumulatedTxs, sig), discarded)
           }
         }
       }

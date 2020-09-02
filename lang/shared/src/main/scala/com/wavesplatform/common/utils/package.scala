@@ -3,11 +3,17 @@ package com.wavesplatform.common
 import scala.util.{Failure, Success, Try}
 
 package object utils {
+  val Base58Alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
   implicit class EitherExt2[A, B](ei: Either[A, B]) {
     def explicitGet(): B = ei match {
       case Left(value)  => throw makeException(value)
       case Right(value) => value
     }
+
+    // used for destructuring in for-comprehensions
+    def withFilter(check: B => Boolean): Either[A, B] =
+      ei.filterOrElse(check, throw new MatchError(ei))
 
     def foldToTry: Try[B] = ei.fold(
       left => Failure(makeException(left)),

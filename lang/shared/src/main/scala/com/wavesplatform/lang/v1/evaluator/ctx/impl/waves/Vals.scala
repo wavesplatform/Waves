@@ -4,19 +4,20 @@ import cats.implicits._
 import cats.{Eval, Monad}
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, EVALUATED}
-import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, LONG, UNION}
+import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ContextfulVal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{buildAssetInfo, ordType, orderObject, transactionObject}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.OrdType
+import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
 
 object Vals {
   def tx(
-    isTokenContext: Boolean,
-    version: StdLibVersion,
-    proofsEnabled: Boolean
+      isTokenContext: Boolean,
+      version: StdLibVersion,
+      proofsEnabled: Boolean
   ): (ExecutionError, (UNION, ContextfulVal[Environment])) =
     ("tx", (scriptInputType(isTokenContext, version, proofsEnabled), inputEntityVal(version, proofsEnabled)))
 
@@ -28,7 +29,7 @@ object Vals {
 
   private def inputEntityVal(version: StdLibVersion, proofsEnabled: Boolean): ContextfulVal[Environment] =
     new ContextfulVal.Lifted[Environment] {
-      override def liftF[F[_] : Monad](env: Environment[F]): Eval[Either[ExecutionError, EVALUATED]] =
+      override def liftF[F[_]: Monad](env: Environment[F]): Eval[Either[ExecutionError, EVALUATED]] =
         Eval.later(
           env.inputEntity
             .eliminate(
@@ -36,7 +37,12 @@ object Vals {
               _.eliminate(
                 o => orderObject(o, proofsEnabled, version).asRight[ExecutionError],
                 _.eliminate(
-                  o => Bindings.scriptTransfer(o).asRight[ExecutionError],
+                  {
+                    case b: BurnPseudoTx        => Bindings.mapBurnPseudoTx(b, version).asRight[ExecutionError]
+                    case r: ReissuePseudoTx     => Bindings.mapReissuePseudoTx(r, version).asRight[ExecutionError]
+                    case sf: SponsorFeePseudoTx => Bindings.mapSponsorFeePseudoTx(sf, version).asRight[ExecutionError]
+                    case st: ScriptTransfer     => Bindings.scriptTransfer(st, version).asRight[ExecutionError]
+                  },
                   _ => "Expected Transaction or Order".asLeft[EVALUATED]
                 )
               )
@@ -46,7 +52,7 @@ object Vals {
 
   val heightVal: ContextfulVal[Environment] =
     new ContextfulVal[Environment] {
-      override def apply[F[_] : Monad](env: Environment[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
+      override def apply[F[_]: Monad](env: Environment[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
         Eval.later {
           env.height
             .map(v => CONST_LONG(v): EVALUATED)
@@ -56,44 +62,52 @@ object Vals {
 
   val accountThisVal: ContextfulVal[Environment] =
     new ContextfulVal.Lifted[Environment] {
-      override def liftF[F[_] : Monad](env: Environment[F]): Eval[Either[ExecutionError, EVALUATED]] =
+      override def liftF[F[_]: Monad](env: Environment[F]): Eval[Either[ExecutionError, EVALUATED]] =
         Eval.later {
-          (Bindings.senderObject(env.tthis): EVALUATED)
-            .asRight[ExecutionError]
+         if(env.dAppAlias) {
+           (FAIL("Use alias is disabled"): EVALUATED)
+             .asRight[ExecutionError]
+         } else {
+           (Bindings.senderObject(env.tthis.eliminate(identity, _ => throw new Exception("In the account's script value 'this` must be Address"))): EVALUATED)
+             .asRight[ExecutionError]
+         }
         }
     }
 
-  val assetThisVal: ContextfulVal[Environment] =
+  def assetThisVal(version: StdLibVersion): ContextfulVal[Environment] =
     new ContextfulVal[Environment] {
-      override def apply[F[_] : Monad](env: Environment[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
+      override def apply[F[_]: Monad](env: Environment[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
         Eval.later {
-          env.assetInfoById(env.tthis.bytes)
-            .map(v => buildAssetInfo(v.get): EVALUATED)
+          env
+            .assetInfoById(env.tthis.eliminate(_ => throw new Exception("In the account's script value 'this` must be Address"), _.eliminate(_.id, v => throw new Exception(s"Incorrect value $v for 'this'"))))
+            .map(v => buildAssetInfo(v.get, version): EVALUATED)
             .map(_.asRight[ExecutionError])
         }
     }
 
-  val lastBlockVal: ContextfulVal[Environment] =
+  def lastBlockVal(version: StdLibVersion): ContextfulVal[Environment] =
     new ContextfulVal[Environment] {
-      override def apply[F[_] : Monad](env: Environment[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
+      override def apply[F[_]: Monad](env: Environment[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
         Eval.later {
-          env.lastBlockOpt()
-            .map(v => Bindings.buildLastBlockInfo(v.get): EVALUATED)
+          env
+            .lastBlockOpt()
+            .map(v => Bindings.buildBlockInfo(v.get, version): EVALUATED)
             .map(_.asRight[ExecutionError])
         }
     }
 
-  val lastBlock = ("lastBlock", (blockInfo, lastBlockVal))
+  def lastBlock(version: StdLibVersion) = ("lastBlock", (blockInfo(version), lastBlockVal(version)))
 
   val sellOrdTypeVal: ContextfulVal[Environment] = ContextfulVal.fromEval(Eval.now(Right(ordType(OrdType.Sell))))
-  val buyOrdTypeVal:  ContextfulVal[Environment] = ContextfulVal.fromEval(Eval.now(Right(ordType(OrdType.Buy))))
+  val buyOrdTypeVal: ContextfulVal[Environment]  = ContextfulVal.fromEval(Eval.now(Right(ordType(OrdType.Buy))))
 
   val sell = ("Sell", (ordTypeType, sellOrdTypeVal))
-  val buy = ("Buy", (ordTypeType, buyOrdTypeVal))
+  val buy  = ("Buy", (ordTypeType, buyOrdTypeVal))
 
   val height: (ExecutionError, (LONG.type, ContextfulVal[Environment])) = ("height", (LONG, heightVal))
 
   val accountThis: (ExecutionError, (CASETYPEREF, ContextfulVal[Environment])) = ("this", (addressType, accountThisVal))
-  val assetThis: (ExecutionError, (CASETYPEREF, ContextfulVal[Environment]))   = ("this", (assetType,   assetThisVal))
+  def assetThis(version: StdLibVersion): (ExecutionError, (CASETYPEREF, ContextfulVal[Environment])) =
+    ("this", (assetType(version), assetThisVal(version)))
 
 }

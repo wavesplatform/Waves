@@ -4,6 +4,7 @@ import com.wavesplatform._
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.transaction.GenesisTransaction
 import org.scalacheck.Gen
@@ -14,7 +15,9 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
     extends PropSpec
     with PropertyChecks
     with DomainScenarioDrivenPropertyCheck
+    with OptionValues
     with Matchers
+    with EitherMatchers
     with TransactionGen
     with BlocksTransactionsHelpers {
 
@@ -22,35 +25,35 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
     forAll(Preconditions.conflictingTransfers()) {
       case (prevBlock, keyBlock, microBlocks, keyBlock1) =>
         withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
-          d.blockchainUpdater.processBlock(prevBlock) shouldBe 'right
-          d.blockchainUpdater.processBlock(keyBlock) shouldBe 'right
+          d.blockchainUpdater.processBlock(prevBlock) should beRight
+          d.blockchainUpdater.processBlock(keyBlock) should beRight
 
-          microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) shouldBe 'right)
+          microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) should beRight)
 
-          d.blockchainUpdater.processBlock(keyBlock1) shouldBe 'right
+          d.blockchainUpdater.processBlock(keyBlock1) should beRight
         }
     }
 
     forAll(Preconditions.conflictingTransfersInMicro()) {
       case (prevBlock, keyBlock, microBlocks, keyBlock1) =>
         withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
-          d.blockchainUpdater.processBlock(prevBlock) shouldBe 'right
-          d.blockchainUpdater.processBlock(keyBlock) shouldBe 'right
+          d.blockchainUpdater.processBlock(prevBlock) should beRight
+          d.blockchainUpdater.processBlock(keyBlock) should beRight
 
-          microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) shouldBe 'right)
+          microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) should beRight)
 
-          d.blockchainUpdater.processBlock(keyBlock1) shouldBe 'right
+          d.blockchainUpdater.processBlock(keyBlock1) should beRight
         }
     }
 
     forAll(Preconditions.leaseAndLeaseCancel()) {
       case (genesisBlock, leaseBlock, keyBlock, microBlocks, transferBlock, secondAccount) =>
         withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
-          Seq(genesisBlock, leaseBlock, keyBlock).foreach(d.blockchainUpdater.processBlock(_) shouldBe 'right)
-          assert(d.blockchainUpdater.effectiveBalance(secondAccount, 0) > 0)
+          Seq(genesisBlock, leaseBlock, keyBlock).foreach(d.blockchainUpdater.processBlock(_) should beRight)
+          assert(d.blockchainUpdater.effectiveBalance(secondAccount.toAddress, 0) > 0)
 
-          microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) shouldBe 'right)
-          assert(d.blockchainUpdater.effectiveBalance(secondAccount, 0, Some(leaseBlock.uniqueId)) > 0)
+          microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) should beRight)
+          assert(d.blockchainUpdater.effectiveBalance(secondAccount.toAddress, 0, Some(leaseBlock.id())) > 0)
 
           assert(d.blockchainUpdater.processBlock(transferBlock).toString.contains("negative effective balance"))
         }
@@ -61,11 +64,10 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
     forAll(Preconditions.duplicateDataKeys()) {
       case (genesisBlock, Seq(block1, block2), microBlocks, address) =>
         withDomain(DataAndMicroblocksActivatedAt0WavesSettings) { d =>
-          Seq(genesisBlock, block1, block2).foreach(d.blockchainUpdater.processBlock(_) shouldBe 'right)
-          d.blockchainUpdater.accountDataKeys(address) shouldBe Set("test")
-
-          microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) shouldBe 'right)
-          d.blockchainUpdater.accountDataKeys(address) shouldBe Set("test")
+          Seq(genesisBlock, block1, block2).foreach(d.blockchainUpdater.processBlock(_) should beRight)
+          d.blockchainUpdater.accountData(address, "test") shouldBe defined
+          microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) should beRight)
+          d.blockchainUpdater.accountData(address, "test") shouldBe defined
         }
     }
   }
@@ -82,20 +84,20 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         tsAmount = FeeAmount * 10
 
         blockTime = ntpNow
-        transfer1 <- transfer(richAccount, secondAccount, tsAmount, validTimestampGen(blockTime))
-        transfer2 <- transfer(secondAccount, richAccount, tsAmount - FeeAmount, validTimestampGen(blockTime))
-        transfer3 <- transfer(secondAccount, richAccount, tsAmount - FeeAmount, validTimestampGen(blockTime))
+        transfer1 <- transfer(richAccount, secondAccount.toAddress, tsAmount, validTimestampGen(blockTime))
+        transfer2 <- transfer(secondAccount, richAccount.toAddress, tsAmount - FeeAmount, validTimestampGen(blockTime))
+        transfer3 <- transfer(secondAccount, richAccount.toAddress, tsAmount - FeeAmount, validTimestampGen(blockTime))
       } yield {
         val genesisBlock = unsafeBlock(
           reference = randomSig,
-          txs = Seq(GenesisTransaction.create(richAccount, tsAmount + FeeAmount, 0).explicitGet()),
+          txs = Seq(GenesisTransaction.create(richAccount.toAddress, tsAmount + FeeAmount, 0).explicitGet()),
           signer = TestBlock.defaultSigner,
           version = 3,
           timestamp = 0
         )
 
         val (keyBlock, microBlocks) = unsafeChainBaseAndMicro(
-          totalRefTo = genesisBlock.signerData.signature,
+          totalRefTo = genesisBlock.signature,
           base = Seq(transfer1),
           micros = Seq(Seq(transfer2)),
           signer = richAccount,
@@ -104,7 +106,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         )
 
         val (keyBlock1, _) = unsafeChainBaseAndMicro(
-          totalRefTo = keyBlock.signerData.signature,
+          totalRefTo = keyBlock.signature,
           base = Seq(transfer3),
           micros = Nil,
           signer = secondAccount,
@@ -124,20 +126,20 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         tsAmount = FeeAmount * 10
 
         blockTime = ntpNow
-        transfer1 <- transfer(richAccount, secondAccount, tsAmount, validTimestampGen(blockTime))
-        transfer2 <- transfer(secondAccount, richAccount, tsAmount - FeeAmount, validTimestampGen(blockTime))
-        transfer3 <- transfer(secondAccount, richAccount, tsAmount - FeeAmount, validTimestampGen(blockTime))
+        transfer1 <- transfer(richAccount, secondAccount.toAddress, tsAmount, validTimestampGen(blockTime))
+        transfer2 <- transfer(secondAccount, richAccount.toAddress, tsAmount - FeeAmount, validTimestampGen(blockTime))
+        transfer3 <- transfer(secondAccount, richAccount.toAddress, tsAmount - FeeAmount, validTimestampGen(blockTime))
       } yield {
         val genesisBlock = unsafeBlock(
           reference = randomSig,
-          txs = Seq(GenesisTransaction.create(richAccount, tsAmount + FeeAmount, 0).explicitGet()),
+          txs = Seq(GenesisTransaction.create(richAccount.toAddress, tsAmount + FeeAmount, 0).explicitGet()),
           signer = TestBlock.defaultSigner,
           version = 3,
           timestamp = 0
         )
 
         val (keyBlock, microBlocks) = unsafeChainBaseAndMicro(
-          totalRefTo = genesisBlock.signerData.signature,
+          totalRefTo = genesisBlock.signature,
           base = Seq(transfer1),
           micros = Seq(Seq(), Seq(transfer2)),
           signer = richAccount,
@@ -164,22 +166,22 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         secondAccount <- accountGen
         randomAccount <- accountGen
 
-        tsAmount = FeeAmount * 10
+        tsAmount  = FeeAmount * 10
         blockTime = ntpNow
-        lease       <- lease(richAccount, secondAccount, tsAmount, validTimestampGen(blockTime))
+        lease       <- lease(richAccount, secondAccount.toAddress, tsAmount, validTimestampGen(blockTime))
         leaseCancel <- leaseCancel(richAccount, lease.id(), validTimestampGen(blockTime))
-        transfer    <- transfer(richAccount, randomAccount, tsAmount, validTimestampGen(blockTime))
+        transfer    <- transfer(richAccount, randomAccount.toAddress, tsAmount, validTimestampGen(blockTime))
       } yield {
         val genesisBlock = unsafeBlock(
           reference = randomSig,
-          txs = Seq(GenesisTransaction.create(richAccount, tsAmount + FeeAmount * 3, 0).explicitGet()),
+          txs = Seq(GenesisTransaction.create(richAccount.toAddress, tsAmount + FeeAmount * 3, 0).explicitGet()),
           signer = TestBlock.defaultSigner,
           version = 3,
           timestamp = 0
         )
 
         val leaseBlock = unsafeBlock(
-          genesisBlock.signerData.signature,
+          genesisBlock.signature,
           Seq(lease),
           richAccount,
           3,
@@ -187,7 +189,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         )
 
         val (keyBlock, microBlocks) = unsafeChainBaseAndMicro(
-          totalRefTo = leaseBlock.signerData.signature,
+          totalRefTo = leaseBlock.signature,
           base = Nil,
           micros = Seq(Seq(leaseCancel)),
           signer = richAccount,
@@ -196,7 +198,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         )
 
         val transferBlock = unsafeBlock(
-          keyBlock.signerData.signature,
+          keyBlock.signature,
           Seq(transfer),
           secondAccount,
           3,
@@ -209,22 +211,22 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
 
     def duplicateDataKeys(): Gen[(Block, Seq[Block], Seq[MicroBlock], Address)] = {
       for {
-        richAccount   <- accountGen
-        tsAmount = FeeAmount * 10
+        richAccount <- accountGen
+        tsAmount  = FeeAmount * 10
         blockTime = ntpNow
         data1 <- QuickTX.data(richAccount, "test", Gen.const(ntpNow))
         data2 <- QuickTX.data(richAccount, "test", Gen.const(ntpNow))
       } yield {
         val genesisBlock = unsafeBlock(
           reference = randomSig,
-          txs = Seq(GenesisTransaction.create(richAccount, FeeAmount * 100, 0).explicitGet()),
+          txs = Seq(GenesisTransaction.create(richAccount.toAddress, FeeAmount * 100, 0).explicitGet()),
           signer = TestBlock.defaultSigner,
           version = 3,
           timestamp = 0
         )
 
         val preBlock = unsafeBlock(
-          genesisBlock.signerData.signature,
+          genesisBlock.signature,
           Seq(data1),
           richAccount,
           3,
@@ -232,7 +234,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         )
 
         val (keyBlock, microBlocks) = unsafeChainBaseAndMicro(
-          totalRefTo = preBlock.signerData.signature,
+          totalRefTo = preBlock.signature,
           base = Seq(),
           micros = Seq(Seq(data2)),
           signer = richAccount,

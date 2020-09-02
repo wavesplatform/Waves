@@ -3,17 +3,19 @@ package com.wavesplatform.utils
 import cats.Id
 import cats.syntax.monoid._
 import com.google.common.primitives.Ints
+import com.wavesplatform.common.merkle.Merkle._
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.directives.values.V3
-import com.wavesplatform.lang.v1.CTX
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, EVALUATED}
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.Common.{NoShrink, produce}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -23,7 +25,7 @@ import scorex.crypto.hash.{Blake2b256, CryptographicHash32, Digest, Digest32}
 
 import scala.util.Random
 
-class MerkleTest extends PropSpec with PropertyChecks with Matchers {
+class MerkleTest extends PropSpec with PropertyChecks with Matchers with NoShrink {
 
   val AMT: Long = 1000000 * 100000000L
 
@@ -110,9 +112,9 @@ class MerkleTest extends PropSpec with PropertyChecks with Matchers {
 
   private val evaluator = new EvaluatorV1[Id, NoContext]()
 
-  private def eval[T <: EVALUATED](code: String): Either[String, T] = {
+  private def eval[T <: EVALUATED](code: String, version: StdLibVersion = V3): Either[String, T] = {
     val untyped  = Parser.parseExpr(code).get.value
-    val ctx: CTX[NoContext] = PureContext.build(Global, V3) |+| CryptoContext.build(Global, V3)
+    val ctx = PureContext.build(version) |+| CryptoContext.build(Global, version)
     val typed    = ExpressionCompiler(ctx.compilerContext, untyped)
     typed.flatMap(v => evaluator.apply[T](ctx.evaluationContext, v._1))
   }
@@ -125,6 +127,27 @@ class MerkleTest extends PropSpec with PropertyChecks with Matchers {
        |
        |checkMerkleProof(rootHash, merkleProof, leafData)
      """.stripMargin
+  }
+
+  private def scriptCreateRootSrc(proof: Seq[Array[Byte]], value: Array[Byte], index: Int): String = {
+    s"""
+       |let leafData = base64'${Base64.encode(value)}'
+       |let merkleProof = [base64'${proof.map(Base64.encode).mkString("', base64'")}']
+       |
+       |createMerkleRoot(merkleProof, leafData, $index)
+     """.stripMargin
+  }
+
+  property("Create root from proof") {
+    val (_, leafs) = testData()
+    val levels = mkLevels(leafs)
+
+    forAll(Gen.oneOf(leafs.zipWithIndex)) { case (leaf, index) =>
+      val proofs = mkProofs(index, levels).reverse
+
+      eval(scriptCreateRootSrc(proofs, hash(leaf), index), V4) shouldBe CONST_BYTESTR(ByteStr(levels.head.head))
+      eval(scriptCreateRootSrc(proofs, hash(leaf), index + (1<<proofs.length)), V4) should produce("out of range allowed by proof list length")
+    }
   }
 
   private def proofBytes(mp: MerkleProof[Digest32]): Array[Byte] = {

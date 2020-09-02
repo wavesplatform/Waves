@@ -12,7 +12,6 @@ import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, Contextful
 import com.wavesplatform.lang.{EvalF, ExecutionError, TrampolinedExecResult}
 
 import scala.annotation.meta.field
-import scala.language.implicitConversions
 import scala.scalajs.js.annotation._
 
 sealed trait BaseFunction[C[_[_]]] {
@@ -20,7 +19,7 @@ sealed trait BaseFunction[C[_[_]]] {
   @JSExport def header: FunctionHeader = signature.header
   def costByLibVersion: Map[StdLibVersion, Long]
   @JSExport def name: String
-  @JSExport def args: Array[String]
+  @JSExport def args: Seq[String]
   @JSExport def deprecated: Boolean = false
 }
 
@@ -37,7 +36,7 @@ case class NativeFunction[C[_[_]]](
                                     costByLibVersion: Map[StdLibVersion, Long],
                                     @(JSExport @field) signature: FunctionTypeSignature,
                                     ev: ContextfulNativeFunction[C],
-                                    @(JSExport @field) args: Array[String]
+                                    @(JSExport @field) args: Seq[String]
 ) extends BaseFunction[C] {
   def eval[F[_] : Monad](context: C[F], args: List[EVALUATED]): TrampolinedExecResult[F, EVALUATED] =
     EitherT.apply[EvalF[F, ?], ExecutionError, EVALUATED](ev((context, args)).pure[Eval])
@@ -51,15 +50,33 @@ object NativeFunction {
       costByLibVersion = DirectiveDictionary[StdLibVersion].all.map(_ -> cost).toMap,
       signature = FunctionTypeSignature(result = resultType, args = args.map(a => (a._1, a._2)), header = FunctionHeader.Native(internalName)),
       ev = ev /*ev.orElse { case _ => "Passed argument with wrong type".asLeft[EVALUATED].pure[F] }(_, _)*/,
-      args = args.map(_._1).toArray
+      args = args.map(_._1)
+    )
+
+  def withEnvironment[C[_[_]]](name: String, costByLibVersion: Map[StdLibVersion, Long], internalName: Short, resultType: TYPE, args: (String, TYPE)*)(
+      ev: ContextfulNativeFunction[C]): NativeFunction[C] =
+    new NativeFunction(
+      name = name,
+      costByLibVersion,
+      signature = FunctionTypeSignature(result = resultType, args = args.map(a => (a._1, a._2)), header = FunctionHeader.Native(internalName)),
+      ev = ev,
+      args = args.map(_._1)
     )
 
   def apply[C[_[_]]](name: String, cost: Long, internalName: Short, resultType: TYPE, args: (String, TYPE)*)(
-    ev: List[EVALUATED] => Either[ExecutionError, EVALUATED]
+    evl: List[EVALUATED] => Either[ExecutionError, EVALUATED]
   ): NativeFunction[C] =
-    withEnvironment[C](name, cost, internalName, resultType, args: _*)(new ContextfulNativeFunction[C] {
-      override def apply[F[_]: Monad](a: (C[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
-        ev(a._2).pure[F]
+    withEnvironment[C](name, cost, internalName, resultType, args: _*)(new ContextfulNativeFunction[C](name, resultType, args.toSeq) {
+      override def ev[F[_]: Monad](a: (C[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
+        evl(a._2).pure[F]
+    })
+
+  def apply[C[_[_]]](name: String, costByLibVersion: Map[StdLibVersion, Long], internalName: Short, resultType: TYPE, args: (String, TYPE)*)(
+    evl: List[EVALUATED] => Either[ExecutionError, EVALUATED]
+  ): NativeFunction[C] =
+    withEnvironment[C](name, costByLibVersion, internalName, resultType, args: _*)(new ContextfulNativeFunction[C](name, resultType, args.toSeq) {
+      override def ev[F[_]: Monad](a: (C[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
+        evl(a._2).pure[F]
     })
 
   def apply[C[_[_]]](name: String,
@@ -72,7 +89,7 @@ object NativeFunction {
       costByLibVersion = costByLibVersion,
       signature = FunctionTypeSignature(result = resultType, args = args.map(a => (a._1, a._2)), header = FunctionHeader.Native(internalName)),
       ev = ev,
-      args = args.map(_._1).toArray
+      args = args.map(_._1)
     )
 
 }
@@ -84,7 +101,7 @@ case class UserFunction[C[_[_]]](
                                   costByLibVersion: Map[StdLibVersion, Long],
                                   @(JSExport@field) signature: FunctionTypeSignature,
                                   ev: ContextfulUserFunction[C],
-                                  @(JSExport@field) args: Array[String]
+                                  @(JSExport@field) args: Seq[String]
 ) extends BaseFunction[C]
 
 object UserFunction {
@@ -128,7 +145,7 @@ object UserFunction {
       costByLibVersion = costByLibVersion,
       signature = FunctionTypeSignature(result = resultType, args = args.map(a => (a._1, a._2)), header = FunctionHeader.User(internalName, name)),
       ev = ev,
-      args = args.map(_._1).toArray
+      args = args.map(_._1)
     )
 
   def apply[C[_[_]]](
@@ -155,7 +172,7 @@ object UserFunction {
       costByLibVersion = costByLibVersion,
       signature = FunctionTypeSignature(result = resultType, args = args.map(a => (a._1, a._2)), header = FunctionHeader.User(internalName, name)),
       ContextfulUserFunction.pure[C](ev),
-      args = args.map(_._1).toArray
+      args = args.map(_._1)
     ) {
       override def deprecated = true
     }

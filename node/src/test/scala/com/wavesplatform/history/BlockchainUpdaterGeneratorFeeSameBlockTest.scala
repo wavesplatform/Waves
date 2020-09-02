@@ -1,11 +1,12 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.{EitherMatchers, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -15,18 +16,19 @@ class BlockchainUpdaterGeneratorFeeSameBlockTest
     with PropertyChecks
     with DomainScenarioDrivenPropertyCheck
     with Matchers
+    with EitherMatchers
     with TransactionGen {
 
-  type Setup = (GenesisTransaction, TransferTransactionV1, TransferTransactionV1)
+  type Setup = (GenesisTransaction, TransferTransaction, TransferTransaction)
 
   val preconditionsAndPayments: Gen[Setup] = for {
     sender    <- accountGen
     recipient <- accountGen
     fee       <- smallFeeGen
     ts        <- positiveIntGen
-    genesis: GenesisTransaction = GenesisTransaction.create(sender, ENOUGH_AMT, ts).explicitGet()
-    payment: TransferTransactionV1 <- wavesTransferGeneratorP(ts, sender, recipient)
-    generatorPaymentOnFee: TransferTransactionV1 = createWavesTransfer(defaultSigner, recipient, payment.fee, fee, ts + 1).explicitGet()
+    genesis: GenesisTransaction = GenesisTransaction.create(sender.toAddress, ENOUGH_AMT, ts).explicitGet()
+    payment: TransferTransaction <- wavesTransferGeneratorP(ts, sender, recipient.toAddress)
+    generatorPaymentOnFee: TransferTransaction = createWavesTransfer(defaultSigner, recipient.toAddress, payment.fee, fee, ts + 1).explicitGet()
   } yield (genesis, payment, generatorPaymentOnFee)
 
   property("block generator can spend fee after transaction before applyMinerFeeWithTransactionAfter") {
@@ -34,7 +36,7 @@ class BlockchainUpdaterGeneratorFeeSameBlockTest
     scenario(preconditionsAndPayments, DefaultWavesSettings) {
       case (domain, (genesis, somePayment, generatorPaymentOnFee)) =>
         val blocks = chainBlocks(Seq(Seq(genesis), Seq(generatorPaymentOnFee, somePayment)))
-        all(blocks.map(block => domain.blockchainUpdater.processBlock(block))) shouldBe 'right
+        blocks.foreach(block => domain.blockchainUpdater.processBlock(block) should beRight)
     }
   }
 
@@ -42,7 +44,7 @@ class BlockchainUpdaterGeneratorFeeSameBlockTest
     scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) {
       case (domain, (genesis, somePayment, generatorPaymentOnFee)) =>
         val blocks = chainBlocks(Seq(Seq(genesis), Seq(generatorPaymentOnFee, somePayment)))
-        blocks.init.foreach(block => domain.blockchainUpdater.processBlock(block).explicitGet())
+        blocks.init.foreach(block => domain.blockchainUpdater.processBlock(block) should beRight)
         domain.blockchainUpdater.processBlock(blocks.last) should produce("unavailable funds")
     }
   }

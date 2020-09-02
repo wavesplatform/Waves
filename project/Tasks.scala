@@ -61,7 +61,7 @@ object Tasks {
         funcs,
         f => (f.name, f.params),
         f => Seq(str(f.name), listStr(f.params.map(str)), ver),
-        f => Seq(str(f.doc), listStr(f.paramsDoc.map(str)))
+        f => Seq(str(f.doc), listStr(f.paramsDoc.map(str)), f.complexity.toString)
       )
 
     def readV1V2Data(): (String, String) =
@@ -90,15 +90,14 @@ object Tasks {
           Seq(
             str(f._1.doc.replace("\n", "\\n")),
             listStr(f._1.paramsDoc.map(str).map(_.replace("\n", "\\n"))),
-            str(f._2)
-        )
+            str(f._2),
+            f._1.complexity.toString
+          )
       )
 
-    def readV3Data(): (String, String) = {
-      val ver = "3"
-
+    def readCategorizedData(ver: String): (String, String) = {
       val funcs = for {
-        path <- Files.list(Paths.get(s"$baseLangDir/doc/v3/funcs")).iterator.asScala
+        path <- Files.list(Paths.get(s"$baseLangDir/doc/v$ver/funcs")).iterator.asScala
         json = JsonValue.readHjson(Files.newBufferedReader(path)).asObject().toString
         funcs <- mapper.readValue[Map[String, List[FuncSourceData]]](json).head._2
         category = path.getName(path.getNameCount - 1).toString.split('.').head
@@ -106,14 +105,15 @@ object Tasks {
 
       val funcsStr = buildCategorizedFuncsStr(funcs.toSeq, ver)
 
-      val vars    = mapper.readValue[Map[String, List[VarSourceData]]](new File(s"$baseLangDir/doc/v3/vars.json")).head._2
+      val vars    = mapper.readValue[Map[String, List[VarSourceData]]](new File(s"$baseLangDir/doc/v$ver/vars.json")).head._2
       val varsStr = buildVarsStr(vars, ver)
 
       (varsStr, funcsStr)
     }
 
     val (vars, funcs)     = readV1V2Data()
-    val (varsV3, funcsV3) = readV3Data()
+    val (varsV3, funcsV3) = readCategorizedData("3")
+    val (varsV4, funcsV4) = readCategorizedData("4")
 
     val sourceStr =
       s"""
@@ -122,9 +122,10 @@ object Tasks {
          | object DocSource {
          |   private val regex = "\\\\[(.+?)\\\\]\\\\(.+?\\\\)".r
          |
-         |   lazy val varData  = $vars ++ $varsV3
-         |   lazy val funcData = $funcs ++ categorizedfuncData.mapValues(v => (regex.replaceAllIn(v._1, _.group(1)), v._2))
-         |   lazy val categorizedfuncData = $funcsV3
+         |   lazy val varData  = $vars ++ $varsV3 ++ $varsV4
+         |   lazy val funcData = $funcs ++ (categorizedfuncDataV3 ++ categorizedfuncDataV4).view.mapValues(v => (regex.replaceAllIn(v._1, _.group(1)), v._2, v._4))
+         |   lazy val categorizedfuncDataV3 = $funcsV3
+         |   lazy val categorizedfuncDataV4 = $funcsV4
          | }
       """.stripMargin
 

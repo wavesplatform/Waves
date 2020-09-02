@@ -2,6 +2,7 @@ package com.wavesplatform.lang.contract
 
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 
 import cats.implicits._
 import com.wavesplatform.lang.contract.DApp._
@@ -81,12 +82,12 @@ object ContractSerDe {
     } yield meta
 
   private[lang]  def serializeDeclaration(out: ByteArrayOutputStream, dec: DECLARATION): Unit = {
-    Serde.serializeDeclaration(out, dec, Serde.serAux(out, Coeval.now(()), _)).value
+    Serde.serializeDeclaration(out, dec, Serde.serAux(out, Coeval.now(()), _)).value()
   }
 
   private[lang]  def deserializeDeclaration(bb: ByteBuffer): Either[String, DECLARATION] = {
     val decType = bb.get()
-    Serde.deserializeDeclaration(bb, desAux(bb), decType).attempt.value.leftMap(_.getMessage)
+    Serde.deserializeDeclaration(bb, desAux(bb), decType).attempt.value().leftMap(_.getMessage)
   }
 
   private[lang] def serializeAnnotation(out: ByteArrayOutputStream, invocationName: String): Unit = {
@@ -105,10 +106,11 @@ object ContractSerDe {
     for {
       ca <- deserializeCallableAnnotation(bb)
       cf <- deserializeDeclaration(bb).map(_.asInstanceOf[FUNC])
+      nameSize = cf.name.getBytes(StandardCharsets.UTF_8).length
       _ <- Either.cond(
-        cf.name.getBytes("UTF-8").size <= ContractLimits.MaxAnnotatedFunctionNameInBytes,
+        nameSize <= ContractLimits.MaxDeclarationNameInBytes,
         (),
-        s"Callable function name (${cf.name}) longer than limit ${ContractLimits.MaxAnnotatedFunctionNameInBytes}"
+        s"Callable function name (${cf.name}) size = $nameSize bytes exceeds ${ContractLimits.MaxDeclarationNameInBytes}"
       )
     } yield CallableFunction(ca, cf)
   }

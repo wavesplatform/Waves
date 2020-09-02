@@ -2,9 +2,9 @@ package com.wavesplatform.state
 
 import cats._
 import cats.kernel.instances.map._
-import com.wavesplatform.block.Block.Fraction
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.state.diffs.BlockDiffer.Fraction
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset._
 import play.api.libs.functional.syntax._
@@ -13,7 +13,7 @@ import play.api.libs.json._
 import scala.collection.Seq
 import scala.collection.immutable.Map
 
-case class Portfolio(balance: Long, lease: LeaseBalance, assets: Map[IssuedAsset, Long]) {
+case class Portfolio(balance: Long = 0L, lease: LeaseBalance = LeaseBalance.empty, assets: Map[IssuedAsset, Long] = Map.empty) {
   lazy val effectiveBalance: Long = safeSum(balance, lease.in) - lease.out
   lazy val spendableBalance: Long = balance - lease.out
 
@@ -26,13 +26,16 @@ case class Portfolio(balance: Long, lease: LeaseBalance, assets: Map[IssuedAsset
 }
 
 object Portfolio {
+  def waves(amount: Long): Portfolio = build(Waves, amount)
+
+  def build(af: (Asset, Long)): Portfolio = build(af._1, af._2)
 
   def build(a: Asset, amount: Long): Portfolio = a match {
-    case Waves              => Portfolio(amount, LeaseBalance.empty, Map.empty)
-    case t @ IssuedAsset(_) => Portfolio(0L, LeaseBalance.empty, Map(t -> amount))
+    case Waves              => Portfolio(amount)
+    case t @ IssuedAsset(_) => Portfolio(assets = Map(t -> amount))
   }
 
-  val empty = Portfolio(0L, Monoid[LeaseBalance].empty, Map.empty)
+  val empty: Portfolio = Portfolio()
 
   implicit val longSemigroup: Semigroup[Long] = (x: Long, y: Long) => safeSum(x, y)
 
@@ -40,9 +43,11 @@ object Portfolio {
     override val empty: Portfolio = Portfolio.empty
 
     override def combine(older: Portfolio, newer: Portfolio): Portfolio =
-      Portfolio(balance = safeSum(older.balance, newer.balance),
-                lease = Monoid.combine(older.lease, newer.lease),
-                assets = Monoid.combine(older.assets, newer.assets))
+      Portfolio(
+        balance = safeSum(older.balance, newer.balance),
+        lease = Monoid.combine(older.lease, newer.lease),
+        assets = Monoid.combine(older.assets, newer.assets)
+      )
   }
 
   implicit class PortfolioExt(self: Portfolio) {
@@ -58,16 +63,14 @@ object Portfolio {
     )
 
     def multiply(f: Fraction): Portfolio =
-      Portfolio(f(self.balance), LeaseBalance.empty, self.assets.mapValues(f.apply))
+      Portfolio(f(self.balance), LeaseBalance.empty, self.assets.view.mapValues(f.apply).toMap)
 
     def minus(other: Portfolio): Portfolio =
-      Portfolio(self.balance - other.balance, LeaseBalance.empty, Monoid.combine(self.assets, other.assets.mapValues(-_)))
+      Portfolio(self.balance - other.balance, LeaseBalance.empty, Monoid.combine(self.assets, other.assets.view.mapValues(-_).toMap))
 
     def negate: Portfolio = Portfolio.empty minus self
 
-    def assetIds: Set[Asset] = {
-      self.assets.keySet ++ Set(Waves)
-    }
+    def assetIds: Set[Asset] = self.assets.keySet ++ Set(Waves)
 
     def changedAssetIds(that: Portfolio): Set[Asset] = {
       val a1 = assetIds
@@ -80,7 +83,7 @@ object Portfolio {
   }
 
   implicit val assetMapReads: Reads[Map[IssuedAsset, Long]] = Reads {
-    case JsObject(fields) => {
+    case JsObject(fields) =>
       val keyReads = implicitly[Reads[Long]]
       val valueReads: String => JsResult[IssuedAsset] = (s: String) =>
         Base58
@@ -88,9 +91,10 @@ object Portfolio {
           .fold(
             _ => JsError("Expected base58-encoded string"),
             arr => JsSuccess(IssuedAsset(ByteStr(arr)))
-        )
+          )
 
       type Errors = Seq[(JsPath, Seq[JsonValidationError])]
+
       def locate(e: Errors, key: String) = e.map {
         case (p, valerr) => (JsPath \ key) ++ p -> valerr
       }
@@ -111,14 +115,13 @@ object Portfolio {
             }
         }
         .fold(JsError.apply, res => JsSuccess(res))
-    }
 
     case _ => JsError("error.expected.jsobject")
   }
 
   implicit val assetMapWrites: Writes[Map[IssuedAsset, Long]] = Writes { m =>
     Json.toJson(m.map {
-      case (asset, balance) => asset.id.base58 -> JsNumber(balance)
+      case (asset, balance) => asset.id.toString -> JsNumber(balance)
     })
   }
 

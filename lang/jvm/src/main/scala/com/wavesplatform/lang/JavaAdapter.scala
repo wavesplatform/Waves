@@ -15,7 +15,7 @@ object JavaAdapter {
       Seq(
         CryptoContext.compilerContext(Global, version),
         WavesContext.build(???).compilerContext,
-        PureContext.build(Global, version).compilerContext
+        PureContext.build(version).compilerContext
       ))
 
   def compile(input: String): EXPR = {
@@ -23,7 +23,7 @@ object JavaAdapter {
       .compile(input, ctx)
       .fold(
         error => throw new IllegalArgumentException(error),
-        expr => expr
+        res => res
       )
   }
 }

@@ -17,25 +17,27 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
   errorTests(
     "can't define LET with the same name as predefined constant" -> "already defined in the scope" -> BLOCK(
       AnyPos,
-      LET(AnyPos, PART.VALID(AnyPos, "unit"), CONST_LONG(AnyPos, 2), Seq.empty),
+      LET(AnyPos, PART.VALID(AnyPos, "unit"), CONST_LONG(AnyPos, 2)),
       TRUE(AnyPos)
     ),
     "can't define LET with the same name as predefined function" -> "function with this name is already defined" -> BLOCK(
       AnyPos,
-      LET(AnyPos, PART.VALID(AnyPos, "drop"), CONST_LONG(AnyPos, 2), Seq.empty),
+      LET(AnyPos, PART.VALID(AnyPos, "drop"), CONST_LONG(AnyPos, 2)),
       TRUE(AnyPos)
     ),
-    "BINARY_OP with wrong types" -> "Compilation failed: Can't find a function overload '+'" -> BINARY_OP(AnyPos,
-                                                                                                          TRUE(AnyPos),
-                                                                                                          SUM_OP,
-                                                                                                          CONST_LONG(AnyPos, 1)),
+    "BINARY_OP with wrong types" -> "Can't find a function overload '+'" -> BINARY_OP(
+      AnyPos,
+      TRUE(AnyPos),
+      SUM_OP,
+      CONST_LONG(AnyPos, 1)
+    ),
     "IF clause must be boolean"                    -> "Unexpected type, required: Boolean" -> IF(AnyPos, CONST_LONG(AnyPos, 0), TRUE(AnyPos), FALSE(AnyPos)),
     "FUNCTION_CALL with wrong amount of arguments" -> "requires 2 arguments" -> FUNCTION_CALL(
       AnyPos,
       PART.VALID(AnyPos, multiplierFunction.name),
       List(CONST_LONG(AnyPos, 0))
     ),
-    "FUNCTION_CALL with wrong type of argument" -> "Compilation failed: Non-matching types" -> FUNCTION_CALL(
+    "FUNCTION_CALL with wrong type of argument" -> "Non-matching types" -> FUNCTION_CALL(
       AnyPos,
       PART.VALID(AnyPos, multiplierFunction.name),
       List(CONST_LONG(AnyPos, 0), FALSE(AnyPos))
@@ -50,9 +52,9 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
         AnyPos,
         Expressions.FUNC(
           AnyPos,
+          Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x")),
           Expressions.PART.VALID(AnyPos, "id"),
-          Seq((Expressions.PART.VALID(AnyPos, "x"), Seq((Expressions.PART.VALID(AnyPos, "Int"), None)))),
-          Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
+          Seq((Expressions.PART.VALID(AnyPos, "x"), Single(Expressions.PART.VALID(AnyPos, "Int"), None)))
         ),
         Expressions.FUNCTION_CALL(AnyPos, Expressions.PART.VALID(AnyPos, "id"), List(Expressions.TRUE(AnyPos)))
       ),
@@ -61,9 +63,9 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
         AnyPos,
         Expressions.FUNC(
           AnyPos,
+          Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x")),
           Expressions.PART.VALID(AnyPos, "id"),
-          Seq((Expressions.PART.VALID(AnyPos, "x"), Seq((Expressions.PART.VALID(AnyPos, "Int"), None)))),
-          Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
+          Seq((Expressions.PART.VALID(AnyPos, "x"), Single(Expressions.PART.VALID(AnyPos, "Int"), None)))
         ),
         Expressions.FUNCTION_CALL(
           AnyPos,
@@ -76,15 +78,15 @@ class ErrorTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
         AnyPos,
         Expressions.FUNC(
           AnyPos,
+          Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x")),
           Expressions.PART.VALID(AnyPos, "id"),
           Seq(
-            (Expressions.PART.VALID(AnyPos, "x"), Seq((Expressions.PART.VALID(AnyPos, "Int"), None))),
-            (Expressions.PART.VALID(AnyPos, "x"), Seq((Expressions.PART.VALID(AnyPos, "Int"), None)))
-          ),
-          Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
+            (Expressions.PART.VALID(AnyPos, "x"), Single(Expressions.PART.VALID(AnyPos, "Int"), None)),
+            (Expressions.PART.VALID(AnyPos, "x"), Single(Expressions.PART.VALID(AnyPos, "Int"), None))
+          )
         ),
         CONST_LONG(AnyPos, 1)
-      ),
+      )
   )
 
   private def errorTests(exprs: ((String, String), Expressions.EXPR)*): Unit = exprs.foreach {

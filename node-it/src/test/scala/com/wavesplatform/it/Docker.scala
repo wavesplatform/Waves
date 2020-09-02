@@ -33,7 +33,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.io.IOUtils
 import org.asynchttpclient.Dsl._
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, blocking}
@@ -199,7 +199,6 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     try {
       val nodeName = nodeConfig.getString("waves.network.node-name")
       val peersOverrides = if (autoConnect) {
-        import scala.collection.JavaConverters._
         val otherAddrs = peersFor(nodeName)
 
         ConfigFactory
@@ -314,6 +313,12 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
                  |Status: ${containerInfo.state().status()}
                  |OOM killed: ${containerInfo.state().oomKilled()}""".stripMargin)
     id
+  }
+
+  def printThreadDump(node: DockerNode): Unit = {
+    val id = node.containerId
+    log.info(s"Saving thread dump for: $id")
+    client.killContainer(id, DockerClient.Signal.SIGQUIT)
   }
 
   def startContainer(id: String): Unit = {
@@ -540,7 +545,7 @@ object Docker {
 
     val genesisConfig    = timestampOverrides.withFallback(configTemplate)
     val gs               = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")
-    val genesisSignature = Block.genesis(gs).explicitGet().uniqueId
+    val genesisSignature = Block.genesis(gs).explicitGet().id()
 
     parseString(s"waves.blockchain.custom.genesis.signature = $genesisSignature").withFallback(timestampOverrides)
   }

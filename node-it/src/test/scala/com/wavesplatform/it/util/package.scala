@@ -1,6 +1,7 @@
 package com.wavesplatform.it
 
 import com.wavesplatform.settings.Constants
+import com.wavesplatform.state.DataEntry
 import io.netty.util.Timer
 
 import scala.concurrent.duration.FiniteDuration
@@ -10,7 +11,7 @@ import scala.util.control.NonFatal
 package object util {
   implicit class TimerExt(val timer: Timer) extends AnyVal {
     def schedule[A](f: => Future[A], delay: FiniteDuration): Future[A] = {
-      val p = Promise[A]
+      val p = Promise[A]()
       try {
         timer.newTimeout(_ => p.completeWith(f), delay.length, delay.unit)
       } catch {
@@ -26,5 +27,8 @@ package object util {
   }
   implicit class DoubleExt(val d: Double) extends AnyVal {
     def waves: Long = (BigDecimal(d) * Constants.UnitsInWave).toLong
+  }
+  implicit class TypedDataEntry(entry: DataEntry[_]) {
+    def as[T]: T = entry.asInstanceOf[T]
   }
 }

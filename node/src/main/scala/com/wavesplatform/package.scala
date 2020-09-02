@@ -4,31 +4,30 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.NG
-import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.BlockchainUpdater
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.ScorexLogging
 
 package object wavesplatform extends ScorexLogging {
-  private def checkOrAppend(block: Block, blockchainUpdater: BlockchainUpdater with NG): Either[ValidationError, Unit] = {
+  private def checkOrAppend(block: Block, blockchainUpdater: Blockchain with BlockchainUpdater): Either[ValidationError, Unit] = {
     if (blockchainUpdater.isEmpty) {
-      blockchainUpdater.processBlock(block).right.map { _ =>
-        log.info(s"Genesis block ${blockchainUpdater.blockHeaderAndSize(1).get._1} has been added to the state")
+      blockchainUpdater.processBlock(block, block.header.generationSignature).map { _ =>
+        log.info(s"Genesis block ${blockchainUpdater.blockHeader(1).get.header} has been added to the state")
       }
     } else {
-      val existingGenesisBlockId: Option[ByteStr] = blockchainUpdater.blockHeaderAndSize(1).map(_._1.signerData.signature)
-      Either.cond(existingGenesisBlockId.fold(false)(_ == block.uniqueId),
+      val existingGenesisBlockId: Option[ByteStr] = blockchainUpdater.blockHeader(1).map(_.id())
+      Either.cond(existingGenesisBlockId.fold(false)(_ == block.id()),
                   (),
                   GenericError("Mismatched genesis blocks in configuration and blockchain"))
     }
   }
 
-  def checkGenesis(settings: WavesSettings, blockchainUpdater: BlockchainUpdater with NG): Unit = {
+  def checkGenesis(settings: WavesSettings, blockchainUpdater: Blockchain with BlockchainUpdater): Unit = {
     Block
       .genesis(settings.blockchainSettings.genesisSettings)
       .flatMap { genesis =>
-        log.debug(s"Genesis block: $genesis")
-        log.debug(s"Genesis block json: ${genesis.json()}")
+        log.trace(s"Genesis block json: ${genesis.json()}")
         checkOrAppend(genesis, blockchainUpdater)
       }
       .left

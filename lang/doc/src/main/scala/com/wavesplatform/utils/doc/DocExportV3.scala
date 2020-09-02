@@ -9,7 +9,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, Expression, V3}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 object DocExportV3 {
   def main(args: Array[String]): Unit = {
@@ -24,7 +24,7 @@ object DocExportV3 {
           f => {
             val argTypes = f.signature.args.map(_._2.toString).toList
             val docKey = (f.name, argTypes, V3.value.asInstanceOf[Int])
-            val (doc, paramsDoc, category) = DocSource.categorizedfuncData(docKey)
+            val (doc, paramsDoc, category) = DocSource.categorizedfuncDataV3(docKey)
             val varDocs =
               (f.args, f.signature.args, paramsDoc)
                 .zipped

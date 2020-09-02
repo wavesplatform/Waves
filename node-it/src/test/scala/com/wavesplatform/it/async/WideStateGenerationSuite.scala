@@ -14,6 +14,7 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
+@LoadTest
 class WideStateGenerationSuite extends FreeSpec with WaitForHeight2 with Matchers with TransferSending with NodesFromDocker {
 
   override protected def createDocker: Docker = new Docker(
@@ -112,12 +113,12 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2 with Matcher
       utxSize <- node.utxSize
       height  <- node.height
       blockGroups <- traverse((2 to height).grouped(maxRequestSize).map { xs =>
-        (xs.head, xs.last)
+        (xs.head, xs.last, false)
       })(Function.tupled(node.blockSeq))
     } yield {
       val blocks = blockGroups.flatten.toList
       val blocksInfo = blocks.zipWithIndex
-        .map { case (x, i) => s"$i: id=${x.signature.trim}, txsSize=${x.transactions.size}, txs=${x.transactions.map(_.id.trim).mkString(", ")}" }
+        .map { case (x, i) => s"$i: id=${x.id.trim}, txsSize=${x.transactions.size}, txs=${x.transactions.map(_.id.trim).mkString(", ")}" }
 
       s"""Dump of ${node.name}:
          |UTX size: $utxSize

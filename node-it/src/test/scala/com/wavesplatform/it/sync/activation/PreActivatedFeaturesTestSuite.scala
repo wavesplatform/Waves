@@ -2,9 +2,9 @@ package com.wavesplatform.it.sync.activation
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.features.api.NodeFeatureStatus
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
-import com.wavesplatform.it.{Docker, ReportingTestName}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
+import com.wavesplatform.it.{Docker, ReportingTestName}
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 class PreActivatedFeaturesTestSuite
     extends FreeSpec
@@ -15,7 +15,10 @@ class PreActivatedFeaturesTestSuite
     with ReportingTestName {
   override protected def nodeConfigs: Seq[Config] = PreActivatedFeaturesTestSuite.Configs
 
-  nodes.foreach(n => n.accountBalances(n.address))
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+    nodes.foreach(n => n.accountBalances(n.address))
+  }
 
   "before activation check" in {
     nodes.waitForHeight(PreActivatedFeaturesTestSuite.votingInterval / 2)
@@ -27,7 +30,7 @@ class PreActivatedFeaturesTestSuite
     val otherNodes = nodes.tail.map(_.featureActivationStatus(PreActivatedFeaturesTestSuite.featureNum))
     otherNodes.foreach { s =>
       s.description shouldBe PreActivatedFeaturesTestSuite.featureDescr
-      assertActivatedStatus(s, 0, NodeFeatureStatus.Voted)
+      assertActivatedStatus(s, 0, NodeFeatureStatus.Implemented)
     }
   }
   "on activation height check" in {
@@ -35,18 +38,19 @@ class PreActivatedFeaturesTestSuite
 
     val mainNodeStatus = nodes.head.featureActivationStatus(PreActivatedFeaturesTestSuite.featureNum)
     mainNodeStatus.description shouldBe PreActivatedFeaturesTestSuite.featureDescr
-    assertApprovedStatus(mainNodeStatus, PreActivatedFeaturesTestSuite.votingInterval * 2, NodeFeatureStatus.Voted)
+    mainNodeStatus.blockchainStatus shouldBe BlockchainFeatureStatus.Undefined
+    mainNodeStatus.activationHeight shouldBe None
+    mainNodeStatus.supportingBlocks shouldBe Some(0)
 
     val otherNodes = nodes.tail
     otherNodes.foreach { node =>
       val feature = node.featureActivationStatus(PreActivatedFeaturesTestSuite.featureNum)
       feature.description shouldBe PreActivatedFeaturesTestSuite.featureDescr
-      assertActivatedStatus(feature, 0, NodeFeatureStatus.Voted)
+      assertActivatedStatus(feature, 0, NodeFeatureStatus.Implemented)
 
-      val node1 = docker.restartNode(node.asInstanceOf[Docker.DockerNode])
-
+      val node1    = docker.restartNode(node.asInstanceOf[Docker.DockerNode])
       val feature2 = node1.featureActivationStatus(PreActivatedFeaturesTestSuite.featureNum)
-      assertActivatedStatus(feature2, 0, NodeFeatureStatus.Voted)
+      assertActivatedStatus(feature2, 0, NodeFeatureStatus.Implemented)
     }
   }
   "after activation height check" in {
@@ -54,15 +58,16 @@ class PreActivatedFeaturesTestSuite
 
     val mainNodeStatus = nodes.head.featureActivationStatus(PreActivatedFeaturesTestSuite.featureNum)
     mainNodeStatus.description shouldBe PreActivatedFeaturesTestSuite.featureDescr
-    assertActivatedStatus(mainNodeStatus, PreActivatedFeaturesTestSuite.votingInterval * 2, NodeFeatureStatus.Voted)
+    assertUndefinedStatus(mainNodeStatus, NodeFeatureStatus.Voted)
 
     val otherNodes = nodes.tail.map(_.featureActivationStatus(PreActivatedFeaturesTestSuite.featureNum))
     otherNodes.foreach { s =>
       s.description shouldBe PreActivatedFeaturesTestSuite.featureDescr
-      assertActivatedStatus(s, 0, NodeFeatureStatus.Voted)
+      assertActivatedStatus(s, 0, NodeFeatureStatus.Implemented)
     }
   }
 }
+
 object PreActivatedFeaturesTestSuite {
   import com.wavesplatform.it.NodeConfigs._
   val votingInterval             = 10
@@ -81,17 +86,18 @@ object PreActivatedFeaturesTestSuite {
                                                                 |  blockchain.custom.functionality {
                                                                 |  feature-check-blocks-period = $votingInterval
                                                                 |  pre-activated-features {
-                                                                |        1: 0
-                                                                |        2: 100
-                                                                |        3: 100
-                                                                |        4: 100
-                                                                |        5: 100
-                                                                |        6: 100
-                                                                |        7: 100
-                                                                |        8: 100
-                                                                |        9: 100
-                                                                |        10: 100
-                                                                |        11: 100
+                                                                |        1 = 0
+                                                                |        2 = 100
+                                                                |        3 = 100
+                                                                |        4 = 100
+                                                                |        5 = 100
+                                                                |        6 = 100
+                                                                |        7 = 100
+                                                                |        8 = 100
+                                                                |        9 = 100
+                                                                |        10 = 100
+                                                                |        11 = 100
+                                                                |        15 = 0
                                                                 |      }
                                                                 |  }
                                                                 |  features.supported = [$featureNum]

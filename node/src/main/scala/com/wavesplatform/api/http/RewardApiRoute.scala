@@ -2,46 +2,22 @@ package com.wavesplatform.api.http
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import io.swagger.annotations._
-import javax.ws.rs.Path
 import play.api.libs.json.{Format, Json}
 
-@Path("/blockchain/rewards")
-@Api(value = "rewards")
 case class RewardApiRoute(blockchain: Blockchain) extends ApiRoute {
   import RewardApiRoute._
 
   override lazy val route: Route = pathPrefix("blockchain" / "rewards") {
-    rewards ~ rewardsAtHeight()
+    rewards() ~ rewardsAtHeight()
   }
 
-  @Path("/")
-  @ApiOperation(value = "Current reward status", notes = "Get current miner’s reward status", httpMethod = "GET")
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Json reward status")
-    )
-  )
   def rewards(): Route = (get & pathEndOrSingleSlash) {
     complete(getRewards(blockchain.height))
   }
 
-  @Path("/{height}")
-  @ApiOperation(value = "Reward status", notes = "Get miner’s reward status at height", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "height", value = "Target block height", required = true, dataType = "integer", paramType = "path")
-    )
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Json reward status")
-    )
-  )
   def rewardsAtHeight(): Route = (get & path(IntNumber)) { height =>
     complete(getRewards(height))
   }

@@ -1,5 +1,6 @@
 package com.wavesplatform.http
 
+import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.AliasApiRoute
@@ -24,7 +25,7 @@ class AliasBroadcastRouteSpec
     with NoShrink {
   private[this] val utxPoolSynchronizer = DummyUtxPoolSynchronizer.rejecting(tx => TransactionValidationError(GenericError("foo"), tx))
 
-  val route = AliasApiRoute(restAPISettings, stub[Wallet], utxPoolSynchronizer, stub[Time], stub[Blockchain]).route
+  val route = AliasApiRoute(restAPISettings, stub[CommonTransactionsApi], stub[Wallet], utxPoolSynchronizer, stub[Time], stub[Blockchain]).route
 
   "returns StateCheckFiled" - {
 
@@ -40,7 +41,7 @@ class AliasBroadcastRouteSpec
   "returns appropriate error code when validation fails for" - {
 
     "create alias transaction" in forAll(createAliasReq) { req =>
-      import com.wavesplatform.api.http.alias.SignedCreateAliasV1Request.broadcastAliasV1RequestReadsFormat
+      import com.wavesplatform.api.http.requests.SignedCreateAliasV1Request.jsonFormat
 
       def posting(v: JsValue): RouteTestResult = Post(routePath("create"), v) ~> route
 

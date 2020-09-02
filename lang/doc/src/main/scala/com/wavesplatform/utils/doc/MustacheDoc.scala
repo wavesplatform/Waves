@@ -2,7 +2,7 @@ package com.wavesplatform.utils.doc
 
 import com.wavesplatform.lang.v1.compiler.Types._
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 abstract class TypeDoc {
   val name: String
@@ -32,7 +32,7 @@ object TypeDoc {
     case UNION(Seq(UNIT, l), _) => OptionOf(typeRepr(l)())
     case UNION(Seq(l, UNIT), _) => OptionOf(typeRepr(l)())
     case UNION(l, _)            => UnionDoc(name, l.map(t => typeRepr(t)()).asJava)
-    case CASETYPEREF(_, fields) =>
+    case CASETYPEREF(_, fields, _) =>
       objDoc(name, fields.map(f => Field(f._1, typeRepr(f._2)())).asJava)
     case LIST(t) => ListOf(typeRepr(t)())
     case t       => nativeTypeDoc(t.toString)

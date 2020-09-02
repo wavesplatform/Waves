@@ -28,12 +28,12 @@ import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.{FreeSpec, Matchers, PrivateMethodTester}
+import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with TransactionGen with PrivateMethodTester with DBCacheSettings {
+class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with TransactionGen with DBCacheSettings {
 
   "base target limit" - {
     "node should stop if base target greater than maximum in block creation " in {
@@ -63,9 +63,8 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
             }
           })
 
-          val forgeBlock = PrivateMethod[MinerImpl]('forgeBlock)
           try {
-            miner invokePrivate forgeBlock(account)
+            miner.forgeBlock(account)
           } catch {
             case _: SecurityException => // NOP
           }
@@ -115,7 +114,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
   }
 
   def withEnv(f: Env => Unit): Unit = {
-    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
+    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
 
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val minerSettings = settings0.minerSettings.copy(quorum = 0)
@@ -132,8 +131,8 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
       featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
     )
 
-    val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
-    val pos = new PoSSelector(bcu, settings.blockchainSettings, settings.synchronizationSettings)
+    val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
+    val pos = PoSSelector(bcu, settings.synchronizationSettings)
 
     val utxPoolStub                        = new UtxPoolImpl(ntpTime, bcu, ignoreSpendableBalanceChanged, settings0.utxSettings)
     val schedulerService: SchedulerService = Scheduler.singleThread("appender")
@@ -146,11 +145,11 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
           .containerOfN[Array, Byte](32, Arbitrary.arbitrary[Byte])
           .map(bs => KeyPair(bs))
           .map { account =>
-            val tx           = GenesisTransaction.create(account, ENOUGH_AMT, ts + 1).explicitGet()
+            val tx           = GenesisTransaction.create(account.toAddress, ENOUGH_AMT, ts + 1).explicitGet()
             val genesisBlock = TestBlock.create(ts + 2, List(tx))
             val secondBlock = TestBlock.create(
               ts + 3,
-              genesisBlock.uniqueId,
+              genesisBlock.id(),
               Seq.empty,
               account
             )
@@ -159,7 +158,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
           .sample
           .get
 
-      bcu.processBlock(firstBlock).explicitGet()
+      bcu.processBlock(firstBlock, firstBlock.header.generationSignature).explicitGet()
 
       f(Env(settings, pos, bcu, utxPoolStub, schedulerService, account, secondBlock))
 
@@ -176,7 +175,7 @@ object BlockWithMaxBaseTargetTest {
   final case class Env(
       settings: WavesSettings,
       pos: PoSSelector,
-      bcu: BlockchainUpdater with NG,
+      bcu: Blockchain with BlockchainUpdater with NG,
       utxPool: UtxPoolImpl,
       schedulerService: SchedulerService,
       miner: KeyPair,

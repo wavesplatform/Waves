@@ -3,12 +3,14 @@ package com.wavesplatform.lang.v1.repl
 import cats.Monad
 import cats.data.EitherT
 import cats.implicits._
+import com.wavesplatform.lang.v1.compiler.CompilerContext.VariableInfo
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.compiler.Types.{FINAL, UNIT}
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, FunctionTypeSignature, LazyVal}
 import com.wavesplatform.lang.v1.parser.Expressions.EXPR
+import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.repl.Implicits._
 import com.wavesplatform.lang.v1.traits.Environment
@@ -25,7 +27,7 @@ class ReplEngine[F[_] : Monad] {
       for {
         parsed                              <- EitherT.fromEither[F](parse(expr))
         (newCompileCtx, compiled, exprType) <- EitherT.fromEither[F](ExpressionCompiler.applyWithCtx(compileCtx, parsed))
-        evaluated                           <- EitherT(evaluator.applyWithCtx(evalCtx, compiled))
+        evaluated                           <- EitherT(evaluator.applyWithCtx(evalCtx, compiled)).leftMap(error => if (error.isEmpty) "Evaluation error" else error)
       } yield resultWithCtx(evaluated, compileCtx, newCompileCtx, exprType)
 
     r.value
@@ -34,7 +36,7 @@ class ReplEngine[F[_] : Monad] {
   private def parse(expr: String): Either[String, EXPR] =
     Parser.parseExprOrDecl(expr)
       .fold(
-        { case (_, _, err) => Left(err.traced.toString) },
+        { case _           => Left(s"Can't parse '$expr'") },
         { case (result, _) => Right(result) }
       )
 
@@ -86,12 +88,12 @@ class ReplEngine[F[_] : Monad] {
 
     val mappedFuncs =
       for {
-        (name, overloads) <- funcs
+        (name, overloads) <- funcs.toSeq.sortBy(_._1)
         signature         <- overloads
       } yield DeclPrinter.declaredFuncStr(name, signature)
 
     val mappedLets =
-      lets.map { case (name, t) => DeclPrinter.declaredLetStr(name, t) }
+      lets.toSeq.sortBy(_._1).map { case (name, t) => DeclPrinter.declaredLetStr(name, t) }
 
     val evalStr =
       resultO.fold("") { case (name, t, result) => s"$name: $t = ${result.prettyString(0)}" }
@@ -108,11 +110,11 @@ class ReplEngine[F[_] : Monad] {
   ): (Set[(String, FINAL)], Set[(String, List[FunctionTypeSignature])]) = {
     val newLets =
       (newCompileCtx.varDefs.keySet diff compileCtx.varDefs.keySet)
-        .map(n => (n, newCompileCtx.varDefs(n)))
+        .map(n => (n, newCompileCtx.varDefs(n).vType))
 
     val newFuncs =
       (newCompileCtx.functionDefs.keySet diff compileCtx.functionDefs.keySet)
-        .map(n => (n, newCompileCtx.functionDefs(n)))
+        .map(n => (n, newCompileCtx.functionDefs(n).fSigList))
 
     (newLets, newFuncs)
   }
@@ -124,7 +126,7 @@ class ReplEngine[F[_] : Monad] {
   ): (CompilerContext, EvaluationContext[Environment, F]) = {
     val (name, t, value) = result
     (
-      compileCtx.copy(varDefs = compileCtx.varDefs + (name -> t)),
+      compileCtx.copy(varDefs = compileCtx.varDefs + (name -> VariableInfo(AnyPos, t))),
       evalCtx.copy(letDefs = evalCtx.letDefs + (name -> LazyVal.fromEvaluated(value)))
     )
   }

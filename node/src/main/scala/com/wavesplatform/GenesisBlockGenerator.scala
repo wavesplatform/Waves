@@ -1,7 +1,6 @@
 package com.wavesplatform
 
 import java.io.{File, FileNotFoundException}
-import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 
 import com.typesafe.config.ConfigFactory
@@ -9,10 +8,10 @@ import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto._
 import com.wavesplatform.settings.{GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.utils._
 import com.wavesplatform.wallet.Wallet
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
@@ -51,7 +50,7 @@ object GenesisBlockGenerator extends App {
                              accountAddress: Address)
 
   private def toFullAddressInfo(item: DistributionItem): FullAddressInfo = {
-    val seedHash = item.seedText.getBytes("UTF-8")
+    val seedHash = item.seedText.utf8Bytes
     val acc      = Wallet.generateNewAccount(seedHash, item.nonce)
 
     FullAddressInfo(
@@ -73,7 +72,7 @@ object GenesisBlockGenerator extends App {
     .map(new File(_).getAbsoluteFile.ensuring(f => !f.isDirectory && f.getParentFile.isDirectory || f.getParentFile.mkdirs()))
 
   val settings: Settings = {
-    implicit val _ = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
+    import net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
     ConfigFactory.parseFile(inputConfFile).as[Settings]("genesis-generator")
   }
 
@@ -92,7 +91,7 @@ object GenesisBlockGenerator extends App {
 
   val genesisTxs: Seq[GenesisTransaction] = shares.map {
     case (_, addrInfo, part) =>
-      GenesisTransaction(addrInfo.accountAddress, part, timestamp, ByteStr.empty)
+      GenesisTransaction(addrInfo.accountAddress, part, timestamp, ByteStr.empty, settings.chainId)
   }
 
   val genesisBlock: Block = {
@@ -104,21 +103,22 @@ object GenesisBlockGenerator extends App {
         version = 1,
         timestamp = timestamp,
         reference = reference,
-        consensusData = NxtLikeConsensusBlockData(settings.baseTarget, ByteStr(Array.fill(crypto.DigestSize)(0: Byte))),
-        transactionData = genesisTxs,
+        settings.baseTarget,
+        ByteStr(Array.fill(crypto.DigestLength)(0: Byte)),
+        txs = genesisTxs,
         signer = genesisSigner,
-        featureVotes = Set.empty,
+        featureVotes = Seq.empty,
         rewardVote = -1L
       )
       .explicitGet()
   }
 
-  val signature = genesisBlock.signerData.signature
+  val signature = genesisBlock.signature
 
   report(
     addrInfos = shares.map(x => (x._1, x._2)),
     settings = GenesisSettings(
-      genesisBlock.timestamp,
+      genesisBlock.header.timestamp,
       timestamp,
       settings.initialBalance,
       Some(signature),
@@ -147,14 +147,14 @@ object GenesisBlockGenerator extends App {
     }
 
     val confBody = s"""genesis {
-         |  average-block-delay: ${settings.averageBlockDelay.toMillis}ms
-         |  initial-base-target: ${settings.initialBaseTarget}
-         |  timestamp: ${settings.timestamp}
-         |  block-timestamp: ${settings.blockTimestamp}
-         |  signature: "${settings.signature.get}"
-         |  initial-balance: ${settings.initialBalance}
+         |  average-block-delay = ${settings.averageBlockDelay.toMillis}ms
+         |  initial-base-target = ${settings.initialBaseTarget}
+         |  timestamp = ${settings.timestamp}
+         |  block-timestamp = ${settings.blockTimestamp}
+         |  signature = "${settings.signature.get}"
+         |  initial-balance = ${settings.initialBalance}
          |  transactions = [
-         |    ${settings.transactions.map(x => s"""{recipient: "${x.recipient}", amount: ${x.amount}}""").mkString(",\n    ")}
+         |    ${settings.transactions.map(x => s"""{recipient = "${x.recipient}", amount = ${x.amount}}""").mkString(",\n    ")}
          |  ]
          |}
          |""".stripMargin
@@ -162,6 +162,6 @@ object GenesisBlockGenerator extends App {
     output.append("Settings:\n")
     output.append(confBody)
     System.out.print(output.result())
-    outputConfFile.foreach(ocf => Files.write(ocf.toPath, confBody.getBytes(StandardCharsets.UTF_8)))
+    outputConfFile.foreach(ocf => Files.write(ocf.toPath, confBody.utf8Bytes))
   }
 }

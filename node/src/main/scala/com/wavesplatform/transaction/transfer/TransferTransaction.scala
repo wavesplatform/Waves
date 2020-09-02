@@ -1,81 +1,108 @@
 package com.wavesplatform.transaction.transfer
 
-import cats.implicits._
-import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.account.AddressOrAlias
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.account._
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.serialization.impl.TransferTxSerializer
 import com.wavesplatform.transaction.validation._
+import com.wavesplatform.transaction.validation.impl.TransferTxValidator
 import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.JsObject
 
-trait TransferTransaction extends ProvenTransaction with VersionedTransaction {
-  def assetId: Asset
-  def recipient: AddressOrAlias
-  def amount: Long
-  def feeAssetId: Asset
-  def fee: Long
-  def attachment: Array[Byte]
-  def version: Byte
+import scala.util.Try
 
-  override val assetFee: (Asset, Long) = (feeAssetId, fee)
+case class TransferTransaction(
+    version: TxVersion,
+    sender: PublicKey,
+    recipient: AddressOrAlias,
+    assetId: Asset,
+    amount: TxAmount,
+    feeAssetId: Asset,
+    fee: TxAmount,
+    attachment: ByteStr,
+    timestamp: TxTimestamp,
+    proofs: Proofs,
+    chainId: Byte
+) extends VersionedTransaction
+    with SigProofsSwitch
+    with FastHashId
+    with TxWithFee.InCustomAsset
+    with LegacyPBSwitch.V3 {
 
-  override final val json: Coeval[JsObject] = Coeval.evalOnce(
-    jsonBase() ++ Json.obj(
-      "version"    -> version,
-      "recipient"  -> recipient.stringRepr,
-      "assetId"    -> assetId.maybeBase58Repr,
-      "feeAsset"   -> feeAssetId.maybeBase58Repr, // legacy v0.11.1 compat
-      "amount"     -> amount,
-      "attachment" -> Base58.encode(attachment)
-    ))
+  override val typeId: TxType = TransferTransaction.typeId
 
-  final protected val bytesBase: Coeval[Array[Byte]] = Coeval.evalOnce {
-    val timestampBytes  = Longs.toByteArray(timestamp)
-    val assetIdBytes    = assetId.byteRepr
-    val feeAssetIdBytes = feeAssetId.byteRepr
-    val amountBytes     = Longs.toByteArray(amount)
-    val feeBytes        = Longs.toByteArray(fee)
+  val bodyBytes: Coeval[TxByteArray] = Coeval.evalOnce(TransferTransaction.serializer.bodyBytes(this))
+  val bytes: Coeval[TxByteArray]     = Coeval.evalOnce(TransferTransaction.serializer.toBytes(this))
+  final val json: Coeval[JsObject]   = Coeval.evalOnce(TransferTransaction.serializer.toJson(this))
 
-    Bytes.concat(
-      sender,
-      assetIdBytes,
-      feeAssetIdBytes,
-      timestampBytes,
-      amountBytes,
-      feeBytes,
-      recipient.bytes.arr,
-      Deser.serializeArray(attachment)
-    )
-  }
-  override def checkedAssets(): Seq[IssuedAsset] = assetId match {
-    case Waves => Seq()
+  override def checkedAssets: Seq[IssuedAsset] = assetId match {
     case a: IssuedAsset => Seq(a)
+    case Waves          => Nil
   }
+
+  override def builder: TransactionParser = TransferTransaction
 }
 
-object TransferTransaction {
-
-  val typeId: Byte = 4
+object TransferTransaction extends TransactionParser {
+  type TransactionT = TransferTransaction
 
   val MaxAttachmentSize            = 140
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)
 
-  def validate(tx: TransferTransaction): Either[ValidationError, Unit] = {
-    validate(tx.amount, tx.assetId, tx.fee, tx.feeAssetId, tx.attachment)
-  }
+  val typeId: TxType                    = 4: Byte
+  val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
 
-  def validate(amt: Long, maybeAmtAsset: Asset, feeAmt: Long, maybeFeeAsset: Asset, attachment: Array[Byte]): Either[ValidationError, Unit] = {
-    (
-      validateAmount(amt, maybeAmtAsset.maybeBase58Repr.getOrElse("waves")),
-      validateFee(feeAmt),
-      validateAttachment(attachment)
-    ).mapN { case _ => () }
-      .toEither
-      .leftMap(_.head)
-  }
+  implicit val validator: TxValidator[TransferTransaction] = TransferTxValidator
+
+  implicit def sign(tx: TransferTransaction, privateKey: PrivateKey): TransferTransaction =
+    tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
+
+  val serializer = TransferTxSerializer
+
+  override def parseBytes(bytes: TxByteArray): Try[TransferTransaction] = serializer.parseBytes(bytes)
+
+  def create(
+      version: TxVersion,
+      sender: PublicKey,
+      recipient: AddressOrAlias,
+      asset: Asset,
+      amount: TxAmount,
+      feeAsset: Asset,
+      fee: TxAmount,
+      attachment: ByteStr,
+      timestamp: TxTimestamp,
+      proofs: Proofs
+  ): Either[ValidationError, TransferTransaction] =
+    TransferTransaction(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, proofs, recipient.chainId).validatedEither
+
+  def signed(
+      version: TxVersion,
+      sender: PublicKey,
+      recipient: AddressOrAlias,
+      asset: Asset,
+      amount: TxAmount,
+      feeAsset: Asset,
+      fee: TxAmount,
+      attachment: ByteStr,
+      timestamp: TxTimestamp,
+      signer: PrivateKey
+  ): Either[ValidationError, TransferTransaction] =
+    create(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, Proofs.empty).map(_.signWith(signer))
+
+  def selfSigned(
+      version: TxVersion,
+      sender: KeyPair,
+      recipient: AddressOrAlias,
+      asset: Asset,
+      amount: TxAmount,
+      feeAsset: Asset,
+      fee: TxAmount,
+      attachment: ByteStr,
+      timestamp: TxTimestamp
+  ): Either[ValidationError, TransferTransaction] =
+    signed(version, sender.publicKey, recipient, asset, amount, feeAsset, fee, attachment, timestamp, sender.privateKey)
 }

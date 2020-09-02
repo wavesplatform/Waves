@@ -1,36 +1,58 @@
 package com.wavesplatform
 
+import java.lang.reflect.Constructor
+
 import com.wavesplatform.account.{PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.utils._
+import org.whispersystems.curve25519.OpportunisticCurve25519Provider
 import scorex.crypto.hash.{Blake2b256, Keccak256}
 import scorex.crypto.signatures.{Curve25519, Signature, PrivateKey => SPrivateKey, PublicKey => SPublicKey}
 
+import scala.util.Try
+
 package object crypto {
+  // Constants
   val SignatureLength: Int = Curve25519.SignatureLength
   val KeyLength: Int       = Curve25519.KeyLength
+  val DigestLength: Int    = 32
 
-  val DigestSize: Int = 32
+  // Additional provider
+  private val provider: OpportunisticCurve25519Provider = {
+    val constructor = classOf[OpportunisticCurve25519Provider].getDeclaredConstructors.head
+      .asInstanceOf[Constructor[OpportunisticCurve25519Provider]]
+    constructor.setAccessible(true)
+    constructor.newInstance()
+  }
 
-  def fastHash(m: Array[Byte]): Array[Byte] = Blake2b256.hash(m)
-
-  def fastHash(s: String): Array[Byte] = fastHash(s.getBytes("UTF-8"))
-
+  // Digests
+  def fastHash(m: Array[Byte]): Array[Byte]   = Blake2b256.hash(m)
+  def fastHash(s: String): Array[Byte]        = fastHash(s.utf8Bytes)
   def secureHash(m: Array[Byte]): Array[Byte] = Keccak256.hash(Blake2b256.hash(m))
+  def secureHash(s: String): Array[Byte]      = secureHash(s.utf8Bytes)
 
-  def secureHash(s: String): Array[Byte] = secureHash(s.getBytes("UTF-8"))
+  // Signatures
+  def sign(account: PrivateKey, message: Array[Byte]): ByteStr =
+    ByteStr(Curve25519.sign(SPrivateKey(account.arr), message))
 
-  def sign(account: PrivateKey, message: ByteStr): ByteStr =
-    Curve25519.sign(SPrivateKey(account.arr), message)
+  def signVRF(account: PrivateKey, message: Array[Byte]): ByteStr =
+    ByteStr(provider.calculateVrfSignature(provider.getRandom(DigestLength), account.arr, message))
 
-  def verify(signature: ByteStr, message: ByteStr, publicKey: PublicKey): Boolean =
+  def verify(signature: ByteStr, message: Array[Byte], publicKey: PublicKey): Boolean =
     Curve25519.verify(Signature(signature.arr), message, SPublicKey(publicKey.arr))
+
+  def verifyVRF(signature: ByteStr, message: Array[Byte], publicKey: PublicKey): Either[ValidationError, ByteStr] =
+    Try(ByteStr(provider.verifyVrfSignature(publicKey.arr, message, signature.arr))).toEither.left
+      .map(_ => GenericError("Could not verify VRF proof"))
 
   def createKeyPair(seed: Array[Byte]): (Array[Byte], Array[Byte]) = Curve25519.createKeyPair(seed)
 
   // see
   // https://github.com/jedisct1/libsodium/blob/ab4ab23d5744a8e060864a7cec1a7f9b059f9ddd/src/libsodium/crypto_scalarmult/curve25519/ref10/x25519_ref10.c#L17
   // https://boringssl.googlesource.com/boringssl/+/master/third_party/wycheproof_testvectors/x25519_test.json
-  private val blacklist: Array[Array[Byte]] = Array(
+  private[this] val BlacklistedKeys: Array[Array[Byte]] = Array(
     // 0 (order 4)
     Array(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00),
@@ -55,8 +77,8 @@ package object crypto {
   ).map(_.map(_.toByte))
 
   def isWeakPublicKey(publicKey: Array[Byte]): Boolean =
-    blacklist.exists { wk =>
-      publicKey.view.init == wk.view.init &&
+    BlacklistedKeys.exists { wk =>
+      publicKey.view.init.iterator.sameElements(wk.view.init) &&
       (publicKey.last == wk.last || (publicKey.last & 0xff) == wk.last + 0x80)
     }
 }

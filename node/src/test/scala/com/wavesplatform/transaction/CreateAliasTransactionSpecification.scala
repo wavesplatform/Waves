@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.account.{KeyPair, PublicKey, Alias}
+import com.wavesplatform.account.{Alias, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import org.scalatest._
@@ -27,8 +27,8 @@ class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks w
   property("The same aliases from different senders have the same id") {
     forAll(accountGen, accountGen, aliasGen, timestampGen) {
       case (a1: KeyPair, a2: KeyPair, a: Alias, t: Long) =>
-        val tx1 = CreateAliasTransactionV1.selfSigned(a1, a, MinIssueFee, t).explicitGet()
-        val tx2 = CreateAliasTransactionV1.selfSigned(a2, a, MinIssueFee, t).explicitGet()
+        val tx1 = CreateAliasTransaction.selfSigned(1.toByte, a1, a, MinIssueFee, t).explicitGet()
+        val tx2 = CreateAliasTransaction.selfSigned(1.toByte, a2, a, MinIssueFee, t).explicitGet()
         tx1.id() shouldBe tx2.id()
     }
   }
@@ -49,16 +49,9 @@ class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks w
                         }
     """)
 
-    val tx = CreateAliasTransactionV1
-      .create(
-        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-        Alias.create("myalias").explicitGet(),
-        100000,
-        1526910778245L,
-        ByteStr.decodeBase58("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").get
-      )
-      .right
-      .get
+    val tx = CreateAliasTransaction
+      .create(Transaction.V1, PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(), "myalias", 100000, 1526910778245L, Proofs(ByteStr.decodeBase58("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").get))
+      .explicitGet()
 
     js shouldEqual tx.json()
   }
@@ -80,16 +73,9 @@ class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks w
                         }
     """)
 
-    val tx = CreateAliasTransactionV2
-      .create(
-        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-        Alias.create("myalias").explicitGet(),
-        100000,
-        1526910778245L,
-        Proofs(Seq(ByteStr.decodeBase58("26U7rQTwpdma5GYSZb5bNygVCtSuWL6DKet1Nauf5J57v19mmfnq434YrkKYJqvYt2ydQBUT3P7Xgj5ZVDVAcc5k").get))
-      )
-      .right
-      .get
+    val tx = CreateAliasTransaction
+      .create(Transaction.V2, PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(), "myalias", 100000, 1526910778245L, Proofs(Seq(ByteStr.decodeBase58("26U7rQTwpdma5GYSZb5bNygVCtSuWL6DKet1Nauf5J57v19mmfnq434YrkKYJqvYt2ydQBUT3P7Xgj5ZVDVAcc5k").get)))
+      .explicitGet()
 
     js shouldEqual tx.json()
   }

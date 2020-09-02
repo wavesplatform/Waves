@@ -8,7 +8,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.utils.Implicits._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -53,11 +53,12 @@ object Gen {
         case BooleanDataEntry(key, _)     => s"""extract(getBoolean(oracle, "$key"))"""
         case BinaryDataEntry(key, value)  => s"""(extract(getBinary(oracle, "$key")) == $value)"""
         case StringDataEntry(key, value)  => s"""(extract(getString(oracle, "$key")) == "$value")"""
+        case EmptyDataEntry(_) => ???
       } reduce [String] { case (l, r) => s"$l && $r " }
 
     val src =
       s"""
-         |let oracle = Address(base58'${oracle.stringRepr}')
+         |let oracle = Address(base58'${oracle.toAddress}')
          |
          |match tx {
          |  case _: SetScriptTransaction => true
@@ -75,7 +76,7 @@ object Gen {
     val keyLets =
       accountsWithIndexes map {
         case (acc, i) =>
-          s"let accountPK$i = base58'${ByteStr(acc.publicKey).base58}'"
+          s"let accountPK$i = base58'${acc.publicKey}'"
       } mkString "\n"
 
     val signedLets =
@@ -123,7 +124,7 @@ object Gen {
       .zipWithIndex
       .map {
         case (((src, dst), fee), i) =>
-          TransferTransactionV2.selfSigned(Waves, src, dst, fee, now + i, Waves, fee, Array.emptyByteArray)
+          TransferTransaction.selfSigned(2.toByte, src, dst, Waves, fee, Waves, fee, ByteStr.empty, now + i)
       }
       .collect { case Right(x) => x }
   }
@@ -138,7 +139,7 @@ object Gen {
         case ((sender, count), i) =>
           val transfers = List.tabulate(count)(_ => ParsedTransfer(recipientGen.next(), amountGen.next()))
           val fee       = 100000 + count * 50000
-          MassTransferTransaction.selfSigned(Waves, sender, transfers, now + i, fee, Array.emptyByteArray)
+          MassTransferTransaction.selfSigned(1.toByte, sender, Waves, transfers, fee, now + i, ByteStr.empty)
       }
       .collect { case Right(tx) => tx }
   }

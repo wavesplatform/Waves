@@ -1,42 +1,58 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
-import com.wavesplatform.RequestGen
+import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets._
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.api.http.requests.{SignedTransferV1Request, SignedTransferV2Request}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction}
-import com.wavesplatform.utils.Time
+import com.wavesplatform.utils.{Time, _}
 import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{NoShrink, RequestGen}
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json.{JsObject, JsValue, Json, Writes}
+import play.api.libs.json._
 
 class AssetsBroadcastRouteSpec
     extends RouteSpec("/assets/broadcast/")
     with RequestGen
     with PathMockFactory
     with PropertyChecks
-    with RestAPISettingsHelper {
+    with RestAPISettingsHelper
+    with NoShrink {
 
   private[this] val route = AssetsApiRoute(
     restAPISettings,
     stub[Wallet],
     DummyUtxPoolSynchronizer.rejecting(tx => TransactionValidationError(GenericError("foo"), tx)),
     stub[Blockchain],
-    stub[Time]
+    stub[Time],
+    stub[CommonAccountsApi],
+    stub[CommonAssetsApi]
   ).route
+
+  private[this] val fixedIssueGen = for {
+    (sender, _, _, quantity, decimals, reissuable, fee, timestamp) <- issueParamGen
+    nameLength                                                     <- G.choose(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
+    name                                                           <- G.listOfN(nameLength, G.alphaNumChar)
+    description                                                    <- G.listOfN(IssueTransaction.MaxAssetDescriptionLength, G.alphaNumChar)
+    tx                                                             <- createLegacyIssue(sender, name.mkString.utf8Bytes, description.mkString.utf8Bytes, quantity, decimals, reissuable, fee, timestamp)
+  } yield tx
 
   "returns StateCheckFailed" - {
     val vt = Table[String, G[_ <: Transaction], JsValue => JsValue](
       ("url", "generator", "transform"),
-      ("issue", issueGen.retryUntil(_.version == 1), identity),
+      ("issue", fixedIssueGen, identity),
       ("reissue", reissueGen.retryUntil(_.version == 1), identity),
       ("burn", burnGen.retryUntil(_.version == 1), {
         case o: JsObject => o ++ Json.obj("quantity" -> o.value("amount"))
@@ -111,7 +127,7 @@ class AssetsBroadcastRouteSpec
           posting(br.copy(senderPublicKey = pk)) should produce(InvalidAddress)
         }
         forAll(nonPositiveLong) { q =>
-          posting(br.copy(quantity = q)) should produce(NegativeAmount(s"$q of assets"))
+          posting(br.copy(amount = q)) should produce(NegativeAmount(s"$q of assets"))
         }
         forAll(nonPositiveLong) { fee =>
           posting(br.copy(fee = fee)) should produce(InsufficientFee())
@@ -133,13 +149,19 @@ class AssetsBroadcastRouteSpec
           posting(tr.copy(recipient = a)) should produce(InvalidAddress)
         }
         forAll(invalidBase58) { a =>
-          posting(tr.copy(assetId = Some(a))) should produce(CustomValidationError("invalid.assetId"))
+          posting(tr.copy(assetId = Some(a))) should produce(
+            WrongJson(errors = Seq(JsPath \ "assetId" -> Seq(JsonValidationError(s"Too long assetId: length of $a exceeds 44"))))
+          )
         }
         forAll(invalidBase58) { a =>
-          posting(tr.copy(feeAssetId = Some(a))) should produce(CustomValidationError("invalid.feeAssetId"))
+          posting(tr.copy(feeAssetId = Some(a))) should produce(
+            WrongJson(errors = Seq(JsPath \ "feeAssetId" -> Seq(JsonValidationError(s"Too long assetId: length of $a exceeds 44"))))
+          )
         }
         forAll(longAttachment) { a =>
-          posting(tr.copy(attachment = Some(a))) should produce(CustomValidationError("invalid.attachment"))
+          posting(tr.copy(attachment = Some(a))) should produce(
+            WrongJson(errors = Seq(JsPath \ "attachment" -> Seq(JsonValidationError(s"Length ${a.length} exceeds maximum length of 192"))))
+          )
         }
         forAll(nonPositiveLong) { fee =>
           posting(tr.copy(fee = fee)) should produce(InsufficientFee())
@@ -149,43 +171,50 @@ class AssetsBroadcastRouteSpec
   }
 
   "compatibility" - {
-    val route = AssetsApiRoute(restAPISettings, stub[Wallet], DummyUtxPoolSynchronizer.accepting, stub[Blockchain], stub[Time]).route
+    val route = AssetsApiRoute(
+      restAPISettings,
+      stub[Wallet],
+      DummyUtxPoolSynchronizer.accepting,
+      stub[Blockchain],
+      stub[Time],
+      stub[CommonAccountsApi],
+      stub[CommonAssetsApi]
+    ).route
 
     val seed               = "seed".getBytes("UTF-8")
     val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)
     val receiverPrivateKey = Wallet.generateNewAccount(seed, 1)
 
     val transferRequest = createSignedTransferRequest(
-      TransferTransactionV1
+      TransferTransaction
         .selfSigned(
-          assetId = Asset.Waves,
-          sender = senderPrivateKey,
-          recipient = receiverPrivateKey.toAddress,
-          amount = 1 * Waves,
-          timestamp = System.currentTimeMillis(),
-          feeAssetId = Asset.Waves,
-          feeAmount = Waves / 3,
-          attachment = Array.emptyByteArray
+          1.toByte,
+          senderPrivateKey,
+          receiverPrivateKey.toAddress,
+          Asset.Waves,
+          1.waves,
+          Asset.Waves,
+          0.3.waves,
+          ByteStr.empty,
+          System.currentTimeMillis()
         )
-        .right
-        .get
+        .explicitGet()
     )
 
     val versionedTransferRequest = createSignedVersionedTransferRequest(
-      TransferTransactionV2
-        .create(
-          assetId = Asset.Waves,
-          sender = senderPrivateKey,
-          recipient = receiverPrivateKey.toAddress,
-          amount = 1 * Waves,
-          timestamp = System.currentTimeMillis(),
-          feeAssetId = Asset.Waves,
-          feeAmount = Waves / 3,
-          attachment = Array.emptyByteArray,
-          proofs = Proofs(Seq.empty)
-        )
-        .right
-        .get
+      TransferTransaction(
+        version = 2.toByte,
+        sender = senderPrivateKey.publicKey,
+        recipient = receiverPrivateKey.toAddress,
+        assetId = Asset.Waves,
+        amount = 1.waves,
+        feeAssetId = Asset.Waves,
+        fee = 0.3.waves,
+        attachment = ByteStr.empty,
+        timestamp = System.currentTimeMillis(),
+        proofs = Proofs(Seq.empty),
+        chainId = receiverPrivateKey.toAddress.chainId
+      )
     )
 
     "/transfer" - {
@@ -193,48 +222,47 @@ class AssetsBroadcastRouteSpec
 
       "accepts TransferRequest" in posting(transferRequest) ~> check {
         status shouldBe StatusCodes.OK
-        responseAs[TransferTransactions].select[TransferTransactionV1] shouldBe defined
+        responseAs[TransferTransaction].version shouldBe 1.toByte
       }
 
       "accepts VersionedTransferRequest" in posting(versionedTransferRequest) ~> check {
         status shouldBe StatusCodes.OK
-        responseAs[TransferTransactions].select[TransferTransactionV2] shouldBe defined
+        responseAs[TransferTransaction].version shouldBe 2.toByte
       }
 
       "returns a error if it is not a transfer request" in posting(issueReq.sample.get) ~> check {
         status shouldBe StatusCodes.BadRequest
       }
     }
-
   }
 
-  protected def createSignedTransferRequest(tx: TransferTransactionV1): SignedTransferV1Request = {
+  protected def createSignedTransferRequest(tx: TransferTransaction): SignedTransferV1Request = {
     import tx._
     SignedTransferV1Request(
-      Base58.encode(tx.sender),
+      Base58.encode(tx.sender.arr),
       assetId.maybeBase58Repr,
       recipient.stringRepr,
       amount,
       fee,
       feeAssetId.maybeBase58Repr,
       timestamp,
-      attachment.headOption.map(_ => Base58.encode(attachment)),
-      signature.base58
+      Some(Base58.encode(attachment.arr)),
+      proofs.toSignature.toString
     )
   }
 
-  protected def createSignedVersionedTransferRequest(tx: TransferTransactionV2): SignedTransferV2Request = {
+  protected def createSignedVersionedTransferRequest(tx: TransferTransaction): SignedTransferV2Request = {
     import tx._
     SignedTransferV2Request(
-      Base58.encode(tx.sender),
+      Base58.encode(tx.sender.arr),
       assetId.maybeBase58Repr,
       recipient.stringRepr,
       amount,
       feeAssetId.maybeBase58Repr,
       fee,
       timestamp,
-      attachment.headOption.map(_ => Base58.encode(attachment)),
-      proofs.proofs.map(_.base58)
+      Some(Base58.encode(attachment.arr)),
+      proofs.proofs.map(_.toString).toList
     )
   }
 

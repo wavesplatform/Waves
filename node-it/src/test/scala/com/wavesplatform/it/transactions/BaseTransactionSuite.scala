@@ -7,14 +7,11 @@ import com.wavesplatform.it._
 import monix.eval.Coeval
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Suite}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.ExecutionContext
 
-trait BaseTransactionSuiteLike
-    extends WaitForHeight2
-    with IntegrationSuiteWithThreeAddresses
-    with BeforeAndAfterAll
-    with NodesFromDocker { this: Suite =>
+trait BaseTransactionSuiteLike extends WaitForHeight2 with IntegrationSuiteWithThreeAddresses with BeforeAndAfterAll with NodesFromDocker {
+  this: Suite =>
 
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
 
@@ -27,8 +24,11 @@ trait BaseTransactionSuiteLike
 
   override def miner: Node = nodes.head
 
+  private var istRunning = false
+
   // protected because https://github.com/sbt/zinc/issues/292
-  protected val theNodes: Coeval[Seq[Node]] = Coeval.evalOnce {
+  protected lazy val theNodes: Coeval[Seq[Node]] = Coeval.evalOnce {
+    require(istRunning, "Do not attempt to access node instances from suite constructors")
     Option(System.getProperty("waves.it.config.file")) match {
       case None => dockerNodes()
       case Some(filePath) =>
@@ -37,6 +37,7 @@ trait BaseTransactionSuiteLike
           .parseFile(new File(filePath))
           .getConfigList("nodes")
           .asScala
+          .toSeq
           .map(cfg => new ExternalNode(cfg.withFallback(defaultConfig).resolve()))
     }
   }
@@ -44,7 +45,8 @@ trait BaseTransactionSuiteLike
   override protected def nodes: Seq[Node] = theNodes()
 
   protected override def beforeAll(): Unit = {
-    theNodes.run
+    istRunning = true
+    theNodes.run()
     super.beforeAll()
   }
 }

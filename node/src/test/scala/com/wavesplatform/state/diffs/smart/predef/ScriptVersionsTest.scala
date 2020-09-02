@@ -13,7 +13,6 @@ import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.utils.EmptyBlockchain
-import fastparse.core.Parsed.Success
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -22,14 +21,14 @@ import shapeless.Coproduct
 class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with TransactionGen {
   def eval[T <: EVALUATED](script: String,
                            version: StdLibVersion,
-                           tx: Transaction = null,
+                           tx: Transaction = transferV2Gen.sample.get,
                            blockchain: Blockchain = EmptyBlockchain): Either[String, EVALUATED] = {
-    val Success(expr, _) = Parser.parseExpr(script)
+    val expr = Parser.parseExpr(script).get.value
     for {
       compileResult <- ExpressionCompiler(compilerContext(version, Expression, isAssetScript = false), expr)
       (typedExpr, _) = compileResult
       s <- ExprScript(version, typedExpr, checkSize = false)
-      r <- ScriptRunner(blockchain.height, Coproduct(tx), blockchain, s, isAssetScript = false, null)._2
+      r <- ScriptRunner(Coproduct(tx), blockchain, s, isAssetScript = false, null)._2
     } yield r
 
   }
@@ -37,7 +36,7 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
   val duplicateNames =
     """
       |match tx {
-      |  case tx: TransferTransaction => true
+      |  case _: TransferTransaction => true
       |  case _ => false
       |}
     """.stripMargin

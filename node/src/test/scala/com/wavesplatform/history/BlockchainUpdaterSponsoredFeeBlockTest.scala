@@ -1,10 +1,11 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
@@ -12,6 +13,7 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, GenesisTransaction}
+import com.wavesplatform.{EitherMatchers, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -21,87 +23,91 @@ class BlockchainUpdaterSponsoredFeeBlockTest
     with PropertyChecks
     with DomainScenarioDrivenPropertyCheck
     with Matchers
+    with EitherMatchers
     with TransactionGen {
 
   private val amtTx = 100000
 
   type Setup =
-    (GenesisTransaction,
-     TransferTransactionV1,
-     IssueTransaction,
-     SponsorFeeTransaction,
-     TransferTransactionV1,
-     TransferTransactionV1,
-     TransferTransactionV1)
+    (GenesisTransaction, TransferTransaction, IssueTransaction, SponsorFeeTransaction, TransferTransaction, TransferTransaction, TransferTransaction)
 
   val sponsorPreconditions: Gen[Setup] = for {
 
     master                      <- accountGen
     ts                          <- timestampGen
     transferAssetWavesFee       <- smallFeeGen
-    sponsor                     <- accountGen
+    _                           <- accountGen
     alice                       <- accountGen
     bob                         <- accountGen
     (feeAsset, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(alice)
     wavesFee                    = Sponsorship.toWaves(sponsorTx.minSponsoredAssetFee.get, sponsorTx.minSponsoredAssetFee.get)
-    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-    masterToAlice: TransferTransactionV1 = TransferTransactionV1
-      .selfSigned(Waves,
-                  master,
-                  alice,
-                  feeAsset.fee + sponsorTx.fee + transferAssetWavesFee + wavesFee,
-                  ts + 1,
-                  Waves,
-                  transferAssetWavesFee,
-                  Array.emptyByteArray)
-      .right
-      .get
-    aliceToBob: TransferTransactionV1 = TransferTransactionV1
+    genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+    masterToAlice: TransferTransaction = TransferTransaction
       .selfSigned(
-        Asset.fromCompatId(Some(feeAsset.id())),
-        alice,
-        bob,
-        feeAsset.quantity / 2,
-        ts + 2,
+        1.toByte,
+        master,
+        alice.toAddress,
+        Waves,
+        feeAsset.fee + sponsorTx.fee + transferAssetWavesFee + wavesFee,
         Waves,
         transferAssetWavesFee,
-        Array.emptyByteArray
+        ByteStr.empty,
+        ts + 1
       )
-      .right
-      .get
-    bobToMaster: TransferTransactionV1 = TransferTransactionV1
+      .explicitGet()
+    aliceToBob: TransferTransaction = TransferTransaction
       .selfSigned(
+        1.toByte,
+        alice,
+        bob.toAddress,
         Asset.fromCompatId(Some(feeAsset.id())),
+        feeAsset.quantity / 2,
+        Waves,
+        transferAssetWavesFee,
+        ByteStr.empty,
+        ts + 2
+      )
+      .explicitGet()
+    bobToMaster: TransferTransaction = TransferTransaction
+      .selfSigned(
+        1.toByte,
         bob,
-        master,
+        master.toAddress,
+        Asset.fromCompatId(Some(feeAsset.id())),
         amtTx,
-        ts + 3,
         Asset.fromCompatId(Some(feeAsset.id())),
         sponsorTx.minSponsoredAssetFee.get,
-        Array.emptyByteArray
+        ByteStr.empty,
+        ts + 3
       )
-      .right
-      .get
-    bobToMaster2: TransferTransactionV1 = TransferTransactionV1
+      .explicitGet()
+    bobToMaster2: TransferTransaction = TransferTransaction
       .selfSigned(
-        Asset.fromCompatId(Some(feeAsset.id())),
+        1.toByte,
         bob,
-        master,
+        master.toAddress,
+        Asset.fromCompatId(Some(feeAsset.id())),
         amtTx,
-        ts + 4,
         Asset.fromCompatId(Some(feeAsset.id())),
         sponsorTx.minSponsoredAssetFee.get,
-        Array.emptyByteArray
+        ByteStr.empty,
+        ts + 4
       )
-      .right
-      .get
+      .explicitGet()
   } yield (genesis, masterToAlice, feeAsset, sponsorTx, aliceToBob, bobToMaster, bobToMaster2)
 
   val SponsoredFeeActivatedAt0BlockchainSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
     functionalitySettings = DefaultBlockchainSettings.functionalitySettings
-      .copy(featureCheckBlocksPeriod = 1,
-            blocksForFeatureActivation = 1,
-            preActivatedFeatures = Map(BlockchainFeatures.FeeSponsorship.id -> 0, BlockchainFeatures.NG.id -> 0)))
+      .copy(
+        featureCheckBlocksPeriod = 1,
+        blocksForFeatureActivation = 1,
+        preActivatedFeatures = Map(
+          BlockchainFeatures.FeeSponsorship.id -> 0,
+          BlockchainFeatures.NG.id             -> 0,
+          BlockchainFeatures.BlockV5.id        -> 0
+        )
+      )
+  )
 
   val SponsoredActivatedAt0WavesSettings: WavesSettings = settings.copy(blockchainSettings = SponsoredFeeActivatedAt0BlockchainSettings)
 
@@ -109,29 +115,26 @@ class BlockchainUpdaterSponsoredFeeBlockTest
     scenario(sponsorPreconditions, SponsoredActivatedAt0WavesSettings) {
       case (domain, (genesis, masterToAlice, feeAsset, sponsor, aliceToBob, bobToMaster, bobToMaster2)) =>
         val (block0, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(masterToAlice, feeAsset, sponsor).map(Seq(_)))
-        val block1 = customBuildBlockOfTxs(microBlocks.last.totalResBlockSig,
-                                           Seq.empty,
-                                           KeyPair(Array.fill(KeyLength)(1: Byte)),
-                                           3: Byte,
-                                           sponsor.timestamp + 1)
-        val block2 = customBuildBlockOfTxs(block1.uniqueId, Seq.empty, KeyPair(Array.fill(KeyLength)(1: Byte)), 3: Byte, sponsor.timestamp + 1)
-        val block3 = buildBlockOfTxs(block2.uniqueId, Seq(aliceToBob, bobToMaster))
-        val block4 = buildBlockOfTxs(block3.uniqueId, Seq(bobToMaster2))
+        val block1 =
+          customBuildBlockOfTxs(microBlocks.last.totalResBlockSig, Seq.empty, KeyPair(Array.fill(KeyLength)(1: Byte)), 3: Byte, sponsor.timestamp + 1)
+        val block2 = customBuildBlockOfTxs(block1.id(), Seq.empty, KeyPair(Array.fill(KeyLength)(1: Byte)), 3: Byte, sponsor.timestamp + 1)
+        val block3 = buildBlockOfTxs(block2.id(), Seq(aliceToBob, bobToMaster))
+        val block4 = buildBlockOfTxs(block3.id(), Seq(bobToMaster2))
 
-        domain.blockchainUpdater.processBlock(block0).explicitGet()
-        domain.blockchainUpdater.processMicroBlock(microBlocks(0)).explicitGet()
-        domain.blockchainUpdater.processMicroBlock(microBlocks(1)).explicitGet()
-        domain.blockchainUpdater.processMicroBlock(microBlocks(2)).explicitGet()
-        domain.blockchainUpdater.processBlock(block1).explicitGet()
-        domain.blockchainUpdater.processBlock(block2).explicitGet()
-        domain.blockchainUpdater.processBlock(block3).explicitGet()
+        domain.blockchainUpdater.processBlock(block0) should beRight
+        domain.blockchainUpdater.processMicroBlock(microBlocks(0)) should beRight
+        domain.blockchainUpdater.processMicroBlock(microBlocks(1)) should beRight
+        domain.blockchainUpdater.processMicroBlock(microBlocks(2)) should beRight
+        domain.blockchainUpdater.processBlock(block1) should beRight
+        domain.blockchainUpdater.processBlock(block2) should beRight
+        domain.blockchainUpdater.processBlock(block3) should beRight
         domain.blockchainUpdater.processBlock(block4) should produce("negative waves balance" /*"unavailable funds"*/ )
     }
   }
 
   property("calculates valid total fee for microblocks") {
     scenario(sponsorPreconditions, SponsoredActivatedAt0WavesSettings) {
-      case (domain, (genesis, masterToAlice, feeAsset, sponsor, aliceToBob, bobToMaster, bobToMaster2)) =>
+      case (domain, (genesis, masterToAlice, feeAsset, sponsor, aliceToBob, bobToMaster, _)) =>
         val (block0, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(Seq(masterToAlice, feeAsset, sponsor), Seq(aliceToBob, bobToMaster)))
 
         val block0TotalFee = block0.transactionData
@@ -140,20 +143,20 @@ class BlockchainUpdaterSponsoredFeeBlockTest
           .sum
 
         {
-          domain.blockchainUpdater.processBlock(block0) shouldBe 'right
-          domain.blockchainUpdater.totalFee(domain.blockchainUpdater.height) should contain(block0TotalFee)
+          domain.blockchainUpdater.processBlock(block0) should beRight
+          domain.blockchainUpdater.bestLiquidDiffAndFees.map(_._3) should contain(block0TotalFee)
         }
 
         {
-          domain.blockchainUpdater.processMicroBlock(microBlocks(0)) shouldBe 'right
-          domain.blockchainUpdater.processMicroBlock(microBlocks(1)) shouldBe 'right
+          domain.blockchainUpdater.processMicroBlock(microBlocks(0)) should beRight
+          domain.blockchainUpdater.processMicroBlock(microBlocks(1)) should beRight
 
           val microBlocksWavesFee = microBlocks
             .flatMap(_.transactionData)
             .map(tx => Sponsorship.calcWavesFeeAmount(tx, ai => domain.blockchainUpdater.assetDescription(ai).map(_.sponsorship)))
             .sum
 
-          domain.blockchainUpdater.totalFee(domain.blockchainUpdater.height) should contain(block0TotalFee + microBlocksWavesFee)
+          domain.blockchainUpdater.bestLiquidDiffAndFees.map(_._3) should contain(block0TotalFee + microBlocksWavesFee)
         }
     }
   }

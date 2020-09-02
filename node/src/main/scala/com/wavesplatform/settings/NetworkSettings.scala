@@ -3,9 +3,9 @@ package com.wavesplatform.settings
 import java.io.File
 import java.net.{InetSocketAddress, URI}
 
-import com.google.common.base.Charsets
-import com.typesafe.config.{Config, ConfigException}
+import com.typesafe.config.Config
 import com.wavesplatform.network.TrafficLogger
+import com.wavesplatform.utils._
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.ValueReader
@@ -45,17 +45,11 @@ object NetworkSettings {
     (cfg: Config, path: String) => fromConfig(cfg.getConfig(path))
 
   private[this] def fromConfig(config: Config): NetworkSettings = {
-    implicit val _: ValueReader[Byte] = { (cfg: Config, path: String) =>
-      val x = cfg.getInt(path)
-      if (x.isValidByte) x.toByte
-      else throw new ConfigException.WrongType(config.origin(), s"$path has an invalid value: '$x' expected to be a byte")
-    }
-
     val file        = config.getAs[File]("file")
     val bindAddress = new InetSocketAddress(config.as[String]("bind-address"), config.as[Int]("port"))
     val nonce       = config.getOrElse("nonce", randomNonce)
     val nodeName    = config.getOrElse("node-name", s"Node-$nonce")
-    require(nodeName.getBytes(Charsets.UTF_8).length <= MaxNodeNameBytesLength,
+    require(nodeName.utf8Bytes.length <= MaxNodeNameBytesLength,
             s"Node name should have length less than $MaxNodeNameBytesLength bytes")
     val declaredAddress = config.getAs[String]("declared-address").map { address =>
       val uri = new URI(s"my://$address")

@@ -7,29 +7,28 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.DataTransaction
 import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.transaction.{DataTransaction, TxVersion}
 import org.scalatest.CancelAfterFailure
-import scorex.crypto.encode.Base64
 
 class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFailure with NTPTime {
-  private val acc0 = pkByAddress(firstAddress)
-  private val acc1 = pkByAddress(secondAddress)
-  private val acc2 = pkByAddress(thirdAddress)
+  private def acc0 = firstKeyPair
+  private def acc1 = secondKeyPair
+  private def acc2 = thirdKeyPair
 
   var exchAsset: String    = ""
   var dtx: DataTransaction = _
   var pair: AssetPair      = _
 
-  val sc1 = Some(s"true")
-  val sc2 = Some(s"""
+  val sc1: Option[String] = Some(s"true")
+  val sc2: Option[String] = Some(s"""
                |match tx {
-               |  case s : SetScriptTransaction => true
+               |  case _: SetScriptTransaction => true
                |  case _ => false
                |}""".stripMargin)
-  val sc3 = Some(s"""
+  val sc3: Option[String] = Some(s"""
                |match tx {
-               |  case s : SetScriptTransaction => true
+               |  case _: SetScriptTransaction => true
                |  case _ => throw("Some generic error")
                |}""".stripMargin)
 
@@ -37,32 +36,35 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
     super.beforeAll()
 
     exchAsset = sender
-      .issue(acc0.stringRepr,
-             "ExchangeCoin",
-             "ExchangeCoin for tests with exchange transaction",
-             someAssetAmount,
-             0,
-             reissuable = false,
-             issueFee,
-             2,
-             waitForTx = true)
+      .issue(
+        acc0,
+        "ExchangeCoin",
+        "ExchangeCoin for tests with exchange transaction",
+        someAssetAmount,
+        8,
+        reissuable = false,
+        issueFee,
+        TxVersion.V2,
+        waitForTx = true
+      )
       .id
 
     pair = AssetPair.createAssetPair(exchAsset, "WAVES").get
 
     val entry1 = IntegerDataEntry("int", 24)
     val entry2 = BooleanDataEntry("bool", value = true)
-    val entry3 = BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=")))
+    val entry3 = BinaryDataEntry("blob", ByteStr.decodeBase64("YWxpY2U=").get)
     val entry4 = StringDataEntry("str", "test")
 
-    dtx = DataTransaction.selfSigned(acc0, List(entry1, entry2, entry3, entry4), minFee, ntpTime.correctedTime()).explicitGet()
+    dtx = DataTransaction.selfSigned(1.toByte, acc0, List(entry1, entry2, entry3, entry4), minFee, ntpTime.correctedTime()).explicitGet()
     sender.signedBroadcast(dtx.json(), waitForTx = true)
   }
 
   test("set contracts and put exchange transaction in blockchain") {
-    val sc4 = Some(cryptoContextScript(true))
-    val sc5 = Some(pureContextScript(dtx, true))
-    val sc6 = Some(wavesContextScript(dtx, true))
+
+    val sc4 = Some(cryptoContextScript(accountScript = true))
+    val sc5 = Some(pureContextScript(dtx, accountScript = true))
+    val sc6 = Some(wavesContextScript(dtx, accountScript = true))
 
     for ((contr1, contr2, mcontr) <- Seq(
            (sc1, sc1, sc1),
@@ -71,17 +73,17 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
            (None, None, sc4),
            (None, None, sc5),
            (None, None, sc6),
-           (sc5, None, sc5),
+           (sc5, None, sc5)
          )) {
 
       setContracts(
         (contr1, acc0),
         (contr2, acc1),
-        (mcontr, acc2),
+        (mcontr, acc2)
       )
       for ((o1ver, o2ver) <- Seq(
              (2: Byte, 2: Byte),
-             (2: Byte, 3: Byte),
+             (2: Byte, 3: Byte)
            )) {
 
         sender.signedBroadcast(exchangeTx(pair, smartMatcherFee, orderFee, ntpTime, o1ver, o2ver, acc1, acc0, acc2), waitForTx = true)
@@ -93,7 +95,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
     setContracts(
       (None, acc0),
       (None, acc1),
-      (None, acc2),
+      (None, acc2)
     )
   }
 
@@ -107,21 +109,23 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
       setContracts(
         (contr1, acc0),
         (contr2, acc1),
-        (mcontr, acc2),
+        (mcontr, acc2)
       )
       for ((o1ver, o2ver) <- Seq(
              (2: Byte, 2: Byte),
-             (3: Byte, 3: Byte),
+             (3: Byte, 3: Byte)
            )) {
-        assertBadRequestAndMessage(sender.signedBroadcast(exchangeTx(pair, smartMatcherFee, orderFee, ntpTime, o1ver, o2ver, acc1, acc0, acc2)),
-                                   "Transaction is not allowed by account-script")
+        assertBadRequestAndMessage(
+          sender.signedBroadcast(exchangeTx(pair, smartMatcherFee, orderFee, ntpTime, o1ver, o2ver, acc1, acc0, acc2)),
+          "Transaction is not allowed by account-script"
+        )
         //TODO : add assert balances
       }
     }
     setContracts(
       (None, acc0),
       (None, acc1),
-      (None, acc2),
+      (None, acc2)
     )
   }
 
@@ -132,11 +136,11 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
       setContracts(
         (contr1, acc0),
         (contr2, acc1),
-        (mcontr, acc2),
+        (mcontr, acc2)
       )
       for ((o1ver, o2ver) <- Seq(
              (2: Byte, 2: Byte),
-             (3: Byte, 3: Byte),
+             (3: Byte, 3: Byte)
            )) {
         val tx = exchangeTx(pair, smartMatcherFee, orderFee, ntpTime, o1ver, o2ver, acc1, acc0, acc2)
         assertBadRequestAndMessage(sender.signedBroadcast(tx), "Error while executing account-script: Some generic error")
@@ -146,7 +150,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
     setContracts(
       (None, acc0),
       (None, acc1),
-      (None, acc2),
+      (None, acc2)
     )
   }
 
@@ -159,24 +163,25 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
       setContracts(
         (contr1, acc0),
         (contr2, acc1),
-        (mcontr, acc2),
+        (mcontr, acc2)
       )
 
       val matcher   = acc2
       val sellPrice = (0.50 * Order.PriceConstant).toLong
       for ((o1ver, o2ver) <- Seq(
              (1: Byte, 2: Byte),
-             (1: Byte, 3: Byte),
+             (1: Byte, 3: Byte)
            )) {
 
         val (buy, sell) = orders(pair, o1ver, o2ver, orderFee, ntpTime, acc1, acc0, acc2)
 
         val amount = math.min(buy.amount, sell.amount)
-        val tx = ExchangeTransactionV2
-          .create(
-            matcher = matcher,
-            buyOrder = buy,
-            sellOrder = sell,
+        val tx = ExchangeTransaction
+          .signed(
+            3.toByte,
+            matcher = matcher.privateKey,
+            order1 = sell,
+            order2 = buy,
             amount = amount,
             price = sellPrice,
             buyMatcherFee = (BigInt(orderFee) * amount / buy.amount).toLong,
@@ -188,7 +193,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
           .json()
 
         val txId = sender.signedBroadcast(tx).id
-        nodes.waitForHeightAriseAndTxPresent(txId)
+        nodes.waitForTransaction(txId)
 
         //TODO : add assert balances
       }
@@ -196,7 +201,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
     setContracts(
       (None, acc0),
       (None, acc1),
-      (None, acc2),
+      (None, acc2)
     )
   }
 
@@ -208,16 +213,17 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
 
     for ((o1ver, o2ver) <- Seq(
            (2: Byte, 1: Byte),
-           (3: Byte, 1: Byte),
+           (3: Byte, 1: Byte)
          )) {
       val (buy, sell) = orders(pair, o1ver, o2ver, orderFee, ntpTime, acc1, acc0, acc2)
 
       val amount = math.min(buy.amount, sell.amount)
-      val tx = ExchangeTransactionV2
-        .create(
-          matcher = matcher,
-          buyOrder = buy,
-          sellOrder = sell,
+      val tx = ExchangeTransaction
+        .signed(
+          2.toByte,
+          matcher = matcher.privateKey,
+          order1 = buy,
+          order2 = sell,
           amount = amount,
           price = sellPrice,
           buyMatcherFee = (BigInt(orderFee) * amount / buy.amount).toLong,

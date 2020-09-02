@@ -2,20 +2,21 @@ package com.wavesplatform.lang
 
 import cats.Id
 import cats.kernel.Monoid
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.diffs.ProduceError
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.{Contextful, EvaluatorV1}
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, _}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import monix.eval.Coeval
-import org.scalacheck.Shrink
+import org.scalacheck.ShrinkLowPriority
 
 import scala.util.{Left, Right, Try}
 
@@ -24,15 +25,15 @@ object Common {
 
   private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTESTR, STRING)
   val dataEntryType              = CASETYPEREF("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
-  val addCtx: CTX[NoContext]            = CTX[NoContext](Seq(dataEntryType), Map.empty, Array.empty)
+  val addCtx: CTX[NoContext]     = CTX[NoContext](Seq(dataEntryType), Map.empty, Array.empty)
 
-  def ev[T <: EVALUATED](context: EvaluationContext[NoContext, Id] = Monoid.combine(PureContext.build(Global, V1).evaluationContext, addCtx.evaluationContext),
-                         expr: EXPR): Either[ExecutionError, T] =
+  def ev[T <: EVALUATED](
+      context: EvaluationContext[NoContext, Id] = Monoid.combine(PureContext.build(V1).evaluationContext, addCtx.evaluationContext),
+      expr: EXPR
+  ): Either[ExecutionError, T] =
     new EvaluatorV1[Id, NoContext]().apply[T](context, expr)
 
-  trait NoShrink {
-    implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
-  }
+  trait NoShrink extends ShrinkLowPriority
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
 
@@ -59,9 +60,11 @@ object Common {
 
   val pointDInstance2 = CaseObj(pointTypeD, Map("YB" -> unit))
 
-  val sampleTypes = Seq(pointTypeA, pointTypeB, pointTypeC, pointTypeD) ++ Seq(UNION.create(AorB.typeList, Some("PointAB")),
-                                                                               UNION.create(BorC.typeList, Some("PointBC")),
-                                                                               UNION.create(CorD.typeList, Some("PointCD")))
+  val sampleTypes = Seq(pointTypeA, pointTypeB, pointTypeC, pointTypeD) ++ Seq(
+    UNION.create(AorB.typeList, Some("PointAB")),
+    UNION.create(BorC.typeList, Some("PointBC")),
+    UNION.create(CorD.typeList, Some("PointCD"))
+  )
 
   def sampleUnionContext(instance: CaseObj) =
     EvaluationContext.build(
@@ -76,7 +79,7 @@ object Common {
     override def inputEntity   = in()
 
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
-    override def transferTransactionById(id: Array[Byte]): Option[Tx]                                            = ???
+    override def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer]                                   = ???
     override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
     override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
     override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
@@ -84,8 +87,13 @@ object Common {
     override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = ???
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
-    override def tthis: Recipient.Address                                                                        = ???
-  }
+    override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails]    = ???
+    override def tthis: Environment.Tthis                                                                        = ???
+    override def multiPaymentAllowed: Boolean                                                                    =  true
+    override def txId: ByteStr                                                                                   = ???
+    override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
+    override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???
+    }
 
   def addressFromPublicKey(chainId: Byte, pk: Array[Byte], addressVersion: Byte = EnvironmentFunctions.AddressVersion): Array[Byte] = {
     val publicKeyHash   = Global.secureHash(pk).take(EnvironmentFunctions.HashLength)

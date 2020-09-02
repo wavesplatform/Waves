@@ -3,14 +3,14 @@ package com.wavesplatform.transaction.smart.script
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -18,7 +18,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
 
   property("ScriptV1.apply should permit BOOLEAN scripts") {
     forAll(BOOLEANgen(10)) { expr =>
-      ExprScript(expr) shouldBe 'right
+      ExprScript(expr).explicitGet()
     }
   }
 
@@ -33,7 +33,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
       }
       .reduceLeft[EXPR](IF(_, _, FALSE))
 
-    Script.estimate(ExprScript(expr).explicitGet(), ScriptEstimatorV2) should produce("Script is too complex")
+    Script.estimate(ExprScript(expr).explicitGet(), ScriptEstimatorV2, useContractVerifierLimit = false) should produce("Script is too complex")
   }
 
   property("ScriptV1.apply should deny too big scripts") {
@@ -43,7 +43,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
         args = List(r, CONST_LONG(i))
       )
     }
-    val expr = (1 to 9).foldLeft[EXPR](CONST_LONG(0)) { (r, i) =>
+    val expr = (1 to 9).foldLeft[EXPR](CONST_LONG(0)) { (r, _) =>
       FUNCTION_CALL(
         function = PureContext.eq.header,
         args = List(r, bigSum)
@@ -64,7 +64,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
       }
       .reduceLeft[EXPR](IF(_, _, FALSE))
 
-    ExprScript(expr) shouldBe 'right
+    ExprScript(expr).explicitGet()
   }
 
   property("Expression block version check - successful on very deep expressions(stack overflow check)") {
@@ -72,7 +72,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
       FUNCTION_CALL(FunctionHeader.Native(SUM_LONG), List(CONST_LONG(1), acc))
     }
 
-    com.wavesplatform.lang.v1.compiler.сontainsBlockV2(expr) shouldBe false
+    com.wavesplatform.lang.v1.compiler.containsBlockV2(expr) shouldBe false
   }
 
 }

@@ -1,11 +1,10 @@
 package com.wavesplatform.it.sync.grpc
 
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync._
-import com.wavesplatform.protobuf.transaction.PBTransactions
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.protobuf.transaction.Recipient
+import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
 import io.grpc.Status.Code
 
 import scala.concurrent.duration._
@@ -17,13 +16,13 @@ class TransferTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
     super.beforeAll()
 
     val issuedAsset = sender.broadcastIssue(firstAcc, "name", someAssetAmount, 8, true, issueFee, waitForTx = true)
-    issuedAssetId = PBTransactions.vanilla(issuedAsset).explicitGet().id().base58
+    issuedAssetId = PBTransactions.vanilla(issuedAsset).explicitGet().id().toString
   }
 
   test("asset transfer changes sender's and recipient's asset balance by transfer amount and waves by fee") {
-    for (v <- supportedVersions) {
+    for (v <- transferTxSupportedVersions) {
       val issuedAsset      = sender.broadcastIssue(firstAcc, "name", someAssetAmount, 8, true, issueFee, waitForTx = true)
-      val issuedAssetId    = PBTransactions.vanilla(issuedAsset).explicitGet().id().base58
+      val issuedAssetId    = PBTransactions.vanilla(issuedAsset).explicitGet().id().toString
       val firstBalance     = sender.wavesBalance(firstAddress).available
       val firstEffBalance  = sender.wavesBalance(firstAddress).effective
       val secondBalance    = sender.wavesBalance(secondAddress).available
@@ -31,7 +30,7 @@ class TransferTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
 
       sender.broadcastTransfer(
         firstAcc,
-        Recipient().withAddress(secondAddress),
+        Recipient().withPublicKeyHash(secondAddress),
         someAssetAmount,
         minFee,
         version = v,
@@ -50,13 +49,13 @@ class TransferTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
   }
 
   test("waves transfer changes waves balances and eff.b. by transfer amount and fee") {
-    for (v <- supportedVersions) {
+    for (v <- transferTxSupportedVersions) {
       val firstBalance     = sender.wavesBalance(firstAddress).available
       val firstEffBalance  = sender.wavesBalance(firstAddress).effective
       val secondBalance    = sender.wavesBalance(secondAddress).available
       val secondEffBalance = sender.wavesBalance(secondAddress).effective
 
-      sender.broadcastTransfer(firstAcc, Recipient().withAddress(secondAddress), transferAmount, minFee, version = v, waitForTx = true)
+      sender.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(secondAddress), transferAmount, minFee, version = v, waitForTx = true)
 
       sender.wavesBalance(firstAddress).available shouldBe firstBalance - transferAmount - minFee
       sender.wavesBalance(firstAddress).effective shouldBe firstEffBalance - transferAmount - minFee
@@ -68,7 +67,7 @@ class TransferTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
   test("invalid signed waves transfer should not be in UTX or blockchain") {
     val invalidTimestampFromFuture = ntpTime.correctedTime() + 91.minutes.toMillis
     val invalidTimestampFromPast   = ntpTime.correctedTime() - 121.minutes.toMillis
-    for (v <- supportedVersions) {
+    for (v <- transferTxSupportedVersions) {
       val firstBalance     = sender.wavesBalance(firstAddress).available
       val firstEffBalance  = sender.wavesBalance(firstAddress).effective
       val secondBalance    = sender.wavesBalance(secondAddress).available
@@ -77,7 +76,7 @@ class TransferTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
       assertGrpcError(
         sender.broadcastTransfer(
           firstAcc,
-          Recipient().withAddress(secondAddress),
+          Recipient().withPublicKeyHash(secondAddress),
           transferAmount,
           minFee,
           timestamp = invalidTimestampFromFuture,
@@ -90,7 +89,7 @@ class TransferTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
       assertGrpcError(
         sender.broadcastTransfer(
           firstAcc,
-          Recipient().withAddress(secondAddress),
+          Recipient().withPublicKeyHash(secondAddress),
           transferAmount,
           minFee,
           timestamp = invalidTimestampFromPast,
@@ -101,7 +100,7 @@ class TransferTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
         Code.INVALID_ARGUMENT
       )
       assertGrpcError(
-        sender.broadcastTransfer(firstAcc, Recipient().withAddress(secondAddress), transferAmount, minFee - 1, version = v, waitForTx = true),
+        sender.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(secondAddress), transferAmount, minFee - 1, version = v, waitForTx = true),
         "Fee .* does not exceed minimal value",
         Code.INVALID_ARGUMENT
       )
@@ -114,14 +113,14 @@ class TransferTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
   }
 
   test("can not make transfer without having enough waves balance") {
-    for (v <- supportedVersions) {
+    for (v <- transferTxSupportedVersions) {
       val firstBalance     = sender.wavesBalance(firstAddress).available
       val firstEffBalance  = sender.wavesBalance(firstAddress).effective
       val secondBalance    = sender.wavesBalance(secondAddress).available
       val secondEffBalance = sender.wavesBalance(secondAddress).effective
 
       assertGrpcError(
-        sender.broadcastTransfer(firstAcc, Recipient().withAddress(secondAddress), firstBalance, minFee, v, waitForTx = true),
+        sender.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(secondAddress), firstBalance, minFee, v, waitForTx = true),
         "Attempt to transfer unavailable funds",
         Code.INVALID_ARGUMENT
       )
@@ -134,14 +133,14 @@ class TransferTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
   }
 
   test("can not make assets transfer without having enough assets balance") {
-    for (v <- supportedVersions) {
+    for (v <- transferTxSupportedVersions) {
       val firstAssetBalance  = sender.assetsBalance(firstAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L)
       val secondAssetBalance = sender.assetsBalance(secondAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L)
 
       assertGrpcError(
         sender.broadcastTransfer(
           firstAcc,
-          Recipient().withAddress(secondAddress),
+          Recipient().withPublicKeyHash(secondAddress),
           firstAssetBalance + 1,
           minFee,
           version = v,
@@ -156,5 +155,4 @@ class TransferTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
       sender.assetsBalance(secondAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe secondAssetBalance
     }
   }
-
 }

@@ -68,8 +68,8 @@ class DirectiveParserTest extends PropSpec with PropertyChecks with Matchers {
 
   property("directive with illegal format") {
     parse("{-# ILLEGAL #-}") shouldBe Left("Directive {-# ILLEGAL #-} has illegal format")
-    parse("{-# A%@#%$^$ A%#%%$ #-}") shouldBe 'left
-    parse("{-# AAA BBB CCC DDD #-}") shouldBe 'left
+    parse("{-# A%@#%$^$ A%#%%$ #-}") shouldBe Symbol("left")
+    parse("{-# AAA BBB CCC DDD #-}") shouldBe Symbol("left")
   }
 
   property("directive duplicate") {

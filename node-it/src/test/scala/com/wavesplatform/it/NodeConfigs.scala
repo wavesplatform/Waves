@@ -2,14 +2,14 @@ package com.wavesplatform.it
 
 import com.typesafe.config.{Config, ConfigFactory}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.util.Random
 
 object NodeConfigs {
 
   private val NonConflictingNodes = Set(1, 4, 6, 7)
 
-  val Default: Seq[Config] = ConfigFactory.parseResources("nodes.conf").getConfigList("nodes").asScala
+  val Default: Seq[Config] = ConfigFactory.parseResources("nodes.conf").getConfigList("nodes").asScala.toSeq
   val Miners: Seq[Config]  = Default.init
   val NotMiner: Config     = Default.last
   def randomMiner: Config  = Random.shuffle(Miners).head
@@ -63,6 +63,14 @@ object NodeConfigs {
   object Templates {
     def raw(x: String): String = x
     def quorum(n: Int): String = s"waves.miner.quorum = $n"
+    def preactivatedFeatures(f: (Int, Int)*): String = {
+      s"""
+         |waves.blockchain.custom.functionality.pre-activated-features {
+         ${f.map {case (id, height) => s"|  $id = $height"}.mkString("\n")}
+         |}""".stripMargin
+    }
+    def minAssetInfoUpdateInterval(blocks: Int): String =
+      s"waves.blockchain.custom.functionality.min-asset-info-update-interval = $blocks"
 
     val nonMiner: String = "waves.miner.enable = no"
   }

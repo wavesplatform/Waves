@@ -8,11 +8,25 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.{NTPTime, NodeConfigs}
 import com.wavesplatform.state.StringDataEntry
+import com.wavesplatform.transaction.TxVersion
 import play.api.libs.json._
 
 import scala.util.Random
 
 class AddressApiSuite extends BaseTransactionSuite with NTPTime {
+  test("balance at height") {
+    val address = sender.createKeyPair().toAddress.stringRepr
+    sender.transfer(sender.keyPair, address, 1, waitForTx = true)
+    nodes.waitForHeightArise()
+    sender.transfer(sender.keyPair, address, 1, waitForTx = true)
+    nodes.waitForHeightArise()
+    sender.transfer(sender.keyPair, address, 1, waitForTx = true)
+    nodes.waitForHeightArise()
+
+    val Seq(_, h2, _) = sender.debugBalanceHistory(address)
+    val Seq((_, balance)) = sender.accountsBalances(Some(h2.height), Seq(address))
+    balance shouldBe 2
+  }
 
   test("filter accounts data by regexp") {
     val dataKeys = List("1aB1cD!@#$", "\"\\", "\u0000qweqwe", "\t\r\n", "reeeee", "rerere", "rerrre", "rre", "eeeee")
@@ -27,8 +41,8 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
     )
     val invalidRegexps = List("%5Ba-z", "%5Ba-z%5D%7B0", "%5Ba-z%5D%7B%2C5%7D")
     val data           = dataKeys.map(str => StringDataEntry(str, Random.nextString(16)))
-    val dataFee        = calcDataFee(data)
-    val txId           = sender.putData(firstAddress, data, dataFee).id
+    val dataFee        = calcDataFee(data, TxVersion.V1)
+    val txId           = sender.putData(firstKeyPair, data, dataFee).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
     for (regexp <- regexps) {
@@ -41,15 +55,10 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
     }
 
     for (invalidRegexp <- invalidRegexps) {
-      try {
-        sender.getData(firstAddress, invalidRegexp)
-        fail("RegexCompiler didn't throw expected error")
-      } catch {
-        case err: Throwable =>
-          if (!err.getMessage.contains("Cannot compile regex")) {
-            throw err
-          }
-      }
+      assertBadRequestAndMessage(
+        sender.getData(firstAddress, invalidRegexp),
+        "Cannot compile regex"
+      )
     }
   }
 
@@ -58,7 +67,7 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
   }
 
   test("balances for issued asset should be correct") {
-    val asset = miner.issue(miner.address, "Test", "Test", 10000, 0, waitForTx = true).id
+    val asset = miner.issue(miner.keyPair, "Test", "Test", 10000, 0, waitForTx = true).id
     assertBalances(Some(asset))
   }
 
@@ -78,7 +87,7 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
   test("requests to the illegal height should be handled correctly ") {
     val height = miner.height + 100
     assertApiError(
-      miner.get(s"/addresses/balance?height=$height&address=$firstAddress"),
+      miner.get(s"/addresses/balance?height=$height&address=$firstKeyPair"),
       CustomValidationError(s"Illegal height: $height")
     )
     assertApiError(
@@ -87,7 +96,7 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
     )
 
     assertApiError(
-      miner.get(s"/addresses/balance?height=-1&address=$firstAddress"),
+      miner.get(s"/addresses/balance?height=-1&address=$firstKeyPair"),
       CustomValidationError("Illegal height: -1")
     )
     assertApiError(
@@ -97,7 +106,7 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
   }
 
   private def assertBalances(asset: Option[String]): Unit = {
-    val addressesAndBalances = (1 to 5).map(i => (miner.createAddress(), (i * 100).toLong)).toList
+    val addressesAndBalances = (1 to 5).map(i => (miner.createKeyPair().toAddress.toString, (i * 100).toLong)).toList
 
     val firstAddresses   = addressesAndBalances.slice(0, 2)
     val secondAddresses  = addressesAndBalances.slice(2, 5)
@@ -123,7 +132,7 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
   }
 
   private def transferAndReturnHeights(addresses: List[(String, Long)], asset: Option[String]): List[Int] = {
-    val ids = addresses.map { case (address, a) => miner.transfer(miner.address, address, a, minFee, asset).id }
+    val ids = addresses.map { case (address, a) => miner.transfer(miner.keyPair, address, a, minFee, asset).id }
     ids.map(id => miner.waitForTransaction(id).height)
   }
 
