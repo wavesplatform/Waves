@@ -355,7 +355,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
 
     miner.transfer(sender.keyPair, address.toAddress.toString, initialWavesBalance, setScriptFee * 2, waitForTx = true)
 
-    nodes.waitForTransaction(
+    miner.waitForHeight(nodes.waitForTransaction(
       miner
         .signedBroadcast(
           SetScriptTransaction
@@ -364,7 +364,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
             .json()
         )
         .id
-    )
+    ).height + 1)
 
     address
   }

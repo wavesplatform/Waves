@@ -4,7 +4,6 @@ import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.it.BaseSuite
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.transactions.{FailedTransactionSuiteLike, OverflowBlock}

@@ -45,10 +45,10 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       .toSeq
   }
 
-  def addressTransactions(address: Address, from: Option[ByteStr] = None): Seq[(Height, Transaction)] = db.withResource { resource =>
+  def addressTransactions(address: Address, from: Option[ByteStr] = None): Seq[(Height, Transaction)] =
     AddressTransactions
       .allAddressTransactions(
-        resource,
+        db,
         blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
         address,
         None,
@@ -57,7 +57,6 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       )
       .map { case (h, tx, _) => h -> tx }
       .toSeq
-  }
 
   def portfolio(address: Address): Seq[(IssuedAsset, Long)] = Domain.portfolio(address, db, blockchainUpdater)
 
