@@ -94,7 +94,7 @@ object CommonValidation {
             address <- blockchain.resolveAlias(citx.dAppAddressOrAlias)
             allowFeeOverdraft = blockchain.accountScript(address) match {
               case Some(AccountScriptInfo(_, ContractScriptImpl(version, _), _, _)) if version >= V4 && blockchain.useCorrectPaymentCheck => true
-              case _                                                                                          => false
+              case _                                                                                                                      => false
             }
             check <- foldPayments(citx.payments)
               .map(p => checkTransfer(citx.sender.toAddress, p.assetId, p.amount, citx.feeAssetId, citx.fee, allowFeeOverdraft))
@@ -136,11 +136,11 @@ object CommonValidation {
       val v4Activation = activationBarrier(BlockchainFeatures.BlockV5)
 
       def scriptVersionActivation(sc: Script): Either[ActivationError, T] = sc.stdLibVersion match {
-        case V1 | V2 | V3 if sc.containsArray    => v4Activation
-        case V1 | V2 if sc.containsBlockV2.value => v3Activation
-        case V1 | V2                             => Right(tx)
-        case V3                                  => v3Activation
-        case V4                                  => v4Activation
+        case V1 | V2 | V3 if sc.containsArray      => v4Activation
+        case V1 | V2 if sc.containsBlockV2.value() => v3Activation
+        case V1 | V2                               => Right(tx)
+        case V3                                    => v3Activation
+        case V4                                    => v4Activation
       }
 
       def scriptTypeActivation(sc: Script): Either[ActivationError, T] = sc match {

@@ -91,8 +91,10 @@ object CommonAccountsApi extends ScorexLogging {
       blockchain.accountData(address, key)
 
     override def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[_]] = {
-      val entriesFromDiff = diff.accountData.get(address).fold[Map[String, DataEntry[_]]](Map.empty)(_.data)
-      val entries         = mutable.ArrayBuffer[DataEntry[_]](entriesFromDiff.values.toSeq: _*)
+      val entriesFromDiff = diff.accountData
+        .get(address)
+        .fold[Map[String, DataEntry[_]]](Map.empty)(_.data.filter { case (k, _) => regex.forall(_.r.pattern.matcher(k).matches()) })
+      val entries = mutable.ArrayBuffer[DataEntry[_]](entriesFromDiff.values.toSeq: _*)
 
       db.readOnly { ro =>
         db.get(Keys.addressId(address)).foreach { addressId =>
@@ -112,12 +114,7 @@ object CommonAccountsApi extends ScorexLogging {
     override def resolveAlias(alias: Alias): Either[ValidationError, Address] = blockchain.resolveAlias(alias)
 
     override def activeLeases(address: Address): Observable[(Height, LeaseTransaction)] = {
-      def leaseIsActive(id: ByteStr): Boolean = {
-        val leaseDetails = blockchain.leaseDetails(id)
-        val active       = leaseDetails.exists(_.isActive)
-        log.info(s"Lease $id: $leaseDetails, active=$active")
-        active
-      }
+      def leaseIsActive(id: ByteStr): Boolean = blockchain.leaseDetails(id).exists(_.isActive)
       common.activeLeases(db, Some(Height(blockchain.height) -> diff), address, leaseIsActive)
     }
   }

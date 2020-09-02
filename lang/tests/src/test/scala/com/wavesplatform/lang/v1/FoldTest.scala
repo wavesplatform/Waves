@@ -22,7 +22,7 @@ class FoldTest extends PropSpec with PropertyChecks with Matchers with NoShrink 
     val ctx: CTX[Environment] =
       Monoid.combineAll(
         Seq(
-          PureContext.build(Global, V3).withEnvironment[Environment],
+          PureContext.build(V3).withEnvironment[Environment],
           WavesContext.build(DirectiveSet.contractDirectiveSet),
           CryptoContext.build(Global, V3).withEnvironment[Environment]
         )
@@ -68,6 +68,34 @@ class FoldTest extends PropSpec with PropertyChecks with Matchers with NoShrink 
 
     eval(script) shouldBe Left("List size exceed 4")
   }
+
+  property("limit for limit") {
+    val script =
+      s"""
+         | func sum(a:Int, b:Int) = a + b
+         | let arr = [1, 2, 3, 4, 5]
+         | let total = FOLD<1001>(arr, 9, sum)
+         | total
+         |
+      """.stripMargin
+
+    val index = script.indexOf("1001")
+    eval(script) shouldBe Left(s"Compilation failed: [List size limit in FOLD is oversized, 1001 must be less or equal 1000 in $index-${index+4}]")
+  }
+
+  property("Maximun limit") {
+    val script =
+      s"""
+         | func sum(a:Int, b:Int) = a + b
+         | let arr = [${"1,"*999}1]
+         | let total = FOLD<1000>(arr, 2, sum)
+         | total
+         |
+      """.stripMargin
+
+    eval(script) shouldBe Right(CONST_LONG(1002L))
+  }
+
 
   property("FOLD as FOLD param") {
     val script =

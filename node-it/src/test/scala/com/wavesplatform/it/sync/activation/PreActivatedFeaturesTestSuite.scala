@@ -15,7 +15,10 @@ class PreActivatedFeaturesTestSuite
     with ReportingTestName {
   override protected def nodeConfigs: Seq[Config] = PreActivatedFeaturesTestSuite.Configs
 
-  nodes.foreach(n => n.accountBalances(n.address))
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+    nodes.foreach(n => n.accountBalances(n.address))
+  }
 
   "before activation check" in {
     nodes.waitForHeight(PreActivatedFeaturesTestSuite.votingInterval / 2)

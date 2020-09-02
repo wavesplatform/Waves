@@ -44,7 +44,7 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*)
     val tx              = CaseObj(transactionType, Map("amount" -> CONST_LONG(100000000L)))
     Monoid
       .combineAll(Seq(
-        PureContext.build(Global, version).withEnvironment[Environment],
+        PureContext.build(version).withEnvironment[Environment],
         CryptoContext.build(Global, version).withEnvironment[Environment],
         WavesContext.build(DirectiveSet.contractDirectiveSet),
         CTX[NoContext](

@@ -833,7 +833,7 @@ object RollbackSpec {
            |
            |@Callable(i)
            |func reissue(assetId: ByteVector, isReissuable: Boolean, quantity: Int) =
-           |  [Reissue(assetId, isReissuable, quantity)]
+           |  [Reissue(assetId, quantity, isReissuable)]
            |
            |@Callable(i)
            |func burn(assetId: ByteVector, quantity: Int) =
@@ -851,7 +851,7 @@ object RollbackSpec {
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(Global, stdLibVersion).withEnvironment[Environment],
+            PureContext.build(stdLibVersion).withEnvironment[Environment],
             CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment],
             WavesContext.build(
               DirectiveSet(stdLibVersion, Account, DAppType).explicitGet()

@@ -5,60 +5,70 @@
       params: [ "ByteVector" ]
       doc: "[Keccak-256](https://keccak.team/files/Keccak-submission-3.pdf) hash function."
       paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 10
     }
     {
       name: "blake2b256"
       params: [ "ByteVector" ]
       doc: "[BLAKE-256](https://en.wikipedia.org/wiki/BLAKE_%28hash_function%29) hash function."
       paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 10
     }
     {
       name: "sha256"
       params: [ "ByteVector" ]
       doc: "[SHA-256](https://en.wikipedia.org/wiki/SHA-2) hash function."
       paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 10
     }
     {
       name: "toBase16String"
       params: [ "ByteVector" ]
       doc: "Encodes array of bytes to [Base16](https://en.wikipedia.org/wiki/Hexadecimal) string."
       paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 10
     }
     {
       name: "toBase58String"
       params: [ "ByteVector" ]
       doc: "Encodes array of bytes to [Base58](https://en.wikipedia.org/wiki/Base58) string."
       paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 10
     }
     {
       name: "toBase64String"
       params: [ "ByteVector" ]
       doc: "Encodes array of bytes to [Base64](https://en.wikipedia.org/wiki/Base64) string."
       paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 10
     }
     {
       name: "fromBase16String"
       params: [ "String" ]
       doc: "Decodes [Base16](https://en.wikipedia.org/wiki/Hexadecimal) string to an array of bytes."
       paramsDoc: [ "The string to decode." ]
+      complexity: 10
     }
     {
       name: "fromBase58String"
       params: [ "String" ]
       doc: "Decodes [Base58](https://en.wikipedia.org/wiki/Base58) string to an array of bytes."
       paramsDoc: [ "The string to decode." ]
+      complexity: 10
     }
     {
       name: "fromBase64String"
       params: [ "String" ]
       doc: "Decodes [Base64](https://en.wikipedia.org/wiki/Base64) string to an array of bytes."
       paramsDoc: [ "The string to decode." ]
+      complexity: 10
     }
     {
       name: "addressFromString"
       params: [ "String" ]
       doc: "Decodes address from [Base58](https://en.wikipedia.org/wiki/Base58) string."
       paramsDoc: [ "The string to decode." ]
+      complexity: 124
     }
     {
       name: "addressFromStringValue"
@@ -69,6 +79,7 @@
         Raises an exception if the address cannot be decoded.
         '''
       paramsDoc: [ "The string to decode." ]
+      complexity: 124
     }
   ]
 }

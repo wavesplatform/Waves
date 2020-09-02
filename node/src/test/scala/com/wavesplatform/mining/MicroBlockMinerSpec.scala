@@ -7,21 +7,19 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl
-import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl.MicroBlockMiningResult
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction, TxVersion}
 import com.wavesplatform.utils.Schedulers
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.{TestValues, TransactionGen}
-import monix.eval.Task
 import monix.execution.Scheduler
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.{FlatSpec, Matchers, PrivateMethodTester}
+import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.duration._
 import scala.util.Random
 
-class MicroBlockMinerSpec extends FlatSpec with Matchers with PrivateMethodTester with PathMockFactory with WithDomain with TransactionGen {
+class MicroBlockMinerSpec extends FlatSpec with Matchers with PathMockFactory with WithDomain with TransactionGen {
   "Micro block miner" should "generate microblocks in flat interval" in {
     val scheduler = Schedulers.singleThread("test")
     val acc       = TestValues.keyPair
@@ -29,7 +27,7 @@ class MicroBlockMinerSpec extends FlatSpec with Matchers with PrivateMethodTeste
     val settings  = domainSettingsWithFS(TestFunctionalitySettings.withFeatures(BlockchainFeatures.NG))
     withDomain(settings) { d =>
       d.appendBlock(TestBlock.create(Seq(genesis)))
-      val utxPool = new UtxPoolImpl(ntpTime, d.blockchainUpdater, ignoreSpendableBalanceChanged, settings.utxSettings, enablePriorityPool = true)
+      val utxPool = new UtxPoolImpl(ntpTime, d.blockchainUpdater, ignoreSpendableBalanceChanged, settings.utxSettings)
       val microBlockMiner = new MicroBlockMinerImpl(
         _ => (),
         null,
@@ -39,17 +37,15 @@ class MicroBlockMinerSpec extends FlatSpec with Matchers with PrivateMethodTeste
         scheduler,
         scheduler
       )
-      val generateOneMicroBlockTask = PrivateMethod[Task[MicroBlockMiningResult]](Symbol("generateOneMicroBlockTask"))
 
       def generateBlocks(
           block: Block,
           constraint: MiningConstraint,
           lastMicroBlock: Long
       ): Block = {
-        val task = microBlockMiner invokePrivate generateOneMicroBlockTask(
+        val task = microBlockMiner.generateOneMicroBlockTask(
           acc,
           block,
-          MiningConstraints(d.blockchainUpdater, d.blockchainUpdater.height, Some(settings.minerSettings)),
           constraint,
           lastMicroBlock
         )

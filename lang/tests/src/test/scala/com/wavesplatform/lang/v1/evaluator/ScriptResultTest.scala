@@ -21,7 +21,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class ScriptResultTest extends PropSpec with PropertyChecks with Matchers with NoShrink {
 
   val pureEvalContext : EvaluationContext[Environment, Id] =
-    PureContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment].evaluationContext(utils.environment)
+    PureContext.build(V3).withEnvironment[Environment].evaluationContext(utils.environment)
 
 
   val el       = List.empty[(String, FINAL)]
@@ -38,7 +38,7 @@ class ScriptResultTest extends PropSpec with PropertyChecks with Matchers with N
         "key"   -> CONST_STRING("xxx").explicitGet(),
         "value" -> CONST_LONG(42)
       )
-    ): EVALUATED), false).explicitGet)
+    ): EVALUATED), false).explicitGet())
   )
 
   val transferSetObj = CaseObj(
@@ -61,7 +61,7 @@ class ScriptResultTest extends PropSpec with PropertyChecks with Matchers with N
             "asset"     -> noAsset
           )
         )
-      ), false).explicitGet)
+      ), false).explicitGet())
   )
 
   val scriptResultObj = CaseObj(CASETYPEREF("ScriptResult", el), Map(FieldNames.ScriptWriteSet -> writeSetObj, FieldNames.ScriptTransferSet -> transferSetObj))

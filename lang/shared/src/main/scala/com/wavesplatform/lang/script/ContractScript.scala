@@ -16,7 +16,7 @@ object ContractScript {
 
   private val Global: BaseGlobal = com.wavesplatform.lang.Global // Hack for IDEA
 
-  private def validateBytes(bs: Array[Byte]): Either[String, Unit] =
+  def validateBytes(bs: Array[Byte]): Either[String, Unit] =
     Either.cond(
       bs.length <= MaxContractSizeInBytes,
       (),

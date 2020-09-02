@@ -1,13 +1,15 @@
 package com.wavesplatform
 
 import java.io._
+import java.net.{MalformedURLException, URL}
 
 import akka.actor.ActorSystem
+import com.google.common.io.ByteStreams
 import com.google.common.primitives.Ints
 import com.wavesplatform.Exporter.Formats
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonBlocksApi, CommonTransactionsApi}
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.openDB
@@ -45,7 +47,7 @@ object Importer extends ScorexLogging {
 
   final case class ImportOptions(
       configFile: File = new File("waves-testnet.conf"),
-      blockchainFile: File = new File("blockchain"),
+      blockchainFile: String = "blockchain",
       importHeight: Int = Int.MaxValue,
       format: String = Formats.Binary,
       verify: Boolean = true
@@ -64,7 +66,7 @@ object Importer extends ScorexLogging {
         opt[File]('c', "config")
           .text("Config file name")
           .action((f, c) => c.copy(configFile = f)),
-        opt[File]('i', "input-file")
+        opt[String]('i', "input-file")
           .required()
           .text("Blockchain data file name")
           .action((f, c) => c.copy(blockchainFile = f)),
@@ -161,43 +163,41 @@ object Importer extends ScorexLogging {
   @volatile private var quit = false
   private val lock           = new Object
 
-  def startImport(
-      scheduler: Scheduler,
-      bis: BufferedInputStream,
-      blockchainUpdater: Blockchain,
-      appendBlock: AppendBlock,
-      importOptions: ImportOptions
-  ): Unit = {
-
+  def startImport(bis: BufferedInputStream, blockchain: Blockchain, appendBlock: AppendBlock, importOptions: ImportOptions): Unit = {
     val lenBytes = new Array[Byte](Ints.BYTES)
-    val start    = System.currentTimeMillis()
+    val start    = System.nanoTime()
     var counter  = 0
 
-    val startHeight   = blockchainUpdater.height
+    val startHeight   = blockchain.height
     var blocksToSkip  = startHeight - 1
     val blocksToApply = importOptions.importHeight - startHeight + 1
 
     log.info(s"Skipping $blocksToSkip block(s)")
 
+    sys.addShutdownHook {
+      import scala.concurrent.duration._
+      val millis = (System.nanoTime() - start).nanos.toMillis
+      log.info(s"Imported $counter block(s) from $startHeight to ${startHeight + counter} in ${humanReadableDuration(millis)}")
+    }
+
     while (!quit && counter < blocksToApply) lock.synchronized {
-      val s1 = bis.read(lenBytes)
+      val s1 = ByteStreams.read(bis, lenBytes, 0, Ints.BYTES)
       if (s1 == Ints.BYTES) {
         val len    = Ints.fromByteArray(lenBytes)
         val buffer = new Array[Byte](len)
-        val s2     = bis.read(buffer)
+        val s2     = ByteStreams.read(bis, buffer, 0, len)
         if (s2 == len) {
           if (blocksToSkip > 0) {
             blocksToSkip -= 1
           } else {
-            val blockV5 = blockchainUpdater.isFeatureActivated(
+            val blockV5 = blockchain.isFeatureActivated(
               BlockchainFeatures.BlockV5,
-              blockchainUpdater.height + 1
+              blockchain.height + 1
             )
             val block =
               (if (importOptions.format == Formats.Binary && !blockV5) Block.parseBytes(buffer)
                else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(buffer)), unsafe = true)).get
-
-            if (blockchainUpdater.lastBlockId.contains(block.header.reference)) {
+            if (blockchain.lastBlockId.contains(block.header.reference)) {
               Await.result(appendBlock(block).runAsyncLogErr, Duration.Inf) match {
                 case Left(ve) =>
                   log.error(s"Error appending block: $ve")
@@ -212,13 +212,10 @@ object Importer extends ScorexLogging {
           quit = true
         }
       } else {
-        log.info(s"Expecting to read ${Ints.BYTES} but got $s1 (${bis.available()})")
+        if (bis.available() > 0) log.info(s"Expecting to read ${Ints.BYTES} but got $s1 (${bis.available()})")
         quit = true
       }
     }
-
-    val duration = System.currentTimeMillis() - start
-    log.info(s"Imported $counter block(s) in ${humanReadableDuration(duration)}")
   }
 
   def main(args: Array[String]): Unit = {
@@ -228,7 +225,23 @@ object Importer extends ScorexLogging {
       override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
     }
 
-    val bis = new BufferedInputStream(new FileInputStream(importOptions.blockchainFile), 2 * 1024 * 1024)
+    def initFileStream(file: String): InputStream = {
+      log.info(s"Opening import file: $file")
+      file match {
+        case "-" =>
+          System.in
+
+        case _ =>
+          System.setProperty("http.agent", s"waves-node/${Version.VersionString}")
+          try new URL(file).openStream()
+          catch {
+            case _: MalformedURLException =>
+              new FileInputStream(file)
+          }
+      }
+    }
+
+    val bis = new BufferedInputStream(initFileStream(importOptions.blockchainFile), 2 * 1024 * 1024)
 
     val scheduler = Schedulers.singleThread("appender")
     val time      = new NTP(settings.ntpServer)
@@ -239,7 +252,7 @@ object Importer extends ScorexLogging {
     val db                       = openDB(settings.dbSettings.directory)
     val (blockchainUpdater, levelDb) =
       StorageFactory(settings, db, time, Observer.empty, blockchainUpdateTriggers)
-    val utxPool     = new UtxPoolImpl(time, blockchainUpdater, PublishSubject(), settings.utxSettings, enablePriorityPool = false)
+    val utxPool     = new UtxPoolImpl(time, blockchainUpdater, PublishSubject(), settings.utxSettings)
     val pos         = PoSSelector(blockchainUpdater, settings.synchronizationSettings)
     val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify) _
 
@@ -249,15 +262,36 @@ object Importer extends ScorexLogging {
     sys.addShutdownHook {
       quit = true
       Await.ready(Future.sequence(extensions.map(_.shutdown())), settings.extensionsShutdownTimeout)
-      Await.result(Kamon.stopModules(), 10.seconds)
       Await.result(actorSystem.terminate(), 10.second)
       lock.synchronized {
+        if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG)) {
+          // Force store liquid block in leveldb
+          val lastHeader = blockchainUpdater.lastBlockHeader.get.header
+          val pseudoBlock = Block(
+            BlockHeader(
+              blockchainUpdater.blockVersionAt(blockchainUpdater.height),
+              System.currentTimeMillis(),
+              blockchainUpdater.lastBlockId.get,
+              lastHeader.baseTarget,
+              lastHeader.generationSignature,
+              lastHeader.generator,
+              Nil,
+              0,
+              ByteStr.empty
+            ),
+            ByteStr.empty,
+            Nil
+          )
+          blockchainUpdater.processBlock(pseudoBlock, ByteStr.empty, verify = false)
+        }
+        scheduler.shutdown()
         blockchainUpdater.shutdown()
         levelDb.close()
         db.close()
       }
     }
 
-    startImport(scheduler, bis, blockchainUpdater, extAppender, importOptions)
+    startImport(bis, blockchainUpdater, extAppender, importOptions)
+    Await.result(Kamon.stopModules(), 10.seconds)
   }
 }

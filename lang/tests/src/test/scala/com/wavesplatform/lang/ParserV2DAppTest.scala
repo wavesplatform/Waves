@@ -58,9 +58,9 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
           List(Expressions.ANNOTATION(AnyPos, PART.VALID(AnyPos, "Ann"), List(PART.VALID(AnyPos, "foo")))),
           Expressions.FUNC(
             AnyPos,
+            CONST_LONG(AnyPos, 3),
             PART.VALID(AnyPos, "bar"),
-            List((PART.VALID(AnyPos, "arg"), List((PART.VALID(AnyPos, "Baz"), None)))),
-            CONST_LONG(AnyPos, 3)
+            List((PART.VALID(AnyPos, "arg"), Single(PART.VALID(AnyPos, "Baz"), None)))
           )
         )
       )
@@ -87,9 +87,9 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
       List(
         FUNC(
           AnyPos,
+          TRUE(AnyPos),
           PART.VALID(AnyPos, "foo"),
-          List.empty,
-          TRUE(AnyPos)
+          List.empty
         )
       ),
       List(
@@ -101,9 +101,9 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
           ),
           Expressions.FUNC(
             AnyPos,
+            CONST_LONG(AnyPos, 3),
             PART.VALID(AnyPos, "bar"),
-            List((PART.VALID(AnyPos, "arg"), List((PART.VALID(AnyPos, "Baz"), None)))),
-            CONST_LONG(AnyPos, 3)
+            List((PART.VALID(AnyPos, "arg"), Single(PART.VALID(AnyPos, "Baz"), None)))
           )
         )
       )
@@ -131,9 +131,9 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
       List(
         FUNC(
           AnyPos,
+          TRUE(AnyPos),
           PART.VALID(AnyPos, "foo"),
-          List.empty,
-          TRUE(AnyPos)
+          List.empty
         )
       ),
       List(
@@ -142,9 +142,9 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
           List(Expressions.ANNOTATION(AnyPos, PART.VALID(AnyPos, "Ann"), List(PART.VALID(AnyPos, "foo")))),
           Expressions.FUNC(
             AnyPos,
+            CONST_LONG(AnyPos, 3),
             PART.VALID(AnyPos, "bar"),
-            List((PART.VALID(AnyPos, "arg"), List((PART.VALID(AnyPos, "Baz"), None)))),
-            CONST_LONG(AnyPos, 3)
+            List((PART.VALID(AnyPos, "arg"), Single(PART.VALID(AnyPos, "Baz"), None)))
           )
         )
       )
@@ -191,9 +191,9 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
           List(Expressions.ANNOTATION(AnyPos, PART.VALID(AnyPos, "Ann"), List(PART.VALID(AnyPos, "foo")))),
           Expressions.FUNC(
             AnyPos,
+            CONST_LONG(AnyPos, 3),
             PART.VALID(AnyPos, "bar"),
-            List((PART.VALID(AnyPos, "arg"), List((PART.VALID(AnyPos, "Baz"), None)))),
-            CONST_LONG(AnyPos, 3)
+            List((PART.VALID(AnyPos, "arg"), Single(PART.VALID(AnyPos, "Baz"), None)))
           )
         )
       )

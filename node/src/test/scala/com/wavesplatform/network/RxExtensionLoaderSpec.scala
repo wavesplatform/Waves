@@ -31,10 +31,10 @@ class RxExtensionLoaderSpec extends FreeSpec with Matchers with TransactionGen w
           PS[(Channel, Signatures)],
           PS[ChannelClosedAndSyncWith],
           Observable[(Channel, Block)]) => Any) = {
-    val blocks          = PS[(Channel, Block)]
-    val sigs            = PS[(Channel, Signatures)]
-    val ccsw            = PS[ChannelClosedAndSyncWith]
-    val timeout         = PS[Channel]
+    val blocks          = PS[(Channel, Block)]()
+    val sigs            = PS[(Channel, Signatures)]()
+    val ccsw            = PS[ChannelClosedAndSyncWith]()
+    val timeout         = PS[Channel]()
     val op              = PeerDatabase.NoOp
     val invBlockStorage = new InMemoryInvalidBlockStorage
     val (singleBlocks, _, _) =

@@ -230,9 +230,9 @@ object Diff {
     )
 
   private def toDiffTxData(
-    tx: Transaction,
-    portfolios: Map[Address, Portfolio],
-    accountData: Map[Address, AccountDataInfo]
+      tx: Transaction,
+      portfolios: Map[Address, Portfolio],
+      accountData: Map[Address, AccountDataInfo]
   ): (ByteStr, NewTransactionInfo) =
     tx.id() -> NewTransactionInfo(tx, (portfolios.keys ++ accountData.keys).toSet, true)
 
@@ -279,5 +279,8 @@ object Diff {
   implicit class DiffExt(private val d: Diff) extends AnyVal {
     def errorMessage(txId: ByteStr): Option[InvokeScriptResult.ErrorMessage] =
       d.scriptResults.get(txId).flatMap(_.error)
+
+    def hashString: String =
+      Integer.toHexString(d.hashCode())
   }
 }

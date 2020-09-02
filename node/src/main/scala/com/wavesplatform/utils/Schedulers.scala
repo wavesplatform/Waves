@@ -133,7 +133,7 @@ object Schedulers {
 
   // Catches InterruptedException correctly
   def executeCatchingInterruptedException[T](pool: Scheduler)(f: => T): Future[T] = {
-    val promise = Promise[T]
+    val promise = Promise[T]()
     pool.execute { () =>
       try promise.success(f)
       catch { case e @ (NonFatal(_) | _: InterruptedException) => promise.failure(e) }

@@ -103,8 +103,9 @@ object Dependencies {
       compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
       "com.softwaremill.sttp" %%% "core" % "1.6.4",
       "com.wavesplatform"     % "zwaves" % "0.1.0-SNAPSHOT",
+      "com.wavesplatform"     % "zwaves-bn256" % "0.1.5-SNAPSHOT",
       "org.web3j" % "crypto" % "4.5.18"
-    ) ++ scalapbRuntime.value ++ circe.value
+    ) ++ scalapbRuntime.value ++ circe.value ++ protobuf.value
   )
 
   lazy val it = scalaTest +: Seq(
@@ -128,12 +129,10 @@ object Dependencies {
   )
 
   private[this] val levelDBJNA = {
-    val levelDbVersion = "1.22.1"
+    val levelDbVersion = "1.22.3"
     Seq(
       "com.wavesplatform.leveldb-jna" % "leveldb-jna-core"   % levelDbVersion,
-      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion classifier "linux-x86_64",
-      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion classifier "windows-x86_64",
-      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion classifier "osx"
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion
     )
   }
 
@@ -161,7 +160,7 @@ object Dependencies {
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test,
       ("org.iq80.leveldb" % "leveldb" % "0.12").exclude("com.google.guava", "guava") % Test
-    ) ++ protobuf.value ++ test ++ console ++ logDeps ++ levelDBJNA
+    ) ++ test ++ console ++ logDeps ++ levelDBJNA
   )
 
   private[this] val protoSchemasLib =
@@ -187,7 +186,7 @@ object Dependencies {
   )
 
   lazy val circe = Def.setting {
-    val circeVersion = "0.12.3"
+    val circeVersion = "0.13.0"
     Seq(
       "io.circe" %%% "circe-core",
       "io.circe" %%% "circe-generic",

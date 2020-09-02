@@ -21,17 +21,9 @@ object ExchangeTransactionDiff {
     val seller  = tx.sellOrder.senderPublicKey.toAddress
 
     val assetIds =
-      Set(
-        tx.buyOrder.assetPair.amountAsset,
-        tx.buyOrder.assetPair.priceAsset,
-        tx.buyOrder.matcherFeeAssetId,
-        tx.sellOrder.assetPair.amountAsset,
-        tx.sellOrder.assetPair.priceAsset,
-        tx.sellOrder.matcherFeeAssetId
-      ).collect {
+      List(tx.buyOrder.assetPair.amountAsset, tx.buyOrder.assetPair.priceAsset, tx.sellOrder.assetPair.amountAsset, tx.sellOrder.assetPair.priceAsset).collect {
         case asset: IssuedAsset => asset
-      }.toVector
-
+      }.distinct
     val assets = assetIds.map(id => id -> blockchain.assetDescription(id)).toMap
 
     val smartTradesEnabled = blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading)

@@ -62,7 +62,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def containsTransaction(tx: Transaction): Boolean = transactionIds.containsKey(tx.id()) || {
     if (tx.timestamp - 2.hours.toMillis <= oldestStoredBlockTimestamp) {
       LevelDBStats.miss.record(1)
-      transactionHeight(tx.id()).nonEmpty
+      transactionMeta(tx.id()).nonEmpty
     } else {
       false
     }

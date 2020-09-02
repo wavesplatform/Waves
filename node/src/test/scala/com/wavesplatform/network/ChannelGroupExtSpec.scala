@@ -37,7 +37,7 @@ class ChannelGroupExtSpec extends FreeSpec with Matchers with MockFactory {
       val allIds      = (0 to 5).toSet
       val allChannels = allIds.map(receiver)
 
-      val excludedChannels = allChannels.filter(_ => Random.nextBoolean)
+      val excludedChannels = allChannels.filter(_ => Random.nextBoolean())
       val excludedIds      = excludedChannels.map(_.id.asLongText().toInt)
 
       allChannels.foreach(channelGroup.add)

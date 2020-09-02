@@ -29,6 +29,9 @@ object MicroblockAppender extends ScorexLogging {
       blockchainUpdater
         .processMicroBlock(microBlock, verify)
         .map { totalBlockId =>
+          if (microBlock.transactionData.nonEmpty) log.trace {
+            s"Removing mined txs from ${microBlock.stringRepr(totalBlockId)}: ${microBlock.transactionData.map(_.id()).mkString(", ")}"
+          }
           utxStorage.removeAll(microBlock.transactionData)
           totalBlockId
         }

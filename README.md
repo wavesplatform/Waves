@@ -121,9 +121,10 @@ Create a Docker image before you run any test:
 sbt node-it/docker
 ```
 
-- Run all tests. You can increase or decrease number of parallel running tests by changing `SBT_THREAD_NUMBER`
+- Run all tests. You can increase or decrease number of parallel running tests by changing `waves.it.max-parallel-suites`
+system property:
 ```bash
-SBT_THREAD_NUMBER=4 sbt node-it/test
+sbt -Dwaves.it.max-parallel-suites=1 node-it/test
 ```
 
 - Run one test:

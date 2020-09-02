@@ -11,7 +11,7 @@ import com.wavesplatform.database.{DBExt, LevelDBWriter}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{BlockchainUpdater, DiscardedTransactions, _}
+import com.wavesplatform.transaction.{BlockchainUpdater, _}
 import org.iq80.leveldb.DB
 
 case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter) {
@@ -26,7 +26,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def effBalance(a: Address): Long = blockchainUpdater.effectiveBalance(a, 1000)
 
-  def appendBlock(b: Block): Option[DiscardedTransactions] = blockchainUpdater.processBlock(b).explicitGet()
+  def appendBlock(b: Block): Seq[Diff] = blockchainUpdater.processBlock(b).explicitGet()
 
   def removeAfter(blockId: ByteStr): DiscardedBlocks = blockchainUpdater.removeAfter(blockId).explicitGet()
 
@@ -45,10 +45,10 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       .toSeq
   }
 
-  def addressTransactions(address: Address, from: Option[ByteStr] = None): Seq[(Height, Transaction)] = db.withResource { resource =>
+  def addressTransactions(address: Address, from: Option[ByteStr] = None): Seq[(Height, Transaction)] =
     AddressTransactions
       .allAddressTransactions(
-        resource,
+        db,
         blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
         address,
         None,
@@ -57,7 +57,6 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       )
       .map { case (h, tx, _) => h -> tx }
       .toSeq
-  }
 
   def portfolio(address: Address): Seq[(IssuedAsset, Long)] = Domain.portfolio(address, db, blockchainUpdater)
 
@@ -102,7 +101,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
 object Domain {
   implicit class BlockchainUpdaterExt[A <: BlockchainUpdater](bcu: A) {
-    def processBlock(block: Block): Either[ValidationError, Option[DiscardedTransactions]] =
+    def processBlock(block: Block): Either[ValidationError, Seq[Diff]] =
       bcu.processBlock(block, block.header.generationSignature)
   }
 

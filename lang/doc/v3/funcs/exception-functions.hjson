@@ -5,12 +5,14 @@
       params: [ ]
       doc: "Raises an exception."
       paramsDoc: [ ]
+      complexity: 1
     }
     {
       name: "throw"
       params: [ "String" ]
       doc: "Raises an exception with a message."
       paramsDoc: [ "The exception message." ]
+      complexity: 1
     }
   ]
 }

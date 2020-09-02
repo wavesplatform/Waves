@@ -34,8 +34,8 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
         .foreach { asset =>
           (bc.assetDescription _).when(asset).returns(mkAssetDescription(asset.id, tx.sender, 8, None))
           (bc.assetScript _).when(asset).returns(None)
-          (bc.activatedFeatures _).when().returns(Map())
-          (bc.settings _).when().returns(BlockchainSettings(
+          (() => bc.activatedFeatures).when().returns(Map())
+          (() => bc.settings).when().returns(BlockchainSettings(
             addressSchemeCharacter = 'N',
             functionalitySettings = TestFunctionalitySettings.Enabled,
             genesisSettings = GenesisSettings.TESTNET,
@@ -54,7 +54,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
       (bc.accountScript _).when(tx.buyOrder.sender.toAddress).returns(Some(AccountScriptInfo(tx.buyOrder.sender, script, complexity)))
       (bc.accountScript _).when(tx.sender.toAddress).returns(None)
 
-      (bc.height _).when().returns(0)
+      (() => bc.height).when().returns(0)
 
       verify(bc, tx).explicitGet()
     }
@@ -105,7 +105,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
   ): ValidationResult[Transaction] = {
 
     val blockchain = stub[Blockchain]
-    (blockchain.settings _).when().returns(BlockchainSettings(
+    (() => blockchain.settings).when().returns(BlockchainSettings(
       addressSchemeCharacter = 'N',
       functionalitySettings = TestFunctionalitySettings.Enabled,
       genesisSettings = GenesisSettings.TESTNET,
@@ -113,7 +113,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
     ))
 
     def activate(features: (BlockchainFeature, Int)*): Unit = {
-      (blockchain.activatedFeatures _).when().returns(features.map(x => x._1.id -> x._2).toMap).anyNumberOfTimes()
+      (() => blockchain.activatedFeatures).when().returns(features.map(x => x._1.id -> x._2).toMap).anyNumberOfTimes()
     }
 
     activate(BlockchainFeatures.SmartAccountTrading -> 0, BlockchainFeatures.OrderV3 -> 0, BlockchainFeatures.SmartAssets -> 0)
@@ -136,7 +136,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
       (blockchain.accountScript _).when(address).returns(None)
     }
 
-    (blockchain.height _).when().returns(0)
+    (() => blockchain.height).when().returns(0)
 
     verify(blockchain, tx)
   }
@@ -144,7 +144,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
   def verify(blockchain: Blockchain, tx: Transaction): ValidationResult[Transaction] =
     (for {
       _ <- Verifier(blockchain)(tx)
-      _ <- Verifier.assets(blockchain)(tx).leftMap { case (_, ve) => ve }
+      _ <- Verifier.assets(blockchain, Int.MaxValue)(tx).leftMap { case (_, ve) => ve }
     } yield tx).resultE
 
 }
