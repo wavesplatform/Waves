@@ -186,7 +186,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(false))
 
     def check(): Unit = {
-      val failed = sender.transactionStatus(txs).dropWhile(_.applicationStatus == "succeeded")
+      val failed = sender.transactionStatus(txs).dropWhile(_.applicationStatus.contains("succeeded"))
       failed should not be empty
 
       all(failed.map(_.status)) shouldBe "confirmed"
@@ -231,7 +231,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
 
     def check(): Unit = {
-      val failed = sender.transactionStatus(txs).dropWhile(_.applicationStatus == "succeeded")
+      val failed = sender.transactionStatus(txs).dropWhile(_.applicationStatus.contains("succeeded"))
       failed should not be empty
 
       all(failed.map(_.status)) shouldBe "confirmed"
