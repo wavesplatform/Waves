@@ -52,11 +52,10 @@ class RollbackSuite
     val stateAfterFirstTry = nodes.head.debugStateAt(stateHeight)
 
     nodes.rollback(startHeight)
-    nodes.waitForHeightArise()
     nodes.waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
     nodes.waitForHeightArise()
 
-    val stateAfterSecondTry = nodes.head.debugStateAt(nodes.head.height)
+    val stateAfterSecondTry = nodes.head.debugStateAt(stateHeight)
     stateAfterSecondTry.toSet shouldBe stateAfterFirstTry.toSet
   }
 
