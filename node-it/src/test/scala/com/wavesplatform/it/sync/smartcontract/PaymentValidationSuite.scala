@@ -15,7 +15,7 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 
 class PaymentValidationSuite extends BaseTransactionSuite {
 
-  test("prerequisite: set contract") {
+  test("payment's validation order check") {
     val dApp = firstKeyPair
     val caller = secondKeyPair
     val (wrKey, wrValue) = ("key", "value")
