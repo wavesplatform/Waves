@@ -56,8 +56,11 @@ class BlockchainUpdaterImpl(
 
   private lazy val maxBlockReadinessAge = wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
 
-  private var ngState: Option[NgState]              = Option.empty
-  private var restTotalConstraint: MiningConstraint = MiningConstraints(leveldb, leveldb.height).total
+  @volatile
+  private[this] var ngState: Option[NgState] = Option.empty
+
+  @volatile
+  private[this] var restTotalConstraint: MiningConstraint = MiningConstraints(leveldb, leveldb.height).total
 
   private val internalLastBlockInfo = ReplaySubject.createLimited[LastBlockInfo](1)
 
@@ -294,7 +297,8 @@ class BlockchainUpdaterImpl(
 
                         val liquidDiffWithCancelledLeases = ng.cancelExpiredLeases(referencedLiquidDiff)
 
-                        val referencedBlockchain = CompositeBlockchain(leveldb, Some(liquidDiffWithCancelledLeases), Some(referencedForgedBlock), carry, reward)
+                        val referencedBlockchain =
+                          CompositeBlockchain(leveldb, Some(liquidDiffWithCancelledLeases), Some(referencedForgedBlock), carry, reward)
                         val maybeDiff = BlockDiffer
                           .fromBlock(
                             referencedBlockchain,
@@ -304,19 +308,27 @@ class BlockchainUpdaterImpl(
                             verify
                           )
 
-                        maybeDiff.map { differResult =>
-                          val tempBlockchain = CompositeBlockchain(referencedBlockchain, Some(differResult.diff), Some(block), differResult.carry, reward, Some(hitSource))
-                          miner.scheduleMining(Some(tempBlockchain))
+                        maybeDiff.map {
+                          differResult =>
+                            val tempBlockchain = CompositeBlockchain(
+                              referencedBlockchain,
+                              Some(differResult.diff),
+                              Some(block),
+                              differResult.carry,
+                              reward,
+                              Some(hitSource)
+                            )
+                            miner.scheduleMining(Some(tempBlockchain))
 
-                          leveldb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
-                          BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
-                          TxsInBlockchainStats.record(ng.transactions.size)
-                          val (discardedMbs, discardedDiffs) = discarded.unzip
-                          if (discardedMbs.nonEmpty) {
-                            log.trace(s"Discarded microblocks: $discardedMbs")
-                          }
+                            leveldb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
+                            BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
+                            TxsInBlockchainStats.record(ng.transactions.size)
+                            val (discardedMbs, discardedDiffs) = discarded.unzip
+                            if (discardedMbs.nonEmpty) {
+                              log.trace(s"Discarded microblocks: $discardedMbs")
+                            }
 
-                          Some((differResult, discardedDiffs, reward, hitSource))
+                            Some((differResult, discardedDiffs, reward, hitSource))
                         }
                       } else {
                         val errorText = s"Forged block has invalid signature. Base: ${ng.base}, requested reference: ${block.header.reference}"
