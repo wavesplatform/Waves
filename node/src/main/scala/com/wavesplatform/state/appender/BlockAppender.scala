@@ -70,7 +70,7 @@ object BlockAppender extends ScorexLogging {
         log.debug(s"${id(ch)} Appended $newBlock")
 
         span.markNtp("block.applied")
-        span.finish()
+        span.finishNtp()
         BlockStats.applied(newBlock, BlockStats.Source.Broadcast, blockchainUpdater.height)
         if (newBlock.transactionData.isEmpty) allChannels.broadcast(BlockForged(newBlock), Some(ch)) // Key block
 
@@ -82,7 +82,7 @@ object BlockAppender extends ScorexLogging {
 
         span.markNtp("block.declined")
         span.fail(ve.toString)
-        span.finish()
+        span.finishNtp()
 
         BlockStats.declined(newBlock, BlockStats.Source.Broadcast)
     }
@@ -105,7 +105,13 @@ object BlockAppender extends ScorexLogging {
 
     implicit class SpanExt(private val span: Span) extends AnyVal {
       def markNtp(name: String)(implicit time: Time): Span =
-        span.mark(name, Instant.ofEpochMilli(time.correctedTime()))
+        span.mark(name, ntpTime)
+
+      def finishNtp()(implicit time: Time): Unit =
+        span.finish(ntpTime)
+
+      private[this] def ntpTime(implicit time: Time) =
+        Instant.ofEpochMilli(time.correctedTime())
     }
   }
 }
