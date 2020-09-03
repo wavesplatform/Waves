@@ -11,10 +11,16 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer._
 import org.scalatest.CancelAfterFailure
+import play.api.libs.json.Json
 
 import scala.concurrent.duration._
 
 class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
+  test("transfer with empty string assetId") {
+    val tx = TransferTransaction.selfSigned(2.toByte, sender.keyPair, sender.keyPair.toAddress, Waves, 100L, Waves, minFee, ByteStr.empty, System.currentTimeMillis()).explicitGet()
+    val json = tx.json() ++ Json.obj("assetId" -> "", "feeAssetId" -> "")
+    sender.signedBroadcast(json, waitForTx = true)
+  }
 
   test("asset transfer changes sender's and recipient's asset balance; issuer's.waves balance is decreased by fee") {
     for (v <- transferTxSupportedVersions) {
