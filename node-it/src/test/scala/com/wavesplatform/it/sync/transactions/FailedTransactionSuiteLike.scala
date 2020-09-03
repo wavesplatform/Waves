@@ -30,7 +30,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
     * @param pt priority transaction sender
     * @param checker transactions checker (will be executed twice - immediately after emptying the utx pool and then after height arising)
     */
-  def sendPriorityTxAndThenOtherTxs[S](t: Int => T, pt: () => T)(
+  def sendTxsAndThenPriorityTx[S](t: Int => T, pt: () => T)(
       checker: (Seq[T], T) => Seq[S]
   ): Seq[S] = {
     val maxTxsInMicroBlock = sender.config.getInt("waves.miner.max-transactions-in-micro-block")
@@ -142,7 +142,9 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                    |
                    |match (tx) {
                    |  case _: SetScriptTransaction => true
-                   |  case _ => $r
+                   |  case _ =>
+                   |    let check = ${"sigVerify(base58'', base58'', base58'') ||" * 16} false
+                   |    if (check) then false else $r
                    |}
                    |""".stripMargin,
                 ScriptEstimatorV3
