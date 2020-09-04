@@ -713,7 +713,7 @@ class UtxPoolSpecification
 
             case tx => Diff(tx)
           }
-          utx.addAndCleanupPriority(asDiffs)
+          utx.priorityPool.addPriorityDiffs(asDiffs)
         }
       }
 
@@ -845,6 +845,7 @@ class UtxPoolSpecification
           val utx =
             new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
           utx.addPriorityTxs(Seq(tx1, tx2))
+          utx.runCleanup()
 
           eventually(Timeout(5 seconds), Interval(50 millis))(utx.all shouldBe empty)
       }

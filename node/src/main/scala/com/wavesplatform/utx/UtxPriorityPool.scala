@@ -79,8 +79,7 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging {
     } yield pf.pessimistic)
 
   def nextMicroBlockSize(): Option[Int] = priorityDiffs.synchronized {
-    val maybeSize = priorityDiffs.headOption.map(_.transactions.size)
-    maybeSize
+    priorityDiffs.headOption.map(_.transactions.size)
   }
 
   private[this] implicit class DiffExt(diff: Diff) {

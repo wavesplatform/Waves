@@ -29,7 +29,8 @@ class MicroBlockMinerImpl(
     utx: UtxPool,
     settings: MinerSettings,
     minerScheduler: SchedulerService,
-    appenderScheduler: SchedulerService
+    appenderScheduler: SchedulerService,
+    nextMicroBlockHint: () => Option[Int]
 ) extends MicroBlockMiner
     with ScorexLogging {
 
@@ -67,7 +68,7 @@ class MicroBlockMinerImpl(
         val mdConstraint = MultiDimensionalMiningConstraint(
           restTotalConstraint,
           OneDimensionalMiningConstraint(
-            utx.nextMicroBlockSize().getOrElse(0).max(settings.maxTransactionsInMicroBlock),
+            nextMicroBlockHint().getOrElse(0).max(settings.maxTransactionsInMicroBlock),
             TxEstimators.one,
             "MaxTxsInMicroBlock"
           )

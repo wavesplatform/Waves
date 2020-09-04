@@ -77,7 +77,8 @@ class MinerImpl(
     utx,
     settings.minerSettings,
     minerScheduler,
-    appenderScheduler
+    appenderScheduler,
+    () => utx.priorityPool.nextMicroBlockSize()
   )
 
   def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] =
@@ -316,7 +317,7 @@ class MinerImpl(
 
   //noinspection TypeAnnotation,ScalaStyle
   private[this] object metrics {
-    val blockBuildTimeStats      = Kamon.timer("miner.pack-and-forge-block-time").withoutTags()
+    val blockBuildTimeStats = Kamon.timer("miner.pack-and-forge-block-time").withoutTags()
   }
 }
 

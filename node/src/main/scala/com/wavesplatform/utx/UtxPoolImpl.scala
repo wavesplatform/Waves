@@ -470,13 +470,9 @@ class UtxPoolImpl(
     TxCleanup.runCleanupAsync()
   }
 
-  def addAndCleanupPriority(discDiffs: Seq[Diff]): Unit = {
-    priorityPool.addPriorityDiffs(discDiffs)
+  def runCleanup(): Unit = {
     TxCleanup.runCleanupAsync()
   }
-
-  def nextMicroBlockSize(): Option[Int] =
-    priorityPool.nextMicroBlockSize()
 
   override def close(): Unit = {
     import scala.concurrent.duration._

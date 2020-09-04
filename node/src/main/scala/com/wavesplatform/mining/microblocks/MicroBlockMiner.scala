@@ -28,7 +28,8 @@ object MicroBlockMiner {
       utx: UtxPool,
       settings: MinerSettings,
       minerScheduler: SchedulerService,
-      appenderScheduler: SchedulerService
+      appenderScheduler: SchedulerService,
+      nextMicroBlockHint: () => Option[Int]
   ): MicroBlockMiner =
     new MicroBlockMinerImpl(
       setDebugState,
@@ -37,6 +38,7 @@ object MicroBlockMiner {
       utx,
       settings,
       minerScheduler,
-      appenderScheduler
+      appenderScheduler,
+      nextMicroBlockHint
     )
 }

@@ -84,14 +84,15 @@ package object appender extends ScorexLogging {
       baseHeight <- appendBlock(blockchainUpdater, utxStorage, verify = true)(block, hitSource)
     } yield baseHeight
 
-  private def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPoolImpl, verify: Boolean)(
+  private def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain, utx: UtxPoolImpl, verify: Boolean)(
       block: Block,
       hitSource: ByteStr
   ): Either[ValidationError, Option[Int]] = {
-    utxStorage.priorityPool.lock {
+    utx.priorityPool.lock {
       metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify)).map { discDiffs =>
-        metrics.utxRemoveAll.measure(utxStorage.removeAll(block.transactionData))
-        metrics.utxDiscardedPut.measure(utxStorage.addAndCleanupPriority(discDiffs))
+        metrics.utxRemoveAll.measure(utx.removeAll(block.transactionData))
+        utx.priorityPool.addPriorityDiffs(discDiffs)
+        utx.runCleanup()
         Some(blockchainUpdater.height)
       }
     }
@@ -146,7 +147,6 @@ package object appender extends ScorexLogging {
     val blockConsensusValidation = Kamon.timer("block-appender.block-consensus-validation").withoutTags()
     val appendBlock              = Kamon.timer("block-appender.blockchain-append-block").withoutTags()
     val utxRemoveAll             = Kamon.timer("block-appender.utx-remove-all").withoutTags()
-    val utxDiscardedPut          = Kamon.timer("block-appender.utx-discarded-put").withoutTags()
   }
 
 }
