@@ -68,7 +68,9 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging {
     (factRemoved.result(), notRemoved.result())
   }
 
-  def contains(txId: ByteStr): Boolean = priorityDiffs.synchronized(priorityDiffs.exists(_.contains(txId)))
+  def transactionById(txId: ByteStr): Option[Transaction] = priorityDiffs.synchronized(priorityDiffsCombined.transactions.get(txId).map(_.transaction))
+
+  def contains(txId: ByteStr): Boolean = transactionById(txId).nonEmpty
 
   def pessimisticPortfolios(addr: Address): Seq[Portfolio] =
     priorityDiffs.synchronized(for {

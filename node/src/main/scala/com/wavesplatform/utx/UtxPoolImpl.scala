@@ -236,7 +236,9 @@ class UtxPoolImpl(
 
   override def size: Int = transactions.size
 
-  override def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
+  override def transactionById(transactionId: ByteStr): Option[Transaction] =
+    Option(transactions.get(transactionId))
+      .orElse(priorityPool.transactionById(transactionId))
 
   private def scriptedAddresses(tx: Transaction): Set[Address] = tx match {
     case i: InvokeScriptTransaction =>
