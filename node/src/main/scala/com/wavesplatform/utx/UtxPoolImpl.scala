@@ -62,6 +62,7 @@ class UtxPoolImpl(
 
   // State
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
+  private[this] val continuationNonces    = new ConcurrentHashMap[ByteStr, Int]()
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionMeta(_).isDefined) // TODO delete in the future
 
   private[this] val priorityDiffs          = mutable.LinkedHashSet.empty[Diff]
@@ -427,8 +428,20 @@ class UtxPoolImpl(
       }
 
       blockchain.continuationStates
-        .collect { case (invokeTxId, ContinuationState.InProgress(nonce, _, _)) => ContinuationTransaction(invokeTxId, time.getTimestamp(), nonce) }
-        .foreach(putIfNew(_))
+        .foreach {
+          case (invokeId, ContinuationState.InProgress(nonce, _, _)) =>
+            continuationNonces.compute(
+              invokeId,
+              (_, expectingNonce) =>
+                if (nonce == expectingNonce) {
+                  putIfNew(ContinuationTransaction(invokeId, time.getTimestamp(), nonce))
+                  nonce + 1
+                } else {
+                  expectingNonce
+                }
+            )
+          case _ => ()
+        }
 
       loop(PackResult(None, Monoid[Diff].empty, initialConstraint, 0, Set.empty, Set.empty, Set.empty))
     }
