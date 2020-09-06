@@ -433,13 +433,15 @@ class UtxPoolImpl(
             continuationNonces.compute(
               invokeId,
               (_, expectingNonce) =>
-                if (nonce == expectingNonce) {
+                if (nonce >= expectingNonce) {
                   putIfNew(ContinuationTransaction(invokeId, time.getTimestamp(), nonce))
                   nonce + 1
                 } else {
                   expectingNonce
                 }
             )
+          case (invokeId, ContinuationState.Finished) =>
+            continuationNonces.remove(invokeId)
           case _ => ()
         }
 
