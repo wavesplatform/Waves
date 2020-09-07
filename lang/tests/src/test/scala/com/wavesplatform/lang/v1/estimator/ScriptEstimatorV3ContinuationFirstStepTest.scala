@@ -182,7 +182,7 @@ class ScriptEstimatorV3ContinuationFirstStepTest extends ScriptEstimatorTestBase
       cost(== 4)              =  1
       cost(if)                =  1
       cost(ref(@address))     =  1 - from expansion getIntegerValue
-      cost(ref(@key))     ````=  1 - from expansion getIntegerValue
+      cost(ref(@key))         =  1 - from expansion getIntegerValue
       cost(s+"y")             = 20
       cost(getInteger)        = 10
     */
