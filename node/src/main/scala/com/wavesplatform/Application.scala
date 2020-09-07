@@ -535,7 +535,7 @@ object Application extends ScorexLogging {
       case "explore"                => Explorer.main(args.tail)
       case "util"                   => UtilApp.main(args.tail)
       case "help" | "--help" | "-h" => println("Usage: waves <config> | export | import | explore | util")
-      case _                        => startNode(args.headOption)
+      case _                        => startNode(args.headOption) // TODO: Consider adding option to specify network-name
     }
   }
 
