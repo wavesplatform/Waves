@@ -1,7 +1,6 @@
 package com.wavesplatform.it
 
 import java.net.{InetSocketAddress, URL}
-import java.util.concurrent.TimeUnit
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.{KeyPair, PublicKey}
@@ -30,8 +29,6 @@ abstract class Node(val config: Config) extends AutoCloseable {
 
   lazy val grpcChannel: ManagedChannel = ManagedChannelBuilder.forAddress(networkAddress.getHostString, nodeExternalPort(6870))
     .usePlaintext()
-    .keepAliveWithoutCalls(true)
-    .keepAliveTime(30, TimeUnit.SECONDS)
     .build()
 
   private[this] val wallet = Wallet(settings.walletSettings.copy(file = None))

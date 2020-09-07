@@ -114,12 +114,7 @@ object CommonAccountsApi extends ScorexLogging {
     override def resolveAlias(alias: Alias): Either[ValidationError, Address] = blockchain.resolveAlias(alias)
 
     override def activeLeases(address: Address): Observable[(Height, LeaseTransaction)] = {
-      def leaseIsActive(id: ByteStr): Boolean = {
-        val leaseDetails = blockchain.leaseDetails(id)
-        val active       = leaseDetails.exists(_.isActive)
-        log.info(s"Lease $id: $leaseDetails, active=$active")
-        active
-      }
+      def leaseIsActive(id: ByteStr): Boolean = blockchain.leaseDetails(id).exists(_.isActive)
       common.activeLeases(db, Some(Height(blockchain.height) -> diff), address, leaseIsActive)
     }
   }
