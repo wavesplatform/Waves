@@ -137,7 +137,7 @@ object PureContext {
   lazy val valueOrElse: BaseFunction[NoContext] =
     UserFunction(
       "valueOrElse",
-      Map[StdLibVersion, Long](V1 -> 13, V2 -> 13, V3 -> 13, V4 -> 2),
+      2,
       TYPEPARAM('T'),
       ("@value", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT))),
       ("@alternative", TYPEPARAM('T'))
@@ -345,7 +345,7 @@ object PureContext {
   lazy val listAppend: NativeFunction[NoContext] =
     NativeFunction(
       LIST_APPEND_OP.func,
-      Map[StdLibVersion, Long](V1 -> 3L, V2 -> 3L, V3 -> 3L, V4 -> 1L),
+      1,
       APPEND_LIST,
       PARAMETERIZEDLIST(PARAMETERIZEDUNION(List(TYPEPARAM('A'), TYPEPARAM('B')))),
       ("list", PARAMETERIZEDLIST(TYPEPARAM('A'))),
@@ -358,7 +358,7 @@ object PureContext {
   lazy val listConcat: NativeFunction[NoContext] =
     NativeFunction(
       LIST_CONCAT_OP.func,
-      Map[StdLibVersion, Long](V1 -> 10L, V2 -> 10L, V3 -> 10L, V4 -> 4L),
+      4,
       CONCAT_LIST,
       PARAMETERIZEDLIST(PARAMETERIZEDUNION(List(TYPEPARAM('A'), TYPEPARAM('B')))),
       ("list1", PARAMETERIZEDLIST(TYPEPARAM('A'))),
@@ -613,7 +613,7 @@ object PureContext {
   lazy val contains: BaseFunction[NoContext] =
     UserFunction(
       "contains",
-      Map[StdLibVersion, Long](V1 -> 20L, V2 -> 20L, V3 -> 20L, V4 -> 3L),
+      3,
       BOOLEAN,
       ("@source", STRING), ("@substr", STRING)
     ) {
