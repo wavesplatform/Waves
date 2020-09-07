@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract
 
+import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -8,19 +9,22 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_STRING
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import org.scalatest.CancelAfterFailure
 
 class InvokeSelfPaymentSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  private val caller = firstAddress
-  private val dAppV4 = secondAddress
-  private val dAppV3 = thirdAddress
+  private def caller = firstKeyPair
+  private def dAppV4 = secondKeyPair
+  private def dAppV3 = thirdKeyPair
 
   private var asset1: IssuedAsset = _
-  private def asset1Id = asset1.id.toString
+  private def asset1Id            = asset1.id.toString
+
+  private lazy val dAppV3Address: String = dAppV3.toAddress.toString
+  private lazy val dAppV4Address: String = dAppV4.toAddress.toString
 
   test("prerequisite: set contract") {
     asset1 = IssuedAsset(ByteStr.decodeBase58(sender.issue(caller, waitForTx = true).id).get)
@@ -61,7 +65,7 @@ class InvokeSelfPaymentSuite extends BaseTransactionSuite with CancelAfterFailur
 
     sender.massTransfer(
       caller,
-      List(Transfer(dAppV4, 1000), Transfer(dAppV3, 1000)),
+      List(Transfer(dAppV4Address, 1000), Transfer(dAppV3Address, 1000)),
       smartMinFee,
       assetId = Some(asset1Id),
       waitForTx = true
@@ -70,38 +74,54 @@ class InvokeSelfPaymentSuite extends BaseTransactionSuite with CancelAfterFailur
 
   test("V4: can't invoke itself with payment") {
     for (payment <- List(
-      Seq(Payment(1, Waves)),
-      Seq(Payment(1, asset1)),
-      Seq(Payment(1, Waves), Payment(1, asset1))
-    )) {
-      val tx = sender.invokeScript(dAppV4, dAppV4, payment = payment, fee = smartMinFee + smartFee, waitForTx = true)._1.id
-      sender.debugStateChanges(tx).stateChanges.get.error.get.text should include("DApp self-payment is forbidden since V4")
+           Seq(InvokeScriptTransaction.Payment(1, Waves)),
+           Seq(InvokeScriptTransaction.Payment(1, asset1)),
+           Seq(InvokeScriptTransaction.Payment(1, Waves), InvokeScriptTransaction.Payment(1, asset1))
+         )) {
+      assertApiError(
+        sender.invokeScript(dAppV4, dAppV4Address, payment = payment, fee = smartMinFee + smartFee),
+        AssertiveApiError(ScriptExecutionError.Id, "DApp self-payment is forbidden since V4", matchMessage = true)
+      )
     }
   }
 
   test("V4: still can invoke itself without any payment") {
-    sender.invokeScript(dAppV4, dAppV4, fee = smartMinFee + smartFee, waitForTx = true)
+    sender.invokeScript(dAppV4, dAppV4Address, fee = smartMinFee + smartFee, waitForTx = true)
   }
 
   test("V4: can't send tokens to itself from a script") {
     for (args <- List(
-      List(CONST_STRING("WAVES").explicitGet()),
-      List(CONST_STRING(asset1Id).explicitGet())
-    )) {
-      val tx = sender.invokeScript(caller, dAppV4, Some("paySelf"), args, waitForTx = true)._1.id
-      sender.debugStateChanges(tx).stateChanges.get.error.get.text should include("DApp self-transfer is forbidden since V4")
+           List(CONST_STRING("WAVES").explicitGet()),
+           List(CONST_STRING(asset1Id).explicitGet())
+         )) {
+      assertApiError(
+        sender.invokeScript(caller, dAppV4Address, Some("paySelf"), args),
+        AssertiveApiError(ScriptExecutionError.Id, "Error while executing account-script: DApp self-transfer is forbidden since V4")
+      )
     }
   }
 
   test("V3: still can invoke itself") {
-    sender.invokeScript(dAppV3, dAppV3, fee = smartMinFee + smartFee, waitForTx = true)
-    sender.invokeScript(dAppV3, dAppV3, payment = Seq(Payment(1, Waves)), fee = smartMinFee + smartFee, waitForTx = true)
-    sender.invokeScript(dAppV3, dAppV3, payment = Seq(Payment(1, asset1)), fee = smartMinFee + smartFee, waitForTx = true)
+    sender.invokeScript(dAppV3, dAppV3Address, fee = smartMinFee + smartFee, waitForTx = true)
+    sender.invokeScript(
+      dAppV3,
+      dAppV3Address,
+      payment = Seq(InvokeScriptTransaction.Payment(1, Waves)),
+      fee = smartMinFee + smartFee,
+      waitForTx = true
+    )
+    sender.invokeScript(
+      dAppV3,
+      dAppV3Address,
+      payment = Seq(InvokeScriptTransaction.Payment(1, asset1)),
+      fee = smartMinFee + smartFee,
+      waitForTx = true
+    )
   }
 
   test("V3: still can pay itself") {
-    sender.invokeScript(caller, dAppV3, Some("paySelf"), List(CONST_STRING("WAVES").explicitGet()), waitForTx = true)
-    sender.invokeScript(caller, dAppV3, Some("paySelf"), List(CONST_STRING(asset1Id).explicitGet()), waitForTx = true)
+    sender.invokeScript(caller, dAppV3Address, Some("paySelf"), List(CONST_STRING("WAVES").explicitGet()), waitForTx = true)
+    sender.invokeScript(caller, dAppV3Address, Some("paySelf"), List(CONST_STRING(asset1Id).explicitGet()), waitForTx = true)
   }
 
 }

@@ -5,7 +5,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.CTX
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Functions._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Functions.{addressFromStringF, _}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Vals._
 import com.wavesplatform.lang.v1.traits._
@@ -21,15 +21,15 @@ object WavesContext {
       getBooleanFromStateF,
       getBinaryFromStateF,
       getStringFromStateF,
-      addressFromPublicKeyF,
-      addressFromStringF,
       addressFromRecipientF,
       )
+
   private val balanceV123Functions =
     Array(
       assetBalanceF,
       wavesBalanceF
     )
+
   private val balanceV4Functions =
     Array(
       assetBalanceV4F,
@@ -94,6 +94,8 @@ object WavesContext {
         getBooleanByIndexF(version),
         getBinaryByIndexF(version),
         getStringByIndexF(version),
+        addressFromPublicKeyF(version),
+        if (version >= V4) addressFromStringV4 else addressFromStringF(version),
       )
 
     val versionSpecificFuncs =

@@ -13,8 +13,8 @@ package object converters {
   implicit def c(b: String): EVALUATED                 = CONST_STRING(b).explicitGet()
   implicit def c(b: Long): EVALUATED                   = CONST_LONG(b)
   implicit def c(b: Boolean): EVALUATED                = CONST_BOOLEAN(b)
-  implicit def c(is: IndexedSeq[EVALUATED]): EVALUATED = ARR(is, false).explicitGet
-  implicit def c(is: Seq[EVALUATED]): EVALUATED        = ARR(is.toIndexedSeq, false).explicitGet
+  implicit def c(is: IndexedSeq[EVALUATED]): EVALUATED = ARR(is, false).explicitGet()
+  implicit def c(is: Seq[EVALUATED]): EVALUATED        = ARR(is.toIndexedSeq, false).explicitGet()
 
   implicit def fromOptionBV(v: Option[ByteStr]): EVALUATED = v.flatMap(CONST_BYTESTR(_).toOption).getOrElse(unit)
   implicit def fromOptionL(v: Option[Long]): EVALUATED     = v.map(CONST_LONG).getOrElse(unit)

@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.smart
 
-import cats.implicits._
 import cats.Id
+import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{ContentType, ScriptType, StdLibVersion}
@@ -31,7 +31,7 @@ object BlockchainContext {
       ContentType.isDApp(isContract)
     ).map { ds =>
       val ctx =
-        PureContext.build(Global, ds).withEnvironment[Environment]   |+|
+        PureContext.build(version).withEnvironment[Environment]   |+|
         CryptoContext.build(Global, version).withEnvironment[Environment] |+|
         WavesContext.build(ds)
 

@@ -1,7 +1,6 @@
 package com.wavesplatform.it
 
 import java.net.{InetSocketAddress, URL}
-import java.util.concurrent.TimeUnit
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.{KeyPair, PublicKey}
@@ -10,6 +9,7 @@ import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.utils.LoggerFacade
+import com.wavesplatform.wallet.Wallet
 import io.grpc.{ManagedChannel, ManagedChannelBuilder}
 import org.asynchttpclient.Dsl.{config => clientConfig, _}
 import org.asynchttpclient._
@@ -29,9 +29,14 @@ abstract class Node(val config: Config) extends AutoCloseable {
 
   lazy val grpcChannel: ManagedChannel = ManagedChannelBuilder.forAddress(networkAddress.getHostString, nodeExternalPort(6870))
     .usePlaintext()
-    .keepAliveWithoutCalls(true)
-    .keepAliveTime(30, TimeUnit.SECONDS)
     .build()
+
+  private[this] val wallet = Wallet(settings.walletSettings.copy(file = None))
+  wallet.generateNewAccounts(1)
+
+  def generateKeyPair(): KeyPair = wallet.synchronized {
+    wallet.generateNewAccount().get
+  }
 
   val keyPair: KeyPair  = KeyPair.fromSeed(config.getString("account-seed")).explicitGet()
   val publicKey: PublicKey = PublicKey.fromBase58String(config.getString("public-key")).explicitGet()

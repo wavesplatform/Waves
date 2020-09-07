@@ -39,7 +39,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
 
   implicit val version: StdLibVersion = V4
 
-  private def pureContext(implicit version: StdLibVersion) = PureContext.build(Global, version)
+  private def pureContext(implicit version: StdLibVersion) = PureContext.build(version)
 
   private def defaultCryptoContext(implicit version: StdLibVersion) = CryptoContext.build(Global, version)
 
@@ -57,7 +57,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
     )
 
   private def pureEvalContext(implicit version: StdLibVersion): EvaluationContext[NoContext, Id] =
-    PureContext.build(Global, version).evaluationContext
+    PureContext.build(version).evaluationContext
 
   private val defaultEvaluator   = new EvaluatorV1[Id, Environment]()
 
@@ -384,8 +384,8 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
     val seed                    = "seed".getBytes("UTF-8")
     val (privateKey, publicKey) = Curve25519.createKeyPair(seed)
 
-    for (i <- 0 to 3) {
-      val bodyBytes = ("m" * ((16 << i) * 1024)).getBytes("UTF-8")
+    for (i <- 0 to 4) {
+      val bodyBytes = ("m" * ((8 << i) * 1024)).getBytes("UTF-8")
       val signature = Curve25519.sign(privateKey, bodyBytes)
 
       val r = sigVerifyTest(bodyBytes, publicKey, signature, Some(i.toShort))
@@ -398,8 +398,8 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
     val seed                    = "seed".getBytes("UTF-8")
     val (privateKey, publicKey) = Curve25519.createKeyPair(seed)
 
-    for (i <- 0 to 3) {
-      val bodyBytes = ("m" * ((16 << i) * 1024 + 1)).getBytes("UTF-8")
+    for (i <- 0 to 4) {
+      val bodyBytes = ("m" * ((8 << i) * 1024 + 1)).getBytes("UTF-8")
       val signature = Curve25519.sign(privateKey, bodyBytes)
 
       val r = sigVerifyTest(bodyBytes, publicKey, signature, Some(i.toShort))
@@ -622,7 +622,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
 
   property("addressFromString works as the native one: sunny without prefix") {
     val environment = Common.emptyBlockchainEnvironment()
-    val ctx         = defaultFullContext
+    val ctx         = defaultFullContext(V3)
 
     val gen = Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary).map { seed =>
       val (_, pk) = Curve25519.createKeyPair(seed)
@@ -640,7 +640,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
 
   property("addressFromString works as the native one: sunny with prefix") {
     val environment = Common.emptyBlockchainEnvironment()
-    val ctx         = defaultFullContext
+    val ctx         = defaultFullContext(V3)
 
     val gen = Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary).map { seed =>
       val (_, pk) = Curve25519.createKeyPair(seed)
@@ -657,7 +657,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
 
   property("addressFromString works as the native one: wrong length") {
     val environment = Common.emptyBlockchainEnvironment()
-    val ctx         = defaultFullContext
+    val ctx         = defaultFullContext(V3)
 
     val gen = Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary).map { seed =>
       val (_, pk) = Curve25519.createKeyPair(seed)
@@ -673,7 +673,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
 
   property("addressFromString works as the native one: wrong address version") {
     val environment = Common.emptyBlockchainEnvironment()
-    val ctx         = defaultFullContext
+    val ctx         = defaultFullContext(V3)
 
     val gen = for {
       seed           <- Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
@@ -693,7 +693,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
 
   property("addressFromString works as the native one: from other network") {
     val environment = Common.emptyBlockchainEnvironment()
-    val ctx         = defaultFullContext
+    val ctx         = defaultFullContext(V3)
 
     val gen = for {
       seed    <- Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary)
@@ -713,7 +713,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
 
   property("addressFromString works as the native one: wrong checksum") {
     val environment = Common.emptyBlockchainEnvironment()
-    val ctx         = defaultFullContext
+    val ctx         = defaultFullContext(V3)
 
     val gen = for {
       seed <- Gen.nonEmptyContainerOf[Array, Byte](Arbitrary.arbByte.arbitrary)

@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1.traits
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain._
 import shapeless._
 
@@ -41,5 +42,6 @@ trait Environment[F[_]] {
   def multiPaymentAllowed: Boolean
   def txId: ByteStr
   def transferTransactionFromProto(b: Array[Byte]): F[Option[Tx.Transfer]]
+  def addressFromString(address: String): Either[String, Address]
   def dAppAlias: Boolean = false
 }

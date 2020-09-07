@@ -4,7 +4,7 @@ import java.util.concurrent.TimeoutException
 
 import com.google.protobuf.ByteString
 import com.google.protobuf.wrappers.StringValue
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
 import com.wavesplatform.api.grpc.{TransactionStatus => PBTransactionStatus, _}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -23,6 +23,7 @@ import io.grpc.Status.Code
 import io.grpc.StatusRuntimeException
 import org.scalatest.{Assertion, Assertions}
 
+import scala.annotation.tailrec
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Awaitable, Future}
 import scala.util.control.NonFatal
@@ -73,7 +74,7 @@ object SyncGrpcApi extends Assertions {
 
     def resolveAlias(alias: String): Addr = {
       val addr = accounts.resolveAlias(StringValue.of(alias))
-      Addr.fromBytes(addr.value.toByteArray).explicitGet()
+      PBRecipients.toAddress(addr.value.toByteArray, AddressScheme.current.chainId).explicitGet()
     }
 
     def stateChanges(txId: String): (VanillaTransaction, StateChangesDetails) = {
@@ -204,11 +205,31 @@ object SyncGrpcApi extends Assertions {
       transactions.getTransactions(TransactionsRequest(sender, recipient, ids.map(id => ByteString.copyFrom(Base58.decode(id))))).toList
     }
 
-    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): PBSignedTransaction =
+    def waitForTransaction(txId: String): PBSignedTransaction =
       sync(async(n).waitForTransaction(txId))
 
+    def waitForTxAndHeightArise(txId: String): Unit = {
+      @tailrec
+      def recWait(): Unit = {
+        val Seq(status)   = getStatuses(TransactionsByIdRequest.of(Seq(ByteString.copyFrom(Base58.decode(txId)))))
+        val currentHeight = this.height
+
+        if (status.status.isNotExists) throw new IllegalArgumentException(s"Transaction not exists: $txId")
+        else if (status.status.isConfirmed && currentHeight > status.height) ()
+        else if (status.status.isUnconfirmed) {
+          waitForTransaction(txId)
+          recWait()
+        } else {
+          waitForHeight(status.height.toInt + 1)
+          recWait()
+        }
+      }
+
+      recWait()
+    }
+
     private def maybeWaitForTransaction(tx: PBSignedTransaction, wait: Boolean): PBSignedTransaction = {
-      if (wait) sync(async(n).waitForTransaction(PBTransactions.vanilla(tx).explicitGet().id().toString))
+      if (wait) waitForTxAndHeightArise(tx.id)
       tx
     }
 

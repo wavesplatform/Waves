@@ -50,7 +50,7 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
 
   test("able to update name/description of issued asset") {
     val nextTerm = issueHeight + updateInterval + 1
-    sender.waitForHeight(nextTerm)
+    sender.waitForHeight(nextTerm, 2.minutes)
     val updateAssetInfoTxId =
       PBTransactions
         .vanilla(

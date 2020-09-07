@@ -1,8 +1,9 @@
 package com.wavesplatform.it.account.storage
 
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.BaseSuite
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
@@ -10,21 +11,20 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG, CONST_STRING}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 case class WriteEntry(ct: String, t: String, v: Any, k: String = "somekey")
 
 class RemoveEntrySuite extends BaseSuite {
 
-  val stringTestData  = WriteEntry("String", "String", "somevalue")
-  val integerTestData = WriteEntry("Integer", "Int", 1)
-  val booleanTestData = WriteEntry("Boolean", "Boolean", true)
-  val binaryTestData  = WriteEntry("Binary", "ByteVector", "bytes")
+  private val stringTestData  = WriteEntry("String", "String", "somevalue")
+  private val integerTestData = WriteEntry("Integer", "Int", 1)
+  private val booleanTestData = WriteEntry("Boolean", "Boolean", true)
+  private val binaryTestData  = WriteEntry("Binary", "ByteVector", "bytes")
 
   def writeEntry(we: WriteEntry): String = s"@Callable(i) func write${we.ct}(k: String, v: ${we.t}) = [${we.ct}Entry(k, v)]"
 
-  val script = """
+  private val script = """
                  |{-# STDLIB_VERSION 4 #-}
                  |{-# SCRIPT_TYPE ACCOUNT #-}
                  |{-# CONTENT_TYPE DAPP #-}
@@ -63,19 +63,20 @@ class RemoveEntrySuite extends BaseSuite {
 
   "Remove entry from account storage" - {
     for (data <- Seq(stringTestData, integerTestData, booleanTestData, binaryTestData)) s"${data.ct}Entry could be removed from account storage" in {
-      val address = createDapp(script, writeEntry(data))
+      val keyPair = createDapp(script, writeEntry(data))
       val v       = if (data.ct.equals("Binary")) ByteStr(data.v.toString.getBytes()) else data.v
 
-      invokeScript(address, s"write${data.ct}", data.k, data.v.toString)
+      invokeScript(keyPair, s"write${data.ct}", data.k, data.v.toString)
 
       nodes.waitForHeightArise() //TODO: delete this line after NODE-2099 will be done
 
+      val address = keyPair.toAddress.toString
       miner.getData(address) should have size 1
       miner.getDataByKey(address, data.k).key shouldBe data.k
       miner.getDataByKey(address, data.k).value shouldBe v
       miner.getDataByKey(address, data.k).getClass.getCanonicalName shouldBe s"com.wavesplatform.state.${data.ct}DataEntry"
 
-      invokeScript(address, "delete", data.k)
+      invokeScript(keyPair, "delete", data.k)
 
       miner.getData(address) should have size 0
     }
@@ -85,55 +86,52 @@ class RemoveEntrySuite extends BaseSuite {
     }
 
     "Could remove 100 entries" in {
-      val address = createDapp(script)
+      val keyPair = createDapp(script)
 
-      invokeScript(address, s"write4")
+      invokeScript(keyPair, s"write4")
 
       val data = (0 to 92).map { i =>
         StringDataEntry(s"$i", "q")
       } ++ List(IntegerDataEntry("93", 1), BooleanDataEntry("94", true), BinaryDataEntry("95", ByteStr("1212".getBytes())))
 
-      miner.putData(address, data.toList, 1.waves, true)
+      miner.putData(keyPair, data.toList, 1.waves, true)
 
-      miner.getData(address) should have size 101
+      miner.getData(keyPair.toAddress.toString) should have size 101
 
-      miner.waitForTransaction(invokeScript(address, s"delete100Entries"))
+      miner.waitForTransaction(invokeScript(keyPair, s"delete100Entries"))
 
-      miner.getData(address) should have size 1
+      miner.getData(keyPair.toAddress.toString) should have size 1
     }
 
     "Removing more than 100 entries should produce an error" in {
-      val address = createDapp(script)
-      invokeScript(address, s"write4")
+      val keyPair = createDapp(script)
+      invokeScript(keyPair, s"write4")
       val data = (100 to 196).map { i =>
         StringDataEntry(s"$i", "q")
       }
 
-      miner.putData(address, data.toList, 1.waves, true)
-      miner.getData(address) should have size 101
+      miner.putData(keyPair, data.toList, 1.waves, true)
+      miner.getData(keyPair.toAddress.toString) should have size 101
 
-      val tx = miner.waitForTransaction(invokeScript(address, s"delete101Entries")).id
+      assertApiError(
+        invokeScript(keyPair, s"delete101Entries"),
+        AssertiveApiError(ScriptExecutionError.Id, "Error while executing account-script: WriteSet can't contain more than 100 entries")
+      )
 
-      miner.transactionStatus(Seq(tx)).head.applicationStatus shouldBe Some("scriptExecutionFailed")
-      miner.debugStateChanges(tx).stateChanges.get.error.get.text should include ("WriteSet can't contain more than 100 entries")
-
-      miner.getData(address) should have size 101
+      miner.getData(keyPair.toAddress.toString) should have size 101
     }
 
     "Trying of writing key longer than 400 bytes and removing it should produce an error" in {
       val address    = createDapp(script)
       val tooLongKey = new scala.util.Random().nextPrintableChar().toString * 401
 
-      val tx = miner.waitForTransaction(invokeScript(address, s"write", tooLongKey, "value")).id
-
-      miner.transactionStatus(Seq(tx)).head.applicationStatus shouldBe Some("scriptExecutionFailed")
-      miner.debugStateChanges(tx).stateChanges.get.error.get.text should include ("Key size = 401 bytes must be less than 400")
+      assertBadRequestAndMessage(invokeScript(address, s"write", tooLongKey, "value"), "Data entry key size = 401 bytes must be less than 400")
     }
   }
 
-  def createDapp(scriptParts: String*): String = {
+  def createDapp(scriptParts: String*): KeyPair = {
     val script  = scriptParts.mkString(" ")
-    val address = miner.createAddress()
+    val address = miner.createKeyPair()
     val compiledScript = ScriptCompiler
       .compile(
         script,
@@ -142,24 +140,18 @@ class RemoveEntrySuite extends BaseSuite {
       .explicitGet()
       ._1
 
-    miner.transfer(sender.address, address, 10.waves, minFee, waitForTx = true)
+    miner.transfer(sender.keyPair, address.toAddress.toString, 10.waves, minFee, waitForTx = true)
 
     nodes.waitForTransaction(
       miner
-        .signedBroadcast(
-          SetScriptTransaction
-            .selfSigned(1.toByte, KeyPair(Base58.decode(miner.seed(address))), Some(compiledScript), setScriptFee, System.currentTimeMillis())
-            .explicitGet()
-            .json
-            .value
-        )
+        .setScript(address, Some(compiledScript.bytes().base64), setScriptFee, 1.toByte, true)
         .id
     )
 
     address
   }
 
-  def invokeScript(address: String, function: String, key: String = "", value: String = "", wait: Boolean = true): String = {
+  def invokeScript(address: KeyPair, function: String, key: String = "", value: String = "", wait: Boolean = true): String = {
     val args = function match {
       case "write"            => List(CONST_STRING(key).explicitGet(), CONST_STRING(value).explicitGet())
       case "writeString"      => List(CONST_STRING(key).explicitGet(), CONST_STRING(value).explicitGet())
@@ -176,7 +168,7 @@ class RemoveEntrySuite extends BaseSuite {
     val tx = miner
       .invokeScript(
         address,
-        address,
+        address.publicKey.toAddress.toString,
         fee = smartMinFee + smartFee,
         waitForTx = wait,
         func = Some(function),

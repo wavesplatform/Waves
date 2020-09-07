@@ -82,12 +82,12 @@ object ContractSerDe {
     } yield meta
 
   private[lang]  def serializeDeclaration(out: ByteArrayOutputStream, dec: DECLARATION): Unit = {
-    Serde.serializeDeclaration(out, dec, Serde.serAux(out, Coeval.now(()), _)).value
+    Serde.serializeDeclaration(out, dec, Serde.serAux(out, Coeval.now(()), _)).value()
   }
 
   private[lang]  def deserializeDeclaration(bb: ByteBuffer): Either[String, DECLARATION] = {
     val decType = bb.get()
-    Serde.deserializeDeclaration(bb, desAux(bb), decType).attempt.value.leftMap(_.getMessage)
+    Serde.deserializeDeclaration(bb, desAux(bb), decType).attempt.value().leftMap(_.getMessage)
   }
 
   private[lang] def serializeAnnotation(out: ByteArrayOutputStream, invocationName: String): Unit = {

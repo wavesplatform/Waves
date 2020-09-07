@@ -22,8 +22,9 @@ import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, P
 import com.wavesplatform.utils._
 import org.scalatest.prop.TableDrivenPropertyChecks
 import com.wavesplatform.common.utils.EitherExt2
+import org.scalatest.Informing
 
-class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
+class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPropertyChecks with Informing {
   private val publicKey         = PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet()
   private val ts: Long          = 1526287561757L
   private val tsOrderFrom: Long = 1526992336241L
@@ -208,7 +209,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     )
     .explicitGet()
 
-  private val leaseV1 = LeaseTransaction
+  private lazy val leaseV1 = LeaseTransaction
     .create(
       1.toByte,
       publicKey,
@@ -220,7 +221,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     )
     .explicitGet()
 
-  private val leaseV2 = LeaseTransaction
+  private lazy val leaseV2 = LeaseTransaction
     .create(
       2.toByte,
       publicKey,
@@ -232,16 +233,14 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     )
     .explicitGet()
 
-  private val transfers = MassTransferTransaction
-    .parseTransfersList(List(Transfer(firstAddress, 1.waves), Transfer(secondAddress, 2.waves)))
-    .explicitGet()
-
-  val mass = MassTransferTransaction
+  lazy val mass = MassTransferTransaction
     .create(
       1.toByte,
       publicKey,
       Waves,
-      transfers,
+      MassTransferTransaction
+        .parseTransfersList(List(Transfer(firstKeyPair.toAddress.toString, 1.waves), Transfer(secondKeyPair.toAddress.toString, 2.waves)))
+        .explicitGet(),
       2.waves,
       ts,
       ByteStr.decodeBase58("59QuUcqP6p").get,
@@ -319,8 +318,8 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     )
     .explicitGet()
 
-  private val recipient = Address.fromString(sender.address).explicitGet()
-  private val transferV1 = TransferTransaction(
+  private lazy val recipient = Address.fromString(sender.address).explicitGet()
+  private lazy val transferV1 = TransferTransaction(
     1.toByte,
     publicKey,
     recipient,
@@ -334,7 +333,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     recipient.chainId
   )
 
-  private val transferV2 = TransferTransaction(
+  private lazy val transferV2 = TransferTransaction(
     2.toByte,
     publicKey,
     recipient,
@@ -367,36 +366,38 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     )
     .explicitGet()
 
-  forAll(
-    Table(
-      ("tx", "name"),
-      (exV1, "exchangeV1"),
-      (exV2, "exchangeV2"),
-      (burnV1, "burnV1"),
-      (burnV2, "burnV2"),
-      (aliasV1, "aliasV1"),
-      (aliasV2, "aliasV2"),
-      (data, "data"),
-      (issueV1, "issueV1"),
-      (issueV2, "issueV2"),
-      (leasecancelV1, "leasecancelV1"),
-      (leasecancelV2, "leasecancelV2"),
-      (leaseV1, "leaseV1"),
-      (leaseV2, "leaseV2"),
-      (mass, "mass"),
-      (reissueV1, "reissueV1"),
-      (reissueV2, "reissueV2"),
-      (setasset, "setasset"),
-      (setscript, "setscript"),
-      (sponsor, "sponsor"),
-      (transferV1, "transferV1"),
-      (transferV2, "transferV2"),
-      (invokeScript, "invokeScript")
-    )
-  ) { (tx, name) =>
-    test(s"Serialize check of $name transaction") {
+  test("serialize transactions") {
+    forAll(
+      Table(
+        ("tx", "name"),
+        (exV1, "exchangeV1"),
+        (exV2, "exchangeV2"),
+        (burnV1, "burnV1"),
+        (burnV2, "burnV2"),
+        (aliasV1, "aliasV1"),
+        (aliasV2, "aliasV2"),
+        (data, "data"),
+        (issueV1, "issueV1"),
+        (issueV2, "issueV2"),
+        (leasecancelV1, "leasecancelV1"),
+        (leasecancelV2, "leasecancelV2"),
+        (leaseV1, "leaseV1"),
+        (leaseV2, "leaseV2"),
+        (mass, "mass"),
+        (reissueV1, "reissueV1"),
+        (reissueV2, "reissueV2"),
+        (setasset, "setasset"),
+        (setscript, "setscript"),
+        (sponsor, "sponsor"),
+        (transferV1, "transferV1"),
+        (transferV2, "transferV2"),
+        (invokeScript, "invokeScript")
+      )
+    ) { (tx, name) =>
+      info(name)
       val r = sender.transactionSerializer(tx.json()).bytes.map(_.toByte)
       r shouldBe tx.bodyBytes()
     }
   }
+
 }

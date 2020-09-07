@@ -19,7 +19,8 @@ class MinerStateTestSuite extends FunSuite with CancelAfterFailure with NodesFro
   private def last  = nodes.last
 
   test("node w/o balance can forge blocks after effective balance increase") {
-    val newAddress = last.createAddress()
+    val newKeyPair = last.createKeyPair()
+    val newAddress = newKeyPair.toAddress.toString
 
     val (balance1, eff1)        = miner.accountBalances(miner.address)
     val minerFullBalanceDetails = miner.balanceDetails(miner.address)
@@ -35,7 +36,7 @@ class MinerStateTestSuite extends FunSuite with CancelAfterFailure with NodesFro
     all(minerInfoBefore) shouldNot matchPattern { case State(`newAddress`, _, ts) if ts > 0 => }
 
     miner.waitForPeers(1)
-    val txId = miner.transfer(miner.address, newAddress, transferAmount, minFee).id
+    val txId = miner.transfer(miner.keyPair, newAddress, transferAmount, minFee).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
     val heightAfterTransfer = miner.height
@@ -50,7 +51,7 @@ class MinerStateTestSuite extends FunSuite with CancelAfterFailure with NodesFro
     atMost(1, minerInfoAfter) should matchPattern { case State(`newAddress`, _, ts) if ts > 0 => }
 
     last.waitForPeers(1)
-    val leaseBack = last.lease(newAddress, miner.address, (transferAmount - minFee), minFee).id
+    val leaseBack = last.lease(newKeyPair, miner.address, (transferAmount - minFee), minFee).id
     nodes.waitForHeightAriseAndTxPresent(leaseBack)
 
     assert(last.balanceDetails(newAddress).generating == balance2)

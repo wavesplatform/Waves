@@ -83,36 +83,28 @@ object Expressions {
     allowShadowing: Boolean = false
   ) extends Declaration
 
-  // deprecated
-  type TypeParam = Option[PART[String]]
-  type ArgType   = (PART[String], TypeParam)
-  type FuncArgs  = Seq[(PART[String], Seq[ArgType])]
-
   sealed trait Type {
     def isEmpty: Boolean =
       this match {
         case _: Single    => false
         case Union(types) => types.isEmpty
-        case Tuple(types) => types.isEmpty
+        case Tuple(types) => types.exists(_.isEmpty)
       }
   }
-  case class Single(name: PART[String], parameter: Option[PART[String]] = None) extends Type
+  case class Single(name: PART[String], parameter: Option[PART[Type]] = None)   extends Type
   case class Union(types: Seq[Type])                                            extends Type
+  object Union {
+    def apply(types: Seq[Type]): Type = types match {
+      case Seq(t) => t
+      case _ => new Union(types)
+    }
+  }
   case class Tuple(types: Seq[Type])                                            extends Type
 
   type CtxOpt = Option[Map[String, Pos]]
 
   case class FUNC(position: Pos, expr: EXPR, name: PART[String], args: Seq[(PART[String], Type)]) extends Declaration {
     val allowShadowing = false
-  }
-  object FUNC {
-    def apply(position: Pos, name: PART[String], args: FuncArgs, expr: EXPR): FUNC =
-      FUNC(
-        position,
-        expr,
-        name,
-        args.map { case (name, t) => (name, Union(t.map { case (name, param) => Single(name, param) })) },
-      )
   }
 
   case class ANNOTATION(position: Pos, name: PART[String], args: Seq[PART[String]]) extends Positioned

@@ -85,7 +85,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
   def script(a: String): Script = {
     val ctx = {
       val directives = DirectiveSet(V4, Account, DAppType).explicitGet()
-      PureContext.build(Global, V4).withEnvironment[Environment] |+|
+      PureContext.build(V4).withEnvironment[Environment] |+|
         CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
         WavesContext.build(directives)
     }
@@ -143,7 +143,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
     def assetScript(acc: ByteStr): Script = {
       val ctx = {
         val directives = DirectiveSet(V4, AssetType, Expression).explicitGet()
-        PureContext.build(Global, V4).withEnvironment[Environment] |+|
+        PureContext.build(V4).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
           WavesContext.build(directives)
       }
@@ -164,7 +164,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
     def dappScript(acc: ByteStr, asset: ByteStr): Script = {
       val ctx = {
         val directives = DirectiveSet(V4, Account, DAppType).explicitGet()
-        PureContext.build(Global, V4).withEnvironment[Environment] |+|
+        PureContext.build(V4).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
           WavesContext.build(directives)
       }
@@ -179,7 +179,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
            | func bar() = {
            |   [
            |    ScriptTransfer(Address(base58'$acc'), 1, base58'$asset'),
-           |    Reissue(base58'$asset', false, 2)
+           |    Reissue(base58'$asset', 2, false)
            |   ]
            | }
         """.stripMargin
@@ -236,7 +236,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
     def assetScript(acc: ByteStr): Script = {
       val ctx = {
         val directives = DirectiveSet(V4, AssetType, Expression).explicitGet()
-        PureContext.build(Global, V4).withEnvironment[Environment] |+|
+        PureContext.build(V4).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
           WavesContext.build(directives)
       }
@@ -257,7 +257,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
     def dappScript(acc: ByteStr, asset: ByteStr): Script = {
       val ctx = {
         val directives = DirectiveSet(V4, Account, DAppType).explicitGet()
-        PureContext.build(Global, V4).withEnvironment[Environment] |+|
+        PureContext.build(V4).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
           WavesContext.build(directives)
       }
@@ -272,7 +272,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
            | func bar() = {
            |   [
            |    ScriptTransfer(Address(base58'$acc'), 1, unit),
-           |    Reissue(base58'$asset', false, 1)
+           |    Reissue(base58'$asset', 1, false)
            |   ]
            | }
         """.stripMargin

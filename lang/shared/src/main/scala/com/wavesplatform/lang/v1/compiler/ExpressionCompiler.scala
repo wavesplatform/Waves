@@ -13,7 +13,6 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE, PART, Pos}
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser, ParserV2}
 import com.wavesplatform.lang.v1.task.imports._
@@ -198,7 +197,6 @@ object ExpressionCompiler {
   private def flatSingle(
       pos: Pos,
       typeDefs: Map[String, FINAL],
-      definedTypesStr: List[String],
       expectedTypes: List[String],
       varName: Option[String],
       typeName: String
@@ -208,32 +206,9 @@ object ExpressionCompiler {
       case Some(realType)             => Right(List(realType))
       case None =>
         Left {
-          val messageTypes =
-            if (expectedTypes.nonEmpty) expectedTypes
-            else definedTypesStr
-          TypeNotFound(pos.start, pos.end, typeName, messageTypes, varName)
+          TypeNotFound(pos.start, pos.end, typeName, expectedTypes, varName)
         }
     }
-
-  private def genericFlat(
-      pos: Pos,
-      typeDefs: Map[String, FINAL],
-      definedTypes: List[(String, Option[String])],
-      expectedTypes: List[String],
-      varName: Option[String]
-  ): Either[CompilationError, List[FINAL]] = {
-    def f(t: String) = flatSingle(pos, typeDefs, definedTypes.map(_.toString), expectedTypes, varName, t)
-    definedTypes.flatTraverse {
-      case (typeName, typeParamO) =>
-        typeParamO.fold(f(typeName))(
-          paramName =>
-            for {
-              typeConstr <- findGenericType(pos, typeName)
-              typeParam  <- f(paramName)
-            } yield List(typeConstr(UNION.reduce(UNION.create(typeParam))))
-        )
-    }
-  }
 
   private def findGenericType(p: Pos, t: String): Either[CompilationError, FINAL => FINAL] =
     t match {
@@ -268,17 +243,6 @@ object ExpressionCompiler {
           defaultCasesCount < 2,
           (),
           MultipleDefaultCases(p.start, p.end, defaultCasesCount)
-        ).toCompileM
-      }
-      _ <- {
-        val unusedCaseVariables =
-          cases.collect {
-            case MATCH_CASE(_, Some(PART.VALID(_, name)), _, expr, _, _) if !exprContainsRef(expr, name) => name
-          }
-        Either.cond(
-          unusedCaseVariables.isEmpty,
-          (),
-          UnusedCaseVariables(p.start, p.end, unusedCaseVariables)
         ).toCompileM
       }
       typedExpr <- compileExprWithCtx(expr, saveExprContext)
@@ -695,7 +659,7 @@ object ExpressionCompiler {
         }
         Expressions.BLOCK(mc.position, Expressions.LET(mc.position, nv, refTmp, Some(caseType), allowShadowing), mc.expr)
       }
-      UNION(caseType).typeList match {
+      UNION(caseType).unfold.typeList match {
         case Nil => Right(blockWithNewVar)
         case types =>
           def isInst(matchType: String): Expressions.EXPR =
@@ -773,10 +737,14 @@ object ExpressionCompiler {
           handledName <- handlePart(name)
           handledParameter <- parameter.traverse(handlePart)
           expectedTypes = expectedType.fold(ctx.predefTypes.keys.toList)(_.typeList.map(_.name))
-          foundType <- liftEither[Id, CompilerContext, CompilationError, List[FINAL]](
-            genericFlat(pos, ctx.predefTypes, List((handledName, handledParameter)), expectedTypes, varName)
-          )
-        } yield UNION.reduce(UNION.create(foundType))
+          parameter <- handledParameter.traverse(handleCompositeType(pos, _, expectedType, varName))
+          t <- liftEither[Id, CompilerContext, CompilationError, FINAL](parameter.fold(flatSingle(pos, ctx.predefTypes, expectedTypes, varName, handledName).map(v => UNION.reduce(UNION.create(v, None)))) {
+            p =>
+              for {
+                typeConstr <- findGenericType(pos, handledName)
+              } yield typeConstr(p)
+          })
+        } yield t
       case Expressions.Union(types) =>
         types.toList
           .traverse(handleCompositeType(pos, _, expectedType, varName))
@@ -819,14 +787,4 @@ object ExpressionCompiler {
             s"Compilation failed: [${res.errors.map(e => Show[CompilationError].show(e)).mkString("; ")}]"
           )
       )
-
-  def parseType(expectedType: String, ctx: CompilerContext): Either[String, FINAL] = {
-    import fastparse._
-    val union = parse(expectedType, Parser.unionTypeP(_)).get.value
-    handleCompositeType(AnyPos, union, None, None)
-      .run(ctx)
-      .value
-      ._2
-      .leftMap(e => Show[CompilationError].show(e))
-  }
 }

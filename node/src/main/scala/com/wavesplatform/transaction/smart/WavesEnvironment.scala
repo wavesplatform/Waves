@@ -1,5 +1,7 @@
 package com.wavesplatform.transaction.smart
 
+import cats.implicits._
+import com.wavesplatform.account
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
@@ -47,12 +49,12 @@ class WavesEnvironment(
       .map(tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, tthis)).explicitGet())
 
   override def inputEntity: InputEntity =
-    in.value
+    in.value()
 
   override def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer] =
     blockchain
       .transferById(ByteStr(id))
-      .map(t => RealTransactionWrapper.mapTransferTx(t._2, ds.stdLibVersion))
+      .map(t => RealTransactionWrapper.mapTransferTx(t._2))
 
   override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any] = {
     for {
@@ -116,7 +118,7 @@ class WavesEnvironment(
   }
 
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
-    blockchain.transactionInfo(ByteStr(id)).filter(_._3).map(_._1.toLong)
+    blockchain.transactionMeta(ByteStr(id)).collect { case (h, true) => h.toLong }
 
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
     for {
@@ -142,9 +144,9 @@ class WavesEnvironment(
       .map(block => toBlockInfo(block.header, height.toInt, blockchain.vrf(height.toInt)))
 
   override def blockInfoByHeight(blockHeight: Int): Option[BlockInfo] =
-    blockchain.blockHeader(blockHeight)
-      .map(blockHAndSize =>
-        toBlockInfo(blockHAndSize.header, blockHeight, blockchain.vrf(blockHeight)))
+    blockchain
+      .blockHeader(blockHeight)
+      .map(blockHAndSize => toBlockInfo(blockHAndSize.header, blockHeight, blockchain.vrf(blockHeight)))
 
   private def toBlockInfo(blockH: BlockHeader, bHeight: Int, vrf: Option[ByteStr]) = {
     BlockInfo(
@@ -159,10 +161,18 @@ class WavesEnvironment(
   }
 
   override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer] =
-    PBTransactionSerializer.parseBytes(b)
+    PBTransactionSerializer
+      .parseBytes(b)
       .toOption
-      .flatMap {
-        case tx: TransferTransaction => Some(RealTransactionWrapper.mapTransferTx(tx, ds.stdLibVersion))
-        case _                       => None
+      .collect {
+        case tx: TransferTransaction => RealTransactionWrapper.mapTransferTx(tx)
       }
+
+  override def addressFromString(addressStr: String): Either[String, Address] =
+    account.Address
+      .fromString(addressStr)
+      .bimap(
+        _.toString,
+        address => Address(ByteStr(address.bytes))
+      )
 }

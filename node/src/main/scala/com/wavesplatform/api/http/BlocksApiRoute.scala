@@ -4,8 +4,9 @@ import akka.http.scaladsl.server.{Route, StandardRoute}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.http.ApiError.{BlockDoesNotExist, TooBigArrayAllocation}
-import com.wavesplatform.block.serialization.BlockSerializer
+import com.wavesplatform.block.Block
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import play.api.libs.json._
 
@@ -17,11 +18,11 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi)
     path("at" / IntNumber) { height =>
       at(height, includeTransactions = true)
     } ~ path("first") {
-      at(1, true)
+      at(1, includeTransactions = true)
     } ~ path("seq" / IntNumber / IntNumber) { (start, end) =>
       seq(start, end, includeTransactions = true)
     } ~ path("last") {
-      at(commonApi.currentHeight, true)
+      at(commonApi.currentHeight, includeTransactions = true)
     } ~ path("height") {
       complete(Json.obj("height" -> commonApi.currentHeight))
     } ~ path("delay" / BlockId / IntNumber) { (blockId, count) =>
@@ -36,7 +37,7 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi)
         meta <- commonApi.meta(signature).toRight(BlockDoesNotExist)
       } yield Json.obj("height" -> meta.height))
     } ~ path("signature" / BlockId) { signature => // TODO: Delete
-      complete(commonApi.block(signature).map(toJson))
+      complete(commonApi.block(signature).map(toJson).toRight(BlockDoesNotExist))
     } ~ path("address" / AddrSegment / IntNumber / IntNumber) { (address, start, end) =>
       if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) extractScheduler { implicit ec =>
         complete(
@@ -57,10 +58,10 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi)
       } ~ path("last") {
         at(commonApi.currentHeight, includeTransactions = false)
       } ~ path(BlockId) { id =>
-        complete(commonApi.meta(id).map(_.json()))
+        complete(commonApi.meta(id).map(_.json()).toRight(BlockDoesNotExist))
       }
     } ~ path(BlockId) { id =>
-      complete(commonApi.block(id).map(toJson))
+      complete(commonApi.block(id).map(toJson).toRight(BlockDoesNotExist))
     }
   }
 
@@ -88,5 +89,14 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi)
 }
 
 object BlocksApiRoute {
-  private def toJson(v: (BlockMeta, Seq[Transaction])): JsObject = v._1.json() ++ BlockSerializer.transactionField(v._2)
+  import TransactionsApiRoute.applicationStatus
+
+  private def toJson(v: (BlockMeta, Seq[(Transaction, Boolean)])): JsObject = v._1.json() ++ transactionField(v._1.header.version, v._2)
+
+  private def transactionField(blockVersion: Byte, transactions: Seq[(Transaction, Boolean)]): JsObject = Json.obj(
+    "fee" -> transactions.map(_._1.assetFee).collect { case (Waves, feeAmt) => feeAmt }.sum,
+    "transactions" -> JsArray(transactions.map {
+      case (transaction, succeeded) => transaction.json() ++ applicationStatus(blockVersion >= Block.ProtoBlockVersion, succeeded)
+    })
+  )
 }

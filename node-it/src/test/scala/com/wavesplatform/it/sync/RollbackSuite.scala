@@ -2,9 +2,10 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.it._
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{Node, NodeConfigs, ReportingTestName, TransferSending}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.{BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.TxVersion
@@ -12,11 +13,12 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
-import com.wavesplatform.common.utils.EitherExt2
+
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Random
 
+@LoadTest
 class RollbackSuite
     extends FunSuite
     with CancelAfterFailure
@@ -43,25 +45,18 @@ class RollbackSuite
     val startHeight = sender.height
 
     Await.result(processRequests(generateTransfersToRandomAddresses(190, nodeAddresses)), 2.minutes)
-
     nodes.waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
-
     nodes.waitForHeightArise()
 
     val stateHeight        = sender.height
     val stateAfterFirstTry = nodes.head.debugStateAt(stateHeight)
 
     nodes.rollback(startHeight)
-
     nodes.waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
-
     nodes.waitForHeightArise()
 
     val stateAfterSecondTry = nodes.head.debugStateAt(stateHeight)
-
-    assert(stateAfterSecondTry.size == stateAfterFirstTry.size)
-
-    stateAfterSecondTry should contain theSameElementsAs stateAfterFirstTry
+    stateAfterSecondTry.toSet shouldBe stateAfterFirstTry.toSet
   }
 
   test("Just rollback transactions") {
@@ -95,7 +90,7 @@ class RollbackSuite
   test("Alias transaction rollback should work fine") {
     val alias = "test_alias4"
 
-    val aliasTxId = sender.createAlias(firstAddress, alias, transferAmount).id
+    val aliasTxId = sender.createAlias(sender.keyPair, alias, transferAmount).id
     nodes.waitForHeightAriseAndTxPresent(aliasTxId)
 
     val txsBefore = sender.transactionsByAddress(firstAddress, 10)
@@ -105,7 +100,7 @@ class RollbackSuite
     nodes.rollback(txHeight - 1, returnToUTX = false)
     nodes.waitForHeight(txHeight + 1)
 
-    val secondAliasTxId = sender.createAlias(firstAddress, alias, transferAmount).id
+    val secondAliasTxId = sender.createAlias(sender.keyPair, alias, transferAmount).id
     nodes.waitForHeightAriseAndTxPresent(secondAliasTxId)
     sender.transactionsByAddress(firstAddress, 10) shouldNot contain theSameElementsAs txsBefore
 
@@ -118,13 +113,13 @@ class RollbackSuite
     val entry3     = IntegerDataEntry("1", 1)
     val txsBefore0 = sender.transactionsByAddress(firstAddress, 10)
 
-    val tx1 = sender.putData(firstAddress, List(entry1), calcDataFee(List(entry1), TxVersion.V1)).id
+    val tx1 = sender.putData(sender.keyPair, List(entry1), calcDataFee(List(entry1), TxVersion.V1)).id
     nodes.waitForHeightAriseAndTxPresent(tx1)
     val txsBefore1 = sender.transactionsByAddress(firstAddress, 10)
 
     val tx1height = sender.waitForTransaction(tx1).height
 
-    val tx2 = sender.putData(firstAddress, List(entry2, entry3), calcDataFee(List(entry2, entry3), TxVersion.V1)).id
+    val tx2 = sender.putData(sender.keyPair, List(entry2, entry3), calcDataFee(List(entry2, entry3), TxVersion.V1)).id
     nodes.waitForHeightAriseAndTxPresent(tx2)
 
     val data2 = sender.getData(firstAddress)
@@ -150,11 +145,11 @@ class RollbackSuite
 
     val sponsorAssetId =
       sender
-        .issue(sender.address, "SponsoredAsset", "For test usage", sponsorAssetTotal, reissuable = false, fee = issueFee)
+        .issue(sender.keyPair, "SponsoredAsset", "For test usage", sponsorAssetTotal, reissuable = false, fee = issueFee)
         .id
     nodes.waitForHeightAriseAndTxPresent(sponsorAssetId)
 
-    val sponsorId = sender.sponsorAsset(sender.address, sponsorAssetId, baseFee = 100L, fee = issueFee).id
+    val sponsorId = sender.sponsorAsset(sender.keyPair, sponsorAssetId, baseFee = 100L, fee = issueFee).id
     nodes.waitForHeightAriseAndTxPresent(sponsorId)
 
     val height     = sender.waitForTransaction(sponsorId).height
@@ -163,7 +158,7 @@ class RollbackSuite
     val assetDetailsBefore = sender.assetsDetails(sponsorAssetId)
 
     nodes.waitForHeightArise()
-    val sponsorSecondId = sender.sponsorAsset(sender.address, sponsorAssetId, baseFee = 2 * 100L, fee = issueFee).id
+    val sponsorSecondId = sender.sponsorAsset(sender.keyPair, sponsorAssetId, baseFee = 2 * 100L, fee = issueFee).id
     nodes.waitForHeightAriseAndTxPresent(sponsorSecondId)
 
     nodes.rollback(height, returnToUTX = false)
@@ -199,10 +194,10 @@ class RollbackSuite
 
     nodes.waitForHeightArise()
     val entry1 = StringDataEntry("oracle", "yes")
-    val dtx    = sender.putData(firstAddress, List(entry1), calcDataFee(List(entry1), TxVersion.V1) + smartFee).id
+    val dtx    = sender.putData(sender.keyPair, List(entry1), calcDataFee(List(entry1), TxVersion.V1) + smartFee).id
     nodes.waitForHeightAriseAndTxPresent(dtx)
 
-    val tx = sender.transfer(firstAddress, firstAddress, transferAmount, smartMinFee, waitForTx = true).id
+    val tx = sender.transfer(sender.keyPair, firstAddress, transferAmount, smartMinFee, waitForTx = true).id
     nodes.waitForHeightAriseAndTxPresent(tx)
 
     //as rollback is too fast, we should blacklist nodes from each other before rollback

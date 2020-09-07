@@ -5,6 +5,7 @@ import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.http.BlocksApiRoute
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.{NoShrink, TestWallet}
@@ -38,22 +39,24 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
   private val testBlock1Meta = BlockMeta.fromBlock(testBlock1, 1, 0L, None, None)
   private val testBlock2Meta = BlockMeta.fromBlock(testBlock2, 2, 0L, Some(5), Some(testBlock2.id()))
 
+  private val invalidBlockId = ByteStr(new Array[Byte](32))
+  (blocksApi.block _).expects(invalidBlockId).returning(None).anyNumberOfTimes()
+  (blocksApi.meta _).expects(invalidBlockId).returning(None).anyNumberOfTimes()
+
   routePath("/first") in {
     (blocksApi.blockAtHeight _).expects(1).returning(Some(testBlock1Meta -> Seq.empty)).once()
     Get(routePath("/first")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock1Json
-      response
     }
   }
 
   routePath("/last") in {
-    (blocksApi.currentHeight _).expects().returning(2).once()
+    (() => blocksApi.currentHeight).expects().returning(2).once()
     (blocksApi.blockAtHeight _).expects(2).returning(Some(testBlock2Meta -> Seq.empty)).once()
     Get(routePath("/last")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock2Json
-      response
     }
   }
 
@@ -62,14 +65,12 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
     Get(routePath("/at/1")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock1Json
-      response
     }
 
     (blocksApi.blockAtHeight _).expects(2).returning(Some(testBlock2Meta -> Seq.empty)).once()
     Get(routePath("/at/2")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock2Json
-      response
     }
   }
 
@@ -79,29 +80,36 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
     Get(routePath(s"/signature/${testBlock1.id()}")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock1Json
-      response
     }
 
     Get(routePath(s"/signature/${testBlock2.id()}")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock2Json
-      response
+    }
+
+    Get(routePath(s"/signature/$invalidBlockId")) ~> route ~> check {
+      response.status.isFailure() shouldBe true
+      responseAs[String] should include ("block does not exist")
     }
   }
 
   routePath("/{id}") in {
     (blocksApi.block _).expects(testBlock1.id()).returning(Some(testBlock1Meta -> Seq.empty)).once()
     (blocksApi.block _).expects(testBlock2.id()).returning(Some(testBlock2Meta -> Seq.empty)).once()
+
     Get(routePath(s"/${testBlock1.id()}")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock1Json
-      response
     }
 
     Get(routePath(s"/${testBlock2.id()}")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock2Json
-      response
+    }
+
+    Get(routePath(s"/$invalidBlockId")) ~> route ~> check {
+      response.status.isFailure() shouldBe true
+      responseAs[String] should include ("block does not exist")
     }
   }
 
@@ -120,17 +128,15 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
     Get(routePath("/seq/1/2")) ~> route ~> check {
       val response = responseAs[Seq[JsObject]]
       response shouldBe Seq(testBlock1Json, testBlock2Json)
-      response
     }
   }
 
   routePath("/headers/last") in {
-    (blocksApi.currentHeight _).expects().returning(2).once()
+    (() => blocksApi.currentHeight).expects().returning(2).once()
     (blocksApi.metaAtHeight _).expects(2).returning(Some(testBlock2Meta)).once()
     Get(routePath("/headers/last")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock2HeaderJson
-      response
     }
   }
 
@@ -147,7 +153,11 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
     Get(routePath(s"/headers/${testBlock2.id()}")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock2HeaderJson
-      response
+    }
+
+    Get(routePath(s"/headers/$invalidBlockId")) ~> route ~> check {
+      response.status.isFailure() shouldBe true
+      responseAs[String] should include ("block does not exist")
     }
   }
 
@@ -158,13 +168,11 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
     Get(routePath("/headers/at/1")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock1HeaderJson
-      response
     }
 
     Get(routePath("/headers/at/2")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock2HeaderJson
-      response
     }
   }
 
@@ -182,7 +190,6 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
     Get(routePath("/headers/seq/1/2")) ~> route ~> check {
       val response = responseAs[Seq[JsObject]]
       response shouldBe Seq(testBlock1HeaderJson, testBlock2HeaderJson)
-      response
     }
   }
 }

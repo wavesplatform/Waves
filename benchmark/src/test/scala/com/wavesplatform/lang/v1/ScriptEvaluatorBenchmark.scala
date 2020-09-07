@@ -5,19 +5,19 @@ import java.util.concurrent.TimeUnit
 import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values.{V1, V4}
+import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.ScriptEvaluatorBenchmark._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.{FROMBASE58, SIGVERIFY, TOBASE58}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, FunctionIds}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 import scorex.crypto.signatures.Curve25519
@@ -26,15 +26,15 @@ import scala.util.Random
 
 object ScriptEvaluatorBenchmark {
   val version                                           = V1
-  val pureEvalContext: EvaluationContext[NoContext, Id] = PureContext.build(Global, V1).evaluationContext
+  val pureEvalContext: EvaluationContext[NoContext, Id] = PureContext.build(V1).evaluationContext
   val evaluatorV1: EvaluatorV1[Id, NoContext]           = new EvaluatorV1[Id, NoContext]()
 }
 
-@OutputTimeUnit(TimeUnit.NANOSECONDS)
+@OutputTimeUnit(TimeUnit.MICROSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
-@Threads(4)
+@Threads(1)
 @Fork(1)
-@Warmup(iterations = 20)
+@Warmup(iterations = 10)
 @Measurement(iterations = 10)
 class ScriptEvaluatorBenchmark {
   @Benchmark
@@ -59,7 +59,35 @@ class ScriptEvaluatorBenchmark {
   def bytesConcat(st: Concat, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.bytes))
 
   @Benchmark
-  def listMedian(st: Median, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.expr))
+  def listMedianRandomElements(st: Median, bh: Blackhole): Unit =
+    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.randomElements(Random.nextInt(10000))))
+
+  @Benchmark
+  def listMedianSortedElements(st: Median, bh: Blackhole): Unit =
+    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.sortedElements))
+
+  @Benchmark
+  def listMedianSortedReverseElements(st: Median, bh: Blackhole): Unit =
+    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.sortedReverseElements))
+
+  @Benchmark
+  def listMedianEqualElements(st: Median, bh: Blackhole): Unit =
+    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.equalElements))
+
+  @Benchmark
+  def listRemoveFirstByIndex(st: ListRemoveByIndex, bh: Blackhole): Unit =
+    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.removeFirst))
+
+  @Benchmark
+  def listRemoveMiddleByIndex(st: ListRemoveByIndex, bh: Blackhole): Unit =
+    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.removeMiddle))
+
+  @Benchmark
+  def listRemoveLastByIndex(st: ListRemoveByIndex, bh: Blackhole): Unit =
+    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.removeLast))
+
+  @Benchmark
+  def sigVerify32Kb(st: SigVerify32Kb, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.expr))
 }
 
 @State(Scope.Benchmark)
@@ -189,14 +217,102 @@ class Concat {
 
 @State(Scope.Benchmark)
 class Median {
-  val context: EvaluationContext[NoContext, Id] = PureContext.build(Global, V4).evaluationContext
+  val context: EvaluationContext[NoContext, Id] = PureContext.build(V4).evaluationContext
 
-  val expr: EXPR = {
-    val listOfLong = (1 to 100).map(_ => CONST_LONG(Random.nextLong()))
+  val randomElements: Array[EXPR] =
+    (1 to 10000).map { _ =>
+      val listOfLong = (1 to 1000).map(_ => CONST_LONG(Random.nextLong()))
+
+      FUNCTION_CALL(
+        Native(FunctionIds.MEDIAN_LIST),
+        List(ARR(listOfLong, limited = true).explicitGet())
+      )
+    }.toArray
+
+  val sortedElements: EXPR = {
+    val listOfLong = (1 to 1000).map(_ => CONST_LONG(Random.nextLong())).sorted
 
     FUNCTION_CALL(
-      PureContext.getListMedian,
-      List(ARR(listOfLong, false).explicitGet())
+      Native(FunctionIds.MEDIAN_LIST),
+      List(ARR(listOfLong, limited = true).explicitGet())
     )
   }
+
+  val sortedReverseElements: EXPR = {
+    val listOfLong = (1 to 1000).map(_ => CONST_LONG(Random.nextLong())).sorted.reverse
+
+    FUNCTION_CALL(
+      Native(FunctionIds.MEDIAN_LIST),
+      List(ARR(listOfLong, limited = true).explicitGet())
+    )
+  }
+
+  val equalElements: EXPR = {
+    val listOfLong = (1 to 1000).map(_ => CONST_LONG(Long.MinValue))
+
+    FUNCTION_CALL(
+      Native(FunctionIds.MEDIAN_LIST),
+      List(ARR(listOfLong, limited = true).explicitGet())
+    )
+  }
+}
+
+@State(Scope.Benchmark)
+class SigVerify32Kb {
+  val context: EvaluationContext[NoContext, Id] =
+    Monoid.combine(PureContext.build(V4).evaluationContext, CryptoContext.build(Global, V4).evaluationContext)
+
+
+  val expr: EXPR = {
+    val (privateKey, publicKey) = curve25519.generateKeypair
+    val message                 = randomBytes(32 * 1024 - 1)
+    val signature               = curve25519.sign(privateKey, message)
+
+    FUNCTION_CALL(
+      Native(SIGVERIFY),
+      List(
+        CONST_BYTESTR(ByteStr(message)).explicitGet(),
+        CONST_BYTESTR(ByteStr(signature)).explicitGet(),
+        CONST_BYTESTR(ByteStr(publicKey)).explicitGet()
+      )
+    )
+  }
+}
+
+@State(Scope.Benchmark)
+class ListRemoveByIndex {
+  val context: EvaluationContext[NoContext, Id] =
+    Monoid.combine(
+      PureContext.build(V4).evaluationContext,
+      CryptoContext.build(Global, V4).evaluationContext
+    )
+
+  val list: ARR = ARR(Vector.fill(1000)(CONST_LONG(Long.MaxValue)), limited = true).explicitGet()
+
+  val removeFirst: EXPR =
+    FUNCTION_CALL(
+      Native(FunctionIds.REMOVE_BY_INDEX_OF_LIST),
+      List(
+        list,
+        CONST_LONG(0)
+      )
+    )
+
+  val removeMiddle: EXPR =
+    FUNCTION_CALL(
+      Native(FunctionIds.REMOVE_BY_INDEX_OF_LIST),
+      List(
+        list,
+        CONST_LONG(500)
+      )
+    )
+
+  val removeLast: EXPR =
+    FUNCTION_CALL(
+      Native(FunctionIds.REMOVE_BY_INDEX_OF_LIST),
+      List(
+        list,
+        CONST_LONG(1000)
+      )
+    )
 }

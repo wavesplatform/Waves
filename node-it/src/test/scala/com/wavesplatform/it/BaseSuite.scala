@@ -49,7 +49,7 @@ class BaseSuite
   override protected def nodes: Seq[Node] = theNodes()
 
   protected override def beforeAll(): Unit = {
-    theNodes.run
+    theNodes.run()
     super.beforeAll()
   }
 }

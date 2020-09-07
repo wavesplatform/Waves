@@ -209,7 +209,7 @@ class NameDuplicationTest extends FreeSpec with PropertyChecks with Matchers wit
               s"""
                  | func f(
                  |      sameArg: Int,
-                 |      ${1 to c map (i => s"x$i: Int") mkString("", ", ", ",")}
+                 |      ${(1 to c).map(i => s"x$i: Int").mkString("", ", ", ",")}
                  |      sameArg: Int
                  |    ) = true
              """

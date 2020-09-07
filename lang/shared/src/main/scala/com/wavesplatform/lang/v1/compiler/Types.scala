@@ -128,6 +128,7 @@ object Types {
     }
       case (l1: REAL, l2: REAL)   => l1 == l2
       case (l1: UNION, l2: UNION) =>
+          l1.typeList.length == l2.typeList.length &&
           (l1.unfold.typeList.sortBy(_.name) zip l2.unfold.typeList.sortBy(_.name))
             .forall { case (t1, t2) => t1 equivalent t2 }
       case (l1: FINAL, l2: FINAL) => l1.union equivalent l2.union

@@ -40,6 +40,7 @@ package object utils {
     override def tthis: Environment.Tthis                                                                        = ???
     override def multiPaymentAllowed: Boolean                                                                    = true
     override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
+    override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???
   }
 
   val lazyContexts: Map[DirectiveSet, Coeval[CTX[Environment]]] = {
@@ -56,7 +57,7 @@ package object utils {
         val ctx = Coeval.evalOnce(
           Monoid.combineAll(
             Seq(
-              PureContext.build(Global, version).withEnvironment[Environment],
+              PureContext.build(version).withEnvironment[Environment],
               CryptoContext.build(Global, version).withEnvironment[Environment],
               WavesContext.build(ds)
             )

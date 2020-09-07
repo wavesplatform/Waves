@@ -39,11 +39,12 @@ object FunctionIds {
   val LONG_TO_STRING: Short    = 420
   val BOOLEAN_TO_STRING: Short = 421
 
-  val CREATE_LIST: Short        = 1100
-  val APPEND_LIST: Short        = 1101
-  val CONCAT_LIST: Short        = 1102
-  val INDEX_OF_LIST: Short      = 1103
-  val LAST_INDEX_OF_LIST: Short = 1104
+  val CREATE_LIST: Short             = 1100
+  val APPEND_LIST: Short             = 1101
+  val CONCAT_LIST: Short             = 1102
+  val INDEX_OF_LIST: Short           = 1103
+  val LAST_INDEX_OF_LIST: Short      = 1104
+  val REMOVE_BY_INDEX_OF_LIST: Short = 1105
 
   val UTF8STRING: Short   = 1200
   val BININT: Short       = 1201
@@ -76,10 +77,12 @@ object FunctionIds {
   val CREATE_MERKLE_ROOT: Short = 701
 
   val BLS12_GROTH16_VERIFY: Short = 800
+  val BN256_GROTH16_VERIFY: Short = 801
 
   val ECRECOVER: Short = 900
 
   val BLS12_GROTH16_VERIFY_LIM: Short = 2400 // Reserved n id for generated limited functions
+  val BN256_GROTH16_VERIFY_LIM: Short = 2450 // Reserved n id for generated limited functions
   val SIGVERIFY_LIM: Short            = 2500 // Reserved n id for generated limited functions
   val RSAVERIFY_LIM: Short            = 2600 // Reserved n id for generated limited functions
   val KECCAK256_LIM: Short            = 2700 // Reserved n id for generated limited functions
@@ -106,8 +109,9 @@ object FunctionIds {
   val DATA_BYTES_FROM_STATE: Short   = 1052
   val DATA_STRING_FROM_STATE: Short  = 1053
 
-  val ADDRESSFROMRECIPIENT: Short = 1060
-  val ADDRESSTOSTRING: Short      = 1061
+  val ADDRESSFROMRECIPIENT: Short     = 1060
+  val ADDRESSTOSTRING: Short          = 1061
+  val ADDRESSFROMSTRING_NATIVE: Short = 1062
 
   val TRANSFER_TRANSACTION_FROM_PROTO: Short = 1070
 

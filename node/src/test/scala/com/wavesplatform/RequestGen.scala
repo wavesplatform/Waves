@@ -1,19 +1,7 @@
 package com.wavesplatform
 
 import com.wavesplatform.account.Alias
-import com.wavesplatform.api.http.requests.{
-  BurnV1Request,
-  IssueV1Request,
-  ReissueV1Request,
-  SignedBurnV1Request,
-  SignedCreateAliasV1Request,
-  SignedIssueV1Request,
-  SignedLeaseCancelV1Request,
-  SignedLeaseV1Request,
-  SignedReissueV1Request,
-  SignedTransferV1Request,
-  TransferV1Request
-}
+import com.wavesplatform.api.http.requests.{BurnV1Request, IssueV1Request, ReissueV1Request, SignedBurnV1Request, SignedCreateAliasV1Request, SignedIssueV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request, SignedReissueV1Request, SignedTransferV1Request, TransferV1Request}
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto._
 import com.wavesplatform.transaction.assets._
@@ -104,7 +92,7 @@ trait RequestGen extends TransactionGen { _: Suite =>
     _signature <- signatureGen
     _timestamp <- ntpTimestampGen
     _br        <- burnReq
-  } yield SignedBurnV1Request(_br.sender, _br.assetId, _br.quantity, _br.fee, _timestamp, _signature)
+  } yield SignedBurnV1Request(_br.sender, _br.assetId, _br.amount, _br.fee, _timestamp, _signature)
 
   val transferReq: G[TransferV1Request] = for {
     (account, fee) <- commonFields

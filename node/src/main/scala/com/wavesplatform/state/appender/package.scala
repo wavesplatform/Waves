@@ -88,12 +88,10 @@ package object appender extends ScorexLogging {
       block: Block,
       hitSource: ByteStr
   ): Either[ValidationError, Option[Int]] =
-    metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify)).map { maybeDiscardedTxs =>
+    metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify)).map { discDiffs =>
       metrics.utxRemoveAll.measure(utxStorage.removeAll(block.transactionData))
-      maybeDiscardedTxs.map { discarded =>
-        metrics.utxDiscardedPut.measure(utxStorage.addAndCleanup(discarded))
-        blockchainUpdater.height
-      }
+      metrics.utxDiscardedPut.measure(utxStorage.addAndCleanupPriority(discDiffs))
+      Some(blockchainUpdater.height)
     }
 
   private def blockConsensusValidation(blockchain: Blockchain, pos: PoSSelector, currentTs: Long, block: Block)(

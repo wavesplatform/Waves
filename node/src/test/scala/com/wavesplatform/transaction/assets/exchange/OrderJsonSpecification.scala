@@ -104,7 +104,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
     json.validate[Order] match {
       case e: JsError =>
         val paths = e.errors.map(_._1)
-        paths should contain allOf (JsPath \ "matcherPublicKey", JsPath \ "senderPublicKey")
+        paths should contain.allOf(JsPath \ "matcherPublicKey", JsPath \ "senderPublicKey")
       case _ =>
         fail("Should be JsError")
     }

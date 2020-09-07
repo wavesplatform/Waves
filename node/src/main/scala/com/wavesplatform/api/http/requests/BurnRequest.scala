@@ -42,7 +42,7 @@ object BurnRequest {
       (JsPath \ "sender").readNullable[String] and
       (JsPath \ "senderPublicKey").readNullable[String] and
       (JsPath \ "assetId").read[IssuedAsset] and
-      (JsPath \ "quantity").read[Long].orElse((JsPath \ "amount").read[Long]) and
+      (JsPath \ "amount").read[Long].orElse((JsPath \ "quantity").read[Long]) and
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").readNullable[Long] and
       (JsPath \ "signature").readNullable[ByteStr] and

@@ -3,13 +3,12 @@ package com.wavesplatform.lang
 import java.math.{BigDecimal, BigInteger}
 
 import cats.implicits._
-
-import scala.concurrent.ExecutionContext.Implicits.global
 import com.wavesplatform.lang.v1.BaseGlobal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
 import scala.collection.mutable
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.scalajs.js
 import scala.scalajs.js.JSConverters._
@@ -47,7 +46,7 @@ object Global extends BaseGlobal {
       output.append(hex((b >> 4) & 0xf))
       output.append(hex(b & 0xf))
     }
-    Right(output.result)
+    Right(output.result())
   }
 
   override def base16DecodeImpl(input: String): Either[String, Array[Byte]] = {
@@ -69,8 +68,8 @@ object Global extends BaseGlobal {
   def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean =
     impl.Global.curve25519verify(toBuffer(message), toBuffer(sig), toBuffer(pub))
 
-  override def rsaVerify(alg: DigestAlgorithm, message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean =
-    impl.Global.rsaVerify(alg, toBuffer(message), toBuffer(sig), toBuffer(pub))
+  override def rsaVerify(alg: DigestAlgorithm, message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Either[String, Boolean] =
+    impl.Global.rsaVerify(alg, toBuffer(message), toBuffer(sig), toBuffer(pub)).asRight[String]
 
   def keccak256(message: Array[Byte]): Array[Byte]  = hash(message)(impl.Global.keccak256)
   def blake2b256(message: Array[Byte]): Array[Byte] = hash(message)(impl.Global.blake2b256)
@@ -104,8 +103,8 @@ object Global extends BaseGlobal {
   ): Either[String, Long] =
     tryEi {
       val result = calc(
-        base * Math.pow(10, -baseScale),
-        exponent * Math.pow(10, -exponentScale)
+        base * Math.pow(10, -baseScale.toDouble),
+        exponent * Math.pow(10, -exponentScale.toDouble)
       )
       unscaled(result, resultScale, round)
     }
@@ -147,6 +146,9 @@ object Global extends BaseGlobal {
       .map(r => NodeResponse(r.status.asInstanceOf[Int], r.body.asInstanceOf[String]))
 
   override def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
+    ???
+
+  override def bn256Groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
     ???
 
   override def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte] =

@@ -2,14 +2,12 @@ package com.wavesplatform.common
 
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.common.EcrecoverBenchmark.{CurveSt32k, EcrecoverSt1, EcrecoverSt2}
+import com.wavesplatform.common.EcrecoverBenchmark.{EcrecoverSt1, EcrecoverSt2}
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
-import scorex.util.encode.Base16
 import scorex.crypto.hash.Keccak256
-import scorex.crypto.signatures.{Curve25519, Signature}
+import scorex.util.encode.Base16
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -26,10 +24,6 @@ class EcrecoverBenchmark {
   @Benchmark
   def ecrover2(st: EcrecoverSt2, bh: Blackhole): Unit =
     bh.consume(Global.ecrecover(st.messageHash, st.signature))
-
-  @Benchmark
-  def sigVerify32Kb(st: CurveSt32k, bh: Blackhole): Unit =
-    bh.consume(Curve25519.verify(Signature @@ st.signature, st.message, st.publicKey))
 }
 
 object EcrecoverBenchmark {
@@ -51,12 +45,5 @@ object EcrecoverBenchmark {
     val message     = "what's up jim"
     val prefix      = "\u0019Ethereum Signed Message:\n" + message.length
     val messageHash = Keccak256.hash((prefix + message).getBytes)
-  }
-
-  @State(Scope.Benchmark)
-  class CurveSt32k {
-    val (privateKey, publicKey) = curve25519.generateKeypair
-    val message                 = randomBytes(32 * 1024)
-    val signature               = curve25519.sign(privateKey, message)
   }
 }

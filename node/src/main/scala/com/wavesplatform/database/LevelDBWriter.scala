@@ -15,6 +15,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
+import com.wavesplatform.database.protobuf.TransactionMeta
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBTransactions
@@ -35,8 +36,8 @@ import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
-import scala.jdk.CollectionConverters._
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+import scala.jdk.CollectionConverters._
 import scala.util.Try
 import scala.util.control.NonFatal
 
@@ -56,7 +57,7 @@ object LevelDBWriter extends ScorexLogging {
   }
 
   private[database] def closest(v: Seq[Int], h: Int): Option[Int] = {
-    v.takeWhile(_ <= h).lastOption // Should we use binary search?
+    v.dropWhile(_ > h).headOption // Should we use binary search?
   }
 
   implicit class ReadOnlyDBExt(val db: ReadOnlyDB) extends AnyVal {
@@ -380,11 +381,11 @@ abstract class LevelDBWriter private[database] (
         rw.put(Keys.safeRollbackHeight, height - dbSettings.maxRollbackDepth)
       }
 
-      val transactions: Map[TransactionId, (Transaction, TxNum)] =
+      val transactions: Map[TransactionId, (Transaction, TxNum, Boolean)] =
         block.transactionData.zipWithIndex.map { in =>
           val (tx, idx) = in
           val k         = TransactionId(tx.id())
-          val v         = (tx, TxNum(idx.toShort))
+          val v         = (tx, TxNum(idx.toShort), !failedTransactionIds.contains(tx.id()))
           k -> v
         }.toMap
 
@@ -481,8 +482,7 @@ abstract class LevelDBWriter private[database] (
         val kk        = Keys.addressTransactionSeqNr(addressId)
         val nextSeqNr = rw.get(kk) + 1
         val txTypeNumSeq = txIds.map { txId =>
-          val (tx, num) = transactions(txId)
-
+          val (tx, num, _) = transactions(txId)
           (tx.typeId, num)
         }
         rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
@@ -493,9 +493,9 @@ abstract class LevelDBWriter private[database] (
         rw.put(Keys.addressIdOfAlias(alias), Some(addressId))
       }
 
-      for ((id, (tx, num)) <- transactions) {
-        rw.put(Keys.transactionAt(Height(height), num), Some((tx, !failedTransactionIds.contains(id))))
-        rw.put(Keys.transactionHNById(id), Some((Height(height), num)))
+      for ((id, (tx, num, succeeded)) <- transactions) {
+        rw.put(Keys.transactionAt(Height(height), num), Some((tx, succeeded)))
+        rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.typeId, !succeeded)))
       }
 
       val activationWindowSize = settings.functionalitySettings.activationWindowSize(height)
@@ -542,8 +542,10 @@ abstract class LevelDBWriter private[database] (
         case (txId, result) =>
           val (txHeight, txNum) = transactions
             .get(TransactionId(txId))
-            .map { case (_, txNum) => (height, txNum) }
-            .orElse(rw.get(Keys.transactionHNById(TransactionId(txId))))
+            .map { case (_, txNum, _) => (height, txNum) }
+            .orElse(rw.get(Keys.transactionMetaById(TransactionId(txId))).map {
+              case TransactionMeta(height, txNum, _, _) => (height, TxNum(txNum.toShort))
+            })
             .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
 
           try rw.put(Keys.invokeScriptResult(txHeight, txNum), Some(result))
@@ -570,11 +572,11 @@ abstract class LevelDBWriter private[database] (
       log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
       val discardedBlocks: Seq[(Block, ByteStr)] = for (currentHeight <- height until targetHeight by -1) yield {
-        val balancesToInvalidate     = Seq.newBuilder[(Address, Asset)]
-        val ordersToInvalidate       = Seq.newBuilder[ByteStr]
-        val scriptsToDiscard         = Seq.newBuilder[Address]
-        val assetScriptsToDiscard    = Seq.newBuilder[IssuedAsset]
-        val accountDataToInvalidate  = Seq.newBuilder[(Address, String)]
+        val balancesToInvalidate    = Seq.newBuilder[(Address, Asset)]
+        val ordersToInvalidate      = Seq.newBuilder[ByteStr]
+        val scriptsToDiscard        = Seq.newBuilder[Address]
+        val assetScriptsToDiscard   = Seq.newBuilder[IssuedAsset]
+        val accountDataToInvalidate = Seq.newBuilder[(Address, String)]
 
         val h = Height(currentHeight)
 
@@ -595,7 +597,7 @@ abstract class LevelDBWriter private[database] (
           rw.iterateOver(KeyTags.ChangedAssetBalances.prefixBytes ++ Ints.toByteArray(h)) { e =>
             val assetId = IssuedAsset(ByteStr(e.getKey.takeRight(32)))
             for ((addressId, address) <- changedAddresses) {
-              val kabh = Keys.assetBalanceHistory(addressId, assetId)
+              val kabh    = Keys.assetBalanceHistory(addressId, assetId)
               val history = rw.get(kabh)
               if (history.nonEmpty && history.head == currentHeight) {
                 log.trace(s"Discarding ${assetId.id} balance for $address at $currentHeight")
@@ -687,7 +689,7 @@ abstract class LevelDBWriter private[database] (
 
               if (tx.typeId != GenesisTransaction.typeId) {
                 rw.delete(Keys.transactionAt(h, num))
-                rw.delete(Keys.transactionHNById(TransactionId(tx.id())))
+                rw.delete(Keys.transactionMetaById(TransactionId(tx.id())))
               }
           }
 
@@ -723,12 +725,12 @@ abstract class LevelDBWriter private[database] (
   }
 
   private def rollbackAssetsInfo(rw: RW, currentHeight: Int): Unit = {
-    val issuedKey = Keys.issuedAssets(currentHeight)
-    val updatedKey = Keys.updatedAssets(currentHeight)
+    val issuedKey      = Keys.issuedAssets(currentHeight)
+    val updatedKey     = Keys.updatedAssets(currentHeight)
     val sponsorshipKey = Keys.sponsorshipAssets(currentHeight)
 
-    val issued = rw.get(issuedKey)
-    val updated = rw.get(updatedKey)
+    val issued      = rw.get(issuedKey)
+    val updated     = rw.get(updatedKey)
     val sponsorship = rw.get(sponsorshipKey)
 
     rw.delete(issuedKey)
@@ -765,8 +767,8 @@ abstract class LevelDBWriter private[database] (
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
     for {
-      (height, num) <- db.get(Keys.transactionHNById(TransactionId @@ id))
-      tx            <- db.get(Keys.transferTransactionAt(height, num))
+      TransactionMeta(height, num, TransferTransaction.typeId, _) <- db.get(Keys.transactionMetaById(TransactionId @@ id))
+      tx <- db.get(Keys.transactionAt(Height(height), TxNum(num.toShort))).collect { case (t: TransferTransaction, true) => t }
     } yield (height, tx)
   }
 
@@ -775,13 +777,13 @@ abstract class LevelDBWriter private[database] (
   protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(Int, Transaction, Boolean)] = {
     val txId = TransactionId(id)
     for {
-      (height, num) <- db.get(Keys.transactionHNById(txId))
-      (tx, status)  <- db.get(Keys.transactionAt(height, num))
-    } yield (height, tx, status)
+      TransactionMeta(height, num, _, failed) <- db.get(Keys.transactionMetaById(txId))
+      (tx, _)                                 <- db.get(Keys.transactionAt(Height(height), TxNum(num.toShort)))
+    } yield (height, tx, !failed)
   }
 
-  override def transactionHeight(id: ByteStr): Option[Int] = readOnly { db =>
-    db.get(Keys.transactionHNById(TransactionId(id))).map(_._1)
+  override def transactionMeta(id: ByteStr): Option[(Int, Boolean)] = readOnly { db =>
+    db.get(Keys.transactionMetaById(TransactionId(id))).map { case TransactionMeta(height, _, _, failed) => (height, !failed) }
   }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readOnly { db =>

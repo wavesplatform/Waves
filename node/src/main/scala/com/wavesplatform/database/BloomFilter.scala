@@ -76,9 +76,11 @@ object BloomFilter extends ScorexLogging {
     } finally in.close()
   }
 
-  private def populate(db: DB, keyTag: KeyTags.KeyTag, expectedInsertions: Long) = {
+  private def populate(db: DB, keyTag: KeyTags.KeyTag, filterName: String, expectedInsertions: Long) = {
+    log.info(s"Populating bloom filter for $filterName, this can take a while.")
     val filter = GBloomFilter.create(Funnels.byteArrayFunnel(), expectedInsertions)
     db.iterateOver(keyTag)(e => filter.put(e.getKey.drop(2)))
+    log.info(s"Populating bloom filter for $filterName finished.")
     filter
   }
 
@@ -94,10 +96,10 @@ object BloomFilter extends ScorexLogging {
     val underlying = tryLoad(db, filterName, directory, expectedHeight).recover {
       case _: FileNotFoundException =>
         log.trace(s"Filter file ${ff.getAbsoluteFile} is missing, will re-build the filter from scratch")
-        populate(db, keyTag, expectedInsertions)
+        populate(db, keyTag, filterName, expectedInsertions)
       case NonFatal(e) =>
         log.debug(s"Could not load bloom filter from ${ff.getAbsolutePath}", e)
-        populate(db, keyTag, expectedInsertions)
+        populate(db, keyTag, filterName, expectedInsertions)
     }.get
 
     new BloomFilterImpl(underlying, directory, filterName, db)
