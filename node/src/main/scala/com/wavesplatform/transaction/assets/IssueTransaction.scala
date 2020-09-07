@@ -20,12 +20,12 @@ case class IssueTransaction(
     sender: PublicKey,
     name: ByteString,
     description: ByteString,
-    quantity: Long,
+    quantity: TxAmount,
     decimals: Byte,
     reissuable: Boolean,
     script: Option[Script],
-    fee: Long,
-    timestamp: Long,
+    fee: TxAmount,
+    timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
 ) extends VersionedTransaction
