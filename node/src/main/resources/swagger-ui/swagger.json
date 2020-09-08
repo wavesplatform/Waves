@@ -305,6 +305,47 @@
         }
       }
     },
+    "/addresses/balance": {
+      "get": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Multiple accounts balances",
+        "description": "Multiple accounts balances",
+        "operationId": "balance_3",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "query",
+            "description": "Address",
+            "required": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          },
+          {
+            "name": "height",
+            "in": "query",
+            "description": "For balance at height requests",
+            "required": false,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Balance"
+              }
+            }
+          }
+        }
+      }
+    },
     "/addresses/effectiveBalance/{address}": {
       "get": {
         "tags": [
@@ -2014,6 +2055,81 @@
         }
       }
     },
+    "/transactions/merkleProof": {
+      "get": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "Merkle proofs",
+        "description": "Get merkle proofs for transactions",
+        "operationId": "merkle_proof_1",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Transaction ID",
+            "required": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/TransactionMerkleProofs"
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "Merkle proofs",
+        "description": "Get merkle proofs for transactions",
+        "operationId": "merkle_proof_2",
+        "consumes": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "ids",
+            "in": "body",
+            "description": "Transaction IDs",
+            "required": false,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "ids"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/TransactionMerkleProofs"
+              }
+            }
+          }
+        }
+      }
+    },
     "/utils/seed/{length}": {
       "get": {
         "tags": [
@@ -2169,7 +2285,9 @@
         "summary": "Compile script",
         "description": "Compiles string code to base64 script representation",
         "operationId": "compileCode_1",
-	"consumes": ["text/plain"],
+        "consumes": [
+          "text/plain"
+        ],
         "parameters": [
           {
             "in": "body",
@@ -3667,12 +3785,7 @@
           "403": {
             "$ref": "#/responses/ApiKeyNotValid"
           }
-        },
-        "security": [
-          {
-            "API Key": []
-          }
-        ]
+        }
       }
     },
     "/debug/balances/history/{address}": {
@@ -4718,6 +4831,29 @@
         },
         "applicationStatus": {
           "type": "string"
+        }
+      }
+    },
+    "TransactionMerkleProofs": {
+      "type": "object",
+      "required": [
+        "id",
+        "transactionIndex",
+        "merkleProof"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "transactionIndex": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "merkleProof": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     }

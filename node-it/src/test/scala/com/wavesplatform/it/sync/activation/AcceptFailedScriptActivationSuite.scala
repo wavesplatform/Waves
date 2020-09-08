@@ -50,7 +50,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
          |
          |@Callable(i)
          |func error() = {
-         |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 20} true
+         |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 16} true
          |  if (check)
          |    then throw("Error in DApp")
          |    else throw("Error in DApp")
@@ -119,7 +119,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       all(statuses.map(_.status)) shouldBe "confirmed"
       all(statuses.map(_.applicationStatus.isDefined)) shouldBe true
 
-      val failed = statuses.dropWhile(s => s.applicationStatus.contains("succeeded"))
+      val failed = statuses.filterNot(s => s.applicationStatus.contains("succeeded"))
 
       failed.size should be > 0
       all(failed.flatMap(_.applicationStatus)) shouldBe "script_execution_failed"
@@ -179,21 +179,21 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     overflowBlock()
 
     val txs =
-      (1 to MaxTxsInMicroBlock * 2).map { _ =>
-        sender.invokeScript(callerKP, dApp, Some("transfer"), fee = minInvokeFee)._1.id
+      (1 to MaxTxsInMicroBlock * 2).map { i =>
+        sender.invokeScript(callerKP, dApp, Some("transfer"), fee = minInvokeFee + i)._1.id
       }
 
     sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(false))
 
     def check(): Unit = {
-      val failed = sender.transactionStatus(txs).dropWhile(_.applicationStatus == "succeeded")
+      val failed = sender.transactionStatus(txs).filterNot(_.applicationStatus.contains("succeeded"))
       failed should not be empty
 
       all(failed.map(_.status)) shouldBe "confirmed"
       all(failed.map(_.applicationStatus)) shouldBe Some("script_execution_failed")
     }
 
-    sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
+    sender.waitFor("empty utx")(n => n.utxSize, (_: Int) == 0, 100.millis)
     nodes.waitForHeightArise()
     check() // hardened
   }
@@ -231,7 +231,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
 
     def check(): Unit = {
-      val failed = sender.transactionStatus(txs).dropWhile(_.applicationStatus == "succeeded")
+      val failed = sender.transactionStatus(txs).filterNot(_.applicationStatus.contains("succeeded"))
       failed should not be empty
 
       all(failed.map(_.status)) shouldBe "confirmed"

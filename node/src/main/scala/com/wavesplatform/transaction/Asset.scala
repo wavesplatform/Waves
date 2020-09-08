@@ -28,7 +28,7 @@ object Asset {
   }
 
   implicit val assetIdReads: Reads[Asset] = Reads {
-    case json: JsString => assetReads.reads(json)
+    case json: JsString => if (json.value.isEmpty) JsSuccess(Waves) else assetReads.reads(json)
     case JsNull         => JsSuccess(Waves)
     case _              => JsError("Expected base58-encoded assetId or null")
   }

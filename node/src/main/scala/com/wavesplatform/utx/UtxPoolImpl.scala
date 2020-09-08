@@ -494,13 +494,17 @@ class UtxPoolImpl(
   private[this] object TxCleanup {
     private[this] val scheduled = AtomicBoolean(false)
 
-    def runCleanupAsync(): Unit =
-      if ((!transactions.isEmpty || priorityTransactions.nonEmpty) && scheduled.compareAndSet(false, true)) {
-        cleanupScheduler.execute { () =>
-          try cleanUnconfirmed()
-          finally scheduled.set(false)
+    def runCleanupAsync(): Unit = if (scheduled.compareAndSet(false, true)) {
+      cleanupLoop()
+    }
+
+    private def cleanupLoop(): Unit = cleanupScheduler.execute { () =>
+      while (scheduled.compareAndSet(true, false)) {
+        if (!transactions.isEmpty || priorityTransactions.nonEmpty) {
+          cleanUnconfirmed()
         }
       }
+    }
   }
 
   /** DOES NOT verify transactions */

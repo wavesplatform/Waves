@@ -103,6 +103,15 @@ object InvokeScriptTransactionDiff {
                   tx.feeAssetId.compatId
                 )
                 val height = blockchain.height
+
+                val disableThisWhenCalledByAlias = tx.dAppAddressOrAlias match {
+                  case _: Alias if AddressScheme.current.chainId == 'T'.toByte =>
+                    !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5) && blockchain.height > 1100000
+                  case _: Alias =>
+                    !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)
+                  case _ => false
+                }
+
                 val environment = new WavesEnvironment(
                   AddressScheme.current.chainId,
                   Coeval.evalOnce(input),
@@ -111,7 +120,7 @@ object InvokeScriptTransactionDiff {
                   tthis,
                   directives,
                   tx.id(),
-                  !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height) && tx.dAppAddressOrAlias.isInstanceOf[Alias]
+                  disableThisWhenCalledByAlias
                 )
 
                 //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
