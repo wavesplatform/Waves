@@ -2,12 +2,13 @@ package com.wavesplatform.lang
 
 import cats.Id
 import cats.kernel.Monoid
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
+import com.wavesplatform.lang.v1.estimator.v3.{FunctionInfo, ScriptEstimatorV3}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -88,6 +89,46 @@ package object utils {
     }
 
     costs.toMap
+  }
+
+  val functionExternalCosts: Map[StdLibVersion, Coeval[Map[FunctionHeader, FunctionInfo]]] =
+    lazyContexts
+      .map {
+        case (directives, context) =>
+          (
+            directives.stdLibVersion,
+            context.map(ctx => estimateExternal(directives.stdLibVersion, ctx.evaluationContext[Id](environment)))
+          )
+      }
+
+  private def estimateExternal(
+      version: StdLibVersion,
+      ctx: EvaluationContext[Environment, Id]
+  ): Map[FunctionHeader, FunctionInfo] = {
+    val constructorCosts =
+      ctx.typeDefs.collect {
+        case (typeName, CASETYPEREF(_, fields, hidden)) if !hidden || version < V4 =>
+          (FunctionHeader.User(typeName), (fields.size.toLong, None))
+      }
+
+    val functionsCostsWithExprs =
+      ctx.functions
+        .map(f => (f._1, (f._2.costByLibVersion(V4), f._2.expr.map(_(environment)))))
+
+    val estimator =
+      ScriptEstimatorV3.continuationFirstModeInstance
+
+    (functionsCostsWithExprs ++ constructorCosts)
+      .map {
+        case (header, (cost, exprOpt)) =>
+          val nativeCost =
+            if (header.isExternal)
+              cost
+            else
+              exprOpt.map(estimator(varNames(version, DApp), functionCosts(version), _).explicitGet()).getOrElse(0L)
+
+          header -> FunctionInfo(cost, Set[String](), nativeCost)
+      }
   }
 
   def compilerContext(version: StdLibVersion, cType: ContentType, isAssetScript: Boolean): CompilerContext = {
