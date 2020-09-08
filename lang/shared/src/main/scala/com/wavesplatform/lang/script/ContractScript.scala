@@ -4,11 +4,12 @@ import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values.{StdLibVersion, DApp => DAppType}
-import com.wavesplatform.lang.utils._
+import com.wavesplatform.lang.utils.{functionNativeCosts, _}
 import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
 import monix.eval.Coeval
 
@@ -57,21 +58,33 @@ object ContractScript {
       dApp: DApp,
       estimator: ScriptEstimator
   ): Either[String, List[(String, Long)]] =
-    estimateDeclarations(version, dApp, estimator, annotatedFunctions(dApp))
-
-  def estimateUserFunctions(
-      version: StdLibVersion,
-      dApp: DApp,
-      estimator: ScriptEstimator
-  ): Either[String, List[(String, Long)]] =
-    estimateDeclarations(version, dApp, estimator, dApp.decs.collect { case f: FUNC => (None, f) })
+    estimateDeclarations(
+      dApp,
+      estimator(varNames(version, DAppType), functionCosts(version), _),
+      annotatedFunctions(dApp)
+    )
 
   def estimateGlobalVariables(
       version: StdLibVersion,
       dApp: DApp,
       estimator: ScriptEstimator
   ): Either[String, List[(String, Long)]] =
-    estimateDeclarations(version, dApp, estimator, dApp.decs.collect { case l: LET => (None, l) })
+    estimateDeclarations(
+      dApp,
+      estimator(varNames(version, DAppType), functionCosts(version), _),
+      dApp.decs.collect { case l: LET => (None, l) }
+    )
+
+  def estimateUserFunctions(
+      version: StdLibVersion,
+      dApp: DApp,
+      estimator: ScriptEstimator
+  ): Either[String, List[(String, Long)]] =
+    estimateDeclarations(
+      dApp,
+      estimator(varNames(version, DAppType), functionCosts(version), _),
+      dApp.decs.collect { case f: FUNC => (None, f) }
+    )
 
   private def annotatedFunctions(dApp: DApp): List[(Some[String], FUNC)] =
     (dApp.verifierFuncOpt ++ dApp.callableFuncs)
@@ -79,30 +92,26 @@ object ContractScript {
       .toList
 
   private def estimateDeclarations(
-      version: StdLibVersion,
       dApp: DApp,
-      estimator: ScriptEstimator,
-      functions: List[(Option[String], DECLARATION)]
+      estimator: EXPR => Either[String, Long],
+      declarations: List[(Option[String], DECLARATION)]
   ): Either[String, List[(String, Long)]] =
-    functions.traverse {
-      case (annotationArgName, funcExpr) =>
-        estimator(
-          varNames(version, DAppType),
-          functionCosts(version),
-          constructExprFromDeclAndContext(dApp.decs, annotationArgName, funcExpr)
-        ).map((funcExpr.name, _))
+    declarations.traverse {
+      case (annotationArgName, declarationExpression) =>
+        val expr = constructExprFromDeclAndContext(dApp.decs, annotationArgName, declarationExpression)
+        estimator(expr).map((declarationExpression.name, _))
     }
 
   private[script] def constructExprFromDeclAndContext(
-    dec: List[DECLARATION],
-    annotationArgNameOpt: Option[String],
-    decl: DECLARATION
+      dec: List[DECLARATION],
+      annotationArgNameOpt: Option[String],
+      decl: DECLARATION
   ): EXPR = {
     val declExpr =
       decl match {
-        case let@LET(name, _,_) =>
+        case let @ LET(name, _, _) =>
           BLOCK(let, REF(name))
-        case func@FUNC(name, args, _) =>
+        case func @ FUNC(name, args, _) =>
           BLOCK(
             func,
             FUNCTION_CALL(FunctionHeader.User(name), List.fill(args.size)(TRUE))
@@ -112,8 +121,7 @@ object ContractScript {
       }
     val funcWithContext =
       annotationArgNameOpt.fold(declExpr)(
-        annotationArgName =>
-          BLOCK(LET(annotationArgName, TRUE), declExpr)
+        annotationArgName => BLOCK(LET(annotationArgName, TRUE), declExpr)
       )
     dec.foldRight(funcWithContext)((declaration, expr) => BLOCK(declaration, expr))
   }
@@ -140,16 +148,16 @@ object ContractScript {
   ): Either[String, Unit] =
     for {
       _ <- if (useReducedVerifierLimit) estimateVerifierReduced(dApp, complexities, version) else Right(())
-      limit =
-        if (allowContinuation)
-          MaxComplexityByVersion(version) * MaxContinuationSteps
-        else
-          MaxComplexityByVersion(version)
+      limit = if (allowContinuation)
+        MaxComplexityByVersion(version) * MaxContinuationSteps
+      else
+        MaxComplexityByVersion(version)
       _ <- Either.cond(
         maxComplexity._2 <= limit,
         (),
         s"Contract function (${maxComplexity._1}) is too complex: ${maxComplexity._2} > $limit"
       )
+      _ <- if (allowContinuation) checkContinuationFirstStep(version, dApp, complexities) else Right(())
     } yield ()
 
   private def estimateVerifierReduced(
@@ -176,4 +184,31 @@ object ContractScript {
       annotatedFunctionComplexities <- estimateAnnotatedFunctions(version, dApp, estimator)
       max = annotatedFunctionComplexities.maximumOption(_._2 compareTo _._2).getOrElse(("", 0L))
     } yield (max, annotatedFunctionComplexities.toMap)
+
+  private def checkContinuationFirstStep(
+      version: StdLibVersion,
+      dApp: DApp,
+      complexities: Map[String, Long]
+  ): Either[String, Unit] = {
+    val limit = MaxComplexityByVersion(version)
+    val multiStepCallables =
+      dApp.callableFuncs
+        .filter(func => complexities(func.u.name) > limit)
+        .map(func => (Some(func.annotation.invocationArgName), func.u))
+    for {
+      firstStepComplexities <- estimateDeclarations(
+        dApp,
+        ScriptEstimatorV3.estimateFirstContinuationStep(functionNativeCosts(version).value(), _),
+        multiStepCallables
+      )
+      exceedingFunctions = firstStepComplexities
+        .collect { case (functionName, nativeCost) if nativeCost > limit => (functionName, nativeCost) }
+        .mkString(", ")
+      _ <- Either.cond(
+        exceedingFunctions.isEmpty,
+        (),
+        s"Complexity of state calls exceeding limit = $limit for function(s): $exceedingFunctions"
+      )
+    } yield ()
+  }
 }

@@ -160,5 +160,4 @@ object ScriptEstimatorV3 {
       .run(EstimatorContext(funcs))
       .value
       ._2
-
 }

@@ -91,17 +91,17 @@ package object utils {
     costs.toMap
   }
 
-  val functionExternalCosts: Map[StdLibVersion, Coeval[Map[FunctionHeader, FunctionInfo]]] =
+  val functionNativeCosts: Map[StdLibVersion, Coeval[Map[FunctionHeader, FunctionInfo]]] =
     lazyContexts
       .map {
         case (directives, context) =>
           (
             directives.stdLibVersion,
-            context.map(ctx => estimateExternal(directives.stdLibVersion, ctx.evaluationContext[Id](environment)))
+            context.map(ctx => estimateNative(directives.stdLibVersion, ctx.evaluationContext[Id](environment)))
           )
       }
 
-  private def estimateExternal(
+  private def estimateNative(
       version: StdLibVersion,
       ctx: EvaluationContext[Environment, Id]
   ): Map[FunctionHeader, FunctionInfo] = {
@@ -115,8 +115,9 @@ package object utils {
       ctx.functions
         .map(f => (f._1, (f._2.costByLibVersion(V4), f._2.expr.map(_(environment)))))
 
-    val estimator =
-      ScriptEstimatorV3.continuationFirstModeInstance
+    val vars      = varNames(version, DApp)
+    val costs     = functionCosts(version)
+    val estimator = ScriptEstimatorV3.continuationFirstModeInstance
 
     (functionsCostsWithExprs ++ constructorCosts)
       .map {
@@ -125,7 +126,7 @@ package object utils {
             if (header.isExternal)
               cost
             else
-              exprOpt.map(estimator(varNames(version, DApp), functionCosts(version), _).explicitGet()).getOrElse(0L)
+              exprOpt.map(estimator(vars, costs, _).explicitGet()).getOrElse(0L)
 
           header -> FunctionInfo(cost, Set[String](), nativeCost)
       }
