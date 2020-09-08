@@ -1,8 +1,7 @@
 package com.wavesplatform.lang.v1.estimator.v3
 
-import com.wavesplatform.common.utils.EitherExt2
 import cats.implicits._
-import cats.{Id, Monad}
+import cats.{Id, Monad, catsInstancesForId}
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -21,34 +20,11 @@ case class ScriptEstimatorV3(private val continuationFirstStepMode: Boolean) ext
       expr: EXPR
   ): Either[ExecutionError, Long] = {
     val ctxFuncs =
-      funcs.view
-        .map { case (header, cost) =>
+      funcs.view.map {
+        case (header, cost) =>
           val nativeCost = if (header.isExternal) cost.value() else 0
           header -> FunctionInfo(cost.value(), Set[String](), nativeCost)
-        }
-        .toMap
-    evalExpr(expr, this.continuationFirstStepMode).run(EstimatorContext(ctxFuncs)).value._2
-  }
-
-  def apply(
-    vars: Set[String],
-    funcCostWithExpr: Map[FunctionHeader, (Long, Option[EXPR])],
-    baseCosts: Map[FunctionHeader, Coeval[Long]],
-    expr: EXPR
- ): Either[ExecutionError, Long] = {
-    val ctxFuncs =
-      funcCostWithExpr.view
-        .map { case (header, (cost, exprOpt)) =>
-          val nativeCost =
-            if (header.isExternal)
-              cost
-            else
-              exprOpt.map(apply(vars, baseCosts, _).explicitGet()).getOrElse(0L)
-
-          header -> FunctionInfo(cost, Set[String](), nativeCost)
-        }
-        .toMap
-
+      }.toMap
     evalExpr(expr, this.continuationFirstStepMode).run(EstimatorContext(ctxFuncs)).value._2
   }
 
@@ -154,11 +130,10 @@ case class ScriptEstimatorV3(private val continuationFirstStepMode: Boolean) ext
             )
         }
       )
-      resultBodyCost =
-        if (!checkContinuationFirstStep || header.isExternal)
-          bodyCost
-        else
-          bodyNativeCost
+      resultBodyCost = if (!checkContinuationFirstStep || header.isExternal)
+        bodyCost
+      else
+        bodyNativeCost
       argsCost <- args.traverse(evalHoldingFuncs(_, checkContinuationFirstStep && resultBodyCost == 0))
 
     } yield {
@@ -173,5 +148,17 @@ case class ScriptEstimatorV3(private val continuationFirstStepMode: Boolean) ext
 }
 
 object ScriptEstimatorV3 {
-  val instance = new ScriptEstimatorV3(continuationFirstStepMode = false)
+  val instance                      = new ScriptEstimatorV3(continuationFirstStepMode = false)
+  val continuationFirstModeInstance = new ScriptEstimatorV3(continuationFirstStepMode = true)
+
+  def estimateFirstContinuationStep(
+      funcs: Map[FunctionHeader, FunctionInfo],
+      expr: EXPR
+  ): Either[ExecutionError, Long] =
+    continuationFirstModeInstance
+      .evalExpr(expr, checkContinuationFirstStep = true)
+      .run(EstimatorContext(funcs))
+      .value
+      ._2
+
 }

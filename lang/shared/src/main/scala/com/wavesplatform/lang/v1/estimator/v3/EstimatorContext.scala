@@ -5,15 +5,15 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.task.TaskM
 import shapeless.{Lens, lens}
 
-private[v3] case class EstimatorContext(
-    funcs: Map[FunctionHeader, FunctionInfo],
-    usedRefs: Set[String] = Set.empty
-)
-
-private[v3] case class FunctionInfo(
+case class FunctionInfo(
     cost: Long,
     usedRefs: Set[String],
     nativeCost: Long
+)
+
+private[v3] case class EstimatorContext(
+    funcs: Map[FunctionHeader, FunctionInfo],
+    usedRefs: Set[String] = Set.empty
 )
 
 private[v3] object EstimatorContext {

@@ -1,10 +1,12 @@
 package com.wavesplatform.lang.v1.estimator
 import com.wavesplatform.lang.directives.values.V4
-import com.wavesplatform.lang.utils.functionCosts
-import com.wavesplatform.lang.v1.FunctionHeader.User
+import com.wavesplatform.lang.utils.functionExternalCosts
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 
-class ScriptEstimatorV3ContinuationFirstStepTest extends ScriptEstimatorTestBase(ScriptEstimatorV3(continuationFirstStepMode= true)) {
+class ScriptEstimatorV3ContinuationFirstStepTest extends ScriptEstimatorTestBase(ScriptEstimatorV3.continuationFirstModeInstance) {
+  private def estimate(script: String) =
+    ScriptEstimatorV3.estimateFirstContinuationStep(functionExternalCosts(V4).value(), compile(script))
+
   property("simple let") {
     val script =
       """
@@ -19,7 +21,7 @@ class ScriptEstimatorV3ContinuationFirstStepTest extends ScriptEstimatorTestBase
         cost("x"+"y")           = 20
         cost(getInteger)        = 10
      */
-    estimate(functionCosts(V4), compile(script)) shouldBe Right(31)
+    estimate(script) shouldBe Right(31)
   }
 
   property("let with args") {
@@ -36,7 +38,7 @@ class ScriptEstimatorV3ContinuationFirstStepTest extends ScriptEstimatorTestBase
         cost("x"+"y")           = 20
         cost(getInteger)        = 10
      */
-    estimate(functionCosts(V4), compile(script)) shouldBe Right(31)
+    estimate(script) shouldBe Right(31)
   }
 
   property("if condition") {
@@ -52,7 +54,7 @@ class ScriptEstimatorV3ContinuationFirstStepTest extends ScriptEstimatorTestBase
         cost("x"+"y")           = 20
         cost(getInteger)        = 10
      */
-    estimate(functionCosts(V4), compile(script)) shouldBe Right(31)
+    estimate(script) shouldBe Right(31)
   }
 
   property("if with branches on true") {
@@ -68,7 +70,7 @@ class ScriptEstimatorV3ContinuationFirstStepTest extends ScriptEstimatorTestBase
         cost("x"+"y")           = 20
         cost(getInteger)        = 10
      */
-    estimate(functionCosts(V4), compile(script)) shouldBe Right(31)
+    estimate(script) shouldBe Right(31)
   }
 
   property("if with branches on false") {
@@ -84,7 +86,7 @@ class ScriptEstimatorV3ContinuationFirstStepTest extends ScriptEstimatorTestBase
         cost("x"+"y")           = 20
         cost(getInteger)        = 10
      */
-    estimate(functionCosts(V4), compile(script)) shouldBe Right(31)
+    estimate(script) shouldBe Right(31)
   }
 
   property("if with branches on condition, true and false") {
@@ -100,7 +102,7 @@ class ScriptEstimatorV3ContinuationFirstStepTest extends ScriptEstimatorTestBase
         cost("x"+"y")           = 20 x3
         cost(getInteger)        = 10 x3
      */
-    estimate(functionCosts(V4), compile(script)) shouldBe Right(93)
+    estimate(script) shouldBe Right(93)
   }
 
   property("pure if inside getInteger") {
@@ -117,7 +119,7 @@ class ScriptEstimatorV3ContinuationFirstStepTest extends ScriptEstimatorTestBase
         cost("x"+"y"+"z")       = 40
         cost(getInteger)        = 10
      */
-    estimate(functionCosts(V4), compile(script)) shouldBe Right(54)
+    estimate(script) shouldBe Right(54)
   }
 
   property("expand user function") {
@@ -138,7 +140,7 @@ class ScriptEstimatorV3ContinuationFirstStepTest extends ScriptEstimatorTestBase
         cost(s+"y")             = 20
         cost(getInteger)        = 10
      */
-    estimate(functionCosts(V4), compile(script)) shouldBe Right(35)
+    estimate(script) shouldBe Right(35)
   }
 
   property("expand predefined user function") {
@@ -163,7 +165,7 @@ class ScriptEstimatorV3ContinuationFirstStepTest extends ScriptEstimatorTestBase
         cost(getInteger)        = 10
      */
 
-    estimate(functionCosts(V4), compile(script)) shouldBe Right(37)
+    estimate(script) shouldBe Right(37)
   }
 
   property("expand library user function") {
@@ -187,15 +189,7 @@ class ScriptEstimatorV3ContinuationFirstStepTest extends ScriptEstimatorTestBase
       cost(getInteger)        = 10
     */
 
-    val functionsCostWithExprs =
-      (ctx(V4)
-        .evaluationContext(env)
-        .functions
-        .map(f => (f._1, (f._2.costByLibVersion(V4), f._2.expr.map(_(env)))))
-        + ((User("Address"), (1L, None))))
-
-    val estimate = ScriptEstimatorV3(continuationFirstStepMode = true)
-    estimate(lets, functionsCostWithExprs, functionCosts(V4), compile(script)(V4)) shouldBe Right(37)
+    estimate(script) shouldBe Right(37)
   }
 
   property("expand user calls user") {
@@ -209,7 +203,7 @@ class ScriptEstimatorV3ContinuationFirstStepTest extends ScriptEstimatorTestBase
         | u5(88+99) + 7
       """.stripMargin
 
-    estimate(functionCosts(V4), compile(script)) shouldBe Right(0)
+    estimate(script) shouldBe Right(0)
   }
 
   property("expand user calls constructor w/ impure") {
@@ -224,6 +218,6 @@ class ScriptEstimatorV3ContinuationFirstStepTest extends ScriptEstimatorTestBase
         cost("x"+"y")           = 20
         cost(getInteger)        = 10
      */
-    estimate(functionCosts(V4), compile(script)) shouldBe Right(31)
+    estimate(script) shouldBe Right(31)
   }
 }
