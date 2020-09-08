@@ -88,9 +88,9 @@ package object appender extends ScorexLogging {
       block: Block,
       hitSource: ByteStr
   ): Either[ValidationError, Option[Int]] = {
-    utx.priorityPool.lock {
+    utx.priorityPool.lockedWrite {
       metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify)).map { discDiffs =>
-        metrics.utxRemoveAll.measure(utx.removeAll(block.transactionData))
+        utx.removeAll(block.transactionData)
         utx.priorityPool.addPriorityDiffs(discDiffs)
         utx.runCleanup()
         Some(blockchainUpdater.height)
@@ -146,7 +146,6 @@ package object appender extends ScorexLogging {
   private[this] object metrics {
     val blockConsensusValidation = Kamon.timer("block-appender.block-consensus-validation").withoutTags()
     val appendBlock              = Kamon.timer("block-appender.blockchain-append-block").withoutTags()
-    val utxRemoveAll             = Kamon.timer("block-appender.utx-remove-all").withoutTags()
   }
 
 }

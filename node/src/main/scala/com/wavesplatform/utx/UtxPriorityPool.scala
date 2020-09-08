@@ -2,6 +2,7 @@ package com.wavesplatform.utx
 
 import java.time.Duration
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.locks.StampedLock
 
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
@@ -13,24 +14,49 @@ import com.wavesplatform.utils.ScorexLogging
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
 
-import scala.collection.mutable
-
 final class UtxPriorityPool(base: Blockchain) extends ScorexLogging {
-  private[this] val priorityDiffs         = mutable.LinkedHashSet.empty[Diff]
-  private[this] var priorityDiffsCombined = Monoid.combineAll(priorityDiffs)
+  private[this] val lock = new StampedLock
 
-  def priorityTransactions: Seq[Transaction] = priorityDiffs.synchronized(priorityDiffs.toVector.flatMap(_.transactionsValues))
-  def priorityTransactionIds: Seq[ByteStr]   = priorityDiffs.synchronized(priorityDiffs.toVector.flatMap(_.transactions.keys))
+  @volatile private[this] var priorityDiffs         = Vector.empty[Diff]
+  @volatile private[this] var priorityDiffsCombined = Monoid.combineAll(priorityDiffs)
 
-  def compositeBlockchain: CompositeBlockchain = priorityDiffs.synchronized(CompositeBlockchain(base, Some(priorityDiffsCombined)))
+  def priorityTransactions: Seq[Transaction] = priorityDiffs.flatMap(_.transactionsValues)
+  def priorityTransactionIds: Seq[ByteStr]   = priorityDiffs.flatMap(_.transactions.keys)
 
-  def lock[T](f: => T): T = priorityDiffs.synchronized(f)
+  def compositeBlockchain: CompositeBlockchain = CompositeBlockchain(base, Some(priorityDiffsCombined))
+
+  def lockedWrite[T](f: => T): T = {
+    val stamp = lock.writeLock()
+    try {
+      f
+    } finally {
+      lock.unlockWrite(stamp)
+    }
+  }
+
+  def optimisticRead[T](f: => T)(shouldRecheck: T => Boolean): T = {
+    def lockedRead(): T = {
+      val stamp = lock.readLock()
+      try {
+        f
+      } finally {
+        lock.unlockRead(stamp)
+      }
+    }
+
+    val stamp = lock.tryOptimisticRead()
+    if (stamp != 0) {
+      val value = f
+      if (lock.validate(stamp) || !shouldRecheck(value)) value
+      else lockedRead()
+    } else lockedRead()
+  }
 
   def addPriorityDiffs(discDiffs: Seq[Diff]): Unit = {
-    if (discDiffs.nonEmpty) priorityDiffs.synchronized {
+    if (discDiffs.nonEmpty) {
       discDiffs.filterNot(priorityDiffs.contains).foreach { diff =>
         diff.transactionsValues.foreach(PoolMetrics.addTransactionPriority(_))
-        priorityDiffs += diff
+        priorityDiffs :+= diff
         log.trace {
           val ids = diff.transactions.keys
           s"Priority diff ${diff.hashString} added: ${ids.mkString(", ")}"
@@ -41,10 +67,10 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging {
     }
   }
 
-  def removeIds(removed: Set[ByteStr]): (Set[Transaction], Set[Transaction]) = priorityDiffs.synchronized {
-    val diffsToReset = priorityDiffs.filter(pd => removed.exists(pd.contains))
-    val factRemoved  = Set.newBuilder[Transaction]
-    val notRemoved   = Set.newBuilder[Transaction]
+  def removeIds(removed: Set[ByteStr]): (Set[Transaction], Set[Transaction]) = {
+    val (diffsToReset, diffsToKeep) = priorityDiffs.partition(pd => removed.exists(pd.contains))
+    val factRemoved                 = Set.newBuilder[Transaction]
+    val notRemoved                  = Set.newBuilder[Transaction]
 
     diffsToReset.foreach { diff =>
       val fullyReset: Boolean = diff.transactions.keySet.forall(removed)
@@ -62,23 +88,24 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging {
         notRemoved ++= txsToAdd
       }
     }
-    priorityDiffs --= diffsToReset
+    priorityDiffs = diffsToKeep
     priorityDiffsCombined = Monoid.combineAll(priorityDiffs)
 
     (factRemoved.result(), notRemoved.result())
   }
 
-  def transactionById(txId: ByteStr): Option[Transaction] = priorityDiffs.synchronized(priorityDiffsCombined.transactions.get(txId).map(_.transaction))
+  def transactionById(txId: ByteStr): Option[Transaction] =
+    priorityDiffsCombined.transactions.get(txId).map(_.transaction)
 
   def contains(txId: ByteStr): Boolean = transactionById(txId).nonEmpty
 
   def pessimisticPortfolios(addr: Address): Seq[Portfolio] =
-    priorityDiffs.synchronized(for {
-      diff    <- priorityDiffs.toVector
+    for {
+      diff    <- priorityDiffs
       (a, pf) <- diff.portfolios if a == addr
-    } yield pf.pessimistic)
+    } yield pf.pessimistic
 
-  def nextMicroBlockSize(): Option[Int] = priorityDiffs.synchronized {
+  def nextMicroBlockSize(): Option[Int] = {
     priorityDiffs.headOption.map(_.transactions.size)
   }
 
