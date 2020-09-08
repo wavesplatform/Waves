@@ -112,8 +112,12 @@ object LevelDBWriter extends ScorexLogging {
 
   def apply(db: DB, spendableBalanceChanged: Observer[(Address, Asset)], settings: WavesSettings): LevelDBWriter with AutoCloseable = {
     val expectedHeight = loadHeight(db)
-    def load(name: String, key: KeyTags.KeyTag): BloomFilterImpl =
-      BloomFilter.loadOrPopulate(db, settings.dbSettings.directory, name, expectedHeight, key, 100000000)
+    def load(name: String, key: KeyTags.KeyTag): Option[BloomFilterImpl] = {
+      if (settings.dbSettings.useBloomFilter)
+        Some(BloomFilter.loadOrPopulate(db, settings.dbSettings.directory, name, expectedHeight, key, 100000000))
+      else
+        None
+    }
 
     val _orderFilter        = load("orders", KeyTags.FilledVolumeAndFeeHistory)
     val _dataKeyFilter      = load("account-data", KeyTags.DataHistory)
@@ -121,18 +125,18 @@ object LevelDBWriter extends ScorexLogging {
     val _assetBalanceFilter = load("asset-balances", KeyTags.AssetBalanceHistory)
     new LevelDBWriter(db, spendableBalanceChanged, settings.blockchainSettings, settings.dbSettings) with AutoCloseable {
 
-      override val orderFilter: BloomFilter        = _orderFilter
-      override val dataKeyFilter: BloomFilter      = _dataKeyFilter
-      override val wavesBalanceFilter: BloomFilter = _wavesBalanceFilter
-      override val assetBalanceFilter: BloomFilter = _assetBalanceFilter
+      override val orderFilter: BloomFilter        = _orderFilter.getOrElse(BloomFilter.AlwaysEmpty)
+      override val dataKeyFilter: BloomFilter      = _dataKeyFilter.getOrElse(BloomFilter.AlwaysEmpty)
+      override val wavesBalanceFilter: BloomFilter = _wavesBalanceFilter.getOrElse(BloomFilter.AlwaysEmpty)
+      override val assetBalanceFilter: BloomFilter = _assetBalanceFilter.getOrElse(BloomFilter.AlwaysEmpty)
 
       override def close(): Unit = {
         log.debug("Shutting down LevelDBWriter")
         val lastHeight = LevelDBWriter.loadHeight(db)
-        _orderFilter.save(lastHeight)
-        _dataKeyFilter.save(lastHeight)
-        _wavesBalanceFilter.save(lastHeight)
-        _assetBalanceFilter.save(lastHeight)
+        _orderFilter.foreach(_.save(lastHeight))
+        _dataKeyFilter.foreach(_.save(lastHeight))
+        _wavesBalanceFilter.foreach(_.save(lastHeight))
+        _assetBalanceFilter.foreach(_.save(lastHeight))
       }
     }
   }
@@ -140,9 +144,12 @@ object LevelDBWriter extends ScorexLogging {
   def readOnly(db: DB, settings: WavesSettings): LevelDBWriter = {
     val expectedHeight = loadHeight(db)
     def loadFilter(filterName: String) =
-      BloomFilter
-        .tryLoad(db, filterName, settings.dbSettings.directory, expectedHeight)
-        .fold(_ => BloomFilter.AlwaysEmpty, gf => new Wrapper(gf))
+      if (settings.dbSettings.useBloomFilter)
+        BloomFilter
+          .tryLoad(db, filterName, settings.dbSettings.directory, expectedHeight)
+          .fold(_ => BloomFilter.AlwaysEmpty, gf => new Wrapper(gf))
+      else
+        BloomFilter.AlwaysEmpty
 
     new LevelDBWriter(db, Observer.stopped, settings.blockchainSettings, settings.dbSettings) {
       override val orderFilter: BloomFilter        = loadFilter("orders")
