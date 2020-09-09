@@ -327,13 +327,13 @@ abstract class LevelDBWriter private[database] (
             } else {
               rw.put(kabh, Seq(height))
               assetBalanceFilter.put(kabh.suffix)
-              if (balance > 0 && issuedAssets
-                    .get(a)
-                    .map(_.static.nft)
-                    .orElse(assetDescription(a).map(_.nft))
-                    .getOrElse(false)) {
-                updatedNftLists.put(addressId.toLong, a)
-              }
+            }
+            if (balance > 0 && issuedAssets
+                  .get(a)
+                  .map(_.static.nft)
+                  .orElse(assetDescription(a).map(_.nft))
+                  .getOrElse(false)) {
+              updatedNftLists.put(addressId.toLong, a)
             }
         }
       }
