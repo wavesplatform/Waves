@@ -11,8 +11,6 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.{DiscardedMicroBlocks, Transaction}
 
-import scala.collection.mutable.{ListBuffer => MList, Map => MMap}
-
 /* This is not thread safe, used only from BlockchainUpdaterImpl */
 class NgState(
     val base: Block,
@@ -32,8 +30,8 @@ class NgState(
   private[this] case class CachedMicroDiff(diff: Diff, carryFee: Long, totalFee: Long, timestamp: Long)
   private[this] val MaxTotalDiffs = 15
 
-  private[this] val microDiffs: MMap[BlockId, CachedMicroDiff] = MMap.empty
-  private[this] val microBlocks: MList[MicroBlockInfo]         = MList.empty // fresh head
+  @volatile private[this] var microDiffs: Map[BlockId, CachedMicroDiff] = Map.empty
+  @volatile private[this] var microBlocks: List[MicroBlockInfo]         = List.empty // fresh head
 
   def cancelExpiredLeases(diff: Diff): Diff =
     leasesToCancel
@@ -43,7 +41,7 @@ class NgState(
           Monoid.combine(d, ld)
       }
 
-  def microBlockIds: Seq[BlockId] = microBlocks.map(_.totalBlockId).toSeq
+  def microBlockIds: Seq[BlockId] = microBlocks.map(_.totalBlockId)
 
   def diffFor(totalResBlockRef: BlockId): (Diff, Long, Long) = {
     val (diff, carry, totalFee) =
@@ -132,8 +130,8 @@ class NgState(
       totalBlockId: Option[BlockId] = None
   ): BlockId = {
     val blockId = totalBlockId.getOrElse(this.createBlockId(microBlock))
-    microDiffs.put(blockId, CachedMicroDiff(diff, microblockCarry, microblockTotalFee, timestamp))
-    microBlocks.prepend(MicroBlockInfo(blockId, microBlock))
+    microDiffs += (blockId -> CachedMicroDiff(diff, microblockCarry, microblockTotalFee, timestamp))
+    microBlocks = MicroBlockInfo(blockId, microBlock) :: microBlocks
     internalCaches.invalidate(blockId)
     blockId
   }
