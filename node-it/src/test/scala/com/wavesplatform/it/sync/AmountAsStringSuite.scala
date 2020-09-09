@@ -200,11 +200,9 @@ class AmountAsStringSuite extends BaseTransactionSuite with OverflowBlock {
     checkMassTransferTx(sender.utxById(massTransferTx.id, amountsAsStrings = true))
 
     val massTransferTxHeight           = sender.waitForTransaction(massTransferTx.id).height
-    val massTransferTxBlockLast        = sender.lastBlock(amountsAsStrings = true).transactions.head
     val massTransferTxBlockAt          = sender.blockAt(massTransferTxHeight, amountsAsStrings = true).transactions.head
     val massTransferTxBlockBySignature = sender.blockById(sender.blockAt(massTransferTxHeight).id, amountsAsStrings = true).transactions.head
     val massTransferTxBlockSeq         = sender.blockSeq(massTransferTxHeight, massTransferTxHeight, amountsAsStrings = true).head.transactions.head
-    checkMassTransferTx(massTransferTxBlockLast)
     checkMassTransferTx(massTransferTxBlockAt)
     checkMassTransferTx(massTransferTxBlockBySignature)
     checkMassTransferTx(massTransferTxBlockSeq)
