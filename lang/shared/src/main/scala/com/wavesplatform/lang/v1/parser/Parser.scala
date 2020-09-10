@@ -274,7 +274,7 @@ object Parser {
 
     sealed trait ConstOrVar
     case class Const(c: Seq[EXPR]) extends ConstOrVar
-    case class Var(v: REF) extends ConstOrVar
+    case class Var(v: REF, ty: Type) extends ConstOrVar
 
     P(
       Index ~~ "case" ~~ &(border) ~ comment ~/ (
@@ -293,21 +293,44 @@ object Parser {
         ((Index ~ falseP ~ Index).map {
           case (start, n, end) => Pattern(None, Some(Single(PART.VALID(Pos(start, end), "Boolean"), None)), Seq(), Seq(n))
         }) | 
-      ((Index ~ anyVarName ~ "(" ~ (anyVarName ~ "=" ~ ((numberP | stringP | byteVectorP | trueP | falseP).rep(1, "|").map(v => Const.apply(v):ConstOrVar) |  refP.map(v => Var.apply(v):ConstOrVar))).rep(0, ",") ~ ")" ~ Index).map {
+      ((Index ~ anyVarName ~ "(" ~ (anyVarName ~ "=" ~ ((numberP | stringP | byteVectorP | trueP | falseP).rep(1, "|").map(v => Const.apply(v):ConstOrVar) |  refP.map(v => Var.apply(v, Union(Seq())):ConstOrVar))).rep(0, ",") ~ ")" ~ Index).map {
           case (start, caseType, p, end) =>
             val pats = p.map {
               case (field, Const(c)) => PConst(c, field)
-              case (field, Var(REF(_, v, _, _))) => PBind(Some(v), field)
+              case (field, Var(REF(_, v, _, _), _)) => PBind(Some(v), field)
             }
             Pattern(None, Some(Union(Seq(Single(caseType, None)))), pats, Seq())
         })|
-        ((Index ~ "(" ~ (Index ~ ((numberP | stringP | byteVectorP | trueP | falseP).rep(1, "|").map(v => Const.apply(v):ConstOrVar) |  refP.map(v => Var.apply(v):ConstOrVar)) ~ Index).rep(0, ",") ~ ")" ~ Index).map {
+        ((Index ~ "(" ~ (Index ~ ((numberP | stringP | byteVectorP | trueP | falseP).rep(1, "|").map(v => Const.apply(v):ConstOrVar) |  (refP ~ comment ~ typesDefP).map(v => Var.apply(v._1, v._2):ConstOrVar)) ~ Index).rep(0, ",") ~ ")" ~ Index).map {
           case (start, p, end) =>
+            val types = p.map({
+              case (_, Var(_, ty), _) => ty
+              case (_, Const(c), _) => Union(c.map {
+                case CONST_LONG(_, _, _) => Single(PART.VALID(Pos.AnyPos,"Int"))
+                case CONST_STRING(_, _, _) => Single(PART.VALID(Pos.AnyPos,"String"))
+                case CONST_BYTESTR(_, _, _) => Single(PART.VALID(Pos.AnyPos,"ByteVector"))
+                case _ => ???
+              })
+            }).distinct
+            val allTyped = ! p.exists {
+              case (_, Var(_, Union(Seq())), _) => true
+              case _ => false
+            }
+            val allUntyped = ! p.exists {
+              case (_, Var(_, Union(Seq())), _) => false
+              case (_, Var(_, _), _) => true
+              case _ => false
+            }
             val pats = p.zipWithIndex.map {
               case ((s, Const(c), e), i) => PConst(c, PART.VALID(Pos(s,e), s"_${i+1}"))
-              case ((s, Var(REF(_, v, _, _)), e), i) => PBind(Some(v), PART.VALID(Pos(s,e), s"_${i+1}"))
+              case ((s, Var(REF(_, v, _, _), ty), e), i) => PBind(Some(v), PART.VALID(Pos(s,e), s"_${i+1}"))
             }
-            Pattern(None, Some(Tuple(Seq())), pats, Seq())
+            (allTyped, allUntyped) match {
+              case (true, false) => Pattern(None, Some(Tuple(types)), pats, Seq())
+              case (false, false) => Pattern(Some(PART.INVALID(Pos(start, end), "destructed tuple is not fully typed")), Some(Tuple(Seq())), pats, Seq())
+              case (_, true) => Pattern(None, Some(Tuple(Seq())), pats, Seq())
+              case _ => ???
+            }
         }) | 
         (varDefP ~ comment ~ typesDefP).map(p => Pattern(p._1, Some(p._2), Seq(), Seq())) |
           (Index ~~ restMatchCaseInvalidP ~~ Index).map {

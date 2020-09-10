@@ -2127,6 +2127,17 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](sampleScript, version=V4) shouldBe evaluated(5)
   }
 
-
+  property("typed tuple destruct") {
+    val sampleScript =
+      """|
+         |match (5, if true then "qqq" else base64'') {
+         |  case (5, n : ByteVector) => "ttt"
+         |  case (5|4, n : String) => n
+         |  case _  => "ggg"
+         |}
+         |
+      """.stripMargin
+    eval[EVALUATED](sampleScript, version=V4) shouldBe evaluated("qqq")
+  }
 
 }

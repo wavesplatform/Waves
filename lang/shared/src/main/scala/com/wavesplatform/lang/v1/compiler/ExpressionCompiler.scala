@@ -689,7 +689,7 @@ object ExpressionCompiler {
         Expressions.BLOCK(mc.position, Expressions.LET(mc.position, nv, refTmp, Some(caseType), allowShadowing), mc.expr)
       }
       val checkConsts = mc.pattern.consts.map(c => Expressions.BINARY_OP(mc.position, c, BinaryOperation.EQ_OP, refTmp)) ++ (mc.pattern.fields.flatMap {
-        case Expressions.PConst(c, a) => c.map(c => Expressions.BINARY_OP(mc.position, c, BinaryOperation.EQ_OP, Expressions.GETTER(mc.position, retyped, a)))
+        case Expressions.PConst(c, a) => Seq(c.map(c => Expressions.BINARY_OP(mc.position, c, BinaryOperation.EQ_OP, Expressions.GETTER(mc.position, retyped, a))).reduce((a,b) =>  Expressions.BINARY_OP(mc.position, a, BinaryOperation.OR_OP, b)))
         case _ => Seq()
       } match {
         case Seq() => Seq()
