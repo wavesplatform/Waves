@@ -349,10 +349,21 @@ object EvaluatorV2 {
       stdLibVersion: StdLibVersion,
       continuationFirstStepMode: Boolean
   ): Either[(ExecutionError, Log[Id]), (EXPR, Int, Log[Id])] = {
-    val log       = ListBuffer[LogItem[Id]]()
-    val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => log.append((name, value)), ctx)
-    val evaluator = new EvaluatorV2(loggedCtx, stdLibVersion)
-    Try(evaluator(expr, limit, continuationFirstStepMode)).toEither
+    val log                 = ListBuffer[LogItem[Id]]()
+    val loggedCtx           = LoggedEvaluationContext[Environment, Id](name => value => log.append((name, value)), ctx)
+    val evaluator           = new EvaluatorV2(loggedCtx, stdLibVersion)
+    val firstStepEvaluation = Try(evaluator(expr, limit, continuationFirstStepMode))
+    val resultEvaluation =
+      if (continuationFirstStepMode)
+        firstStepEvaluation
+          .map {
+            case (exprAfterNativeEvaluation, unusedCost) =>
+              evaluator(exprAfterNativeEvaluation, unusedCost, continuationFirstStepMode = false)
+          }
+      else
+        firstStepEvaluation
+
+    resultEvaluation.toEither
       .bimap(
         err => (err.getMessage, log.toList),
         { case (expr, unused) => (expr, unused, log.toList) }
