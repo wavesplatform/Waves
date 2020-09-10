@@ -1,4 +1,5 @@
-package com.wavesplatform.lang.v1.estimator
+package com.wavesplatform.lang.estimator
+
 import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.utils.functionNativeCosts
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3

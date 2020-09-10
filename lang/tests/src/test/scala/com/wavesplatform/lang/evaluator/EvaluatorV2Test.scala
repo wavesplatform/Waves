@@ -1,4 +1,4 @@
-package com.wavesplatform.lang
+package com.wavesplatform.lang.evaluator
 
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._

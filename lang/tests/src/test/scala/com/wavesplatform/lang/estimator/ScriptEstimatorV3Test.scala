@@ -1,4 +1,4 @@
-package com.wavesplatform.lang.v1.estimator
+package com.wavesplatform.lang.estimator
 
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.utils.functionCosts

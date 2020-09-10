@@ -1,4 +1,4 @@
-package com.wavesplatform.lang
+package com.wavesplatform.lang.serde
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.diffs.ProduceError._

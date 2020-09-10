@@ -1,4 +1,4 @@
-package com.wavesplatform.lang
+package com.wavesplatform.lang.evaluator
 
 import cats.Id
 import cats.kernel.Monoid

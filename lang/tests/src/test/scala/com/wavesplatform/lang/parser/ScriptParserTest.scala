@@ -1,7 +1,8 @@
-package com.wavesplatform.lang
+package com.wavesplatform.lang.parser
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.Common._
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions._

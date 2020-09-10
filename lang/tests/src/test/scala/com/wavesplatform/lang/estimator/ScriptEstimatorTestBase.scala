@@ -1,4 +1,4 @@
-package com.wavesplatform.lang.v1.estimator
+package com.wavesplatform.lang.estimator
 
 import cats.Id
 import cats.kernel.Monoid
@@ -8,6 +8,7 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ContextfulVal
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._

@@ -1,4 +1,4 @@
-package com.wavesplatform.lang.v1
+package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.v1.repl.Repl

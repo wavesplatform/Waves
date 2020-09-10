@@ -1,9 +1,9 @@
-package com.wavesplatform.lang
+package com.wavesplatform.lang.compiler
 
+import com.wavesplatform.lang.Common.produce
+import com.wavesplatform.lang.v1.compiler.TypeInferrer
 import com.wavesplatform.lang.v1.compiler.Types._
 import org.scalatest.{FreeSpec, Matchers}
-import Common._
-import com.wavesplatform.lang.v1.compiler.TypeInferrer
 
 class TypeInferrerTest extends FreeSpec with Matchers {
 

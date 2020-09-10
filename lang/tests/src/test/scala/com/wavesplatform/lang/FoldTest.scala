@@ -1,11 +1,11 @@
-package com.wavesplatform.lang.v1
+package com.wavesplatform.lang
 
 import cats.kernel.Monoid
-import com.wavesplatform.lang.utils.environment
 import com.wavesplatform.lang.Common.NoShrink
-import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.V3
+import com.wavesplatform.lang.utils.environment
+import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, EVALUATED}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1

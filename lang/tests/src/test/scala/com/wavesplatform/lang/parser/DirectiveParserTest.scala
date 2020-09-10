@@ -1,5 +1,6 @@
-package com.wavesplatform.lang
+package com.wavesplatform.lang.parser
 
+import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.DirectiveKey._
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{Directive, DirectiveParser}

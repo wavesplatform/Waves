@@ -1,4 +1,4 @@
-package com.wavesplatform.lang
+package com.wavesplatform.lang.serde
 
 import java.nio.charset.StandardCharsets
 
@@ -8,8 +8,8 @@ import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.testing.ScriptGen

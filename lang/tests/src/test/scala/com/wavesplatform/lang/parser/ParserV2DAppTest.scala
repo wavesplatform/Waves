@@ -1,4 +1,4 @@
-package com.wavesplatform.lang
+package com.wavesplatform.lang.parser
 
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos

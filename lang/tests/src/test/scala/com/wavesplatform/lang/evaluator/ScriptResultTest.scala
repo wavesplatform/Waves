@@ -1,4 +1,4 @@
-package com.wavesplatform.lang.v1.evaluator
+package com.wavesplatform.lang.evaluator
 
 import cats.Id
 import com.wavesplatform.common.state.ByteStr
@@ -12,6 +12,7 @@ import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.FieldNames
+import com.wavesplatform.lang.v1.evaluator.{ScriptResult, ScriptResultV3}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, DataItem}

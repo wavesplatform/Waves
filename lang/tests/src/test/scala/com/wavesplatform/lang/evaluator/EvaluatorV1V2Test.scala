@@ -1,4 +1,4 @@
-package com.wavesplatform.lang
+package com.wavesplatform.lang.evaluator
 
 import java.nio.ByteBuffer
 
@@ -29,6 +29,7 @@ import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, Evaluator
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, ContractLimits, FunctionHeader}
+import com.wavesplatform.lang.{Common, EvalF, ExecutionError, Global}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{EitherValues, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}

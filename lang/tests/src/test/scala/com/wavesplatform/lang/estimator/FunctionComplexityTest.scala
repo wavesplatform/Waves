@@ -1,4 +1,5 @@
-package com.wavesplatform.lang.v1.estimator
+package com.wavesplatform.lang.estimator
+
 import com.wavesplatform.DocSource
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.NoShrink

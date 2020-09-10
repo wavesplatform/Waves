@@ -1,4 +1,4 @@
-package com.wavesplatform.lang
+package com.wavesplatform.lang.evaluator
 
 class EvaluatorV2ExternalFunctionsTest extends EvaluatorV2TestBase {
 
