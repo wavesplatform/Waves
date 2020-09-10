@@ -4,6 +4,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{Transaction, TransactionInfo}
+import com.wavesplatform.it.sync.transactions.OverflowBlock
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.state.IntegerDataEntry
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
@@ -14,7 +15,7 @@ import org.scalatest
 import org.scalatest.Assertion
 import play.api.libs.json.{JsString, JsValue, Json}
 
-class AmountAsStringSuite extends BaseTransactionSuite {
+class AmountAsStringSuite extends BaseTransactionSuite with OverflowBlock {
 
   val (headerName, headerValue) = ("Accept", "application/json;large-significand-format=string")
 
@@ -185,6 +186,8 @@ class AmountAsStringSuite extends BaseTransactionSuite {
   }
   test("amount as string in masstransfer transaction") {
     nodes.waitForHeightArise()
+    overflowBlock()
+
     def checkMassTransferTx(tx: Transaction): Assertion = {
       tx.transfers.get.head.amount shouldBe transferAmount
       tx.totalAmount shouldBe Some(transferAmount)

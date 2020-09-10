@@ -14,7 +14,8 @@ import play.api.libs.json.JsObject
 
 import scala.util.Try
 
-case class GenesisTransaction private (recipient: Address, amount: Long, timestamp: Long, signature: ByteStr, chainId: Byte) extends Transaction {
+case class GenesisTransaction private (recipient: Address, amount: TxAmount, timestamp: TxTimestamp, signature: ByteStr, chainId: Byte)
+    extends Transaction {
   override val builder                 = GenesisTransaction
   override val assetFee: (Asset, Long) = (Waves, 0)
   override val id: Coeval[ByteStr]     = Coeval.evalOnce(signature)
@@ -36,10 +37,11 @@ object GenesisTransaction extends TransactionParser {
     serializer.parseBytes(bytes)
 
   implicit val validator: TxValidator[GenesisTransaction] =
-    tx => TxConstraints.seq(tx)(
-      Validated.condNel(tx.amount >= 0, tx, TxValidationError.NegativeAmount(tx.amount, "waves")),
-      TxConstraints.addressChainId(tx.recipient, tx.chainId)
-    )
+    tx =>
+      TxConstraints.seq(tx)(
+        Validated.condNel(tx.amount >= 0, tx, TxValidationError.NegativeAmount(tx.amount, "waves")),
+        TxConstraints.addressChainId(tx.recipient, tx.chainId)
+      )
 
   def generateSignature(recipient: Address, amount: Long, timestamp: Long): Array[Byte] = {
     val payload = Bytes.concat(Ints.toByteArray(typeId), Longs.toByteArray(timestamp), recipient.bytes, Longs.toByteArray(amount))

@@ -17,7 +17,7 @@ import monix.execution.{AsyncQueue, Scheduler}
 import monix.reactive.Observable
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, ExecutionException, Future}
 import scala.util.Success
 
 trait UtxPoolSynchronizer {
@@ -81,6 +81,10 @@ class UtxPoolSynchronizerImpl(
     Schedulers
       .executeCatchingInterruptedException(timedScheduler)(putIfNew(tx, source.isEmpty))
       .recover {
+        case err: ExecutionException if err.getCause.isInstanceOf[InterruptedException]  =>
+          log.trace(s"Transaction took too long to validate: ${tx.id()}")
+          TracedResult(Left(GenericError("Transaction took too long to validate")))
+
         case err =>
           log.warn(s"Error validating transaction ${tx.id()}", err)
           TracedResult(Left(GenericError(err)))

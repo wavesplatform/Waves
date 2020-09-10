@@ -17,7 +17,7 @@ case class DataTransaction(
     version: TxVersion,
     sender: PublicKey,
     data: Seq[DataEntry[_]],
-    fee: TxTimestamp,
+    fee: TxAmount,
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
