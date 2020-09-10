@@ -178,6 +178,7 @@ case class AddressApiRoute(
       } ~ extractScheduler(
         implicit sc =>
           (formField("matches") | parameter("matches")) { matches =>
+            log.debug(s"AccountData[$address]: Starting")
             complete(
               Try(matches.r)
                 .fold(
@@ -260,6 +261,9 @@ case class AddressApiRoute(
       .toListL
       .runAsyncLogErr
       .map(_.sortBy(_.key))
+      .andThen {
+        case _ => log.debug(s"AccountData[$addr]: Finished")
+      }
 
   private def accountDataEntry(address: Address, key: String): ToResponseMarshallable =
     commonAccountsApi.data(address, key).toRight(DataKeyDoesNotExist)
