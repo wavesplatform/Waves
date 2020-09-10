@@ -1,5 +1,7 @@
 package com.wavesplatform.mining
 
+import java.time.LocalTime
+
 import cats.implicits._
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block._
@@ -22,6 +24,7 @@ import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import monix.eval.Task
+import monix.execution.Scheduler
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.SchedulerService
 
@@ -244,7 +247,10 @@ class MinerImpl(
           if (blockchainUpdater.contains(block)) Task.unit
           else Task.defer(waitUntilBlockAppended(block)).delayExecution(1 seconds)
 
-        log.debug(f"Next attempt for acc=${account.toAddress} in ${offset.toUnit(SECONDS)}%.3f seconds")
+        log.debug(
+          f"Next attempt for acc=${account.toAddress} in ${offset.toUnit(SECONDS)}%.3f seconds (${LocalTime.now().plusNanos(offset.toNanos)})"
+        )
+
         val waitTask = maybeBlockchain match {
           case Some(value) => waitUntilBlockAppended(value.lastBlockId.get)
           case None        => Task.unit
@@ -253,32 +259,38 @@ class MinerImpl(
           .flatMap {
             case (elapsed, _) =>
               val newOffset = (offset - elapsed).max(Duration.Zero)
-              Task(forgeBlock(account)).delayExecution(newOffset)
+              Task(microBlockAttempt := SerialCancelable())
+                .delayExecution(newOffset)
+                .flatMap { _ =>
+                  Task(forgeBlock(account))
+                    .flatMap {
+                      case Right((block, totalConstraint)) =>
+                        BlockAppender(blockchainUpdater, timeService, utx, pos, appenderScheduler)(block).flatMap {
+                          case Left(BlockFromFuture(_)) => // Time was corrected, retry
+                            generateBlockTask(account, None)
+
+                          case Left(err) =>
+                            Task.raiseError(new RuntimeException(err.toString))
+
+                          case Right(Some(score)) =>
+                            log.debug(s"Forged and applied $block with cumulative score $score")
+                            BlockStats.mined(block, blockchainUpdater.height)
+                            allChannels.broadcast(BlockForged(block))
+                            if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
+                            Task.unit
+
+                          case Right(None) =>
+                            Task.raiseError(new RuntimeException("Newly created block has already been appended, should not happen"))
+                        }.uncancelable
+
+                      case Left(err) =>
+                        log.debug(s"No block generated because $err, retrying")
+                        generateBlockTask(account, None)
+                    }
+                    .executeOn(minerScheduler)
+                }
           }
-          .flatMap {
-            case Right((block, totalConstraint)) =>
-              BlockAppender(blockchainUpdater, timeService, utx, pos, appenderScheduler)(block).flatMap {
-                case Left(BlockFromFuture(_)) => // Time was corrected, retry
-                  generateBlockTask(account, None)
-
-                case Left(err) =>
-                  Task.raiseError(new RuntimeException(err.toString))
-
-                case Right(Some(score)) =>
-                  log.debug(s"Forged and applied $block with cumulative score $score")
-                  BlockStats.mined(block, blockchainUpdater.height)
-                  allChannels.broadcast(BlockForged(block))
-                  if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
-                  Task.unit
-
-                case Right(None) =>
-                  Task.raiseError(new RuntimeException("Newly created block has already been appended, should not happen"))
-              }.uncancelable
-
-            case Left(err) =>
-              log.debug(s"No block generated because $err, retrying")
-              generateBlockTask(account, None)
-          }
+          .executeOn(Scheduler.global)
 
       case Left(err) =>
         log.debug(s"Not scheduling block mining because $err")
