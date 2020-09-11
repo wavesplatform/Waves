@@ -322,18 +322,18 @@ abstract class LevelDBWriter private[database] (
             changedAssetBalances.put(a, addressId.toLong)
             rw.put(Keys.assetBalance(addressId, a)(height), balance)
             val kabh = Keys.assetBalanceHistory(addressId, a)
+            val isNFT = balance > 0 && issuedAssets
+              .get(a)
+              .map(_.static.nft)
+              .orElse(assetDescription(a).map(_.nft))
+              .getOrElse(false)
             if (assetBalanceFilter.mightContain(kabh.suffix)) {
+              if (rw.get(kabh).isEmpty && isNFT) updatedNftLists.put(addressId.toLong, a)
               updateHistory(rw, kabh, threshold, Keys.assetBalance(addressId, a)).foreach(rw.delete)
             } else {
               rw.put(kabh, Seq(height))
               assetBalanceFilter.put(kabh.suffix)
-            }
-            if (balance > 0 && issuedAssets
-                  .get(a)
-                  .map(_.static.nft)
-                  .orElse(assetDescription(a).map(_.nft))
-                  .getOrElse(false)) {
-              updatedNftLists.put(addressId.toLong, a)
+              if (isNFT) updatedNftLists.put(addressId.toLong, a)
             }
         }
       }
