@@ -24,7 +24,6 @@ import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import monix.eval.Task
-import monix.execution.Scheduler
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.SchedulerService
 
@@ -61,11 +60,9 @@ class MinerImpl(
     with MinerDebugInfo
     with ScorexLogging {
 
-  private[this] implicit val implicitScheduler: SchedulerService = minerScheduler
-
-  private[this] lazy val minerSettings              = settings.minerSettings
-  private[this] lazy val minMicroBlockDurationMills = minerSettings.minMicroBlockAge.toMillis
-  private[this] lazy val blockchainSettings         = settings.blockchainSettings
+  private[this] val minerSettings              = settings.minerSettings
+  private[this] val minMicroBlockDurationMills = minerSettings.minMicroBlockAge.toMillis
+  private[this] val blockchainSettings         = settings.blockchainSettings
 
   private[this] val scheduledAttempts = SerialCancelable()
   private[this] val microBlockAttempt = SerialCancelable()
@@ -243,54 +240,55 @@ class MinerImpl(
       else offset.max(settings.minerSettings.noQuorumMiningDelay)
     }) match {
       case Right(offset) =>
-        def waitUntilBlockAppended(block: BlockId): Task[Unit] =
-          if (blockchainUpdater.contains(block)) Task.unit
-          else Task.defer(waitUntilBlockAppended(block)).delayExecution(1 seconds)
-
         log.debug(
           f"Next attempt for acc=${account.toAddress} in ${offset.toUnit(SECONDS)}%.3f seconds (${LocalTime.now().plusNanos(offset.toNanos)})"
         )
 
-        val waitTask = maybeBlockchain match {
-          case Some(value) => waitUntilBlockAppended(value.lastBlockId.get)
-          case None        => Task.unit
+        val waitBlockAppendedTask = maybeBlockchain match {
+          case Some(value) =>
+            def waitUntilBlockAppended(block: BlockId): Task[Unit] =
+              if (blockchainUpdater.contains(block)) Task.unit
+              else Task.defer(waitUntilBlockAppended(block)).delayExecution(1 seconds)
+
+            waitUntilBlockAppended(value.lastBlockId.get)
+
+          case None => Task.unit
         }
-        waitTask.timed
-          .flatMap {
-            case (elapsed, _) =>
-              val newOffset = (offset - elapsed).max(Duration.Zero)
-              Task(microBlockAttempt := SerialCancelable())
-                .delayExecution(newOffset)
-                .flatMap { _ =>
-                  Task(forgeBlock(account))
-                    .flatMap {
-                      case Right((block, totalConstraint)) =>
-                        BlockAppender(blockchainUpdater, timeService, utx, pos, appenderScheduler)(block).flatMap {
-                          case Left(BlockFromFuture(_)) => // Time was corrected, retry
-                            generateBlockTask(account, None)
 
-                          case Left(err) =>
-                            Task.raiseError(new RuntimeException(err.toString))
+        def appendTask(result: Either[String, (Block, MiningConstraint)]) = result match {
+          case Right((block, totalConstraint)) =>
+            BlockAppender(blockchainUpdater, timeService, utx, pos, appenderScheduler)(block).flatMap {
+              case Left(BlockFromFuture(_)) => // Time was corrected, retry
+                generateBlockTask(account, None)
 
-                          case Right(Some(score)) =>
-                            log.debug(s"Forged and applied $block with cumulative score $score")
-                            BlockStats.mined(block, blockchainUpdater.height)
-                            allChannels.broadcast(BlockForged(block))
-                            if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
-                            Task.unit
+              case Left(err) =>
+                Task.raiseError(new RuntimeException(err.toString))
 
-                          case Right(None) =>
-                            Task.raiseError(new RuntimeException("Newly created block has already been appended, should not happen"))
-                        }.uncancelable
+              case Right(Some(score)) =>
+                log.debug(s"Forged and applied $block with cumulative score $score")
+                BlockStats.mined(block, blockchainUpdater.height)
+                allChannels.broadcast(BlockForged(block))
+                if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
+                Task.unit
 
-                      case Left(err) =>
-                        log.debug(s"No block generated because $err, retrying")
-                        generateBlockTask(account, None)
-                    }
-                    .executeOn(minerScheduler)
-                }
-          }
-          .executeOn(Scheduler.global)
+              case Right(None) =>
+                Task.raiseError(new RuntimeException("Newly created block has already been appended, should not happen"))
+            }.uncancelable
+
+          case Left(err) =>
+            log.debug(s"No block generated because $err, retrying")
+            generateBlockTask(account, None)
+        }
+
+        for {
+          elapsed <- waitBlockAppendedTask.timed.map(_._1)
+          newOffset = (offset - elapsed).max(Duration.Zero)
+
+          _      <- Task(microBlockAttempt := SerialCancelable()).delayExecution(newOffset)
+          result <- Task(forgeBlock(account)).executeOn(minerScheduler)
+
+          _ <- appendTask(result)
+        } yield ()
 
       case Left(err) =>
         log.debug(s"Not scheduling block mining because $err")
@@ -306,7 +304,7 @@ class MinerImpl(
     scheduledAttempts := CompositeCancelable.fromSet(nonScriptedAccounts.map { account =>
       generateBlockTask(account, tempBlockchain)
         .onErrorHandle(err => log.warn(s"Error mining Block: $err"))
-        .runAsyncLogErr
+        .runAsyncLogErr(appenderScheduler)
     }.toSet)
     microBlockAttempt := SerialCancelable()
 
@@ -321,7 +319,7 @@ class MinerImpl(
     Miner.microMiningStarted.increment()
     microBlockAttempt := microBlockMiner
       .generateMicroBlockSequence(account, lastBlock, restTotalConstraint, 0)
-      .runAsyncLogErr
+      .runAsyncLogErr(minerScheduler)
     log.trace(s"MicroBlock mining scheduled for acc=${account.toAddress}")
   }
 
