@@ -255,30 +255,24 @@ class MinerImpl(
           case None => Task.unit
         }
 
-        def appendTask(result: Either[String, (Block, MiningConstraint)]) = result match {
-          case Right((block, totalConstraint)) =>
-            BlockAppender(blockchainUpdater, timeService, utx, pos, appenderScheduler)(block).flatMap {
-              case Left(BlockFromFuture(_)) => // Time was corrected, retry
-                generateBlockTask(account, None)
+        def appendTask(block: Block, totalConstraint: MiningConstraint) =
+          BlockAppender(blockchainUpdater, timeService, utx, pos, appenderScheduler)(block).flatMap {
+            case Left(BlockFromFuture(_)) => // Time was corrected, retry
+              generateBlockTask(account, None)
 
-              case Left(err) =>
-                Task.raiseError(new RuntimeException(err.toString))
+            case Left(err) =>
+              Task.raiseError(new RuntimeException(err.toString))
 
-              case Right(Some(score)) =>
-                log.debug(s"Forged and applied $block with cumulative score $score")
-                BlockStats.mined(block, blockchainUpdater.height)
-                allChannels.broadcast(BlockForged(block))
-                if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
-                Task.unit
+            case Right(Some(score)) =>
+              log.debug(s"Forged and applied $block with cumulative score $score")
+              BlockStats.mined(block, blockchainUpdater.height)
+              allChannels.broadcast(BlockForged(block))
+              if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
+              Task.unit
 
-              case Right(None) =>
-                Task.raiseError(new RuntimeException("Newly created block has already been appended, should not happen"))
-            }.uncancelable
-
-          case Left(err) =>
-            log.debug(s"No block generated because $err, retrying")
-            generateBlockTask(account, None)
-        }
+            case Right(None) =>
+              Task.raiseError(new RuntimeException("Newly created block has already been appended, should not happen"))
+          }.uncancelable
 
         for {
           elapsed <- waitBlockAppendedTask.timed.map(_._1)
@@ -287,7 +281,14 @@ class MinerImpl(
           _      <- Task(microBlockAttempt := SerialCancelable()).delayExecution(newOffset)
           result <- Task(forgeBlock(account)).executeOn(minerScheduler)
 
-          _ <- appendTask(result)
+          _ <- result match {
+            case Right((block, totalConstraint)) =>
+              appendTask(block, totalConstraint)
+
+            case Left(err) =>
+              log.debug(s"No block generated because $err, retrying")
+              generateBlockTask(account, None)
+          }
         } yield ()
 
       case Left(err) =>
