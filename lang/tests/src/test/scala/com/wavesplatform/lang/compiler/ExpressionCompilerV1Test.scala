@@ -301,7 +301,6 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     ExpressionCompiler(compilerContextV4, expr5) shouldBe Symbol("right")
   }
 
-
   property("JS API compile limit exceeding error") {
     val expr = s" ${"sigVerify(base58'', base58'', base58'') &&" * 350} true "
     val ctx = Monoid.combineAll(
@@ -329,6 +328,29 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
     checkExtract(V2) shouldBe Symbol("right")
     checkExtract(V3) shouldBe Symbol("right")
     checkExtract(V4) should produce("Can't find a function 'extract'")
+  }
+
+  property("DataTransaction data composite type") {
+    val expr =
+      """
+        | match tx {
+        |    case dataTx: DataTransaction =>
+        |       match dataTx.data[0] {
+        |         case e: BinaryEntry  => e.key == "" && e.value == base58''
+        |         case e: BooleanEntry => e.key == "" && e.value == true
+        |         case e: IntegerEntry => e.key == "" && e.value == 1
+        |         case e: StringEntry  => e.key == "" && e.value == ""
+        |         case e: DeleteEntry  => e.key == ""
+        |       }
+        |     case _ =>
+        |       false
+        | }
+      """.stripMargin
+
+    ExpressionCompiler(
+      getTestContext(V4).compilerContext,
+      Parser.parseExpr(expr).get.value
+    ) shouldBe Symbol("right")
   }
 
   treeTypeTest("GETTER")(

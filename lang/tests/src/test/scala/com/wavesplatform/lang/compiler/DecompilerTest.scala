@@ -30,18 +30,8 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     def shouldEq(s2: String) = sp.replaceAllIn(s1, "") shouldEqual sp.replaceAllIn(s2, "")
   }
 
-  def getCtx(v: StdLibVersion): CTX[Environment] = {
-    Monoid.combineAll(
-      Seq(
-        getTestContext(v).withEnvironment[Environment],
-        CryptoContext.build(Global, v).withEnvironment[Environment],
-        WavesContext.build(DirectiveSet(v, Account, DAppType).explicitGet())
-      )
-    )
-  }
-
-  val decompilerContextV3 = getCtx(V3).decompilerContext
-  val decompilerContextV4 = getCtx(V4).decompilerContext
+  val decompilerContextV3 = getTestContext(V3).decompilerContext
+  val decompilerContextV4 = getTestContext(V4).decompilerContext
 
   property("successful on very deep expressions (stack overflow check)") {
     val expr = (1 to 10000).foldLeft[EXPR](CONST_LONG(0)) { (acc, _) =>
@@ -541,7 +531,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   def compileExpr(code: String, v: StdLibVersion = V3): Either[String, (EXPR, TYPE)] = {
     val untyped = Parser.parseExpr(code).get.value
-    val typed   = ExpressionCompiler(getCtx(v).compilerContext, untyped)
+    val typed   = ExpressionCompiler(getTestContext(v).compilerContext, untyped)
     typed
   }
 
