@@ -5,7 +5,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common
 import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftIterator}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.{DBExt, KeyTags, Keys}
+import com.wavesplatform.database.{DBExt, KeyTags, Keys, readIntSeq}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBRecipients
@@ -91,6 +91,7 @@ object CommonAccountsApi extends ScorexLogging {
       blockchain.accountData(address, key)
 
     override def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[_]] = {
+      log.debug(s"AccountData[$address]: collecting ${regex.fold("all keys")(r => s"keys matching $r")}")
       val entriesFromDiff = diff.accountData
         .get(address)
         .fold[Map[String, DataEntry[_]]](Map.empty)(_.data.filter { case (k, _) => regex.forall(_.r.pattern.matcher(k).matches()) })
@@ -101,13 +102,14 @@ object CommonAccountsApi extends ScorexLogging {
           db.iterateOver(KeyTags.DataHistory.prefixBytes ++ PBRecipients.publicKeyHash(address)) { e =>
             val key = new String(e.getKey.drop(2 + Address.HashLength), Charsets.UTF_8)
             if (regex.forall(_.r.pattern.matcher(key).matches()) && !entriesFromDiff.contains(key)) {
-              for (h <- ro.get(Keys.dataHistory(address, key)).headOption; e <- ro.get(Keys.data(addressId, key)(h))) {
+              for (h <- readIntSeq(e.getValue).headOption; e <- ro.get(Keys.data(addressId, key)(h))) {
                 entries += e
               }
             }
           }
         }
       }
+      log.debug(s"AccountData[$address]: collected ${entries.size} values")
       Observable.fromIterable(entries).filterNot(_.isEmpty)
     }
 
