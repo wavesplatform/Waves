@@ -71,14 +71,15 @@ class SponsorFeeActionSuite extends BaseSuite {
     }
 
     "Use sponsored asset as fee" in {
-      nodes.waitForHeight(miner.height + 1)
+      val firstCheckHeight = miner.height + 1
+      nodes.waitForHeight(firstCheckHeight)
 
       val alice = miner.createKeyPair()
       val bob   = miner.createKeyPair()
 
       val startDAppSponsorAssetBalance = miner.assetBalance(globalDAppAddress, sponsoredAssetId).balance
       val startDAppBalance             = miner.balance(globalDAppAddress).balance
-      val startMinerBalance            = miner.balance(miner.address).balance
+      val startMinerBalance            = miner.balanceAtHeight(miner.address, firstCheckHeight)
 
       val assetFee            = 100
       val assetTransferAmount = 1000
@@ -102,11 +103,14 @@ class SponsorFeeActionSuite extends BaseSuite {
       val dAppWavesOutgo = smartMinFee + Sponsorship.toWaves(assetFee, minSponsoredAssetFee)
       val blockReward    = miner.lastBlock().reward.get
 
-      miner.waitForHeight(miner.height + 1)
+      val lastCheckHeight = miner.height + 1
+      miner.waitForHeight(lastCheckHeight)
 
       miner.assetBalance(globalDAppAddress, sponsoredAssetId).balance shouldBe startDAppSponsorAssetBalance - assetTransferAmount
-      miner.balance(globalDAppAddress).balance shouldBe startDAppBalance - dAppWavesOutgo
-      miner.balance(miner.address).balance shouldBe startMinerBalance + dAppWavesOutgo + blockReward
+      miner.balanceAtHeight(globalDAppAddress, lastCheckHeight) shouldBe startDAppBalance - dAppWavesOutgo
+
+      miner.balanceAtHeight(miner.address, lastCheckHeight) shouldBe
+        startMinerBalance + dAppWavesOutgo + blockReward * (lastCheckHeight - firstCheckHeight)
     }
 
     "Cancel sponsorship" in {

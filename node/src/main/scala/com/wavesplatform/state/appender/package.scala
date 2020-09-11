@@ -19,7 +19,7 @@ import scala.util.{Left, Right}
 
 package object appender extends ScorexLogging {
 
-  private val MaxTimeDrift: Long = 100 // millis
+  val MaxTimeDrift: Long = 100 // millis
 
   // Invalid blocks, that are already in blockchain
   private val exceptions = List(
