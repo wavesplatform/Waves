@@ -8,7 +8,7 @@ import com.wavesplatform.api.grpc.BlockRangeRequest.Filter
 import com.wavesplatform.api.grpc.BlockRequest.Request
 import com.wavesplatform.api.http.ApiError.BlockDoesNotExist
 import com.wavesplatform.protobuf.block.PBBlock
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.{ApplicationStatus, Transaction}
 import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
 
@@ -64,7 +64,7 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
 }
 
 object BlocksApiGrpcImpl {
-  private def toBlockWithHeight(v: (BlockMeta, Seq[(Transaction, Boolean)])) = {
+  private def toBlockWithHeight(v: (BlockMeta, Seq[(Transaction, ApplicationStatus)])) = {
     BlockWithHeight(Some(PBBlock(Some(v._1.header.toPBHeader), v._1.signature.toPBByteString, v._2.map(_._1.toPB))), v._1.height)
   }
 }
