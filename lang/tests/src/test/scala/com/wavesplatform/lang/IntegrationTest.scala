@@ -2056,7 +2056,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     )
   }
 
-  property("extracting data functions") {
+  property("extracting data functions with DeleteEntry") {
     val script =
       """
         | let deleteEntry  = DeleteEntry("delete")
