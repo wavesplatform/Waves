@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.VariableInfo
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -347,10 +347,15 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
         | }
       """.stripMargin
 
-    ExpressionCompiler(
-      getTestContext(V4).compilerContext,
-      Parser.parseExpr(expr).get.value
-    ) shouldBe Symbol("right")
+    DirectiveDictionary[StdLibVersion].all
+      .filter(_ >= V4)
+      .foreach {
+        version =>
+          ExpressionCompiler(
+            getTestContext(version).compilerContext,
+            Parser.parseExpr(expr).get.value
+          ) shouldBe Symbol("right")
+      }
   }
 
   treeTypeTest("GETTER")(
