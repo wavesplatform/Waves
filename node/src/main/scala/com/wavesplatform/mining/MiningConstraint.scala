@@ -31,7 +31,7 @@ case class OneDimensionalMiningConstraint(rest: Long, estimator: TxEstimators.Fn
   }
 
   override def toString: String = {
-    s"MiningConstraint(${if (description.isEmpty) "???" else description}, rest = $rest, estimator = $estimator)"
+    s"${if (description.isEmpty) "Constraint" else description}(rest = $rest, estimator = $estimator)"
   }
 }
 
@@ -40,6 +40,8 @@ case class MultiDimensionalMiningConstraint(constraints: NonEmptyList[MiningCons
   override def isOverfilled: Boolean = constraints.exists(_.isOverfilled)
   override def put(blockchain: Blockchain, x: Transaction, diff: Diff): MultiDimensionalMiningConstraint =
     MultiDimensionalMiningConstraint(constraints.map(_.put(blockchain, x, diff)))
+
+  override def toString: String = s"Constraint([${constraints.head}${constraints.tail.mkString(",", ",", "")}])"
 }
 
 object MultiDimensionalMiningConstraint {

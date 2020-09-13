@@ -630,7 +630,7 @@ class EvaluatorV2Test extends EvaluatorV2TestBase {
          | a$count() == a$count()
       """.stripMargin
 
-    println(eval(script, 10000))
+    eval(script, 10000)
   }
 
   property("big let assignment chain with function") {
@@ -642,7 +642,7 @@ class EvaluatorV2Test extends EvaluatorV2TestBase {
          | a$count == a$count
       """.stripMargin
 
-    println(eval(script, 20000)._3)
+    eval(script, 20000)._3
   }
 
   property("let ctx") {
