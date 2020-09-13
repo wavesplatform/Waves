@@ -2063,7 +2063,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         | let integerEntry = IntegerEntry("integer", 123)
         | let stringEntry  = StringEntry("string", "value")
         | let booleanEntry = BooleanEntry("boolean", true)
-        | let binaryEntry  = BinaryEntry("binary", base58'')
+        | let binaryEntry  = BinaryEntry("binary", base58'a')
         |
         | let entries = [deleteEntry, integerEntry, stringEntry, booleanEntry, binaryEntry]
         |
@@ -2073,8 +2073,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         | getStringValue(entries, 2)          == "value"   &&
         | getBooleanValue(entries, "boolean") == true      &&
         | getBooleanValue(entries, 3)         == true      &&
-        | getBinaryValue(entries, "binary")   == base58''  &&
-        | getBinaryValue(entries, 4)          == base58''
+        | getBinaryValue(entries, "binary")   == base58'a' &&
+        | getBinaryValue(entries, 4)          == base58'a'
       """.stripMargin
 
     val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
