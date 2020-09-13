@@ -7,13 +7,13 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing.evaluated
-import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
@@ -406,48 +406,63 @@ class TransactionBindingsTest
   }
 
   property("DataTransaction binding") {
-    forAll(dataTransactionGen(10, useForScript = true, withDeleteEntry = true)) { t =>
-      def declareKey(i: Int): String =
-        s"let key$i = t.data[$i].key == ${Json.toJson(t.data(i).key)} "
-
-      def declareKV(i: Int, v: Object): String =
-        s"""${declareKey(i)}
-           |let value$i = t.data[$i].value == $v
+    forAll(
+      for {
+        version <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.toSeq)
+        tx      <- dataTransactionGen(maxEntryCount = 10, useForScript = true, withDeleteEntry = true)
+      } yield (version, tx)
+    ) {
+      case (version, tx) =>
+        def check(i: Int, rideType: String, valueOpt: Option[Any]): String = {
+          val key        = Json.toJson(tx.data(i).key)
+          val keyCheck   = s"t.data[$i].key == $key"
+          val valueCheck = valueOpt.map(value => s"t.data[$i].value == $value").getOrElse("true")
+          val matchCheck =
+            s"""
+             | match t.data[$i] {
+             |   case entry: $rideType =>
+             |     entry.key == $key &&
+             |     ${valueOpt.map(value => s"entry.value == $value").getOrElse("true")} 
+             |   case _ =>
+             |     throw("unexpected type instead $rideType")
+             | }
          """.stripMargin
 
-      def pg(i: Int): String =
-        t.data(i) match {
-          case e: IntegerDataEntry => declareKV(i, e.value.toString)
-          case e: BooleanDataEntry => declareKV(i, e.value.toString)
-          case e: BinaryDataEntry  => declareKV(i, s"base64'${e.value.base64}'")
-          case e: StringDataEntry  => declareKV(i, Json.toJson(e.value))
-          case _: EmptyDataEntry   => declareKey(i)
+          if (version >= V4)
+            s"$keyCheck && $matchCheck"
+          else
+            s"$keyCheck && $valueCheck"
         }
 
-      val resString =
-        if (t.data.isEmpty) assertProvenPart("t")
-        else
-          assertProvenPart("t") + s" && " +
-            t.data.indices
-              .map(i => s"key$i" + (if (t.data(i).isInstanceOf[EmptyDataEntry]) "" else s" && value$i"))
+        def toRideChecks(i: Int): String =
+          tx.data(i) match {
+            case e: IntegerDataEntry => check(i, FieldNames.IntegerEntry, Some(e.value))
+            case e: BooleanDataEntry => check(i, FieldNames.BooleanEntry, Some(e.value))
+            case e: BinaryDataEntry  => check(i, FieldNames.BinaryEntry, Some(s"base58'${e.value}'"))
+            case e: StringDataEntry  => check(i, FieldNames.StringEntry, Some(Json.toJson(e.value)))
+            case _: EmptyDataEntry   => check(i, FieldNames.DeleteEntry, None)
+          }
+
+        val assertTxData =
+          if (tx.data.nonEmpty)
+            tx.data.indices
+              .map(toRideChecks)
               .mkString(" && ")
+          else
+            "true"
 
-      val s = s"""
-                 |match tx {
-                 | case t : DataTransaction =>
-                 |   ${provenPart(t)}
-                 |   ${t.data.indices.map(pg).mkString("\n")}
-                 |   $resString
-                 | case _ => throw()
-                 | }
-                 |""".stripMargin
+        val script =
+          s"""
+             | match tx {
+             |   case t : DataTransaction =>
+             |     ${provenPart(tx)}
+             |     ${assertProvenPart("t")} &&
+             |     $assertTxData
+             |   case _ => throw()
+             | }
+           """.stripMargin
 
-      val result = runScript(
-        s,
-        Coproduct(t),
-        T
-      )
-      result shouldBe evaluated(true)
+        runScript(script, Coproduct(tx), ctxV = version, chainId = T) shouldBe evaluated(true)
     }
   }
 
@@ -676,7 +691,15 @@ class TransactionBindingsTest
         CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
         WavesContext.build(DirectiveSet(V2, Asset, Expression).explicitGet())
 
-    val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coproduct[Environment.Tthis](Environment.AssetId(Array())), directives, ByteStr.empty)
+    val environment = new WavesEnvironment(
+      chainId,
+      Coeval(???),
+      null,
+      EmptyBlockchain,
+      Coproduct[Environment.Tthis](Environment.AssetId(Array())),
+      directives,
+      ByteStr.empty
+    )
     for {
       compileResult <- compiler.ExpressionCompiler(ctx.compilerContext, expr)
       (typedExpr, _) = compileResult
