@@ -2055,4 +2055,29 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       "Can't find a function 'removeByIndex'(List[Int], Int)"
     )
   }
+
+  property("extracting data functions") {
+    val script =
+      """
+        | let deleteEntry  = DeleteEntry("delete")
+        | let integerEntry = IntegerEntry("integer", 123)
+        | let stringEntry  = StringEntry("string", "value")
+        | let booleanEntry = BooleanEntry("boolean", true)
+        | let binaryEntry  = BinaryEntry("binary", base58'')
+        |
+        | let entries = [deleteEntry, integerEntry, stringEntry, booleanEntry, binaryEntry]
+        |
+        | getIntegerValue(entries, "integer") == 123       &&
+        | getIntegerValue(entries, 1)         == 123       &&
+        | getStringValue(entries, "string")   == "value"   &&
+        | getStringValue(entries, 2)          == "value"   &&
+        | getBooleanValue(entries, "boolean") == true      &&
+        | getBooleanValue(entries, 3)         == true      &&
+        | getBinaryValue(entries, "binary")   == base58''  &&
+        | getBinaryValue(entries, 4)          == base58''
+      """.stripMargin
+
+    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+    genericEval(script, ctxt = ctx, version = V4, env = utils.environment) shouldBe Right(CONST_BOOLEAN(true))
+  }
 }
