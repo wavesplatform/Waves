@@ -9,7 +9,7 @@ import com.wavesplatform.database.protobuf.TransactionMeta
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.{ApplicationStatus, Transaction}
 import com.wavesplatform.utils._
 
 object Keys {
@@ -113,8 +113,8 @@ object Keys {
       unsupported("Can not explicitly write block bytes")
     )
 
-  def transactionAt(height: Height, n: TxNum): Key[Option[(Transaction, Boolean)]] =
-    Key.opt[(Transaction, Boolean)](
+  def transactionAt(height: Height, n: TxNum): Key[Option[(Transaction, ApplicationStatus)]] =
+    Key.opt[(Transaction, ApplicationStatus)](
       NthTransactionInfoAtHeight,
       hNum(height, n),
       readTransaction,

@@ -25,7 +25,7 @@ import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
+import com.wavesplatform.transaction.{ApplicationStatus, GenesisTransaction, LegacyPBSwitch, PaymentTransaction, ScriptExecutionFailed, Succeeded, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.{ScorexLogging, _}
 import monix.eval.Task
 import monix.reactive.Observable
@@ -501,18 +501,19 @@ package object database extends ScorexLogging {
     )
   }
 
-  def readTransaction(b: Array[Byte]): (Transaction, Boolean) = {
+  def readTransaction(b: Array[Byte]): (Transaction, ApplicationStatus) = {
     import pb.TransactionData.Transaction._
 
     val data = pb.TransactionData.parseFrom(b)
+    val status = if (data.failed) ScriptExecutionFailed else Succeeded
     data.transaction match {
-      case tx: LegacyBytes    => (TransactionParsers.parseBytes(tx.value.toByteArray).get, !data.failed)
-      case tx: NewTransaction => (PBTransactions.vanilla(tx.value).explicitGet(), !data.failed)
+      case tx: LegacyBytes    => (TransactionParsers.parseBytes(tx.value.toByteArray).get, status)
+      case tx: NewTransaction => (PBTransactions.vanilla(tx.value).explicitGet(), status)
       case _                  => throw new IllegalArgumentException("Illegal transaction data")
     }
   }
 
-  def writeTransaction(v: (Transaction, Boolean)): Array[Byte] = {
+  def writeTransaction(v: (Transaction, ApplicationStatus)): Array[Byte] = {
     import pb.TransactionData.Transaction._
     val (tx, succeeded) = v
     val ptx = tx match {
@@ -521,7 +522,7 @@ package object database extends ScorexLogging {
       case _: PaymentTransaction                         => LegacyBytes(ByteString.copyFrom(tx.bytes()))
       case _                                             => NewTransaction(PBTransactions.protobuf(tx))
     }
-    pb.TransactionData(!succeeded, ptx).toByteArray
+    pb.TransactionData(succeeded != ScriptExecutionFailed, ptx).toByteArray
   }
 
   /** Returns status (succeed - true, failed -false) and bytes (left - legacy format bytes, right - new format bytes) */
@@ -558,7 +559,7 @@ package object database extends ScorexLogging {
     (succeed, bytes)
   }
 
-  def loadTransactions(height: Height, db: ReadOnlyDB): Option[Seq[(Transaction, Boolean)]] =
+  def loadTransactions(height: Height, db: ReadOnlyDB): Option[Seq[(Transaction, ApplicationStatus)]] =
     for {
       meta <- db.get(Keys.blockMetaAt(height))
     } yield (0 until meta.transactionCount).toList.flatMap { n =>
@@ -623,7 +624,7 @@ package object database extends ScorexLogging {
       pb.TransactionMeta(h, n, _, _) <- r.get(Keys.transactionMetaById(TransactionId(id)))
       tx                             <- r.get(Keys.transactionAt(Height(h), TxNum(n.toShort)))
     } yield tx).collect {
-      case (lt: LeaseTransaction, true) => lt
+      case (lt: LeaseTransaction, Succeeded) => lt
     }.toSeq
   }
 

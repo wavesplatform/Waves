@@ -7,7 +7,7 @@ import com.wavesplatform.api.http.ApiError.{BlockDoesNotExist, TooBigArrayAlloca
 import com.wavesplatform.block.Block
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.{ApplicationStatus, Transaction}
 import play.api.libs.json._
 
 case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi) extends ApiRoute {
@@ -91,9 +91,10 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi)
 object BlocksApiRoute {
   import TransactionsApiRoute.applicationStatus
 
-  private def toJson(v: (BlockMeta, Seq[(Transaction, Boolean)])): JsObject = v._1.json() ++ transactionField(v._1.header.version, v._2)
+  private def toJson(v: (BlockMeta, Seq[(Transaction, ApplicationStatus)])): JsObject =
+    v._1.json() ++ transactionField(v._1.header.version, v._2)
 
-  private def transactionField(blockVersion: Byte, transactions: Seq[(Transaction, Boolean)]): JsObject = Json.obj(
+  private def transactionField(blockVersion: Byte, transactions: Seq[(Transaction, ApplicationStatus)]): JsObject = Json.obj(
     "fee" -> transactions.map(_._1.assetFee).collect { case (Waves, feeAmt) => feeAmt }.sum,
     "transactions" -> JsArray(transactions.map {
       case (transaction, succeeded) => transaction.json() ++ applicationStatus(blockVersion >= Block.ProtoBlockVersion, succeeded)

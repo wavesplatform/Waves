@@ -73,7 +73,7 @@ class BlockchainUpdaterImpl(
 
   def liquidBlock(id: ByteStr): Option[Block] = readLock(ngState.flatMap(_.totalDiffOf(id).map(_._1)))
 
-  def liquidTransactions(id: ByteStr): Option[Seq[(Transaction, Boolean)]] =
+  def liquidTransactions(id: ByteStr): Option[Seq[(Transaction, ApplicationStatus)]] =
     readLock(
       ngState
         .flatMap(_.totalDiffOf(id))
@@ -595,7 +595,7 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.transferById(id)
   }
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)] = readLock {
+  override def transactionInfo(id: ByteStr): Option[(Int, Transaction, ApplicationStatus)] = readLock {
     compositeBlockchain.transactionInfo(id)
   }
 
@@ -645,7 +645,7 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.accountData(acc, key)
   }
 
-  override def transactionMeta(id: ByteStr): Option[(Int, Boolean)] = readLock {
+  override def transactionMeta(id: ByteStr): Option[(Int, ApplicationStatus)] = readLock {
     compositeBlockchain.transactionMeta(id)
   }
 

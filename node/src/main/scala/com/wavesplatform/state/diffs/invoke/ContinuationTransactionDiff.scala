@@ -16,7 +16,7 @@ import com.wavesplatform.lang.v1.traits.Environment.Tthis
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, ContinuationState, Diff}
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.{ScriptExecutionFailed, Transaction}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
@@ -30,7 +30,10 @@ object ContinuationTransactionDiff {
     val invokeScriptTransaction         = foundTx.asInstanceOf[InvokeScriptTransaction]
     for {
       _ <- TracedResult(
-        Either.cond(status, (), GenericError(s"Cannot continue failed invoke script transaction with id=${tx.invokeScriptTransactionId}"))
+        Either.cond(
+          status == ScriptExecutionFailed,
+          (),
+          GenericError(s"Cannot continue failed invoke script transaction with id=${tx.invokeScriptTransactionId}"))
       )
       dAppAddress <- TracedResult(blockchain.resolveAlias(invokeScriptTransaction.dAppAddressOrAlias))
       scriptInfo <- TracedResult(

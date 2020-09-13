@@ -24,7 +24,7 @@ import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.{ApplicationStatus, _}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -385,11 +385,12 @@ abstract class LevelDBWriter private[database] (
         rw.put(Keys.safeRollbackHeight, height - dbSettings.maxRollbackDepth)
       }
 
-      val transactions: Map[TransactionId, (Transaction, TxNum, Boolean)] =
+      val transactions: Map[TransactionId, (Transaction, TxNum, ApplicationStatus)] =
         block.transactionData.zipWithIndex.map { in =>
           val (tx, idx) = in
           val k         = TransactionId(tx.id())
-          val v         = (tx, TxNum(idx.toShort), !failedTransactionIds.contains(tx.id()))
+          val status    = if (failedTransactionIds.contains(tx.id())) ScriptExecutionFailed else Succeeded
+          val v         = (tx, TxNum(idx.toShort), status)
           k -> v
         }.toMap
 
@@ -499,7 +500,7 @@ abstract class LevelDBWriter private[database] (
 
       for ((id, (tx, num, succeeded)) <- transactions) {
         rw.put(Keys.transactionAt(Height(height), num), Some((tx, succeeded)))
-        rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.typeId, !succeeded)))
+        rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.typeId, succeeded == ScriptExecutionFailed)))
       }
 
       val activationWindowSize = settings.functionalitySettings.activationWindowSize(height)
@@ -777,22 +778,25 @@ abstract class LevelDBWriter private[database] (
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
     for {
       TransactionMeta(height, num, TransferTransaction.typeId, _) <- db.get(Keys.transactionMetaById(TransactionId @@ id))
-      tx <- db.get(Keys.transactionAt(Height(height), TxNum(num.toShort))).collect { case (t: TransferTransaction, true) => t }
+      tx <- db.get(Keys.transactionAt(Height(height), TxNum(num.toShort))).collect { case (t: TransferTransaction, Succeeded) => t }
     } yield (height, tx)
   }
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)] = readOnly(transactionInfo(id, _))
+  override def transactionInfo(id: ByteStr): Option[(Int, Transaction, ApplicationStatus)] = readOnly(transactionInfo(id, _))
 
-  protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(Int, Transaction, Boolean)] = {
+  protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(Int, Transaction, ApplicationStatus)] = {
     val txId = TransactionId(id)
     for {
       TransactionMeta(height, num, _, failed) <- db.get(Keys.transactionMetaById(txId))
       (tx, _)                                 <- db.get(Keys.transactionAt(Height(height), TxNum(num.toShort)))
-    } yield (height, tx, !failed)
+    } yield (height, tx, if (failed) ScriptExecutionFailed else Succeeded)
   }
 
-  override def transactionMeta(id: ByteStr): Option[(Int, Boolean)] = readOnly { db =>
-    db.get(Keys.transactionMetaById(TransactionId(id))).map { case TransactionMeta(height, _, _, failed) => (height, !failed) }
+  override def transactionMeta(id: ByteStr): Option[(Int, ApplicationStatus)] = readOnly { db =>
+    db.get(Keys.transactionMetaById(TransactionId(id)))
+      .map { case TransactionMeta(height, _, _, failed) =>
+        (height, if (failed) ScriptExecutionFailed else Succeeded)
+      }
   }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readOnly { db =>
@@ -805,7 +809,7 @@ abstract class LevelDBWriter private[database] (
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>
     transactionInfo(leaseId, db) match {
-      case Some((h, lt: LeaseTransaction, true)) =>
+      case Some((h, lt: LeaseTransaction, Succeeded)) =>
         Some(LeaseDetails(lt.sender, lt.recipient, h, lt.amount, loadLeaseStatus(db, leaseId)))
       case _ => None
     }

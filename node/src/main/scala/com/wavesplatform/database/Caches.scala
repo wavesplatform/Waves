@@ -14,7 +14,7 @@ import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, ScriptExecutionFailed, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
 
@@ -190,7 +190,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       newAddresses += address
     }
 
-    val failedTransactionIds: Set[ByteStr] = diff.transactions.collect { case (id, NewTransactionInfo(_, _, false)) => id }.toSet
+    val failedTransactionIds: Set[ByteStr] =
+      diff.transactions.collect { case (id, NewTransactionInfo(_, _, ScriptExecutionFailed)) => id }.toSet
 
     val newAddressIds = (for {
       (address, offset) <- newAddresses.result().zipWithIndex

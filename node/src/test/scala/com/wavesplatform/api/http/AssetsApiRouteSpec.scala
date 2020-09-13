@@ -10,6 +10,7 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Succeeded
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.{NoShrink, TestTime, TestValues, TestWallet, TransactionGen}
 import monix.reactive.Observable
@@ -55,7 +56,7 @@ class AssetsApiRouteSpec
 
   routePath(s"/details/{id} - smart asset") in forAll(smartIssueAndDetailsGen) {
     case (smartAssetTx, smartAssetDesc) =>
-      (blockchain.transactionInfo _).when(smartAssetTx.id()).onCall((_: ByteStr) => Some((1, smartAssetTx, true)))
+      (blockchain.transactionInfo _).when(smartAssetTx.id()).onCall((_: ByteStr) => Some((1, smartAssetTx, Succeeded)))
       (blockchain.assetDescription _).when(IssuedAsset(smartAssetTx.id())).onCall((_: IssuedAsset) => Some(smartAssetDesc))
 
       Get(routePath(s"/details/${smartAssetTx.id().toString}")) ~> route ~> check {
@@ -109,7 +110,7 @@ class AssetsApiRouteSpec
 
   routePath(s"/details/{id} - non-smart asset") in forAll(sillyIssueAndDetailsGen) {
     case (sillyAssetTx, sillyAssetDesc) =>
-      (blockchain.transactionInfo _).when(sillyAssetTx.id()).onCall((_: ByteStr) => Some((1, sillyAssetTx, true)))
+      (blockchain.transactionInfo _).when(sillyAssetTx.id()).onCall((_: ByteStr) => Some((1, sillyAssetTx, Succeeded)))
       (blockchain.assetDescription _).when(IssuedAsset(sillyAssetTx.id())).onCall((_: IssuedAsset) => Some(sillyAssetDesc))
       Get(routePath(s"/details/${sillyAssetTx.id().toString}")) ~> route ~> check {
         val response = responseAs[JsObject]

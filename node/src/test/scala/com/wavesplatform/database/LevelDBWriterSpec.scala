@@ -20,7 +20,7 @@ import com.wavesplatform.state.{BlockchainUpdaterImpl, Height, TransactionId, Tx
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.transaction.{GenesisTransaction, ScriptExecutionFailed, Succeeded, TxVersion}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.{EitherMatchers, RequestGen, TransactionGen, WithDB, database}
 import org.scalacheck.{Arbitrary, Gen}
@@ -309,8 +309,9 @@ class LevelDBWriterSpec
       forAll(scenario) {
         case (tx, s) =>
           val transactionId = tx.id()
+          val status = if (s) Succeeded else ScriptExecutionFailed
           db.put(Keys.transactionMetaById(TransactionId(transactionId)).keyBytes, TransactionMeta(1, 0, tx.typeId, !s).toByteArray)
-          db.put(Keys.transactionAt(Height(1), TxNum(0.toShort)).keyBytes, database.writeTransaction((tx, s)))
+          db.put(Keys.transactionAt(Height(1), TxNum(0.toShort)).keyBytes, database.writeTransaction((tx, status)))
 
           writer.transactionInfo(transactionId) shouldBe Some((1, tx, s))
       }

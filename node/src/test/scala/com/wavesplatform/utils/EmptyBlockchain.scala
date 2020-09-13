@@ -11,7 +11,7 @@ import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{ApplicationStatus, Asset, Transaction}
 
 case object EmptyBlockchain extends Blockchain {
   override lazy val settings: BlockchainSettings = BlockchainSettings.fromRootConfig(ConfigFactory.load())
@@ -44,9 +44,9 @@ case object EmptyBlockchain extends Blockchain {
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = None
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)] = None
+  override def transactionInfo(id: ByteStr): Option[(Int, Transaction, ApplicationStatus)] = None
 
-  override def transactionMeta(id: ByteStr): Option[(Int, Boolean)] = None
+  override def transactionMeta(id: ByteStr): Option[(Int, ApplicationStatus)] = None
 
   override def containsTransaction(tx: Transaction): Boolean = false
 

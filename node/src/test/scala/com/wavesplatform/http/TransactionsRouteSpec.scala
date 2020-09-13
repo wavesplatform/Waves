@@ -15,7 +15,7 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.state.{Blockchain, Height}
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.{Asset, ScriptExecutionFailed, Succeeded}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -272,7 +272,8 @@ class TransactionsRouteSpec
         case (tx, succeed, height, acceptFailedActivationHeight) =>
           val h: Height           = Height(height)
           val info                = if (tx.typeId == InvokeScriptTransaction.typeId) Right((tx.asInstanceOf[InvokeScriptTransaction], None)) else Left(tx)
-          (addressTransactions.transactionById _).expects(tx.id()).returning(Some((h, info, succeed))).once()
+          val status              = if (succeed) Succeeded else ScriptExecutionFailed
+          (addressTransactions.transactionById _).expects(tx.id()).returning(Some((h, info, status))).once()
           (() => blockchain.activatedFeatures)
             .expects()
             .returning(Map(BlockchainFeatures.BlockV5.id -> acceptFailedActivationHeight))
@@ -314,7 +315,8 @@ class TransactionsRouteSpec
 
       forAll(txAvailability) {
         case (tx, height, acceptFailedActivationHeight, succeed) =>
-          (blockchain.transactionInfo _).expects(tx.id()).returning(Some((height, tx, succeed))).anyNumberOfTimes()
+          val status = if (succeed) Succeeded else ScriptExecutionFailed
+          (blockchain.transactionInfo _).expects(tx.id()).returning(Some((height, tx, status))).anyNumberOfTimes()
           (() => blockchain.height).expects().returning(1000).anyNumberOfTimes()
           (() => blockchain.activatedFeatures)
             .expects()

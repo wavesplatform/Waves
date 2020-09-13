@@ -12,7 +12,7 @@ import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
 import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction}
+import com.wavesplatform.transaction.{ApplicationStatus, Asset, CreateAliasTransaction, Transaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import monix.reactive.Observable
@@ -28,7 +28,7 @@ trait CommonTransactionsApi {
       sender: Option[Address],
       transactionTypes: Set[Byte],
       fromId: Option[ByteStr] = None
-  ): Observable[(Height, Transaction, Boolean)]
+  ): Observable[(Height, Transaction, ApplicationStatus)]
 
   def transactionById(txId: ByteStr): Option[TransactionMeta]
 
@@ -51,7 +51,7 @@ trait CommonTransactionsApi {
 }
 
 object CommonTransactionsApi {
-  type TransactionMeta = (Height, Either[Transaction, (InvokeScriptTransaction, Option[InvokeScriptResult])], Boolean)
+  type TransactionMeta = (Height, Either[Transaction, (InvokeScriptTransaction, Option[InvokeScriptResult])], ApplicationStatus)
 
   def apply(
       maybeDiff: => Option[(Height, Diff)],
@@ -71,7 +71,7 @@ object CommonTransactionsApi {
         sender: Option[Address],
         transactionTypes: Set[Byte],
         fromId: Option[ByteStr] = None
-    ): Observable[(Height, Transaction, Boolean)] = resolve(subject).fold(Observable.empty[(Height, Transaction, Boolean)]) { subjectAddress =>
+    ): Observable[(Height, Transaction, ApplicationStatus)] = resolve(subject).fold(Observable.empty[(Height, Transaction, ApplicationStatus)]) { subjectAddress =>
       common.addressTransactions(db, maybeDiff, subjectAddress, sender, transactionTypes, fromId)
     }
 

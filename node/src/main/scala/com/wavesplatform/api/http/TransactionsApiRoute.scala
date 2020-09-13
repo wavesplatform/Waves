@@ -242,15 +242,16 @@ object TransactionsApiRoute {
     val NotFound    = "not_found"
   }
 
-  object ApplicationStatus {
-    val Succeeded             = "succeeded"
-    val ScriptExecutionFailed = "script_execution_failed"
-  }
-
-  def applicationStatus(isBlockV5: Boolean, succeeded: Boolean): JsObject =
-    if (isBlockV5)
-      JsObject(Map("applicationStatus" -> JsString(if (succeeded) ApplicationStatus.Succeeded else ApplicationStatus.ScriptExecutionFailed)))
-    else
+  def applicationStatus(isBlockV5: Boolean, applicationStatus: ApplicationStatus): JsObject =
+    if (isBlockV5) {
+      val textValue =
+        applicationStatus match {
+          case Succeeded                 => "succeeded"
+          case ScriptExecutionFailed     => "script_execution_failed"
+          case ScriptExecutionInProgress => "script_execution_in_progress"
+        }
+      JsObject(Map("applicationStatus" -> JsString(textValue)))
+    } else
       JsObject.empty
 
   implicit val transactionProofWrites: Writes[TransactionProof] = Writes { mi =>

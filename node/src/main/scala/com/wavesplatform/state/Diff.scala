@@ -11,7 +11,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{ApplicationStatus, Asset, Succeeded, Transaction}
 import play.api.libs.json._
 
 import scala.collection.mutable
@@ -140,7 +140,7 @@ object Sponsorship {
     }
 }
 
-case class NewTransactionInfo(transaction: Transaction, affected: Set[Address], applied: Boolean)
+case class NewTransactionInfo(transaction: Transaction, affected: Set[Address], applied: ApplicationStatus)
 
 case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: AssetVolumeInfo)
 
@@ -246,7 +246,7 @@ object Diff {
       portfolios: Map[Address, Portfolio],
       accountData: Map[Address, AccountDataInfo]
   ): (ByteStr, NewTransactionInfo) =
-    tx.id() -> NewTransactionInfo(tx, (portfolios.keys ++ accountData.keys).toSet, true)
+    tx.id() -> NewTransactionInfo(tx, (portfolios.keys ++ accountData.keys).toSet, Succeeded)
 
   val empty =
     new Diff(

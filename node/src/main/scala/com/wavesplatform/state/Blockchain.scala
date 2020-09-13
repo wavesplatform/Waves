@@ -14,7 +14,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{ApplicationStatus, Asset, Transaction}
 
 trait Blockchain {
   def settings: BlockchainSettings
@@ -41,8 +41,8 @@ trait Blockchain {
   def wavesAmount(height: Int): BigInt
 
   def transferById(id: ByteStr): Option[(Int, TransferTransaction)]
-  def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)]
-  def transactionMeta(id: ByteStr): Option[(Int, Boolean)]
+  def transactionInfo(id: ByteStr): Option[(Int, Transaction, ApplicationStatus)]
+  def transactionMeta(id: ByteStr): Option[(Int, ApplicationStatus)]
 
   def containsTransaction(tx: Transaction): Boolean
 
