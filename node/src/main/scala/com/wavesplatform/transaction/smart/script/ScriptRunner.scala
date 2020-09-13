@@ -81,7 +81,7 @@ object ScriptRunner {
               t =>
                 RealTransactionWrapper(t, blockchain, directives.stdLibVersion, DAppTarget)
                   .leftMap((_, Nil))
-                  .flatMap(tx => verify(Bindings.transactionObject(tx, proofsEnabled = true))),
+                  .flatMap(tx => verify(Bindings.transactionObject(tx, proofsEnabled = true, directives.stdLibVersion))),
               _.eliminate(
                 t => verify(Bindings.orderObject(RealTransactionWrapper.ord(t), proofsEnabled = true)),
                 _ => ???

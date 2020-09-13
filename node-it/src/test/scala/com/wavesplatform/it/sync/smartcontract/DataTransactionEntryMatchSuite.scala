@@ -37,8 +37,12 @@ class DataTransactionEntryMatchSuite extends BaseTransactionSuite {
          |           case entry: StringEntry =>
          |             entry.key == "key" &&
          |             entry.value == "value"
-         |           case _ =>
-         |             throw("not a string")
+         |           case _: IntegerEntry =>
+         |             throw("unexpected IntegerEntry")
+         |           case _: BinaryEntry =>
+         |             throw("unexpected BinaryEntry")
+         |           case _: BooleanEntry =>
+         |             throw("unexpected BooleanEntry")
          |         }
          |     case _ =>
          |       sigVerify(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)
