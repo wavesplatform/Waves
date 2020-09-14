@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
@@ -14,7 +15,7 @@ import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class DataTransactionEntryMatchSuite extends BaseTransactionSuite {
-  private val activationHeight = 4
+  private val activationHeight = 5
 
   private def compile(scriptText: String) =
     ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
@@ -26,60 +27,76 @@ class DataTransactionEntryMatchSuite extends BaseTransactionSuite {
       .withDefault(1)
       .buildNonConflicting()
 
-  private val script =
+  private def script(dApp: Boolean) =
     compile(
       s"""
-         | {-# STDLIB_VERSION 4 #-}
-         | {-# CONTENT_TYPE DAPP #-}
-         | {-# SCRIPT_TYPE ACCOUNT #-}
+         | {-# STDLIB_VERSION 4       #-}
+         | {-# SCRIPT_TYPE    ACCOUNT #-}
+         | {-# CONTENT_TYPE ${if (dApp) "DAPP" else "EXPRESSION" }  #-}
          |
-         | @Verifier(tx)
-         | func verify() = match tx {
-         |     case d:DataTransaction =>
-         |         d.data.size() == 1 &&
-         |         match d.data[0] {
-         |           case entry: StringEntry =>
-         |             entry.key == "key" &&
-         |             entry.value == "value"
-         |           case _: IntegerEntry =>
-         |             throw("unexpected IntegerEntry")
-         |           case _: BinaryEntry =>
-         |             throw("unexpected BinaryEntry")
-         |           case _: BooleanEntry =>
-         |             throw("unexpected BooleanEntry")
-         |         }
-         |     case _ =>
-         |       sigVerify(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)
+         | ${if (dApp) "@Verifier(tx) \n func verify() = " else ""}
+         | match tx {
+         |   case d:DataTransaction =>
+         |       d.data.size() == 1 &&
+         |       match d.data[0] {
+         |         case entry: StringEntry =>
+         |           entry.key == "key" &&
+         |           entry.value == "value"
+         |         case _: IntegerEntry =>
+         |           throw("unexpected IntegerEntry")
+         |         case _: BinaryEntry =>
+         |           throw("unexpected BinaryEntry")
+         |         case _: BooleanEntry =>
+         |           throw("unexpected BooleanEntry")
+         |       }
+         |   case _ =>
+         |     sigVerify(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)
          | }
        """.stripMargin
     )
 
+  private lazy val dAppVerifier: KeyPair      = firstKeyPair
+  private lazy val accountExpression: KeyPair = secondKeyPair
+
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    val setScriptId = sender.setScript(firstKeyPair, Some(script), setScriptFee, waitForTx = true).id
-    sender.transactionInfo[TransactionInfo](setScriptId).script.get.startsWith("base64:") shouldBe true
 
-    val scriptInfo = sender.addressScriptInfo(firstKeyPair.toAddress.toString)
-    scriptInfo.script.isEmpty shouldBe false
-    scriptInfo.scriptText.isEmpty shouldBe false
-    scriptInfo.script.get.startsWith("base64:") shouldBe true
+    val setDApp = sender.setScript(dAppVerifier, Some(script(dApp = true)), setScriptFee, waitForTx = true).id
+    sender.transactionInfo[TransactionInfo](setDApp).script.get.startsWith("base64:") shouldBe true
+
+    val dAppInfo = sender.addressScriptInfo(dAppVerifier.toAddress.toString)
+    dAppInfo.script.isEmpty shouldBe false
+    dAppInfo.scriptText.isEmpty shouldBe false
+    dAppInfo.script.get.startsWith("base64:") shouldBe true
+
+    val setAccountExpression = sender.setScript(accountExpression, Some(script(dApp = false)), setScriptFee, waitForTx = true).id
+    sender.transactionInfo[TransactionInfo](setAccountExpression).script.get.startsWith("base64:") shouldBe true
+
+    val accountExpressionInfo = sender.addressScriptInfo(accountExpression.toAddress.toString)
+    accountExpressionInfo.script.isEmpty shouldBe false
+    accountExpressionInfo.scriptText.isEmpty shouldBe false
+    accountExpressionInfo.script.get.startsWith("base64:") shouldBe true
   }
 
-  test("data transaction validation error due to incorrect RIDE mapping") {
+  test("successful validation of data transaction for account expression") {
+    sendDataTransaction(accountExpression)
+  }
+
+  test("data transaction validation error due to incorrect RIDE mapping for DApp verifier") {
     assertBadRequestAndMessage(
-      sendDataTransaction(),
+      sendDataTransaction(dAppVerifier),
       "Error while executing account-script: Match error"
     )
   }
 
-  test("successful validation of data transaction") {
+  test("successful validation of data transaction for DApp verifier after activation of fix") {
     sender.waitForHeight(activationHeight)
-    sendDataTransaction()
+    sendDataTransaction(dAppVerifier)
   }
 
-  private def sendDataTransaction() = {
+  private def sendDataTransaction(address: KeyPair) = {
     val data = List(StringDataEntry("key", "value"))
     val fee  = calcDataFee(data, TxVersion.V1) + smartFee
-    sender.putData(firstKeyPair, data, version = TxVersion.V1, fee = fee, waitForTx = true)
+    sender.putData(address, data, version = TxVersion.V1, fee = fee, waitForTx = true)
   }
 }
