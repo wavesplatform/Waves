@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
@@ -13,12 +14,15 @@ import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class DataTransactionEntryMatchSuite extends BaseTransactionSuite {
+  private val activationHeight = 4
+
   private def compile(scriptText: String) =
     ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.ContinuationTransaction.id, activationHeight)))
       .withDefault(1)
       .buildNonConflicting()
 
@@ -61,9 +65,21 @@ class DataTransactionEntryMatchSuite extends BaseTransactionSuite {
     scriptInfo.script.get.startsWith("base64:") shouldBe true
   }
 
-  test("filled data transaction body bytes") {
+  test("data transaction validation error due to incorrect RIDE mapping") {
+    assertBadRequestAndMessage(
+      sendDataTransaction(),
+      "Error while executing account-script: Match error"
+    )
+  }
+
+  test("successful validation of data transaction") {
+    sender.waitForHeight(activationHeight)
+    sendDataTransaction()
+  }
+
+  private def sendDataTransaction() = {
     val data = List(StringDataEntry("key", "value"))
-    val fee = calcDataFee(data, TxVersion.V1) + smartFee
+    val fee  = calcDataFee(data, TxVersion.V1) + smartFee
     sender.putData(firstKeyPair, data, version = TxVersion.V1, fee = fee, waitForTx = true)
   }
 }
