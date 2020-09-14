@@ -313,7 +313,7 @@ class LevelDBWriterSpec
           db.put(Keys.transactionMetaById(TransactionId(transactionId)).keyBytes, TransactionMeta(1, 0, tx.typeId, !s).toByteArray)
           db.put(Keys.transactionAt(Height(1), TxNum(0.toShort)).keyBytes, database.writeTransaction((tx, status)))
 
-          writer.transactionInfo(transactionId) shouldBe Some((1, tx, s))
+          writer.transactionInfo(transactionId) shouldBe Some((1, tx, status))
       }
     }
   }

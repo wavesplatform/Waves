@@ -270,10 +270,10 @@ class TransactionsRouteSpec
 
       forAll(txAvailability) {
         case (tx, succeed, height, acceptFailedActivationHeight) =>
-          val h: Height           = Height(height)
-          val info                = if (tx.typeId == InvokeScriptTransaction.typeId) Right((tx.asInstanceOf[InvokeScriptTransaction], None)) else Left(tx)
-          val status              = if (succeed) Succeeded else ScriptExecutionFailed
-          (addressTransactions.transactionById _).expects(tx.id()).returning(Some((h, info, status))).once()
+          val h: Height         = Height(height)
+          val info              = if (tx.typeId == InvokeScriptTransaction.typeId) Right((tx.asInstanceOf[InvokeScriptTransaction], None)) else Left(tx)
+          val applicationStatus = if (succeed) Succeeded else ScriptExecutionFailed
+          (addressTransactions.transactionById _).expects(tx.id()).returning(Some((h, info, applicationStatus))).once()
           (() => blockchain.activatedFeatures)
             .expects()
             .returning(Map(BlockchainFeatures.BlockV5.id -> acceptFailedActivationHeight))
@@ -315,8 +315,8 @@ class TransactionsRouteSpec
 
       forAll(txAvailability) {
         case (tx, height, acceptFailedActivationHeight, succeed) =>
-          val status = if (succeed) Succeeded else ScriptExecutionFailed
-          (blockchain.transactionInfo _).expects(tx.id()).returning(Some((height, tx, status))).anyNumberOfTimes()
+          val applicationStatus = if (succeed) Succeeded else ScriptExecutionFailed
+          (blockchain.transactionInfo _).expects(tx.id()).returning(Some((height, tx, applicationStatus))).anyNumberOfTimes()
           (() => blockchain.height).expects().returning(1000).anyNumberOfTimes()
           (() => blockchain.activatedFeatures)
             .expects()
