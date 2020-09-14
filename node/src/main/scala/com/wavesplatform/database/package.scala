@@ -522,7 +522,7 @@ package object database extends ScorexLogging {
       case _: PaymentTransaction                         => LegacyBytes(ByteString.copyFrom(tx.bytes()))
       case _                                             => NewTransaction(PBTransactions.protobuf(tx))
     }
-    pb.TransactionData(succeeded != ScriptExecutionFailed, ptx).toByteArray
+    pb.TransactionData(succeeded == ScriptExecutionFailed, ptx).toByteArray
   }
 
   /** Returns status (succeed - true, failed -false) and bytes (left - legacy format bytes, right - new format bytes) */
