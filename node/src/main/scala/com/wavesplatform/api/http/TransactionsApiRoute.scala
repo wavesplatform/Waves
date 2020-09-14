@@ -66,7 +66,7 @@ case class TransactionsApiRoute(
     } ~ path(TransactionId) { id =>
       commonApi.transactionById(id) match {
         case Some((h, either, succeeded)) =>
-          complete(txToExtendedJson(either.fold(identity, _._1)) ++ applicationStatus(isBlockV5(h), succeeded) + ("height" -> JsNumber(h)))
+          complete(txToExtendedJson(either.fold(identity, _._1)) ++ applicationStatusJsField(isBlockV5(h), succeeded) + ("height" -> JsNumber(h)))
         case None => complete(ApiError.TransactionDoesNotExist)
       }
     }
@@ -80,7 +80,7 @@ case class TransactionsApiRoute(
           "status"        -> Confirmed,
           "height"        -> height,
           "confirmations" -> (blockchain.height - height).max(0)
-        ) ++ applicationStatus(isBlockV5(height), succeeded)
+        ) ++ applicationStatusJsField(isBlockV5(height), succeeded)
       case None =>
         commonApi.unconfirmedTransactionById(id) match {
           case Some(_) => Json.obj("status" -> Unconfirmed)
@@ -221,7 +221,7 @@ case class TransactionsApiRoute(
       .take(limitParam)
       .mapEval {
         case (height, tx, succeeded) =>
-          txToCompactJson(address, tx).map(_ ++ applicationStatus(isBlockV5(height), succeeded) + ("height" -> JsNumber(height)))
+          txToCompactJson(address, tx).map(_ ++ applicationStatusJsField(isBlockV5(height), succeeded) + ("height" -> JsNumber(height)))
       }
       .toListL
       .runToFuture
@@ -242,7 +242,7 @@ object TransactionsApiRoute {
     val NotFound    = "not_found"
   }
 
-  def applicationStatus(isBlockV5: Boolean, applicationStatus: ApplicationStatus): JsObject =
+  def applicationStatusJsField(isBlockV5: Boolean, applicationStatus: ApplicationStatus): JsObject =
     if (isBlockV5) {
       val textValue =
         applicationStatus match {

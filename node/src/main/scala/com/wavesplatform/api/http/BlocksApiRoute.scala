@@ -89,7 +89,7 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi)
 }
 
 object BlocksApiRoute {
-  import TransactionsApiRoute.applicationStatus
+  import TransactionsApiRoute.applicationStatusJsField
 
   private def toJson(v: (BlockMeta, Seq[(Transaction, ApplicationStatus)])): JsObject =
     v._1.json() ++ transactionField(v._1.header.version, v._2)
@@ -97,7 +97,7 @@ object BlocksApiRoute {
   private def transactionField(blockVersion: Byte, transactions: Seq[(Transaction, ApplicationStatus)]): JsObject = Json.obj(
     "fee" -> transactions.map(_._1.assetFee).collect { case (Waves, feeAmt) => feeAmt }.sum,
     "transactions" -> JsArray(transactions.map {
-      case (transaction, succeeded) => transaction.json() ++ applicationStatus(blockVersion >= Block.ProtoBlockVersion, succeeded)
+      case (transaction, succeeded) => transaction.json() ++ applicationStatusJsField(blockVersion >= Block.ProtoBlockVersion, succeeded)
     })
   )
 }
