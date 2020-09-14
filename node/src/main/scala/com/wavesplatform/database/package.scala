@@ -25,7 +25,7 @@ import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{ApplicationStatus, GenesisTransaction, LegacyPBSwitch, PaymentTransaction, ScriptExecutionFailed, Succeeded, Transaction, TransactionParsers, TxValidationError}
+import com.wavesplatform.transaction.{ApplicationStatus, GenesisTransaction, LegacyPBSwitch, PaymentTransaction, ScriptExecutionFailed, ScriptExecutionInProgress, Succeeded, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.{ScorexLogging, _}
 import monix.eval.Task
 import monix.reactive.Observable
@@ -503,9 +503,16 @@ package object database extends ScorexLogging {
 
   def readTransaction(b: Array[Byte]): (Transaction, ApplicationStatus) = {
     import pb.TransactionData.Transaction._
+    import pb.TransactionData.ApplicationStatus._
 
     val data = pb.TransactionData.parseFrom(b)
-    val status = if (data.failed) ScriptExecutionFailed else Succeeded
+    val status =
+      data.applicationStatus match {
+        case SUCCEEDED                    => Succeeded
+        case SCRIPT_EXECUTION_FAILED      => ScriptExecutionFailed
+        case SCRIPT_EXECUTION_IN_PROGRESS => ScriptExecutionInProgress
+        case Unrecognized(value)          => throw new IllegalArgumentException(s"Illegal transaction application status = $value")
+      }
     data.transaction match {
       case tx: LegacyBytes    => (TransactionParsers.parseBytes(tx.value.toByteArray).get, status)
       case tx: NewTransaction => (PBTransactions.vanilla(tx.value).explicitGet(), status)
@@ -515,6 +522,8 @@ package object database extends ScorexLogging {
 
   def writeTransaction(v: (Transaction, ApplicationStatus)): Array[Byte] = {
     import pb.TransactionData.Transaction._
+    import pb.TransactionData.ApplicationStatus._
+
     val (tx, succeeded) = v
     val ptx = tx match {
       case lps: LegacyPBSwitch if !lps.isProtobufVersion => LegacyBytes(ByteString.copyFrom(tx.bytes()))
@@ -522,7 +531,13 @@ package object database extends ScorexLogging {
       case _: PaymentTransaction                         => LegacyBytes(ByteString.copyFrom(tx.bytes()))
       case _                                             => NewTransaction(PBTransactions.protobuf(tx))
     }
-    pb.TransactionData(succeeded == ScriptExecutionFailed, ptx).toByteArray
+    val status =
+      succeeded match {
+        case Succeeded                 => SUCCEEDED
+        case ScriptExecutionFailed     => SCRIPT_EXECUTION_FAILED
+        case ScriptExecutionInProgress => SCRIPT_EXECUTION_IN_PROGRESS
+      }
+    pb.TransactionData(status, ptx).toByteArray
   }
 
   /** Returns status (succeed - true, failed -false) and bytes (left - legacy format bytes, right - new format bytes) */
@@ -551,7 +566,7 @@ package object database extends ScorexLogging {
         val statusFieldTag  = coded.readTag()
         val statusFieldNum  = WireFormat.getTagFieldNumber(statusFieldTag)
         val statusFieldType = WireFormat.getTagWireType(statusFieldTag)
-        require(statusFieldNum == FAILED_FIELD_NUMBER, "Unknown `failed` field in transaction data")
+        require(statusFieldNum == APPLICATION_STATUS_FIELD_NUMBER, "Unknown `application_status` field in transaction data")
         require(statusFieldType == WireFormat.WIRETYPE_VARINT, "Can't parse `failed` field in transaction data")
         !coded.readBool()
       }

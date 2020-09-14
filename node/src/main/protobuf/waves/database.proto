@@ -33,11 +33,17 @@ message TransactionMeta {
 }
 
 message TransactionData {
+    enum ApplicationStatus {
+        SUCCEEDED = 0;
+        SCRIPT_EXECUTION_FAILED = 1;
+        SCRIPT_EXECUTION_IN_PROGRESS = 2;
+    }
+
     oneof transaction {
         bytes legacy_bytes = 1;
         SignedTransaction new_transaction = 2;
     }
-    bool failed = 3;
+    ApplicationStatus application_status = 3;
 }
 
 message AccountScriptInfo {
