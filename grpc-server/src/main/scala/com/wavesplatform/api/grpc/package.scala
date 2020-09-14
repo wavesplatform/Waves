@@ -8,6 +8,7 @@ import io.grpc.stub.{CallStreamObserver, ServerCallStreamObserver, StreamObserve
 import monix.execution.{Ack, AsyncQueue, Scheduler}
 import monix.reactive.Observable
 
+import scala.concurrent.Future
 import scala.util.control.NonFatal
 
 package object grpc extends PBImplicitConversions {
@@ -78,6 +79,7 @@ package object grpc extends PBImplicitConversions {
 
   implicit class EitherVEExt[T](e: Either[ValidationError, T]) {
     def explicitGetErr(): T = e.fold(e => throw GRPCErrors.toStatusException(e), identity)
+    def toFuture: Future[T] = Future.fromTry(e.left.map(err => GRPCErrors.toStatusException(err)).toTry)
   }
 
   implicit class OptionErrExt[T](e: Option[T]) {

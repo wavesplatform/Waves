@@ -90,18 +90,20 @@ object CommonAccountsApi extends ScorexLogging {
     override def data(address: Address, key: String): Option[DataEntry[_]] =
       blockchain.accountData(address, key)
 
-    override def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[_]] = {
+    override def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[_]] = Observable.defer {
       log.debug(s"AccountData[$address]: collecting ${regex.fold("all keys")(r => s"keys matching $r")}")
+
+      val pattern = regex.map(_.r.pattern)
       val entriesFromDiff = diff.accountData
         .get(address)
-        .fold[Map[String, DataEntry[_]]](Map.empty)(_.data.filter { case (k, _) => regex.forall(_.r.pattern.matcher(k).matches()) })
+        .fold[Map[String, DataEntry[_]]](Map.empty)(_.data.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) })
       val entries = mutable.ArrayBuffer[DataEntry[_]](entriesFromDiff.values.toSeq: _*)
 
       db.readOnly { ro =>
         db.get(Keys.addressId(address)).foreach { addressId =>
           db.iterateOver(KeyTags.DataHistory.prefixBytes ++ PBRecipients.publicKeyHash(address)) { e =>
             val key = new String(e.getKey.drop(2 + Address.HashLength), Charsets.UTF_8)
-            if (regex.forall(_.r.pattern.matcher(key).matches()) && !entriesFromDiff.contains(key)) {
+            if (pattern.forall(_.matcher(key).matches()) && !entriesFromDiff.contains(key)) {
               for (h <- readIntSeq(e.getValue).headOption; e <- ro.get(Keys.data(addressId, key)(h))) {
                 entries += e
               }

@@ -18,6 +18,8 @@ import com.wavesplatform.wallet.Wallet
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
 
+import scala.concurrent.Future
+
 trait CommonTransactionsApi {
   import CommonTransactionsApi._
 
@@ -38,7 +40,7 @@ trait CommonTransactionsApi {
 
   def calculateFee(tx: Transaction): Either[ValidationError, (Asset, Long, Long)]
 
-  def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean]
+  def broadcastTransaction(tx: Transaction): Future[TracedResult[ValidationError, Boolean]]
 
   def invokeScriptResults(
       subject: AddressOrAlias,
@@ -59,7 +61,7 @@ object CommonTransactionsApi {
       blockchain: Blockchain,
       utx: UtxPool,
       wallet: Wallet,
-      publishTransaction: Transaction => TracedResult[ValidationError, Boolean],
+      publishTransaction: Transaction => Future[TracedResult[ValidationError, Boolean]],
       blockAt: Int => Option[(BlockMeta, Seq[Transaction])]
   ): CommonTransactionsApi = new CommonTransactionsApi {
     private def resolve(subject: AddressOrAlias): Option[Address] = blockchain.resolveAlias(subject).toOption
@@ -102,7 +104,7 @@ object CommonTransactionsApi {
             (asset, feeInAsset, feeInWaves)
         }
 
-    override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] = publishTransaction(tx)
+    override def broadcastTransaction(tx: Transaction): Future[TracedResult[ValidationError, Boolean]] = publishTransaction(tx)
 
     override def invokeScriptResults(
         subject: AddressOrAlias,
