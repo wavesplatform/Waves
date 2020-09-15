@@ -87,7 +87,6 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
     scriptInfo.script.isEmpty shouldBe false
     scriptInfo.scriptText.isEmpty shouldBe false
     scriptInfo.script.get.startsWith("base64:") shouldBe true
-
   }
 
   test("successful continuation") {

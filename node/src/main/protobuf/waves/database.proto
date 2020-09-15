@@ -25,20 +25,20 @@ message BlockMeta {
     bytes vrf = 9;
 }
 
+enum ApplicationStatus {
+    SUCCEEDED = 0;
+    SCRIPT_EXECUTION_FAILED = 1;
+    SCRIPT_EXECUTION_IN_PROGRESS = 2;
+}
+
 message TransactionMeta {
     int32 height = 1;
     int32 num = 2;
     int32 type = 3;
-    bool failed = 4;
+    ApplicationStatus application_status = 4;
 }
 
 message TransactionData {
-    enum ApplicationStatus {
-        SUCCEEDED = 0;
-        SCRIPT_EXECUTION_FAILED = 1;
-        SCRIPT_EXECUTION_IN_PROGRESS = 2;
-    }
-
     oneof transaction {
         bytes legacy_bytes = 1;
         SignedTransaction new_transaction = 2;

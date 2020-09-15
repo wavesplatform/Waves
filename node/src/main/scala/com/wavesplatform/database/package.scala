@@ -16,6 +16,7 @@ import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
+import com.wavesplatform.database.protobuf.ApplicationStatus.{SCRIPT_EXECUTION_FAILED, SCRIPT_EXECUTION_IN_PROGRESS, SUCCEEDED, Unrecognized}
 import com.wavesplatform.database.protobuf.DataEntry.Value
 import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
@@ -503,16 +504,8 @@ package object database extends ScorexLogging {
 
   def readTransaction(b: Array[Byte]): (Transaction, ApplicationStatus) = {
     import pb.TransactionData.Transaction._
-    import pb.TransactionData.ApplicationStatus._
-
     val data = pb.TransactionData.parseFrom(b)
-    val status =
-      data.applicationStatus match {
-        case SUCCEEDED                    => Succeeded
-        case SCRIPT_EXECUTION_FAILED      => ScriptExecutionFailed
-        case SCRIPT_EXECUTION_IN_PROGRESS => ScriptExecutionInProgress
-        case Unrecognized(value)          => throw new IllegalArgumentException(s"Illegal transaction application status = $value")
-      }
+    val status = data.applicationStatus
     data.transaction match {
       case tx: LegacyBytes    => (TransactionParsers.parseBytes(tx.value.toByteArray).get, status)
       case tx: NewTransaction => (PBTransactions.vanilla(tx.value).explicitGet(), status)
@@ -522,21 +515,13 @@ package object database extends ScorexLogging {
 
   def writeTransaction(v: (Transaction, ApplicationStatus)): Array[Byte] = {
     import pb.TransactionData.Transaction._
-    import pb.TransactionData.ApplicationStatus._
-
-    val (tx, succeeded) = v
+    val (tx, status) = v
     val ptx = tx match {
       case lps: LegacyPBSwitch if !lps.isProtobufVersion => LegacyBytes(ByteString.copyFrom(tx.bytes()))
       case _: GenesisTransaction                         => LegacyBytes(ByteString.copyFrom(tx.bytes()))
       case _: PaymentTransaction                         => LegacyBytes(ByteString.copyFrom(tx.bytes()))
       case _                                             => NewTransaction(PBTransactions.protobuf(tx))
     }
-    val status =
-      succeeded match {
-        case Succeeded                 => SUCCEEDED
-        case ScriptExecutionFailed     => SCRIPT_EXECUTION_FAILED
-        case ScriptExecutionInProgress => SCRIPT_EXECUTION_IN_PROGRESS
-      }
     pb.TransactionData(status, ptx).toByteArray
   }
 
@@ -656,4 +641,19 @@ package object database extends ScorexLogging {
   implicit class LongExt(val l: Long) extends AnyVal {
     def toByteArray: Array[Byte] = Longs.toByteArray(l)
   }
+
+  implicit def toDb(status: ApplicationStatus): protobuf.ApplicationStatus =
+    status match {
+      case Succeeded                 => SUCCEEDED
+      case ScriptExecutionFailed     => SCRIPT_EXECUTION_FAILED
+      case ScriptExecutionInProgress => SCRIPT_EXECUTION_IN_PROGRESS
+    }
+
+  implicit def fromDb(status: protobuf.ApplicationStatus): ApplicationStatus =
+    status match {
+      case SUCCEEDED                    => Succeeded
+      case SCRIPT_EXECUTION_FAILED      => ScriptExecutionFailed
+      case SCRIPT_EXECUTION_IN_PROGRESS => ScriptExecutionInProgress
+      case Unrecognized(value)          => throw new IllegalArgumentException(s"Illegal transaction application status = $value")
+    }
 }

@@ -512,7 +512,7 @@ abstract class LevelDBWriter private[database] (
 
       for ((id, (tx, num, succeeded)) <- transactions) {
         rw.put(Keys.transactionAt(Height(height), num), Some((tx, succeeded)))
-        rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.typeId, succeeded == ScriptExecutionFailed)))
+        rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.typeId, succeeded)))
       }
 
       val activationWindowSize = settings.functionalitySettings.activationWindowSize(height)
@@ -799,15 +799,15 @@ abstract class LevelDBWriter private[database] (
   protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(Int, Transaction, ApplicationStatus)] = {
     val txId = TransactionId(id)
     for {
-      TransactionMeta(height, num, _, failed) <- db.get(Keys.transactionMetaById(txId))
+      TransactionMeta(height, num, _, status) <- db.get(Keys.transactionMetaById(txId))
       (tx, _)                                 <- db.get(Keys.transactionAt(Height(height), TxNum(num.toShort)))
-    } yield (height, tx, if (failed) ScriptExecutionFailed else Succeeded)
+    } yield (height, tx, status)
   }
 
   override def transactionMeta(id: ByteStr): Option[(Int, ApplicationStatus)] = readOnly { db =>
     db.get(Keys.transactionMetaById(TransactionId(id)))
-      .map { case TransactionMeta(height, _, _, failed) =>
-        (height, if (failed) ScriptExecutionFailed else Succeeded)
+      .map { case TransactionMeta(height, _, _, status) =>
+        (height, status)
       }
   }
 
