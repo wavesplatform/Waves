@@ -396,7 +396,7 @@ abstract class LevelDBWriter private[database] (
               tx match {
                 case ContinuationTransaction(invokeId, _, _) if continuationStates(invokeId) != Finished =>
                   ScriptExecutionInProgress
-                case invoke: InvokeScriptTransaction if continuationStates.getOrElse(invoke.id.value, Finished) != Finished =>
+                case invoke: InvokeScriptTransaction if continuationStates.getOrElse(invoke.id.value(), Finished) != Finished =>
                   ScriptExecutionInProgress
                 case _ =>
                   Succeeded
