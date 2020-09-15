@@ -20,16 +20,17 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings, WavesSettings}
+import com.wavesplatform.state.ContinuationState.Finished
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
-import com.wavesplatform.transaction.{ApplicationStatus, _}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{ApplicationStatus, _}
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import monix.reactive.Observer
 import org.iq80.leveldb.DB
@@ -388,9 +389,20 @@ abstract class LevelDBWriter private[database] (
       val transactions: Map[TransactionId, (Transaction, TxNum, ApplicationStatus)] =
         block.transactionData.zipWithIndex.map { in =>
           val (tx, idx) = in
-          val k         = TransactionId(tx.id())
-          val status    = if (failedTransactionIds.contains(tx.id())) ScriptExecutionFailed else Succeeded
-          val v         = (tx, TxNum(idx.toShort), status)
+          val status =
+            if (failedTransactionIds.contains(tx.id()))
+              ScriptExecutionFailed
+            else
+              tx match {
+                case ContinuationTransaction(invokeId, _, _) if continuationStates(invokeId) != Finished =>
+                  ScriptExecutionInProgress
+                case invoke: InvokeScriptTransaction if continuationStates.getOrElse(invoke.id.value, Finished) != Finished =>
+                  ScriptExecutionInProgress
+                case _ =>
+                  Succeeded
+              }
+          val k = TransactionId(tx.id())
+          val v = (tx, TxNum(idx.toShort), status)
           k -> v
         }.toMap
 
