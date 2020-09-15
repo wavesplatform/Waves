@@ -172,7 +172,16 @@ object Decompiler {
         val argsCoeval = argsStr(args)
         func match {
           case FunctionHeader.Native(id) if ctx.binaryOps.contains(id) =>
-            argsCoeval.map(as => out(s"(${as(0)} ${ctx.binaryOps(id)} ${as(1)})", i))
+            val (bs0, be0) = args(0) match {
+              case Terms.IF(_,_,_) => ("(", ")")
+              case _ => ("", "")
+            }
+            val (bs1, be1) = args(1) match {
+              case Terms.IF(_,_,_) => ("(", ")")
+              case _ => ("", "")
+            }
+
+            argsCoeval.map(as => out(s"(${bs0}${as(0)}${be0} ${ctx.binaryOps(id)} ${bs1}${as(1)}${be1})", i))
 
           case FunctionHeader.User(internalName, _) if internalName == "!=" =>
             argsCoeval.map(as => out(s"(${as(0)} != ${as(1)})", i))
