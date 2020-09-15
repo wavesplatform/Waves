@@ -388,12 +388,14 @@ abstract class LevelDBWriter private[database] (
       val transactions: Map[TransactionId, (Transaction, TxNum, ApplicationStatus)] =
         block.transactionData.zipWithIndex.map { in =>
           def checkExecutionStatus(invokeId: ByteStr, tx: Transaction): ApplicationStatus =
-            continuationStates(invokeId) match {
-              case s: ContinuationState.InProgress if s.lastTransactionId == tx.id.value() =>
-                ScriptExecutionInProgress
-              case _ =>
-                Succeeded
-            }
+            continuationStates.get(invokeId)
+              .map {
+                case ContinuationState.Finished(transactionId) if transactionId == tx.id.value() =>
+                  Succeeded
+                case _ =>
+                  ScriptExecutionInProgress
+              }
+              .getOrElse(Succeeded)
 
           val (tx, idx) = in
           val status =

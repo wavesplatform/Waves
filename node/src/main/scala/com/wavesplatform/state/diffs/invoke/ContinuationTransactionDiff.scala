@@ -100,19 +100,19 @@ object ContinuationTransactionDiff {
         verifyAssets
       )
 
-      continuationStopDiff = Diff.stateOps(continuationStates = Map(tx.invokeScriptTransactionId -> ContinuationState.Finished))
-
       resultDiff <- scriptResult._1 match {
         case ScriptResultV3(dataItems, transfers) =>
-          doProcessActions(dataItems ::: transfers).map(_.copy(transactions = Map()) |+| continuationStopDiff)
+          doProcessActions(dataItems ::: transfers).map(_.copy(transactions = Map()) |+| finishContinuation(tx))
         case ScriptResultV4(actions) =>
-          doProcessActions(actions).map(_.copy(transactions = Map()) |+| continuationStopDiff)
+          doProcessActions(actions).map(_.copy(transactions = Map()) |+| finishContinuation(tx))
         case ir: IncompleteResult =>
           TracedResult.wrapValue[Diff, ValidationError](
             Diff.stateOps(continuationStates = Map(tx.invokeScriptTransactionId -> ContinuationState.InProgress(tx.nonce + 1, ir.expr, ir.unusedComplexity, tx.id.value())))
           )
       }
-
     } yield resultDiff
   }
+
+  private def finishContinuation(tx: ContinuationTransaction) =
+    Diff.stateOps(continuationStates = Map(tx.invokeScriptTransactionId -> ContinuationState.Finished(tx.id.value())))
 }

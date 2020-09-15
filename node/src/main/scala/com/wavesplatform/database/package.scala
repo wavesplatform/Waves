@@ -264,7 +264,7 @@ package object database extends ScorexLogging {
           ByteString.copyFrom(lastTransactionId.arr)
         ).toByteArray
 
-      case ContinuationState.Finished =>
+      case _: ContinuationState.Finished =>
         Array.empty
     }
   }

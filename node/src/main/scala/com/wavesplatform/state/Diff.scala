@@ -153,7 +153,7 @@ object ContinuationState {
     lastTransactionId: ByteStr
   ) extends ContinuationState
 
-  case object Finished extends ContinuationState
+  case class Finished(transactionId: ByteStr) extends ContinuationState
 }
 
 case class Diff(

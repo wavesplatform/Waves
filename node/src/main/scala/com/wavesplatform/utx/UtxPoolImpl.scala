@@ -440,7 +440,7 @@ class UtxPoolImpl(
                   expectingNonce
                 }
             )
-          case (invokeId, ContinuationState.Finished) =>
+          case (invokeId, ContinuationState.Finished(_)) =>
             continuationNonces.remove(invokeId)
           case _ => ()
         }
