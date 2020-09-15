@@ -20,7 +20,6 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings, WavesSettings}
-import com.wavesplatform.state.ContinuationState.Finished
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -388,18 +387,23 @@ abstract class LevelDBWriter private[database] (
 
       val transactions: Map[TransactionId, (Transaction, TxNum, ApplicationStatus)] =
         block.transactionData.zipWithIndex.map { in =>
+          def checkExecutionStatus(invokeId: ByteStr, tx: Transaction): ApplicationStatus =
+            continuationStates(invokeId) match {
+              case s: ContinuationState.InProgress if s.lastTransactionId == tx.id.value() =>
+                ScriptExecutionInProgress
+              case _ =>
+                Succeeded
+            }
+
           val (tx, idx) = in
           val status =
             if (failedTransactionIds.contains(tx.id()))
               ScriptExecutionFailed
             else
               tx match {
-                case ContinuationTransaction(invokeId, _, _) if continuationStates(invokeId) != Finished =>
-                  ScriptExecutionInProgress
-                case invoke: InvokeScriptTransaction if continuationStates.getOrElse(invoke.id.value(), Finished) != Finished =>
-                  ScriptExecutionInProgress
-                case _ =>
-                  Succeeded
+                case tx: ContinuationTransaction => checkExecutionStatus(tx.invokeScriptTransactionId, tx)
+                case tx: InvokeScriptTransaction => checkExecutionStatus(tx.id.value(), tx)
+                case _                           => Succeeded
               }
           val k = TransactionId(tx.id())
           val v = (tx, TxNum(idx.toShort), status)

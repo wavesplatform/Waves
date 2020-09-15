@@ -172,7 +172,7 @@ object InvokeScriptTransactionDiff {
                 TracedResult.wrapValue(
                   Diff(
                     tx = tx,
-                    continuationStates = Map(tx.id.value() -> ContinuationState.InProgress(nonce = 0, ir.expr, residualComplexity = 0))
+                    continuationStates = Map(tx.id.value() -> ContinuationState.InProgress(nonce = 0, ir.expr, residualComplexity = 0, tx.id.value()))
                   )
                 )
             }

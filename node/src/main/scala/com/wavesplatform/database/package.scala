@@ -248,29 +248,21 @@ package object database extends ScorexLogging {
   }
 
   def readContinuationState(bytes: Array[Byte]): ContinuationState = {
-    val input = newDataInput(bytes)
-
-    val exprBytesLength = input.readInt()
-    val exprBytes       = input.readBytes(exprBytesLength)
-    val expr            = Serde.deserialize(exprBytes).explicitGet()._1
-
-    val nonce = input.readInt()
-    val residualComplexity = input.readInt()
-
-    ContinuationState.InProgress(nonce, expr, residualComplexity)
+    val pb.ContinuationState(nonce, exprBytes, residualComplexity, lastTransactionId) =
+      pb.ContinuationState.parseFrom(bytes)
+    val expr = Serde.deserialize(exprBytes.asReadOnlyByteBuffer()).explicitGet()
+    ContinuationState.InProgress(nonce, expr, residualComplexity, ByteStr(lastTransactionId.toByteArray))
   }
 
   def writeContinuationState(continuationState: ContinuationState): Array[Byte] = {
     continuationState match {
-      case ContinuationState.InProgress(nonce, expr, residualComplexity) =>
-        val output    = newDataOutput()
-        val exprBytes = Serde.serialize(expr, allowObjects = true)
-        output.writeInt(exprBytes.length)
-        output.write(exprBytes)
-
-        output.writeInt(nonce)
-        output.writeInt(residualComplexity)
-        output.toByteArray
+      case ContinuationState.InProgress(nonce, expr, residualComplexity, lastTransactionId) =>
+        pb.ContinuationState(
+          nonce,
+          ByteString.copyFrom(Serde.serialize(expr, allowObjects = true)),
+          residualComplexity,
+          ByteString.copyFrom(lastTransactionId.arr)
+        ).toByteArray
 
       case ContinuationState.Finished =>
         Array.empty

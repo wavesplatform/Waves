@@ -429,7 +429,7 @@ class UtxPoolImpl(
 
       blockchain.continuationStates
         .foreach {
-          case (invokeId, ContinuationState.InProgress(nonce, _, _)) =>
+          case (invokeId, ContinuationState.InProgress(nonce, _, _, _)) =>
             continuationNonces.compute(
               invokeId,
               (_, expectingNonce) =>

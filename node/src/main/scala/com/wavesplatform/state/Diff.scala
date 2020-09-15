@@ -146,8 +146,14 @@ case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: Ass
 
 sealed trait ContinuationState
 object ContinuationState {
-  case class  InProgress(nonce: Int, expr: EXPR, residualComplexity: Int) extends ContinuationState
-  case object Finished                                                    extends ContinuationState
+  case class InProgress(
+    nonce: Int,
+    expr: EXPR,
+    residualComplexity: Int,
+    lastTransactionId: ByteStr
+  ) extends ContinuationState
+
+  case object Finished extends ContinuationState
 }
 
 case class Diff(
