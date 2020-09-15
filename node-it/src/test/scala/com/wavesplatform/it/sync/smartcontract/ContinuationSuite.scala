@@ -116,7 +116,6 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure wit
       _.blockAt(sender.height - 1)
         .transactions
         .exists { tx =>
-          println(tx)
           tx._type == ContinuationTransaction.typeId &&
           tx.applicationStatus.contains("succeeded") &&
           tx.invokeScriptTransactionId.contains(invokeId)
