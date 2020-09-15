@@ -17,12 +17,13 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.smart.ContinuationTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import monix.eval.Coeval
-import org.scalatest.CancelAfterFailure
+import org.scalatest.{Assertion, CancelAfterFailure, OptionValues}
 
-class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
+class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure with OptionValues {
   private val activationHeight = 6
 
   override protected def nodeConfigs: Seq[Config] =
@@ -68,7 +69,7 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
   protected override def beforeAll(): Unit = {
     super.beforeAll()
 
-    dApp   = firstKeyPair
+    dApp = firstKeyPair
     caller = secondKeyPair
 
     lazy val setScriptTx = sender.setScript(dApp, Some(script), setScriptFee)
@@ -90,7 +91,7 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
   }
 
   test("successful continuation") {
-    val invokeScriptTx = sender.invokeScript(
+    val invoke = sender.invokeScript(
       caller,
       dApp.toAddress.toString,
       func = Some("foo"),
@@ -100,12 +101,44 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
       version = TxVersion.V2,
       waitForTx = true
     )
-    nodes.waitForHeightAriseAndTxPresent(invokeScriptTx._1.id)
-    nodes.waitForHeight(sender.height + 4)
+    waitForContinuation(invoke._1.id)
+    checkContinuationChain(invoke._1.id, sender.height)
     nodes.foreach { node =>
       node.getDataByKey(dApp.toAddress.toString, "a") shouldBe BooleanDataEntry("a", true)
       node.getDataByKey(dApp.toAddress.toString, "sender") shouldBe BinaryDataEntry("sender", ByteStr(Base58.decode(caller.toAddress.toString)))
     }
+  }
+
+  private def waitForContinuation(invokeId: String): Boolean = {
+    nodes.waitFor(
+      s"chain of continuation for InvokeScript Transaction with id = $invokeId is completed"
+    )(
+      _.blockAt(sender.height - 1)
+        .transactions
+        .exists { tx =>
+          println(tx)
+          tx._type == ContinuationTransaction.typeId &&
+          tx.applicationStatus.contains("succeeded") &&
+          tx.invokeScriptTransactionId.contains(invokeId)
+        }
+    )(
+      _.forall(identity)
+    )
+  }
+
+  private def checkContinuationChain(invokeId: String, completionHeight: Int): Assertion = {
+    val invokeInfo = sender.transactionStatus(invokeId)
+    invokeInfo.applicationStatus.value shouldBe "script_execution_in_progress"
+
+    val continuations =
+      (invokeInfo.height.get to completionHeight)
+        .map(sender.blockAt(_))
+        .flatMap(_.transactions)
+        .filter(tx => tx._type == ContinuationTransaction.typeId && tx.invokeScriptTransactionId.contains(invokeId))
+
+    continuations.dropRight(1).foreach(_.applicationStatus.value shouldBe "script_execution_in_progress")
+    continuations.last.applicationStatus.value shouldBe "succeeded"
+    continuations.map(_.nonce.value) shouldBe continuations.indices
   }
 
   test("insufficient fee") {
@@ -122,8 +155,8 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
     assertBadRequestAndMessage(
       invokeScriptTx,
       "Fee in WAVES for InvokeScriptTransaction (900000 in WAVES) " +
-      "with 8 invocation steps " +
-      "does not exceed minimal value of 4000000 WAVES."
+        "with 8 invocation steps " +
+        "does not exceed minimal value of 4000000 WAVES."
     )
   }
 }

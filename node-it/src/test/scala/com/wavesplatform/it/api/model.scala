@@ -135,7 +135,9 @@ class Transaction(
     val senderPublicKey: Option[String],
     val recipient: Option[String],
     val proofs: Option[Seq[String]],
-    val applicationStatus: Option[String]
+    val applicationStatus: Option[String],
+    val invokeScriptTransactionId: Option[String], // for ContinuationTransaction
+    val nonce: Option[Int]                         // for ContinuationTransaction
 ) {
   import Transaction._
   override def toString: String = Json.toJson(this).toString
@@ -172,7 +174,9 @@ object Transaction {
       senderPublicKey: Option[String],
       recipient: Option[String],
       proofs: Option[Seq[String]],
-      applicationStatus: Option[String]
+      applicationStatus: Option[String],
+      invokeScriptTransactionId: Option[String],
+      nonce: Option[Int]
   ): Transaction = new Transaction(
     _type,
     id,
@@ -197,7 +201,9 @@ object Transaction {
     senderPublicKey,
     recipient,
     proofs,
-    applicationStatus
+    applicationStatus,
+    invokeScriptTransactionId,
+    nonce
   )
 
   implicit val transactionFormat: Format[Transaction] = Format(
@@ -218,19 +224,21 @@ object Transaction {
             case Some(v) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
             case _                                    => JsSuccess(None)
           }
-          price                <- (jsv \ "price").validateOpt[Long]
-          sellMatcherFee       <- (jsv \ "sellMatcherFee").validateOpt[Long]
-          buyMatcherFee        <- (jsv \ "buyMatcherFee").validateOpt[Long]
-          sellOrderMatcherFee  <- (jsv \ "order2" \ "matcherFee").validateOpt[Long]
-          buyOrderMatcherFee   <- (jsv \ "order1" \ "matcherFee").validateOpt[Long]
-          data                 <- (jsv \ "data").validateOpt[Seq[DataEntry[_]]]
-          minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
-          transfers            <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
-          totalAmount          <- (jsv \ "totalAmount").validateOpt[Long]
-          senderPublicKey      <- (jsv \ "senderPublicKey").validateOpt[String]
-          recipient            <- (jsv \ "recipient").validateOpt[String]
-          proofs               <- (jsv \ "proofs").validateOpt[Seq[String]]
-          applicationStatus    <- (jsv \ "applicationStatus").validateOpt[String]
+          price                     <- (jsv \ "price").validateOpt[Long]
+          sellMatcherFee            <- (jsv \ "sellMatcherFee").validateOpt[Long]
+          buyMatcherFee             <- (jsv \ "buyMatcherFee").validateOpt[Long]
+          sellOrderMatcherFee       <- (jsv \ "order2" \ "matcherFee").validateOpt[Long]
+          buyOrderMatcherFee        <- (jsv \ "order1" \ "matcherFee").validateOpt[Long]
+          data                      <- (jsv \ "data").validateOpt[Seq[DataEntry[_]]]
+          minSponsoredAssetFee      <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
+          transfers                 <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
+          totalAmount               <- (jsv \ "totalAmount").validateOpt[Long]
+          senderPublicKey           <- (jsv \ "senderPublicKey").validateOpt[String]
+          recipient                 <- (jsv \ "recipient").validateOpt[String]
+          proofs                    <- (jsv \ "proofs").validateOpt[Seq[String]]
+          applicationStatus         <- (jsv \ "applicationStatus").validateOpt[String]
+          invokeScriptTransactionId <- (jsv \ "invokeScriptTransactionId").validateOpt[String]
+          nonce                     <- (jsv \ "nonce").validateOpt[Int]
         } yield new Transaction(
           _type,
           id,
@@ -255,7 +263,9 @@ object Transaction {
           senderPublicKey,
           recipient,
           proofs,
-          applicationStatus
+          applicationStatus,
+          invokeScriptTransactionId,
+          nonce
         )
     ),
     Writes { t =>
