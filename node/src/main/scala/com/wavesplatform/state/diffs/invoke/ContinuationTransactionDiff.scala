@@ -29,12 +29,6 @@ object ContinuationTransactionDiff {
     val (invokeHeight, foundTx, status) = blockchain.transactionInfo(tx.invokeScriptTransactionId).get
     val invokeScriptTransaction         = foundTx.asInstanceOf[InvokeScriptTransaction]
     for {
-      _ <- TracedResult(
-        Either.cond(
-          status == ScriptExecutionInProgress,
-          (),
-          GenericError(s"Cannot continue invoke script transaction with status = $status and id = ${tx.invokeScriptTransactionId}"))
-      )
       dAppAddress <- TracedResult(blockchain.resolveAlias(invokeScriptTransaction.dAppAddressOrAlias))
       scriptInfo <- TracedResult(
         blockchain
