@@ -4,7 +4,9 @@ import com.typesafe.sbt.packager.Keys.executableScriptName
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbtassembly.MergeStrategy
 
-enablePlugins(RunApplicationSettings, JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning, VersionObject)
+enablePlugins(RunApplicationSettings, JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning, VersionObject, JavaAgent)
+
+javaAgents += "io.kamon" % "kanela-agent" % "1.0.6"
 
 resolvers ++= Seq(
   Resolver.bintrayRepo("ethereum", "maven")

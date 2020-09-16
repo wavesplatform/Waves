@@ -145,6 +145,10 @@ object Dependencies {
       kamonCore,
       kamonModule("system-metrics"),
       kamonModule("influxdb"),
+      kamonModule("akka"),
+      kamonModule("executors"),
+      kamonModule("status-page"),
+      "io.kamon" % "kanela-agent" % "1.0.6",
       "org.influxdb" % "influxdb-java" % "2.14",
       googleGuava,
       "com.google.code.findbugs" % "jsr305"         % "3.0.2" % Compile, // javax.annotation stubs
