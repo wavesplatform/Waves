@@ -49,13 +49,17 @@ class EvaluatorV2TestBase extends PropSpec with PropertyChecks with ScriptGen wi
     override def tthis: Tthis =
       Coproduct(Recipient.Address(ByteStr.empty))
 
-    override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Id[Option[Any]]  =
-      Some(dataType match {
-        case DataType.Boolean   => true
-        case DataType.Long      => 42L
-        case DataType.ByteArray => ByteStr.fill(8)(1)
-        case DataType.String    => "foo"
-      })
+    override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Id[Option[Any]]  ={
+      if (key == "unexisting")
+        None
+      else
+        Some(dataType match {
+          case DataType.Boolean   => true
+          case DataType.Long      => 42L
+          case DataType.ByteArray => ByteStr.fill(8)(1)
+          case DataType.String    => "foo"
+        })
+    }
   }
 
   private val evaluator =

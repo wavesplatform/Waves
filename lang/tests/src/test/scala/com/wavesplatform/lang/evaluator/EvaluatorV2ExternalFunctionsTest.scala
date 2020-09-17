@@ -1389,4 +1389,68 @@ class EvaluatorV2ExternalFunctionsTest extends EvaluatorV2TestBase {
             |""".stripMargin.trim
     }
   }
+
+  property("omit branch errors") {
+    val script =
+      """
+        |if (true)
+        |  then {
+        |    let key2 = 1 / getIntegerValue(Address(base58''), "unexisting")
+        |    getInteger(Address(base58''), key2.toString())
+        |  }
+        |  else {
+        |    getInteger(Address(base58''), "existing")
+        |  }
+        |
+      """.stripMargin
+
+    inside(eval(script, limit = 999, continuationFirstStepMode = true)) {
+      case (_, decompiled, cost) =>
+        cost shouldBe 27
+        decompiled shouldBe
+          """
+            |if (true)
+            |    then {
+            |        let key2 = (1 / throw("value() called on unit value"))
+            |        getInteger(Address(
+            |	bytes = base58''
+            |), toString(key2))
+            |        }
+            |    else 42
+          """.stripMargin.trim
+    }
+  }
+
+  property("omit branch errors - unevaluated condition") {
+    val script =
+      """
+        |let a = 1
+        |if (a > 1)
+        |  then {
+        |    let key2 = 1 / getIntegerValue(Address(base58''), "unexisting")
+        |    getInteger(Address(base58''), key2.toString())
+        |  }
+        |  else {
+        |    getInteger(Address(base58''), "existing")
+        |  }
+        |
+      """.stripMargin
+
+    inside(eval(script, limit = 999, continuationFirstStepMode = true)) {
+      case (_, decompiled, cost) =>
+        cost shouldBe 27
+        decompiled shouldBe
+          """
+            |let a = 1
+            |if ((a > 1))
+            |    then {
+            |        let key2 = (1 / throw("value() called on unit value"))
+            |        getInteger(Address(
+            |	bytes = base58''
+            |), toString(key2))
+            |        }
+            |    else 42
+          """.stripMargin.trim
+    }
+  }
 }

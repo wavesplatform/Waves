@@ -23,7 +23,7 @@ class EvaluatorV2(
 
   def apply(expr: EXPR, limit: Int, continuationFirstStepMode: Boolean = false): (EXPR, Int) = {
     var ref    = expr.deepCopy.value
-    val unused = root(ref, v => Coeval.delay { ref = v }, limit, Nil, continuationFirstStepMode).value()
+    val unused = root(ref, v => Coeval.delay { ref = v }, limit, Nil, continuationFirstStepMode, omitErrors = false).value()
     (ref, unused)
   }
 
@@ -32,7 +32,8 @@ class EvaluatorV2(
       _update: EXPR => Coeval[Unit],
       limit: Int,
       parentBlocks: List[BLOCK_DEF],
-      continuationFirstStepMode: Boolean
+      continuationFirstStepMode: Boolean,
+      omitErrors: Boolean
   ): Coeval[Int] = {
     val update =
       if (!continuationFirstStepMode || (expr.isInstanceOf[FUNCTION_CALL] && expr.asInstanceOf[FUNCTION_CALL].function.isExternal))
@@ -45,12 +46,14 @@ class EvaluatorV2(
           root(
             expr = b.body,
             _update = {
-              case ev: EVALUATED => Coeval.defer(update(ev))
-              case nonEvaluated  => Coeval.delay(b.body = nonEvaluated)
+              case ev: EVALUATED                                                        => Coeval.defer(update(ev))
+              case err @ FUNCTION_CALL(FunctionHeader.Native(_), List(CONST_STRING(_))) => Coeval.defer(update(err)) // for non-verbose throw("error")
+              case nonEvaluated                                                         => Coeval.delay(b.body = nonEvaluated)
             },
             limit = limit,
             parentBlocks = b :: parentBlocks,
-            continuationFirstStepMode
+            continuationFirstStepMode,
+            omitErrors
           )
         )
       case g: GETTER =>
@@ -60,7 +63,8 @@ class EvaluatorV2(
             _update = v => Coeval.delay(g.expr = v),
             limit = limit,
             parentBlocks = parentBlocks,
-            continuationFirstStepMode
+            continuationFirstStepMode,
+            omitErrors
           ).flatMap { unused =>
             g.expr match {
               case co: CaseObj if unused > 0 =>
@@ -81,11 +85,34 @@ class EvaluatorV2(
             _update = (v: EXPR) => Coeval.delay(i.cond = v),
             limit = limit,
             parentBlocks = parentBlocks,
-            continuationFirstStepMode
+            continuationFirstStepMode,
+            omitErrors
           ).flatMap { unused =>
             i.cond match {
-              case TRUE | FALSE if unused <= 0 =>
+              case TRUE | FALSE if unused == 0 =>
                 Coeval.now(unused)
+              case _ if continuationFirstStepMode && unused > 0 =>
+                root(
+                  expr = i.ifTrue,
+                  _update = (v: EXPR) => Coeval.delay(i.ifTrue = v),
+                  limit = unused,
+                  parentBlocks = parentBlocks,
+                  continuationFirstStepMode,
+                  omitErrors = true
+                ).flatMap(
+                  unusedAfterIfTrue =>
+                    if (unusedAfterIfTrue > 0)
+                      root(
+                        expr = i.ifFalse,
+                        _update = (v: EXPR) => Coeval.delay(i.ifFalse = v),
+                        limit = unusedAfterIfTrue,
+                        parentBlocks = parentBlocks,
+                        continuationFirstStepMode,
+                        omitErrors = true
+                      )
+                    else
+                      Coeval.now(unusedAfterIfTrue)
+                )
               case TRUE if unused > 0 =>
                 update(i.ifTrue).flatMap(
                   _ =>
@@ -94,7 +121,8 @@ class EvaluatorV2(
                       _update = update,
                       limit = unused - 1,
                       parentBlocks = parentBlocks,
-                      continuationFirstStepMode
+                      continuationFirstStepMode,
+                      omitErrors || continuationFirstStepMode
                     )
                 )
               case FALSE if unused > 0 =>
@@ -105,30 +133,10 @@ class EvaluatorV2(
                       _update = update,
                       limit = unused - 1,
                       parentBlocks = parentBlocks,
-                      continuationFirstStepMode
+                      continuationFirstStepMode,
+                      omitErrors || continuationFirstStepMode
                     )
                 )
-              case _ if continuationFirstStepMode && unused > 0 =>
-                root(
-                  expr = i.ifTrue,
-                  _update = (v: EXPR) => Coeval.delay(i.ifTrue = v),
-                  limit = unused,
-                  parentBlocks = parentBlocks,
-                  continuationFirstStepMode
-                ).flatMap(
-                  unusedAfterIfTrue =>
-                    if (unusedAfterIfTrue > 0)
-                      root(
-                        expr = i.ifFalse,
-                        _update = (v: EXPR) => Coeval.delay(i.ifFalse = v),
-                        limit = unusedAfterIfTrue,
-                        parentBlocks = parentBlocks,
-                        continuationFirstStepMode
-                      )
-                    else
-                      Coeval.now(unusedAfterIfTrue)
-                )
-
               case _: EVALUATED => throw new IllegalArgumentException("Non-boolean result in cond")
               case _            => Coeval.now(unused)
             }
@@ -137,7 +145,7 @@ class EvaluatorV2(
 
       case REF(key) =>
         Coeval.defer {
-          visitRef(key, update, limit, parentBlocks, continuationFirstStepMode)
+          visitRef(key, update, limit, parentBlocks, continuationFirstStepMode, omitErrors)
             .orElse(if (continuationFirstStepMode) Some(Coeval.now(limit)) else findGlobalVar(key, update, limit))
             .getOrElse(throw new NoSuchElementException(s"A definition of '$key' not found"))
         }
@@ -158,7 +166,8 @@ class EvaluatorV2(
                       _update = argValue => Coeval.delay(fc.args = fc.args.updated(argIndex, argValue)),
                       limit = unused,
                       parentBlocks,
-                      !forceEvaluateArgs
+                      !forceEvaluateArgs,
+                      omitErrors
                     )
               }
           }
@@ -175,8 +184,19 @@ class EvaluatorV2(
                   if (unusedArgsComplexity < cost)
                     Coeval.now(unusedArgsComplexity)
                   else {
-                    update(function.ev[Id]((ctx.ec.environment, fc.args.asInstanceOf[List[EVALUATED]])).explicitGet())
-                      .map(_ => unusedArgsComplexity - cost)
+                    val (functionResult, resultCost) =
+                      function
+                        .ev[Id]((ctx.ec.environment, fc.args.asInstanceOf[List[EVALUATED]]))
+                        .fold(
+                          error =>
+                            if (omitErrors)
+                              (FUNCTION_CALL(FunctionHeader.Native(FunctionIds.THROW), List(CONST_STRING(error).explicitGet())), 1)
+                            else
+                              throw new RuntimeException(error),
+                          result => (result, cost)
+                        )
+                    update(functionResult)
+                      .map(_ => unusedArgsComplexity - resultCost)
                   }
 
                 case FunctionHeader.User(_, name) =>
@@ -195,7 +215,7 @@ class EvaluatorV2(
                       _update(argsWithExpr).flatMap(
                         _ =>
                           if (unusedArgsComplexity > 0)
-                            root(argsWithExpr, _update, unusedArgsComplexity, parentBlocks, continuationFirstStepMode)
+                            root(argsWithExpr, _update, unusedArgsComplexity, parentBlocks, continuationFirstStepMode, omitErrors)
                           else
                             Coeval.now(unusedArgsComplexity)
                       )
@@ -209,7 +229,7 @@ class EvaluatorV2(
                           }
                         caseType.flatMap { objectType =>
                           val fields = objectType.fields.map(_._1) zip fc.args.asInstanceOf[List[EVALUATED]]
-                          root(CaseObj(objectType, fields.toMap), update, unusedArgsComplexity, parentBlocks, continuationFirstStepMode)
+                          root(CaseObj(objectType, fields.toMap), update, unusedArgsComplexity, parentBlocks, continuationFirstStepMode, omitErrors)
                         }
                       } else
                         Coeval.now(unusedArgsComplexity)
@@ -238,7 +258,7 @@ class EvaluatorV2(
                       _update(argsWithExpr).flatMap(
                         _ =>
                           if (unusedArgsComplexity > 0)
-                            root(argsWithExpr, _update, unusedArgsComplexity, parentBlocks, continuationFirstStepMode)
+                            root(argsWithExpr, _update, unusedArgsComplexity, parentBlocks, continuationFirstStepMode, omitErrors)
                           else
                             Coeval.now(unusedArgsComplexity)
                       )
@@ -262,13 +282,16 @@ class EvaluatorV2(
       update: EVALUATED => Coeval[Unit],
       limit: Int,
       parentBlocks: List[BLOCK_DEF],
-      continuationFirstStepMode: Boolean
+      continuationFirstStepMode: Boolean,
+      omitErrors: Boolean
   ): Option[Coeval[Int]] =
     parentBlocks match {
-      case LET_BLOCK(l @ LET(`key`, _, _), _) :: nextParentBlocks => Some(evaluateRef(update, limit, l, nextParentBlocks, continuationFirstStepMode))
-      case BLOCK(l @ LET(`key`, _, _), _) :: nextParentBlocks     => Some(evaluateRef(update, limit, l, nextParentBlocks, continuationFirstStepMode))
-      case _ :: nextParentBlocks                                  => visitRef(key, update, limit, nextParentBlocks, continuationFirstStepMode)
-      case Nil                                                    => None
+      case LET_BLOCK(l @ LET(`key`, _, _), _) :: nextParentBlocks =>
+        Some(evaluateRef(update, limit, l, nextParentBlocks, continuationFirstStepMode, omitErrors))
+      case BLOCK(l @ LET(`key`, _, _), _) :: nextParentBlocks =>
+        Some(evaluateRef(update, limit, l, nextParentBlocks, continuationFirstStepMode, omitErrors))
+      case _ :: nextParentBlocks => visitRef(key, update, limit, nextParentBlocks, continuationFirstStepMode, omitErrors)
+      case Nil                   => None
     }
 
   private def evaluateRef(
@@ -276,7 +299,8 @@ class EvaluatorV2(
       limit: Int,
       let: LET,
       nextParentBlocks: List[BLOCK_DEF],
-      continuationFirstStepMode: Boolean
+      continuationFirstStepMode: Boolean,
+      omitErrors: Boolean
   ): Coeval[Int] = {
     val wasLogged = let.value match {
       case evaluated: EVALUATED if evaluated.wasLogged => true
@@ -301,7 +325,8 @@ class EvaluatorV2(
             ),
         limit = limit,
         parentBlocks = nextParentBlocks,
-        continuationFirstStepMode
+        continuationFirstStepMode,
+        omitErrors
       ).flatMap { unused =>
           let.checked = true
           if (unused < 0) throw new Error("Unused < 0")
@@ -359,8 +384,7 @@ object EvaluatorV2 {
           .map {
             case (exprAfterNativeEvaluation, unusedCost) =>
               evaluator(exprAfterNativeEvaluation, unusedCost, continuationFirstStepMode = false)
-          }
-      else
+          } else
         firstStepEvaluation
 
     resultEvaluation.toEither
