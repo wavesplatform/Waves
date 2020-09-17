@@ -217,7 +217,7 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure wit
     sender.transfer(txSender, thirdAddress, amount = 1, smartMinFee, waitForTx = true)
 
   private def createAlias(txSender: KeyPair) =
-    sender.createAlias(txSender, "alias", smartMinFee, waitForTx = true)
+    sender.createAlias(txSender, s"alias${System.currentTimeMillis()}", smartMinFee, waitForTx = true)
 
   private def putData(txSender: KeyPair) = {
     val data = List(StringDataEntry("key", "value"))
