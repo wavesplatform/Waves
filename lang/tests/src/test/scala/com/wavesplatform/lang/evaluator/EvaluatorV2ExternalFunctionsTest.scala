@@ -1393,15 +1393,14 @@ class EvaluatorV2ExternalFunctionsTest extends EvaluatorV2TestBase {
   property("omit branch errors") {
     val script =
       """
-        |if (true)
-        |  then {
-        |    let key2 = 1 / getIntegerValue(Address(base58''), "unexisting")
-        |    getInteger(Address(base58''), key2.toString())
-        |  }
-        |  else {
-        |    getInteger(Address(base58''), "existing")
-        |  }
-        |
+        | if (true)
+        |   then {
+        |     let key2 = 1 / getIntegerValue(Address(base58''), "unexisting")
+        |     getInteger(Address(base58''), key2.toString())
+        |   }
+        |   else {
+        |     getInteger(Address(base58''), "existing")
+        |   }
       """.stripMargin
 
     inside(eval(script, limit = 999, continuationFirstStepMode = true)) {
@@ -1424,16 +1423,15 @@ class EvaluatorV2ExternalFunctionsTest extends EvaluatorV2TestBase {
   property("omit branch errors - unevaluated condition") {
     val script =
       """
-        |let a = 1
-        |if (a > 1)
-        |  then {
-        |    let key2 = 1 / getIntegerValue(Address(base58''), "unexisting")
-        |    getInteger(Address(base58''), key2.toString())
-        |  }
-        |  else {
-        |    getInteger(Address(base58''), "existing")
-        |  }
-        |
+        | let a = 1
+        | if (a > 1)
+        |   then {
+        |     let key2 = 1 / getIntegerValue(Address(base58''), "unexisting")
+        |     getInteger(Address(base58''), key2.toString())
+        |   }
+        |   else {
+        |     getInteger(Address(base58''), "existing")
+        |   }
       """.stripMargin
 
     inside(eval(script, limit = 999, continuationFirstStepMode = true)) {
@@ -1452,5 +1450,16 @@ class EvaluatorV2ExternalFunctionsTest extends EvaluatorV2TestBase {
             |    else 42
           """.stripMargin.trim
     }
+  }
+
+  property("don't omit errors outside of if-block") {
+    val script =
+      """
+        | let key2 = 1 / getIntegerValue(Address(base58''), "unexisting")
+        | getInteger(Address(base58''), key2.toString())
+      """.stripMargin
+
+    val exception = the[RuntimeException] thrownBy eval(script, limit = 999, continuationFirstStepMode = true)
+    exception.getMessage shouldBe "value() called on unit value"
   }
 }
