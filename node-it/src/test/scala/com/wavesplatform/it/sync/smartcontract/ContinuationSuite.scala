@@ -8,6 +8,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.{DebugStateChanges, TransactionInfo}
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -126,11 +127,11 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure wit
   }
 
   private def checkContinuationChain(invokeId: String, completionHeight: Int): Assertion = {
-    val invokeInfo = sender.transactionStatus(invokeId)
+    val invokeInfo = sender.transactionInfo[DebugStateChanges](invokeId)
     invokeInfo.applicationStatus.value shouldBe "script_execution_in_progress"
 
     val continuations =
-      (invokeInfo.height.get to completionHeight)
+      (invokeInfo.height to completionHeight)
         .map(sender.blockAt(_))
         .flatMap(_.transactions)
         .filter(tx => tx._type == ContinuationTransaction.typeId && tx.invokeScriptTransactionId.contains(invokeId))
@@ -138,6 +139,7 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure wit
     continuations.dropRight(1).foreach(_.applicationStatus.value shouldBe "script_execution_in_progress")
     continuations.last.applicationStatus.value shouldBe "succeeded"
     continuations.map(_.nonce.value) shouldBe continuations.indices
+    invokeInfo.timestamp +: continuations.map(_.timestamp) shouldBe sorted
   }
 
   test("insufficient fee") {
