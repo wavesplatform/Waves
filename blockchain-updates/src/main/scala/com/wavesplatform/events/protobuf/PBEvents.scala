@@ -126,7 +126,7 @@ object serde {
                 VanillaBlockAppended(
                   toId = ByteStr(self.id.toByteArray),
                   toHeight = self.height,
-                  block = PBBlocks.vanilla(body.block.get).get,
+                  block = PBBlocks.vanilla(body.block.get, unsafe = true).get,
                   updatedWavesAmount = body.updatedWavesAmount,
                   blockStateUpdate = append.stateUpdate.map(_.vanilla.get).getOrElse(Monoid[VanillaStateUpdate].empty),
                   transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get)
@@ -135,7 +135,7 @@ object serde {
                 VanillaMicroBlockAppended(
                   toId = ByteStr(self.id.toByteArray),
                   toHeight = self.height,
-                  microBlock = PBMicroBlocks.vanilla(body.microBlock.get).get.microblock,
+                  microBlock = PBMicroBlocks.vanilla(body.microBlock.get, unsafe = true).get.microblock,
                   microBlockStateUpdate = append.stateUpdate.map(_.vanilla.get).getOrElse(Monoid[VanillaStateUpdate].empty),
                   transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get),
                   totalTransactionsRoot = ByteStr(body.updatedTransactionsRoot.toByteArray)
