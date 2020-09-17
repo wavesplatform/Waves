@@ -26,8 +26,8 @@ import shapeless.Coproduct
 
 object ContinuationTransactionDiff {
   def apply(blockchain: Blockchain, blockTime: Long, verifyAssets: Boolean = true)(tx: ContinuationTransaction): TracedResult[ValidationError, Diff] = {
-    val (invokeHeight, foundTx, status) = blockchain.transactionInfo(tx.invokeScriptTransactionId).get
-    val invokeScriptTransaction         = foundTx.asInstanceOf[InvokeScriptTransaction]
+    val (invokeHeight, foundTx, _) = blockchain.transactionInfo(tx.invokeScriptTransactionId).get
+    val invokeScriptTransaction    = foundTx.asInstanceOf[InvokeScriptTransaction]
     for {
       dAppAddress <- TracedResult(blockchain.resolveAlias(invokeScriptTransaction.dAppAddressOrAlias))
       scriptInfo <- TracedResult(

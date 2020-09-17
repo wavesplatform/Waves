@@ -47,6 +47,7 @@ object ApiError {
       case TxValidationError.UnsupportedTransactionType      => UnsupportedTransactionType
       case TxValidationError.Mistiming(err)                  => Mistiming(err)
       case TxValidationError.WrongChain(ex, pr)              => InvalidChainId(ex, pr)
+      case TxValidationError.ContinuationInProgress          => ContinuationInProgress
       case err: TxValidationError.TooManyProofs              => InvalidProofs(err.toString())
       case err: TxValidationError.ToBigProof                 => InvalidProofs(err.toString())
       case TransactionValidationError(error, tx) =>
@@ -395,6 +396,12 @@ object ApiError {
   case object InvalidAssetId extends ApiError {
     override val id      = 4007
     override val message = "Invalid asset id"
+    override val code    = StatusCodes.BadRequest
+  }
+
+  case object ContinuationInProgress extends ApiError {
+    override val id      = 4008
+    override val message = "Can't process transaction from the address from which DApp is executing"
     override val code    = StatusCodes.BadRequest
   }
 }
