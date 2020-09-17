@@ -263,8 +263,10 @@ object CommonValidation {
       case _ => Right(tx)
     }
 
-  def disallowTxIfContinuationInProgress[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] = {
+  def disallowTxIfContinuationInProgress[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] =
     tx match {
+      case _: ContinuationTransaction =>
+        Right(tx)
       case authorized: Authorized =>
         val continuationExists =
           blockchain.continuationStates
@@ -277,5 +279,4 @@ object CommonValidation {
       case _ =>
         Right(tx)
     }
-  }
 }
