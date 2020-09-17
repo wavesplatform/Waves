@@ -7,8 +7,8 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
+import com.wavesplatform.it.api.DebugStateChanges
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.{DebugStateChanges, TransactionInfo}
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -25,7 +25,7 @@ import monix.eval.Coeval
 import org.scalatest.{Assertion, CancelAfterFailure, OptionValues}
 
 class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure with OptionValues {
-  private val activationHeight = 6
+  private val activationHeight = 5
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
@@ -34,8 +34,8 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure wit
       .overrideBase(_.raw("waves.blockchain.use-evaluator-v2 = true"))
       .buildNonConflicting()
 
-  private var dApp: KeyPair   = _
-  private var caller: KeyPair = _
+  private lazy val dApp: KeyPair   = firstKeyPair
+  private lazy val caller: KeyPair = secondKeyPair
 
   private val dummyEstimator = new ScriptEstimator {
     override val version: Int = 0
@@ -67,16 +67,9 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure wit
     ScriptCompiler.compile(scriptText, dummyEstimator).explicitGet()._1.bytes().base64
   }
 
-  protected override def beforeAll(): Unit = {
-    super.beforeAll()
-
-    dApp = firstKeyPair
-    caller = secondKeyPair
-
-    lazy val setScriptTx = sender.setScript(dApp, Some(script), setScriptFee)
-
+  test("can't set continuation before activation") {
     assertBadRequestAndMessage(
-      setScriptTx,
+      sender.setScript(dApp, Some(script), setScriptFee),
       "State check failed. Reason: Contract function (foo) is too complex: 30638 > 4000"
     )
   }
@@ -110,36 +103,44 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure wit
     }
   }
 
-  private def waitForContinuation(invokeId: String): Boolean = {
-    nodes.waitFor(
-      s"chain of continuation for InvokeScript Transaction with id = $invokeId is completed"
-    )(
-      _.blockAt(sender.height - 1)
-        .transactions
-        .exists { tx =>
-          tx._type == ContinuationTransaction.typeId &&
-          tx.applicationStatus.contains("succeeded") &&
-          tx.invokeScriptTransactionId.contains(invokeId)
-        }
-    )(
-      _.forall(identity)
+  test("forbid transactions from DApp address until continuation is completed") {
+    val invoke = sender.invokeScript(
+      caller,
+      dApp.toAddress.toString,
+      func = Some("foo"),
+      args = Nil,
+      fee = 1.waves,
+      version = TxVersion.V2,
+      waitForTx = true
     )
+
+    assertTransactionsSendError(dApp)
+    nodes.waitForHeight(sender.height + 1)
+    assertTransactionsSendError(dApp)
+    nodes.waitForHeight(sender.height + 1)
+    assertTransactionsSendError(dApp)
+
+    waitForContinuation(invoke._1.id)
+    assertTransactionsSendSuccess(dApp)
   }
 
-  private def checkContinuationChain(invokeId: String, completionHeight: Int): Assertion = {
-    val invokeInfo = sender.transactionInfo[DebugStateChanges](invokeId)
-    invokeInfo.applicationStatus.value shouldBe "script_execution_in_progress"
+  test("don't forbid transactions from other addresses while continuation is not completed") {
+    val invoke = sender.invokeScript(
+      caller,
+      dApp.toAddress.toString,
+      func = Some("foo"),
+      args = Nil,
+      fee = 1.waves,
+      version = TxVersion.V2,
+      waitForTx = true
+    )
 
-    val continuations =
-      (invokeInfo.height to completionHeight)
-        .map(sender.blockAt(_))
-        .flatMap(_.transactions)
-        .filter(tx => tx._type == ContinuationTransaction.typeId && tx.invokeScriptTransactionId.contains(invokeId))
+    assertTransactionsSendSuccess(caller)
+    nodes.waitForHeight(sender.height + 1)
+    assertTransactionsSendSuccess(caller)
 
-    continuations.dropRight(1).foreach(_.applicationStatus.value shouldBe "script_execution_in_progress")
-    continuations.last.applicationStatus.value shouldBe "succeeded"
-    continuations.map(_.nonce.value) shouldBe continuations.indices
-    invokeInfo.timestamp +: continuations.map(_.timestamp) shouldBe sorted
+    waitForContinuation(invoke._1.id)
+    assertTransactionsSendSuccess(caller)
   }
 
   test("insufficient fee") {
@@ -159,5 +160,67 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure wit
         "with 8 invocation steps " +
         "does not exceed minimal value of 4000000 WAVES."
     )
+  }
+
+  private def waitForContinuation(invokeId: String): Boolean = {
+    nodes.waitFor(
+      s"chain of continuation for InvokeScript Transaction with id = $invokeId is completed"
+    )(
+      _.blockAt(sender.height - 1).transactions
+        .exists { tx =>
+          tx._type == ContinuationTransaction.typeId &&
+          tx.applicationStatus.contains("succeeded") &&
+          tx.invokeScriptTransactionId.contains(invokeId)
+        }
+    )(
+      _.forall(identity)
+    )
+  }
+
+  private def checkContinuationChain(invokeId: String, completionHeight: Int): Assertion = {
+    val invoke = sender.transactionInfo[DebugStateChanges](invokeId)
+    val continuations =
+      (invoke.height to completionHeight)
+        .map(sender.blockAt(_))
+        .flatMap(_.transactions)
+        .filter(tx => tx._type == ContinuationTransaction.typeId && tx.invokeScriptTransactionId.contains(invokeId))
+
+    invoke.applicationStatus.value shouldBe "script_execution_in_progress"
+    continuations.dropRight(1).foreach(_.applicationStatus.value shouldBe "script_execution_in_progress")
+    continuations.last.applicationStatus.value shouldBe "succeeded"
+    continuations.map(_.nonce.value) shouldBe continuations.indices
+    invoke.timestamp +: continuations.map(_.timestamp) shouldBe sorted
+  }
+
+  private def assertTransactionsSendError(txSender: KeyPair): Assertion = {
+    assertBadRequestAndMessage(
+      putData(txSender),
+      "Can't process transaction from the address from which DApp is executing"
+    )
+    assertBadRequestAndMessage(
+      transfer(txSender),
+      "Can't process transaction from the address from which DApp is executing"
+    )
+    assertBadRequestAndMessage(
+      createAlias(txSender),
+      "Can't process transaction from the address from which DApp is executing"
+    )
+  }
+
+  private def assertTransactionsSendSuccess(txSender: KeyPair) = {
+    putData(txSender)
+    transfer(txSender)
+    createAlias(txSender)
+  }
+
+  private def transfer(txSender: KeyPair) =
+    sender.transfer(txSender, thirdAddress, amount = 1, smartMinFee, waitForTx = true)
+
+  private def createAlias(txSender: KeyPair) =
+    sender.createAlias(txSender, "alias", smartMinFee, waitForTx = true)
+
+  private def putData(txSender: KeyPair) = {
+    val data = List(StringDataEntry("key", "value"))
+    sender.putData(txSender, data, calcDataFee(data, TxVersion.V1) + smartFee, waitForTx = true)
   }
 }
