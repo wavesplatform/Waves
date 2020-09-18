@@ -84,6 +84,7 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
     "valid tx" in {
       val blockchain = createBlockchainStub()
       (blockchain.balance _).when(TxHelpers.defaultSigner.publicKey.toAddress, *).returns(Long.MaxValue)
+      (() => blockchain.continuationStates).when().returning(Map.empty)
 
       val route = debugApiRoute.copy(blockchain = blockchain).route
 
@@ -113,6 +114,7 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
     "exchange tx with fail script" in {
       val blockchain = createBlockchainStub()
       (blockchain.balance _).when(TxHelpers.defaultSigner.publicKey.toAddress, *).returns(Long.MaxValue)
+      (() => blockchain.continuationStates).when().returning(Map.empty)
 
       val (assetScript, comp) = ScriptCompiler.compile("if true then throw(\"error\") else false", ScriptEstimatorV3.instance).explicitGet()
       (blockchain.assetScript _).when(TestValues.asset).returns(Some(AssetScriptInfo(assetScript, comp)))
@@ -129,7 +131,6 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
       val tx = TxHelpers.exchange(TxHelpers.order(OrderType.BUY, TestValues.asset), TxHelpers.order(OrderType.SELL, TestValues.asset))
       Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString())) ~> ApiKeyHeader ~> route ~> check {
         val json = Json.parse(responseAs[String])
-        println(json)
         (json \ "valid").as[Boolean] shouldBe false
         (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
         (json \ "error").as[String] should include("not allowed by script of the asset")
