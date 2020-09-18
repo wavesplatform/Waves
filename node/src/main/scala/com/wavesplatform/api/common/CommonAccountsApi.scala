@@ -5,14 +5,13 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common
 import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftIterator}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.{DBExt, KeyTags, Keys, readIntSeq}
+import com.wavesplatform.database.{DBExt, KeyTags, Keys}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{DebugUtils, ScorexLogging}
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
@@ -91,27 +90,36 @@ object CommonAccountsApi extends ScorexLogging {
       blockchain.accountData(address, key)
 
     override def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[_]] = Observable.defer {
-      log.debug(s"AccountData[$address]: collecting ${regex.fold("all keys")(r => s"keys matching $r")}")
-
       val pattern = regex.map(_.r.pattern)
       val entriesFromDiff = diff.accountData
         .get(address)
         .fold[Map[String, DataEntry[_]]](Map.empty)(_.data.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) })
       val entries = mutable.ArrayBuffer[DataEntry[_]](entriesFromDiff.values.toSeq: _*)
 
+      val baseName    = s"AccountData[$address, ${regex.getOrElse(".*")}]"
+      val iterate     = DebugUtils.startMulti(s"$baseName iterateOver")
+      val readHistory = DebugUtils.startMulti(s"$baseName read history")
+      val readValues  = DebugUtils.startMulti(s"$baseName read values")
       db.readOnly { ro =>
         db.get(Keys.addressId(address)).foreach { addressId =>
-          db.iterateOver(KeyTags.DataHistory.prefixBytes ++ PBRecipients.publicKeyHash(address)) { e =>
-            val key = new String(e.getKey.drop(2 + Address.HashLength), Charsets.UTF_8)
-            if (pattern.forall(_.matcher(key).matches()) && !entriesFromDiff.contains(key)) {
-              for (h <- readIntSeq(e.getValue).headOption; e <- ro.get(Keys.data(addressId, key)(h))) {
-                entries += e
-              }
-            }
+          var start = iterate.startOperation()
+          db.iterateOver(KeyTags.DataKeys.prefixBytes ++ addressId.toByteArray) { e =>
+            val key = new String(e.getKey.drop(10), Charsets.UTF_8)
+            iterate.finishOperation(start)
+
+            if (pattern.forall(_.matcher(key).matches()) && !entriesFromDiff.contains(key))
+              for {
+                h <- readHistory.measureOperation(ro.get(Keys.dataHistory(address, key)).headOption)
+                e <- readValues.measureOperation(ro.get(Keys.data(addressId, key)(h)))
+              } entries += e
+
+            start = iterate.startOperation()
           }
         }
       }
-      log.debug(s"AccountData[$address]: collected ${entries.size} values")
+      log.info(iterate.toString)
+      log.info(readHistory.toString)
+      log.info(readValues.toString)
       Observable.fromIterable(entries).filterNot(_.isEmpty)
     }
 

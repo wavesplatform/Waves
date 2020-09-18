@@ -475,6 +475,7 @@ abstract class LevelDBWriter private[database] (
           rw.put(Keys.data(addressId, key)(height), Some(value))
           dataKeyFilter.put(kdh.suffix)
           expiredKeys ++= updateHistory(rw, kdh, threshold, Keys.data(addressId, key))
+          rw.put(Keys.dataKey(addressId, key), ())
         }
       }
 
