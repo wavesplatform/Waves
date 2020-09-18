@@ -16,8 +16,6 @@ import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
 
-import scala.collection.mutable
-
 trait CommonAccountsApi {
   import CommonAccountsApi._
 
@@ -94,33 +92,37 @@ object CommonAccountsApi extends ScorexLogging {
       val entriesFromDiff = diff.accountData
         .get(address)
         .fold[Map[String, DataEntry[_]]](Map.empty)(_.data.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) })
-      val entries = mutable.ArrayBuffer[DataEntry[_]](entriesFromDiff.values.toSeq: _*)
 
       val baseName    = s"AccountData[$address, ${regex.getOrElse(".*")}]"
       val iterate     = DebugUtils.startMulti(s"$baseName iterateOver")
       val readHistory = DebugUtils.startMulti(s"$baseName read history")
       val readValues  = DebugUtils.startMulti(s"$baseName read values")
-      db.readOnly { ro =>
-        db.get(Keys.addressId(address)).foreach { addressId =>
-          var start = iterate.startOperation()
+      val entries = db.readOnly { ro =>
+        db.get(Keys.addressId(address)).fold(Seq.empty[DataEntry[_]]) { addressId =>
+          var start        = iterate.startOperation()
+          val filteredKeys = Set.newBuilder[String]
+
           db.iterateOver(KeyTags.ChangedDataKeys.prefixBytes ++ addressId.toByteArray) { e =>
             val keys = database.readStrings(e.getValue)
             iterate.finishOperation(start)
 
-            for {
-              key <- keys if !entriesFromDiff.contains(key) && pattern.forall(_.matcher(key).matches())
-              h   <- readHistory.measureOperation(ro.get(Keys.dataHistory(address, key)).headOption)
-              e   <- readValues.measureOperation(ro.get(Keys.data(addressId, key)(h)))
-            } entries += e
+            for (key <- keys if !entriesFromDiff.contains(key) && pattern.forall(_.matcher(key).matches()))
+              filteredKeys += key
 
             start = iterate.startOperation()
           }
+
+          for {
+            key <- filteredKeys.result().toVector
+            h   <- readHistory.measureOperation(ro.get(Keys.dataHistory(address, key)).headOption)
+            e   <- readValues.measureOperation(ro.get(Keys.data(addressId, key)(h)))
+          } yield e
         }
       }
       log.info(iterate.toString)
       log.info(readHistory.toString)
       log.info(readValues.toString)
-      Observable.fromIterable(entries).filterNot(_.isEmpty)
+      Observable.fromIterable(entries.filterNot(_.isEmpty))
     }
 
     override def resolveAlias(alias: Alias): Either[ValidationError, Address] = blockchain.resolveAlias(alias)
