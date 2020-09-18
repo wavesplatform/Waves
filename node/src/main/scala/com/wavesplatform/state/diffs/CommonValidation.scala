@@ -265,16 +265,15 @@ object CommonValidation {
 
   def disallowTxIfContinuationInProgress[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] =
     tx match {
-      case _: ContinuationTransaction =>
-        Right(tx)
       case authorized: Authorized =>
         val continuationExists =
           blockchain.continuationStates
-            .collectFirst {
+            .exists {
               case (invokeId, _: ContinuationState.InProgress) =>
                 blockchain.transactionInfo(invokeId).get._2.asInstanceOf[InvokeScriptTransaction].sender == authorized.sender
+              case _ =>
+                false
             }
-            .isDefined
         Either.cond(!continuationExists, tx, ContinuationInProgress)
       case _ =>
         Right(tx)
