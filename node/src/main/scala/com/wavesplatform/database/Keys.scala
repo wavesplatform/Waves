@@ -1,6 +1,6 @@
 package com.wavesplatform.database
 
-import com.google.common.primitives.{Bytes, Ints, Longs}
+import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.common.state.ByteStr
@@ -84,8 +84,6 @@ object Keys {
     historyKey(DataHistory, PBRecipients.publicKeyHash(address) ++ key.utf8Bytes)
   def data(addressId: AddressId, key: String)(height: Int): Key[Option[DataEntry[_]]] =
     Key.opt(Data, hBytes(addressId.toByteArray ++ key.utf8Bytes, height), readDataEntry(key), writeDataEntry)
-  def dataKey(addressId: AddressId, key: String): Key[Unit] =
-    Key(KeyTags.DataKeys, Bytes.concat(addressId.toByteArray, key.utf8Bytes), _ => (), _ => Array.emptyByteArray)
 
   def sponsorshipHistory(asset: IssuedAsset): Key[Seq[Int]] = historyKey(SponsorshipHistory, asset.id.arr)
   def sponsorship(asset: IssuedAsset)(height: Int): Key[SponsorshipValue] =

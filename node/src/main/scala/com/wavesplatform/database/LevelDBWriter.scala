@@ -475,7 +475,6 @@ abstract class LevelDBWriter private[database] (
           rw.put(Keys.data(addressId, key)(height), Some(value))
           dataKeyFilter.put(kdh.suffix)
           expiredKeys ++= updateHistory(rw, kdh, threshold, Keys.data(addressId, key))
-          rw.put(Keys.dataKey(addressId, key), ())
         }
       }
 
@@ -616,6 +615,7 @@ abstract class LevelDBWriter private[database] (
               rw.delete(Keys.data(addressId, k)(currentHeight))
               rw.filterHistory(Keys.dataHistory(address, k), currentHeight)
             }
+            rw.delete(Keys.changedDataKeys(currentHeight, addressId))
 
             balancesToInvalidate += (address -> Waves)
             rw.delete(Keys.wavesBalance(addressId)(currentHeight))

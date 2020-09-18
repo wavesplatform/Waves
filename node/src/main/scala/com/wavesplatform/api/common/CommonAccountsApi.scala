@@ -1,10 +1,10 @@
 package com.wavesplatform.api.common
 
-import com.google.common.base.Charsets
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common
 import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftIterator}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.database
 import com.wavesplatform.database.{DBExt, KeyTags, Keys}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
@@ -103,15 +103,15 @@ object CommonAccountsApi extends ScorexLogging {
       db.readOnly { ro =>
         db.get(Keys.addressId(address)).foreach { addressId =>
           var start = iterate.startOperation()
-          db.iterateOver(KeyTags.DataKeys.prefixBytes ++ addressId.toByteArray) { e =>
-            val key = new String(e.getKey.drop(10), Charsets.UTF_8)
+          db.iterateOver(KeyTags.ChangedDataKeys.prefixBytes ++ addressId.toByteArray) { e =>
+            val keys = database.readStrings(e.getValue)
             iterate.finishOperation(start)
 
-            if (pattern.forall(_.matcher(key).matches()) && !entriesFromDiff.contains(key))
-              for {
-                h <- readHistory.measureOperation(ro.get(Keys.dataHistory(address, key)).headOption)
-                e <- readValues.measureOperation(ro.get(Keys.data(addressId, key)(h)))
-              } entries += e
+            for {
+              key <- keys if !entriesFromDiff.contains(key) && pattern.forall(_.matcher(key).matches())
+              h   <- readHistory.measureOperation(ro.get(Keys.dataHistory(address, key)).headOption)
+              e   <- readValues.measureOperation(ro.get(Keys.data(addressId, key)(h)))
+            } entries += e
 
             start = iterate.startOperation()
           }
