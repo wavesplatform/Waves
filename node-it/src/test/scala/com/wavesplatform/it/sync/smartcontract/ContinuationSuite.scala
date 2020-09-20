@@ -22,9 +22,9 @@ import com.wavesplatform.transaction.smart.ContinuationTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import monix.eval.Coeval
-import org.scalatest.{Assertion, CancelAfterFailure, OptionValues}
+import org.scalatest.{Assertion, OptionValues}
 
-class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure with OptionValues {
+class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   private val activationHeight = 5
 
   override protected def nodeConfigs: Seq[Config] =
@@ -166,7 +166,8 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure wit
     nodes.waitFor(
       s"chain of continuation for InvokeScript Transaction with id = $invokeId is completed"
     )(
-      _.blockAt(sender.height - 1).transactions
+       _.blockSeq(sender.height - 1, sender.height)
+        .flatMap(_.transactions)
         .exists { tx =>
           tx._type == ContinuationTransaction.typeId &&
           tx.applicationStatus.contains("succeeded") &&
@@ -180,8 +181,7 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure wit
   private def checkContinuationChain(invokeId: String, completionHeight: Int): Assertion = {
     val invoke = sender.transactionInfo[DebugStateChanges](invokeId)
     val continuations =
-      (invoke.height to completionHeight)
-        .map(sender.blockAt(_))
+      sender.blockSeq(invoke.height, completionHeight)
         .flatMap(_.transactions)
         .filter(tx => tx._type == ContinuationTransaction.typeId && tx.invokeScriptTransactionId.contains(invokeId))
 
