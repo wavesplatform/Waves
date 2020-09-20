@@ -212,29 +212,57 @@ class UtxPoolImpl(
   }
 
   private[utx] def addTransaction(tx: Transaction, verify: Boolean, forceValidate: Boolean = false): TracedResult[ValidationError, Boolean] = {
-    val diffEi = priorityDiffs.synchronized {
-      val patchedBlockchain = CompositeBlockchain(blockchain, Some(Monoid.combineAll(priorityDiffs)))
+    val checkIfContinuationIsActual =
+      tx match {
+        case ContinuationTransaction(invokeId, _, nonce) =>
+          val newNonce =
+            continuationNonces.compute(
+              invokeId,
+              (_, expectingNonce) =>
+                if (nonce >= expectingNonce) {
+                  nonce + 1
+                } else {
+                  expectingNonce
+                }
+            )
+          lazy val checkState =
+            blockchain.continuationStates
+              .get(invokeId)
+              .collect { case ContinuationState.InProgress(stateNonce, _, _, _) => nonce >= stateNonce }
+              .getOrElse(false)
 
-      if (forceValidate)
-        TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(patchedBlockchain, tx)
-      else
-        TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(patchedBlockchain, tx)
+          newNonce > nonce && checkState
+        case _ =>
+          true
+      }
+
+    if (checkIfContinuationIsActual) {
+      val diffEi = priorityDiffs.synchronized {
+        val patchedBlockchain = CompositeBlockchain(blockchain, Some(Monoid.combineAll(priorityDiffs)))
+
+        if (forceValidate)
+          TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(patchedBlockchain, tx)
+        else
+          TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(patchedBlockchain, tx)
+      }
+
+      def addPortfolio(): Unit = diffEi.map { diff =>
+        pessimisticPortfolios.add(tx.id(), diff)
+        onEvent(UtxEvent.TxAdded(tx, diff))
+      }
+
+      if (!verify || diffEi.resultE.isRight) {
+        transactions.computeIfAbsent(tx.id(), { _ =>
+          PoolMetrics.addTransaction(tx)
+          addPortfolio()
+          tx
+        })
+      }
+
+      diffEi.map(_ => true)
+    } else {
+      TracedResult.wrapValue(false)
     }
-
-    def addPortfolio(): Unit = diffEi.map { diff =>
-      pessimisticPortfolios.add(tx.id(), diff)
-      onEvent(UtxEvent.TxAdded(tx, diff))
-    }
-
-    if (!verify || diffEi.resultE.isRight) {
-      transactions.computeIfAbsent(tx.id(), { _ =>
-        PoolMetrics.addTransaction(tx)
-        addPortfolio()
-        tx
-      })
-    }
-
-    diffEi.map(_ => true)
   }
 
   override def spendableBalance(addr: Address, assetId: Asset): Long =
@@ -430,19 +458,10 @@ class UtxPoolImpl(
       blockchain.continuationStates
         .foreach {
           case (invokeId, ContinuationState.InProgress(nonce, _, _, _)) =>
-            continuationNonces.compute(
-              invokeId,
-              (_, expectingNonce) =>
-                if (nonce >= expectingNonce) {
-                  putIfNew(ContinuationTransaction(invokeId, time.getTimestamp(), nonce))
-                  nonce + 1
-                } else {
-                  expectingNonce
-                }
-            )
+            val tx = ContinuationTransaction(invokeId, time.getTimestamp(), nonce)
+            addTransaction(tx, verify = false)
           case (invokeId, ContinuationState.Finished(_)) =>
             continuationNonces.remove(invokeId)
-          case _ => ()
         }
 
       loop(PackResult(None, Monoid[Diff].empty, initialConstraint, 0, Set.empty, Set.empty, Set.empty))
