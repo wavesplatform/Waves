@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction.smart
 
 import cats.implicits._
+import com.google.common.primitives.Ints
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.Asset.Waves
@@ -31,7 +32,7 @@ case class ContinuationTransaction(
     TxVersion.V1
 
   override val id: Coeval[ByteStr] =
-    bodyBytes.map(FastHashId.create)
+    Coeval.now(FastHashId.create(invokeScriptTransactionId.arr ++ Ints.toByteArray(nonce)))
 
   override def assetFee: (Asset, Long) =
     (Waves, 0)
