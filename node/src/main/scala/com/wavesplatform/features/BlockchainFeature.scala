@@ -40,7 +40,8 @@ object BlockchainFeatures {
     OrderV3,
     ReduceNFTFee,
     BlockReward,
-    BlockV5
+    BlockV5,
+    ContinuationTransaction
   ).map(f => f.id -> f).toMap
 
   val implemented: Set[Short] = dict.keySet
