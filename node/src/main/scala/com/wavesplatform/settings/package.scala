@@ -34,7 +34,7 @@ package object settings {
         case other =>
           throw new ConfigException.WrongType(config.getValue(path).origin(), path, ConfigValueType.OBJECT.name(), other.name())
       }
-  }
+    }
 
   implicit val byteReader: ValueReader[Byte] = { (cfg: Config, path: String) =>
     val x = cfg.getInt(path)
@@ -57,22 +57,24 @@ package object settings {
   }
 
   def loadConfig(maybeUserConfig: Option[Config]): Config = {
-    val defaults = ConfigFactory.defaultOverrides()
-    val external = maybeUserConfig
-      .fold(defaults)(defaults.withFallback)
-
-    val withApp = external
-      .withFallback(ConfigFactory.defaultApplication())
-      .withFallback(ConfigFactory.defaultReference())
-      .resolve()
+    val sysProps = ConfigFactory.defaultOverrides()
+    val external = maybeUserConfig.fold(sysProps)(sysProps.withFallback)
 
     val cmdDefaults =
-      Try(withApp.getConfig("waves.defaults"))
+      Try(external.getConfig("waves.defaults"))
         .getOrElse(ConfigFactory.empty())
         .atPath("waves")
 
+    val withApp = external.withFallback(cmdDefaults).withFallback(ConfigFactory.defaultApplication())
+
+    val networkDefaults = {
+      val network = withApp.getString("waves.blockchain.type").toLowerCase
+      withApp.getConfig(s"waves.defaults.$network")
+    }
+
     external
       .withFallback(cmdDefaults)
+      .withFallback(networkDefaults.atKey("waves"))
       .withFallback(ConfigFactory.parseString(s"waves.directory = ${defaultDirectory(withApp)}"))
       .withFallback(ConfigFactory.defaultApplication())
       .withFallback(ConfigFactory.defaultReference())

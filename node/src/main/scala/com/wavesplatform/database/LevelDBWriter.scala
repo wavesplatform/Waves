@@ -36,8 +36,8 @@ import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
-import scala.jdk.CollectionConverters._
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+import scala.jdk.CollectionConverters._
 import scala.util.Try
 import scala.util.control.NonFatal
 
@@ -57,7 +57,7 @@ object LevelDBWriter extends ScorexLogging {
   }
 
   private[database] def closest(v: Seq[Int], h: Int): Option[Int] = {
-    v.takeWhile(_ <= h).lastOption // Should we use binary search?
+    v.dropWhile(_ > h).headOption // Should we use binary search?
   }
 
   implicit class ReadOnlyDBExt(val db: ReadOnlyDB) extends AnyVal {

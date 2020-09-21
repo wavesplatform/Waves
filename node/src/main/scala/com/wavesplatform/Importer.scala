@@ -262,9 +262,28 @@ object Importer extends ScorexLogging {
     sys.addShutdownHook {
       quit = true
       Await.ready(Future.sequence(extensions.map(_.shutdown())), settings.extensionsShutdownTimeout)
-      Await.result(Kamon.stopModules(), 10.seconds)
       Await.result(actorSystem.terminate(), 10.second)
       lock.synchronized {
+        if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG)) {
+          // Force store liquid block in leveldb
+          val lastHeader = blockchainUpdater.lastBlockHeader.get.header
+          val pseudoBlock = Block(
+            BlockHeader(
+              blockchainUpdater.blockVersionAt(blockchainUpdater.height),
+              System.currentTimeMillis(),
+              blockchainUpdater.lastBlockId.get,
+              lastHeader.baseTarget,
+              lastHeader.generationSignature,
+              lastHeader.generator,
+              Nil,
+              0,
+              ByteStr.empty
+            ),
+            ByteStr.empty,
+            Nil
+          )
+          blockchainUpdater.processBlock(pseudoBlock, ByteStr.empty, verify = false)
+        }
         scheduler.shutdown()
         blockchainUpdater.shutdown()
         levelDb.close()
@@ -273,27 +292,6 @@ object Importer extends ScorexLogging {
     }
 
     startImport(bis, blockchainUpdater, extAppender, importOptions)
-
-    if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG)) {
-      // Force store liquid block in leveldb
-      val lastHeader = blockchainUpdater.lastBlockHeader.get.header
-      val pseudoBlock = Block(
-        BlockHeader(
-          blockchainUpdater.blockVersionAt(blockchainUpdater.height),
-          System.currentTimeMillis(),
-          blockchainUpdater.lastBlockId.get,
-          lastHeader.baseTarget,
-          lastHeader.generationSignature,
-          lastHeader.generator,
-          Nil,
-          0,
-          ByteStr.empty
-        ),
-        ByteStr.empty,
-        Nil
-      )
-
-      blockchainUpdater.processBlock(pseudoBlock, ByteStr.empty, verify = false)
-    }
+    Await.result(Kamon.stopModules(), 10.seconds)
   }
 }

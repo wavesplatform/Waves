@@ -11,8 +11,8 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
-import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
@@ -817,8 +817,8 @@ class InvokeScriptTransactionDiffTest
     }
   }
 
-  val chainId: TxVersion     = AddressScheme.current.chainId
-  val enoughFee: TxTimestamp = FeeValidation.ScriptExtraFee + FeeValidation.FeeConstants(IssueTransaction.typeId) * FeeValidation.FeeUnit
+  val chainId: Byte     = AddressScheme.current.chainId
+  val enoughFee: TxAmount = FeeValidation.ScriptExtraFee + FeeValidation.FeeConstants(IssueTransaction.typeId) * FeeValidation.FeeUnit
 
   property("invoking contract receive payment") {
     forAll(for {
@@ -1927,7 +1927,7 @@ class InvokeScriptTransactionDiffTest
         for {                                                                                   // smart asset script execution
           fee             <- ciFee(1)
           acc             <- accountGen
-          amt             <- Gen.choose(1, issueTx.quantity)
+          amt             <- Gen.choose(1L, issueTx.quantity)
           arg             <- genBoundedStringBytes(1, 32)
           paymentContract <- paymentContractGen(acc.toAddress, amt, List(IssuedAsset(issueTx.assetId)), V4)(funcBinding)
         } yield (fee, Waves, paymentContract, List(CONST_BYTESTR(ByteStr(arg)).explicitGet()))

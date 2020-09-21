@@ -1,7 +1,6 @@
 package com.wavesplatform
 
 import java.io.File
-import java.nio.file.Files
 import java.security.Security
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -61,8 +60,8 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import scala.util.Try
 import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject, time: NTP) extends ScorexLogging {
   app =>
@@ -224,7 +223,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         utxSynchronizer.publish,
         loadBlockAt(db, blockchainUpdater)
       )
-      override val blocksApi: CommonBlocksApi     = CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
+      override val blocksApi: CommonBlocksApi =
+        CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
       override val accountsApi: CommonAccountsApi = CommonAccountsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
       override val assetsApi: CommonAssetsApi     = CommonAssetsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
     }
@@ -312,7 +312,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         log.error(
           "Usage of the default api key hash (H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu) is prohibited, please change it in the waves.conf"
         )
-        forceStopApplication(InvalidApiKey)
+        forceStopApplication(Misconfiguration)
       }
 
       def loadBalanceHistory(address: Address): Seq[(Int, Long)] = db.readOnly { rdb =>
@@ -469,15 +469,19 @@ object Application extends ScorexLogging {
   private[wavesplatform] def loadApplicationConfig(external: Option[File] = None): WavesSettings = {
     import com.wavesplatform.settings._
 
-    val config = loadConfig(external.map(ConfigFactory.parseFile))
+    val maybeExternalConfig = Try(external.map(ConfigFactory.parseFile(_, ConfigParseOptions.defaults().setAllowMissing(false))))
+    val config              = loadConfig(maybeExternalConfig.getOrElse(None))
 
     // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
     System.setProperty("waves.directory", config.getString("waves.directory"))
     if (config.hasPath("waves.config.directory")) System.setProperty("waves.config.directory", config.getString("waves.config.directory"))
 
-    external match {
-      case None    => log.debug("Config file not defined, TESTNET config will be used")
-      case Some(f) => if (!Files.exists(f.toPath)) log.warn(s"Config ${f.toPath.toAbsolutePath.toString} not found, TESTNET config will be used")
+    maybeExternalConfig match {
+      case Success(None) => log.warn("Config file not defined, TESTNET config will be used")
+      case Failure(exception) =>
+        log.error(s"Couldn't read ${external.get.toPath.toAbsolutePath}", exception)
+        forceStopApplication(Misconfiguration)
+      case _ => // Pass
     }
 
     val settings = WavesSettings.fromRootConfig(config)
@@ -505,7 +509,9 @@ object Application extends ScorexLogging {
   private[wavesplatform] def loadBlockAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[(BlockMeta, Seq[Transaction])] =
     loadBlockInfoAt(db, blockchainUpdater)(height).map { case (meta, txs) => (meta, txs.map(_._1)) }
 
-  private[wavesplatform] def loadBlockInfoAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[(BlockMeta, Seq[(Transaction, Boolean)])] =
+  private[wavesplatform] def loadBlockInfoAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(
+      height: Int
+  ): Option[(BlockMeta, Seq[(Transaction, Boolean)])] =
     loadBlockMetaAt(db, blockchainUpdater)(height).map { meta =>
       meta -> blockchainUpdater
         .liquidTransactions(meta.id)
@@ -535,7 +541,7 @@ object Application extends ScorexLogging {
       case "explore"                => Explorer.main(args.tail)
       case "util"                   => UtilApp.main(args.tail)
       case "help" | "--help" | "-h" => println("Usage: waves <config> | export | import | explore | util")
-      case _                        => startNode(args.headOption)
+      case _                        => startNode(args.headOption) // TODO: Consider adding option to specify network-name
     }
   }
 
