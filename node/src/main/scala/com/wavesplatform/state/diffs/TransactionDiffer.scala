@@ -13,9 +13,9 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
+import com.wavesplatform.state.diffs.invoke.{ContinuationTransactionDiff, InvokeScriptTransactionDiff}
 import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.state.diffs.invoke.{ContinuationTransactionDiff, InvokeScriptTransactionDiff}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
@@ -92,7 +92,6 @@ object TransactionDiffer {
             _ <- CommonValidation.disallowBeforeActivationTime(blockchain, tx)
             _ <- CommonValidation.disallowDuplicateIds(blockchain, tx)
             _ <- CommonValidation.disallowSendingGreaterThanBalance(blockchain, currentBlockTs, tx)
-            _ <- CommonValidation.disallowTxIfContinuationInProgress(blockchain, tx)
             _ <- FeeValidation(blockchain, tx)
           } yield ()
         } else Right(())
