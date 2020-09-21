@@ -15,9 +15,9 @@ import scala.util.Try
 case class PaymentTransaction private (
     sender: PublicKey,
     recipient: Address,
-    amount: Long,
-    fee: Long,
-    timestamp: Long,
+    amount: TxAmount,
+    fee: TxAmount,
+    timestamp: TxTimestamp,
     signature: ByteStr,
     chainId: Byte
 ) extends SignedTransaction
