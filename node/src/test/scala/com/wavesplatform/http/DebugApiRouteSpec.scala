@@ -104,7 +104,6 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
       val tx = TxHelpers.transfer(TxHelpers.defaultSigner, TestValues.address, 1.waves)
       Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString())) ~> route ~> check {
         val json = Json.parse(responseAs[String])
-        println(json)
         (json \ "valid").as[Boolean] shouldBe false
         (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
         (json \ "error").as[String] should include("Attempt to transfer unavailable funds")

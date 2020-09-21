@@ -943,9 +943,11 @@ object AsyncHttpApi extends Assertions {
 
     def accountBalance(acc: String): Future[Long] = n.balance(acc).map(_.balance)
 
-    def accountsBalances(height: Option[Int], accounts: Seq[String], asset: Option[String]): Future[Seq[(String, Long)]] = {
+    def balanceAtHeight(address: String, height: Int): Future[Long] =
+      accountsBalances(Some(height), Seq(address), None).map(_.collectFirst { case (`address`, balance) => balance }.getOrElse(0L))
+
+    def accountsBalances(height: Option[Int], accounts: Seq[String], asset: Option[String]): Future[Seq[(String, Long)]] =
       n.balances(height, accounts, asset).map(_.map(b => (b.address, b.balance)))
-    }
 
     def accountBalances(acc: String): Future[(Long, Long)] = {
       n.balance(acc).map(_.balance).zip(n.effectiveBalance(acc).map(_.balance))
