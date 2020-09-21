@@ -11,7 +11,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.utils.{DebugUtils, ScorexLogging}
+import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
@@ -93,35 +93,22 @@ object CommonAccountsApi extends ScorexLogging {
         .get(address)
         .fold[Map[String, DataEntry[_]]](Map.empty)(_.data.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) })
 
-      val baseName    = s"AccountData[$address, ${regex.getOrElse(".*")}]"
-      val iterate     = DebugUtils.startMulti(s"$baseName iterateOver")
-      val readHistory = DebugUtils.startMulti(s"$baseName read history")
-      val readValues  = DebugUtils.startMulti(s"$baseName read values")
       val entries = db.readOnly { ro =>
         db.get(Keys.addressId(address)).fold(Seq.empty[DataEntry[_]]) { addressId =>
-          var start        = iterate.startOperation()
           val filteredKeys = Set.newBuilder[String]
 
           db.iterateOver(KeyTags.ChangedDataKeys.prefixBytes ++ addressId.toByteArray) { e =>
-            val keys = database.readStrings(e.getValue)
-            iterate.finishOperation(start)
-
-            for (key <- keys if !entriesFromDiff.contains(key) && pattern.forall(_.matcher(key).matches()))
+            for (key <- database.readStrings(e.getValue) if !entriesFromDiff.contains(key) && pattern.forall(_.matcher(key).matches()))
               filteredKeys += key
-
-            start = iterate.startOperation()
           }
 
           for {
             key <- filteredKeys.result().toVector
-            h   <- readHistory.measureOperation(ro.get(Keys.dataHistory(address, key)).headOption)
-            e   <- readValues.measureOperation(ro.get(Keys.data(addressId, key)(h)))
+            h   <- ro.get(Keys.dataHistory(address, key)).headOption
+            e   <- ro.get(Keys.data(addressId, key)(h))
           } yield e
         }
       }
-      log.info(iterate.toString)
-      log.info(readHistory.toString)
-      log.info(readValues.toString)
       Observable.fromIterable(entries.filterNot(_.isEmpty))
     }
 
