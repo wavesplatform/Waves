@@ -8,6 +8,7 @@ import cats.Monoid
 import cats.syntax.monoid._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.lang.ValidationError
@@ -365,6 +366,9 @@ class UtxPoolImpl(
                 this.removeFromOrdPool(tx.id())
                 onEvent(UtxEvent.TxRemoved(tx, Some(GenericError("Expired"))))
                 r.copy(iterations = r.iterations + 1, removedTransactions = r.removedTransactions + tx.id())
+              } else if (TxCheck.isBlockedByContinuation(tx)) {
+                log.debug(s"Transaction ${tx.id()} is blocked due to evaluation of continuation")
+                r.copy(iterations = r.iterations + 1)
               } else {
                 val newScriptedAddresses = scriptedAddresses(tx)
                 if (!priority && r.checkedAddresses.intersect(newScriptedAddresses).nonEmpty) r
@@ -501,6 +505,23 @@ class UtxPoolImpl(
         case _: ExchangeTransaction     => false
         case a: AuthorizedTransaction   => blockchain.hasAccountScript(a.sender.toAddress)
         case _                          => false
+      }
+
+    def isBlockedByContinuation(transaction: Transaction): Boolean =
+      transaction match {
+        case authorized: AuthorizedTransaction =>
+          blockchain.continuationStates
+            .exists {
+              case (invokeId, _: ContinuationState.InProgress) =>
+                val txSender     = authorized.sender.toAddress
+                val invoke       = blockchain.transactionInfo(invokeId).get._2.asInstanceOf[InvokeScriptTransaction]
+                val invokeSender = blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
+                invokeSender == txSender
+              case _ =>
+                false
+            }
+        case _ =>
+          false
       }
 
     def canCreateAlias(alias: Alias): Boolean =
