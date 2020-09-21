@@ -103,9 +103,10 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
   }
 
   override def broadcast(tx: PBSignedTransaction): Future[PBSignedTransaction] =
-    for {
-      txv    <- tx.toVanilla.toFuture
-      result <- commonApi.broadcastTransaction(txv)
-      _      <- result.resultE.toFuture
-    } yield tx
+    (for {
+      maybeTx <- Future(tx.toVanilla)
+      vtx     <- maybeTx.toFuture
+      result  <- commonApi.broadcastTransaction(vtx)
+      _       <- result.resultE.toFuture
+    } yield tx).wrapErrors
 }
