@@ -103,7 +103,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     }
   }
 
-  test("forbid transactions from DApp address until continuation is completed") {
+  ignore("forbid transactions from DApp address until continuation is completed") {
     val invoke = sender.invokeScript(
       caller,
       dApp.toAddress.toString,
@@ -124,7 +124,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     assertTransactionsSendSuccess(dApp)
   }
 
-  test("don't forbid transactions from other addresses while continuation is not completed") {
+  ignore("don't forbid transactions from other addresses while continuation is not completed") {
     val invoke = sender.invokeScript(
       caller,
       dApp.toAddress.toString,
