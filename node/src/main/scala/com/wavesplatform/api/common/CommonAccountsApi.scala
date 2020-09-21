@@ -94,10 +94,10 @@ object CommonAccountsApi extends ScorexLogging {
         .fold[Map[String, DataEntry[_]]](Map.empty)(_.data.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) })
 
       val entries = db.readOnly { ro =>
-        db.get(Keys.addressId(address)).fold(Seq.empty[DataEntry[_]]) { addressId =>
+        ro.get(Keys.addressId(address)).fold(Seq.empty[DataEntry[_]]) { addressId =>
           val filteredKeys = Set.newBuilder[String]
 
-          db.iterateOver(KeyTags.ChangedDataKeys.prefixBytes ++ addressId.toByteArray) { e =>
+          ro.iterateOver(KeyTags.ChangedDataKeys.prefixBytes ++ addressId.toByteArray) { e =>
             for (key <- database.readStrings(e.getValue) if !entriesFromDiff.contains(key) && pattern.forall(_.matcher(key).matches()))
               filteredKeys += key
           }
@@ -109,7 +109,7 @@ object CommonAccountsApi extends ScorexLogging {
           } yield e
         }
       }
-      Observable.fromIterable(entries.filterNot(_.isEmpty))
+      Observable.fromIterable((entriesFromDiff.values ++ entries).filterNot(_.isEmpty))
     }
 
     override def resolveAlias(alias: Alias): Either[ValidationError, Address] = blockchain.resolveAlias(alias)
