@@ -44,7 +44,7 @@ class RollbackSuite
 
     val startHeight = sender.height
 
-    Await.result(processRequests(generateTransfersToRandomAddresses(190, nodeAddresses)), 2.minutes)
+    val transactionIds = Await.result(processRequests(generateTransfersToRandomAddresses(190, nodeAddresses)), 2.minutes).map(_.id)
     nodes.waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
     nodes.waitForHeightArise()
 
@@ -53,9 +53,10 @@ class RollbackSuite
 
     nodes.rollback(startHeight)
     nodes.waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
-    nodes.waitForHeightArise()
+    val maxHeight = sender.transactionStatus(transactionIds).flatMap(_.height).max
+    sender.waitForHeight(maxHeight + 2) // so that NG fees won't affect miner's balances
 
-    val stateAfterSecondTry = nodes.head.debugStateAt(stateHeight)
+    val stateAfterSecondTry = nodes.head.debugStateAt(maxHeight + 1)
     stateAfterSecondTry.toSet shouldBe stateAfterFirstTry.toSet
   }
 
