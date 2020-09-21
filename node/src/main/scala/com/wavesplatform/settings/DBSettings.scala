@@ -8,5 +8,5 @@ case class DBSettings(
     maxCacheSize: Int,
     maxRollbackDepth: Int,
     rememberBlocks: FiniteDuration,
-    useBloomFilter: Boolean = false
+    useBloomFilter: Boolean
 )
