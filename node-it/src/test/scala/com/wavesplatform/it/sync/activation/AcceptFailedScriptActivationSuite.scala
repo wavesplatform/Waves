@@ -64,6 +64,8 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     )
 
     sender.setScript(dAppKP, dAppScript, setScriptFee, waitForTx = true).id
+    nodes.waitForEmptyUtx()
+    nodes.waitForHeightArise()
   }
 
   test("reject failed transaction before activation height") {
