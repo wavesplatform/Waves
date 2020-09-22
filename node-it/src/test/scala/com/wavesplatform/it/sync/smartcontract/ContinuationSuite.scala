@@ -115,7 +115,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     )
     sendTransactions(dApp)
     waitForContinuation(invoke._1.id)
-    assertAbsenceOfTransactions(invoke._1.id, startHeight, sender.height)
+    assertAbsenceOfTransactions(startHeight, sender.height)
 
     sender.waitForHeight(sender.height + 2)
     assertExistenceOfTransactions(dApp, startHeight, sender.height)
@@ -171,45 +171,51 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       _.forall(identity)
     )
 
-  private def assertContinuationChain(invokeId: String, completionHeight: Int): Assertion = {
-    val invoke = sender.transactionInfo[DebugStateChanges](invokeId)
-    val continuations =
-      sender
-        .blockSeq(invoke.height, completionHeight)
-        .flatMap(_.transactions)
-        .filter(tx => tx._type == ContinuationTransaction.typeId && tx.invokeScriptTransactionId.contains(invokeId))
+  private def assertContinuationChain(invokeId: String, completionHeight: Int): Unit =
+    nodes.foreach {
+      node =>
+        val invoke = node.transactionInfo[DebugStateChanges](invokeId)
+        val continuations =
+          node
+            .blockSeq(invoke.height, completionHeight)
+            .flatMap(_.transactions)
+            .filter(tx => tx._type == ContinuationTransaction.typeId && tx.invokeScriptTransactionId.contains(invokeId))
 
-    invoke.applicationStatus.value shouldBe "script_execution_in_progress"
-    continuations.dropRight(1).foreach(_.applicationStatus.value shouldBe "script_execution_in_progress")
-    continuations.last.applicationStatus.value shouldBe "succeeded"
-    continuations.map(_.nonce.value) shouldBe continuations.indices
-    invoke.timestamp +: continuations.map(_.timestamp) shouldBe sorted
-  }
+        invoke.applicationStatus.value shouldBe "script_execution_in_progress"
+        continuations.dropRight(1).foreach(_.applicationStatus.value shouldBe "script_execution_in_progress")
+        continuations.last.applicationStatus.value shouldBe "succeeded"
+        continuations.map(_.nonce.value) shouldBe continuations.indices
+        invoke.timestamp +: continuations.map(_.timestamp) shouldBe sorted
+    }
 
-  private def assertAbsenceOfTransactions(invokeId: String, fromHeight: Int, toHeight: Int): Assertion = {
-    val invoke = sender.transactionInfo[DebugStateChanges](invokeId)
-    val transactions =
-      sender
-        .blockSeq(fromHeight, toHeight)
-        .flatMap(_.transactions)
+  private def assertAbsenceOfTransactions(fromHeight: Int, toHeight: Int): Unit =
+    nodes.foreach {
+      node =>
+        val transactions =
+          node
+            .blockSeq(fromHeight, toHeight)
+            .flatMap(_.transactions)
 
-    val invokeIndex           = transactions.indexWhere(_._type == smart.InvokeScriptTransaction.typeId)
-    val lastContinuationIndex = transactions.lastIndexWhere(_._type == ContinuationTransaction.typeId)
+        val invokeIndex           = transactions.indexWhere(_._type == smart.InvokeScriptTransaction.typeId)
+        val lastContinuationIndex = transactions.lastIndexWhere(_._type == ContinuationTransaction.typeId)
 
-    val otherTransactionsExist =
-      transactions
-        .slice(invokeIndex, lastContinuationIndex)
-        .exists(tx => tx._type != smart.InvokeScriptTransaction.typeId && tx._type != ContinuationTransaction.typeId)
+        val otherTransactionsExist =
+          transactions
+            .slice(invokeIndex, lastContinuationIndex)
+            .exists(tx => tx._type != smart.InvokeScriptTransaction.typeId && tx._type != ContinuationTransaction.typeId)
 
-    otherTransactionsExist shouldBe false
-  }
+        otherTransactionsExist shouldBe false
+    }
 
-  private def assertExistenceOfTransactions(txSender: KeyPair, fromHeight: Int, toHeight: Int): Assertion = {
-    val transactions = sender.blockSeq(fromHeight, toHeight).flatMap(_.transactions)
-    val publicKey    = txSender.toAddress.toString
-    transactions.exists(tx => tx._type == DataTransaction.typeId && tx.sender.get == publicKey) shouldBe true
-    transactions.exists(tx => tx._type == TransferTransaction.typeId && tx.sender.get == publicKey) shouldBe true
-    transactions.exists(tx => tx._type == CreateAliasTransaction.typeId && tx.sender.get == publicKey) shouldBe true
+  private def assertExistenceOfTransactions(txSender: KeyPair, fromHeight: Int, toHeight: Int): Unit = {
+    nodes.foreach {
+      node =>
+        val transactions = node.blockSeq(fromHeight, toHeight).flatMap(_.transactions)
+        val publicKey    = txSender.toAddress.toString
+        transactions.exists(tx => tx._type == DataTransaction.typeId && tx.sender.get == publicKey) shouldBe true
+        transactions.exists(tx => tx._type == TransferTransaction.typeId && tx.sender.get == publicKey) shouldBe true
+        transactions.exists(tx => tx._type == CreateAliasTransaction.typeId && tx.sender.get == publicKey) shouldBe true
+    }
   }
 
   private def sendTransactions(txSender: KeyPair) = {
