@@ -17,10 +17,11 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.ContinuationTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, TxVersion, smart}
 import monix.eval.Coeval
 import org.scalatest.{Assertion, OptionValues}
 
@@ -56,10 +57,8 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
          | @Callable(inv)
          | func foo() = {
          |  let a =
-         |    height == $activationHeight                                                  &&
-         |    getInteger(Address(base58''), "key") == unit                                 &&
-         |    !(${List.fill(150)("sigVerify(base64'',base64'',base64'')").mkString("||")}) &&
-         |    height == $activationHeight
+         |    getInteger(Address(base58''), "key") == unit &&
+         |    !(${List.fill(150)("sigVerify(base64'',base64'',base64'')").mkString("||")})
          |  [BooleanEntry("a", a), BinaryEntry("sender", inv.caller.bytes)]
          | }
          |
@@ -70,7 +69,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   test("can't set continuation before activation") {
     assertBadRequestAndMessage(
       sender.setScript(dApp, Some(script), setScriptFee),
-      "State check failed. Reason: Contract function (foo) is too complex: 30638 > 4000"
+      "State check failed. Reason: Contract function (foo) is too complex: 30630 > 4000"
     )
   }
 
@@ -96,14 +95,14 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       waitForTx = true
     )
     waitForContinuation(invoke._1.id)
-    checkContinuationChain(invoke._1.id, sender.height)
+    assertContinuationChain(invoke._1.id, sender.height)
     nodes.foreach { node =>
       node.getDataByKey(dApp.toAddress.toString, "a") shouldBe BooleanDataEntry("a", true)
       node.getDataByKey(dApp.toAddress.toString, "sender") shouldBe BinaryDataEntry("sender", ByteStr(Base58.decode(caller.toAddress.toString)))
     }
   }
 
-  ignore("forbid transactions from DApp address until continuation is completed") {
+  test("hold transactions from DApp address until continuation is completed") {
     val invoke = sender.invokeScript(
       caller,
       dApp.toAddress.toString,
@@ -113,19 +112,16 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       version = TxVersion.V2,
       waitForTx = true
     )
-
-    assertTransactionsSendError(dApp)
-    nodes.waitForHeight(sender.height + 1)
-    assertTransactionsSendError(dApp)
-    nodes.waitForHeight(sender.height + 1)
-    assertTransactionsSendError(dApp)
-
+    sendTransactions(dApp)
     waitForContinuation(invoke._1.id)
-    assertTransactionsSendSuccess(dApp)
+    assertAbsenceOfTransactions(invoke._1.id, sender.height)
+
+    sender.waitForHeight(sender.height + 2)
+    assertExistenceOfTransactions(sender.height, dApp)
   }
 
-  ignore("don't forbid transactions from other addresses while continuation is not completed") {
-    val invoke = sender.invokeScript(
+  test("don't forbid transactions from other addresses while continuation is not completed") {
+    sender.invokeScript(
       caller,
       dApp.toAddress.toString,
       func = Some("foo"),
@@ -134,13 +130,9 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       version = TxVersion.V2,
       waitForTx = true
     )
-
-    assertTransactionsSendSuccess(caller)
-    nodes.waitForHeight(sender.height + 1)
-    assertTransactionsSendSuccess(caller)
-
-    waitForContinuation(invoke._1.id)
-    assertTransactionsSendSuccess(caller)
+    sendTransactions(caller)
+    nodes.waitForHeight(sender.height + 2)
+    assertExistenceOfTransactions(sender.height, caller)
   }
 
   test("insufficient fee") {
@@ -162,11 +154,11 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     )
   }
 
-  private def waitForContinuation(invokeId: String): Boolean = {
+  private def waitForContinuation(invokeId: String): Boolean =
     nodes.waitFor(
       s"chain of continuation for InvokeScript Transaction with id = $invokeId is completed"
     )(
-       _.blockSeq(sender.height - 1, sender.height)
+      _.blockSeq(sender.height - 2, sender.height)
         .flatMap(_.transactions)
         .exists { tx =>
           tx._type == ContinuationTransaction.typeId &&
@@ -176,12 +168,12 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     )(
       _.forall(identity)
     )
-  }
 
-  private def checkContinuationChain(invokeId: String, completionHeight: Int): Assertion = {
+  private def assertContinuationChain(invokeId: String, completionHeight: Int): Assertion = {
     val invoke = sender.transactionInfo[DebugStateChanges](invokeId)
     val continuations =
-      sender.blockSeq(invoke.height, completionHeight)
+      sender
+        .blockSeq(invoke.height, completionHeight)
         .flatMap(_.transactions)
         .filter(tx => tx._type == ContinuationTransaction.typeId && tx.invokeScriptTransactionId.contains(invokeId))
 
@@ -192,35 +184,36 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     invoke.timestamp +: continuations.map(_.timestamp) shouldBe sorted
   }
 
-  private def assertTransactionsSendError(txSender: KeyPair): Assertion = {
-    assertBadRequestAndMessage(
-      putData(txSender),
-      "Can't process transaction from the address from which DApp is executing"
-    )
-    assertBadRequestAndMessage(
-      transfer(txSender),
-      "Can't process transaction from the address from which DApp is executing"
-    )
-    assertBadRequestAndMessage(
-      createAlias(txSender),
-      "Can't process transaction from the address from which DApp is executing"
-    )
+  private def assertAbsenceOfTransactions(invokeId: String, completionHeight: Int): Assertion = {
+    val invoke = sender.transactionInfo[DebugStateChanges](invokeId)
+    val transactions =
+      sender
+        .blockSeq(invoke.height, completionHeight)
+        .flatMap(_.transactions)
+
+    val invokeIndex           = transactions.indexWhere(_._type == smart.InvokeScriptTransaction.typeId)
+    val lastContinuationIndex = transactions.lastIndexWhere(_._type == ContinuationTransaction.typeId)
+
+    val otherTransactionsExist =
+      transactions
+        .slice(invokeIndex, lastContinuationIndex)
+        .exists(tx => tx._type != smart.InvokeScriptTransaction.typeId && tx._type != ContinuationTransaction.typeId)
+
+    otherTransactionsExist shouldBe false
   }
 
-  private def assertTransactionsSendSuccess(txSender: KeyPair) = {
-    putData(txSender)
-    transfer(txSender)
-    createAlias(txSender)
+  private def assertExistenceOfTransactions(height: Int, txSender: KeyPair): Assertion = {
+    val transactions = sender.blockSeq(height - 2, height).flatMap(_.transactions)
+    val publicKey    = txSender.toAddress.toString
+    transactions.exists(tx => tx._type == DataTransaction.typeId && tx.sender.get == publicKey) shouldBe true
+    transactions.exists(tx => tx._type == TransferTransaction.typeId && tx.sender.get == publicKey) shouldBe true
+    transactions.exists(tx => tx._type == CreateAliasTransaction.typeId && tx.sender.get == publicKey) shouldBe true
   }
 
-  private def transfer(txSender: KeyPair) =
-    sender.transfer(txSender, thirdAddress, amount = 1, smartMinFee, waitForTx = true)
-
-  private def createAlias(txSender: KeyPair) =
-    sender.createAlias(txSender, s"alias${System.currentTimeMillis()}", smartMinFee, waitForTx = true)
-
-  private def putData(txSender: KeyPair) = {
+  private def sendTransactions(txSender: KeyPair) = {
+    sender.transfer(txSender, thirdAddress, amount = 1, smartMinFee)
+    sender.createAlias(txSender, s"alias${System.currentTimeMillis()}", smartMinFee)
     val data = List(StringDataEntry("key", "value"))
-    sender.putData(txSender, data, calcDataFee(data, TxVersion.V1) + smartFee, waitForTx = true)
+    sender.putData(txSender, data, calcDataFee(data, TxVersion.V1) + smartFee)
   }
 }
