@@ -217,7 +217,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     for (v <- dataTxSupportedVersions) {
       val txSender = if (v < 2) secondKeyPair else thirdKeyPair
       // define first int entry
-      val intEntry = IntegerDataEntry("int", 8)
+      val intEntry = IntegerDataEntry("int", -8)
       val intList  = List(intEntry)
       val tx1      = sender.putData(txSender, intList, calcDataFee(intList, v), version = v).id
       nodes.waitForHeightAriseAndTxPresent(tx1)
