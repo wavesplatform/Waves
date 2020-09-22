@@ -23,7 +23,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, TxVersion, smart}
 import monix.eval.Coeval
-import org.scalatest.{Assertion, OptionValues}
+import org.scalatest.OptionValues
 
 class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   private val activationHeight = 5
