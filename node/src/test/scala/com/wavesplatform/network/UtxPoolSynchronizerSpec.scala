@@ -11,12 +11,11 @@ import com.wavesplatform.utils.Schedulers
 import io.netty.util.HashedWheelTimer
 import monix.execution.atomic.AtomicInt
 import monix.reactive.Observable
-import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
 
 import scala.concurrent.duration._
 
-class UtxPoolSynchronizerSpec extends FreeSpec with Matchers with BeforeAndAfterAll with ScalaFutures {
+class UtxPoolSynchronizerSpec extends FreeSpec with Matchers with BeforeAndAfterAll {
   private[this] val timer     = new HashedWheelTimer
   private[this] val scheduler = Schedulers.timeBoundedFixedPool(timer, 1.second, 2, "test-utx-sync")
 
