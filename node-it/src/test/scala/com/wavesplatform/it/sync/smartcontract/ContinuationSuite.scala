@@ -103,6 +103,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   }
 
   test("hold transactions from DApp address until continuation is completed") {
+    val startHeight = sender.height
     val invoke = sender.invokeScript(
       caller,
       dApp.toAddress.toString,
@@ -114,13 +115,14 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     )
     sendTransactions(dApp)
     waitForContinuation(invoke._1.id)
-    assertAbsenceOfTransactions(invoke._1.id, sender.height)
+    assertAbsenceOfTransactions(invoke._1.id, startHeight, sender.height)
 
     sender.waitForHeight(sender.height + 2)
-    assertExistenceOfTransactions(sender.height, dApp)
+    assertExistenceOfTransactions(dApp, startHeight, sender.height)
   }
 
   test("don't forbid transactions from other addresses while continuation is not completed") {
+    val startHeight = sender.height
     sender.invokeScript(
       caller,
       dApp.toAddress.toString,
@@ -132,7 +134,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     )
     sendTransactions(caller)
     nodes.waitForHeight(sender.height + 2)
-    assertExistenceOfTransactions(sender.height, caller)
+    assertExistenceOfTransactions(caller, startHeight, sender.height)
   }
 
   test("insufficient fee") {
@@ -184,11 +186,11 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     invoke.timestamp +: continuations.map(_.timestamp) shouldBe sorted
   }
 
-  private def assertAbsenceOfTransactions(invokeId: String, completionHeight: Int): Assertion = {
+  private def assertAbsenceOfTransactions(invokeId: String, fromHeight: Int, toHeight: Int): Assertion = {
     val invoke = sender.transactionInfo[DebugStateChanges](invokeId)
     val transactions =
       sender
-        .blockSeq(invoke.height, completionHeight)
+        .blockSeq(fromHeight, toHeight)
         .flatMap(_.transactions)
 
     val invokeIndex           = transactions.indexWhere(_._type == smart.InvokeScriptTransaction.typeId)
@@ -202,8 +204,8 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     otherTransactionsExist shouldBe false
   }
 
-  private def assertExistenceOfTransactions(height: Int, txSender: KeyPair): Assertion = {
-    val transactions = sender.blockSeq(height - 2, height).flatMap(_.transactions)
+  private def assertExistenceOfTransactions(txSender: KeyPair, fromHeight: Int, toHeight: Int): Assertion = {
+    val transactions = sender.blockSeq(fromHeight, toHeight).flatMap(_.transactions)
     val publicKey    = txSender.toAddress.toString
     transactions.exists(tx => tx._type == DataTransaction.typeId && tx.sender.get == publicKey) shouldBe true
     transactions.exists(tx => tx._type == TransferTransaction.typeId && tx.sender.get == publicKey) shouldBe true
