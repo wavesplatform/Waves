@@ -17,7 +17,10 @@ import scala.concurrent.ExecutionContext
 
 case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings)(system: ActorSystem) extends ScorexLogging {
   // Only affects extractScheduler { implicit sc => ... } routes
-  val scheduler = ExecutionContext.fromExecutorService(Executors.newWorkStealingPool(8), log.error("Error in REST API", _))
+  val scheduler = ExecutionContext.fromExecutorService(
+    Executors.newWorkStealingPool((Runtime.getRuntime.availableProcessors() * 2).min(4)),
+    log.error("Error in REST API", _)
+  )
 
   private val redirectToSwagger = redirect("/api-docs/index.html", StatusCodes.PermanentRedirect)
   private val swaggerRoute: Route =
