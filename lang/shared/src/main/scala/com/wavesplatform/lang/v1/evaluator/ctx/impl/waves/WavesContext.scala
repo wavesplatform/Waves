@@ -41,9 +41,7 @@ object WavesContext {
       getIntegerFromStateSelfF,
       getBooleanFromStateSelfF,
       getBinaryFromStateSelfF,
-      getStringFromStateSelfF,
-      assetBalanceSelfF,
-      wavesBalanceSelfF
+      getStringFromStateSelfF
     ) ++ extractedStateSelfFuncs(v)
 
   private val invariableCtx =

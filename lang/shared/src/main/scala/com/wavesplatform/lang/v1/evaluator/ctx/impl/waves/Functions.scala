@@ -374,17 +374,12 @@ object Functions {
       }
     }
 
-  private def assetBalanceV4F(selfCall: Boolean, id: Short): BaseFunction[Environment] = {
-    val args =
-      if (selfCall)
-        Seq(("assetId", BYTESTR))
-      else
-        Seq(("addressOrAlias", addressOrAliasType), ("assetId", BYTESTR))
-
+  val assetBalanceV4F: BaseFunction[Environment] = {
+    val args = Seq(("addressOrAlias", addressOrAliasType), ("assetId", BYTESTR))
     NativeFunction.withEnvironment[Environment](
       "assetBalance",
       10,
-      id,
+      ACCOUNTASSETONLYBALANCE,
       LONG,
       args: _*
     ) {
@@ -394,8 +389,6 @@ object Functions {
           (env.tthis, args) match {
             case (_, (c: CaseObj) :: CONST_BYTESTR(assetId: ByteStr) :: Nil) =>
               env.accountBalanceOf(caseObjToRecipient(c), Some(assetId.arr)).map(_.map(CONST_LONG))
-            case (address: Recipient.Address, CONST_BYTESTR(assetId: ByteStr) :: Nil) if selfCall =>
-              env.accountBalanceOf(address, Some(assetId.arr)).map(_.map(CONST_LONG))
             case (_, xs) =>
               notImplemented[F, EVALUATED](s"assetBalance(a: Address|Alias, u: ByteVector)", xs)
           }
@@ -404,20 +397,12 @@ object Functions {
     }
   }
 
-  val assetBalanceV4F: BaseFunction[Environment]   = assetBalanceV4F(selfCall = false, ACCOUNTASSETONLYBALANCE)
-  val assetBalanceSelfF: BaseFunction[Environment] = assetBalanceV4F(selfCall = true, ACCOUNTASSETONLYBALANCE_SELF)
-
-  private def wavesBalanceF(selfCall: Boolean, id: Short): BaseFunction[Environment] = {
-    val args =
-      if (selfCall)
-        Seq()
-      else
-        Seq(("addressOrAlias", addressOrAliasType))
-
+  val wavesBalanceV4F: BaseFunction[Environment] = {
+    val args = Seq(("addressOrAlias", addressOrAliasType))
     NativeFunction.withEnvironment[Environment](
       "wavesBalance",
       Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 10L, V5 -> 10L),
-      id,
+      ACCOUNTWAVESBALANCE,
       balanceDetailsType,
       args: _*
     ) {
@@ -444,8 +429,6 @@ object Functions {
         override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] = {
           val (env, args) = input
           (env.tthis, args) match {
-            case (address: Recipient.Address, Nil) if selfCall =>
-              wavesBalance(env, address)
             case (_, (c: CaseObj) :: Nil) =>
               wavesBalance(env, caseObjToRecipient(c))
             case (_, xs) =>
@@ -455,9 +438,6 @@ object Functions {
       }
     }
   }
-
-  val wavesBalanceV4F: BaseFunction[Environment]   = wavesBalanceF(selfCall = false, ACCOUNTWAVESBALANCE)
-  val wavesBalanceSelfF: BaseFunction[Environment] = wavesBalanceF(selfCall = true, ACCOUNTWAVESBALANCE_SELF)
 
   def assetInfoF(version: StdLibVersion): BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
