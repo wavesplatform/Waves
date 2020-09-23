@@ -367,7 +367,7 @@ class UtxPoolImpl(
                 onEvent(UtxEvent.TxRemoved(tx, Some(GenericError("Expired"))))
                 r.copy(iterations = r.iterations + 1, removedTransactions = r.removedTransactions + tx.id())
               } else if (TxCheck.isBlockedByContinuation(tx)) {
-                log.debug(s"Transaction ${tx.id()} is blocked due to evaluation of continuation")
+                log.trace(s"Transaction ${tx.id()} is blocked due to evaluation of continuation")
                 r.copy(iterations = r.iterations + 1)
               } else {
                 val newScriptedAddresses = scriptedAddresses(tx)
