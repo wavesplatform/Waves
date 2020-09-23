@@ -4,7 +4,7 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.{DataEntry, Diff, StringDataEntry, diffs}
+import com.wavesplatform.state.{DataEntry, Diff, EmptyDataEntry, StringDataEntry, diffs}
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
 import com.wavesplatform.{BlocksTransactionsHelpers, TransactionGen, history}
 import monix.execution.Scheduler.Implicits.global
@@ -33,24 +33,38 @@ class CommonAccountApiSpec
         data1          = DataTransaction.selfSigned(1.toByte, acc, Seq(entry1), fee, ts).explicitGet()
         data2          = DataTransaction.selfSigned(1.toByte, acc, Seq(entry2), fee, ts).explicitGet()
         data3          = DataTransaction.selfSigned(1.toByte, acc, Seq(entry3), fee, ts).explicitGet()
+        data4          = DataTransaction.selfSigned(2.toByte, acc, Seq(EmptyDataEntry("test"), EmptyDataEntry("test1")), fee, ts).explicitGet()
+        data5          = DataTransaction.selfSigned(2.toByte, acc, Seq(EmptyDataEntry("test2"), entry1, entry2), fee, ts).explicitGet()
         (block1, mbs1) = UnsafeBlocks.unsafeChainBaseAndMicro(history.randomSig, Seq(genesis), Seq(Seq(data1)), acc, 3, ts)
         (block2, mbs2) = UnsafeBlocks.unsafeChainBaseAndMicro(mbs1.last.totalResBlockSig, Seq(data2), Seq(Seq(data3)), acc, 3, ts)
-      } yield (acc, block1, mbs1.head, block2, mbs2.head)
+        (block3, mbs3) = UnsafeBlocks.unsafeChainBaseAndMicro(mbs2.last.totalResBlockSig, Seq(data4), Seq(Seq(data5)), acc, 3, ts)
+      } yield (acc, block1, mbs1.head, block2, mbs2.head, block3, mbs3.head)
 
       forAll(preconditions) {
-        case (acc, block1, mb1, block2, mb2) =>
-          withDomain(domainSettingsWithFS(TestFunctionalitySettings.withFeatures(BlockchainFeatures.NG, BlockchainFeatures.DataTransaction))) { d =>
+        case (acc, block1, mb1, block2, mb2, block3, mb3) =>
+          withDomain(
+            domainSettingsWithFS(
+              TestFunctionalitySettings.withFeatures(
+                BlockchainFeatures.NG,
+                BlockchainFeatures.DataTransaction,
+                BlockchainFeatures.BlockV5
+              )
+            )
+          ) { d =>
             val commonAccountsApi             = CommonAccountsApi(d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, d.blockchainUpdater)
             def dataList(): Set[DataEntry[_]] = commonAccountsApi.dataStream(acc.toAddress, None).toListL.runSyncUnsafe().toSet
 
             d.appendBlock(block1)
-            //dataList() shouldBe empty
             d.appendMicroBlock(mb1)
             dataList() shouldBe Set(entry1)
             d.appendBlock(block2)
             dataList() shouldBe Set(entry1, entry2)
             d.appendMicroBlock(mb2)
             dataList() shouldBe Set(entry1, entry2, entry3)
+            d.appendBlock(block3)
+            dataList() shouldBe Set(entry3)
+            d.appendMicroBlock(mb3)
+            dataList() shouldBe Set(entry1, entry2)
           }
       }
     }
