@@ -21,6 +21,7 @@ import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -354,6 +355,30 @@ package object database extends ScorexLogging {
         ndo.writeShort(num)
     }
 
+    ndo.toByteArray
+  }
+
+  def readStateHash(bs: Array[Byte]): StateHash = {
+    val ndi = newDataInput(bs)
+    val sectionsCount = ndi.readByte()
+    val sections = (0 until sectionsCount).map { _ =>
+      val sectionId = ndi.readByte()
+      val value = ndi.readByteStr(DigestLength)
+      SectionId(sectionId) -> value
+    }
+    val totalHash = ndi.readByteStr(DigestLength)
+    StateHash(totalHash, sections.toMap)
+  }
+
+  def writeStateHash(sh: StateHash): Array[Byte] = {
+    val sorted = sh.sectionHashes.toSeq.sortBy(_._1)
+    val ndo = newDataOutput(crypto.DigestLength + 1 + sorted.length * (1 + crypto.DigestLength))
+    ndo.writeByte(sorted.length)
+    sorted.foreach { case (sectionId, value) =>
+      ndo.writeByte(sectionId.id.toByte)
+      ndo.writeByteStr(value.ensuring(_.arr.length == DigestLength))
+    }
+    ndo.writeByteStr(sh.totalHash.ensuring(_.arr.length == DigestLength))
     ndo.toByteArray
   }
 

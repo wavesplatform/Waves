@@ -374,7 +374,8 @@ abstract class LevelDBWriter private[database] (
       reward: Option[Long],
       hitSource: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult],
-      failedTransactionIds: Set[ByteStr]
+      failedTransactionIds: Set[ByteStr],
+      stateHash: StateHashBuilder.Result
   ): Unit = {
     log.trace(s"Persisting block ${block.id()} at height $height")
     readWrite { rw =>
@@ -569,6 +570,21 @@ abstract class LevelDBWriter private[database] (
       }
 
       rw.put(Keys.hitSource(height), Some(hitSource))
+
+      if (dbSettings.storeStateHashes) {
+        val prevStateHash =
+          if (height == 1) ByteStr.empty
+          else
+            rw.get(Keys.stateHash(height - 1))
+              .fold(
+                throw new IllegalStateException(
+                  s"Couldn't load state hash for ${height - 1}. Please rebuild the state or disable db.store-state-hashes"
+                )
+              )(_.totalHash)
+
+        val newStateHash = stateHash.createStateHash(prevStateHash)
+        rw.put(Keys.stateHash(height), Some(newStateHash))
+      }
     }
 
     log.trace(s"Finished persisting block ${block.id()} at height $height")
@@ -706,6 +722,7 @@ abstract class LevelDBWriter private[database] (
           rw.delete(Keys.blockTransactionsFee(currentHeight))
           rw.delete(Keys.blockReward(currentHeight))
           rw.delete(Keys.wavesAmount(currentHeight))
+          rw.delete(Keys.stateHash(currentHeight))
 
           if (DisableHijackedAliases.height == currentHeight) {
             disabledAliases = DisableHijackedAliases.revert(rw)
@@ -901,6 +918,10 @@ abstract class LevelDBWriter private[database] (
   override def hitSource(height: Int): Option[ByteStr] = readOnly { db =>
     db.get(Keys.hitSource(height))
       .filter(_.arr.length == Block.HitSourceLength)
+  }
+
+  def loadStateHash(height: Int): Option[StateHash] = readOnly { db =>
+    db.get(Keys.stateHash(height))
   }
 
   private def transactionsAtHeight(h: Height): List[(TxNum, Transaction)] = readOnly { db =>

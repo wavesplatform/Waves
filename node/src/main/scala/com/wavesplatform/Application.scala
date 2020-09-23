@@ -367,7 +367,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           mbSyncCacheSizes,
           scoreStatsReporter,
           configRoot,
-          loadBalanceHistory
+          loadBalanceHistory,
+          levelDB.loadStateHash
         ),
         AssetsApiRoute(
           settings.restAPISettings,
