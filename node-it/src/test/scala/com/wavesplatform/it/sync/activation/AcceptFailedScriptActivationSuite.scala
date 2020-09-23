@@ -64,7 +64,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     )
 
     sender.setScript(dAppKP, dAppScript, setScriptFee, waitForTx = true).id
-    nodes.waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
+    nodes.waitForEmptyUtx()
     nodes.waitForHeightArise()
   }
 

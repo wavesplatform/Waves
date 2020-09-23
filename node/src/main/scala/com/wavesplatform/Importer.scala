@@ -94,7 +94,10 @@ object Importer extends ScorexLogging {
       .getOrElse(throw new IllegalArgumentException("Invalid options"))
   }
 
-  def loadSettings(file: File): WavesSettings = Application.loadApplicationConfig(Some(file))
+  def loadSettings(file: File): WavesSettings = {
+    val settings = Application.loadApplicationConfig(Some(file))
+    settings.copy(dbSettings = settings.dbSettings.copy(useBloomFilter = true))
+  }
 
   def initExtensions(
       wavesSettings: WavesSettings,
