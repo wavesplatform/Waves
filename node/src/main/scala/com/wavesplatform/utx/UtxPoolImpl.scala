@@ -22,6 +22,7 @@ import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{Blockchain, ContinuationState, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AlreadyInTheState, GenericError, SenderIsBlacklisted}
+import com.wavesplatform.transaction.TxWithFee.InCustomAsset
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.ReissueTransaction
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -513,10 +514,21 @@ class UtxPoolImpl(
           blockchain.continuationStates
             .exists {
               case (invokeId, _: ContinuationState.InProgress) =>
-                val txSender     = authorized.sender.toAddress
-                val invoke       = blockchain.transactionInfo(invokeId).get._2.asInstanceOf[InvokeScriptTransaction]
-                val invokeSender = blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
-                invokeSender == txSender
+                val txSender    = authorized.sender.toAddress
+                val invoke      = blockchain.transactionInfo(invokeId).get._2.asInstanceOf[InvokeScriptTransaction]
+                val dAppAddress = blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
+                lazy val specificCases =
+                  authorized match {
+                    case e: ExchangeTransaction =>
+                      dAppAddress == e.order1.sender.toAddress || dAppAddress == e.order2.sender.toAddress
+                    case i: InvokeScriptTransaction =>
+                      dAppAddress == blockchain.resolveAlias(i.dAppAddressOrAlias).explicitGet()
+                    case a: InCustomAsset =>
+                      a.assetFee._1.fold(onWaves = false)(asset => dAppAddress == blockchain.assetDescription(asset).get.issuer.toAddress)
+                    case _ =>
+                      false
+                  }
+                dAppAddress == txSender || specificCases
               case _ =>
                 false
             }

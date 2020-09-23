@@ -207,7 +207,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         otherTransactionsExist shouldBe false
     }
 
-  private def assertExistenceOfTransactions(txSender: KeyPair, fromHeight: Int, toHeight: Int): Unit = {
+  private def assertExistenceOfTransactions(txSender: KeyPair, fromHeight: Int, toHeight: Int): Unit =
     nodes.foreach {
       node =>
         val transactions = node.blockSeq(fromHeight, toHeight).flatMap(_.transactions)
@@ -216,7 +216,6 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         transactions.exists(tx => tx._type == TransferTransaction.typeId && tx.sender.get == publicKey) shouldBe true
         transactions.exists(tx => tx._type == CreateAliasTransaction.typeId && tx.sender.get == publicKey) shouldBe true
     }
-  }
 
   private def sendTransactions(txSender: KeyPair) = {
     sender.transfer(txSender, thirdAddress, amount = 1, smartMinFee)
