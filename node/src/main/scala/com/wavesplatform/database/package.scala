@@ -7,7 +7,7 @@ import java.util.{Map => JMap}
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
-import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
+import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.google.protobuf.{ByteString, CodedInputStream, WireFormat}
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.BlockMeta
@@ -155,21 +155,22 @@ package object database extends ScorexLogging {
     val s = Seq.newBuilder[String]
 
     while (i < data.length) {
-      val len = Shorts.fromByteArray(data.drop(i))
+      val len = ((data(i) << 8) | (data(i + 1) & 0xFF)).toShort // Optimization
       s += new String(data, i + 2, len, UTF_8)
       i += (2 + len)
     }
     s.result()
   }
 
-  def writeStrings(strings: Seq[String]): Array[Byte] =
-    strings
-      .foldLeft(ByteBuffer.allocate(strings.map(_.utf8Bytes.length + 2).sum)) {
-        case (b, s) =>
-          val bytes = s.utf8Bytes
-          b.putShort(bytes.length.toShort).put(bytes)
+  def writeStrings(strings: Seq[String]): Array[Byte] = {
+    val utfBytes = strings.toVector.map(_.utf8Bytes)
+    utfBytes
+      .foldLeft(ByteBuffer.allocate(utfBytes.map(_.length + 2).sum)) {
+        case (buf, bytes) =>
+          buf.putShort(bytes.length.toShort).put(bytes)
       }
       .array()
+  }
 
   def writeLeaseBalance(lb: LeaseBalance): Array[Byte] = {
     val ndo = newDataOutput()

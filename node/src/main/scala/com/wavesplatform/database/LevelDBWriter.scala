@@ -638,6 +638,7 @@ abstract class LevelDBWriter private[database] (
               rw.delete(Keys.data(addressId, k)(currentHeight))
               rw.filterHistory(Keys.dataHistory(address, k), currentHeight)
             }
+            rw.delete(Keys.changedDataKeys(currentHeight, addressId))
 
             balancesToInvalidate += (address -> Waves)
             rw.delete(Keys.wavesBalance(addressId)(currentHeight))

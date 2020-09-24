@@ -134,7 +134,7 @@ object Importer extends ScorexLogging {
               blockchainUpdater,
               utxPool,
               wallet,
-              _ => TracedResult.wrapE(Left(GenericError("Not implemented during import"))),
+              _ => Future.successful(TracedResult.wrapE(Left(GenericError("Not implemented during import")))),
               Application.loadBlockAt(db, blockchainUpdater)
             )
           override def blocksApi: CommonBlocksApi =

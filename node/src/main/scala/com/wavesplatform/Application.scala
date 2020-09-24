@@ -202,17 +202,18 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     // Extensions start
     val extensionContext: Context = new Context {
-      override def settings: WavesSettings                                                       = app.settings
-      override def blockchain: Blockchain                                                        = app.blockchainUpdater
-      override def rollbackTo(blockId: ByteStr): Task[Either[ValidationError, DiscardedBlocks]]  = rollbackTask(blockId, returnTxsToUtx = false)
-      override def time: Time                                                                    = app.time
-      override def wallet: Wallet                                                                = app.wallet
-      override def utx: UtxPool                                                                  = utxStorage
-      override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] = utxSynchronizer.publish(tx)
-      override def spendableBalanceChanged: Observable[(Address, Asset)]                         = app.spendableBalanceChanged
-      override def actorSystem: ActorSystem                                                      = app.actorSystem
-      override def utxEvents: Observable[UtxEvent]                                               = app.utxEvents
-      override def blockchainUpdated: Observable[BlockchainUpdated]                              = app.blockchainUpdated
+      override def settings: WavesSettings                                                      = app.settings
+      override def blockchain: Blockchain                                                       = app.blockchainUpdater
+      override def rollbackTo(blockId: ByteStr): Task[Either[ValidationError, DiscardedBlocks]] = rollbackTask(blockId, returnTxsToUtx = false)
+      override def time: Time                                                                   = app.time
+      override def wallet: Wallet                                                               = app.wallet
+      override def utx: UtxPool                                                                 = utxStorage
+      override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] =
+        Await.result(utxSynchronizer.publish(tx), Duration.Inf) // TODO: Replace with async if possible
+      override def spendableBalanceChanged: Observable[(Address, Asset)] = app.spendableBalanceChanged
+      override def actorSystem: ActorSystem                              = app.actorSystem
+      override def utxEvents: Observable[UtxEvent]                       = app.utxEvents
+      override def blockchainUpdated: Observable[BlockchainUpdated]      = app.blockchainUpdated
 
       override val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
         blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
@@ -385,9 +386,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         RewardApiRoute(blockchainUpdater)
       )
 
-      val combinedRoute = CompositeHttpService(apiRoutes, settings.restAPISettings)(actorSystem).loggingCompositeRoute
+      val httpService = CompositeHttpService(apiRoutes, settings.restAPISettings)(actorSystem)
+      val combinedRoute = httpService.loggingCompositeRoute
       val httpFuture    = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       serverBinding = Await.result(httpFuture, 20.seconds)
+      serverBinding.whenTerminated.foreach(_ => httpService.scheduler.shutdown())
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
     }
 
