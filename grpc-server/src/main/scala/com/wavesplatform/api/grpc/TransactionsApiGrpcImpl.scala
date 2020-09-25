@@ -102,11 +102,11 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
     throw new StatusRuntimeException(Status.UNIMPLEMENTED)
   }
 
-  override def broadcast(tx: PBSignedTransaction): Future[PBSignedTransaction] = Future {
-    val result = for {
-      txv <- tx.toVanilla
-      _   <- commonApi.broadcastTransaction(txv).resultE
-    } yield tx
-    result.explicitGetErr()
-  }
+  override def broadcast(tx: PBSignedTransaction): Future[PBSignedTransaction] =
+    (for {
+      maybeTx <- Future(tx.toVanilla)
+      vtx     <- maybeTx.toFuture
+      result  <- commonApi.broadcastTransaction(vtx)
+      _       <- result.resultE.toFuture
+    } yield tx).wrapErrors
 }

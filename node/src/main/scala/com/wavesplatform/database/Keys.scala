@@ -178,4 +178,7 @@ object Keys {
     Key(ContinuationStates, invokeTxId.arr, readContinuationState, writeContinuationState)
 
   def bloomFilterChecksum(filterName: String): Key[Array[Byte]] = Key(KeyTags.BloomFilterChecksum, filterName.utf8Bytes, identity, identity)
+
+  def stateHash(height: Int): Key[Option[StateHash]] =
+    Key.opt(StateHash, h(height), readStateHash, writeStateHash)
 }

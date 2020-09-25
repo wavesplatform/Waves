@@ -13,7 +13,7 @@ import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.{Asset, ScriptExecutionFailed, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
@@ -178,11 +178,14 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       hitSource: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult],
       failedTransactionIds: Set[ByteStr],
+      stateHash: StateHashBuilder.Result,
       continuationStates: Map[ByteStr, ContinuationState]
   ): Unit
 
   override def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], hitSource: ByteStr, block: Block): Unit = {
     val newHeight = current._1 + 1
+
+    val stateHash = new StateHashBuilder
 
     val newAddresses = Set.newBuilder[Address]
     newAddresses ++= diff.portfolios.keys.filter(addressIdCache.get(_).isEmpty)
@@ -233,6 +236,52 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
     current = (newHeight, current._2 + block.blockScore(), Some(block))
 
+    for {
+      (address, assets) <- updatedBalances
+      (asset, balance)  <- assets
+    } asset match {
+      case Waves              => stateHash.addWavesBalance(address, balance)
+      case asset: IssuedAsset => stateHash.addAssetBalance(address, asset, balance)
+    }
+
+    updatedLeaseBalances foreach {
+      case (address, balance) =>
+        stateHash.addLeaseBalance(address, balance.in, balance.out)
+    }
+
+    for {
+      (address, data) <- diff.accountData
+      entry           <- data.data.values
+    } stateHash.addDataEntry(address, entry)
+
+    diff.aliases.foreach {
+      case (alias, address) =>
+        stateHash.addAlias(address, alias.name)
+    }
+
+    for {
+      (address, sv) <- diff.scripts
+      script = sv.map(_.script)
+    } stateHash.addAccountScript(address, script)
+
+    for {
+      (address, sv) <- diff.assetScripts
+      script = sv.map(_.script)
+    } stateHash.addAssetScript(address, script)
+
+    diff.leaseState.foreach {
+      case (leaseId, status) =>
+        stateHash.addLeaseStatus(TransactionId @@ leaseId, status)
+    }
+
+    diff.sponsorship.foreach {
+      case (asset, sponsorship) =>
+        stateHash.addSponsorship(asset, sponsorship match {
+          case SponsorshipValue(minFee) => minFee
+          case SponsorshipNoInfo        => 0L
+        })
+    }
+
     doAppend(
       block,
       carryFee,
@@ -254,6 +303,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       hitSource,
       diff.scriptResults,
       failedTransactionIds,
+      stateHash.result(),
       diff.continuationStates
     )
 

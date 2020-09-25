@@ -148,7 +148,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
       assertGrpcError(
         sender.broadcastIssue(issuer, assetName, someAssetAmount, 2, reissuable = true, issueFee, script = Left(Base64.decode(script))),
         error,
-        Code.INTERNAL
+        Code.INVALID_ARGUMENT
       )
     }
   }
