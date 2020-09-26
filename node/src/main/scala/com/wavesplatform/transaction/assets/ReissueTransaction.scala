@@ -17,10 +17,10 @@ case class ReissueTransaction(
     version: TxVersion,
     sender: PublicKey,
     asset: IssuedAsset,
-    quantity: Long,
+    quantity: TxAmount,
     reissuable: Boolean,
-    fee: Long,
-    timestamp: Long,
+    fee: TxAmount,
+    timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
 ) extends VersionedTransaction

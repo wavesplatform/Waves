@@ -2,9 +2,10 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.it._
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{LoadTest, Node, NodeConfigs, ReportingTestName, TransferSending}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.{BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.TxVersion
@@ -12,7 +13,6 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
-import com.wavesplatform.common.utils.EitherExt2
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -44,26 +44,20 @@ class RollbackSuite
 
     val startHeight = sender.height
 
-    Await.result(processRequests(generateTransfersToRandomAddresses(190, nodeAddresses)), 2.minutes)
-
+    val transactionIds = Await.result(processRequests(generateTransfersToRandomAddresses(190, nodeAddresses)), 2.minutes).map(_.id)
     nodes.waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
-
     nodes.waitForHeightArise()
 
     val stateHeight        = sender.height
     val stateAfterFirstTry = nodes.head.debugStateAt(stateHeight)
 
     nodes.rollback(startHeight)
-
     nodes.waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
+    val maxHeight = sender.transactionStatus(transactionIds).flatMap(_.height).max
+    sender.waitForHeight(maxHeight + 2) // so that NG fees won't affect miner's balances
 
-    nodes.waitForHeightArise()
-
-    val stateAfterSecondTry = nodes.head.debugStateAt(stateHeight)
-
-    assert(stateAfterSecondTry.size == stateAfterFirstTry.size)
-
-    stateAfterSecondTry should contain theSameElementsAs stateAfterFirstTry
+    val stateAfterSecondTry = nodes.head.debugStateAt(maxHeight + 1)
+    stateAfterSecondTry.toSet shouldBe stateAfterFirstTry.toSet
   }
 
   test("Just rollback transactions") {

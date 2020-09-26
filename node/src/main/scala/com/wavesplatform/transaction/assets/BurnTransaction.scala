@@ -17,9 +17,9 @@ final case class BurnTransaction(
     version: TxVersion,
     sender: PublicKey,
     asset: IssuedAsset,
-    quantity: Long,
-    fee: Long,
-    timestamp: Long,
+    quantity: TxAmount,
+    fee: TxAmount,
+    timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
 ) extends ProvenTransaction
