@@ -1,12 +1,12 @@
 package com.wavesplatform.mining
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
+import com.wavesplatform.state.appender.{BlockAppender, MicroblockAppender}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{BalanceSnapshot, BlockMinerInfo, Blockchain, NG}
 import com.wavesplatform.transaction.BlockchainUpdater
@@ -16,7 +16,6 @@ import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{TransactionGen, WithDB}
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
-import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.Scheduler.Implicits.global
 import org.scalamock.scalatest.PathMockFactory
@@ -54,17 +53,18 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PathMockFactory wi
       val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
       val wallet      = Wallet(WalletSettings(None, Some("123"), None))
       val utxPool     = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, wavesSettings.utxSettings)
-      val pos         = PoSSelector(blockchainUpdater, wavesSettings.synchronizationSettings)
       new MinerImpl(
         allChannels,
         blockchainUpdater,
-        wavesSettings.copy(blockchainSettings = blockchainSettings),
+        wavesSettings.minerSettings,
+        wavesSettings.featuresSettings.supported.toSet,
+        wavesSettings.rewardsSettings.desired,
         ntpTime,
         utxPool,
         wallet,
-        pos,
         scheduler,
-        scheduler
+        block => BlockAppender(blockchainUpdater, ntpTime, utxPool, PoSSelector(blockchainUpdater), scheduler)(block),
+        mb => MicroblockAppender(blockchainUpdater, utxPool, scheduler)(mb).map(_.fold(_ => throw new Exception(), id => id))
       )
     }
 
@@ -103,11 +103,8 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PathMockFactory wi
     (blockchainUpdater.balanceSnapshots _).when(*, *, *).returning(Seq(BalanceSnapshot(1, ENOUGH_AMT, 0, 0)))
 
     val account       = accountGen.sample.get
-    val generateBlock = generateBlockTask(miner)(account)
+    val generateBlock = miner.generateBlockTask(account, blockchainUpdater)
     generateBlock.runSyncUnsafe() shouldBe ((): Unit)
     minedBlock.header.featureVotes shouldBe empty
   }
-
-  private[this] def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] =
-    miner.generateBlockTask(account, None)
 }

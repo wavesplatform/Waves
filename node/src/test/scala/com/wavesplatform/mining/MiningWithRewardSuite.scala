@@ -6,15 +6,17 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
-import com.wavesplatform.consensus.PoSSelector
+import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
 import com.wavesplatform.database.{Keys, TestStorageFactory}
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
+import com.wavesplatform.state.appender.{BlockAppender, MicroblockAppender}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NG}
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.TxValidationError.MicroBlockAppendError
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction}
 import com.wavesplatform.utx.UtxPoolImpl
@@ -40,7 +42,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
   it should "generate valid empty blocks of version 4" in {
     withEnv(Seq.empty) {
       case Env(_, account, miner, blockchain) =>
-        val generateBlock = generateBlockTask(miner)(account)
+        val generateBlock = miner.generateBlockTask(account, blockchain)
         val oldBalance    = blockchain.balance(account.toAddress)
         val newBalance    = oldBalance + 2 * settings.blockchainSettings.rewardsSettings.initial
         for {
@@ -58,7 +60,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
   it should "generate valid empty block of version 4 after block of version 3" in {
     withEnv(Seq((ts, reference, _) => TestBlock.create(time = ts, ref = reference, txs = Seq.empty, version = Block.NgBlockVersion))) {
       case Env(_, account, miner, blockchain) =>
-        val generateBlock = generateBlockTask(miner)(account)
+        val generateBlock = miner.generateBlockTask(account, blockchain)
         val oldBalance    = blockchain.balance(account.toAddress)
         val newBalance    = oldBalance + settings.blockchainSettings.rewardsSettings.initial
 
@@ -95,7 +97,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
 
     withEnv(bps, txs) {
       case Env(_, account, miner, blockchain) =>
-        val generateBlock = generateBlockTask(miner)(account)
+        val generateBlock = miner.generateBlockTask(account, blockchain)
         val oldBalance    = blockchain.balance(account.toAddress)
         val newBalance    = oldBalance + settings.blockchainSettings.rewardsSettings.initial - 10 * Constants.UnitsInWave
 
@@ -120,12 +122,23 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
       case (blockchainUpdater, _) =>
         for {
           _ <- Task.unit
-          pos          = PoSSelector(blockchainUpdater, settings.synchronizationSettings)
-          utxPool      = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, settings.utxSettings)
-          scheduler    = Scheduler.singleThread("appender")
-          allChannels  = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-          wallet       = Wallet(WalletSettings(None, Some("123"), None))
-          miner        = new MinerImpl(allChannels, blockchainUpdater, settings, ntpTime, utxPool, wallet, pos, scheduler, scheduler)
+          utxPool     = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, settings.utxSettings)
+          scheduler   = Scheduler.singleThread("appender")
+          allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
+          wallet      = Wallet(WalletSettings(None, Some("123"), None))
+          miner = new MinerImpl(
+            allChannels,
+            blockchainUpdater,
+            settings.minerSettings,
+            settings.featuresSettings.supported.toSet,
+            settings.rewardsSettings.desired,
+            ntpTime,
+            utxPool,
+            wallet,
+            scheduler,
+            block => BlockAppender(blockchainUpdater, ntpTime, utxPool, PoSSelector(blockchainUpdater), scheduler)(block),
+            mb => MicroblockAppender(blockchainUpdater, utxPool, scheduler)(mb).map(_.fold(_ => throw new Exception(), id => id))
+          )
           account      = createAccount
           ts           = ntpTime.correctedTime() - 60000
           genesisBlock = TestBlock.create(ts + 2, List(GenesisTransaction.create(account.toAddress, ENOUGH_AMT, ts + 1).explicitGet()))
@@ -143,8 +156,6 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
           r <- f(env)
         } yield r
     }
-
-  private def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] = miner.generateBlockTask(account, None)
 
   private def forgeBlock(miner: MinerImpl)(account: KeyPair): Either[String, (Block, MiningConstraint)] = miner.forgeBlock(account)
 

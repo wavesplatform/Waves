@@ -17,7 +17,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WalletSettings, WavesSettings}
-import com.wavesplatform.state.appender.BlockAppender
+import com.wavesplatform.state.appender.{BlockAppender, MicroblockAppender}
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NG, diffs}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -53,10 +53,8 @@ class BlockV5Test
   import BlockV5Test._
 
   private val testTime = new TestTime(1)
-  def shiftTime(miner: MinerImpl, minerAcc: KeyPair): Unit = {
-    val offset = miner.getNextBlockGenerationOffset(minerAcc).explicitGet()
-    testTime.advance(offset + 1.milli)
-  }
+  def shiftTime(miner: MinerImpl, minerAcc: KeyPair): Unit =
+    testTime.setTime(miner.nextBlockTime(minerAcc).explicitGet() + 1)
 
   "Proto block" should "be serialized" in {
     val features = Seq(534, 3, 33, 5, 1, 0, 12343242).map(_.toShort)
@@ -471,14 +469,29 @@ class BlockV5Test
   private def withMiner(blockchain: Blockchain with BlockchainUpdater with NG, time: Time, settings: WavesSettings = testSettings)(
       f: (MinerImpl, Appender, Scheduler) => Unit
   ): Unit = {
-    val pos               = PoSSelector(blockchain, settings.synchronizationSettings)
+    val pos               = PoSSelector(blockchain)
     val allChannels       = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val wallet            = Wallet(WalletSettings(None, Some("123"), None))
     val utxPool           = new UtxPoolImpl(time, blockchain, Observer.stopped, settings.utxSettings)
     val minerScheduler    = Scheduler.singleThread("miner")
     val appenderScheduler = Scheduler.singleThread("appender")
-    val miner             = new MinerImpl(allChannels, blockchain, settings, time, utxPool, wallet, pos, minerScheduler, appenderScheduler)
-    val blockAppender     = BlockAppender(blockchain, time, utxPool, pos, appenderScheduler) _
+    val miner = new MinerImpl(
+      allChannels,
+      blockchain,
+      settings.minerSettings,
+      settings.featuresSettings.supported.toSet,
+      settings.rewardsSettings.desired,
+      time,
+      utxPool,
+      wallet,
+      minerScheduler,
+      block => BlockAppender(blockchain, time, utxPool, pos, appenderScheduler)(block),
+      microBlock =>
+        MicroblockAppender(blockchain, utxPool, appenderScheduler)(microBlock).flatMap {
+          case _ => ???
+        }
+    )
+    val blockAppender = BlockAppender(blockchain, time, utxPool, pos, appenderScheduler) _
     f(miner, blockAppender, appenderScheduler)
   }
 }

@@ -10,7 +10,6 @@ case class MinerSettings(
     intervalAfterLastBlockThenGenerationIsAllowed: FiniteDuration,
     noQuorumMiningDelay: FiniteDuration,
     microBlockInterval: FiniteDuration,
-    minimalBlockGenerationOffset: FiniteDuration,
     maxTransactionsInMicroBlock: Int,
     minMicroBlockAge: FiniteDuration
 ) {

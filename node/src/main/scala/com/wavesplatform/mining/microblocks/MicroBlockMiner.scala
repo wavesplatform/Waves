@@ -1,11 +1,11 @@
 package com.wavesplatform.mining.microblocks
 
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.mining.{MinerDebugInfo, MiningConstraint}
 import com.wavesplatform.settings.MinerSettings
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
@@ -24,11 +24,11 @@ object MicroBlockMiner {
   def apply(
       setDebugState: MinerDebugInfo.State => Unit,
       allChannels: ChannelGroup,
-      blockchainUpdater: BlockchainUpdater with Blockchain,
+      blockchainUpdater: Blockchain,
       utx: UtxPool,
       settings: MinerSettings,
       minerScheduler: SchedulerService,
-      appenderScheduler: SchedulerService
+      appendMicroblock: MicroBlock => Task[BlockId]
   ): MicroBlockMiner =
     new MicroBlockMinerImpl(
       setDebugState,
@@ -37,6 +37,6 @@ object MicroBlockMiner {
       utx,
       settings,
       minerScheduler,
-      appenderScheduler
+      appendMicroblock
     )
 }

@@ -26,6 +26,7 @@ import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.database.{DBExt, Keys, openDB}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{History, StorageFactory}
@@ -39,6 +40,7 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height}
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.Schedulers._
@@ -179,10 +181,25 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
 
-    val pos = PoSSelector(blockchainUpdater, settings.synchronizationSettings)
+    val pos = PoSSelector(blockchainUpdater)
 
     if (settings.minerSettings.enable)
-      miner = new MinerImpl(allChannels, blockchainUpdater, settings, time, utxStorage, wallet, pos, minerScheduler, appenderScheduler)
+      miner = new MinerImpl(
+        allChannels,
+        blockchainUpdater,
+        settings.minerSettings,
+        settings.featuresSettings.supported.toSet,
+        settings.rewardsSettings.desired,
+        time,
+        utxStorage,
+        wallet,
+        minerScheduler,
+        block => BlockAppender(blockchainUpdater, time, utxStorage, pos, appenderScheduler)(block),
+        microBlock =>
+          MicroblockAppender(blockchainUpdater, utxStorage, appenderScheduler)(microBlock).flatMap {
+            case _ => ???
+          }
+      )
 
     val processBlock =
       BlockAppender(blockchainUpdater, time, utxStorage, pos, allChannels, peerDatabase, appenderScheduler) _
@@ -407,7 +424,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         RewardApiRoute(blockchainUpdater)
       )
 
-      val httpService = CompositeHttpService(apiRoutes, settings.restAPISettings)(actorSystem)
+      val httpService   = CompositeHttpService(apiRoutes, settings.restAPISettings)(actorSystem)
       val combinedRoute = httpService.loggingCompositeRoute
       val httpFuture    = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       serverBinding = Await.result(httpFuture, 20.seconds)

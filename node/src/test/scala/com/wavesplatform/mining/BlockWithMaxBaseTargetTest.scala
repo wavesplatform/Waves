@@ -20,10 +20,7 @@ import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
 import com.wavesplatform.utils.BaseTargetReachedMaximum
 import com.wavesplatform.utx.UtxPoolImpl
-import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{TransactionGen, WithDB}
-import io.netty.channel.group.DefaultChannelGroup
-import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
@@ -36,47 +33,6 @@ import scala.concurrent.duration._
 class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with TransactionGen with DBCacheSettings {
 
   "base target limit" - {
-    "node should stop if base target greater than maximum in block creation " in {
-      withEnv {
-        case Env(settings, pos, bcu, utxPoolStub, scheduler, account, lastBlock) =>
-          var stopReasonCode = 0
-
-          val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-          val wallet      = Wallet(WalletSettings(None, Some("123"), None))
-          val miner =
-            new MinerImpl(allChannels, bcu, settings, ntpTime, utxPoolStub, wallet, pos, scheduler, scheduler)
-
-          val signal = new Semaphore(1)
-          signal.acquire()
-
-          System.setSecurityManager(new SecurityManager {
-            override def checkPermission(perm: Permission): Unit = {}
-
-            override def checkPermission(perm: Permission, context: Object): Unit = {}
-
-            override def checkExit(status: Int): Unit = signal.synchronized {
-              super.checkExit(status)
-              stopReasonCode = status
-              if (status == BaseTargetReachedMaximum.code)
-                signal.release()
-              throw new SecurityException("System exit is not allowed")
-            }
-          })
-
-          try {
-            miner.forgeBlock(account)
-          } catch {
-            case _: SecurityException => // NOP
-          }
-
-          signal.tryAcquire(10, TimeUnit.SECONDS)
-
-          stopReasonCode shouldBe BaseTargetReachedMaximum.code
-
-          System.setSecurityManager(null)
-      }
-    }
-
     "node should stop if base target greater than maximum in block append" in {
       withEnv {
         case Env(settings, pos, bcu, utxPoolStub, scheduler, _, lastBlock) =>
@@ -132,7 +88,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
     )
 
     val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
-    val pos = PoSSelector(bcu, settings.synchronizationSettings)
+    val pos = PoSSelector(bcu)
 
     val utxPoolStub                        = new UtxPoolImpl(ntpTime, bcu, ignoreSpendableBalanceChanged, settings0.utxSettings)
     val schedulerService: SchedulerService = Scheduler.singleThread("appender")

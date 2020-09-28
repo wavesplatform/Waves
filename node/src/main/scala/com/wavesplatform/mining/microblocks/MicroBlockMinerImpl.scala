@@ -10,8 +10,7 @@ import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl._
 import com.wavesplatform.network.{MicroBlockInv, _}
 import com.wavesplatform.settings.MinerSettings
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.appender.MicroblockAppender
-import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.utx.UtxPool.PackStrategy
@@ -25,11 +24,11 @@ import scala.concurrent.duration._
 class MicroBlockMinerImpl(
     setDebugState: MinerDebugInfo.State => Unit,
     allChannels: ChannelGroup,
-    blockchainUpdater: BlockchainUpdater with Blockchain,
+    blockchainUpdater: Blockchain,
     utx: UtxPool,
     settings: MinerSettings,
     minerScheduler: SchedulerService,
-    appenderScheduler: SchedulerService
+    appendMicroblock: MicroBlock => Task[BlockId]
 ) extends MicroBlockMiner
     with ScorexLogging {
 
@@ -111,7 +110,7 @@ class MicroBlockMinerImpl(
             .leftWiden[Throwable]
             .liftTo[Task]
           (signedBlock, microBlock) = blocks
-          blockId <- appendMicroBlock(microBlock)
+          blockId <- appendMicroblock(microBlock)
           _       <- broadcastMicroBlock(account, microBlock, blockId)
         } yield {
           if (updatedTotalConstraint.isFull) Stop
@@ -131,13 +130,6 @@ class MicroBlockMinerImpl(
 
   private def broadcastMicroBlock(account: KeyPair, microBlock: MicroBlock, blockId: BlockId): Task[Unit] =
     Task(if (allChannels != null) allChannels.broadcast(MicroBlockInv(account, blockId, microBlock.reference)))
-
-  private def appendMicroBlock(microBlock: MicroBlock): Task[BlockId] =
-    MicroblockAppender(blockchainUpdater, utx, appenderScheduler)(microBlock)
-      .flatMap {
-        case Left(err) => Task.raiseError(MicroBlockAppendError(microBlock, err))
-        case Right(v)  => Task.now(v)
-      }
 
   private def forgeBlocks(
       account: KeyPair,

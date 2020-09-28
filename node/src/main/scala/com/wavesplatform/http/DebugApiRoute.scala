@@ -163,10 +163,10 @@ case class DebugApiRoute(
       wallet.privateKeyAccounts
         .filterNot(account => blockchain.hasAccountScript(account.toAddress))
         .map { account =>
-          (account.toAddress, miner.getNextBlockGenerationOffset(account))
+          (account.toAddress, miner.nextBlockTime(account))
         }
         .collect {
-          case (address, Right(offset)) =>
+          case (address, Right(blockTime)) =>
             AccountMiningInfo(
               address.stringRepr,
               blockchain.effectiveBalance(
@@ -174,7 +174,7 @@ case class DebugApiRoute(
                 ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(blockchain.height),
                 blockchain.microblockIds.lastOption
               ),
-              System.currentTimeMillis() + offset.toMillis
+              blockTime
             )
         }
     )
