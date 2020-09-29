@@ -10,7 +10,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
 import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult}
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, ContinuationTransaction}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{ApplicationStatus, Asset, CreateAliasTransaction, Transaction}
 import com.wavesplatform.utx.UtxPool
@@ -50,6 +50,8 @@ trait CommonTransactionsApi {
   ): Observable[TransactionMeta]
 
   def transactionProofs(transactionIds: List[ByteStr]): List[TransactionProof]
+
+  def continuations(invokeTransactionId: ByteStr): List[ByteStr] 
 }
 
 object CommonTransactionsApi {
@@ -123,5 +125,13 @@ object CommonTransactionsApi {
         (meta, allTransactions)  <- blockAt(height) if meta.header.version >= Block.ProtoBlockVersion
         transactionProof         <- block.transactionProof(transaction, allTransactions)
       } yield transactionProof
+
+    override def continuations(invokeTransactionId: ByteStr): List[ByteStr] = {
+      def cId(sern: Int): ByteStr = {
+         ContinuationTransaction(invokeTransactionId, 0L, sern).id()
+      }
+      def cts(sern: Int): LazyList[ByteStr] = cId(sern) #:: cts(sern + 1)
+      cts(0).takeWhile(blockchain.transactionMeta(_).nonEmpty).toList
+    }
   }
 }

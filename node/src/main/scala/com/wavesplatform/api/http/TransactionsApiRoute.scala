@@ -75,12 +75,17 @@ case class TransactionsApiRoute(
   private def loadTransactionStatus(id: ByteStr): JsObject = {
     import Status._
     val statusJson = blockchain.transactionInfo(id) match {
-      case Some((height, _, succeeded)) =>
+      case Some((height, t, succeeded)) =>
+        val enrich = t match {
+          case t: smart.InvokeScriptTransaction => Json.obj("сontinuationTtansactionIds" -> commonApi.continuations(t.id()).map(_.toString))
+          case t: smart.ContinuationTransaction => Json.obj("сontinuationTtansactionIds" -> commonApi.continuations(t.invokeScriptTransactionId).map(_.toString))
+          case _ => Json.obj()
+        }
         Json.obj(
           "status"        -> Confirmed,
           "height"        -> height,
           "confirmations" -> (blockchain.height - height).max(0)
-        ) ++ applicationStatusJsField(isBlockV5(height), succeeded)
+        ) ++ applicationStatusJsField(isBlockV5(height), succeeded) ++ enrich
       case None =>
         commonApi.unconfirmedTransactionById(id) match {
           case Some(_) => Json.obj("status" -> Unconfirmed)
