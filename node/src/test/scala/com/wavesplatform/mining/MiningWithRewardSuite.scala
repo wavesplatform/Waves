@@ -6,7 +6,6 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
-import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
 import com.wavesplatform.database.{Keys, TestStorageFactory}
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
@@ -16,7 +15,6 @@ import com.wavesplatform.state.appender.{BlockAppender, MicroblockAppender}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NG}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxValidationError.MicroBlockAppendError
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction}
 import com.wavesplatform.utx.UtxPoolImpl
@@ -136,7 +134,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
             utxPool,
             wallet,
             scheduler,
-            block => BlockAppender(blockchainUpdater, ntpTime, utxPool, PoSSelector(blockchainUpdater), scheduler)(block),
+            block => BlockAppender(blockchainUpdater, ntpTime, utxPool, scheduler, settings.synchronizationSettings)(block),
             mb => MicroblockAppender(blockchainUpdater, utxPool, scheduler)(mb).map(_.fold(_ => throw new Exception(), id => id))
           )
           account      = createAccount

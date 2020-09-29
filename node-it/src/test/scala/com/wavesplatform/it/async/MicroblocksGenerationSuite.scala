@@ -43,13 +43,16 @@ object MicroblocksGenerationSuite {
   private val ConfigOverrides = ConfigFactory.parseString(s"""waves {
                                                              |    miner {
                                                              |      quorum = 0
-                                                             |      minimal-block-generation-offset = 1m
                                                              |      micro-block-interval = 3s
                                                              |      max-transactions-in-key-block = 0
                                                              |      max-transactions-in-micro-block = $txsInMicroBlock
                                                              |    }
                                                              |
-                                                             |    blockchain.custom.functionality.pre-activated-features.2 = 0
+                                                             |    blockchain.custom.functionality {
+                                                             |      pre-activated-features.2 = 0
+                                                             |      min-block-time = 1m
+                                                             |    }
+                                                             |
                                                              |    features.supported = [2]
                                                              |}""".stripMargin)
 }

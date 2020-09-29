@@ -21,18 +21,17 @@ import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.database.{DBExt, Keys, openDB}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{History, StorageFactory}
 import com.wavesplatform.http.{DebugApiRoute, NodeApiRoute}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.Metrics
+import com.wavesplatform.mining.microblocks.MicroBlockAppendError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo, MinerImpl}
 import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
@@ -40,7 +39,6 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height}
-import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.Schedulers._
@@ -113,15 +111,20 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   // update triggers combined into one instance
   private var triggers = Seq.empty[BlockchainUpdateTriggers]
   private val triggersCombined = new BlockchainUpdateTriggers {
-    override def onProcessBlock(block: Block, diff: BlockDiffer.DetailedDiff, minerReward: Option[Long], blockchainBeforeWithMinerReward: Blockchain): Unit =
+    override def onProcessBlock(
+        block: Block,
+        diff: BlockDiffer.DetailedDiff,
+        minerReward: Option[Long],
+        blockchainBeforeWithMinerReward: Blockchain
+    ): Unit =
       triggers.foreach(_.onProcessBlock(block, diff, minerReward, blockchainBeforeWithMinerReward))
 
     override def onProcessMicroBlock(
-                                      microBlock: MicroBlock,
-                                      diff: BlockDiffer.DetailedDiff,
-                                      blockchainBeforeWithMinerReward: Blockchain,
-                                      totalBlockId: ByteStr,
-                                      totalTransactionsRoot: ByteStr
+        microBlock: MicroBlock,
+        diff: BlockDiffer.DetailedDiff,
+        blockchainBeforeWithMinerReward: Blockchain,
+        totalBlockId: ByteStr,
+        totalTransactionsRoot: ByteStr
     ): Unit =
       triggers.foreach(_.onProcessMicroBlock(microBlock, diff, blockchainBeforeWithMinerReward, totalBlockId, totalTransactionsRoot))
 
@@ -181,8 +184,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
 
-    val pos = PoSSelector(blockchainUpdater)
-
     if (settings.minerSettings.enable)
       miner = new MinerImpl(
         allChannels,
@@ -194,18 +195,17 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         utxStorage,
         wallet,
         minerScheduler,
-        block => BlockAppender(blockchainUpdater, time, utxStorage, pos, appenderScheduler)(block),
+        block => BlockAppender(blockchainUpdater, time, utxStorage, appenderScheduler, settings.synchronizationSettings)(block),
         microBlock =>
-          MicroblockAppender(blockchainUpdater, utxStorage, appenderScheduler)(microBlock).flatMap {
-            case _ => ???
-          }
+          MicroblockAppender(blockchainUpdater, utxStorage, appenderScheduler)(microBlock)
+            .map(_.fold(e => throw MicroBlockAppendError(microBlock, e), identity))
       )
 
     val processBlock =
-      BlockAppender(blockchainUpdater, time, utxStorage, pos, allChannels, peerDatabase, appenderScheduler) _
+      BlockAppender(blockchainUpdater, time, utxStorage, allChannels, peerDatabase, appenderScheduler, settings.synchronizationSettings) _
 
     val processFork =
-      ExtensionAppender(blockchainUpdater, utxStorage, pos, time, knownInvalidBlocks, peerDatabase, appenderScheduler) _
+      ExtensionAppender(blockchainUpdater, utxStorage, time, knownInvalidBlocks, peerDatabase, appenderScheduler, settings.synchronizationSettings) _
     val processMicroBlock =
       MicroblockAppender(blockchainUpdater, utxStorage, allChannels, peerDatabase, appenderScheduler) _
 
@@ -248,9 +248,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def utx: UtxPool                                                                 = utxStorage
       override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] =
         Await.result(utxSynchronizer.publish(tx), Duration.Inf) // TODO: Replace with async if possible
-      override def spendableBalanceChanged: Observable[(Address, Asset)]                         = app.spendableBalanceChanged
-      override def actorSystem: ActorSystem                                                      = app.actorSystem
-      override def utxEvents: Observable[UtxEvent]                                               = app.utxEvents
+      override def spendableBalanceChanged: Observable[(Address, Asset)] = app.spendableBalanceChanged
+      override def actorSystem: ActorSystem                              = app.actorSystem
+      override def utxEvents: Observable[UtxEvent]                       = app.utxEvents
 
       override val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
         blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
@@ -339,7 +339,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       .onErrorHandle(stopOnAppendError.reportFailure)
       .subscribe()
 
-    miner.scheduleMining()
+    miner.scheduleMining(blockchainUpdater)
 
     for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
       upnp.addPort(addr.getPort)

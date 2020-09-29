@@ -130,8 +130,8 @@ object Blockchain {
     def isMiningAllowed(height: Int, effectiveBalance: Long): Boolean =
       GeneratingBalanceProvider.isMiningAllowed(blockchain, height, effectiveBalance)
 
-    def isEffectiveBalanceValid(height: Int, block: Block, effectiveBalance: Long): Boolean =
-      GeneratingBalanceProvider.isEffectiveBalanceValid(blockchain, height, block, effectiveBalance)
+    def isEffectiveBalanceValid(height: Int, blockTimestamp: Long, effectiveBalance: Long): Boolean =
+      GeneratingBalanceProvider.isEffectiveBalanceValid(blockchain, height, blockTimestamp, effectiveBalance)
 
     def generatingBalance(account: Address, blockId: Option[BlockId] = None): Long =
       GeneratingBalanceProvider.balance(blockchain, account, blockId)

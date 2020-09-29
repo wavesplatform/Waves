@@ -6,8 +6,9 @@ import java.util.concurrent.{Semaphore, TimeUnit}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.PoSSelector
+import com.wavesplatform.consensus.PoSCalculator
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -35,7 +36,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
   "base target limit" - {
     "node should stop if base target greater than maximum in block append" in {
       withEnv {
-        case Env(settings, pos, bcu, utxPoolStub, scheduler, _, lastBlock) =>
+        case Env(settings, bcu, utxPoolStub, scheduler, _, lastBlock) =>
           var stopReasonCode = 0
 
           val signal = new Semaphore(1)
@@ -55,12 +56,13 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
             }
           })
 
-          val blockAppendTask = BlockAppender(bcu, ntpTime, utxPoolStub, pos, scheduler)(lastBlock).onErrorRecoverWith {
-            case _: SecurityException => Task.unit
-          }
+          val blockAppendTask =
+            BlockAppender(bcu, ntpTime, utxPoolStub, scheduler, settings.synchronizationSettings, verify = false)(lastBlock).onErrorRecoverWith {
+              case _: SecurityException => Task.unit
+            }
           Await.result(blockAppendTask.runToFuture(scheduler), Duration.Inf)
 
-          signal.tryAcquire(10, TimeUnit.SECONDS)
+          signal.tryAcquire(10, TimeUnit.SECONDS) should be(true)
 
           stopReasonCode shouldBe BaseTargetReachedMaximum.code
 
@@ -87,8 +89,8 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
       featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
     )
 
-    val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
-    val pos = PoSSelector(bcu)
+    val bcu =
+      new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
 
     val utxPoolStub                        = new UtxPoolImpl(ntpTime, bcu, ignoreSpendableBalanceChanged, settings0.utxSettings)
     val schedulerService: SchedulerService = Scheduler.singleThread("appender")
@@ -107,7 +109,8 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
               ts + 3,
               genesisBlock.id(),
               Seq.empty,
-              account
+              account,
+              generationSignature = Some(ByteStr(PoSCalculator.generationSignature(ByteStr(new Array[Byte](32)), account.publicKey)))
             )
             (account, genesisBlock, secondBlock)
           }
@@ -116,7 +119,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
 
       bcu.processBlock(firstBlock, firstBlock.header.generationSignature).explicitGet()
 
-      f(Env(settings, pos, bcu, utxPoolStub, schedulerService, account, secondBlock))
+      f(Env(settings, bcu, utxPoolStub, schedulerService, account, secondBlock))
 
       bcu.shutdown()
     } finally {
@@ -130,7 +133,6 @@ object BlockWithMaxBaseTargetTest {
 
   final case class Env(
       settings: WavesSettings,
-      pos: PoSSelector,
       bcu: Blockchain with BlockchainUpdater with NG,
       utxPool: UtxPoolImpl,
       schedulerService: SchedulerService,

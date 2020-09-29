@@ -3,7 +3,6 @@ package com.wavesplatform.mining
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
 import com.wavesplatform.state.appender.{BlockAppender, MicroblockAppender}
@@ -63,7 +62,7 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PathMockFactory wi
         utxPool,
         wallet,
         scheduler,
-        block => BlockAppender(blockchainUpdater, ntpTime, utxPool, PoSSelector(blockchainUpdater), scheduler)(block),
+        block => BlockAppender(blockchainUpdater, ntpTime, utxPool, scheduler, wavesSettings.synchronizationSettings)(block),
         mb => MicroblockAppender(blockchainUpdater, utxPool, scheduler)(mb).map(_.fold(_ => throw new Exception(), id => id))
       )
     }

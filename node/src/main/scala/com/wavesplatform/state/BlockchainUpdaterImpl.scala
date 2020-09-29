@@ -214,7 +214,7 @@ class BlockchainUpdaterImpl(
                       )
                       .map { r =>
                         val updatedBlockchain = CompositeBlockchain(leveldb, Some(r.diff), Some(block), r.carry, reward, Some(hitSource))
-                        miner.scheduleMining(Some(updatedBlockchain))
+                        miner.scheduleMining(updatedBlockchain)
                         blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, reward, referencedBlockchain)
                         Option((r, Nil, reward, hitSource))
                       }
@@ -324,7 +324,7 @@ class BlockchainUpdaterImpl(
                               reward,
                               Some(hitSource)
                             )
-                            miner.scheduleMining(Some(tempBlockchain))
+                            miner.scheduleMining(tempBlockchain)
 
                             blockchainUpdateTriggers.onProcessBlock(block, differResult.detailedDiff, reward, referencedBlockchain)
 
@@ -431,7 +431,7 @@ class BlockchainUpdaterImpl(
 
     notifyChangedSpendable(prevNgState, ngState)
     publishLastBlockInfo()
-    miner.scheduleMining()
+    miner.scheduleMining(this)
     result
   }
 

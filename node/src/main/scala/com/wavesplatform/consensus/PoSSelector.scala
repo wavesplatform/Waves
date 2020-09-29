@@ -77,7 +77,7 @@ case class PoSSelector(blockchain: Blockchain) extends ScorexLogging {
         .toRight(GenericError("No blocks in blockchain"))
         .map(b => generationSignature(b.header.generationSignature, block.header.generator))
         .ensureOr { expectedGenSig =>
-          GenericError(s"Generation signatures does not match: Expected = ${Base58.encode(expectedGenSig)}; Found = $blockGenSig")
+          GenericError(s"Generation signatures do not match: Expected = ${Base58.encode(expectedGenSig)}; Found = $blockGenSig")
         } { expectedGenSig =>
           blockGenSig.arr sameElements expectedGenSig
         }

@@ -1,7 +1,6 @@
 package com.wavesplatform.consensus
 
 import com.wavesplatform.account.Address
-import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.Blockchain
@@ -18,8 +17,8 @@ object GeneratingBalanceProvider {
   }
 
   //noinspection ScalaStyle
-  def isEffectiveBalanceValid(blockchain: Blockchain, height: Int, block: Block, effectiveBalance: Long): Boolean =
-    block.header.timestamp < blockchain.settings.functionalitySettings.minimalGeneratingBalanceAfter || (block.header.timestamp >= blockchain.settings.functionalitySettings.minimalGeneratingBalanceAfter && effectiveBalance >= MinimalEffectiveBalanceForGenerator1) ||
+  def isEffectiveBalanceValid(blockchain: Blockchain, height: Int, blockTimestamp: Long, effectiveBalance: Long): Boolean =
+    blockTimestamp < blockchain.settings.functionalitySettings.minimalGeneratingBalanceAfter || (blockTimestamp >= blockchain.settings.functionalitySettings.minimalGeneratingBalanceAfter && effectiveBalance >= MinimalEffectiveBalanceForGenerator1) ||
       blockchain.activatedFeatures
         .get(BlockchainFeatures.SmallerMinimalGeneratingBalance.id)
         .exists(height >= _) && effectiveBalance >= MinimalEffectiveBalanceForGenerator2

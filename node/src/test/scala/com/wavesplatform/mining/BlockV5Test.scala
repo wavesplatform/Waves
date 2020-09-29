@@ -9,7 +9,6 @@ import com.wavesplatform.block.validation.Validators
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.chainBaseAndMicro
@@ -469,7 +468,6 @@ class BlockV5Test
   private def withMiner(blockchain: Blockchain with BlockchainUpdater with NG, time: Time, settings: WavesSettings = testSettings)(
       f: (MinerImpl, Appender, Scheduler) => Unit
   ): Unit = {
-    val pos               = PoSSelector(blockchain)
     val allChannels       = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val wallet            = Wallet(WalletSettings(None, Some("123"), None))
     val utxPool           = new UtxPoolImpl(time, blockchain, Observer.stopped, settings.utxSettings)
@@ -485,13 +483,13 @@ class BlockV5Test
       utxPool,
       wallet,
       minerScheduler,
-      block => BlockAppender(blockchain, time, utxPool, pos, appenderScheduler)(block),
+      block => BlockAppender(blockchain, time, utxPool, appenderScheduler, settings.synchronizationSettings)(block),
       microBlock =>
         MicroblockAppender(blockchain, utxPool, appenderScheduler)(microBlock).flatMap {
           case _ => ???
         }
     )
-    val blockAppender = BlockAppender(blockchain, time, utxPool, pos, appenderScheduler) _
+    val blockAppender = BlockAppender(blockchain, time, utxPool, appenderScheduler, settings.synchronizationSettings) _
     f(miner, blockAppender, appenderScheduler)
   }
 }

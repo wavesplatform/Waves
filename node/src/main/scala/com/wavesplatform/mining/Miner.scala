@@ -24,11 +24,12 @@ import kamon.Kamon
 import monix.eval.Task
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.SchedulerService
+import monix.execution.{Cancelable, Scheduler}
 
 import scala.concurrent.duration._
 
 trait Miner {
-  def scheduleMining(blockchain: Option[Blockchain] = None): Unit
+  def scheduleMining(currentBlockchain: Blockchain): Unit
 }
 
 trait MinerDebugInfo {
@@ -117,6 +118,7 @@ class MinerImpl(
     blockchain.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get.blockId
 
   private[mining] def forgeBlock(account: KeyPair): Either[String, (Block, MiningConstraint)] = {
+    log.debug(s"Forging for account ${account.toAddress}")
     // should take last block right at the time of mining since microblocks might have been added
     val height          = blockchain.height
     val version         = blockchain.nextBlockVersion
@@ -127,10 +129,6 @@ class MinerImpl(
       _         <- checkQuorumAvailable()
       blockTime <- Miner.nextBlockTime(blockchain, timeService, account, Some(reference))
       currentTime = timeService.correctedTime()
-      blockTime = math.max(
-        lastBlockHeader.timestamp + validBlockDelay,
-        currentTime - 1.minute.toMillis
-      )
       _ <- Either.cond(
         blockTime <= currentTime + appender.MaxTimeDrift,
         log.debug(
@@ -187,53 +185,57 @@ class MinerImpl(
     }
   }
 
-  private[mining] def generateBlockTask(account: KeyPair, blockchain: Blockchain): Task[Unit] = {
-    Miner.nextBlockTime(blockchain, timeService, account, blockchain.lastBlockId) match {
-      case Left(err) =>
-        log.debug(s"Not scheduling block mining because $err")
-        debugStateRef = MinerDebugInfo.Error(err)
-        Task.unit
-      case Right(nextBlockTime) =>
-        val offset = (nextBlockTime - timeService.correctedTime()).max(0L).millis
-        log.debug(f"Next attempt for acc=${account.toAddress} in ${offset.toUnit(SECONDS)}%.3f seconds")
-        mkBlock(blockchain.lastBlockId, account)
-          .delayExecution(offset)
-          .flatMap {
-            case Right((block, totalConstraint)) =>
-              appendBlock(block).flatMap {
-                case Left(BlockFromFuture(_)) => // Time was corrected, retry
-                  generateBlockTask(account, blockchain)
+  private[mining] def generateBlockTask(account: KeyPair, blockchain: Blockchain): Task[Unit] =
+    mkBlock(blockchain.lastBlockId, account)
+      .executeOn(minerScheduler)
+      .flatMap {
+        case Right((block, totalConstraint)) =>
+          appendBlock(block)
+            .executeOn(Scheduler.Implicits.global)
+            .flatMap {
+              case Left(BlockFromFuture(_)) => // Time was corrected, retry
+                generateBlockTask(account, blockchain).delayExecution(appender.MaxTimeDrift.millis)
 
-                case Left(err) =>
-                  Task.raiseError(new RuntimeException(err.toString))
+              case Left(err) =>
+                log.error(s"Error appending block: $err")
+                Task.raiseError(new RuntimeException(err.toString))
 
-                case Right(Some(score)) =>
-                  log.debug(s"Forged and applied $block with cumulative score $score")
-                  BlockStats.mined(block, blockchain.height)
-                  allChannels.broadcast(BlockForged(block))
-                  if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
-                  Task.unit
+              case Right(Some(score)) =>
+                log.info(s"Forged and applied block ${block.id()} with cumulative score $score")
+                BlockStats.mined(block, blockchain.height)
+                allChannels.broadcast(BlockForged(block))
+                if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
+                Task.unit
 
-                case Right(None) =>
-                  Task.raiseError(new RuntimeException("Newly created block has already been appended, should not happen"))
-              }
-            case Left(err) =>
-              log.debug(s"Not scheduling block mining because $err")
-              debugStateRef = MinerDebugInfo.Error(err)
-              Task.unit
-          }
-    }
-  }
+              case Right(None) =>
+                log.warn("Newly created block has already been appended, should not happen")
+                Task.unit
+            }
 
-  def scheduleMining(tempBlockchain: Option[Blockchain]): Unit = {
+        case Left(err) =>
+          log.warn(s"Error mining block: $err")
+          debugStateRef = MinerDebugInfo.Error(err)
+          Task.unit
+      }
+
+  def scheduleMining(currentBlockchain: Blockchain): Unit = {
     Miner.blockMiningStarted.increment()
 
-    val nonScriptedAccounts = wallet.privateKeyAccounts.filterNot(kp => tempBlockchain.getOrElse(blockchain).hasAccountScript(kp.toAddress))
-    scheduledAttempts := CompositeCancelable.fromSet(nonScriptedAccounts.map { account =>
-      generateBlockTask(account, tempBlockchain.getOrElse(blockchain))
-        .onErrorHandle(err => log.warn(s"Error mining Block: $err"))
-        .runAsyncLogErr
-    }.toSet)
+    scheduledAttempts := CompositeCancelable(
+      wallet.privateKeyAccounts.filterNot(kp => currentBlockchain.hasAccountScript(kp.toAddress)).map { account =>
+        Miner.nextBlockTime(currentBlockchain, timeService, account, currentBlockchain.lastBlockId) match {
+          case Left(err) =>
+            log.debug(s"Not scheduling block mining because $err")
+            Cancelable.empty
+          case Right(nextBlockTime) =>
+            val offset = (nextBlockTime - timeService.correctedTime()).max(0L).millis
+            log.debug(f"Next attempt for acc=${account.toAddress} in ${offset.toUnit(SECONDS)}%.3f seconds")
+            minerScheduler.scheduleOnce(offset) {
+              generateBlockTask(account, blockchain).runAsyncLogErr(minerScheduler)
+            }
+        }
+      }: _*
+    )
     microBlockAttempt := SerialCancelable()
 
     debugStateRef = MinerDebugInfo.MiningBlocks
@@ -266,7 +268,7 @@ object Miner {
   val MaxTransactionsPerMicroblock: Int = 500
 
   case object Disabled extends Miner with MinerDebugInfo {
-    override def scheduleMining(blockchain: Option[Blockchain]): Unit         = ()
+    override def scheduleMining(currentBlockchain: Blockchain): Unit          = {}
     override def nextBlockTime(account: KeyPair): Either[String, TxTimestamp] = Left("Miner is disabled")
     override val state: MinerDebugInfo.State                                  = MinerDebugInfo.Disabled
   }
@@ -296,20 +298,21 @@ object Miner {
       timeService: Time,
       account: KeyPair,
       reference: Option[BlockId]
-  ): Either[String, Long] = {
-    val height = blockchain.height
-
+  ): Either[String, Long] =
     for {
-      _               <- checkScript(blockchain, account)
+      _ <- checkScript(blockchain, account)
+      currentTime = timeService.correctedTime()
+      generatingBalance <- Right(blockchain.generatingBalance(account.toAddress, reference))
+        .ensureOr(effectiveBalance => s"generator's effective balance $effectiveBalance is less that required for generation")(
+          blockchain.isEffectiveBalanceValid(blockchain.height, currentTime, _)
+        )
       lastBlockHeader <- blockchain.lastBlockHeader.toRight("Blockchain is empty")
       validBlockDelay <- PoSSelector(blockchain)
-        .getValidBlockDelay(height, account, lastBlockHeader.header.baseTarget, blockchain.generatingBalance(account.toAddress, reference))
+        .getValidBlockDelay(blockchain.height, account, lastBlockHeader.header.baseTarget, generatingBalance)
         .leftMap(_.toString)
-      currentTime = timeService.correctedTime()
       blockTime = math.max(
         lastBlockHeader.header.timestamp + validBlockDelay,
         currentTime - blockchain.settings.functionalitySettings.maxTransactionTimeForwardOffset.toMillis
       )
     } yield blockTime
-  }
 }

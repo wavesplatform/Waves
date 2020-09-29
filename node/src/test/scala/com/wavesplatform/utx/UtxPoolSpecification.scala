@@ -9,7 +9,7 @@ import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.{PoSSelector, TransactionsOrdering}
+import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.database.{LevelDBWriter, TestStorageFactory, openDB}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.events.UtxEvent
@@ -23,10 +23,9 @@ import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.mining._
-import com.wavesplatform.network.{InvalidBlockStorage, PeerDatabase}
 import com.wavesplatform.settings._
 import com.wavesplatform.state._
-import com.wavesplatform.state.appender.{ExtensionAppender, MicroblockAppender}
+import com.wavesplatform.state.appender.{BlockAppender, MicroblockAppender}
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.Asset.Waves
@@ -1126,20 +1125,11 @@ class UtxPoolSpecification
             val utx =
               new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
 
-            val pos = stub[PoSSelector]
-            (pos.validateBaseTarget _).when(*, *, *, *).returning(Right((): Unit))
-            (pos.validateBlockDelay _).when(*, *, *, *).returning(Right((): Unit))
-            (pos.validateGenerationSignature _).when(*).returning(Right(ByteStr(new Array[Byte](32))))
-
-            val extAppender = ExtensionAppender(
-              blockchain,
-              utx,
-              pos,
+            val extAppender = BlockAppender(blockchain,
               ntpTime,
-              stub[InvalidBlockStorage],
-              stub[PeerDatabase],
-              scheduler
-            )(null, _)
+              utx,
+              scheduler,
+              WavesSettings.default().synchronizationSettings, verify = false) _
 
             val microBlockAppender = MicroblockAppender(blockchain, utx, scheduler) _
 
@@ -1148,14 +1138,14 @@ class UtxPoolSpecification
             mbs1.foreach(microBlockAppender(_).runSyncUnsafe() should beRight)
 
             mbs2.head.transactionData.foreach(utx.putIfNew(_).resultE should beRight)
-            extAppender(Seq(block2)).runSyncUnsafe() should beRight
+            extAppender(block2).runSyncUnsafe() should beRight
             val expectedTxs1 = mbs1.last.transactionData ++ mbs2.head.transactionData.sorted(TransactionsOrdering.InUTXPool(Set()))
             utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(expectedTxs1)
 
             mbs2.foreach(microBlockAppender(_).runSyncUnsafe() should beRight)
             utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(mbs1.last.transactionData)
 
-            extAppender(Seq(block3)).runSyncUnsafe() should beRight
+            extAppender(block3).runSyncUnsafe() should beRight
             utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(mbs1.last.transactionData)
 
             // Not supported at the moment

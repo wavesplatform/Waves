@@ -11,7 +11,6 @@ import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonBlocksApi, CommonTransactionsApi}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
@@ -252,8 +251,7 @@ object Importer extends ScorexLogging {
     val (blockchainUpdater, levelDb) =
       StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.noop)
     val utxPool     = new UtxPoolImpl(time, blockchainUpdater, PublishSubject(), settings.utxSettings)
-    val pos         = PoSSelector(blockchainUpdater)
-    val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify) _
+    val extAppender = BlockAppender(blockchainUpdater, time, utxPool, scheduler, settings.synchronizationSettings, importOptions.verify) _
 
     checkGenesis(settings, blockchainUpdater)
     val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, db, actorSystem)

@@ -4,10 +4,10 @@ import java.time.Instant
 
 import cats.data.EitherT
 import com.wavesplatform.block.Block
-import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.network._
+import com.wavesplatform.settings.SynchronizationSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, InvalidSignature}
@@ -28,13 +28,13 @@ object BlockAppender extends ScorexLogging {
       blockchainUpdater: BlockchainUpdater with Blockchain,
       time: Time,
       utxStorage: UtxPoolImpl,
-      pos: PoSSelector,
       scheduler: Scheduler,
+      syncSettings: SynchronizationSettings,
       verify: Boolean = true
   )(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
     Task {
       if (blockchainUpdater.isLastBlockId(newBlock.header.reference))
-        appendBlock(blockchainUpdater, utxStorage, pos, time, verify)(newBlock).map(_ => Some(blockchainUpdater.score))
+        appendBlock(blockchainUpdater, utxStorage, time, syncSettings, verify)(newBlock).map(_ => Some(blockchainUpdater.score))
       else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
         Right(None)
       else
@@ -45,10 +45,10 @@ object BlockAppender extends ScorexLogging {
       blockchainUpdater: BlockchainUpdater with Blockchain,
       time: Time,
       utxStorage: UtxPoolImpl,
-      pos: PoSSelector,
       allChannels: ChannelGroup,
       peerDatabase: PeerDatabase,
-      scheduler: Scheduler
+      scheduler: Scheduler,
+      syncSettings: SynchronizationSettings
   )(ch: Channel, newBlock: Block): Task[Unit] = {
     import metrics._
     implicit val implicitTime: Time = time
@@ -61,7 +61,7 @@ object BlockAppender extends ScorexLogging {
       (for {
         _ <- EitherT(Task(Either.cond(newBlock.signatureValid(), (), GenericError("Invalid block signature"))))
         _ = span.markNtp("block.signatures-validated")
-        validApplication <- EitherT(apply(blockchainUpdater, time, utxStorage, pos, scheduler)(newBlock))
+        validApplication <- EitherT(apply(blockchainUpdater, time, utxStorage, scheduler, syncSettings)(newBlock))
       } yield validApplication).value
 
     val handle = append.asyncBoundary.map {

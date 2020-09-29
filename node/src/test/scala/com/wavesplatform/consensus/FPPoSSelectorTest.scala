@@ -207,7 +207,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with EitherMatchers with 
             pos
               .validateGenerationSignature(
                 block
-              ) should (if (!vrfActivated) produce("Generation signatures does not match") else produce("Could not verify VRF proof"))
+              ) should (if (!vrfActivated) produce("Generation signatures do not match") else produce("Could not verify VRF proof"))
         }
     }
   }
