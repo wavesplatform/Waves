@@ -149,7 +149,7 @@ class MinerImpl(
       currentTime = timeService.correctedTime()
       blockTime = math.max(
         lastBlockHeader.timestamp + validBlockDelay,
-        currentTime - blockchainSettings.functionalitySettings.maxTransactionTimeForwardOffset.toMillis
+        currentTime - 1.minute.toMillis
       )
       _ <- Either.cond(
         blockTime <= currentTime + appender.MaxTimeDrift,
