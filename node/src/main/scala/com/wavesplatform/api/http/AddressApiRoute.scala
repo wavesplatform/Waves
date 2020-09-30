@@ -1,7 +1,9 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
+import akka.NotUsed
+import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.server.Route
+import akka.stream.scaladsl.Source
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.ApiError._
@@ -17,7 +19,7 @@ import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, DataEntry}
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -173,21 +175,21 @@ case class AddressApiRoute(
 
   def getData: Route =
     pathPrefix("data" / AddrSegment) { address =>
+      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[JsValue, NotUsed]] = jsonStreamMarshaller()
+
       (path(Segment) & get) { key =>
         complete(accountDataEntry(address, key))
       } ~ extractScheduler(
         implicit sc =>
           (formField("matches") | parameter("matches")) { matches =>
-            complete(
-              Try(matches.r)
-                .fold(
-                  { e =>
-                    log.trace(s"Error compiling regex $matches: ${e.getMessage}")
-                    ApiError.fromValidationError(GenericError(s"Cannot compile regex"))
-                  },
-                  _ => accountData(address, matches)
-                )
-            )
+            Try(matches.r)
+              .fold(
+                { e =>
+                  log.trace(s"Error compiling regex $matches: ${e.getMessage}")
+                  complete(ApiError.fromValidationError(GenericError(s"Cannot compile regex")))
+                },
+                _ => complete(accountData(address, matches))
+              )
           } ~ anyParam("key").filter(_.nonEmpty) { keys =>
             complete(accountDataList(address, keys.toSeq: _*))
           } ~ get {
@@ -252,20 +254,24 @@ case class AddressApiRoute(
   }
 
   private def accountData(address: Address)(implicit sc: Scheduler) =
-    commonAccountsApi.dataStream(address, None).toListL.runAsyncLogErr.map(_.sortBy(_.key))
+    commonAccountsApi
+      .dataStream(address, None)
+      .toListL
+      .runAsyncLogErr
+      .map(data => Source.fromIterator(() => data.sortBy(_.key).iterator.map(Json.toJson[DataEntry[_]])))
 
-  private def accountData(addr: Address, regex: String)(implicit sc: Scheduler): ToResponseMarshallable =
+  private def accountData(addr: Address, regex: String)(implicit sc: Scheduler) =
     commonAccountsApi
       .dataStream(addr, Some(regex))
       .toListL
       .runAsyncLogErr
-      .map(_.sortBy(_.key))
+      .map(data => Source.fromIterator(() => data.sortBy(_.key).iterator.map(Json.toJson[DataEntry[_]])))
 
   private def accountDataEntry(address: Address, key: String): ToResponseMarshallable =
     commonAccountsApi.data(address, key).toRight(DataKeyDoesNotExist)
 
-  private def accountDataList(address: Address, keys: String*): ToResponseMarshallable =
-    keys.flatMap(commonAccountsApi.data(address, _))
+  private def accountDataList(address: Address, keys: String*) =
+    Source.fromIterator(() => keys.flatMap(commonAccountsApi.data(address, _)).iterator.map(Json.toJson[DataEntry[_]]))
 
   private def signPath(address: Address, encode: Boolean): Route = (post & entity(as[String])) { message =>
     withAuth {
