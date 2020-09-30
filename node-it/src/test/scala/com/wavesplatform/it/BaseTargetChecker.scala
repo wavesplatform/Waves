@@ -28,7 +28,7 @@ object BaseTargetChecker {
     val db                = openDB("/tmp/tmp-db")
     val ntpTime           = new NTP("ntp.pool.org")
     val (blockchainUpdater, _) = StorageFactory(settings, db, ntpTime, Observer.empty, BlockchainUpdateTriggers.noop)
-    val poSSelector       = PoSSelector(blockchainUpdater, settings.synchronizationSettings)
+    val poSSelector       = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTargetOpt)
 
     try {
       val genesisBlock = Block.genesis(settings.blockchainSettings.genesisSettings).explicitGet()

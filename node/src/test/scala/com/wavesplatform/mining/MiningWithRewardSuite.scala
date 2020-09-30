@@ -120,7 +120,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
       case (blockchainUpdater, _) =>
         for {
           _ <- Task.unit
-          pos          = PoSSelector(blockchainUpdater, settings.synchronizationSettings)
+          pos          = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTargetOpt)
           utxPool      = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, settings.utxSettings)
           scheduler    = Scheduler.singleThread("appender")
           allChannels  = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)

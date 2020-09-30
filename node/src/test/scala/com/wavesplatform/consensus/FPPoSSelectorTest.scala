@@ -257,7 +257,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with EitherMatchers with 
     val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu =
       new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
-    val pos = PoSSelector(bcu, settings.synchronizationSettings)
+    val pos = PoSSelector(bcu, settings.synchronizationSettings.maxBaseTargetOpt)
     try {
       val (accounts, blocks) = gen(ntpTime).sample.get
 

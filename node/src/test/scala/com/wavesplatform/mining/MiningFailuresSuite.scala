@@ -54,7 +54,7 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PathMockFactory wi
       val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
       val wallet      = Wallet(WalletSettings(None, Some("123"), None))
       val utxPool     = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, wavesSettings.utxSettings)
-      val pos         = PoSSelector(blockchainUpdater, wavesSettings.synchronizationSettings)
+      val pos         = PoSSelector(blockchainUpdater, wavesSettings.synchronizationSettings.maxBaseTargetOpt)
       new MinerImpl(
         allChannels,
         blockchainUpdater,
