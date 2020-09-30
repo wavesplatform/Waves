@@ -7,6 +7,7 @@ import com.wavesplatform.database.{DBExt, DBResource, Keys}
 import com.wavesplatform.state.{Diff, Height, InvokeScriptResult, NewTransactionInfo, TransactionId, TxNum}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.{Authorized, GenesisTransaction, Transaction}
+import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
 
@@ -21,9 +22,7 @@ trait AddressTransactions {
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
   ): Observable[(Height, Transaction, Boolean)] =
-    db.resourceObservable.flatMap { resource =>
-      Observable.fromIterable(allAddressTransactions(resource, maybeDiff, subject, sender, types, fromId))
-    }
+    Observable.fromIterator(Task(allAddressTransactions(db, maybeDiff, subject, sender, types, fromId)))
 
   def invokeScriptResults(
       db: DB,
@@ -33,21 +32,19 @@ trait AddressTransactions {
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
   ): Observable[TransactionMeta] =
-    db.resourceObservable.flatMap { resource =>
-      Observable
-        .fromIterable(allAddressTransactions(resource, maybeDiff, subject, sender, types, fromId).map {
-          case (h, ist: InvokeScriptTransaction, status) =>
-            (h, Right(ist -> maybeDiff.flatMap(_._2.scriptResults.get(ist.id())).orElse(loadInvokeScriptResult(resource, ist.id()))), status)
-          case (h, tx, status) => (h, Left(tx), status)
-        })
-    }
+    Observable
+      .fromIterator(Task(allAddressTransactions(db, maybeDiff, subject, sender, types, fromId).map {
+        case (h, ist: InvokeScriptTransaction, status) =>
+          (h, Right(ist -> maybeDiff.flatMap(_._2.scriptResults.get(ist.id())).orElse(loadInvokeScriptResult(db, ist.id()))), status)
+        case (h, tx, status) => (h, Left(tx), status)
+      }))
 }
 
 object AddressTransactions {
   type TransactionMeta = (Height, Either[Transaction, (InvokeScriptTransaction, Option[InvokeScriptResult])], Boolean)
 
-  private def loadTransaction(resource: DBResource, height: Height, txNum: TxNum, sender: Option[Address]): Option[(Height, Transaction, Boolean)] =
-    resource.get(Keys.transactionAt(height, txNum)) match {
+  private def loadTransaction(db: DB, height: Height, txNum: TxNum, sender: Option[Address]): Option[(Height, Transaction, Boolean)] =
+    db.get(Keys.transactionAt(height, txNum)) match {
       case Some((tx: Authorized, status)) if sender.forall(_ == tx.sender.toAddress) => Some((height, tx, status))
       case Some((gt: GenesisTransaction, status)) if sender.isEmpty                  => Some((height, gt, status))
       case _                                                                         => None
@@ -63,16 +60,16 @@ object AddressTransactions {
     db.withResource(r => loadInvokeScriptResult(r, txId))
 
   def allAddressTransactions(
-      resource: DBResource,
+      db: DB,
       maybeDiff: Option[(Height, Diff)],
       subject: Address,
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Iterable[(Height, Transaction, Boolean)] =
+  ): Iterator[(Height, Transaction, Boolean)] =
     transactionsFromDiff(maybeDiff, subject, sender, types, fromId) ++
       transactionsFromDB(
-        resource,
+        db,
         subject,
         sender,
         types,
@@ -80,28 +77,31 @@ object AddressTransactions {
       )
 
   def transactionsFromDB(
-      resource: DBResource,
+      db: DB,
       subject: Address,
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Iterable[(Height, Transaction, Boolean)] = resource.get(Keys.addressId(subject)).fold(Iterable.empty[(Height, Transaction, Boolean)]) {
-    addressId =>
-      val (maxHeight, maxTxNum) =
-        fromId
-          .flatMap(id => resource.get(Keys.transactionMetaById(TransactionId(id))))
-          .map { case pb.TransactionMeta(h, n, _, _) => (Height(h), TxNum(n.toShort)) }
-          .getOrElse(Height(Int.MaxValue) -> TxNum(Short.MaxValue))
+  ): Iterator[(Height, Transaction, Boolean)] =
+    db.get(Keys.addressId(subject))
+      .fold(Iterable.empty[(Height, Transaction, Boolean)]) { addressId =>
+        val (maxHeight, maxTxNum) =
+          fromId
+            .flatMap(id => db.get(Keys.transactionMetaById(TransactionId(id))))
+            .fold[(Height, TxNum)](Height(Int.MaxValue) -> TxNum(Short.MaxValue)) { tm =>
+              Height(tm.height) -> TxNum(tm.num.toShort)
+            }
 
-      (for {
-        seqNr                    <- (resource.get(Keys.addressTransactionSeqNr(addressId)) to 0 by -1).view
-        (height, transactionIds) <- resource.get(Keys.addressTransactionHN(addressId, seqNr)).view if height <= maxHeight
-        (txType, txNum)          <- transactionIds.view
-      } yield (height, txNum, txType))
-        .dropWhile { case (h, txNum, _) => h > maxHeight || h == maxHeight && txNum >= maxTxNum }
-        .collect { case (h, txNum, txType) if types.isEmpty || types(txType) => h -> txNum }
-        .flatMap { case (h, txNum) => loadTransaction(resource, h, txNum, sender) }
-  }
+        (for {
+          seqNr                    <- (db.get(Keys.addressTransactionSeqNr(addressId)) to 0 by -1).view
+          (height, transactionIds) <- db.get(Keys.addressTransactionHN(addressId, seqNr)).view if height <= maxHeight
+          (txType, txNum)          <- transactionIds.view
+        } yield (height, txNum, txType))
+          .dropWhile { case (h, txNum, _) => h > maxHeight || h == maxHeight && txNum >= maxTxNum }
+          .collect { case (h, txNum, txType) if types.isEmpty || types(txType) => h -> txNum }
+          .flatMap { case (h, txNum) => loadTransaction(db, h, txNum, sender) }
+      }
+      .iterator
 
   def transactionsFromDiff(
       maybeDiff: Option[(Height, Diff)],
@@ -109,7 +109,7 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Iterable[(Height, Transaction, Boolean)] =
+  ): Iterator[(Height, Transaction, Boolean)] =
     (for {
       (h, diff)                                 <- maybeDiff.toSeq
       NewTransactionInfo(tx, addresses, status) <- diff.transactions.values.toSeq.reverse
@@ -119,4 +119,5 @@ object AddressTransactions {
       .dropWhile { case (_, tx, _) => fromId.contains(tx.id()) }
       .filter { case (_, tx, _) => types.isEmpty || types.contains(tx.typeId) }
       .collect { case v @ (_, tx: Authorized, _) if sender.forall(_ == tx.sender.toAddress) => v }
+      .iterator
 }

@@ -77,7 +77,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       "ABABRFnfcU6tj7ELaOMRU60BmUEXZSyzyWDG4yxX597CilhGAUSJ/UXOr7T3dYRD2dI6xLKS+XNccQNSaToBCQEAAAADZm9vAAAAAQEAAAAFYWxpY2UAAQApAAAAAAAAAAcBWd9xTq2PsQto4xFTrQGZQRdlLLPJYMbjLFfn3sKKWEYAAAAAAAGGoAAAAAFjgvl7hQEAAQBAL4aaBFut6sRjmJqyUMSsW344/xjKn74k0tXmtbAMnZhCIysagYHWE578HZUBuKPxN/3v8OxBmN3lSChpsYrsCg=="
     )
     AddressScheme.current = new AddressScheme {
-      override val chainId: TxVersion = 'D'.toByte
+      override val chainId: Byte = 'D'.toByte
     }
     val json = Json.parse(s"""{
                          "type": 16,
@@ -337,7 +337,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
           List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get).explicitGet())
         )
       ),
-      payment = Some(Seq(Payment(-1, Waves))),
+      payment = Some(Seq(Payment(-1L, Waves))),
       dApp = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,
       proofs =

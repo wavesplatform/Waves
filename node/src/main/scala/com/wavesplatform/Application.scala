@@ -1,7 +1,6 @@
 package com.wavesplatform
 
 import java.io.File
-import java.nio.file.Files
 import java.security.Security
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -63,8 +62,8 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import scala.util.Try
 import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject, time: NTP) extends ScorexLogging {
   app =>
@@ -224,13 +223,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     // Extensions start
     val extensionContext: Context = new Context {
-      override def settings: WavesSettings                                                       = app.settings
-      override def blockchain: Blockchain                                                        = app.blockchainUpdater
-      override def rollbackTo(blockId: ByteStr): Task[Either[ValidationError, DiscardedBlocks]]  = rollbackTask(blockId, returnTxsToUtx = false)
-      override def time: Time                                                                    = app.time
-      override def wallet: Wallet                                                                = app.wallet
-      override def utx: UtxPool                                                                  = utxStorage
-      override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] = utxSynchronizer.publish(tx)
+      override def settings: WavesSettings                                                      = app.settings
+      override def blockchain: Blockchain                                                       = app.blockchainUpdater
+      override def rollbackTo(blockId: ByteStr): Task[Either[ValidationError, DiscardedBlocks]] = rollbackTask(blockId, returnTxsToUtx = false)
+      override def time: Time                                                                   = app.time
+      override def wallet: Wallet                                                               = app.wallet
+      override def utx: UtxPool                                                                 = utxStorage
+      override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] =
+        Await.result(utxSynchronizer.publish(tx), Duration.Inf) // TODO: Replace with async if possible
       override def spendableBalanceChanged: Observable[(Address, Asset)]                         = app.spendableBalanceChanged
       override def actorSystem: ActorSystem                                                      = app.actorSystem
       override def utxEvents: Observable[UtxEvent]                                               = app.utxEvents
@@ -334,7 +334,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         log.error(
           "Usage of the default api key hash (H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu) is prohibited, please change it in the waves.conf"
         )
-        forceStopApplication(InvalidApiKey)
+        forceStopApplication(Misconfiguration)
       }
 
       def loadBalanceHistory(address: Address): Seq[(Int, Long)] = db.readOnly { rdb =>
@@ -389,7 +389,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           mbSyncCacheSizes,
           scoreStatsReporter,
           configRoot,
-          loadBalanceHistory
+          loadBalanceHistory,
+          levelDB.loadStateHash
         ),
         AssetsApiRoute(
           settings.restAPISettings,
@@ -406,9 +407,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         RewardApiRoute(blockchainUpdater)
       )
 
-      val combinedRoute = CompositeHttpService(apiRoutes, settings.restAPISettings)(actorSystem).loggingCompositeRoute
+      val httpService = CompositeHttpService(apiRoutes, settings.restAPISettings)(actorSystem)
+      val combinedRoute = httpService.loggingCompositeRoute
       val httpFuture    = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       serverBinding = Await.result(httpFuture, 20.seconds)
+      serverBinding.whenTerminated.foreach(_ => httpService.scheduler.shutdown())
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
     }
 
@@ -488,15 +491,19 @@ object Application extends ScorexLogging {
   private[wavesplatform] def loadApplicationConfig(external: Option[File] = None): WavesSettings = {
     import com.wavesplatform.settings._
 
-    val config = loadConfig(external.map(ConfigFactory.parseFile))
+    val maybeExternalConfig = Try(external.map(ConfigFactory.parseFile(_, ConfigParseOptions.defaults().setAllowMissing(false))))
+    val config              = loadConfig(maybeExternalConfig.getOrElse(None))
 
     // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
     System.setProperty("waves.directory", config.getString("waves.directory"))
     if (config.hasPath("waves.config.directory")) System.setProperty("waves.config.directory", config.getString("waves.config.directory"))
 
-    external match {
-      case None    => log.debug("Config file not defined, TESTNET config will be used")
-      case Some(f) => if (!Files.exists(f.toPath)) log.warn(s"Config ${f.toPath.toAbsolutePath.toString} not found, TESTNET config will be used")
+    maybeExternalConfig match {
+      case Success(None) => log.warn("Config file not defined, TESTNET config will be used")
+      case Failure(exception) =>
+        log.error(s"Couldn't read ${external.get.toPath.toAbsolutePath}", exception)
+        forceStopApplication(Misconfiguration)
+      case _ => // Pass
     }
 
     val settings = WavesSettings.fromRootConfig(config)
@@ -556,7 +563,7 @@ object Application extends ScorexLogging {
       case "explore"                => Explorer.main(args.tail)
       case "util"                   => UtilApp.main(args.tail)
       case "help" | "--help" | "-h" => println("Usage: waves <config> | export | import | explore | util")
-      case _                        => startNode(args.headOption)
+      case _                        => startNode(args.headOption) // TODO: Consider adding option to specify network-name
     }
   }
 

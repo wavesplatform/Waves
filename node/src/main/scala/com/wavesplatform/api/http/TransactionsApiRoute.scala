@@ -24,8 +24,8 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
+import monix.eval.Task
 import monix.execution.Scheduler
-import monix.reactive.Observable
 import play.api.libs.json._
 
 import scala.concurrent.Future
@@ -195,34 +195,37 @@ case class TransactionsApiRoute(
     case t => t.json()
   }
 
-  def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr])(implicit sc: Scheduler): Future[List[JsObject]] =
-    Observable
-      .fromTask(commonApi.aliasesOfAddress(address).collect { case (_, cat) => cat.alias }.toListL)
-      .flatMap { aliases =>
-        val addressesCached = (aliases :+ address).toSet
+  def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr])(implicit sc: Scheduler): Future[List[JsObject]] = {
+    val aliasesOfAddress =
+      commonApi
+        .aliasesOfAddress(address)
+        .collect { case (_, cat) => cat.alias }
+        .toListL
+        .map(aliases => (address :: aliases).toSet)
+        .memoize
 
-        /**
-          * Produces compact representation for large transactions by stripping unnecessary data.
-          * Currently implemented for MassTransfer transaction only.
-          */
-        def txToCompactJson(address: Address, tx: Transaction): JsObject = {
-          import com.wavesplatform.transaction.transfer._
-          tx match {
-            case mtt: MassTransferTransaction if mtt.sender.toAddress != address => mtt.compactJson(addressesCached)
-            case _                                                               => txToExtendedJson(tx)
-          }
-        }
+    /**
+      * Produces compact representation for large transactions by stripping unnecessary data.
+      * Currently implemented for MassTransfer transaction only.
+      */
+    def txToCompactJson(address: Address, tx: Transaction): Task[JsObject] = {
+      import com.wavesplatform.transaction.transfer._
+      tx match {
+        case mtt: MassTransferTransaction if mtt.sender.toAddress != address => aliasesOfAddress.map(mtt.compactJson)
+        case _                                                               => Task.now(txToExtendedJson(tx))
+      }
+    }
 
-        commonApi
-          .transactionsByAddress(address, None, Set.empty, maybeAfter)
-          .take(limitParam)
-          .map {
-            case (height, tx, succeeded) =>
-              txToCompactJson(address, tx) ++ applicationStatus(isBlockV5(height), succeeded) + ("height" -> JsNumber(height))
-          }
+    commonApi
+      .transactionsByAddress(address, None, Set.empty, maybeAfter)
+      .take(limitParam)
+      .mapEval {
+        case (height, tx, succeeded) =>
+          txToCompactJson(address, tx).map(_ ++ applicationStatus(isBlockV5(height), succeeded) + ("height" -> JsNumber(height)))
       }
       .toListL
       .runToFuture
+  }
 
   private def isBlockV5(height: Int): Boolean = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height)
 }

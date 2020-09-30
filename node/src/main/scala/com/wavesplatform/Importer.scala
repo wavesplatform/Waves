@@ -94,7 +94,10 @@ object Importer extends ScorexLogging {
       .getOrElse(throw new IllegalArgumentException("Invalid options"))
   }
 
-  def loadSettings(file: File): WavesSettings = Application.loadApplicationConfig(Some(file))
+  def loadSettings(file: File): WavesSettings = {
+    val settings = Application.loadApplicationConfig(Some(file))
+    settings.copy(dbSettings = settings.dbSettings.copy(useBloomFilter = true))
+  }
 
   def initExtensions(
       wavesSettings: WavesSettings,
@@ -129,7 +132,7 @@ object Importer extends ScorexLogging {
               blockchainUpdater,
               utxPool,
               wallet,
-              _ => TracedResult.wrapE(Left(GenericError("Not implemented during import"))),
+              _ => Future.successful(TracedResult.wrapE(Left(GenericError("Not implemented during import")))),
               Application.loadBlockAt(db, blockchainUpdater)
             )
           override def blocksApi: CommonBlocksApi =
@@ -258,9 +261,28 @@ object Importer extends ScorexLogging {
     sys.addShutdownHook {
       quit = true
       Await.ready(Future.sequence(extensions.map(_.shutdown())), settings.extensionsShutdownTimeout)
-      Await.result(Kamon.stopModules(), 10.seconds)
       Await.result(actorSystem.terminate(), 10.second)
       lock.synchronized {
+        if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG)) {
+          // Force store liquid block in leveldb
+          val lastHeader = blockchainUpdater.lastBlockHeader.get.header
+          val pseudoBlock = Block(
+            BlockHeader(
+              blockchainUpdater.blockVersionAt(blockchainUpdater.height),
+              System.currentTimeMillis(),
+              blockchainUpdater.lastBlockId.get,
+              lastHeader.baseTarget,
+              lastHeader.generationSignature,
+              lastHeader.generator,
+              Nil,
+              0,
+              ByteStr.empty
+            ),
+            ByteStr.empty,
+            Nil
+          )
+          blockchainUpdater.processBlock(pseudoBlock, ByteStr.empty, verify = false)
+        }
         scheduler.shutdown()
         blockchainUpdater.shutdown()
         levelDb.close()
@@ -269,27 +291,6 @@ object Importer extends ScorexLogging {
     }
 
     startImport(bis, blockchainUpdater, extAppender, importOptions)
-
-    if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG)) {
-      // Force store liquid block in leveldb
-      val lastHeader = blockchainUpdater.lastBlockHeader.get.header
-      val pseudoBlock = Block(
-        BlockHeader(
-          blockchainUpdater.blockVersionAt(blockchainUpdater.height),
-          System.currentTimeMillis(),
-          blockchainUpdater.lastBlockId.get,
-          lastHeader.baseTarget,
-          lastHeader.generationSignature,
-          lastHeader.generator,
-          Nil,
-          0,
-          ByteStr.empty
-        ),
-        ByteStr.empty,
-        Nil
-      )
-
-      blockchainUpdater.processBlock(pseudoBlock, ByteStr.empty, verify = false)
-    }
+    Await.result(Kamon.stopModules(), 10.seconds)
   }
 }

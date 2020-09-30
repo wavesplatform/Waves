@@ -129,12 +129,10 @@ object Dependencies {
   )
 
   private[this] val levelDBJNA = {
-    val levelDbVersion = "1.22.1"
+    val levelDbVersion = "1.22.3"
     Seq(
       "com.wavesplatform.leveldb-jna" % "leveldb-jna-core"   % levelDbVersion,
-      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion classifier "linux-x86_64",
-      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion classifier "windows-x86_64",
-      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion classifier "osx"
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion
     )
   }
 
@@ -182,7 +180,7 @@ object Dependencies {
   }
 
   lazy val grpc: Seq[ModuleID] = Seq(
-    "io.grpc"              % "grpc-netty" % "1.31.1",
+    "io.grpc"              % "grpc-netty" % "1.31.1" /* scalapb.compiler.Version.grpcJavaVersion */,
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion,
     protoSchemasLib        % "protobuf"
   )
