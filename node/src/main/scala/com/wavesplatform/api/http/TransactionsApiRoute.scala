@@ -78,7 +78,7 @@ case class TransactionsApiRoute(
       case Some((height, t, succeeded)) =>
         val enrich = t match {
           case t: smart.InvokeScriptTransaction => Json.obj("сontinuationTransactionIds" -> commonApi.continuations(t.id()).map(_.toString))
-          case t: smart.ContinuationTransaction => Json.obj("сontinuationTtansactionIds" -> commonApi.continuations(t.invokeScriptTransactionId).map(_.toString))
+          case t: smart.ContinuationTransaction => Json.obj("сontinuationTransactionIds" -> commonApi.continuations(t.invokeScriptTransactionId).map(_.toString))
           case _ => Json.obj()
         }
         Json.obj(
