@@ -112,8 +112,7 @@ inScope(Global)(
       "-Ywarn-unused:-implicits",
       "-Xlint",
       "-opt:l:inline",
-      "-opt-inline-from:**",
-      "-target:jvm-1.8"
+      "-opt-inline-from:**"
     ),
     crossPaths := false,
     scalafmtOnCompile := false,
@@ -136,8 +135,7 @@ inScope(Global)(
     network := Network(sys.props.get("network")),
     resolvers += Resolver.sonatypeRepo("snapshots"),
     sources in (Compile, doc) := Seq.empty,
-    publishArtifact in (Compile, packageDoc) := false,
-    javacOptions ++= "-source 8 -target 8".split(' ').toSeq
+    publishArtifact in (Compile, packageDoc) := false
   )
 )
 
@@ -163,7 +161,6 @@ checkPRRaw := Def
   .sequential(
     root / clean,
     Def.task {
-      (`lang-jvm` / Compile / PB.generate).value
       (Test / compile).value
       (`lang-tests` / Test / test).value
       (`lang-js` / Compile / fastOptJS).value

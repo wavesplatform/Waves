@@ -71,7 +71,7 @@ object backpressure extends ScorexLogging {
           dest.onNext(f(elem)); Ack.Continue
         },
         dest.onError,
-        dest.onCompleted
+        () => dest.onCompleted()
       )
 
   }

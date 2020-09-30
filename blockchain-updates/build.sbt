@@ -8,14 +8,10 @@ extensionClasses += "com.wavesplatform.events.BlockchainUpdates"
 
 inConfig(Compile)(
   Seq(
-    PB.protoSources in Compile := Seq(PB.externalIncludePath.value, sourceDirectory.value / "protobuf"),
-    includeFilter in PB.generate := new SimpleFileFilter(
-      (f: File) => {
-        val name = f.getName
-        name == "blockchain_updates.proto" || name == "events_temp.proto" || (name.endsWith(".proto") && f.getParent
-          .contains("waves") && name != "events.proto")
-      }
-    ),
+    PB.protoSources in Compile := Seq(PB.externalIncludePath.value),
+    includeFilter in PB.generate := { (f: File) =>
+      (** / "waves" / "events" / ** / "*.proto").matches(f.toPath)
+    },
     PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value
   )
 )

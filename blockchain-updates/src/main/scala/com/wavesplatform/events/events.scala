@@ -147,7 +147,7 @@ object StateUpdate {
       case Some(_) => parentStateUpdate
       case None =>
         val minerBalance = blockchainBeforeWithMinerReward.balance(minerAddress, Waves)
-        parentStateUpdate.copy(balances = parentStateUpdate.balances :+ (minerAddress, Waves, minerBalance))
+        parentStateUpdate.copy(balances = parentStateUpdate.balances :+ ((minerAddress, Waves, minerBalance)))
     }
 
     val (txsStateUpdates, _) = txsDiffs
