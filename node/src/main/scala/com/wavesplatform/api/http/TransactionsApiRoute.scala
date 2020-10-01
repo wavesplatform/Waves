@@ -66,9 +66,18 @@ case class TransactionsApiRoute(
     } ~ path(TransactionId) { id =>
       commonApi.transactionById(id) match {
         case Some((h, either, succeeded)) =>
-          complete(txToExtendedJson(either.fold(identity, _._1)) ++ applicationStatusJsField(isBlockV5(h), succeeded) + ("height" -> JsNumber(h)))
+          val tx = either.fold(identity, _._1)
+          complete(txToExtendedJson(tx) ++ enrich(tx) ++ applicationStatusJsField(isBlockV5(h), succeeded) + ("height" -> JsNumber(h)))
         case None => complete(ApiError.TransactionDoesNotExist)
       }
+    }
+  }
+
+  private def enrich(t: Transaction) = {
+    t match {
+      case t: smart.InvokeScriptTransaction => Json.obj("сontinuationTransactionIds" -> commonApi.continuations(t.id()).map(_.toString))
+      case t: smart.ContinuationTransaction => Json.obj("сontinuationTransactionIds" -> commonApi.continuations(t.invokeScriptTransactionId).map(_.toString))
+      case _ => Json.obj()
     }
   }
 
@@ -76,16 +85,11 @@ case class TransactionsApiRoute(
     import Status._
     val statusJson = blockchain.transactionInfo(id) match {
       case Some((height, t, succeeded)) =>
-        val enrich = t match {
-          case t: smart.InvokeScriptTransaction => Json.obj("сontinuationTransactionIds" -> commonApi.continuations(t.id()).map(_.toString))
-          case t: smart.ContinuationTransaction => Json.obj("сontinuationTransactionIds" -> commonApi.continuations(t.invokeScriptTransactionId).map(_.toString))
-          case _ => Json.obj()
-        }
         Json.obj(
           "status"        -> Confirmed,
           "height"        -> height,
           "confirmations" -> (blockchain.height - height).max(0)
-        ) ++ applicationStatusJsField(isBlockV5(height), succeeded) ++ enrich
+        ) ++ applicationStatusJsField(isBlockV5(height), succeeded) ++ enrich(t)
       case None =>
         commonApi.unconfirmedTransactionById(id) match {
           case Some(_) => Json.obj("status" -> Unconfirmed)
@@ -133,7 +137,7 @@ case class TransactionsApiRoute(
       path(TransactionId) { id =>
         commonApi.unconfirmedTransactionById(id) match {
           case Some(tx) =>
-            complete(txToExtendedJson(tx))
+            complete(txToExtendedJson(tx) ++ enrich(tx))
           case None =>
             complete(ApiError.TransactionDoesNotExist)
         }
