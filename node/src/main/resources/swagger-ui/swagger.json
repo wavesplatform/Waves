@@ -275,10 +275,14 @@
               "application/json": {
                 "schema": {
                   "required": [
+                    "address",
                     "seed"
                   ],
                   "type": "object",
                   "properties": {
+                    "address": {
+                      "type": "string"
+                    },
                     "seed": {
                       "type": "string"
                     }
@@ -3254,48 +3258,7 @@
                             "format": "int64"
                           },
                           "issueTransaction": {
-                            "required": [
-                              "decimals",
-                              "description",
-                              "height",
-                              "id",
-                              "name",
-                              "quantity",
-                              "reissuable",
-                              "version"
-                            ],
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "string"
-                              },
-                              "height": {
-                                "type": "integer",
-                                "format": "int32"
-                              },
-                              "version": {
-                                "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
-                                "type": "string",
-                                "format": "byte"
-                              },
-                              "name": {
-                                "type": "string"
-                              },
-                              "description": {
-                                "type": "string"
-                              },
-                              "quantity": {
-                                "type": "integer",
-                                "format": "int64"
-                              },
-                              "reissuable": {
-                                "type": "boolean"
-                              },
-                              "decimals": {
-                                "type": "integer",
-                                "format": "int32"
-                              }
-                            }
+                            "$ref": "#/components/schemas/IssueTransaction"
                           }
                         }
                       }
@@ -3594,48 +3557,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "required": [
-                      "decimals",
-                      "description",
-                      "height",
-                      "id",
-                      "name",
-                      "quantity",
-                      "reissuable",
-                      "version"
-                    ],
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string"
-                      },
-                      "height": {
-                        "type": "integer",
-                        "format": "int32"
-                      },
-                      "version": {
-                        "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
-                        "type": "string",
-                        "format": "byte"
-                      },
-                      "name": {
-                        "type": "string"
-                      },
-                      "description": {
-                        "type": "string"
-                      },
-                      "quantity": {
-                        "type": "integer",
-                        "format": "int64"
-                      },
-                      "reissuable": {
-                        "type": "boolean"
-                      },
-                      "decimals": {
-                        "type": "integer",
-                        "format": "int32"
-                      }
-                    }
+                    "$ref": "#/definitions/AssetDetails"
                   }
                 }
               }
@@ -5093,6 +5015,7 @@
         }
       },
       "AssetDetails": {
+        "type": "object",
         "required": [
           "assetId",
           "decimals",
@@ -5107,7 +5030,6 @@
           "scriptDetails",
           "scripted"
         ],
-        "type": "object",
         "properties": {
           "assetId": {
             "type": "string"
@@ -5121,6 +5043,9 @@
             "format": "int64"
           },
           "issuer": {
+            "type": "string"
+          },
+          "issuerPublicKey": {
             "type": "string"
           },
           "name": {
@@ -5147,13 +5072,16 @@
             "type": "integer",
             "format": "int64"
           },
+          "originTransactionId": {
+            "type": "string"
+          },
           "scriptDetails": {
+            "type": "object",
             "required": [
               "script",
               "scriptComplexity",
               "scriptText"
             ],
-            "type": "object",
             "properties": {
               "scriptComplexity": {
                 "type": "integer",
@@ -5422,6 +5350,47 @@
           }
         }
       },
+      "BinaryEntry": {
+        "required": [
+          "key",
+          "type",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["binary"]
+          },
+          "value": {
+            "type": "string",
+            "format": "byte"
+          }
+        }
+      },
+      "BooleanEntry": {
+        "required": [
+          "key",
+          "type",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["boolean"]
+          },
+          "value": {
+            "type": "boolean"
+          }
+        }
+      },
       "DataEntry": {
         "required": [
           "key",
@@ -5449,6 +5418,62 @@
           }
         }
       },
+      "DeleteEntry": {
+        "required": [
+          "key",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "value": {
+            "type": "null"
+          }
+        }
+      },
+      "IntegerEntry": {
+        "required": [
+          "key",
+          "type",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["integer"]
+          },
+          "value": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "StringEntry": {
+        "required": [
+          "key",
+          "type",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["string"]
+          },
+          "value":{
+            "type": "string"
+          }
+        }
+      },
       "HashedMessage": {
         "required": [
           "hash",
@@ -5461,6 +5486,76 @@
           },
           "hash": {
             "type": "string"
+          }
+        }
+      },
+      "Order": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "senderPublicKey": {
+            "type": "string"
+          },
+          "matcherPublicKey": {
+            "type": "string"
+          },
+          "assetPair": {
+            "type": "object",
+            "properties": {
+              "amountAsset": {
+                "type": "string",
+                "nullable": true
+              },
+              "priceAsset": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          },
+          "orderType": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "price": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "timestamp": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expiration": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "matcherFee": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "proofs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "matcherFeeAssetId": {
+            "type": "string",
+            "format": "nullable"
           }
         }
       },
@@ -5695,6 +5790,1227 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "BurnTransaction": {
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "sender",
+          "senderPublicKey",
+          "fee",
+          "feeAssetId",
+          "timestamp",
+          "proofs",
+          "version",
+          "assetId",
+          "amount",
+          "chainId",
+          "applicationStatus"
+        ],
+        "properties": {
+          "type": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "senderPublicKey": {
+            "type": "string"
+          },
+          "fee": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "feeAssetId": {
+            "type": "string",
+            "format": "nullable"
+          },
+          "timestamp": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "proofs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "assetId": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "chainId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "applicationStatus": {
+            "type": "string"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "CreateAliasTransaction": {
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "sender",
+          "senderPublicKey",
+          "fee",
+          "feeAssetId",
+          "timestamp",
+          "proofs",
+          "version",
+          "alias",
+          "applicationStatus"
+        ],
+        "properties": {
+          "type": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "senderPublicKey": {
+            "type": "string"
+          },
+          "fee": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "feeAssetId": {
+            "type": "string",
+            "format": "nullable"
+          },
+          "timestamp": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "proofs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "chainId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "alias": {
+            "type": "string"
+          },
+          "applicationStatus": {
+            "type": "string"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "DataTransaction": {
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "sender",
+          "senderPublicKey",
+          "fee",
+          "feeAssetId",
+          "timestamp",
+          "proofs",
+          "version",
+          "data",
+          "applicationStatus"
+        ],
+        "properties": {
+          "type": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "senderPublicKey": {
+            "type": "string"
+          },
+          "fee": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "feeAssetId": {
+            "type": "string",
+            "format": "nullable"
+          },
+          "timestamp": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "proofs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "chainId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/BinaryEntry"
+                },
+                {
+                  "$ref": "#/components/schemas/BooleanEntry"
+                },
+                {
+                  "$ref": "#/components/schemas/DeleteEntry"
+                },
+                {
+                  "$ref": "#/components/schemas/IntegerEntry"
+                },
+                {
+                  "$ref": "#/components/schemas/StringEntry"
+                }
+              ]
+            }
+          },
+          "applicationStatus": {
+            "type": "string"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ExchangeTransaction": {
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "sender",
+          "senderPublicKey",
+          "fee",
+          "feeAssetId",
+          "timestamp",
+          "proofs",
+          "version",
+          "order1",
+          "order2",
+          "amount",
+          "price",
+          "buyMatcherFee",
+          "sellMatcherFee",
+          "applicationStatus"
+        ],
+        "properties": {
+          "type": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "senderPublicKey": {
+            "type": "string"
+          },
+          "fee": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "feeAssetId": {
+            "type": "string",
+            "format": "nullable"
+          },
+          "timestamp": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "proofs": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "order1": {
+            "$ref": "#/components/schemas/Order"
+          },
+          "order2": {
+            "$ref": "#/components/schemas/Order"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "price": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "buyMatcherFee": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sellMatcherFee": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "chainId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "applicationStatus": {
+            "type": "string"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "InvokeScriptTransaction": {
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "sender",
+          "senderPublicKey",
+          "fee",
+          "feeAssetId",
+          "timestamp",
+          "proofs",
+          "version",
+          "dApp",
+          "payment",
+          "call",
+          "applicationStatus"
+        ],
+        "properties": {
+          "type": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "senderPublicKey": {
+            "type": "string"
+          },
+          "fee": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "feeAssetId": {
+            "type": "string",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "proofs": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "chainId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "dApp": {
+            "type": "string"
+          },
+          "payment": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "assetId": {
+                  "type": "string",
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "call": {
+            "type": "object",
+            "properties": {
+              "function": {
+                "type": "string"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "required": [
+                    "type",
+                    "value"
+                  ],
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "binary",
+                        "boolean",
+                        "integer",
+                        "list",
+                        "string"
+                      ]
+                    },
+                    "value": {
+                      "type": "object",
+                      "properties": {},
+                      "description": "binary/boolean/integer/string value or list of { type, value } objects"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "applicationStatus": {
+                "type": "string"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "IssueTransaction": {
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "sender",
+          "senderPublicKey",
+          "fee",
+          "feeAssetId",
+          "timestamp",
+          "proofs",
+          "version",
+          "assetId",
+          "name",
+          "quantity",
+          "reissuable",
+          "decimals",
+          "description",
+          "script",
+          "chainId",
+          "applicationStatus"
+        ],
+        "properties": {
+          "type": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "senderPublicKey": {
+            "type": "string"
+          },
+          "fee": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "feeAssetId": {
+            "type": "string",
+            "format": "nullable"
+          },
+          "timestamp": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "proofs": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "assetId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reissuable": {
+            "type": "boolean"
+          },
+          "decimals": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "description": {
+            "type": "string"
+          },
+          "script": {
+            "type": "string"
+          },
+          "chainId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "applicationStatus": {
+            "type": "string"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "LeaseCancelTransaction": {
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "sender",
+          "senderPublicKey",
+          "fee",
+          "feeAssetId",
+          "timestamp",
+          "proofs",
+          "version",
+          "leaseId",
+          "chainId",
+          "applicationStatus"
+        ],
+        "properties": {
+          "type": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "senderPublicKey": {
+            "type": "string"
+          },
+          "fee": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "feeAssetId": {
+            "type": "string",
+            "format": "nullable"
+          },
+          "timestamp": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "proofs": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "leaseId": {
+            "type": "string"
+          },
+          "chainId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lease": {
+            "$ref": "#/components/schemas/LeaseTransaction"
+          },
+          "applicationStatus": {
+            "type": "string"
+          },
+          "height": {
+            "type": "integer",
+             "format": "int32"
+          }
+        }
+      },
+      "LeaseTransaction": {
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "sender",
+          "senderPublicKey",
+          "fee",
+          "feeAssetId",
+          "timestamp",
+          "proofs",
+          "version",
+          "amount",
+          "recipient",
+          "applicationStatus"
+        ],
+        "properties": {
+          "type": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "senderPublicKey": {
+            "type": "string"
+          },
+          "fee": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "feeAssetId": {
+            "type": "string",
+            "format": "nullable"
+          },
+          "timestamp": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "proofs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "chainId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recipient": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "applicationStatus": {
+            "type": "string"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "MassTransferTransaction": {
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "sender",
+          "senderPublicKey",
+          "fee",
+          "feeAssetId",
+          "timestamp",
+          "proofs",
+          "version",
+          "assetId",
+          "attachment",
+          "transfersCount",
+          "totalAmount",
+          "transfers",
+          "applicationStatus"
+        ],
+        "properties": {
+          "type": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "senderPublicKey": {
+                "type": "string"
+          },
+          "fee": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "feeAssetId": {
+            "type": "string",
+            "format": "nullable"
+          },
+          "timestamp": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "proofs": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "chainId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "assetId": {
+            "type": "string"
+          },
+          "attachment": {
+            "type": "string"
+          },
+          "transferCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalAmount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "transfers": {
+            "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "recipient": {
+                    "type": "string"
+                  },
+                  "amount": {
+                    "type": "integer",
+                    "format": "int64"
+                  }
+                }
+              }
+            },
+          "applicationStatus": {
+            "type": "string"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ReissueTransaction": {
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "sender",
+          "senderPublicKey",
+          "fee",
+          "feeAssetId",
+          "timestamp",
+          "proofs",
+          "version",
+          "assetId",
+          "quantity",
+          "reissuable",
+          "chainId",
+          "applicationStatus"
+        ],
+        "properties": {
+          "type": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "senderPublicKey": {
+            "type": "string"
+          },
+          "fee": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "feeAssetId": {
+            "type": "string",
+            "format": "nullable"
+          },
+          "timestamp": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "proofs": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "assetId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reissuable": {
+            "type": "boolean"
+          },
+          "chainId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "applicationStatus": {
+            "type": "string"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "SetAssetScriptTransaction": {
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "sender",
+          "senderPublicKey",
+          "fee",
+          "feeAssetId",
+          "timestamp",
+          "proofs",
+          "version",
+          "assetId",
+          "script",
+          "chainId",
+          "applicationStatus"
+        ],
+        "properties": {
+          "type": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "senderPublicKey": {
+                "type": "string"
+          },
+          "fee": {
+             "type": "integer",
+             "format": "int32"
+          },
+          "feeAssetId": {
+            "type": "string",
+            "format": "nullable"
+          },
+          "timestamp": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "proofs": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "assetId": {
+            "type": "string"
+          },
+          "script": {
+            "type": "string",
+            "format": "byte"
+          },
+          "chainId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "applicationStatus": {
+            "type": "string"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "SetScriptTransaction": {
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "sender",
+          "senderPublicKey",
+          "fee",
+          "feeAssetId",
+          "timestamp",
+          "proofs",
+          "version",
+          "script",
+          "chainId",
+          "applicationStatus"
+        ],
+        "properties": {
+          "type": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "senderPublicKey": {
+            "type": "string"
+          },
+          "fee": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "feeAssetId": {
+            "type": "string",
+            "format": "nullable"
+          },
+          "timestamp": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "proofs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "script": {
+            "type": "string",
+            "format": "byte"
+          },
+          "chainId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "applicationStatus": {
+            "type": "string"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "SponsorFeeTransaction": {
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "sender",
+          "senderPublicKey",
+          "fee",
+          "feeAssetId",
+          "timestamp",
+          "proofs",
+          "version",
+          "assetId",
+          "minSponsoredAssetFee",
+          "applicationStatus"
+        ],
+        "properties": {
+          "type": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "senderPublicKey": {
+            "type": "string"
+          },
+          "fee": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "feeAssetId": {
+            "type": "string",
+            "format": "nullable"
+          },
+          "timestamp": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "proofs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "chainId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "assetId": {
+            "type": "string"
+          },
+          "minSponsoredAssetFee": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "applicationStatus": {
+            "type": "string"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "TransferTransaction": {
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "sender",
+          "senderPublicKey",
+          "fee",
+          "feeAssetId",
+          "timestamp",
+          "proofs",
+          "version",
+          "recipient",
+          "assetId",
+          "amount",
+          "attachment",
+          "applicationStatus"
+        ],
+        "properties": {
+          "type": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "senderPublicKey": {
+            "type": "string"
+          },
+          "fee": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "feeAssetId": {
+            "type": "string",
+            "format": "nullable"
+          },
+          "timestamp": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "proofs": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "chainId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recipient": {
+            "type": "string"
+          },
+          "assetId": {
+            "type": "string"
+          },
+          "feeAsset": {
+            "type": "string",
+            "format": "nullable"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "attachment": {
+            "type": "string"
+          },
+          "applicationStatus": {
+            "type": "string"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }  
+      },
+      "UpdateAssetInfoTransaction": {
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "sender",
+          "senderPublicKey",
+          "fee",
+          "feeAssetId",
+          "timestamp",
+          "proofs",
+          "version",
+          "chainId",
+          "assetId",
+          "name",
+          "description",
+          "applicationStatus"
+        ],
+        "properties": {
+          "type": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "senderPublicKey": {
+            "type": "string"
+          },
+          "fee": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "feeAssetId": {
+            "type": "string",
+            "format": "nullable"
+          },
+          "timestamp": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "proofs": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "assetId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "applicationStatus": {
+            "type": "string"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       }
