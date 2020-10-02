@@ -26,7 +26,7 @@ import monix.eval.Coeval
 import org.scalatest.OptionValues
 
 class ContinuationSuite extends BaseTransactionSuite with OptionValues {
-  private val activationHeight = 5
+  private val activationHeight = 10
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
@@ -180,6 +180,9 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
             .blockSeq(invoke.height, completionHeight)
             .flatMap(_.transactions)
             .filter(tx => tx._type == ContinuationTransaction.typeId && tx.invokeScriptTransactionId.contains(invokeId))
+        for((t,b) <- invoke.сontinuationTransactionIds.get.zip(continuations.map(_.id))) {
+          t shouldBe b
+        }
 
         invoke.applicationStatus.value shouldBe "script_execution_in_progress"
         continuations.dropRight(1).foreach(_.applicationStatus.value shouldBe "script_execution_in_progress")
