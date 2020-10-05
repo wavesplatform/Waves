@@ -91,7 +91,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       args = Nil,
       payment = Seq(Payment(1.waves, Waves)),
       fee = 1.waves,
-      version = TxVersion.V2,
+      version = TxVersion.V3,
       waitForTx = true
     )
     waitForContinuation(invoke._1.id)
@@ -110,7 +110,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       func = Some("foo"),
       args = Nil,
       fee = 1.waves,
-      version = TxVersion.V2,
+      version = TxVersion.V3,
       waitForTx = true
     )
     sendTransactions(dApp)
@@ -129,7 +129,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       func = Some("foo"),
       args = Nil,
       fee = 1.waves,
-      version = TxVersion.V2,
+      version = TxVersion.V3,
       waitForTx = true
     )
     sendTransactions(caller)
@@ -145,7 +145,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       args = Nil,
       payment = Seq(Payment(1.waves, Waves)),
       fee = invokeFee,
-      version = TxVersion.V2
+      version = TxVersion.V3
     )
 
     assertBadRequestAndMessage(

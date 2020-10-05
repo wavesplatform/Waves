@@ -49,7 +49,7 @@ object InvokeScriptTransaction extends TransactionParser {
   type TransactionT = InvokeScriptTransaction
 
   override val typeId: TxType                    = 16: Byte
-  override val supportedVersions: Set[TxVersion] = Set(1, 2)
+  override val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
 
   implicit val validator: TxValidator[InvokeScriptTransaction] = InvokeScriptTxValidator
 

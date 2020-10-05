@@ -75,8 +75,8 @@ case class TransactionsApiRoute(
 
   private def enrich(t: Transaction) = {
     t match {
-      case t: smart.InvokeScriptTransaction => Json.obj("сontinuationTransactionIds" -> commonApi.continuations(t.id()).map(_.toString))
       case t: smart.ContinuationTransaction => Json.obj("сontinuationTransactionIds" -> commonApi.continuations(t.invokeScriptTransactionId).map(_.toString))
+      case t: smart.InvokeScriptTransaction if t.version == TxVersion.V3 => Json.obj("сontinuationTransactionIds" -> commonApi.continuations(t.id()).map(_.toString))
       case _ => Json.obj()
     }
   }
