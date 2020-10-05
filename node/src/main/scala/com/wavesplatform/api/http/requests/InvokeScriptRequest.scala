@@ -77,6 +77,7 @@ case class InvokeScriptRequest(
     sender: String,
     fee: Long,
     feeAssetId: Option[String],
+    feeIncreaseFactor: Int,
     call: Option[InvokeScriptRequest.FunctionCallPart],
     payment: Seq[InvokeScriptTransaction.Payment],
     dApp: String,
@@ -88,6 +89,7 @@ case class SignedInvokeScriptRequest(
     senderPublicKey: String,
     fee: Long,
     feeAssetId: Option[String],
+    feeIncreaseFactor: Int,
     dApp: String,
     call: Option[InvokeScriptRequest.FunctionCallPart],
     payment: Option[Seq[InvokeScriptTransaction.Payment]],
@@ -107,6 +109,7 @@ case class SignedInvokeScriptRequest(
         payment.getOrElse(Seq()),
         fee,
         _feeAssetId,
+        feeIncreaseFactor,
         timestamp,
         proofs
       )

@@ -28,7 +28,7 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
     def checkLength =
       if (tx.isProtobufVersion)
         PBTransactions
-          .toPBInvokeScriptData(tx.dAppAddressOrAlias, tx.funcCallOpt, tx.payments)
+          .toPBInvokeScriptData(tx.dAppAddressOrAlias, tx.funcCallOpt, tx.payments, feeIncreaseFactor)
           .toByteArray
           .length <= ContractLimits.MaxInvokeScriptSizeInBytes
       else tx.bytes().length <= ContractLimits.MaxInvokeScriptSizeInBytes
