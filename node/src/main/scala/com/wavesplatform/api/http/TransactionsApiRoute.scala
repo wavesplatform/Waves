@@ -75,7 +75,13 @@ case class TransactionsApiRoute(
 
   private def enrich(t: Transaction) = {
     t match {
-      case t: smart.ContinuationTransaction => Json.obj("сontinuationTransactionIds" -> commonApi.continuations(t.invokeScriptTransactionId).map(_.toString))
+      case t: smart.ContinuationTransaction => 
+        import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer.functionCallToJson
+        val isId = t.invokeScriptTransactionId
+        blockchain.transactionInfo(isId) match {
+          case Some((_, invoke: smart.InvokeScriptTransaction, _)) => Json.obj("сontinuationTransactionIds" -> commonApi.continuations(isId).map(_.toString), "call" -> invoke.funcCallOpt.map(functionCallToJson))
+          case _ => ???
+        }
       case t: smart.InvokeScriptTransaction if t.version == TxVersion.V3 => Json.obj("сontinuationTransactionIds" -> commonApi.continuations(t.id()).map(_.toString))
       case _ => Json.obj()
     }
