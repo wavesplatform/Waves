@@ -55,7 +55,7 @@ object TransactionDiffer {
   /**
     * Validates transaction.
     * @param limitedExecution skip execution of the DApp and asset scripts
-    * @param verify validate common checks, proofs and asset scripts execution. If `skipFailing` is true asset scripts will not be executed
+    * @param verify validate common checks, proofs and asset scripts execution. If `limitedExecution` is true asset scripts will not be executed
     */
   private def validate(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, verify: Boolean, limitedExecution: Boolean)(
       blockchain: Blockchain,

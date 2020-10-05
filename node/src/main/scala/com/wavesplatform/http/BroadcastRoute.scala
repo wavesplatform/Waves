@@ -19,17 +19,17 @@ trait BroadcastRoute { _: ApiRoute =>
         tx =>
           utxPoolSynchronizer
             .publish(tx)
-            .map(
-              _.transformE(
+            .map { tr =>
+              tr.transformE(
                 _.bimap(
                   ApiError.fromValidationError,
                   _ =>
                     tx.json() ++ params
                       .get("trace")
-                      .fold(Json.obj())(_ => Json.obj("trace" -> utxPoolSynchronizer.publish(tx).trace.map(_.loggedJson)))
+                      .fold(Json.obj())(_ => Json.obj("trace" -> tr.trace.map(_.loggedJson)))
                 )
               )
-            )
+            }
       )
     }
   }
