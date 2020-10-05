@@ -594,7 +594,7 @@ object PBTransactions {
         val data = SponsorFeeTransactionData(Some(Amount(assetId.id.toByteString, minSponsoredAssetFee.getOrElse(0L))))
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.SponsorFee(data))
 
-      case vt.smart.InvokeScriptTransaction(version, sender, dappAddress, fcOpt, payment, fee, feeAssetId, timestamp, proofs, chainId) =>
+      case vt.smart.InvokeScriptTransaction(version, sender, dappAddress, fcOpt, payment, fee, feeAssetId, timestamp, proofs, chainId, feeIncreaseFactor) =>
         val data = Data.InvokeScript(toPBInvokeScriptData(dappAddress, fcOpt, payment))
         PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, version, proofs, data)
 

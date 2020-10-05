@@ -27,7 +27,8 @@ case class InvokeScriptTransaction(
     feeAssetId: Asset,
     timestamp: TxTimestamp,
     proofs: Proofs,
-    chainId: Byte
+    chainId: Byte,
+    feeIncreaseFactor: Int = 1
 ) extends ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InCustomAsset
