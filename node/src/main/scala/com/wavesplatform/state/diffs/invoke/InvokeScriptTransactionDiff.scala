@@ -24,9 +24,7 @@ import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult,
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.metrics._
-import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
@@ -66,32 +64,7 @@ object InvokeScriptTransactionDiff {
           }
 
           stepLimit = ContractLimits.MaxComplexityByVersion(version)
-          stepsNumber = if (invocationComplexity % stepLimit == 0)
-            invocationComplexity / stepLimit
-          else
-            invocationComplexity / stepLimit + 1
-
-          stepsInfo = if (stepsNumber > 1) s" with $stepsNumber invocation steps" else ""
-
-          feeIncreaseFactorInfo =
-            if (stepsNumber > 1 && tx.feeIncreaseFactor > 100)
-              s" and fee increase factor = ${tx.feeIncreaseFactor}"
-            else
-              ""
-
-          _ <- TracedResult {
-            val minFee    = math.ceil((FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber * tx.feeIncreaseFactor) / InvokeScriptTransaction.DefaultFeeIncreaseFactor).toLong
-            val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
-            val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
-            Either.cond(
-              feeInfo._1 >= minFee,
-              (),
-              GenericError(
-                s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)$stepsInfo$feeIncreaseFactorInfo " +
-                  s"does not exceed minimal value of $minFee WAVES."
-              )
-            )
-          }
+          _ <- InvokeDiffsCommon.checkFee(tx, blockchain, feeInfo._1, stepLimit, invocationComplexity, issueList = Nil, actionScriptInvoked = 0)
 
           result <- for {
             scriptResult <- {
@@ -142,10 +115,10 @@ object InvokeScriptTransactionDiff {
                     fullLimit
 
                 for {
-                  (failFreeResult, evaluationCtx, failFreeLog) <- evaluateV2(version, contract, directives, invocation, environment, failFreeLimit, continuationFirstStepMode = stepsNumber > 1)
+                  (failFreeResult, evaluationCtx, failFreeLog) <- evaluateV2(version, contract, directives, invocation, environment, failFreeLimit, continuationFirstStepMode = invocationComplexity > stepLimit)
                   (result, log) <- failFreeResult match {
                     case IncompleteResult(expr, unusedComplexity) if !limitedExecution =>
-                      continueEvaluation(version, expr, evaluationCtx, fullLimit - failFreeLimit + unusedComplexity, tx.id(), invocationComplexity, continuationFirstStepMode = stepsNumber > 1)
+                      continueEvaluation(version, expr, evaluationCtx, fullLimit - failFreeLimit + unusedComplexity, tx.id(), invocationComplexity, continuationFirstStepMode = invocationComplexity > stepLimit)
                     case _ =>
                       Right((failFreeResult, Nil))
                   }
