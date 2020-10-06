@@ -8,7 +8,7 @@ import cats.instances.try_._
 import cats.syntax.alternative._
 import cats.syntax.either._
 import cats.syntax.traverse._
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.block.Block
@@ -79,7 +79,13 @@ case class TransactionsApiRoute(
         import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer.functionCallToJson
         val isId = t.invokeScriptTransactionId
         blockchain.transactionInfo(isId) match {
-          case Some((_, invoke: smart.InvokeScriptTransaction, _)) => Json.obj("сontinuationTransactionIds" -> commonApi.continuations(isId).map(_.toString), "call" -> invoke.funcCallOpt.map(functionCallToJson))
+          case Some((_, invoke: smart.InvokeScriptTransaction, _)) => Json.obj(
+            "сontinuationTransactionIds" -> commonApi.continuations(isId).map(_.toString),
+            "call" -> invoke.funcCallOpt.map(functionCallToJson),
+            "dApp" -> (invoke.dAppAddressOrAlias match {
+              case a: Alias => blockchain.resolveAlias(a).fold(_ => a.stringRepr, _.stringRepr)
+              case a => a.stringRepr
+            }))
           case _ => ???
         }
       case t: smart.InvokeScriptTransaction if t.version == TxVersion.V3 => Json.obj("сontinuationTransactionIds" -> commonApi.continuations(t.id()).map(_.toString))
