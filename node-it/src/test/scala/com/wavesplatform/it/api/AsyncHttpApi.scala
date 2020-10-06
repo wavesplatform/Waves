@@ -469,7 +469,7 @@ object AsyncHttpApi extends Assertions {
         payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
         fee: Long = 500000,
         feeAssetId: Option[String] = None,
-        feeIncreaseFactor: Float,
+        feeIncreaseFactor: Int,
         version: TxVersion = TxVersion.V1
     ): Future[(Transaction, JsValue)] =
       signedTraceBroadcast(
@@ -496,7 +496,7 @@ object AsyncHttpApi extends Assertions {
         payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
         fee: Long = 500000,
         feeAssetId: Option[String] = None,
-        feeIncreaseFactor: Float,
+        feeIncreaseFactor: Int,
         version: TxVersion = TxVersion.V1
     ): Future[(JsValue, JsValue)] = {
       val jsObject = InvokeScriptTransaction(

@@ -452,7 +452,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
         val fee = 150000000L
         val issue =
           InvokeScriptTransaction
-            .selfSigned(2.toByte, invoker, dApp.toAddress, Some(fc), Seq.empty, fee, Waves, feeIncreaseFactor = 1, nextTs)
+            .selfSigned(2.toByte, invoker, dApp.toAddress, Some(fc), Seq.empty, fee, Waves, feeIncreaseFactor = 100, nextTs)
             .explicitGet()
 
         d.appendBlock(
