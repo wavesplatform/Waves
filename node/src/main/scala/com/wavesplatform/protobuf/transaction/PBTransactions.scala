@@ -599,7 +599,7 @@ object PBTransactions {
       case vt.smart.InvokeScriptTransaction(
           version,
           sender,
-          dappAddress,
+          dAppAddress,
           fcOpt,
           payment,
           fee,
@@ -609,7 +609,7 @@ object PBTransactions {
           proofs,
           chainId
       ) =>
-        val data = Data.InvokeScript(toPBInvokeScriptData(dappAddress, fcOpt, payment, feeIncreaseFactor))
+        val data = Data.InvokeScript(toPBInvokeScriptData(dAppAddress, fcOpt, payment, feeIncreaseFactor))
         PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, version, proofs, data)
 
       case tx @ vt.assets.UpdateAssetInfoTransaction(version, sender, assetId, name, description, timestamp, _, _, proofs, chainId) =>
