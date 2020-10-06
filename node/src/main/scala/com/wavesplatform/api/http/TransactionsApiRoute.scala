@@ -85,7 +85,9 @@ case class TransactionsApiRoute(
             "dApp" -> (invoke.dAppAddressOrAlias match {
               case a: Alias => blockchain.resolveAlias(a).fold(_ => a.stringRepr, _.stringRepr)
               case a => a.stringRepr
-            }))
+            }),
+            "feeIncreaseFactor" -> invoke.feeIncreaseFactor / 100.0
+          )
           case _ => ???
         }
       case t: smart.InvokeScriptTransaction if t.version == TxVersion.V3 => Json.obj("сontinuationTransactionIds" -> commonApi.continuations(t.id()).map(_.toString))
