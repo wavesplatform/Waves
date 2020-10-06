@@ -153,7 +153,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
         Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
         100000,
         Waves,
-        feeIncreaseFactor = 100,
+        feeIncreaseFactor = InvokeScriptTransaction.DefaultFeeIncreaseFactor,
         1526910778245L
       )
       .explicitGet()
@@ -193,7 +193,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
         Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
         100000,
         Waves,
-        feeIncreaseFactor = 100,
+        feeIncreaseFactor = InvokeScriptTransaction.DefaultFeeIncreaseFactor,
         1526910778245L
       )
       .explicitGet()
@@ -239,7 +239,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       Seq(),
       1,
       Waves,
-      feeIncreaseFactor = 100,
+      feeIncreaseFactor = InvokeScriptTransaction.DefaultFeeIncreaseFactor,
       1,
       Proofs.empty
     ) should produce("more than 22 arguments")
@@ -261,7 +261,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
         Seq(),
         1,
         Waves,
-        feeIncreaseFactor = 100,
+        feeIncreaseFactor = InvokeScriptTransaction.DefaultFeeIncreaseFactor,
         1,
         Proofs.empty
       )
@@ -284,7 +284,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       Seq(),
       1,
       Waves,
-      feeIncreaseFactor = 100,
+      feeIncreaseFactor = InvokeScriptTransaction.DefaultFeeIncreaseFactor,
       1,
       Proofs.empty,
     ) should produce("is unsupported")
@@ -302,7 +302,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       Seq(),
       1,
       Waves,
-      feeIncreaseFactor = 100,
+      feeIncreaseFactor = InvokeScriptTransaction.DefaultFeeIncreaseFactor,
       1,
       Proofs.empty
     ) should produce("TooBigArray")

@@ -100,6 +100,6 @@ object InvokeScriptTxSerializer {
     val fee          = buf.getLong
     val feeAssetId   = buf.getAsset
     val timestamp    = buf.getLong
-    InvokeScriptTransaction(TxVersion.V1, sender, dApp, functionCall, payments, fee, feeAssetId, feeIncreaseFactor = 100, timestamp, buf.getProofs, chainId)
+    InvokeScriptTransaction(TxVersion.V1, sender, dApp, functionCall, payments, fee, feeAssetId, feeIncreaseFactor = InvokeScriptTransaction.DefaultFeeIncreaseFactor, timestamp, buf.getProofs, chainId)
   }
 }

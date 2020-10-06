@@ -109,7 +109,7 @@ case class SignedInvokeScriptRequest(
         payment.getOrElse(Seq()),
         fee,
         _feeAssetId,
-        feeIncreaseFactor.getOrElse(100),
+        feeIncreaseFactor.getOrElse(InvokeScriptTransaction.DefaultFeeIncreaseFactor),
         timestamp,
         proofs
       )
