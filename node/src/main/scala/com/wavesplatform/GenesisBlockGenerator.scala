@@ -9,12 +9,14 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.PoSSelector
+import com.wavesplatform.consensus.PoSCalculator.{generationSignature, hit}
+import com.wavesplatform.consensus.{FairPoSCalculator, NxtPoSCalculator, PoSCalculator}
 import com.wavesplatform.crypto._
+import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, GenesisTransactionSettings, RewardsSettings}
-import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.state._
+import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, Transaction}
@@ -28,42 +30,39 @@ import scala.concurrent.duration._
 
 object GenesisBlockGenerator extends App {
 
-  private type AccountName = String
-  private type SeedText    = String
-  private type Share       = Long
+  private type SeedText = String
+  private type Share    = Long
 
-  case class DistributionItem(seedText: String, nonce: Int, amount: Share)
+  case class DistributionItem(seedText: String, nonce: Int, amount: Share, miner: Boolean = true)
 
   case class Settings(
       networkType: String,
-      initialBalance: Share,
       baseTarget: Option[Long],
       averageBlockDelay: FiniteDuration,
       timestamp: Option[Long],
-      distributions: Map[AccountName, DistributionItem],
-      preActivatedFeatures: Option[List[Int]]
+      distributions: List[DistributionItem],
+      preActivatedFeatures: Option[List[Int]],
+      minBlockTime: Option[FiniteDuration],
+      delayDelta: Option[Int]
   ) {
 
-    private[this] val distributionsSum = distributions.values.map(_.amount).sum
-    require(
-      distributionsSum == initialBalance,
-      s"The sum of all balances should be == $initialBalance, but it is $distributionsSum"
-    )
+    val initialBalance: Share = distributions.map(_.amount).sum
 
     val chainId: Byte = networkType.head.toByte
 
-    def blockchainSettings(genesisSettings: GenesisSettings): BlockchainSettings =
-      BlockchainSettings(
-        networkType.head,
-        FunctionalitySettings(
-          Int.MaxValue,
-          Int.MaxValue,
-          preActivatedFeatures = preActivatedFeatures.getOrElse(List()).map(f => f.toShort -> 0).toMap,
-          doubleFeaturesPeriodsAfterHeight = Int.MaxValue
-        ),
-        genesisSettings,
-        RewardsSettings(Int.MaxValue, Long.MaxValue, Long.MaxValue, Int.MaxValue)
-      )
+    private val features: Map[Short, Int] =
+      preActivatedFeatures.getOrElse(List(BlockchainFeatures.FairPoS.id.toInt, BlockchainFeatures.BlockV5.id.toInt)).map(f => f.toShort -> 0).toMap
+
+    val functionalitySettings: FunctionalitySettings = FunctionalitySettings(
+      Int.MaxValue,
+      Int.MaxValue,
+      preActivatedFeatures = features,
+      doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
+      minBlockTime = minBlockTime.getOrElse(15.seconds),
+      delayDelta = delayDelta.getOrElse(8)
+    )
+
+    def preActivated(feature: BlockchainFeature): Boolean = features.contains(feature.id)
   }
 
   case class FullAddressInfo(
@@ -73,7 +72,8 @@ object GenesisBlockGenerator extends App {
       accountPrivateKey: ByteStr,
       accountPublicKey: ByteStr,
       accountAddress: Address,
-      account: KeyPair
+      account: KeyPair,
+      miner: Boolean
   )
 
   private def toFullAddressInfo(item: DistributionItem): FullAddressInfo = {
@@ -87,7 +87,8 @@ object GenesisBlockGenerator extends App {
       accountPrivateKey = acc.privateKey,
       accountPublicKey = acc.publicKey,
       accountAddress = acc.toAddress,
-      acc
+      acc,
+      item.miner
     )
   }
 
@@ -108,39 +109,35 @@ object GenesisBlockGenerator extends App {
     override val chainId: Byte = settings.chainId
   }
 
-  val shares: Seq[(AccountName, FullAddressInfo, Share)] = settings.distributions
-    .map {
-      case (accountName, x) => (accountName, toFullAddressInfo(x), x.amount)
-    }
-    .toSeq
-    .sortBy(_._1)
+  val shares: Seq[(FullAddressInfo, Share)] = settings.distributions
+    .map(x => (toFullAddressInfo(x), x.amount))
+    .sortBy(_._2)
 
   val timestamp = settings.timestamp.getOrElse(System.currentTimeMillis())
 
   val genesisTxs: Seq[GenesisTransaction] = shares.map {
-    case (_, addrInfo, part) =>
+    case (addrInfo, part) =>
       GenesisTransaction(addrInfo.accountAddress, part, timestamp, ByteStr.empty, settings.chainId)
   }
 
   report(
-    addrInfos = shares.map(x => (x._1, x._2)),
+    addrInfos = shares.map(_._1),
     settings = genesisSettings(settings.baseTarget)
   )
 
-  private def report(addrInfos: Iterable[(AccountName, FullAddressInfo)], settings: GenesisSettings): Unit = {
+  private def report(addrInfos: Iterable[FullAddressInfo], settings: GenesisSettings): Unit = {
     val output = new StringBuilder(8192)
     output.append("Addresses:\n")
-    addrInfos.foreach {
-      case (accountName, acc) =>
-        output.append(s"""$accountName:
-                         | Seed text:           ${acc.seedText}
-                         | Seed:                ${acc.seed}
-                         | Account seed:        ${acc.accountSeed}
-                         | Private account key: ${acc.accountPrivateKey}
-                         | Public account key:  ${acc.accountPublicKey}
-                         | Account address:     ${acc.accountAddress}
-                         |
-                         |""".stripMargin)
+    addrInfos.foreach { acc =>
+      output.append(s"""
+             | Seed text:           ${acc.seedText}
+             | Seed:                ${acc.seed}
+             | Account seed:        ${acc.accountSeed}
+             | Private account key: ${acc.accountPrivateKey}
+             | Public account key:  ${acc.accountPublicKey}
+             | Account address:     ${acc.accountAddress}
+             | ===
+             |""".stripMargin)
     }
 
     val confBody = s"""genesis {
@@ -162,25 +159,16 @@ object GenesisBlockGenerator extends App {
     outputConfFile.foreach(ocf => Files.write(ocf.toPath, confBody.utf8Bytes))
   }
 
-  def genesisSettings(predefined: Option[Long]): GenesisSettings = {
+  def genesisSettings(predefined: Option[Long]): GenesisSettings =
     predefined
-      .map(baseTarget => mkGenesisSettings(mkGenesisBlock(baseTarget)))
-      .getOrElse {
-        @tailrec
-        def loop(bt: Long): GenesisSettings = {
-          checkBaseTarget(bt) match {
-            case None          => loop(bt + 1)
-            case Some(genesis) => mkGenesisSettings(genesis)
-          }
-        }
-        loop(1)
-      }
-  }
+      .map(baseTarget => mkGenesisSettings(baseTarget))
+      .getOrElse(mkGenesisSettings(calcInitialBaseTarget()))
 
-  def mkGenesisBlock(baseTarget: Long): Block = {
+  def mkGenesisSettings(baseTarget: Long): GenesisSettings = {
     val reference     = ByteStr(Array.fill(SignatureLength)(-1: Byte))
     val genesisSigner = KeyPair(ByteStr.empty)
-    Block
+
+    val genesis = Block
       .buildAndSign(
         version = 1,
         timestamp = timestamp,
@@ -193,9 +181,7 @@ object GenesisBlockGenerator extends App {
         rewardVote = -1L
       )
       .explicitGet()
-  }
 
-  def mkGenesisSettings(genesis: Block): GenesisSettings =
     GenesisSettings(
       genesis.header.timestamp,
       timestamp,
@@ -207,24 +193,53 @@ object GenesisBlockGenerator extends App {
       genesis.header.baseTarget,
       settings.averageBlockDelay
     )
+  }
 
-  def checkBaseTarget(bt: Long): Option[Block] = {
-    val genesis         = mkGenesisBlock(bt)
-    val genesisSettings = mkGenesisSettings(genesis)
+  def calcInitialBaseTarget(): Long = {
+    val posCalculator: PoSCalculator =
+      if (settings.preActivated(BlockchainFeatures.FairPoS))
+        if (settings.preActivated(BlockchainFeatures.BlockV5)) FairPoSCalculator.fromSettings(settings.functionalitySettings)
+        else FairPoSCalculator.V1
+      else NxtPoSCalculator
 
-    val pos = PoSSelector(InitialBlockchain(genesis.header.generationSignature, settings.blockchainSettings(genesisSettings)), None)
-    shares
-      .map {
-        case (_, accountInfo, amount) =>
-          timestamp + pos.getValidBlockDelay(1, accountInfo.account, genesis.header.baseTarget, amount).explicitGet()
-      }
-      .find { nextGenTime =>
-        timestamp + settings.averageBlockDelay.toMillis == nextGenTime
-      }
-      .map { nextGenTime =>
-        System.out.println(s"Next generation time: $nextGenTime")
-        genesis
-      }
+    val hitSource = ByteStr(Array.fill(crypto.DigestLength)(0: Byte))
+
+    def getHit(account: KeyPair): BigInt = {
+      val gs = if (settings.preActivated(BlockchainFeatures.BlockV5)) {
+        val vrfProof = crypto.signVRF(account.privateKey, hitSource.arr)
+        crypto.verifyVRF(vrfProof, hitSource.arr, account.publicKey).map(_.arr).explicitGet()
+      } else generationSignature(hitSource, account.publicKey)
+
+      hit(gs)
+    }
+
+    val (bt, delay, account, balance) =
+      shares
+        .filter(_._1.miner)
+        .map {
+          case (accountInfo, amount) =>
+            def calc(delay: FiniteDuration) = posCalculator.calculateInitialBaseTarget(getHit(accountInfo.account), delay.toMillis, amount)
+
+            @tailrec
+            def search(delay: FiniteDuration): Long = {
+              val bt = calc(delay)
+              if (bt > 0) bt else search(delay + 10.millis)
+            }
+
+            val calculatedBT = calc(settings.averageBlockDelay)
+            val initialBT =
+              if (calculatedBT > 0) calculatedBT
+              else search(settings.averageBlockDelay + 10.millis)
+
+            val calcDelay = posCalculator.calculateDelay(getHit(accountInfo.account), initialBT, amount)
+            (initialBT, calcDelay, accountInfo.account, amount)
+        }
+        .filter(_._2 >= settings.averageBlockDelay.toMillis)
+        .minBy(_._2 - settings.averageBlockDelay.toMillis)
+
+    //noinspection ScalaStyle
+    println(s"First generated block timestamp: ${timestamp + posCalculator.calculateDelay(getHit(account), bt, balance)}, delay: $delay")
+    bt
   }
 }
 

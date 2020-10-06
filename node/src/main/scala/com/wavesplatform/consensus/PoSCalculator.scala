@@ -17,13 +17,19 @@ trait PoSCalculator {
   ): Long
 
   def calculateDelay(hit: BigInt, bt: Long, balance: Long): Long
+
+  def calculateInitialBaseTarget(
+      hit: BigInt,
+      desiredDelay: Long,
+      balance: Long
+  ): Long
 }
 
 object PoSCalculator {
   private[consensus] val HitSize: Int        = 8
   private[consensus] val MinBaseTarget: Long = 9
 
-  private[consensus] def generationSignature(signature: ByteStr, publicKey: PublicKey): Array[Byte] = {
+  def generationSignature(signature: ByteStr, publicKey: PublicKey): Array[Byte] = {
     val s = new Array[Byte](crypto.DigestLength * 2)
     System.arraycopy(signature.arr, 0, s, 0, crypto.DigestLength)
     System.arraycopy(publicKey.arr, 0, s, crypto.DigestLength, crypto.DigestLength)
@@ -33,7 +39,7 @@ object PoSCalculator {
   private[consensus] def generationVRFSignature(signature: Array[Byte], privateKey: PrivateKey): ByteStr =
     crypto.signVRF(privateKey, signature)
 
-  private[consensus] def hit(generatorSignature: Array[Byte]): BigInt = BigInt(1, generatorSignature.take(HitSize).reverse)
+  def hit(generatorSignature: Array[Byte]): BigInt = BigInt(1, generatorSignature.take(HitSize).reverse)
 
   private[consensus] def normalize(value: Long, targetBlockDelaySeconds: Long): Double =
     value * targetBlockDelaySeconds / (60: Double)
@@ -83,6 +89,8 @@ object NxtPoSCalculator extends PoSCalculator {
 
   def calculateDelay(hit: BigInt, bt: Long, balance: Long): Long = Math.ceil((BigDecimal(hit) / (BigDecimal(bt) * balance)).toDouble).toLong * 1000
 
+  def calculateInitialBaseTarget(hit: BigInt, desiredDelay: Long, balance: Long): Long =
+    Math.ceil(((BigDecimal(hit) * 1000) / (BigDecimal(desiredDelay) * balance)).toDouble).toLong
 }
 
 object FairPoSCalculator {
@@ -128,5 +136,11 @@ case class FairPoSCalculator(minBlockTime: Int, delayDelta: Int) extends PoSCalc
         else if (avg < minDelay) prevBaseTarget - math.max(1, prevBaseTarget / 100)
         else prevBaseTarget
     }
+  }
+
+  def calculateInitialBaseTarget(hit: BigInt, desiredDelay: Long, balance: Long): Long = {
+    val h  = (BigDecimal(hit) / MaxHit).toDouble
+    val bt = C2 * math.log(h) / balance / (1 - math.pow(math.E, (desiredDelay - minBlockTime).toDouble / C1))
+    Math.floor(bt).toLong
   }
 }
