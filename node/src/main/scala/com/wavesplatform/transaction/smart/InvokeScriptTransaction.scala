@@ -25,7 +25,7 @@ case class InvokeScriptTransaction(
     payments: Seq[Payment],
     fee: TxAmount,
     feeAssetId: Asset,
-    feeIncreaseFactor: Int,
+    feeIncreaseFactor: Float,
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
@@ -76,7 +76,7 @@ object InvokeScriptTransaction extends TransactionParser {
       p: Seq[Payment],
       fee: TxAmount,
       feeAssetId: Asset,
-      feeIncreaseFactor: Int,
+      feeIncreaseFactor: Float,
       timestamp: TxTimestamp,
       proofs: Proofs,
   ): Either[ValidationError, InvokeScriptTransaction] =
@@ -90,7 +90,7 @@ object InvokeScriptTransaction extends TransactionParser {
       p: Seq[Payment],
       fee: TxAmount,
       feeAssetId: Asset,
-      feeIncreaseFactor: Int,
+      feeIncreaseFactor: Float,
       timestamp: TxTimestamp,
       signer: PrivateKey
   ): Either[ValidationError, InvokeScriptTransaction] =
@@ -104,7 +104,7 @@ object InvokeScriptTransaction extends TransactionParser {
       p: Seq[Payment],
       fee: TxAmount,
       feeAssetId: Asset,
-      feeIncreaseFactor: Int,
+      feeIncreaseFactor: Float,
       timestamp: TxTimestamp
   ): Either[ValidationError, InvokeScriptTransaction] =
     signed(version, sender.publicKey, dappAddress, fc, p, fee, feeAssetId, feeIncreaseFactor, timestamp, sender.privateKey)
