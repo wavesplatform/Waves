@@ -64,7 +64,16 @@ object InvokeScriptTransactionDiff {
           }
 
           stepLimit = ContractLimits.MaxComplexityByVersion(version)
-          _ <- InvokeDiffsCommon.checkFee(tx, blockchain, feeInfo._1, stepLimit, invocationComplexity, issueList = Nil, actionScriptInvoked = 0)
+          _ <- InvokeDiffsCommon.checkFee(
+            (message, _) => GenericError(message),
+            tx,
+            blockchain,
+            feeInfo._1,
+            stepLimit,
+            invocationComplexity,
+            issueList = Nil,
+            actionScriptsInvoked = 0
+          )
 
           result <- for {
             scriptResult <- {
@@ -115,10 +124,26 @@ object InvokeScriptTransactionDiff {
                     fullLimit
 
                 for {
-                  (failFreeResult, evaluationCtx, failFreeLog) <- evaluateV2(version, contract, directives, invocation, environment, failFreeLimit, continuationFirstStepMode = invocationComplexity > stepLimit)
+                  (failFreeResult, evaluationCtx, failFreeLog) <- evaluateV2(
+                    version,
+                    contract,
+                    directives,
+                    invocation,
+                    environment,
+                    failFreeLimit,
+                    continuationFirstStepMode = invocationComplexity > stepLimit
+                  )
                   (result, log) <- failFreeResult match {
                     case IncompleteResult(expr, unusedComplexity) if !limitedExecution =>
-                      continueEvaluation(version, expr, evaluationCtx, fullLimit - failFreeLimit + unusedComplexity, tx.id(), invocationComplexity, continuationFirstStepMode = invocationComplexity > stepLimit)
+                      continueEvaluation(
+                        version,
+                        expr,
+                        evaluationCtx,
+                        fullLimit - failFreeLimit + unusedComplexity,
+                        tx.id(),
+                        invocationComplexity,
+                        continuationFirstStepMode = invocationComplexity > stepLimit
+                      )
                     case _ =>
                       Right((failFreeResult, Nil))
                   }
