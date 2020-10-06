@@ -532,10 +532,6 @@
         "summary": "Complete Data",
         "description": "Read all data posted by an account",
         "operationId": "postData_1",
-        "consumes": [
-          "application/json",
-          "application/x-www-form-urlencoded"
-        ],
         "parameters": [
           {
             "name": "address",
@@ -564,6 +560,7 @@
             },
             "application/x-www-form-urlencoded": {
               "schema": {
+                "type": "object",
                 "properties": {
                   "key": {
                     "type": "array",
@@ -3557,7 +3554,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/definitions/AssetDetails"
+                    "$ref": "#/components/schemas/AssetDetails"
                   }
                 }
               }
@@ -3588,7 +3585,16 @@
         "responses": {
           "200": {
             "description": "Lease transactions",
-            "content": {}
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LeaseTransaction"
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -4139,48 +4145,54 @@
             "in": "path",
             "description": "Target block height",
             "required": true,
-            "type": "integer"
+            "schema": {
+              "type": "integer"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "State hash",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "blockId": {
-                  "type": "string"
-                },
-                "wavesBalanceHash": {
-                  "type": "string"
-                },
-                "assetsBalanceHash": {
-                  "type": "string"
-                },
-                "dataEntryHash": {
-                  "type": "string"
-                },
-                "accountScriptHash": {
-                  "type": "string"
-                },
-                "assetScriptHash": {
-                  "type": "string"
-                },
-                "leaseBalanceHash": {
-                  "type": "string"
-                },
-                "leaseStatusHash": {
-                  "type": "string"
-                },
-                "sponsorshipHash": {
-                  "type": "string"
-                },
-                "aliasHash": {
-                  "type": "string"
-                },
-                "stateHash": {
-                  "type": "string"
-                }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "blockId": {
+                      "type": "string"
+                    },
+                    "wavesBalanceHash": {
+                      "type": "string"
+                    },
+                    "assetsBalanceHash": {
+                      "type": "string"
+                    },
+                    "dataEntryHash": {
+                      "type": "string"
+                    },
+                    "accountScriptHash": {
+                      "type": "string"
+                    },
+                    "assetScriptHash": {
+                      "type": "string"
+                    },
+                    "leaseBalanceHash": {
+                      "type": "string"
+                    },
+                    "leaseStatusHash": {
+                      "type": "string"
+                    },
+                    "sponsorshipHash": {
+                      "type": "string"
+                    },
+                    "aliasHash": {
+                      "type": "string"
+                    },
+                    "stateHash": {
+                      "type": "string"
+                    }
+                  }
+                }  
               }
             }
           }
@@ -5130,7 +5142,9 @@
           "totalFee",
           "transactionCount",
           "transactions",
-          "version"
+          "version",
+          "VRF",
+          "transactionsRoot"
         ],
         "type": "object",
         "properties": {
@@ -5206,6 +5220,12 @@
           "desiredReward": {
             "type": "integer",
             "format": "int64"
+          },
+          "VRF": {
+              "type": "string"
+          },
+          "transactionsRoot": {
+              "type": "string"
           }
         }
       },
@@ -5220,7 +5240,9 @@
           "timestamp",
           "totalFee",
           "transactionCount",
-          "version"
+          "version",
+          "VRF",
+          "transactionsRoot"
         ],
         "type": "object",
         "properties": {
@@ -5290,6 +5312,12 @@
           "desiredReward": {
             "type": "integer",
             "format": "int64"
+          },
+          "VRF": {
+              "type": "string"
+          },
+          "transactionsRoot": {
+              "type": "string"
           }
         }
       },
