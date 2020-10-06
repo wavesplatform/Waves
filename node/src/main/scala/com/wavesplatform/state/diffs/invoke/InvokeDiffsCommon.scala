@@ -144,7 +144,7 @@ object InvokeDiffsCommon {
         val totalScriptsInvoked = smartAssetInvocations.count(blockchain.hasAssetScript) + (if (blockchain.hasAccountScript(tx.sender.toAddress)) 1
                                                                                             else 0)
         val minIssueFee       = issueList.count(i => !blockchain.isNFT(i)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
-        val dAppInvocationFee = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber * tx.feeIncreaseFactor
+        val dAppInvocationFee = math.ceil(FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber * tx.feeIncreaseFactor).toInt
         val minWaves          = totalScriptsInvoked * ScriptExtraFee + dAppInvocationFee + minIssueFee
         val txName            = Constants.TransactionNames(InvokeScriptTransaction.typeId)
         val assetName         = tx.assetFee._1.fold("WAVES")(_.id.toString)

@@ -80,7 +80,7 @@ object InvokeScriptTransactionDiff {
               ""
 
           _ <- TracedResult {
-            val minFee    = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber * tx.feeIncreaseFactor
+            val minFee    = math.ceil(FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber * tx.feeIncreaseFactor).toInt
             val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
             val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
             Either.cond(
