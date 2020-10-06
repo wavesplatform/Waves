@@ -224,6 +224,7 @@ class ProtoVersionTransactionsSpec
           Seq(Payment(100, Asset.Waves)),
           InvokeScriptTxFee,
           IssuedAsset(feeAssetId),
+          feeIncreaseFactor = 1,
           Now,
           Proofs.empty
         )
