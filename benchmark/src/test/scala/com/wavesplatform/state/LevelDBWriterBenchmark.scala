@@ -13,7 +13,7 @@ import com.wavesplatform.database
 import com.wavesplatform.database.{DBExt, Keys, LevelDBFactory, LevelDBWriter}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.LevelDBWriterBenchmark._
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.{ApplicationStatus, Transaction}
 import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
@@ -93,16 +93,16 @@ object LevelDBWriterBenchmark {
 
     val db = LevelDBWriter.readOnly(rawDB, wavesSettings)
 
-    def loadBlockInfoAt(height: Int): Option[(BlockMeta, Seq[(Transaction, Boolean)])] =
+    def loadBlockInfoAt(height: Int): Option[(BlockMeta, Seq[(Transaction, ApplicationStatus)])] =
       loadBlockMetaAt(height).map { meta =>
-        meta -> rawDB.readOnly(ro => database.loadTransactions(Height(height), ro)).fold(Seq.empty[(Transaction, Boolean)])(identity)
+        meta -> rawDB.readOnly(ro => database.loadTransactions(Height(height), ro)).fold(Seq.empty[(Transaction, ApplicationStatus)])(identity)
       }
 
     def loadBlockMetaAt(height: Int): Option[BlockMeta] = rawDB.get(Keys.blockMetaAt(Height(height)))
 
     val cba = CommonBlocksApi(db, loadBlockMetaAt, loadBlockInfoAt)
 
-    def blockById(id: ByteStr): Option[(BlockMeta, Seq[(Transaction, Boolean)])] = cba.block(id)
+    def blockById(id: ByteStr): Option[(BlockMeta, Seq[(Transaction, ApplicationStatus)])] = cba.block(id)
 
     @TearDown
     def close(): Unit = {
