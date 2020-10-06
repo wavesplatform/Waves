@@ -469,7 +469,7 @@ object AsyncHttpApi extends Assertions {
         payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
         fee: Long = 500000,
         feeAssetId: Option[String] = None,
-        feeIncreaseFactor: Int,
+        feeIncreaseFactor: Int = InvokeScriptTransaction.DefaultFeeIncreaseFactor,
         version: TxVersion = TxVersion.V1
     ): Future[(Transaction, JsValue)] =
       signedTraceBroadcast(
