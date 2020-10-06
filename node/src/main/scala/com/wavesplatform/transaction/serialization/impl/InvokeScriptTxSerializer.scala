@@ -48,7 +48,12 @@ object InvokeScriptTxSerializer {
     ) ++ (funcCallOpt match {
       case Some(fc) => Json.obj("call" -> this.functionCallToJson(fc))
       case None     => JsObject.empty
-    })
+    }) ++ (
+      if (version >= TxVersion.V3)
+        Json.obj("feeIncreaseFactor" -> feeIncreaseFactor)
+      else
+        JsObject.empty
+      )
   }
 
   def bodyBytes(tx: InvokeScriptTransaction): Array[Byte] = {
