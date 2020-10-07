@@ -490,7 +490,7 @@
           {
             "name": "matches",
             "in": "query",
-            "description": "URL encoded (percent-encoded) regular expression to filter keys (https://www.tutorialspoint.com/scala/scala_regular_expressions.htm)",
+            "description": "URL encoded (percent-encoded) <a href='https://www.tutorialspoint.com/scala/scala_regular_expressions.htm'>regular expression</a> to filter keys",
             "schema": {
               "type": "string"
             }
@@ -2429,7 +2429,7 @@
           }
         ],
         "requestBody": {
-          "description": "Transaction data including <a href='transaction-types.html'>type</a>",
+          "description": "Transaction data including type, see <a href='https://docs.waves.tech/en/blockchain/transaction/'>documentation</a>",
           "content": {
             "application/json": {
               "schema": {
@@ -5457,7 +5457,9 @@
             "type": "string"
           },
           "value": {
-            "type": "null"
+            "type": "object",
+            "properties": {},
+            "description": "null"
           }
         }
       },
@@ -5755,17 +5757,63 @@
       },
       "Transaction": {
         "type": "object",
-        "additionalProperties": {
-          "type": "object",
-          "properties": {}
-        },
-        "description": "Transaction's json representation (see https://docs.wavesplatform.com/en/blockchain/transaction/)",
+        "description": "Transaction's JSON representation (see <a href='https://docs.wavesplatform.com/en/blockchain/transaction/'>documentation</a>)",
         "example": {
           "id": "string",
           "timestamp": 0,
           "version": 2,
           "...": "..."
-        }
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/BurnTransaction"
+          },
+          {
+            "$ref": "#/components/schemas/CreateAliasTransaction"
+          },
+          {
+            "$ref": "#/components/schemas/DataTransaction"
+          },
+          {
+            "$ref": "#/components/schemas/ExchangeTransaction"
+          },
+          {
+            "$ref": "#/components/schemas/GenesisTransaction"
+          },
+          {
+            "$ref": "#/components/schemas/InvokeScriptTransaction"
+          },
+          {
+            "$ref": "#/components/schemas/IssueTransaction"
+          },
+          {
+            "$ref": "#/components/schemas/LeaseCancelTransaction"
+          },
+          {
+            "$ref": "#/components/schemas/LeaseTransaction"
+          },
+          {
+            "$ref": "#/components/schemas/MassTransferTransaction"
+          },
+          {
+            "$ref": "#/components/schemas/ReissueTransaction"
+          },
+          {
+            "$ref": "#/components/schemas/SetAssetScriptTransaction"
+          },
+          {
+            "$ref": "#/components/schemas/SetScriptTransaction"
+          },
+          {
+            "$ref": "#/components/schemas/SponsorFeeTransaction"
+          },
+          {
+            "$ref": "#/components/schemas/TransferTransaction"
+          },
+          {
+            "$ref": "#/components/schemas/UpdateAssetInfoTransaction"
+          }
+        ]
       },
       "TransactionStatus": {
         "required": [
@@ -6131,6 +6179,49 @@
           },
           "applicationStatus": {
             "type": "string"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "GenesisTransaction": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "senderPublicKey": {
+            "type": "string"
+          },
+          "fee": {
+            "type": "number"
+          },
+          "feeAssetId": {
+            "type": "number"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "proofs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "recipient": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
           },
           "height": {
             "type": "integer",
