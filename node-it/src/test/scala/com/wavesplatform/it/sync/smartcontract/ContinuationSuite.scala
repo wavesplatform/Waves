@@ -152,7 +152,6 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       invokeScriptTx,
       "Fee in WAVES for InvokeScriptTransaction (900000 in WAVES) " +
         "with 8 invocation steps " +
-        "with 0 total scripts invoked " +
         "does not exceed minimal value of 4000000 WAVES."
     )
   }
