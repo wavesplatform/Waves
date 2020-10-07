@@ -97,7 +97,7 @@ object InvokeDiffsCommon {
 
       val issuesInfo =
         if (issueList.nonEmpty)
-          s" with $actionScriptsInvoked assets issued"
+          s" with ${issueList.length} assets issued"
         else
           ""
 
