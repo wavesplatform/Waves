@@ -85,13 +85,19 @@ object InvokeDiffsCommon {
 
       val feeIncreaseFactorInfo =
         if (stepsNumber > 1 && tx.feeIncreaseFactor > 100)
-          s" and fee increase factor = ${tx.feeIncreaseFactor}"
+          s" with fee increase factor = ${tx.feeIncreaseFactor}"
         else
           ""
 
       val totalScriptsInvokedInfo =
         if (actionScriptsInvoked > 0)
           s" with $actionScriptsInvoked total scripts invoked"
+        else
+          ""
+
+      val issuesInfo =
+        if (issueList.nonEmpty)
+          s" with $actionScriptsInvoked assets issued"
         else
           ""
 
@@ -108,9 +114,8 @@ object InvokeDiffsCommon {
           {
             val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
             val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
-
             s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
-              s"$stepsInfo$totalScriptsInvokedInfo$feeIncreaseFactorInfo " +
+              s"$stepsInfo$feeIncreaseFactorInfo$totalScriptsInvokedInfo$issuesInfo " +
               s"does not exceed minimal value of $minFee WAVES."
           },
           invocationComplexity
