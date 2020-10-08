@@ -65,6 +65,8 @@ class UtxPoolImpl(
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionMeta(_).isDefined) // TODO delete in the future
 
+  private[this] val inUTXPoolOrdering = TransactionsOrdering.InUTXPool(utxSettings.fastLaneAddresses)
+
   override def putIfNew(tx: Transaction, forceValidate: Boolean): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id()) || priorityPool.contains(tx.id())) TracedResult.wrapValue(false)
     else putNewTx(tx, verify = true, forceValidate)
@@ -106,7 +108,7 @@ class UtxPoolImpl(
           )
 
         def checkNotBlacklisted(tx: Transaction): Either[SenderIsBlacklisted, Unit] = PoolMetrics.checkNotBlacklisted.measure {
-          if (utxSettings.blacklistSenderAddresses.isEmpty) {
+          if (utxSettings.blacklistSenderAddresses.isEmpty || checkWhitelisted(tx)) {
             Right(())
           } else {
             val sender: Option[String] = tx match {
@@ -130,15 +132,19 @@ class UtxPoolImpl(
           }
         }
 
+        def checkWhitelisted(tx: Transaction): Boolean = PoolMetrics.checkWhitelisted.measure {
+          inUTXPoolOrdering.isWhitelisted(tx)
+        }
+
         def checkIsMostProfitable(newTx: Transaction): Boolean = PoolMetrics.checkIsMostProfitable.measure {
           transactions
             .values()
             .asScala
-            .forall(poolTx => TransactionsOrdering.InUTXPool.compare(newTx, poolTx) < 0)
+            .forall(poolTx => inUTXPoolOrdering.compare(newTx, poolTx) < 0)
         }
       }
 
-      lazy val skipSizeCheck = utxSettings.allowSkipChecks && LimitChecks.checkIsMostProfitable(tx)
+      lazy val skipSizeCheck = LimitChecks.checkWhitelisted(tx) || (utxSettings.allowSkipChecks && LimitChecks.checkIsMostProfitable(tx))
       lazy val transactionsBytes = transactions.values.asScala // Bytes size of all transactions in pool
         .map(_.bytes().length)
         .sum
@@ -229,7 +235,7 @@ class UtxPoolImpl(
 
   private[utx] def nonPriorityTransactions: Seq[Transaction] = {
     transactions.values.asScala.toVector
-      .sorted(TransactionsOrdering.InUTXPool)
+      .sorted(inUTXPoolOrdering)
   }
 
   override def all: Seq[Transaction] =
@@ -242,6 +248,7 @@ class UtxPoolImpl(
       .orElse(priorityPool.transactionById(transactionId))
 
   private def scriptedAddresses(tx: Transaction): Set[Address] = tx match {
+    case t if inUTXPoolOrdering.isWhitelisted(t) => Set.empty
     case i: InvokeScriptTransaction =>
       Set(i.sender.toAddress)
         .filter(blockchain.hasAccountScript) ++ blockchain.resolveAlias(i.dAppAddressOrAlias).fold[Set[Address]](_ => Set.empty, Set(_))
@@ -501,6 +508,7 @@ class UtxPoolImpl(
     val checkCanReissue       = Kamon.timer("utx.check.can-reissue").withoutTags()
     val checkNotBlacklisted   = Kamon.timer("utx.check.not-blacklisted").withoutTags()
     val checkScripted         = Kamon.timer("utx.check.scripted").withoutTags()
+    val checkWhitelisted      = Kamon.timer("utx.check.whitelisted").withoutTags()
 
     def addTransaction(tx: Transaction): Unit = {
       sizeStats.increment()
@@ -570,5 +578,4 @@ object UtxPoolImpl {
       }
     }
   }
-
 }

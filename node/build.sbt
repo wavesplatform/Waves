@@ -7,7 +7,7 @@ import sbtassembly.MergeStrategy
 enablePlugins(RunApplicationSettings, JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning, VersionObject)
 
 resolvers ++= Seq(
-  Resolver.bintrayRepo("ethereum", "maven"),
+  Resolver.bintrayRepo("ethereum", "maven")
 )
 
 libraryDependencies ++= Dependencies.node.value
@@ -15,7 +15,6 @@ coverageExcludedPackages := ""
 
 inConfig(Compile)(
   Seq(
-    PB.protoSources in Compile := Seq(sourceDirectory.value / "protobuf"),
     PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
     PB.deleteTargetDirectory := false,
     packageDoc / publishArtifact := false,
@@ -61,13 +60,14 @@ inTask(assembly)(
 scriptClasspath += "*" // adds "$lib_dir/*" to app_classpath in the executable file
 // Logback creates a "waves.directory_UNDEFINED" without this option.
 bashScriptExtraDefines ++= Seq(
+  s"""addJava "-Dwaves.defaults.blockchain.type=${network.value}"""",
   s"""addJava "-Dwaves.defaults.directory=/var/lib/${(Universal / normalizedName).value}"""",
   s"""addJava "-Dwaves.defaults.config.directory=/etc/${(Universal / normalizedName).value}""""
 )
 
 inConfig(Universal)(
   Seq(
-    mappings += (baseDirectory.value / s"waves-${network.value}.conf" -> "doc/waves.conf.sample"),
+    mappings += (baseDirectory.value / s"waves-sample.conf" -> "doc/waves.conf.sample"),
     mappings := {
       val linuxScriptPattern = "bin/(.+)".r
       val batScriptPattern   = "bin/([^.]+)\\.bat".r
@@ -96,7 +96,8 @@ inConfig(Universal)(
       "-J-XX:+ParallelRefProcEnabled",
       "-J-XX:+UseStringDeduplication",
       // JVM default charset for proper and deterministic getBytes behaviour
-      "-J-Dfile.encoding=UTF-8"
+      "-J-Dfile.encoding=UTF-8",
+      "-J-XX:+UseStringDeduplication"
     )
   )
 )

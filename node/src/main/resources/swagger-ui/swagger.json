@@ -3573,6 +3573,68 @@
         ]
       }
     },
+    "/debug/stateHash/{height}": {
+      "get": {
+        "tags": [
+          "debug"
+        ],
+        "summary": "State hash",
+        "description": "Get state hash at height",
+        "operationId": "state_hash",
+        "parameters": [
+          {
+            "name": "height",
+            "in": "path",
+            "description": "Target block height",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "State hash",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "blockId": {
+                  "type": "string"
+                },
+                "wavesBalanceHash": {
+                  "type": "string"
+                },
+                "assetsBalanceHash": {
+                  "type": "string"
+                },
+                "dataEntryHash": {
+                  "type": "string"
+                },
+                "accountScriptHash": {
+                  "type": "string"
+                },
+                "assetScriptHash": {
+                  "type": "string"
+                },
+                "leaseBalanceHash": {
+                  "type": "string"
+                },
+                "leaseStatusHash": {
+                  "type": "string"
+                },
+                "sponsorshipHash": {
+                  "type": "string"
+                },
+                "aliasHash": {
+                  "type": "string"
+                },
+                "stateHash": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/debug/blacklist": {
       "post": {
         "tags": [

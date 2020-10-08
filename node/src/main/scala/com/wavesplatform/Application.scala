@@ -1,7 +1,6 @@
 package com.wavesplatform
 
 import java.io.File
-import java.nio.file.Files
 import java.security.Security
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -20,11 +19,12 @@ import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.AliasApiRoute
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.database.{DBExt, Keys, openDB}
-import com.wavesplatform.events.{BlockchainUpdateTriggersImpl, BlockchainUpdated, UtxEvent}
+import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.api.ActivationApiRoute
@@ -37,6 +37,7 @@ import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
+import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
@@ -61,8 +62,8 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import scala.util.Try
 import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject, time: NTP) extends ScorexLogging {
   app =>
@@ -103,20 +104,39 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val historyRepliesScheduler         = fixedPool(poolSize = 2, "history-replier", reporter = log.error("Error in History Replier", _))
   private val minerScheduler                  = singleThread("block-miner", reporter = log.error("Error in Miner", _))
 
-  private val blockchainUpdatesScheduler = singleThread("blockchain-updates", reporter = log.error("Error on sending blockchain updates", _))
-  private val blockchainUpdated          = ConcurrentSubject.publish[BlockchainUpdated](scheduler)
-  private val utxEvents                  = ConcurrentSubject.publish[UtxEvent](scheduler)
-  private val blockchainUpdateTriggers   = new BlockchainUpdateTriggersImpl(blockchainUpdated)
+  private val utxEvents = ConcurrentSubject.publish[UtxEvent](scheduler)
+
+  private var extensions = Seq.empty[Extension]
+
+  // update triggers combined into one instance
+  private var triggers = Seq.empty[BlockchainUpdateTriggers]
+  private val triggersCombined = new BlockchainUpdateTriggers {
+    override def onProcessBlock(block: Block, diff: BlockDiffer.DetailedDiff, minerReward: Option[Long], blockchainBeforeWithMinerReward: Blockchain): Unit =
+      triggers.foreach(_.onProcessBlock(block, diff, minerReward, blockchainBeforeWithMinerReward))
+
+    override def onProcessMicroBlock(
+                                      microBlock: MicroBlock,
+                                      diff: BlockDiffer.DetailedDiff,
+                                      blockchainBeforeWithMinerReward: Blockchain,
+                                      totalBlockId: ByteStr,
+                                      totalTransactionsRoot: ByteStr
+    ): Unit =
+      triggers.foreach(_.onProcessMicroBlock(microBlock, diff, blockchainBeforeWithMinerReward, totalBlockId, totalTransactionsRoot))
+
+    override def onRollback(toBlockId: ByteStr, toHeight: Int): Unit =
+      triggers.foreach(_.onRollback(toBlockId, toHeight))
+
+    override def onMicroBlockRollback(toBlockId: ByteStr, height: Int): Unit =
+      triggers.foreach(_.onMicroBlockRollback(toBlockId, height))
+  }
 
   private[this] var miner: Miner with MinerDebugInfo = Miner.Disabled
   private val (blockchainUpdater, levelDB) =
-    StorageFactory(settings, db, time, spendableBalanceChanged, blockchainUpdateTriggers, bc => miner.scheduleMining(bc))
+    StorageFactory(settings, db, time, spendableBalanceChanged, triggersCombined, bc => miner.scheduleMining(bc))
 
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
   private var maybeUtx: Option[UtxPool]                                        = None
   private var maybeNetwork: Option[NS]                                         = None
-
-  private var extensions = Seq.empty[Extension]
 
   def apiShutdown(): Unit = {
     for {
@@ -203,17 +223,17 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     // Extensions start
     val extensionContext: Context = new Context {
-      override def settings: WavesSettings                                                       = app.settings
-      override def blockchain: Blockchain                                                        = app.blockchainUpdater
-      override def rollbackTo(blockId: ByteStr): Task[Either[ValidationError, DiscardedBlocks]]  = rollbackTask(blockId, returnTxsToUtx = false)
-      override def time: Time                                                                    = app.time
-      override def wallet: Wallet                                                                = app.wallet
-      override def utx: UtxPool                                                                  = utxStorage
-      override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] = utxSynchronizer.publish(tx)
+      override def settings: WavesSettings                                                      = app.settings
+      override def blockchain: Blockchain                                                       = app.blockchainUpdater
+      override def rollbackTo(blockId: ByteStr): Task[Either[ValidationError, DiscardedBlocks]] = rollbackTask(blockId, returnTxsToUtx = false)
+      override def time: Time                                                                   = app.time
+      override def wallet: Wallet                                                               = app.wallet
+      override def utx: UtxPool                                                                 = utxStorage
+      override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] =
+        Await.result(utxSynchronizer.publish(tx), Duration.Inf) // TODO: Replace with async if possible
       override def spendableBalanceChanged: Observable[(Address, Asset)]                         = app.spendableBalanceChanged
       override def actorSystem: ActorSystem                                                      = app.actorSystem
       override def utxEvents: Observable[UtxEvent]                                               = app.utxEvents
-      override def blockchainUpdated: Observable[BlockchainUpdated]                              = app.blockchainUpdated
 
       override val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
         blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
@@ -224,7 +244,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         utxSynchronizer.publish,
         loadBlockAt(db, blockchainUpdater)
       )
-      override val blocksApi: CommonBlocksApi     = CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
+      override val blocksApi: CommonBlocksApi =
+        CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
       override val accountsApi: CommonAccountsApi = CommonAccountsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
       override val assetsApi: CommonAssetsApi     = CommonAssetsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
     }
@@ -235,6 +256,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       log.info(s"Enable extension: $extensionClassName")
       ctor.newInstance(extensionContext)
     }
+    triggers ++= extensions.collect { case e: BlockchainUpdateTriggers => e }
     extensions.foreach(_.start())
 
     // Node start
@@ -312,7 +334,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         log.error(
           "Usage of the default api key hash (H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu) is prohibited, please change it in the waves.conf"
         )
-        forceStopApplication(InvalidApiKey)
+        forceStopApplication(Misconfiguration)
       }
 
       def loadBalanceHistory(address: Address): Seq[(Int, Long)] = db.readOnly { rdb =>
@@ -367,7 +389,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           mbSyncCacheSizes,
           scoreStatsReporter,
           configRoot,
-          loadBalanceHistory
+          loadBalanceHistory,
+          levelDB.loadStateHash
         ),
         AssetsApiRoute(
           settings.restAPISettings,
@@ -384,9 +407,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         RewardApiRoute(blockchainUpdater)
       )
 
-      val combinedRoute = CompositeHttpService(apiRoutes, settings.restAPISettings)(actorSystem).loggingCompositeRoute
+      val httpService = CompositeHttpService(apiRoutes, settings.restAPISettings)(actorSystem)
+      val combinedRoute = httpService.loggingCompositeRoute
       val httpFuture    = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       serverBinding = Await.result(httpFuture, 20.seconds)
+      serverBinding.whenTerminated.foreach(_ => httpService.scheduler.shutdown())
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
     }
 
@@ -402,12 +427,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   def shutdown(utx: UtxPool, network: NS): Unit =
     if (shutdownInProgress.compareAndSet(false, true)) {
-
-      if (extensions.nonEmpty) {
-        log.info(s"Shutting down extensions")
-        Await.ready(Future.sequence(extensions.map(_.shutdown())), settings.extensionsShutdownTimeout)
-      }
-
       spendableBalanceChanged.onComplete()
       utx.close()
 
@@ -430,9 +449,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       log.info("Stopping network services")
       network.shutdown()
 
-      blockchainUpdated.onComplete()
-
-      shutdownAndWait(blockchainUpdatesScheduler, "BlockchainUpdated")
       shutdownAndWait(minerScheduler, "Miner")
       shutdownAndWait(microblockSynchronizerScheduler, "MicroblockSynchronizer")
       shutdownAndWait(scoreObserverScheduler, "ScoreObserver")
@@ -444,6 +460,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       log.info("Closing storage")
       db.close()
+
+      // extensions should be shut down last, after all node functionality, to guarantee no data loss
+      if (extensions.nonEmpty) {
+        log.info(s"Shutting down extensions")
+        Await.ready(Future.sequence(extensions.map(_.shutdown())), settings.extensionsShutdownTimeout)
+      }
 
       time.close()
       log.info("Shutdown complete")
@@ -469,15 +491,19 @@ object Application extends ScorexLogging {
   private[wavesplatform] def loadApplicationConfig(external: Option[File] = None): WavesSettings = {
     import com.wavesplatform.settings._
 
-    val config = loadConfig(external.map(ConfigFactory.parseFile))
+    val maybeExternalConfig = Try(external.map(ConfigFactory.parseFile(_, ConfigParseOptions.defaults().setAllowMissing(false))))
+    val config              = loadConfig(maybeExternalConfig.getOrElse(None))
 
     // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
     System.setProperty("waves.directory", config.getString("waves.directory"))
     if (config.hasPath("waves.config.directory")) System.setProperty("waves.config.directory", config.getString("waves.config.directory"))
 
-    external match {
-      case None    => log.debug("Config file not defined, TESTNET config will be used")
-      case Some(f) => if (!Files.exists(f.toPath)) log.warn(s"Config ${f.toPath.toAbsolutePath.toString} not found, TESTNET config will be used")
+    maybeExternalConfig match {
+      case Success(None) => log.warn("Config file not defined, TESTNET config will be used")
+      case Failure(exception) =>
+        log.error(s"Couldn't read ${external.get.toPath.toAbsolutePath}", exception)
+        forceStopApplication(Misconfiguration)
+      case _ => // Pass
     }
 
     val settings = WavesSettings.fromRootConfig(config)
@@ -505,7 +531,9 @@ object Application extends ScorexLogging {
   private[wavesplatform] def loadBlockAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[(BlockMeta, Seq[Transaction])] =
     loadBlockInfoAt(db, blockchainUpdater)(height).map { case (meta, txs) => (meta, txs.map(_._1)) }
 
-  private[wavesplatform] def loadBlockInfoAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[(BlockMeta, Seq[(Transaction, Boolean)])] =
+  private[wavesplatform] def loadBlockInfoAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(
+      height: Int
+  ): Option[(BlockMeta, Seq[(Transaction, Boolean)])] =
     loadBlockMetaAt(db, blockchainUpdater)(height).map { meta =>
       meta -> blockchainUpdater
         .liquidTransactions(meta.id)
@@ -535,7 +563,7 @@ object Application extends ScorexLogging {
       case "explore"                => Explorer.main(args.tail)
       case "util"                   => UtilApp.main(args.tail)
       case "help" | "--help" | "-h" => println("Usage: waves <config> | export | import | explore | util")
-      case _                        => startNode(args.headOption)
+      case _                        => startNode(args.headOption) // TODO: Consider adding option to specify network-name
     }
   }
 

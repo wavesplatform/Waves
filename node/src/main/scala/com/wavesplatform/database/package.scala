@@ -7,7 +7,7 @@ import java.util.{Map => JMap}
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
-import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
+import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.google.protobuf.{ByteString, CodedInputStream, WireFormat}
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.BlockMeta
@@ -21,6 +21,7 @@ import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -154,21 +155,22 @@ package object database extends ScorexLogging {
     val s = Seq.newBuilder[String]
 
     while (i < data.length) {
-      val len = Shorts.fromByteArray(data.drop(i))
+      val len = ((data(i) << 8) | (data(i + 1) & 0xFF)).toShort // Optimization
       s += new String(data, i + 2, len, UTF_8)
       i += (2 + len)
     }
     s.result()
   }
 
-  def writeStrings(strings: Seq[String]): Array[Byte] =
-    strings
-      .foldLeft(ByteBuffer.allocate(strings.map(_.utf8Bytes.length + 2).sum)) {
-        case (b, s) =>
-          val bytes = s.utf8Bytes
-          b.putShort(bytes.length.toShort).put(bytes)
+  def writeStrings(strings: Seq[String]): Array[Byte] = {
+    val utfBytes = strings.toVector.map(_.utf8Bytes)
+    utfBytes
+      .foldLeft(ByteBuffer.allocate(utfBytes.map(_.length + 2).sum)) {
+        case (buf, bytes) =>
+          buf.putShort(bytes.length.toShort).put(bytes)
       }
       .array()
+  }
 
   def writeLeaseBalance(lb: LeaseBalance): Array[Byte] = {
     val ndo = newDataOutput()
@@ -354,6 +356,30 @@ package object database extends ScorexLogging {
         ndo.writeShort(num)
     }
 
+    ndo.toByteArray
+  }
+
+  def readStateHash(bs: Array[Byte]): StateHash = {
+    val ndi = newDataInput(bs)
+    val sectionsCount = ndi.readByte()
+    val sections = (0 until sectionsCount).map { _ =>
+      val sectionId = ndi.readByte()
+      val value = ndi.readByteStr(DigestLength)
+      SectionId(sectionId) -> value
+    }
+    val totalHash = ndi.readByteStr(DigestLength)
+    StateHash(totalHash, sections.toMap)
+  }
+
+  def writeStateHash(sh: StateHash): Array[Byte] = {
+    val sorted = sh.sectionHashes.toSeq.sortBy(_._1)
+    val ndo = newDataOutput(crypto.DigestLength + 1 + sorted.length * (1 + crypto.DigestLength))
+    ndo.writeByte(sorted.length)
+    sorted.foreach { case (sectionId, value) =>
+      ndo.writeByte(sectionId.id.toByte)
+      ndo.writeByteStr(value.ensuring(_.arr.length == DigestLength))
+    }
+    ndo.writeByteStr(sh.totalHash.ensuring(_.arr.length == DigestLength))
     ndo.toByteArray
   }
 

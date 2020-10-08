@@ -107,23 +107,16 @@ class MinerImpl(
 
   private def ngEnabled: Boolean = blockchainUpdater.featureActivationHeight(BlockchainFeatures.NG.id).exists(blockchainUpdater.height > _ + 1)
 
-  private def consensusData(
-      height: Int,
-      account: KeyPair,
-      lastBlock: BlockHeader,
-      refBlockBT: Long,
-      refBlockTS: Long,
-      currentTime: Long
-  ): Either[String, NxtLikeConsensusBlockData] =
+  private def consensusData(height: Int, account: KeyPair, lastBlock: BlockHeader, blockTime: Long): Either[String, NxtLikeConsensusBlockData] =
     pos
       .consensusData(
         account,
         height,
         blockchainSettings.genesisSettings.averageBlockDelay,
-        refBlockBT,
-        refBlockTS,
+        lastBlock.baseTarget,
+        lastBlock.timestamp,
         blockchainUpdater.parentHeader(lastBlock, 2).map(_.timestamp),
-        currentTime
+        blockTime
       )
       .leftMap(_.toString)
 
@@ -143,33 +136,36 @@ class MinerImpl(
 
   private[mining] def forgeBlock(account: KeyPair): Either[String, (Block, MiningConstraint)] = {
     // should take last block right at the time of mining since microblocks might have been added
-    val height              = blockchainUpdater.height
-    val version             = blockchainUpdater.nextBlockVersion
-    val lastBlock           = blockchainUpdater.lastBlockHeader.get
-    val referencedBlockInfo = blockchainUpdater.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get
-    val refBlockBT          = referencedBlockInfo.baseTarget
-    val refBlockTS          = referencedBlockInfo.timestamp
-    val refBlockID          = referencedBlockInfo.blockId
-    lazy val currentTime    = timeService.correctedTime()
-    lazy val blockDelay     = currentTime - lastBlock.header.timestamp
-    lazy val balance        = blockchainUpdater.generatingBalance(account.toAddress, Some(refBlockID))
+    val height          = blockchainUpdater.height
+    val version         = blockchainUpdater.nextBlockVersion
+    val lastBlockHeader = blockchainUpdater.lastBlockHeader.get.header
+    val reference       = blockchainUpdater.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get.blockId
 
     metrics.blockBuildTimeStats.measureSuccessful(for {
       _ <- checkQuorumAvailable()
+      balance = blockchainUpdater.generatingBalance(account.toAddress, Some(reference))
       validBlockDelay <- pos
-        .getValidBlockDelay(height, account, refBlockBT, balance)
+        .getValidBlockDelay(height, account, lastBlockHeader.baseTarget, balance)
         .leftMap(_.toString)
-        .ensure(s"$currentTime: Block delay $blockDelay was NOT less than estimated delay")(_ < blockDelay)
-      _ = log.debug(
-        s"Forging with ${account.toAddress}, Time $blockDelay > Estimated Time $validBlockDelay, balance $balance, prev block $refBlockID at $height with target $refBlockBT"
+      currentTime = timeService.correctedTime()
+      blockTime = math.max(
+        lastBlockHeader.timestamp + validBlockDelay,
+        currentTime - 1.minute.toMillis
       )
-      consensusData <- consensusData(height, account, lastBlock.header, refBlockBT, refBlockTS, currentTime)
+      _ <- Either.cond(
+        blockTime <= currentTime + appender.MaxTimeDrift,
+        log.debug(
+          s"Forging with ${account.toAddress}, balance $balance, prev block $reference at $height with target ${lastBlockHeader.baseTarget}"
+        ),
+        s"Block time $blockTime is from the future: current time is $currentTime, MaxTimeDrift = ${appender.MaxTimeDrift}"
+      )
+      consensusData <- consensusData(height, account, lastBlockHeader, blockTime)
       (unconfirmed, totalConstraint) = packTransactionsForKeyBlock()
       block <- Block
         .buildAndSign(
           version,
-          currentTime,
-          refBlockID,
+          blockTime,
+          reference,
           consensusData.baseTarget,
           consensusData.generationSignature,
           unconfirmed,
@@ -181,10 +177,9 @@ class MinerImpl(
     } yield (block, totalConstraint))
   }
 
-  private def checkQuorumAvailable(): Either[String, Unit] = {
-    val chanCount = allChannels.size()
-    Either.cond(chanCount >= minerSettings.quorum, (), s"Quorum not available ($chanCount/${minerSettings.quorum}), not forging block.")
-  }
+  private def checkQuorumAvailable(): Either[String, Int] =
+    Right(allChannels.size())
+      .ensureOr(chanCount => s"Quorum not available ($chanCount/${minerSettings.quorum}), not forging block.")(_ >= minerSettings.quorum)
 
   private def blockFeatures(version: Byte): Seq[Short] =
     if (version <= PlainBlockVersion) Nil

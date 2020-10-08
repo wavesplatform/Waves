@@ -157,7 +157,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
         .explicitGet()
     )
 
-    val sorted = Random.shuffle(correctSeq).sorted(TransactionsOrdering.InUTXPool)
+    val sorted = Random.shuffle(correctSeq).sorted(TransactionsOrdering.InUTXPool(Set.empty))
 
     sorted shouldBe correctSeq
   }
@@ -195,17 +195,18 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
     Random.shuffle(correctSeq).sorted(TransactionsOrdering.InBlock) shouldBe correctSeq
   }
 
-  property("TransactionsOrdering.InUTXPool should sort txs by ascending block timestamp") {
+  property("TransactionsOrdering.InUTXPool should sort txs by ascending block timestamp taking into consideration whitelisted senders") {
+    val whitelisted = KeyPair(Array.fill(32)(1: Byte))
     val correctSeq = Seq(
       TransferTransaction
         .selfSigned(
           1.toByte,
-          kp,
+          whitelisted,
           Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           Waves,
           100000,
           Waves,
-          1,
+          2,
           ByteStr.empty,
           123L
         )
@@ -213,17 +214,17 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransaction
         .selfSigned(
           1.toByte,
-          kp,
+          KeyPair(Array.fill(32)(0: Byte)),
           Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
           Waves,
           100000,
           Waves,
-          1,
+          2,
           ByteStr.empty,
           124L
         )
         .explicitGet()
     )
-    Random.shuffle(correctSeq).sorted(TransactionsOrdering.InUTXPool) shouldBe correctSeq
+    Random.shuffle(correctSeq).sorted(TransactionsOrdering.InUTXPool(Set(whitelisted.toAddress.stringRepr))) shouldBe correctSeq
   }
 }

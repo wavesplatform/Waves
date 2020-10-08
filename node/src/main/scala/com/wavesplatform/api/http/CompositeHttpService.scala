@@ -1,5 +1,7 @@
 package com.wavesplatform.api.http
 
+import java.util.concurrent.Executors
+
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.headers._
@@ -11,7 +13,14 @@ import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utils.ScorexLogging
 
+import scala.concurrent.ExecutionContext
+
 case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings)(system: ActorSystem) extends ScorexLogging {
+  // Only affects extractScheduler { implicit sc => ... } routes
+  val scheduler = ExecutionContext.fromExecutorService(
+    Executors.newWorkStealingPool((Runtime.getRuntime.availableProcessors() * 2).min(4)),
+    log.error("Error in REST API", _)
+  )
 
   private val redirectToSwagger = redirect("/api-docs/index.html", StatusCodes.PermanentRedirect)
   private val swaggerRoute: Route =
@@ -22,7 +31,10 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
           getFromResourceDirectory("swagger-ui")
       }
 
-  val compositeRoute: Route        = extendRoute(routes.map(_.route).reduce(_ ~ _)) ~ swaggerRoute ~ complete(StatusCodes.NotFound)
+  val compositeRoute: Route = withExecutionContext(scheduler)(extendRoute(routes.map(_.route).reduce(_ ~ _))) ~ swaggerRoute ~ complete(
+    StatusCodes.NotFound
+  )
+
   val loggingCompositeRoute: Route = Route.seal(DebuggingDirectives.logRequestResult(LoggingMagnet(_ => logRequestResponse))(compositeRoute))
 
   private def logRequestResponse(req: HttpRequest)(res: RouteResult): Unit = res match {
