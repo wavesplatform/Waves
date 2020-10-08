@@ -1,6 +1,6 @@
 package com.wavesplatform.events.repo
 
-import com.wavesplatform.events.{BlockAppended, BlockchainUpdated, MicroBlockAppended, MicroBlockRollbackCompleted, RollbackCompleted}
+import com.wavesplatform.events._
 import monix.reactive.Observable
 
 import scala.util.Try

@@ -1,6 +1,6 @@
 package com.wavesplatform.events.api.grpc
 
-import com.wavesplatform.events.api.grpc.backpressure._
+import com.wavesplatform.api.grpc._
 import com.wavesplatform.events.api.grpc.protobuf._
 import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.events.repo.UpdatesRepo
@@ -46,7 +46,7 @@ class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo.Read with UpdatesRepo.Strea
         .stream(request.fromHeight)
         .map(elem => SubscribeEvent(update = Some(elem.protobuf)))
 
-      wrapObservable(updatesPB, responseObserver)(identity)
+      responseObserver.completeWith(updatesPB)
     }
   }
 

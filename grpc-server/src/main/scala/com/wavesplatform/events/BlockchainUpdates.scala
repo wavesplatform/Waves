@@ -24,7 +24,7 @@ import scala.util.{Failure, Success}
 class BlockchainUpdates(private val context: Context) extends Extension with ScorexLogging with BlockchainUpdateTriggers {
   implicit val scheduler: Scheduler = Scheduler(context.actorSystem.dispatcher)
 
-  private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("blockchain-updates")
+  private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("waves.blockchain-updates")
 
   private[this] val repo = new UpdatesRepoImpl(s"${context.settings.directory}/blockchain-updates")
 

@@ -9,7 +9,6 @@
 import sbt.Keys._
 import sbt._
 import sbtcrossproject.CrossPlugin.autoImport.{CrossType, crossProject}
-import sbtcrossproject.CrossProject
 
 val langPublishSettings = Seq(
   coverageExcludedPackages := "",
@@ -82,8 +81,6 @@ lazy val `node-it`        = project.dependsOn(node, `grpc-server`)
 lazy val `node-generator` = project.dependsOn(node, `node` % "compile")
 lazy val benchmark        = project.dependsOn(node % "compile;test->test")
 
-lazy val `blockchain-updates` = project.dependsOn(node % "compile;test->test;runtime->provided")
-
 lazy val root = (project in file("."))
   .aggregate(
     `lang-js`,
@@ -93,8 +90,7 @@ lazy val root = (project in file("."))
     node,
     `node-it`,
     `node-generator`,
-    benchmark,
-    `blockchain-updates`
+    benchmark
   )
 
 inScope(Global)(
@@ -156,8 +152,6 @@ packageAll := Def
       (node / Debian / packageBin).value
       (`grpc-server` / Universal / packageZipTarball).value
       (`grpc-server` / Debian / packageBin).value
-      (`blockchain-updates` / Universal / packageZipTarball).value
-      (`blockchain-updates` / Debian / packageBin).value
     }
   )
   .value
