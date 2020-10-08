@@ -33,7 +33,7 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
 
   log.info(s"BlockchainUpdates extension opened db at ${directory}")
 
-  override def shutdown(): Unit = db.close()
+  override def shutdown(): Unit = writeLock(db.close())
 
   private[this] val realTimeUpdates = ConcurrentSubject.publish[BlockchainUpdated]
   private[this] def sendRealTimeUpdate(ba: BlockchainUpdated): Try[Unit] = {
