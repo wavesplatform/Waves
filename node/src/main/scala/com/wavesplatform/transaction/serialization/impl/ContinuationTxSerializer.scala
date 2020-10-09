@@ -7,6 +7,7 @@ object ContinuationTxSerializer {
   def toJson(tx: ContinuationTransaction): JsObject = {
     import tx._
     Json.obj(
+      "version"                   -> 1,
       "type"                      -> builder.typeId,
       "id"                        -> id().toString,
       "fee"                       -> 0,
