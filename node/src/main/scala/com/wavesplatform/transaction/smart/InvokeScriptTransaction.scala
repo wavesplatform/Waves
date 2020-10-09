@@ -35,7 +35,6 @@ case class InvokeScriptTransaction(
     with FastHashId
     with LegacyPBSwitch.V2 {
 
-  def feeIncreaseFactor: Long = 100  // 100/100 = 1.0
   val funcCall = funcCallOpt.getOrElse(FUNCTION_CALL(FunctionHeader.User(ContractEvaluator.DEFAULT_FUNC_NAME), List.empty))
 
   override val builder = InvokeScriptTransaction
