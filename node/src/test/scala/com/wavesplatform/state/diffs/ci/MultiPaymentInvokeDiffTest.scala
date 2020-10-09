@@ -234,7 +234,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
           val payments = issues.map(i => Payment(1, IssuedAsset(i.id())))
           (issues, payments)
         }
-        ci <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, payments, fee, Waves, ts + 3)
+        ci <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, payments, fee, Waves, feeIncreaseFactor = InvokeScriptTransaction.DefaultFeeIncreaseFactor, ts + 3)
       } yield (List(genesis, genesis2), setVerifier, setDApp, ci, issues, master, invoker, fee)
     }.explicitGet()
 

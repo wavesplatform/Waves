@@ -146,8 +146,11 @@ class MinerImpl(
       validBlockDelay <- pos
         .getValidBlockDelay(height, account, lastBlockHeader.baseTarget, balance)
         .leftMap(_.toString)
-      blockTime   = lastBlockHeader.timestamp + validBlockDelay
       currentTime = timeService.correctedTime()
+      blockTime = math.max(
+        lastBlockHeader.timestamp + validBlockDelay,
+        currentTime - 1.minute.toMillis
+      )
       _ <- Either.cond(
         blockTime <= currentTime + appender.MaxTimeDrift,
         log.debug(

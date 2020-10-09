@@ -247,7 +247,7 @@ object PBTransactions {
           chainId
         )
 
-      case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments)) =>
+      case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments, feeIncreaseFactor)) =>
         import cats.instances.either._
         import cats.instances.option._
         import cats.syntax.traverse._
@@ -276,6 +276,7 @@ object PBTransactions {
             payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
             feeAmount,
             feeAssetId,
+            feeIncreaseFactor,
             timestamp,
             proofs
           )
@@ -472,7 +473,7 @@ object PBTransactions {
           chainId
         )
 
-      case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments)) =>
+      case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments, feeIncreaseFactor)) =>
         import com.wavesplatform.lang.v1.Serde
         import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 
@@ -486,6 +487,7 @@ object PBTransactions {
           payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
           feeAmount,
           feeAssetId,
+          feeIncreaseFactor,
           timestamp,
           proofs,
           chainId
@@ -594,8 +596,20 @@ object PBTransactions {
         val data = SponsorFeeTransactionData(Some(Amount(assetId.id.toByteString, minSponsoredAssetFee.getOrElse(0L))))
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.SponsorFee(data))
 
-      case vt.smart.InvokeScriptTransaction(version, sender, dappAddress, fcOpt, payment, fee, feeAssetId, timestamp, proofs, chainId) =>
-        val data = Data.InvokeScript(toPBInvokeScriptData(dappAddress, fcOpt, payment))
+      case vt.smart.InvokeScriptTransaction(
+          version,
+          sender,
+          dAppAddress,
+          fcOpt,
+          payment,
+          fee,
+          feeAssetId,
+          feeIncreaseFactor,
+          timestamp,
+          proofs,
+          chainId
+      ) =>
+        val data = Data.InvokeScript(toPBInvokeScriptData(dAppAddress, fcOpt, payment, feeIncreaseFactor))
         PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, version, proofs, data)
 
       case tx @ vt.assets.UpdateAssetInfoTransaction(version, sender, assetId, name, description, timestamp, _, _, proofs, chainId) =>
@@ -619,13 +633,19 @@ object PBTransactions {
     }
   }
 
-  def toPBInvokeScriptData(dappAddress: AddressOrAlias, fcOpt: Option[FUNCTION_CALL], payment: Seq[Payment]): InvokeScriptTransactionData = {
+  def toPBInvokeScriptData(
+      dAppAddress: AddressOrAlias,
+      fcOpt: Option[FUNCTION_CALL],
+      payment: Seq[Payment],
+      feeIncreaseFactor: Int
+  ): InvokeScriptTransactionData = {
     import com.wavesplatform.lang.v1.Serde
 
     InvokeScriptTransactionData(
-      Some(PBRecipients.create(dappAddress)),
+      Some(PBRecipients.create(dAppAddress)),
       ByteString.copyFrom(Deser.serializeOption(fcOpt)(Serde.serialize(_))),
-      payment.map(p => (p.assetId, p.amount): Amount)
+      payment.map(p => (p.assetId, p.amount): Amount),
+      feeIncreaseFactor
     )
   }
 

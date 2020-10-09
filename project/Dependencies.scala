@@ -160,11 +160,11 @@ object Dependencies {
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test,
       ("org.iq80.leveldb" % "leveldb" % "0.12").exclude("com.google.guava", "guava") % Test
-    ) ++ test ++ console ++ logDeps ++ levelDBJNA
+    ) ++ test ++ console ++ logDeps ++ levelDBJNA ++ protobuf.value
   )
 
   private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.2.7-SC-545-2-SNAPSHOT" classifier "proto"
+    "com.wavesplatform" % "protobuf-schemas" % "1.2.9-SC-545-SNAPSHOT" classifier "proto" intransitive()
 
   lazy val scalapbRuntime = Def.setting {
     val version = scalapb.compiler.Version.scalapbVersion

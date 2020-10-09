@@ -48,7 +48,12 @@ object InvokeScriptTxSerializer {
     ) ++ (funcCallOpt match {
       case Some(fc) => Json.obj("call" -> this.functionCallToJson(fc))
       case None     => JsObject.empty
-    })
+    }) ++ (
+      if (version >= TxVersion.V3)
+        Json.obj("feeIncreaseFactor" -> feeIncreaseFactor)
+      else
+        JsObject.empty
+      )
   }
 
   def bodyBytes(tx: InvokeScriptTransaction): Array[Byte] = {
@@ -95,6 +100,6 @@ object InvokeScriptTxSerializer {
     val fee          = buf.getLong
     val feeAssetId   = buf.getAsset
     val timestamp    = buf.getLong
-    InvokeScriptTransaction(TxVersion.V1, sender, dApp, functionCall, payments, fee, feeAssetId, timestamp, buf.getProofs, chainId)
+    InvokeScriptTransaction(TxVersion.V1, sender, dApp, functionCall, payments, fee, feeAssetId, feeIncreaseFactor = InvokeScriptTransaction.DefaultFeeIncreaseFactor, timestamp, buf.getProofs, chainId)
   }
 }

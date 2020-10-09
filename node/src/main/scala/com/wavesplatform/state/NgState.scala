@@ -142,15 +142,19 @@ class NgState(
     baseBlockCarry + microDiffs.values.map(_.carryFee).sum
 
   def createBlockId(microBlock: MicroBlock): BlockId = {
-    val newTransactions  = this.transactions ++ microBlock.transactionData
-    val transactionsRoot = block.mkTransactionsRoot(base.header.version, newTransactions)
+    val newTransactions = this.transactions ++ microBlock.transactionData
     val fullBlock =
       base.copy(
         transactionData = newTransactions,
         signature = microBlock.totalResBlockSig,
-        header = base.header.copy(transactionsRoot = transactionsRoot)
+        header = base.header.copy(transactionsRoot = createTransactionsRoot(microBlock))
       )
     fullBlock.id()
+  }
+
+  def createTransactionsRoot(microBlock: MicroBlock): ByteStr = {
+    val newTransactions = this.transactions ++ microBlock.transactionData
+    block.mkTransactionsRoot(base.header.version, newTransactions)
   }
 
   private[this] def forgeBlock(blockId: BlockId): Option[(Block, DiscardedMicroBlocks)] =
