@@ -473,14 +473,14 @@ object PBTransactions {
           chainId
         )
 
-      case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments, feeIncreaseFactor)) =>
+      case Data.InvokeScript(InvokeScriptTransactionData(Some(dAppAddress), functionCall, payments, feeIncreaseFactor)) =>
         import com.wavesplatform.lang.v1.Serde
         import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 
         vt.smart.InvokeScriptTransaction(
           version.toByte,
           sender,
-          PBRecipients.toAddressOrAlias(dappAddress, chainId).explicitGet(),
+          PBRecipients.toAddressOrAlias(dAppAddress, chainId).explicitGet(),
           Deser
             .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
             .map(_.explicitGet().asInstanceOf[FUNCTION_CALL]),
