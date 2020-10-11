@@ -14,7 +14,7 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, EmptyDataEntr
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
-import com.wavesplatform.transaction.smart.ContinuationTransaction
+import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
@@ -247,7 +247,7 @@ object PBTransactions {
           chainId
         )
 
-      case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments, feeIncreaseFactor)) =>
+      case Data.InvokeScript(InvokeScriptTransactionData(Some(dAppAddress), functionCall, payments, feeIncreaseFactor)) =>
         import cats.instances.either._
         import cats.instances.option._
         import cats.syntax.traverse._
@@ -255,7 +255,7 @@ object PBTransactions {
         import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 
         for {
-          dApp <- PBRecipients.toAddressOrAlias(dappAddress, chainId)
+          dApp <- PBRecipients.toAddressOrAlias(dAppAddress, chainId)
 
           fcOpt <- Deser
             .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
@@ -276,7 +276,7 @@ object PBTransactions {
             payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
             feeAmount,
             feeAssetId,
-            feeIncreaseFactor,
+            useDefaultIfEmpty(feeIncreaseFactor),
             timestamp,
             proofs
           )
@@ -487,7 +487,7 @@ object PBTransactions {
           payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
           feeAmount,
           feeAssetId,
-          feeIncreaseFactor,
+          useDefaultIfEmpty(feeIncreaseFactor),
           timestamp,
           proofs,
           chainId
@@ -683,4 +683,10 @@ object PBTransactions {
     case Some(sc) => ByteString.copyFrom(sc.bytes().arr)
     case None     => ByteString.EMPTY
   }
+
+  private def useDefaultIfEmpty(feeIncreaseFactor: Int): Int =
+    if (feeIncreaseFactor == 0)
+      InvokeScriptTransaction.DefaultFeeIncreaseFactor
+    else
+      feeIncreaseFactor
 }
