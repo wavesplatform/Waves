@@ -8,7 +8,7 @@ import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.TxValidationError.{GenericError, NonPositiveAmount, TooBigArray}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.{DefaultFeeIncreaseFactor, Payment}
 import com.wavesplatform.transaction.validation.{TxValidator, ValidatedNV, ValidatedV}
 import com.wavesplatform.utils._
 
@@ -51,6 +51,10 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
       ),
       checkAmounts(payments),
       V.fee(fee),
+      V.cond(
+        feeIncreaseFactor >= DefaultFeeIncreaseFactor,
+        GenericError(s"Fee increase factor = $feeIncreaseFactor must be more or equal than $DefaultFeeIncreaseFactor")
+      ),
       Try(checkLength)
         .toEither
         .leftMap(err => GenericError(err.getMessage))
