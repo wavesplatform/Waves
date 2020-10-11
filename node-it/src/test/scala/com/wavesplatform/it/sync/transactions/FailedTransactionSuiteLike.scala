@@ -176,7 +176,6 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
       all(statuses.map(_.status)) shouldBe PBTransactionStatus.Status.CONFIRMED
       all(statuses.map(_.applicationStatus)) should not be ApplicationStatus.UNKNOWN
 
-      println("STATUSES " + statuses)
       val failed = statuses.dropWhile(s => s.applicationStatus == ApplicationStatus.SUCCEEDED)
 
       failed.size should be > 0
