@@ -4,7 +4,7 @@ import java.io._
 import java.net.{MalformedURLException, URL}
 
 import akka.actor.ActorSystem
-import com.google.common.io.{ByteStreams, CountingInputStream}
+import com.google.common.io.ByteStreams
 import com.google.common.primitives.Ints
 import com.wavesplatform.Exporter.Formats
 import com.wavesplatform.account.{Address, AddressScheme}
@@ -49,7 +49,6 @@ object Importer extends ScorexLogging {
       configFile: File = new File("waves-testnet.conf"),
       blockchainFile: String = "blockchain",
       importHeight: Int = Int.MaxValue,
-      offset: Long = 0,
       format: String = Formats.Binary,
       verify: Boolean = true
   )
@@ -75,10 +74,6 @@ object Importer extends ScorexLogging {
           .text("Import to height")
           .action((h, c) => c.copy(importHeight = h))
           .validate(h => if (h > 0) success else failure("Import height must be > 0")),
-        opt[Long]('o', "offset")
-          .text("File offset")
-          .action((o, c) => c.copy(offset = o))
-          .validate(o => if (o > 0) success else failure("File offset must be > 0")),
         opt[String]('f', "format")
           .text("Blockchain data file format")
           .action((f, c) => c.copy(format = f))
@@ -169,31 +164,34 @@ object Importer extends ScorexLogging {
   @volatile private var quit = false
   private val lock           = new Object
 
-  def startImport(bis: BufferedInputStream, blockchain: Blockchain, appendBlock: AppendBlock, importOptions: ImportOptions): Unit = {
-    val lenBytes       = new Array[Byte](Ints.BYTES)
-    val start          = System.nanoTime()
-    var counter        = 0
-    val countingStream = new CountingInputStream(bis)
-    var lastOffset     = 0L
+  //noinspection UnstableApiUsage
+  def startImport(
+      inputStream: BufferedInputStream,
+      blockchain: Blockchain,
+      appendBlock: AppendBlock,
+      importOptions: ImportOptions,
+      skipBlocks: Boolean
+  ): Unit = {
+    val lenBytes = new Array[Byte](Ints.BYTES)
+    val start    = System.nanoTime()
+    var counter  = 0
 
     val startHeight   = blockchain.height
-    var blocksToSkip  = startHeight - 1
+    var blocksToSkip  = if (skipBlocks) startHeight - 1 else 0
     val blocksToApply = importOptions.importHeight - startHeight + 1
 
-    if (importOptions.offset == 0 && blocksToSkip > 0)
-      log.info(s"Skipping $blocksToSkip block(s)")
-    else blocksToSkip = 0
+    if (blocksToSkip > 0) log.info(s"Skipping $blocksToSkip block(s)")
 
     sys.addShutdownHook {
       import scala.concurrent.duration._
       val millis = (System.nanoTime() - start).nanos.toMillis
       log.info(
-        s"Imported $counter block(s) from $startHeight to ${startHeight + counter} in ${humanReadableDuration(millis)}, offset=${importOptions.offset + lastOffset}"
+        s"Imported $counter block(s) from $startHeight to ${startHeight + counter} in ${humanReadableDuration(millis)}"
       )
     }
 
     while (!quit && counter < blocksToApply) lock.synchronized {
-      val s1 = ByteStreams.read(countingStream, lenBytes, 0, Ints.BYTES)
+      val s1 = ByteStreams.read(inputStream, lenBytes, 0, Ints.BYTES)
       if (s1 == Ints.BYTES) {
         val blockSize = Ints.fromByteArray(lenBytes)
 
@@ -201,10 +199,10 @@ object Importer extends ScorexLogging {
         val factReadSize =
           if (blocksToSkip > 0) {
             // File IO optimization
-            ByteStreams.skipFully(countingStream, blockSize)
+            ByteStreams.skipFully(inputStream, blockSize)
             blockSize
           } else {
-            ByteStreams.read(countingStream, blockBytes, 0, blockSize)
+            ByteStreams.read(inputStream, blockBytes, 0, blockSize)
           }
 
         if (factReadSize == blockSize) {
@@ -225,7 +223,6 @@ object Importer extends ScorexLogging {
                   quit = true
                 case _ =>
                   counter = counter + 1
-                  lastOffset = countingStream.getCount
               }
             } else {
               log.warn(s"Block $block is not a child of the last block ${blockchain.lastBlockId.get}")
@@ -236,7 +233,7 @@ object Importer extends ScorexLogging {
           quit = true
         }
       } else {
-        if (countingStream.available() > 0) log.info(s"Expecting to read ${Ints.BYTES} but got $s1 (${countingStream.available()})")
+        if (inputStream.available() > 0) log.info(s"Expecting to read ${Ints.BYTES} but got $s1 (${inputStream.available()})")
         quit = true
       }
     }
@@ -272,8 +269,6 @@ object Importer extends ScorexLogging {
       }
     }
 
-    val bis = new BufferedInputStream(initFileStream(importOptions.blockchainFile, importOptions.offset), 2 * 1024 * 1024)
-
     val scheduler = Schedulers.singleThread("appender")
     val time      = new NTP(settings.ntpServer)
 
@@ -287,6 +282,19 @@ object Importer extends ScorexLogging {
 
     checkGenesis(settings, blockchainUpdater)
     val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, db, actorSystem)
+
+    val importFileOffset = importOptions.format match {
+      case Formats.Binary =>
+        val sizes = for {
+          height <- 2 to blockchainUpdater.height // Skip genesis
+          meta   <- db.get(Keys.blockMetaAt(Height(height)))
+        } yield meta.size
+
+        sizes.map(_.toLong + 4).sum
+
+      case _ => 0L
+    }
+    val inputStream = new BufferedInputStream(initFileStream(importOptions.blockchainFile, importFileOffset), 2 * 1024 * 1024)
 
     sys.addShutdownHook {
       quit = true
@@ -319,10 +327,10 @@ object Importer extends ScorexLogging {
         levelDb.close()
         db.close()
       }
-      bis.close()
+      inputStream.close()
     }
 
-    startImport(bis, blockchainUpdater, extAppender, importOptions)
+    startImport(inputStream, blockchainUpdater, extAppender, importOptions, importFileOffset == 0)
     Await.result(Kamon.stopModules(), 10.seconds)
   }
 }
