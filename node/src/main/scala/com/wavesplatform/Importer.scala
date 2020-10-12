@@ -12,7 +12,7 @@ import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonB
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.database.{Keys, openDB}
+import com.wavesplatform.database.{DBExt, KeyTags, openDB}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.BlockchainFeatures
@@ -286,12 +286,16 @@ object Importer extends ScorexLogging {
 
     val importFileOffset = importOptions.format match {
       case Formats.Binary =>
-        val sizes = for {
-          height <- 2 to blockchainUpdater.height // Skip genesis
-          meta   <- db.get(Keys.blockMetaAt(Height(height)))
-        } yield meta.size
-
-        sizes.map(_.toLong + 4).sum
+        var result = 0L
+        db.iterateOver(KeyTags.BlockInfoAtHeight) { e =>
+          e.getKey match {
+            case Array(_, _, 0, 0, 0, 1) => // Skip genesis
+            case _ =>
+              val meta = com.wavesplatform.database.readBlockMeta(1)(e.getValue)
+              result += meta.size + 4
+          }
+        }
+        result
 
       case _ => 0L
     }
