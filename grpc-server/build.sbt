@@ -1,4 +1,3 @@
-import WavesDockerKeys.{additionalFiles, exposedPorts}
 import sbt.nio.file.FileAttributes
 
 name := "grpc-server"
@@ -22,15 +21,4 @@ inConfig(Compile)(
   )
 )
 
-enablePlugins(RunApplicationSettings, ExtensionPackaging, WavesExtensionDockerPlugin)
-
-docker := docker.dependsOn(LocalProject("node-it") / docker).value
-inTask(docker)(
-  Seq(
-    imageNames := Seq(ImageName("com.wavesplatform/blockchain-updates")),
-    exposedPorts := Set(6880, 6881),
-    additionalFiles ++= Seq(
-      (LocalProject("grpc-server") / Universal / stage).value
-    )
-  )
-)
+enablePlugins(RunApplicationSettings, ExtensionPackaging)
