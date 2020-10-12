@@ -5100,7 +5100,8 @@
                 "format": "int32"
               },
               "script": {
-                "type": "string"
+                "type": "string",
+                "format": "byte"
               },
               "scriptText": {
                 "type": "string"
@@ -5330,7 +5331,8 @@
         "type": "object",
         "properties": {
           "script": {
-            "type": "string"
+            "type": "string",
+            "format": "byte"
           },
           "complexity": {
             "type": "integer",
@@ -5459,7 +5461,7 @@
           "value": {
             "type": "object",
             "properties": {},
-            "description": "null"
+            "description": "null for entry deletion"
           }
         }
       },
@@ -5480,7 +5482,7 @@
           },
           "value": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           }
         }
       },
@@ -5556,7 +5558,7 @@
           },
           "amount": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "price": {
             "type": "integer",
@@ -5585,7 +5587,7 @@
           },
           "matcherFeeAssetId": {
             "type": "string",
-            "format": "nullable"
+            "nullable": true
           }
         }
       },
@@ -5902,11 +5904,11 @@
           },
           "fee": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "feeAssetId": {
             "type": "string",
-            "format": "nullable"
+            "nullable": true
           },
           "timestamp": {
             "type": "integer",
@@ -5927,7 +5929,7 @@
           },
           "amount": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "chainId": {
             "type": "integer",
@@ -5973,11 +5975,11 @@
           },
           "fee": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "feeAssetId": {
             "type": "string",
-            "format": "nullable"
+            "nullable": true
           },
           "timestamp": {
             "type": "integer",
@@ -6040,11 +6042,11 @@
           },
           "fee": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "feeAssetId": {
             "type": "string",
-            "format": "nullable"
+            "nullable": true
           },
           "timestamp": {
             "type": "integer",
@@ -6131,11 +6133,11 @@
           },
           "fee": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "feeAssetId": {
             "type": "string",
-            "format": "nullable"
+            "nullable": true
           },
           "timestamp": {
             "type": "integer",
@@ -6159,7 +6161,7 @@
           },
           "amount": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "price": {
             "type": "integer",
@@ -6262,7 +6264,7 @@
           },
           "fee": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "feeAssetId": {
             "type": "string",
@@ -6296,7 +6298,7 @@
               "properties": {
                 "amount": {
                   "type": "integer",
-                  "format": "int32"
+                  "format": "int64"
                 },
                 "assetId": {
                   "type": "string",
@@ -6387,11 +6389,11 @@
           },
           "fee": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "feeAssetId": {
             "type": "string",
-            "format": "nullable"
+            "nullable": true
           },
           "timestamp": {
             "type": "integer",
@@ -6428,7 +6430,8 @@
             "type": "string"
           },
           "script": {
-            "type": "string"
+            "type": "string",
+            "format": "byte"
           },
           "chainId": {
             "type": "integer",
@@ -6475,11 +6478,11 @@
           },
           "fee": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "feeAssetId": {
             "type": "string",
-            "format": "nullable"
+            "nullable": true
           },
           "timestamp": {
             "type": "integer",
@@ -6546,11 +6549,11 @@
           },
           "fee": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "feeAssetId": {
             "type": "string",
-            "format": "nullable"
+            "nullable": true
           },
           "timestamp": {
             "type": "integer",
@@ -6572,7 +6575,7 @@
           },
           "amount": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "recipient": {
             "type": "string"
@@ -6620,15 +6623,15 @@
             "type": "string"
           },
           "senderPublicKey": {
-                "type": "string"
+            "type": "string"
           },
           "fee": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "feeAssetId": {
             "type": "string",
-            "format": "nullable"
+            "nullable": true
           },
           "timestamp": {
             "type": "integer",
@@ -6649,7 +6652,8 @@
             "format": "int32"
           },
           "assetId": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "attachment": {
             "type": "string"
@@ -6720,11 +6724,11 @@
           },
           "fee": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "feeAssetId": {
             "type": "string",
-            "format": "nullable"
+            "nullable": true
           },
           "timestamp": {
             "type": "integer",
@@ -6745,7 +6749,7 @@
           },
           "quantity": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "reissuable": {
             "type": "boolean"
@@ -6792,15 +6796,15 @@
             "type": "string"
           },
           "senderPublicKey": {
-                "type": "string"
+            "type": "string"
           },
           "fee": {
-             "type": "integer",
-             "format": "int32"
+            "type": "integer",
+            "format": "int64"
           },
           "feeAssetId": {
             "type": "string",
-            "format": "nullable"
+            "nullable": true
           },
           "timestamp": {
             "type": "integer",
@@ -6868,11 +6872,11 @@
           },
           "fee": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "feeAssetId": {
             "type": "string",
-            "format": "nullable"
+            "nullable": true
           },
           "timestamp": {
             "type": "integer",
@@ -6937,11 +6941,11 @@
           },
           "fee": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "feeAssetId": {
             "type": "string",
-            "format": "nullable"
+            "nullable": true
           },
           "timestamp": {
             "type": "integer",
@@ -7011,11 +7015,11 @@
           },
           "fee": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "feeAssetId": {
             "type": "string",
-            "format": "nullable"
+            "nullable": true
           },
           "timestamp": {
             "type": "integer",
@@ -7043,11 +7047,11 @@
           },
           "feeAsset": {
             "type": "string",
-            "format": "nullable"
+            "nullable": true
           },
           "amount": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "attachment": {
             "type": "string"
@@ -7095,11 +7099,11 @@
           },
           "fee": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "feeAssetId": {
             "type": "string",
-            "format": "nullable"
+            "nullable": true
           },
           "timestamp": {
             "type": "integer",
