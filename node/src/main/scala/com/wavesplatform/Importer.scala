@@ -75,6 +75,7 @@ object Importer extends ScorexLogging {
           .action((h, c) => c.copy(importHeight = h))
           .validate(h => if (h > 0) success else failure("Import height must be > 0")),
         opt[String]('f', "format")
+          .hidden()
           .text("Blockchain data file format")
           .action((f, c) => c.copy(format = f))
           .valueName(s"<${Formats.importerList.mkString("|")}> (default is ${Formats.default})")
