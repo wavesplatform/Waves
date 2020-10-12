@@ -2,7 +2,7 @@ package com.wavesplatform.api.grpc
 
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.protobuf.transaction._
-import com.wavesplatform.transaction.{Authorized, ScriptExecutionFailed}
+import com.wavesplatform.transaction.{Authorized, ScriptExecutionFailed, ScriptExecutionInProgress, Succeeded}
 import io.grpc.stub.StreamObserver
 import io.grpc.{Status, StatusRuntimeException}
 import monix.execution.Scheduler
@@ -45,8 +45,9 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
         stream
           .filter { case (_, t, _) => transactionIdSet.isEmpty || transactionIdSet(t.id()) }
           .map {
-            case (h, tx, ScriptExecutionFailed) => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB), ApplicationStatus.SCRIPT_EXECUTION_FAILED)
-            case (h, tx, _)                     => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB), ApplicationStatus.SUCCEEDED)
+            case (h, tx, ScriptExecutionFailed)     => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB), ApplicationStatus.SCRIPT_EXECUTION_FAILED)
+            case (h, tx, Succeeded)                 => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB), ApplicationStatus.SUCCEEDED)
+            case (h, tx, ScriptExecutionInProgress) => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB), ApplicationStatus.SCRIPT_EXECUTION_IN_PROGRESS)
           }
       )
     }
@@ -89,8 +90,9 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
           .map(_ => TransactionStatus(txId, TransactionStatus.Status.UNCONFIRMED))
           .orElse {
             commonApi.transactionById(txId).map {
-              case (h, _, ScriptExecutionFailed) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h, ApplicationStatus.SCRIPT_EXECUTION_FAILED)
-              case (h, _, _)                     => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h, ApplicationStatus.SUCCEEDED)
+              case (h, _, ScriptExecutionFailed)     => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h, ApplicationStatus.SCRIPT_EXECUTION_FAILED)
+              case (h, _, ScriptExecutionInProgress) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h, ApplicationStatus.SCRIPT_EXECUTION_IN_PROGRESS)
+              case (h, _, Succeeded)                 => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h, ApplicationStatus.SUCCEEDED)
             }
           }
           .getOrElse(TransactionStatus(txId, TransactionStatus.Status.NOT_EXISTS))
