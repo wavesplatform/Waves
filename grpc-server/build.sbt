@@ -1,4 +1,5 @@
 import WavesDockerKeys.{additionalFiles, exposedPorts}
+import sbt.nio.file.FileAttributes
 
 name := "grpc-server"
 
@@ -14,10 +15,8 @@ inConfig(Compile)(
     PB.protoSources in Compile := Seq(PB.externalIncludePath.value),
     includeFilter in PB.generate := new SimpleFileFilter(
       (f: File) =>
-        Seq(
-          ** / "waves" / "node" / "grpc" / ** / "*.proto",
-          ** / "waves" / "events" / ** / "*.proto"
-        ).exists(_.matches(f.toPath))
+        ((** / "waves" / "node" / "grpc" / ** / "*.proto") || (** / "waves" / "events" / ** / "*.proto"))
+          .accept(f.toPath, FileAttributes(f.toPath).getOrElse(FileAttributes.NonExistent))
     ),
     PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value
   )
