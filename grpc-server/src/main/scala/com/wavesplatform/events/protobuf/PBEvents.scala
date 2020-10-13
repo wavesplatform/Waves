@@ -28,8 +28,8 @@ trait Vanilla[A] {
   def vanilla: Try[A]
 }
 
+//noinspection ScalaStyle
 object serde {
-
   import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 
   implicit class BlockchainUpdatedProtobuf(self: VanillaBlockchainUpdated) extends Protobuf[BlockchainUpdated] {

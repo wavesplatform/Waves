@@ -188,7 +188,7 @@ object BlockAppended {
       // genesis case
       case 0 => block.transactionData.collect { case GenesisTransaction(_, amount, _, _, _) => amount }.sum
       // miner reward case
-      case _ => blockchainBeforeWithMinerReward.wavesAmount(blockchainBeforeWithMinerReward.height).toLong + minerReward.getOrElse(0L)
+      case height => blockchainBeforeWithMinerReward.wavesAmount(height).toLong
     }
 
     BlockAppended(block.id.value(), blockchainBeforeWithMinerReward.height + 1, block, updatedWavesAmount, blockStateUpdate, txsStateUpdates)

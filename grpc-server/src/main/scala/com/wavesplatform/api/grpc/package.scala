@@ -62,20 +62,15 @@ package object grpc extends PBImplicitConversions with ScorexLogging {
         }
 
       val cancelable = source.subscribe(
-        (elem: A) => {
+        (elem: A) =>
           queue
             .offer(f(elem))
             .flatMap { _ =>
               pushNext()
               Ack.Continue
-            }
-        },
-        err => {
-          cso.onError(err)
-        },
-        () => {
-          cso.onCompleted()
-        }
+            },
+        err => cso.onError(GRPCErrors.toStatusException(err)),
+        cso.onCompleted _
       )
 
       cso match {
