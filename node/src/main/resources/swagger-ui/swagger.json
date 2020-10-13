@@ -6204,10 +6204,12 @@
             "type": "string"
           },
           "fee": {
-            "type": "number"
+            "type": "integer",
+            "format": "int64"
           },
           "feeAssetId": {
-            "type": "number"
+            "type": "string",
+            "nullable": true
           },
           "timestamp": {
             "type": "string",
@@ -6223,7 +6225,8 @@
             "type": "string"
           },
           "amount": {
-            "type": "number"
+            "type": "integer",
+            "format": "int64"
           },
           "height": {
             "type": "integer",
