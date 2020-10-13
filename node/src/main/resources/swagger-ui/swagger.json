@@ -142,13 +142,7 @@
         "operationId": "verify_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "requestBody": {
@@ -259,13 +253,7 @@
         "operationId": "seed_2",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -364,13 +352,7 @@
         "operationId": "balance_2",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -399,14 +381,15 @@
           {
             "name": "address",
             "in": "query",
-            "description": "Address",
+            "description": "Up to 1000 addresses base58 encoded",
             "required": true,
             "style": "form",
             "explode": true,
             "schema": {
               "type": "array",
               "items": {
-                "type": "string"
+                "type": "string",
+                "pattern": "^[1-9A-HJ-NP-Za-km-z]{35}$"
               }
             }
           },
@@ -446,13 +429,7 @@
         "operationId": "effectiveBalance_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -479,13 +456,7 @@
         "operationId": "getData_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           },
           {
             "name": "matches",
@@ -534,13 +505,7 @@
         "operationId": "postData_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "requestBody": {
@@ -602,13 +567,7 @@
         "operationId": "sign_3",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "requestBody": {
@@ -666,13 +625,7 @@
         "operationId": "validate_2",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -711,13 +664,7 @@
         "operationId": "scriptMeta_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -744,13 +691,7 @@
         "operationId": "scriptInfo_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -801,13 +742,7 @@
         "operationId": "deleteAddress_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -861,13 +796,7 @@
         "operationId": "signText_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "requestBody": {
@@ -925,13 +854,7 @@
         "operationId": "verifyText_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "requestBody": {
@@ -997,13 +920,7 @@
         "operationId": "balanceDetails_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -1058,13 +975,7 @@
         "operationId": "balanceWithConfirmations_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           },
           {
             "name": "confirmations",
@@ -1100,13 +1011,7 @@
         "operationId": "effectiveBalanceWithConfirmations_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           },
           {
             "name": "confirmations",
@@ -1142,13 +1047,7 @@
         "operationId": "getDataItem_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           },
           {
             "name": "key",
@@ -1186,10 +1085,11 @@
           {
             "name": "signature",
             "in": "path",
-            "description": "Base58-encoded block signature",
+            "description": "Block signature base58 encoded",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]+$"
             }
           }
         ],
@@ -1218,13 +1118,7 @@
         "operationId": "block_by_id",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "description": "Base58-encoded block id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/blockId"
           }
         ],
         "responses": {
@@ -1291,13 +1185,7 @@
             }
           },
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -1372,13 +1260,7 @@
         "operationId": "delay_1",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "description": "Base58-encoded block id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/blockId"
           },
           {
             "name": "blockNum",
@@ -1509,13 +1391,7 @@
         "operationId": "heightEncoded_1",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "description": "Base58-encoded block id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/blockId"
           }
         ],
         "responses": {
@@ -1584,13 +1460,7 @@
         "operationId": "block_header_by_id",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "description": "Base58-encoded block id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/blockId"
           }
         ],
         "responses": {
@@ -2054,14 +1924,15 @@
           {
             "name": "id",
             "in": "query",
-            "description": "Transaction ID",
+            "description": "Transaction IDs base58 encoded",
             "required": true,
             "style": "form",
             "explode": true,
             "schema": {
               "type": "array",
               "items": {
-                "type": "string"
+                "type": "string",
+                "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
               }
             }
           }
@@ -2093,9 +1964,10 @@
                 "properties": {
                   "id": {
                     "type": "array",
-                    "description": "Transaction IDs",
+                    "description": "Transaction IDs base58 encoded",
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
                     }
                   }
                 }
@@ -2144,13 +2016,7 @@
         "operationId": "info_2",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "description": "Transaction ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/txId"
           }
         ],
         "responses": {
@@ -2255,13 +2121,7 @@
         "operationId": "addressLimit_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           },
           {
             "name": "limit",
@@ -2339,13 +2199,7 @@
         "operationId": "utxTransactionInfo_1",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "description": "Transaction ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/txId"
           }
         ],
         "responses": {
@@ -2421,10 +2275,11 @@
           {
             "name": "signerAddress",
             "in": "path",
-            "description": "Wallet address",
+            "description": "Wallet address base58 encoded",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{35}$"
             }
           }
         ],
@@ -3157,13 +3012,7 @@
         "operationId": "aliasOfAddress_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -3194,13 +3043,7 @@
         "operationId": "balances_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -3278,13 +3121,7 @@
         "operationId": "asset_details",
         "parameters": [
           {
-            "name": "assetId",
-            "in": "path",
-            "description": "ID of the asset",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref":"#/components/parameters/assetId"
           },
           {
             "name": "full",
@@ -3368,22 +3205,10 @@
         "operationId": "balance",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           },
           {
-            "name": "assetId",
-            "in": "path",
-            "description": "Asset ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref":"#/components/parameters/assetId"
           }
         ],
         "responses": {
@@ -3427,13 +3252,7 @@
         "operationId": "balanceDistribution_1",
         "parameters": [
           {
-            "name": "assetId",
-            "in": "path",
-            "description": "Asset ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref":"#/components/parameters/assetId"
           }
         ],
         "responses": {
@@ -3461,13 +3280,7 @@
         "operationId": "balanceDistributionAtHeight_1",
         "parameters": [
           {
-            "name": "assetId",
-            "in": "path",
-            "description": "Asset ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref":"#/components/parameters/assetId"
           },
           {
             "name": "height",
@@ -3520,13 +3333,7 @@
         "operationId": "nft_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           },
           {
             "name": "limit",
@@ -3573,13 +3380,7 @@
         "operationId": "active_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Wallet address ",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -3609,13 +3410,7 @@
         "operationId": "generatingBalance_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -3657,10 +3452,11 @@
           {
             "name": "blockId",
             "in": "path",
-            "description": "Block id",
+            "description": "Block ID base58 encoded",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
             }
           }
         ],
@@ -4260,13 +4056,7 @@
         "operationId": "portfolios_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "An address of portfolio",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           },
           {
             "name": "considerUnspent",
@@ -4361,13 +4151,7 @@
         "operationId": "rollbackTo_1",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "description": "Base58-encoded block id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/blockId"
           }
         ],
         "responses": {
@@ -4489,13 +4273,7 @@
         "operationId": "balanceHistory_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "An address to load waves balance history for",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           }
         ],
         "responses": {
@@ -4779,13 +4557,7 @@
         "operationId": "stateChangesById_1",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "description": "Transaction ID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/txId"
           }
         ],
         "responses": {
@@ -4812,13 +4584,7 @@
         "operationId": "stateChangesByAddress_1",
         "parameters": [
           {
-            "name": "address",
-            "in": "path",
-            "description": "Address",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "$ref": "#/components/parameters/address"
           },
           {
             "name": "limit",
@@ -7162,6 +6928,48 @@
         "type": "apiKey",
         "name": "X-API-Key",
         "in": "header"
+      }
+    },
+    "parameters": {
+      "address": {
+        "name": "address",
+        "in": "path",
+        "description": "Address base58 encoded",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[1-9A-HJ-NP-Za-km-z]{35}$"
+        }
+      },
+      "assetId": {
+        "name": "assetId",
+        "in": "path",
+        "description": "Asset ID base58 encoded",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
+        }
+      },
+      "blockId": {
+        "name": "id",
+        "in": "path",
+        "description": "Block ID base58 encoded",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
+        }
+      },
+      "txId": {
+        "name": "id",
+        "in": "path",
+        "description": "Transaction ID base58 encoded",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
+        }
       }
     }
   }
