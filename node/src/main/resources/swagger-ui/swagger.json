@@ -4044,7 +4044,7 @@
                       "properties": {
                         "localScore": {
                           "type": "integer",
-                          "format": "int32"
+                          "format": "int64"
                         },
                         "currentBestChannel": {
                           "type": "string"
@@ -5169,7 +5169,7 @@
           },
           "totalFee": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "reference": {
             "type": "string"
@@ -5261,7 +5261,7 @@
           },
           "totalFee": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "reference": {
             "type": "string"
@@ -5562,7 +5562,7 @@
           },
           "price": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "timestamp": {
             "type": "integer",
@@ -5574,7 +5574,7 @@
           },
           "matcherFee": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "signature": {
             "type": "string"
@@ -5612,7 +5612,7 @@
           },
           "totalWavesAmount": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "currentReward": {
             "type": "integer",
@@ -6165,15 +6165,15 @@
           },
           "price": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "buyMatcherFee": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "sellMatcherFee": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "chainId": {
             "type": "integer",
@@ -6420,7 +6420,7 @@
           },
           "quantity": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "reissuable": {
             "type": "boolean"
@@ -6973,7 +6973,7 @@
           },
           "minSponsoredAssetFee": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           "applicationStatus": {
             "type": "string"
