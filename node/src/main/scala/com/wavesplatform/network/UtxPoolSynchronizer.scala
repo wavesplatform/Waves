@@ -17,12 +17,12 @@ import monix.execution.{AsyncQueue, Scheduler}
 import monix.reactive.Observable
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionException, Future}
+import scala.concurrent.{ExecutionException, Future}
 import scala.util.Success
 
 trait UtxPoolSynchronizer {
   def tryPublish(tx: Transaction, source: Channel): Unit
-  def publish(tx: Transaction): TracedResult[ValidationError, Boolean]
+  def publish(tx: Transaction): Future[TracedResult[ValidationError, Boolean]]
 }
 
 class UtxPoolSynchronizerImpl(
@@ -81,7 +81,7 @@ class UtxPoolSynchronizerImpl(
     Schedulers
       .executeCatchingInterruptedException(timedScheduler)(putIfNew(tx, source.isEmpty))
       .recover {
-        case err: ExecutionException if err.getCause.isInstanceOf[InterruptedException]  =>
+        case err: ExecutionException if err.getCause.isInstanceOf[InterruptedException] =>
           log.trace(s"Transaction took too long to validate: ${tx.id()}")
           TracedResult(Left(GenericError("Transaction took too long to validate")))
 
@@ -93,8 +93,8 @@ class UtxPoolSynchronizerImpl(
         case Success(TracedResult(Right(isNew), _)) if isNew || allowRebroadcast => broadcast(tx, source)
       }
 
-  override def publish(tx: Transaction): TracedResult[ValidationError, Boolean] =
-    Await.result(validateFuture(tx, settings.allowTxRebroadcasting, None), Duration.Inf)
+  override def publish(tx: Transaction): Future[TracedResult[ValidationError, Boolean]] =
+    validateFuture(tx, settings.allowTxRebroadcasting, None)
 
   override def close(): Unit = pollLoopCancelable.cancel()
 }

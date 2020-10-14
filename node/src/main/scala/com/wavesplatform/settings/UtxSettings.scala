@@ -6,6 +6,7 @@ case class UtxSettings(
     maxScriptedSize: Int,
     blacklistSenderAddresses: Set[String],
     allowBlacklistedTransferTo: Set[String],
+    fastLaneAddresses: Set[String],
     allowTransactionsFromSmartAccounts: Boolean,
     allowSkipChecks: Boolean
 )

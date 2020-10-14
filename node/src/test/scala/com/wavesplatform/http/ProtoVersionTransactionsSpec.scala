@@ -31,6 +31,8 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Matchers, OptionValues}
 import play.api.libs.json._
 
+import scala.concurrent.Future
+
 class ProtoVersionTransactionsSpec
     extends RouteSpec("/transactions")
     with RestAPISettingsHelper
@@ -62,7 +64,7 @@ class ProtoVersionTransactionsSpec
     TransactionsApiRoute(restAPISettings, transactionsApi, testWallet, blockchain, () => utx.size, utxPoolSynchronizer, ntpTime).route
 
   private def test(f: => Any): Unit = {
-    (utxPoolSynchronizer.publish _).expects(*).anyNumberOfTimes().returning(TracedResult(Right(true)))
+    (utxPoolSynchronizer.publish _).expects(*).anyNumberOfTimes().returning(Future.successful(TracedResult(Right(true))))
     f
   }
 

@@ -4,7 +4,7 @@ import com.wavesplatform.state.Blockchain
 
 object InvokeScriptSelfPaymentPolicyProvider {
   implicit class SelfPaymentPolicyBlockchainExt(b: Blockchain) {
-    val disallowSelfPayment: Boolean =
+    def disallowSelfPayment: Boolean =
       b.isFeatureActivated(BlockchainFeatures.BlockV5)
   }
 }
