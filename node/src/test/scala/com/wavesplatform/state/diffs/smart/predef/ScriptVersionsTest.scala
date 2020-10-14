@@ -15,7 +15,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.state.{BinaryDataEntry, Blockchain, BooleanDataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, Blockchain, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.{ScriptCompiler, ScriptRunner}
 import com.wavesplatform.utils.EmptyBlockchain
