@@ -13,7 +13,7 @@ import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.openDB
-import com.wavesplatform.events.{BlockchainUpdateTriggersImpl, BlockchainUpdated, UtxEvent}
+import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
@@ -94,7 +94,12 @@ object Importer extends ScorexLogging {
       .getOrElse(throw new IllegalArgumentException("Invalid options"))
   }
 
-  def loadSettings(file: File): WavesSettings = Application.loadApplicationConfig(Some(file))
+  def loadSettings(file: File): WavesSettings = {
+    val settings = Application.loadApplicationConfig(Some(file))
+    settings.copy(dbSettings = settings.dbSettings.copy(useBloomFilter = true))
+  }
+
+  private[this] var triggers = Seq.empty[BlockchainUpdateTriggers]
 
   def initExtensions(
       wavesSettings: WavesSettings,
@@ -102,7 +107,6 @@ object Importer extends ScorexLogging {
       appenderScheduler: Scheduler,
       extensionTime: Time,
       utxPool: UtxPool,
-      blockchainUpdatedObservable: Observable[BlockchainUpdated],
       db: DB,
       extensionActorSystem: ActorSystem
   ): Seq[Extension] =
@@ -122,7 +126,6 @@ object Importer extends ScorexLogging {
             TracedResult.wrapE(Left(GenericError("Not implemented during import")))
           override def spendableBalanceChanged: Observable[(Address, Asset)] = Observable.empty
           override def actorSystem: ActorSystem                              = extensionActorSystem
-          override def blockchainUpdated: Observable[BlockchainUpdated]      = blockchainUpdatedObservable
           override def utxEvents: Observable[UtxEvent]                       = Observable.empty
           override def transactionsApi: CommonTransactionsApi =
             CommonTransactionsApi(
@@ -131,7 +134,7 @@ object Importer extends ScorexLogging {
               blockchainUpdater,
               utxPool,
               wallet,
-              _ => TracedResult.wrapE(Left(GenericError("Not implemented during import"))),
+              _ => Future.successful(TracedResult.wrapE(Left(GenericError("Not implemented during import")))),
               Application.loadBlockAt(db, blockchainUpdater)
             )
           override def blocksApi: CommonBlocksApi =
@@ -152,6 +155,7 @@ object Importer extends ScorexLogging {
       extensions.flatMap { ext =>
         Try(ext.start()) match {
           case Success(_) =>
+            triggers ++= Some(ext).collect { case t: BlockchainUpdateTriggers => t }
             Some(ext)
           case Failure(e) =>
             log.warn(s"Can't initialize extension $ext", e)
@@ -246,22 +250,19 @@ object Importer extends ScorexLogging {
     val scheduler = Schedulers.singleThread("appender")
     val time      = new NTP(settings.ntpServer)
 
-    val actorSystem              = ActorSystem("wavesplatform-import")
-    val blockchainUpdated        = PublishSubject[BlockchainUpdated]()
-    val blockchainUpdateTriggers = new BlockchainUpdateTriggersImpl(blockchainUpdated)
-    val db                       = openDB(settings.dbSettings.directory)
+    val actorSystem = ActorSystem("wavesplatform-import")
+    val db          = openDB(settings.dbSettings.directory)
     val (blockchainUpdater, levelDb) =
-      StorageFactory(settings, db, time, Observer.empty, blockchainUpdateTriggers)
+      StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.combined(triggers))
     val utxPool     = new UtxPoolImpl(time, blockchainUpdater, PublishSubject(), settings.utxSettings)
     val pos         = PoSSelector(blockchainUpdater, settings.synchronizationSettings)
     val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify) _
 
+    val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, db, actorSystem)
     checkGenesis(settings, blockchainUpdater)
-    val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, blockchainUpdated, db, actorSystem)
 
     sys.addShutdownHook {
       quit = true
-      Await.ready(Future.sequence(extensions.map(_.shutdown())), settings.extensionsShutdownTimeout)
       Await.result(actorSystem.terminate(), 10.second)
       lock.synchronized {
         if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG)) {
@@ -284,7 +285,14 @@ object Importer extends ScorexLogging {
           )
           blockchainUpdater.processBlock(pseudoBlock, ByteStr.empty, verify = false)
         }
+
+        // Terminate appender
         scheduler.shutdown()
+        scheduler.awaitTermination(10 seconds)
+
+        // Terminate extensions
+        Await.ready(Future.sequence(extensions.map(_.shutdown())), settings.extensionsShutdownTimeout)
+
         blockchainUpdater.shutdown()
         levelDb.close()
         db.close()

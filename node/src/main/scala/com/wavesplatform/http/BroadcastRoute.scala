@@ -12,13 +12,25 @@ import play.api.libs.json._
 trait BroadcastRoute { _: ApiRoute =>
   def utxPoolSynchronizer: UtxPoolSynchronizer
 
-  def broadcast[A: Reads](f: A => Either[ValidationError, Transaction]): Route = jsonParammedPost[A] { (a, params) =>
-    f(a).fold[ToResponseMarshallable](
-      ApiError.fromValidationError,
-      tx => {
-        val p = utxPoolSynchronizer.publish(tx)
-        p.transformE(r => r.bimap(ApiError.fromValidationError, t => tx.json() ++ params.get("trace").fold(Json.obj())(_ => Json.obj("trace" -> p.trace.map(_.loggedJson)))))
-      }
-    )
+  def broadcast[A: Reads](f: A => Either[ValidationError, Transaction]): Route = extractScheduler { implicit sc =>
+    jsonParammedPost[A] { (a, params) =>
+      f(a).fold[ToResponseMarshallable](
+        ApiError.fromValidationError,
+        tx =>
+          utxPoolSynchronizer
+            .publish(tx)
+            .map(
+              _.transformE(
+                _.bimap(
+                  ApiError.fromValidationError,
+                  _ =>
+                    tx.json() ++ params
+                      .get("trace")
+                      .fold(Json.obj())(_ => Json.obj("trace" -> utxPoolSynchronizer.publish(tx).trace.map(_.loggedJson)))
+                )
+              )
+            )
+      )
+    }
   }
 }

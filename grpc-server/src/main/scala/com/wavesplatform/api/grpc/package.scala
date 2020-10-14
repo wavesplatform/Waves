@@ -4,13 +4,15 @@ import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.{CallStreamObserver, ServerCallStreamObserver, StreamObserver}
 import monix.execution.{Ack, AsyncQueue, Scheduler}
 import monix.reactive.Observable
 
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
 
-package object grpc extends PBImplicitConversions {
+package object grpc extends PBImplicitConversions with ScorexLogging {
   def wrapObservable[A, B](source: Observable[A], dest: StreamObserver[B])(f: A => B)(implicit s: Scheduler): Unit = dest match {
     case cso: CallStreamObserver[B] @unchecked =>
       val queue = AsyncQueue.bounded[B](32)
@@ -62,6 +64,7 @@ package object grpc extends PBImplicitConversions {
       )
 
   }
+
   implicit class StreamObserverMonixOps[T](streamObserver: StreamObserver[T])(implicit sc: Scheduler) {
     def completeWith(obs: Observable[T]): Unit = {
       wrapObservable(obs, streamObserver)(identity)
@@ -78,6 +81,7 @@ package object grpc extends PBImplicitConversions {
 
   implicit class EitherVEExt[T](e: Either[ValidationError, T]) {
     def explicitGetErr(): T = e.fold(e => throw GRPCErrors.toStatusException(e), identity)
+    def toFuture: Future[T] = Future.fromTry(e.left.map(err => GRPCErrors.toStatusException(err)).toTry)
   }
 
   implicit class OptionErrExt[T](e: Option[T]) {
@@ -86,5 +90,9 @@ package object grpc extends PBImplicitConversions {
 
   implicit class AddressOrAliasExt(a: AddressOrAlias) {
     def resolved(blockchain: Blockchain): Option[Address] = blockchain.resolveAlias(a).toOption
+  }
+
+  implicit class FutureExt[T](f: Future[T])(implicit ec: ExecutionContext) {
+    def wrapErrors: Future[T] = f.recoverWith { case err => Future.failed(GRPCErrors.toStatusException(err)) }
   }
 }

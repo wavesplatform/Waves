@@ -7,7 +7,7 @@ import com.wavesplatform.crypto.KeyLength
 
 object PrivateKey extends TaggedType[ByteStr] {
   def apply(privateKey: ByteStr): PrivateKey = {
-    require(privateKey.arr.length == KeyLength, s"invalid public key length: ${privateKey.arr.length}")
+    require(privateKey.arr.length == KeyLength, s"invalid private key length: ${privateKey.arr.length}")
     privateKey @@ PrivateKey
   }
 

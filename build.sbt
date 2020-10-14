@@ -9,6 +9,7 @@
 import sbt.Keys._
 import sbt._
 import sbtcrossproject.CrossPlugin.autoImport.{CrossType, crossProject}
+import sbtcrossproject.CrossProject
 
 val langPublishSettings = Seq(
   coverageExcludedPackages := "",
@@ -31,9 +32,12 @@ lazy val lang =
       inConfig(Compile)(
         Seq(
           sourceGenerators += Tasks.docSource,
-          PB.targets += scalapb.gen(flatPackage = true) -> (sourceManaged).value,
+          PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
           PB.protoSources := Seq(PB.externalIncludePath.value, baseDirectory.value.getParentFile / "shared" / "src" / "main" / "protobuf"),
-          includeFilter in PB.generate := new SimpleFileFilter((f: File) => f.getName == "DAppMeta.proto" || (f.getName.endsWith(".proto") && f.getParent.endsWith("waves"))),
+          includeFilter in PB.generate := { (f: File) =>
+            (** / "DAppMeta.proto").matches(f.toPath) ||
+              (** / "waves" / "*.proto").matches(f.toPath)
+          },
           PB.deleteTargetDirectory := false
         )
       )
@@ -98,7 +102,7 @@ inScope(Global)(
     scalaVersion := "2.13.3",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
-    V.fallback := (1, 2, 12),
+    V.fallback := (1, 2, 13),
     organizationHomepage := Some(url("https://wavesplatform.com")),
     scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/Waves"), "git@github.com:wavesplatform/Waves.git", None)),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
@@ -152,6 +156,8 @@ packageAll := Def
       (node / Debian / packageBin).value
       (`grpc-server` / Universal / packageZipTarball).value
       (`grpc-server` / Debian / packageBin).value
+      (`blockchain-updates` / Universal / packageZipTarball).value
+      (`blockchain-updates` / Debian / packageBin).value
     }
   )
   .value
@@ -161,7 +167,6 @@ checkPRRaw := Def
   .sequential(
     root / clean,
     Def.task {
-      (`lang-jvm` / Compile / PB.generate).value
       (Test / compile).value
       (`lang-tests` / Test / test).value
       (`lang-js` / Compile / fastOptJS).value
