@@ -1,9 +1,11 @@
 package com.wavesplatform.state.diffs.smart.predef
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.Testing
+import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -13,7 +15,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.state.{Blockchain, StringDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, Blockchain, BooleanDataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.{ScriptCompiler, ScriptRunner}
 import com.wavesplatform.utils.EmptyBlockchain
@@ -38,7 +40,7 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
     } yield r
   }
 
-  private def eval[T <: EVALUATED](
+  private def eval(
       script: Script,
       tx: Transaction,
       blockchain: Blockchain
@@ -117,11 +119,11 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
       def compile(scriptText: String) =
         ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1
 
-      def script(dApp: Boolean) =
+      def script(dApp: Boolean, version: StdLibVersion): Script =
         compile(
           s"""
-             | {-# STDLIB_VERSION 4       #-}
-             | {-# SCRIPT_TYPE    ACCOUNT #-}
+             | {-# STDLIB_VERSION ${version.id}                        #-}
+             | {-# SCRIPT_TYPE    ACCOUNT                              #-}
              | {-# CONTENT_TYPE ${if (dApp) "DAPP" else "EXPRESSION"}  #-}
              |
              | ${if (dApp) "@Verifier(tx) \n func verify() = " else ""}
@@ -132,12 +134,15 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
              |         case entry: StringEntry =>
              |           entry.key == "key" &&
              |           entry.value == "value"
-             |         case _: IntegerEntry =>
-             |           throw("unexpected IntegerEntry")
-             |         case _: BinaryEntry =>
-             |           throw("unexpected BinaryEntry")
-             |         case _: BooleanEntry =>
-             |           throw("unexpected BooleanEntry")
+             |         case entry: IntegerEntry =>
+             |           entry.key == "key" &&
+             |           entry.value == 1
+             |         case entry: BinaryEntry =>
+             |           entry.key == "key" &&
+             |           entry.value == base58'aaaa'
+             |         case entry: BooleanEntry =>
+             |           entry.key == "key" &&
+             |           entry.value == true
              |       }
              |   case _ =>
              |     sigVerify(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)
@@ -145,15 +150,31 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
        """.stripMargin
         )
 
-      val tx = dataTransactionGen.sample.get.copy(data = Seq(StringDataEntry("key", "value")))
       val fixedBlockchain = new EmptyBlockchain {
         override def activatedFeatures: Map[Short, Int] = Map(BlockchainFeatures.ContinuationTransaction.id -> 0)
       }
 
-      eval[EVALUATED](script(dApp = false), tx, EmptyBlockchain) shouldBe Testing.evaluated(true)
-      eval[EVALUATED](script(dApp = false), tx, fixedBlockchain) shouldBe Testing.evaluated(true)
-      eval[EVALUATED](script(dApp = true), tx, EmptyBlockchain) should produce("Match error")
-      eval[EVALUATED](script(dApp = true), tx, fixedBlockchain) shouldBe Testing.evaluated(true)
+      for {
+        isDApp      <- List(true, false)
+        version     <- DirectiveDictionary[StdLibVersion].all.filter(if (isDApp) _ >= V3 else _ => true)
+        activateFix <- List(true, false)
+        entry       <- List(
+          StringDataEntry("key", "value"),
+          IntegerDataEntry("key", 1),
+          BinaryDataEntry("key", ByteStr.decodeBase58("aaaa").get),
+          BooleanDataEntry("key", true)
+        )
+      } {
+        val tx = dataTransactionGen.sample.get.copy(data = Seq(entry))
+        val blockchain = if (activateFix) fixedBlockchain else EmptyBlockchain
+        if (version >= V4) {
+          if (!activateFix && isDApp)
+            eval(script(isDApp, version), tx, blockchain) should produce("Match error")
+          else
+            eval(script(isDApp, version), tx, blockchain) shouldBe Testing.evaluated(true)
+        } else
+          (the[RuntimeException] thrownBy script(isDApp, version)).getMessage should include("Undefined type")
+      }
     }
   }
 }
