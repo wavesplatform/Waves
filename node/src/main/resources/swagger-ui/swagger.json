@@ -111,18 +111,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -176,18 +165,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -280,18 +258,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -593,18 +560,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -765,18 +721,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -822,18 +767,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -888,18 +822,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -1602,18 +1525,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -1652,18 +1564,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -2064,18 +1965,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -2304,8 +2194,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
+        "security": [
+          {
+            "APIKey": []
+          }
+        ],
         "x-codegen-request-body-name": "json"
       }
     },
@@ -2779,20 +2677,6 @@
                 }
               }
             }
-          },
-          "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
           }
         }
       }
@@ -2940,18 +2824,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -3673,18 +3546,7 @@
             "content": {}
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -3724,18 +3586,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -3860,18 +3711,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -3906,18 +3746,7 @@
             "content": {}
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -3933,7 +3762,7 @@
           "debug"
         ],
         "summary": "State hash",
-        "description": "Get state hash at height",
+        "description": "Get state hash at height. Available only if node configuration contains `waves.db.store-state-hashes = true` option",
         "operationId": "state_hash",
         "parameters": [
           {
@@ -4020,18 +3849,7 @@
             "content": {}
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           },
           "404": {
             "description": "There are no peer with such address",
@@ -4120,18 +3938,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -4174,18 +3981,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -4241,20 +4037,6 @@
                       }
                     }
                   }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
                 }
               }
             }
@@ -4347,18 +4129,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -4420,18 +4191,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -4480,18 +4240,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -4526,18 +4275,7 @@
             "content": {}
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
@@ -4649,18 +4387,7 @@
             }
           },
           "403": {
-            "description": "Provided API key is not correct",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                },
-                "example": {
-                  "error": 2,
-                  "message": "Provided API key is not correct"
-                }
-              }
-            }
+            "$ref": "#/components/responses/ApiKeyNotValid"
           }
         },
         "security": [
