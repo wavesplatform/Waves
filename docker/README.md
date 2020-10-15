@@ -14,7 +14,7 @@ It is highly recommended to read more about [Waves Node configuration](https://d
 ## Building Docker image
 
 Dockerfile supports 3 main scenarios:
-1. Basic scenario `docker build .` - build an image with the latest Waves Node release available
+1. Basic scenario `docker build -t wavesplatform/wavesnode .` - build an image with the latest Waves Node release available
 *Note*: pre-releases are skipped
 2. Existing Version scenario `docker build --build-arg WAVES_VERSION=1.1.1` - specify the version of Waves Node available in GitHub Releases. If this version does not exist, this is the next scenario.
 3. Build scenario `docker build --build-arg WAVES_VERSION=99.99.99 --build-arg BRANCH=version-0.17.x` - this scenario assumes that you want to build Waves Node from sources. Use `WAVES_VERSION` build argument to specify a Git tag ('v' is added automatically) and `BRANCH` to specify a Git branch to checkout to. Make sure you specify a tag that does not exist in the repo, otherwise it is the previous scenario.
