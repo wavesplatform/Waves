@@ -7,7 +7,7 @@ import akka.actor.ActorSystem
 import com.google.common.io.ByteStreams
 import com.google.common.primitives.Ints
 import com.wavesplatform.Exporter.Formats
-import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonBlocksApi, CommonTransactionsApi}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -222,9 +222,6 @@ object Importer extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     val importOptions = parseOptions(args)
     val settings      = loadSettings(importOptions.configFile)
-    AddressScheme.current = new AddressScheme {
-      override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
-    }
 
     def initFileStream(file: String): InputStream = {
       log.info(s"Opening import file: $file")
