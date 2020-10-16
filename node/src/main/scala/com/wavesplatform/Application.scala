@@ -19,7 +19,6 @@ import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.AliasApiRoute
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
-import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
@@ -37,7 +36,6 @@ import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
@@ -108,31 +106,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private var extensions = Seq.empty[Extension]
 
-  // update triggers combined into one instance
   private var triggers = Seq.empty[BlockchainUpdateTriggers]
-  private val triggersCombined = new BlockchainUpdateTriggers {
-    override def onProcessBlock(block: Block, diff: BlockDiffer.DetailedDiff, minerReward: Option[Long], blockchainBeforeWithMinerReward: Blockchain): Unit =
-      triggers.foreach(_.onProcessBlock(block, diff, minerReward, blockchainBeforeWithMinerReward))
-
-    override def onProcessMicroBlock(
-                                      microBlock: MicroBlock,
-                                      diff: BlockDiffer.DetailedDiff,
-                                      blockchainBeforeWithMinerReward: Blockchain,
-                                      totalBlockId: ByteStr,
-                                      totalTransactionsRoot: ByteStr
-    ): Unit =
-      triggers.foreach(_.onProcessMicroBlock(microBlock, diff, blockchainBeforeWithMinerReward, totalBlockId, totalTransactionsRoot))
-
-    override def onRollback(toBlockId: ByteStr, toHeight: Int): Unit =
-      triggers.foreach(_.onRollback(toBlockId, toHeight))
-
-    override def onMicroBlockRollback(toBlockId: ByteStr, height: Int): Unit =
-      triggers.foreach(_.onMicroBlockRollback(toBlockId, height))
-  }
 
   private[this] var miner: Miner with MinerDebugInfo = Miner.Disabled
   private val (blockchainUpdater, levelDB) =
-    StorageFactory(settings, db, time, spendableBalanceChanged, triggersCombined, bc => miner.scheduleMining(bc))
+    StorageFactory(settings, db, time, spendableBalanceChanged, BlockchainUpdateTriggers.combined(triggers), bc => miner.scheduleMining(bc))
 
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
   private var maybeUtx: Option[UtxPool]                                        = None
