@@ -2055,4 +2055,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       "Can't find a function 'removeByIndex'(List[Int], Int)"
     )
   }
+
+  property("Union with single List") {
+    eval("""match (if false then 2 else [3]) { case n: Int => n case a => a[0] }""", version = V4) shouldBe Right(CONST_LONG(3))
+  }
 }

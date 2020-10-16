@@ -29,6 +29,7 @@ object Types {
     override lazy val name: String    = "List[" ++ innerType.toString ++ "]"
     override def typeList: List[REAL] = List(this)
   }
+  case object ANY extends REAL /*FINAL*/ { override val name = "Any"; override val typeList = List(this) }
   case class UNION(override val typeList: List[REAL], n: Option[String] = None) extends FINAL {
     override lazy val fields = typeList.map(_.fields.toSet).reduce(_ intersect _).toList
     override val name        = if (n.nonEmpty) n.get else typeList.sortBy(_.toString).mkString("|")
@@ -98,20 +99,25 @@ object Types {
 
   object UNION {
     def create(l: Seq[FINAL], n: Option[String] = None): UNION = {
-      UNION(l.flatMap {
-                case NOTHING         => List.empty
-                case UNION(inner, _) => inner
-                case s: REAL         => List(s)
-              }
-              .toList
-              .distinct,
-            n)
+      UNION((if(l.contains(ANY)) {
+               List(ANY)
+             } else {
+               l.flatMap {
+                     case NOTHING         => List.empty
+                     case UNION(inner, _) => inner
+                     case s: REAL         => List(s)
+                   }
+                   .toList
+                   .distinct
+             }),
+             n)
     }
     def apply(l: FINAL*): UNION = create(l.toList)
 
     def reduce(u: UNION): FINAL = u.typeList match {
       case Nil      => throw new Exception("Empty union")
       case x :: Nil => x
+      case u if u.contains(ANY) => ANY
       case _        => u
     }
   }
@@ -126,6 +132,7 @@ object Types {
         else
           unfolded equivalent l2.unfold
     }
+      case (l1: LIST, l2: LIST)   => l1.innerType equivalent l2.innerType
       case (l1: REAL, l2: REAL)   => l1 == l2
       case (l1: UNION, l2: UNION) =>
           l1.typeList.length == l2.typeList.length &&
@@ -135,15 +142,16 @@ object Types {
     }
 
     def >=(l2: FINAL): Boolean = (l1, l2) match {
-      case (l1: UNION, l2: UNION) =>
-        val bigger = l1.typeList.toSet
-        l2.typeList.forall(bigger.contains)
+      case (ANY, _) => true
+      case (l1, UNION(l2, _)) => l2.forall(l1 >= _)
+      case (UNION(l1, _), l2) => l1.exists(_ >= l2)
+      case (_, ANY)               => false
       case (_, NOTHING)           => true
       case (NOTHING, _)           => false
       case (LIST(t1), LIST(t2))   => t1 >= t2
       case (TUPLE(types1), TUPLE(types2)) =>
         types1.length == types2.length && (types1 zip types2).forall { case (t1, t2) => t1 >= t2 }
-      case (l1: FINAL, l2: FINAL) => l1.union >= l2.union
+      case (l1: REAL, l2: REAL) => l1 equivalent l2
     }
 
     def <=(l2: FINAL): Boolean = l2 >= l1

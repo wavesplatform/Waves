@@ -8,7 +8,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.compiler.CompilationError._
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types.{FINAL, _}
+import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
@@ -248,6 +248,7 @@ object ExpressionCompiler {
       typedExpr <- compileExprWithCtx(expr, saveExprContext)
       exprTypesWithErr <- (typedExpr.t match {
         case u: UNION => u.pure[CompileM]
+        case ANY => ANY.pure[CompileM]
         case _        => raiseError[Id, CompilerContext, CompilationError, UNION](MatchOnlyUnion(p.start, p.end))
       }).handleError()
       exprTypes = exprTypesWithErr._1.getOrElse(NOTHING)
@@ -259,10 +260,15 @@ object ExpressionCompiler {
         case _      => None
       }
       matchTypes <- cases.traverse(c => handleCompositeType(p, c.caseType, Some(exprTypes), allowShadowVarName))
+      defaultType = exprTypes match {
+        case ANY => ANY
+        case UNION(tl, _) => UNION(tl.filter(t => !matchTypes.contains(t)), None)
+        case _ => NOTHING
+      }
       ifCasesWithErr <- inspectFlat[Id, CompilerContext, CompilationError, Expressions.EXPR](
         updatedCtx => {
           val ref = Expressions.REF(p, PART.VALID(p, refTmpKey), ctxOpt = saveExprContext.toOption(updatedCtx.getSimpleContext()))
-          mkIfCases(cases, matchTypes, ref, allowShadowVarName).toCompileM
+          mkIfCases(cases, matchTypes, ref, defaultType, allowShadowVarName).toCompileM
         }
       ).handleError()
       compiledMatch <- compileLetBlock(
@@ -648,6 +654,7 @@ object ExpressionCompiler {
       cases: List[MATCH_CASE],
       caseTypes: List[FINAL],
       refTmp: Expressions.REF,
+      defaultType: FINAL,
       allowShadowVarName: Option[String]
   ): Either[CompilationError, Expressions.EXPR] = {
 
@@ -657,7 +664,14 @@ object ExpressionCompiler {
           case PART.VALID(_, x) => allowShadowVarName.contains(x)
           case _                => false
         }
-        Expressions.BLOCK(mc.position, Expressions.LET(mc.position, nv, refTmp, Some(caseType), allowShadowing), mc.expr)
+        val t = caseType match {
+          case UNION(Seq(),_) => defaultType match {
+                                   case UNION(Seq(t), _) => t
+                                   case _ => defaultType
+                                 }
+          case _ => caseType
+        }
+        Expressions.BLOCK(mc.position, Expressions.LET(mc.position, nv, refTmp, Some(t), allowShadowing), mc.expr)
       }
       UNION(caseType).unfold.typeList match {
         case Nil => Right(blockWithNewVar)
