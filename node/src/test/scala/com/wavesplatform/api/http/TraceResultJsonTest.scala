@@ -31,7 +31,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         p = List(Payment(1, Waves)),
         fee = 10000000,
         feeAssetId = Waves,
-        feeIncreaseFactor = InvokeScriptTransaction.DefaultFeeIncreaseFactor,
+        extraFeePerStep = InvokeScriptTransaction.DefaultExtraFeePerStep,
         timestamp = 1111,
         proofs = Proofs(List(proof))
       )

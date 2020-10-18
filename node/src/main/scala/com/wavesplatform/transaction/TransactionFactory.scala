@@ -279,7 +279,7 @@ object  TransactionFactory {
         request.payment,
         request.fee,
         Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
-        request.feeIncreaseFactor.getOrElse(InvokeScriptTransaction.DefaultFeeIncreaseFactor),
+        request.extraFeePerStep.getOrElse(InvokeScriptTransaction.DefaultExtraFeePerStep),
         request.timestamp.getOrElse(time.getTimestamp()),
         signer.privateKey
       )
@@ -297,7 +297,7 @@ object  TransactionFactory {
         request.payment,
         request.fee,
         Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
-        request.feeIncreaseFactor.getOrElse(InvokeScriptTransaction.DefaultFeeIncreaseFactor),
+        request.extraFeePerStep.getOrElse(InvokeScriptTransaction.DefaultExtraFeePerStep),
         request.timestamp.getOrElse(0),
         Proofs.empty
       )

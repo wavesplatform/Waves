@@ -161,7 +161,7 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
       }
       val byDApp = (1 to 5).map { _ =>
         InvokeScriptTransaction
-          .selfSigned(TxVersion.V1, invokeAccount, whitelistedDAppAccount.toAddress, None, Seq.empty, minInvokeFee, Waves, feeIncreaseFactor = InvokeScriptTransaction.DefaultFeeIncreaseFactor, timestamp = time)
+          .selfSigned(TxVersion.V1, invokeAccount, whitelistedDAppAccount.toAddress, None, Seq.empty, minInvokeFee, Waves, extraFeePerStep = InvokeScriptTransaction.DefaultExtraFeePerStep, timestamp = time)
           .explicitGet()
       }
       Random.shuffle(bySender ++ byDApp)

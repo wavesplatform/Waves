@@ -50,7 +50,7 @@ object InvokeScriptTxSerializer {
       case None     => JsObject.empty
     }) ++ (
       if (version >= TxVersion.V3)
-        Json.obj("feeIncreaseFactor" -> feeIncreaseFactor)
+        Json.obj("extraFeePerStep" -> extraFeePerStep)
       else
         JsObject.empty
       )
@@ -100,6 +100,7 @@ object InvokeScriptTxSerializer {
     val fee          = buf.getLong
     val feeAssetId   = buf.getAsset
     val timestamp    = buf.getLong
-    InvokeScriptTransaction(TxVersion.V1, sender, dApp, functionCall, payments, fee, feeAssetId, feeIncreaseFactor = InvokeScriptTransaction.DefaultFeeIncreaseFactor, timestamp, buf.getProofs, chainId)
+    InvokeScriptTransaction(TxVersion.V1, sender, dApp, functionCall, payments, fee, feeAssetId,
+      extraFeePerStep = InvokeScriptTransaction.DefaultExtraFeePerStep, timestamp, buf.getProofs, chainId)
   }
 }

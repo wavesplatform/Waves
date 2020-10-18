@@ -247,7 +247,7 @@ object PBTransactions {
           chainId
         )
 
-      case Data.InvokeScript(InvokeScriptTransactionData(Some(dAppAddress), functionCall, payments, feeIncreaseFactor)) =>
+      case Data.InvokeScript(InvokeScriptTransactionData(Some(dAppAddress), functionCall, payments, extraFeePerStep)) =>
         import cats.instances.either._
         import cats.instances.option._
         import cats.syntax.traverse._
@@ -276,7 +276,7 @@ object PBTransactions {
             payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
             feeAmount,
             feeAssetId,
-            useDefaultIfEmpty(feeIncreaseFactor),
+            extraFeePerStep,
             timestamp,
             proofs
           )
@@ -473,7 +473,7 @@ object PBTransactions {
           chainId
         )
 
-      case Data.InvokeScript(InvokeScriptTransactionData(Some(dAppAddress), functionCall, payments, feeIncreaseFactor)) =>
+      case Data.InvokeScript(InvokeScriptTransactionData(Some(dAppAddress), functionCall, payments, extraFeePerStep)) =>
         import com.wavesplatform.lang.v1.Serde
         import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 
@@ -487,7 +487,7 @@ object PBTransactions {
           payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
           feeAmount,
           feeAssetId,
-          useDefaultIfEmpty(feeIncreaseFactor),
+          extraFeePerStep,
           timestamp,
           proofs,
           chainId
@@ -604,12 +604,12 @@ object PBTransactions {
           payment,
           fee,
           feeAssetId,
-          feeIncreaseFactor,
+          extraFeePerStep,
           timestamp,
           proofs,
           chainId
       ) =>
-        val data = Data.InvokeScript(toPBInvokeScriptData(dAppAddress, fcOpt, payment, feeIncreaseFactor))
+        val data = Data.InvokeScript(toPBInvokeScriptData(dAppAddress, fcOpt, payment, extraFeePerStep))
         PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, version, proofs, data)
 
       case tx @ vt.assets.UpdateAssetInfoTransaction(version, sender, assetId, name, description, timestamp, _, _, proofs, chainId) =>
@@ -637,7 +637,7 @@ object PBTransactions {
       dAppAddress: AddressOrAlias,
       fcOpt: Option[FUNCTION_CALL],
       payment: Seq[Payment],
-      feeIncreaseFactor: Int
+      extraFeePerStep: Int
   ): InvokeScriptTransactionData = {
     import com.wavesplatform.lang.v1.Serde
 
@@ -645,7 +645,7 @@ object PBTransactions {
       Some(PBRecipients.create(dAppAddress)),
       ByteString.copyFrom(Deser.serializeOption(fcOpt)(Serde.serialize(_))),
       payment.map(p => (p.assetId, p.amount): Amount),
-      feeIncreaseFactor
+      extraFeePerStep
     )
   }
 
@@ -683,10 +683,4 @@ object PBTransactions {
     case Some(sc) => ByteString.copyFrom(sc.bytes().arr)
     case None     => ByteString.EMPTY
   }
-
-  private def useDefaultIfEmpty(feeIncreaseFactor: Int): Int =
-    if (feeIncreaseFactor == 0)
-      InvokeScriptTransaction.DefaultFeeIncreaseFactor
-    else
-      feeIncreaseFactor
 }

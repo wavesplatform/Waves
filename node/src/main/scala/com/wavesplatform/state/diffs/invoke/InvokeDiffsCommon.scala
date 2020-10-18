@@ -77,49 +77,48 @@ object InvokeDiffsCommon {
         else
           invocationComplexity / stepLimit + 1
 
-      val stepsInfo =
-        if (stepsNumber > 1)
-          s" with $stepsNumber invocation steps"
-        else
-          ""
-
-      val feeIncreaseFactorInfo =
-        if (stepsNumber > 1 && tx.feeIncreaseFactor > 100)
-          s" with fee increase factor = ${tx.feeIncreaseFactor}"
-        else
-          ""
-
-      val totalScriptsInvokedInfo =
-        if (actionScriptsInvoked > 0)
-          s" with $actionScriptsInvoked total scripts invoked"
-        else
-          ""
-
-      val issuesInfo =
-        if (issueList.nonEmpty)
-          s" with ${issueList.length} assets issued"
-        else
-          ""
-
-      val dAppFeeRaw = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber * tx.feeIncreaseFactor
-      val dAppFee    = math.ceil(dAppFeeRaw.toDouble / InvokeScriptTransaction.DefaultFeeIncreaseFactor).toLong
-      val issuesFee  = issueList.count(i => !blockchain.isNFT(i)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
+      val dAppFee    = (FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + tx.extraFeePerStep) * stepsNumber
+      val issuesFee  = issueList.count(!blockchain.isNFT(_)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
       val actionsFee = actionScriptsInvoked * ScriptExtraFee
       val minFee     = dAppFee + issuesFee + actionsFee
+
+      lazy val errorMessage = {
+        val stepsInfo =
+          if (stepsNumber > 1)
+            s" with $stepsNumber invocation steps"
+          else
+            ""
+
+        val extraFeePerStepInfo =
+          if (stepsNumber > 1 && tx.extraFeePerStep > 100)
+            s" with fee increase factor = ${tx.extraFeePerStep}"
+          else
+            ""
+
+        val totalScriptsInvokedInfo =
+          if (actionScriptsInvoked > 0)
+            s" with $actionScriptsInvoked total scripts invoked"
+          else
+            ""
+
+        val issuesInfo =
+          if (issueList.nonEmpty)
+            s" with ${issueList.length} assets issued"
+          else
+            ""
+
+        val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
+        val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
+
+        s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
+          s"$stepsInfo$extraFeePerStepInfo$totalScriptsInvokedInfo$issuesInfo " +
+          s"does not exceed minimal value of $minFee WAVES."
+      }
 
       Either.cond(
         fee >= minFee,
         (),
-        makeError(
-          {
-            val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
-            val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
-            s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
-              s"$stepsInfo$feeIncreaseFactorInfo$totalScriptsInvokedInfo$issuesInfo " +
-              s"does not exceed minimal value of $minFee WAVES."
-          },
-          invocationComplexity
-        )
+        makeError(errorMessage, invocationComplexity)
       )
     }
 

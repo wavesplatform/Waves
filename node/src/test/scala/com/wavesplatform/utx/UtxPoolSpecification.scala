@@ -162,7 +162,7 @@ class UtxPoolSpecification
 
   private def invokeScript(sender: KeyPair, dApp: Address, time: Time) =
     Gen.choose(500000L, 600000L).map { fee =>
-      InvokeScriptTransaction.selfSigned(TxVersion.V1, sender, dApp, None, Seq.empty, fee, Waves, feeIncreaseFactor = InvokeScriptTransaction.DefaultFeeIncreaseFactor, time.getTimestamp()).explicitGet()
+      InvokeScriptTransaction.selfSigned(TxVersion.V1, sender, dApp, None, Seq.empty, fee, Waves, extraFeePerStep = InvokeScriptTransaction.DefaultExtraFeePerStep, time.getTimestamp()).explicitGet()
     }
 
   private def dAppSetScript(sender: KeyPair, time: Time) = {

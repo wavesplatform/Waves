@@ -310,7 +310,7 @@ class NarrowTransactionGenerator(
                 Seq(InvokeScriptTransaction.Payment(random.nextInt(5000), asset)),
                 5300000L,
                 Waves,
-                InvokeScriptTransaction.DefaultFeeIncreaseFactor,
+                InvokeScriptTransaction.DefaultExtraFeePerStep,
                 timestamp
               )
             )
