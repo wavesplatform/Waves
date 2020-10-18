@@ -92,7 +92,7 @@ object InvokeDiffsCommon {
 
             val extraFeePerStepInfo =
               if (stepsNumber > 1 && tx.extraFeePerStep > 100)
-                s" with fee increase factor = ${tx.extraFeePerStep}"
+                s" with extra fee per step = ${tx.extraFeePerStep}"
               else
                 ""
 

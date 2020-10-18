@@ -53,7 +53,7 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
       V.fee(fee),
       V.cond(
         extraFeePerStep >= DefaultExtraFeePerStep,
-        GenericError(s"Fee increase factor = $extraFeePerStep must be more or equal than $DefaultExtraFeePerStep")
+        GenericError(s"Extra fee per step = $extraFeePerStep must be more or equal than $DefaultExtraFeePerStep")
       ),
       Try(checkLength)
         .toEither
