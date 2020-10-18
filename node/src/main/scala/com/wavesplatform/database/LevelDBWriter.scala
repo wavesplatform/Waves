@@ -379,7 +379,8 @@ abstract class LevelDBWriter private[database] (
       scriptResults: Map[ByteStr, InvokeScriptResult],
       failedTransactionIds: Set[ByteStr],
       stateHash: StateHashBuilder.Result,
-      continuationStates: Map[ByteStr, ContinuationState]
+      continuationStates: Map[ByteStr, ContinuationState],
+      addressTransactionBindings: Map[AddressId, Seq[TransactionId]]
   ): Unit = {
     log.trace(s"Persisting block ${block.id()} at height $height")
     readWrite { rw =>
@@ -396,7 +397,8 @@ abstract class LevelDBWriter private[database] (
       val transactions: Map[TransactionId, (Transaction, TxNum, ApplicationStatus)] =
         block.transactionData.zipWithIndex.map { in =>
           def checkExecutionStatus(invokeId: ByteStr, tx: Transaction): ApplicationStatus =
-            continuationStates.get(invokeId)
+            continuationStates
+              .get(invokeId)
               .map {
                 case ContinuationState.Finished(transactionId) if transactionId == tx.id.value() =>
                   Succeeded
@@ -443,7 +445,7 @@ abstract class LevelDBWriter private[database] (
 
       appendBalances(balances, issuedAssets, rw, threshold, balanceThreshold)
 
-      val changedAddresses = (addressTransactions.keys ++ balances.keys).toSet
+      val changedAddresses = (addressTransactions.keys ++ addressTransactionBindings.keys ++ balances.keys).toSet
       rw.put(Keys.changedAddresses(height), changedAddresses.toSeq)
 
       // leases
@@ -520,6 +522,28 @@ abstract class LevelDBWriter private[database] (
         rw.put(kk, nextSeqNr)
       }
 
+      if (dbSettings.storeTransactionsByAddress) for ((addressId, txIds) <- addressTransactionBindings) {
+        val kk           = Keys.addressTransactionSeqNr(addressId)
+        val currentSeqNr = rw.get(kk)
+        val txsByHeight =
+          txIds
+            .map { txId =>
+              val TransactionMeta(txHeight, num, typeId, _) = rw.get(Keys.transactionMetaById(txId)).get
+              (txHeight, num, typeId)
+            }
+            .groupBy(_._1)
+            .zipWithIndex
+        rw.put(kk, currentSeqNr + txsByHeight.size)
+        txsByHeight
+          .foreach {
+            case ((txHeight, txs), i) =>
+              rw.put(
+                Keys.addressTransactionHN(addressId, currentSeqNr + i + 1),
+                Some((Height(txHeight), txs.map { case (_, num, typeId) => (typeId.toByte, TxNum(num.toShort)) }))
+              )
+          }
+      }
+
       for ((alias, addressId) <- aliases) {
         rw.put(Keys.addressIdOfAlias(alias), Some(addressId))
       }
@@ -587,8 +611,9 @@ abstract class LevelDBWriter private[database] (
       }
 
       continuationStates
-        .foreach { case (invokeTxId, state) =>
-          rw.put(Keys.continuationState(TransactionId(invokeTxId)), state)
+        .foreach {
+          case (invokeTxId, state) =>
+            rw.put(Keys.continuationState(TransactionId(invokeTxId)), state)
         }
 
       expiredKeys.foreach(rw.delete(_, "expired-keys"))
@@ -821,7 +846,7 @@ abstract class LevelDBWriter private[database] (
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
     for {
       TransactionMeta(height, num, TransferTransaction.typeId, _) <- db.get(Keys.transactionMetaById(TransactionId @@ id))
-      tx <- db.get(Keys.transactionAt(Height(height), TxNum(num.toShort))).collect { case (t: TransferTransaction, Succeeded) => t }
+      tx                                                          <- db.get(Keys.transactionAt(Height(height), TxNum(num.toShort))).collect { case (t: TransferTransaction, Succeeded) => t }
     } yield (height, tx)
   }
 
@@ -837,8 +862,9 @@ abstract class LevelDBWriter private[database] (
 
   override def transactionMeta(id: ByteStr): Option[(Int, ApplicationStatus)] = readOnly { db =>
     db.get(Keys.transactionMetaById(TransactionId(id)))
-      .map { case TransactionMeta(height, _, _, status) =>
-        (height, status)
+      .map {
+        case TransactionMeta(height, _, _, status) =>
+          (height, status)
       }
   }
 

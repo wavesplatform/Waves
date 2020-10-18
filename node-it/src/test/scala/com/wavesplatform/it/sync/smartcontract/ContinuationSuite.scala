@@ -93,13 +93,15 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       fee = 1.waves,
       version = TxVersion.V2,
       waitForTx = true
-    )
-    waitForContinuation(invoke._1.id)
-    assertContinuationChain(invoke._1.id, sender.height)
+    )._1
+    waitForContinuation(invoke.id)
+    assertContinuationChain(invoke.id, sender.height)
     nodes.foreach { node =>
       node.getDataByKey(dApp.toAddress.toString, "a") shouldBe BooleanDataEntry("a", true)
       node.getDataByKey(dApp.toAddress.toString, "sender") shouldBe BinaryDataEntry("sender", ByteStr(Base58.decode(caller.toAddress.toString)))
     }
+    sender.transactionsByAddress(dApp.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
+    sender.transactionsByAddress(caller.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
   }
 
   test("hold transactions from DApp address until continuation is completed") {

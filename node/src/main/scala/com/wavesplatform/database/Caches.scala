@@ -3,8 +3,7 @@ package com.wavesplatform.database
 import java.util
 
 import cats.data.Ior
-import cats.syntax.monoid._
-import cats.syntax.option._
+import cats.implicits._
 import com.google.common.cache._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
@@ -18,8 +17,8 @@ import com.wavesplatform.transaction.{Asset, ScriptExecutionFailed, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
 
-import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 import scala.reflect.ClassTag
 
 abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) extends Blockchain with Storage {
@@ -179,7 +178,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       scriptResults: Map[ByteStr, InvokeScriptResult],
       failedTransactionIds: Set[ByteStr],
       stateHash: StateHashBuilder.Result,
-      continuationStates: Map[ByteStr, ContinuationState]
+      continuationStates: Map[ByteStr, ContinuationState],
+      addressTransactionBindings: Map[AddressId, Seq[TransactionId]]
   ): Unit
 
   override def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], hitSource: ByteStr, block: Block): Unit = {
@@ -232,6 +232,17 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
         .mapValues(_.map {
           case (_, txId) => txId
         })
+        .toMap
+
+    val addressTransactionBindings: Map[AddressId, Seq[TransactionId]] =
+      diff.addressTransactionBindings
+        .toList
+        .flatMap { case (txId, addresses) =>
+          addresses.map(address => addressId(address).get -> TransactionId(txId))
+        }
+        .groupBy(_._1)
+        .view
+        .mapValues(_.map(_._2))
         .toMap
 
     current = (newHeight, current._2 + block.blockScore(), Some(block))
@@ -304,7 +315,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       diff.scriptResults,
       failedTransactionIds,
       stateHash.result(),
-      diff.continuationStates
+      diff.continuationStates,
+      addressTransactionBindings
     )
 
     val emptyData = Map.empty[(Address, String), Option[DataEntry[_]]]
