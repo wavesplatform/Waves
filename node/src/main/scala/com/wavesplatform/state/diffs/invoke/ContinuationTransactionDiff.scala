@@ -85,14 +85,11 @@ object ContinuationTransactionDiff {
         InvokeDiffsCommon.getInvocationComplexity(blockchain, invokeScriptTransaction, callableComplexities, dAppAddress)
       )
 
-      feeInfo <- TracedResult(InvokeDiffsCommon.calcFee(blockchain, invokeScriptTransaction))
-
       doProcessActions = InvokeDiffsCommon.processActions(
         _,
         script.stdLibVersion,
         dAppAddress,
         dAppPublicKey,
-        feeInfo,
         invocationComplexity,
         invokeScriptTransaction,
         blockchain,

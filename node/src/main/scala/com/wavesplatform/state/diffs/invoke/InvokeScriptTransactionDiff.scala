@@ -52,8 +52,6 @@ object InvokeScriptTransactionDiff {
           _           <- TracedResult.wrapE(checkCall(functionCall, blockchain).leftMap(GenericError.apply))
           dAppAddress <- TracedResult(dAppAddressEi)
 
-          feeInfo <- TracedResult(InvokeDiffsCommon.calcFee(blockchain, tx))
-
           directives <- TracedResult.wrapE(DirectiveSet(version, Account, DAppType).leftMap(GenericError.apply))
           payments   <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DAppTarget).leftMap(GenericError.apply))
           tthis = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(dAppAddress.bytes)))
@@ -64,11 +62,10 @@ object InvokeScriptTransactionDiff {
           }
 
           stepLimit = ContractLimits.MaxComplexityByVersion(version)
-          _ <- InvokeDiffsCommon.checkFee(
+          _ <- InvokeDiffsCommon.calcAndCheckFee(
             (message, _) => GenericError(message),
             tx,
             blockchain,
-            feeInfo._1,
             stepLimit,
             invocationComplexity,
             issueList = Nil,
@@ -160,7 +157,6 @@ object InvokeScriptTransactionDiff {
               version,
               dAppAddress,
               pk,
-              feeInfo,
               invocationComplexity,
               tx,
               blockchain,
