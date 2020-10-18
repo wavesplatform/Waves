@@ -10,11 +10,9 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.TransferTransaction
 
 class PseudoTransactionSuite extends BaseTransactionSuite {
 
@@ -150,6 +148,7 @@ class PseudoTransactionSuite extends BaseTransactionSuite {
       Seq.empty,
       smartMinFee + smartFee,
       Waves,
+      0,
       System.currentTimeMillis()).explicitGet()
   }
 }
