@@ -14,7 +14,7 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, EmptyDataEntr
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
-import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction}
+import com.wavesplatform.transaction.smart.ContinuationTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
