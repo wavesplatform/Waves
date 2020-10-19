@@ -1,16 +1,16 @@
 package com.wavesplatform.events.api.grpc
 
+import scala.concurrent.Future
+import scala.util.{Failure, Success}
+
 import com.wavesplatform.api.grpc._
 import com.wavesplatform.events.api.grpc.protobuf._
 import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.events.repo.UpdatesRepo
 import com.wavesplatform.utils.ScorexLogging
-import io.grpc.stub.StreamObserver
 import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
-
-import scala.concurrent.Future
-import scala.util.{Failure, Success}
 
 class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo.Read with UpdatesRepo.Stream)(implicit sc: Scheduler)
     extends BlockchainUpdatesApiGrpc.BlockchainUpdatesApi
@@ -27,15 +27,13 @@ class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo.Read with UpdatesRepo.Strea
     }
   }
 
-  override def getBlockUpdatesRange(request: GetBlockUpdatesRangeRequest): Future[GetBlockUpdatesRangeResponse] = Future {
-    repo.updatesRange(request.fromHeight, request.toHeight) match {
-      case Success(updates) => GetBlockUpdatesRangeResponse(updates.map(_.protobuf))
-      case Failure(e: IllegalArgumentException) =>
-        throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription(e.getMessage))
-      case Failure(e) =>
-        log.error(s"BlockchainUpdates gRPC failed to get block range updates for range ${request.fromHeight} to ${request.toHeight}", e)
-        throw new StatusRuntimeException(Status.INTERNAL)
-    }
+  override def getBlockUpdatesRange(request: GetBlockUpdatesRangeRequest): Future[GetBlockUpdatesRangeResponse] = {
+    repo.updatesRange(request.fromHeight, request.toHeight) // TODO: Use stream
+      .take(1000) // Limit
+      .toListL
+      .runAsyncLogErr
+      .map(updates => GetBlockUpdatesRangeResponse(updates.map(_.protobuf)))
+      .wrapErrors
   }
 
   override def subscribe(request: SubscribeRequest, responseObserver: StreamObserver[SubscribeEvent]): Unit = {
