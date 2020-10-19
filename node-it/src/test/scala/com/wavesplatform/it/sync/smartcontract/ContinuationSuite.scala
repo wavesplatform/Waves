@@ -14,6 +14,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
@@ -55,11 +56,15 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
          |{-# CONTENT_TYPE DAPP #-}
          |
          | @Callable(inv)
-         | func foo() = {
+         | func foo(fail: Boolean) = {
          |  let a =
          |    getInteger(Address(base58''), "key") == unit &&
          |    !(${List.fill(150)("sigVerify(base64'',base64'',base64'')").mkString("||")})
-         |  [BooleanEntry("a", a), BinaryEntry("sender", inv.caller.bytes)]
+         |  if (fail && a)
+         |    then
+         |      throw("fail")
+         |    else
+         |      [BooleanEntry("a", a), BinaryEntry("sender", inv.caller.bytes)]
          | }
          |
        """.stripMargin
@@ -69,7 +74,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   test("can't set continuation before activation") {
     assertBadRequestAndMessage(
       sender.setScript(dApp, Some(script), setScriptFee),
-      "State check failed. Reason: Contract function (foo) is too complex: 30630 > 4000"
+      "State check failed. Reason: Contract function (foo) is too complex: 30635 > 4000"
     )
   }
 
@@ -88,19 +93,36 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       caller,
       dApp.toAddress.toString,
       func = Some("foo"),
-      args = Nil,
+      args = List(CONST_BOOLEAN(false)),
       payment = Seq(Payment(1.waves, Waves)),
       fee = 1.waves,
       version = TxVersion.V2,
       waitForTx = true
     )._1
-    waitForContinuation(invoke.id)
-    assertContinuationChain(invoke.id, sender.height)
+    waitForContinuation(invoke.id, shouldBeFailed = false)
+    assertContinuationChain(invoke.id, sender.height, shouldBeFailed = false)
     nodes.foreach { node =>
       node.getDataByKey(dApp.toAddress.toString, "a") shouldBe BooleanDataEntry("a", true)
       node.getDataByKey(dApp.toAddress.toString, "sender") shouldBe BinaryDataEntry("sender", ByteStr(Base58.decode(caller.toAddress.toString)))
     }
     sender.transactionsByAddress(dApp.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
+    sender.transactionsByAddress(caller.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
+  }
+
+  test("failed continuation") {
+    val invoke = sender.invokeScript(
+      caller,
+      dApp.toAddress.toString,
+      func = Some("foo"),
+      args = List(CONST_BOOLEAN(true)),
+      payment = Seq(Payment(1.waves, Waves)),
+      fee = 1.waves,
+      version = TxVersion.V2,
+      waitForTx = true
+    )._1
+    waitForContinuation(invoke.id, shouldBeFailed = true)
+    assertContinuationChain(invoke.id, sender.height, shouldBeFailed = true)
+
     sender.transactionsByAddress(caller.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
   }
 
@@ -110,13 +132,13 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       caller,
       dApp.toAddress.toString,
       func = Some("foo"),
-      args = Nil,
+      args = List(CONST_BOOLEAN(false)),
       fee = 1.waves,
       version = TxVersion.V2,
       waitForTx = true
     )
     sendTransactions(dApp)
-    waitForContinuation(invoke._1.id)
+    waitForContinuation(invoke._1.id, shouldBeFailed = false)
     assertAbsenceOfTransactions(startHeight, sender.height)
 
     sender.waitForHeight(sender.height + 2)
@@ -129,7 +151,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       caller,
       dApp.toAddress.toString,
       func = Some("foo"),
-      args = Nil,
+      args = List(CONST_BOOLEAN(false)),
       fee = 1.waves,
       version = TxVersion.V2,
       waitForTx = true
@@ -144,7 +166,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       caller,
       dApp.toAddress.toString,
       func = Some("foo"),
-      args = Nil,
+      args = List(CONST_BOOLEAN(false)),
       payment = Seq(Payment(1.waves, Waves)),
       fee = invokeFee,
       version = TxVersion.V2
@@ -158,7 +180,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     )
   }
 
-  private def waitForContinuation(invokeId: String): Boolean =
+  private def waitForContinuation(invokeId: String, shouldBeFailed: Boolean): Boolean =
     nodes.waitFor(
       s"chain of continuation for InvokeScript Transaction with id = $invokeId is completed"
     )(
@@ -166,14 +188,14 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         .flatMap(_.transactions)
         .exists { tx =>
           tx._type == ContinuationTransaction.typeId &&
-          tx.applicationStatus.contains("succeeded") &&
+          tx.applicationStatus.contains(if (shouldBeFailed) "script_execution_failed" else "succeeded") &&
           tx.invokeScriptTransactionId.contains(invokeId)
         }
     )(
       _.forall(identity)
     )
 
-  private def assertContinuationChain(invokeId: String, completionHeight: Int): Unit =
+  private def assertContinuationChain(invokeId: String, completionHeight: Int, shouldBeFailed: Boolean): Unit =
     nodes.foreach {
       node =>
         val invoke = node.transactionInfo[DebugStateChanges](invokeId)
@@ -185,7 +207,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
 
         invoke.applicationStatus.value shouldBe "script_execution_in_progress"
         continuations.dropRight(1).foreach(_.applicationStatus.value shouldBe "script_execution_in_progress")
-        continuations.last.applicationStatus.value shouldBe "succeeded"
+        continuations.last.applicationStatus.value shouldBe (if (shouldBeFailed) "script_execution_failed" else "succeeded")
         continuations.map(_.nonce.value) shouldBe continuations.indices
         invoke.timestamp +: continuations.map(_.timestamp) shouldBe sorted
     }
