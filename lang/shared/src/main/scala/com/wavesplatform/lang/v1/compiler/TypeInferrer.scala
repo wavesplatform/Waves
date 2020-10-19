@@ -76,11 +76,23 @@ object TypeInferrer {
     lazy val err = s"Non-matching types: expected: $placeholder, actual: $argType"
 
     (placeholder, argType) match {
-      case (tp @ TYPEPARAM(char), _)                           => Right(Some(MatchResult(argType, tp)))
-      case (tp @ PARAMETERIZEDLIST(innerTypeParam), LIST(t))   => matchTypes(t, innerTypeParam, knownTypes)
-      case (tp @ PARAMETERIZEDLIST(_), _)                      => Left(err)
-      case (tp @ PARAMETERIZEDTUPLE(typeParams), TUPLE(types)) => matchTupleTypes(err, typeParams, types, knownTypes)
-      case (tp @ PARAMETERIZEDTUPLE(_), _)                     => Left(err)
+      case (tp @ TYPEPARAM(char), _)                             => Right(Some(MatchResult(argType, tp)))
+      case (tp @ PARAMETERIZEDLIST(innerTypeParam), LIST(t))     => matchTypes(t, innerTypeParam, knownTypes)
+      case (tp @ PARAMETERIZEDLIST(innerTypeParam), UNION(l, _)) => l.foldLeft(Right(UNION(List(), None)):Either[String, FINAL]) {
+        (u, tl) => u match {
+          case Left(e) => Left(e)
+          case Right(UNION(l, _)) => tl match {
+            case LIST(t:  REAL) => Right(UNION(t::l, None))
+            case _ => Left(err)
+          }
+          case _ => ???
+        }
+      } flatMap {
+          t => matchTypes(t, innerTypeParam, knownTypes)
+      }
+      case (tp @ PARAMETERIZEDLIST(_), _)                        => Left(err)
+      case (tp @ PARAMETERIZEDTUPLE(typeParams), TUPLE(types))   => matchTupleTypes(err, typeParams, types, knownTypes)
+      case (tp @ PARAMETERIZEDTUPLE(_), _)                       => Left(err)
       case (tp @ PARAMETERIZEDUNION(l), _) =>
         val concretes = UNION.create(
           l.filter(_.isInstanceOf[REAL])

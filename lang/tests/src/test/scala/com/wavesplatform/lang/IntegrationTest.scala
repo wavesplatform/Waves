@@ -2059,4 +2059,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("Union with single List") {
     eval("""match (if false then 2 else [3]) { case n: Int => n case a => a[0] }""", version = V4) shouldBe Right(CONST_LONG(3))
   }
+
+  property("Union with multiple List") {
+    eval("""match (if false then 2 else if true then [3] else ["qqq"]) { case n: Int => n case a => a[0] }""", version = V4) shouldBe Right(CONST_LONG(3))
+  }
 }
