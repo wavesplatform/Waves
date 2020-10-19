@@ -251,11 +251,11 @@ object TransactionDiffer {
     } yield {
       val diff =
         Diff.empty.copy(
-        transactions = mutable.LinkedHashMap((tx.id(), NewTransactionInfo(tx, (portfolios.keys ++ maybeDApp.toList).toSet, ScriptExecutionFailed))),
-        portfolios = portfolios,
-        scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
-        scriptsComplexity = spentComplexity
-      )
+          transactions = mutable.LinkedHashMap((tx.id(), NewTransactionInfo(tx, (portfolios.keys ++ maybeDApp.toList).toSet, ScriptExecutionFailed))),
+          portfolios = portfolios,
+          scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
+          scriptsComplexity = spentComplexity
+        )
 
       tx match {
         case c: ContinuationTransaction =>
