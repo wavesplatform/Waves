@@ -245,26 +245,27 @@ object TransactionDiffer {
       case _                            => Right(None)
     }
 
-    val continuationDiff: Diff =
-      tx match {
-        case c: ContinuationTransaction =>
-          Diff.stateOps(
-            continuationStates = Map(c.invokeScriptTransactionId -> ContinuationState.Finished(tx.id.value()))
-          ).bindOldTransaction(c.invokeScriptTransactionId)
-        case _ =>
-          Diff.empty
-      }
-
     for {
       portfolios <- feePortfolios(blockchain, tx)
       maybeDApp  <- extractDAppAddress
     } yield {
-      Diff.empty.copy(
+      val diff =
+        Diff.empty.copy(
         transactions = mutable.LinkedHashMap((tx.id(), NewTransactionInfo(tx, (portfolios.keys ++ maybeDApp.toList).toSet, ScriptExecutionFailed))),
         portfolios = portfolios,
         scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
         scriptsComplexity = spentComplexity
-      ) |+| continuationDiff
+      )
+
+      tx match {
+        case c: ContinuationTransaction =>
+          val finishContinuation = Diff.stateOps(
+            continuationStates = Map(c.invokeScriptTransactionId -> ContinuationState.Finished(tx.id.value()))
+          )
+          diff.bindOldTransaction(c.invokeScriptTransactionId) |+| finishContinuation
+        case _ =>
+          diff
+      }
     }
   }
 
