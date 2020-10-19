@@ -5,14 +5,12 @@ import java.nio.{ByteBuffer, ByteOrder}
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
-import cats.implicits._
 import com.wavesplatform.Shutdownable
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events._
-import com.wavesplatform.events.protobuf.{BlockchainUpdated ⇒ PBBlockchainUpdated}
+import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
 import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.utils.ScorexLogging
-import monix.eval.Task
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
@@ -35,7 +33,7 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
 
   override def shutdown(): Unit = db.close()
 
-  private[this] val realTimeUpdates = ConcurrentSubject.publish[BlockchainUpdated]
+  private[this] val realTimeUpdates = ConcurrentSubject.replayLimited[BlockchainUpdated](100)
 
   private[this] def sendRealTimeUpdate(ba: BlockchainUpdated): Try[Unit] = {
     realTimeUpdates.onNext(ba) match {
@@ -185,19 +183,17 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
 
   // UpdatesRepo.Stream impl
   override def stream(fromHeight: Int): Observable[BlockchainUpdated] = {
-    val realTimeUpdatesForCurrentSubscription = ConcurrentSubject.replay[BlockchainUpdated]
-
     /**
       * reads from level db by synchronous batches each using one iterator
       * each batch gets a read lock
-      * @param startingFrom batch start height
+      * @param from batch start height
       * @return Task to be consumed by Observable.unfoldEval
       */
-    def readBatch(startingFrom: Option[Int]): Task[Option[(Seq[BlockchainUpdated], Option[Int])]] = Task.eval {
-      startingFrom map { from =>
+    def readBatch(from: Int): (Seq[BlockchainUpdated], Option[Int]) =
+      readLockCond {
         def isLastBatch(data: Seq[_]): Boolean = data.length < LevelDBReadBatchSize
 
-        val data = readLockCond {
+        val data = {
           val iterator = db.iterator()
           try {
             iterator.seek(key(from))
@@ -206,10 +202,9 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
               .map(e => PBBlockchainUpdated.parseFrom(e.getValue).vanilla.get)
               .toVector
           } finally iterator.close()
-        }(isLastBatch)
+        }
 
         if (isLastBatch(data)) {
-          realTimeUpdates.subscribe(realTimeUpdatesForCurrentSubscription)
           val liquidUpdates = liquidState match {
             case None                                     => Seq.empty
             case Some(LiquidState(keyBlock, microBlocks)) => Seq(keyBlock) ++ microBlocks
@@ -219,18 +214,24 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
           val nextTickFrom = data.lastOption.map(_.toHeight + 1)
           (data, nextTickFrom)
         }
-      }
-    }
+      }(_._2.isEmpty)
 
     Observable.fromTry(height).flatMap { h =>
       if (h < fromHeight) {
         Observable.raiseError(new IllegalArgumentException("Requested start height exceeds current blockchain height"))
       } else {
-        val historical = Observable
-          .unfoldEval(fromHeight.some)(readBatch)
-          .flatMap(Observable.fromIterable)
+        def readBatchStream(from: Int): Observable[BlockchainUpdated] = Observable.defer {
+          val (data, next) = readBatch(from)
+          Observable.fromIterable(data) ++ (next match {
+            case Some(next) =>
+              readBatchStream(next)
 
-        historical ++ realTimeUpdatesForCurrentSubscription
+            case None =>
+              val lastHeight = data.lastOption.fold(from - 1)(_.toHeight)
+              realTimeUpdates.dropWhile(_.toHeight <= lastHeight)
+          })
+        }
+        readBatchStream(fromHeight)
       }
     }
   }

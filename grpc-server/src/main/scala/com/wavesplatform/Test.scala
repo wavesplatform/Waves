@@ -9,7 +9,14 @@ object Test extends App {
     .build()
 
   val service = BlockchainUpdatesApiGrpc.blockingStub(channel)
+  var lastHeight = 0
   service.subscribe(SubscribeRequest.of(1, Int.MaxValue)).foreach { se ⇒
-    println(se.getUpdate.height)
+    val currentHeight = se.getUpdate.height
+    if (currentHeight > lastHeight + 1) {
+      println(s"Error: $lastHeight -> $currentHeight")
+      sys.exit(1)
+    }
+    println(currentHeight)
+    lastHeight = currentHeight
   }
 }
