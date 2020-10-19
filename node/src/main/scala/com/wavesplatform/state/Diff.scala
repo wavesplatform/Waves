@@ -178,8 +178,8 @@ case class Diff(
     copy(transactions = transactions.concat(Map(Diff.toDiffTxData(tx, portfolios, accountData))))
 
   def bindOldTransaction(id: ByteStr): Diff = {
-    val tuple = (id, (portfolios.keys ++ accountData.keys).toSet)
-    copy(addressTransactionBindings = addressTransactionBindings + tuple)
+    val idWithAddresses = (id, (portfolios.keys ++ accountData.keys).toSet)
+    copy(addressTransactionBindings = addressTransactionBindings + idWithAddresses)
   }
 }
 
