@@ -17,7 +17,7 @@ import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, ContinuationState, Diff}
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
+import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction, WavesEnvironment, buildThisValue}
@@ -76,7 +76,7 @@ object ContinuationTransactionDiff {
             limit,
             continuationFirstStepMode = false
           )
-          .leftMap { case (error, log) => ScriptExecutionError.dAppExecution(error, log) }
+          .leftMap { case (error, log) => FailedTransactionError.dAppExecution(error, 0, log) }
         TracedResult(
           r,
           List(InvokeScriptTrace(invokeScriptTransaction.dAppAddressOrAlias, invokeScriptTransaction.funcCall, r.map(_._1), r.fold(_.log, _._2)))

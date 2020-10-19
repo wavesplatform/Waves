@@ -1,10 +1,7 @@
 package com.wavesplatform.state.diffs
 
-import cats.instances.either._
-import cats.instances.map._
+import cats.implicits._
 import cats.kernel.Monoid
-import cats.syntax.either._
-import cats.syntax.functor._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures.BlockV5
@@ -14,7 +11,7 @@ import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.invoke.{ContinuationTransactionDiff, InvokeScriptTransactionDiff}
-import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
+import com.wavesplatform.state.{Blockchain, ContinuationState, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
@@ -144,11 +141,11 @@ object TransactionDiffer {
   private def transactionDiff(blockchain: Blockchain, tx: Transaction, initDiff: Diff, currentBlockTs: TxTimestamp, limitedExecution: Boolean) = {
     val diff = stats.transactionDiffValidation.measureForType(tx.typeId) {
       tx match {
-        case gtx: GenesisTransaction       => GenesisTransactionDiff(blockchain.height)(gtx).traced
-        case ptx: PaymentTransaction       => PaymentTransactionDiff(blockchain)(ptx).traced
-        case ci: InvokeScriptTransaction   => InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(ci)
-        case cont: ContinuationTransaction => ContinuationTransactionDiff(blockchain, currentBlockTs, limitedExecution)(cont)
-        case etx: ExchangeTransaction      => ExchangeTransactionDiff(blockchain)(etx).traced
+        case gtx: GenesisTransaction           => GenesisTransactionDiff(blockchain.height)(gtx).traced
+        case ptx: PaymentTransaction           => PaymentTransactionDiff(blockchain)(ptx).traced
+        case ci: InvokeScriptTransaction       => InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(ci)
+        case cont: ContinuationTransaction     => ContinuationTransactionDiff(blockchain, currentBlockTs, limitedExecution)(cont)
+        case etx: ExchangeTransaction          => ExchangeTransactionDiff(blockchain)(etx).traced
         case itx: IssueTransaction             => AssetTransactionsDiff.issue(blockchain)(itx).traced
         case rtx: ReissueTransaction           => AssetTransactionsDiff.reissue(blockchain, currentBlockTs)(rtx).traced
         case btx: BurnTransaction              => AssetTransactionsDiff.burn(blockchain)(btx).traced
@@ -248,6 +245,16 @@ object TransactionDiffer {
       case _                            => Right(None)
     }
 
+    val continuationDiff: Diff =
+      tx match {
+        case c: ContinuationTransaction =>
+          Diff.stateOps(
+            continuationStates = Map(c.invokeScriptTransactionId -> ContinuationState.Finished(tx.id.value()))
+          ).bindOldTransaction(c.invokeScriptTransactionId)
+        case _ =>
+          Diff.empty
+      }
+
     for {
       portfolios <- feePortfolios(blockchain, tx)
       maybeDApp  <- extractDAppAddress
@@ -257,7 +264,7 @@ object TransactionDiffer {
         portfolios = portfolios,
         scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
         scriptsComplexity = spentComplexity
-      )
+      ) |+| continuationDiff
     }
   }
 
@@ -275,8 +282,8 @@ object TransactionDiffer {
   // helpers
   private def feePortfolios(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Map[Address, Portfolio]] =
     tx match {
-      case _: GenesisTransaction | _: ContinuationTransaction   => Map.empty[Address, Portfolio].asRight
-      case ptx: PaymentTransaction => Map(ptx.sender.toAddress -> Portfolio(balance = -ptx.fee, LeaseBalance.empty, assets = Map.empty)).asRight
+      case _: GenesisTransaction | _: ContinuationTransaction => Map.empty[Address, Portfolio].asRight
+      case ptx: PaymentTransaction                            => Map(ptx.sender.toAddress -> Portfolio(balance = -ptx.fee, LeaseBalance.empty, assets = Map.empty)).asRight
       case ptx: ProvenTransaction =>
         ptx.assetFee match {
           case (Waves, fee) => Map(ptx.sender.toAddress -> Portfolio(-fee, LeaseBalance.empty, Map.empty)).asRight
