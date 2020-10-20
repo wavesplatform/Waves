@@ -9,8 +9,8 @@ import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{AccountDataInfo, AssetDescription, AssetScriptInfo, Blockchain, DataEntry, Diff, DiffToStateApplier, LeaseBalance}
-import com.wavesplatform.transaction.{Asset, GenesisTransaction, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.{Asset, GenesisTransaction, Transaction}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer

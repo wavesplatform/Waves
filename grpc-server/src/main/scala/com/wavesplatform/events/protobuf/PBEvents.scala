@@ -8,18 +8,10 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
-import com.wavesplatform.events.{
-  AssetStateUpdate => VanillaAssetStateUpdate,
-  StateUpdate => VanillaStateUpdate,
-  BlockchainUpdated => VanillaBlockchainUpdated,
-  BlockAppended => VanillaBlockAppended,
-  MicroBlockAppended => VanillaMicroBlockAppended,
-  RollbackCompleted => VanillaRollbackCompleted,
-  MicroBlockRollbackCompleted => VanillaMicroBlockRollbackCompleted
-}
 import com.wavesplatform.events.protobuf.BlockchainUpdated.{Append, Rollback, Update}
 import com.wavesplatform.events.protobuf.StateUpdate.AssetStateUpdate.AssetScriptInfo
 import com.wavesplatform.events.protobuf.StateUpdate.{AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeasingUpdate}
+import com.wavesplatform.events.{AssetStateUpdate => VanillaAssetStateUpdate, BlockAppended => VanillaBlockAppended, BlockchainUpdated => VanillaBlockchainUpdated, MicroBlockAppended => VanillaMicroBlockAppended, MicroBlockRollbackCompleted => VanillaMicroBlockRollbackCompleted, RollbackCompleted => VanillaRollbackCompleted, StateUpdate => VanillaStateUpdate}
 import com.wavesplatform.protobuf.block.{PBBlocks, PBMicroBlocks}
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions}
 import com.wavesplatform.state.{LeaseBalance, AssetScriptInfo => VanillaAssetScriptInfo}
