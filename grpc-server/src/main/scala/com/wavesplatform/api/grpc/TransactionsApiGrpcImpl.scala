@@ -2,7 +2,6 @@ package com.wavesplatform.api.grpc
 
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBRecipientImplicitConversionOps
@@ -91,10 +90,10 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
     responseObserver.interceptErrors {
       val result = Observable(request.transactionIds: _*).map { txId =>
         commonApi
-          .unconfirmedTransactionById(ByteStr(txId.toByteArray))
+          .unconfirmedTransactionById(txId.toByteStr)
           .map(_ => TransactionStatus(txId, TransactionStatus.Status.UNCONFIRMED))
           .orElse {
-            commonApi.transactionById(ByteStr(txId.toByteArray)).map {
+            commonApi.transactionById(txId.toByteStr).map {
               case (h, _, false) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h, ApplicationStatus.SCRIPT_EXECUTION_FAILED)
               case (h, _, _)     => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h, ApplicationStatus.SUCCEEDED)
             }
