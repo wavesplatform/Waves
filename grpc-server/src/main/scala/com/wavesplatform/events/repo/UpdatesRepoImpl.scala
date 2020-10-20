@@ -16,7 +16,7 @@ import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 
 class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
-    extends UpdatesRepo.Read
+  extends UpdatesRepo.Read
     with UpdatesRepo.Write
     with UpdatesRepo.Stream
     with ScorexLogging
@@ -185,11 +185,11 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
   override def stream(fromHeight: Int): Observable[BlockchainUpdated] = {
 
     /**
-      * reads from level db by synchronous batches each using one iterator
-      * each batch gets a read lock
-      * @param from batch start height
-      * @return Task to be consumed by Observable.unfoldEval
-      */
+     * reads from level db by synchronous batches each using one iterator
+     * each batch gets a read lock
+     * @param from batch start height
+     * @return Task to be consumed by Observable.unfoldEval
+     */
     def readBatch(from: Int): (Seq[BlockchainUpdated], Option[Int]) =
       readLockCond {
         def isLastBatch(data: Seq[_]): Boolean = data.length < LevelDBReadBatchSize
@@ -232,7 +232,7 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
 
             case None =>
               val lastPersistentUpdate = data.lastOption
-              realTimeUpdates.dropWhile(u => lastPersistentUpdate.exists(u.references))
+              realTimeUpdates.dropWhile(u => !lastPersistentUpdate.forall(u.references))
           })
         }
         readBatchStream(fromHeight)
@@ -244,6 +244,6 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
 object UpdatesRepoImpl {
   private val LevelDBReadBatchSize = 100
 
-  private def key(height: Int): Array[Byte] = // TODO: Why 8 bytes?
+  private def key(height: Int): Array[Byte] =
     ByteBuffer.allocate(8).order(ByteOrder.BIG_ENDIAN).putInt(height).array()
 }

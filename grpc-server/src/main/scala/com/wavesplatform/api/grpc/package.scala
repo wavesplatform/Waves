@@ -1,5 +1,8 @@
 package com.wavesplatform.api
 
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.control.NonFatal
+
 import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.lang.ValidationError
@@ -8,9 +11,6 @@ import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.{CallStreamObserver, ServerCallStreamObserver, StreamObserver}
 import monix.execution.{Ack, AsyncQueue, Scheduler}
 import monix.reactive.Observable
-
-import scala.concurrent.{ExecutionContext, Future}
-import scala.util.control.NonFatal
 
 package object grpc extends PBImplicitConversions with ScorexLogging {
   implicit class StreamObserverMonixOps[T](streamObserver: StreamObserver[T])(implicit sc: Scheduler) {
@@ -83,9 +83,10 @@ package object grpc extends PBImplicitConversions with ScorexLogging {
     case _ =>
       source.subscribe(
         { (elem: A) =>
-          dest.onNext(f(elem)); Ack.Continue
+          dest.onNext(f(elem))
+          Ack.Continue
         },
-        dest.onError,
+        err => dest.onError(GRPCErrors.toStatusException(err)),
         dest.onCompleted _
       )
 

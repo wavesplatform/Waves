@@ -42,6 +42,7 @@ class BlockchainUpdatesApiGrpcImpl(repo: UpdatesRepo.Read with UpdatesRepo.Strea
     } else {
       val updatesPB = repo
         .stream(request.fromHeight)
+        .takeWhile(bu => bu.toHeight <= request.toHeight)
         .map(elem => SubscribeEvent(update = Some(elem.protobuf)))
 
       responseObserver.completeWith(updatesPB)

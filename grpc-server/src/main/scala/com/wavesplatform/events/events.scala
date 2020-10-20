@@ -172,9 +172,9 @@ sealed trait BlockchainUpdated extends Product with Serializable {
 object BlockchainUpdated {
   implicit class BlockchainUpdatedExt(private val bu: BlockchainUpdated) extends AnyVal {
     def references(other: BlockchainUpdated): Boolean = bu match {
-      case b: BlockAppended => b.block.header.reference == other.toId
-      case mb: MicroBlockAppended => mb.microBlock.reference == other.toId
-      case rb: RollbackCompleted => rb.toHeight < other.toHeight
+      case b: BlockAppended                 => b.block.header.reference == other.toId
+      case mb: MicroBlockAppended           => mb.microBlock.reference == other.toId
+      case rb: RollbackCompleted            => rb.toHeight < other.toHeight
       case mrb: MicroBlockRollbackCompleted => mrb.toHeight == other.toHeight
     }
   }
