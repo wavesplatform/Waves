@@ -183,6 +183,7 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
 
   // UpdatesRepo.Stream impl
   override def stream(fromHeight: Int): Observable[BlockchainUpdated] = {
+
     /**
       * reads from level db by synchronous batches each using one iterator
       * each batch gets a read lock
@@ -206,8 +207,11 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
 
         if (isLastBatch(data)) {
           val liquidUpdates = liquidState match {
-            case None                                     => Seq.empty
-            case Some(LiquidState(keyBlock, microBlocks)) => Seq(keyBlock) ++ microBlocks
+            case None => Seq.empty
+            case Some(LiquidState(keyBlock, microBlocks)) =>
+              val lastBlock = data.lastOption
+              require(lastBlock.forall(keyBlock.references))
+              Seq(keyBlock) ++ microBlocks
           }
           (data ++ liquidUpdates, None)
         } else {
@@ -221,14 +225,14 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
         Observable.raiseError(new IllegalArgumentException("Requested start height exceeds current blockchain height"))
       } else {
         def readBatchStream(from: Int): Observable[BlockchainUpdated] = Observable.defer {
-          val (data, next) = readBatch(from)
+          val (data, next) = concurrent.blocking(readBatch(from))
           Observable.fromIterable(data) ++ (next match {
             case Some(next) =>
               readBatchStream(next)
 
             case None =>
-              val lastHeight = data.lastOption.fold(from - 1)(_.toHeight)
-              realTimeUpdates.dropWhile(_.toHeight <= lastHeight)
+              val lastPersistentUpdate = data.lastOption
+              realTimeUpdates.dropWhile(u => lastPersistentUpdate.exists(u.references))
           })
         }
         readBatchStream(fromHeight)
@@ -238,8 +242,8 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
 }
 
 object UpdatesRepoImpl {
-  private val LevelDBReadBatchSize = 1024
+  private val LevelDBReadBatchSize = 100
 
-  private def key(height: Int): Array[Byte] =
+  private def key(height: Int): Array[Byte] = // TODO: Why 8 bytes?
     ByteBuffer.allocate(8).order(ByteOrder.BIG_ENDIAN).putInt(height).array()
 }
