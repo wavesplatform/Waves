@@ -8,6 +8,7 @@ import cats.syntax.monoid._
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.protobuf._
 import com.wavesplatform.state.{AccountDataInfo, AssetDescription, AssetScriptInfo, Blockchain, DataEntry, Diff, DiffToStateApplier, LeaseBalance}
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
@@ -118,8 +119,8 @@ object StateUpdate {
     } yield AssetStateUpdate(
       a,
       decimals,
-      ByteStr(name.toByteArray),
-      ByteStr(description.toByteArray),
+      name.toByteStr,
+      description.toByteStr,
       reissuable,
       totalVolume,
       script,
