@@ -342,7 +342,7 @@
           "addresses"
         ],
         "summary": "Multiple accounts balances",
-        "description": "Multiple accounts balances",
+        "description": "Get multiple accounts balances. For dozens of addresses, better use the POST method",
         "operationId": "balance_3",
         "parameters": [
           {
@@ -365,12 +365,66 @@
           {
             "name": "height",
             "in": "query",
-            "description": "For balance at height requests",
+            "description": "For balance at height requests. No more than 2000 back from the current",
             "schema": {
               "type": "integer"
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Balance"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Multiple accounts balances",
+        "description": "Get multiple accounts balances. Max for 1000 addresses",
+        "operationId": "balance_4",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "addresses"
+                ],
+                "properties": {
+                  "addresses": {
+                    "type": "array",
+                    "description": "Addresses base58 encoded",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[1-9A-HJ-NP-Za-km-z]{35}$"
+                    },
+                    "minItems": 1,
+                    "maxItems": 1000
+                  },
+                  "height": {
+                    "type": "integer",
+                    "description": "For balance at height requests. No more than 2000 back from the current"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1827,7 +1881,7 @@
           "transactions"
         ],
         "summary": "Transaction status",
-        "description": "Get transaction status by their ID. Max number of transactions is set by `waves.rest-api.transactions-by-address-limit`, 1000 by default",
+        "description": "Get transaction status by their ID. For dozens of transactions, better use the POST method",
         "operationId": "status_3",
         "parameters": [
           {
@@ -1844,7 +1898,7 @@
                 "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
               },
               "minItems": 1,
-              "maxItems": 1000
+              "maxItems": 42
             }
           }
         ],
@@ -6665,6 +6719,16 @@
             "example": {
               "error": 2,
               "message": "Provided API key is not correct"
+            }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "The request cannot be fulfilled due to bad syntax",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
             }
           }
         }
