@@ -1,6 +1,6 @@
 package com.wavesplatform.utils
 import com.wavesplatform.lang.ScriptMeta.FunctionArgument
-import com.wavesplatform.lang.{Ride, RideException, RideVersion, Script}
+import com.wavesplatform.lang.{Ride, RideException, Script}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -113,15 +113,5 @@ class JavaAdapterTest extends PropSpec with PropertyChecks with Matchers {
     Ride.meta(script).getVersion shouldBe 2
     Ride.meta(script).getFunctionSignatures.get(0).getName shouldBe "paySelf"
     Ride.meta(script).getFunctionSignatures.get(0).getArguments.get(0) shouldBe new FunctionArgument("asset", "String")
-  }
-
-  property("repl") {
-    val repl = Ride.repl(RideVersion.V4)
-    repl.execute("let a = 1")
-    repl.execute("let b = 2")
-    repl.execute("a + b") shouldBe "res1: Int = 3"
-    repl.info("b") shouldBe "let b: Int"
-    repl.clear()
-    repl.info("b") shouldBe "b not found in context"
   }
 }

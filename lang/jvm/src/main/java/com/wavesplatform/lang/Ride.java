@@ -18,12 +18,4 @@ public class Ride {
     public static ScriptMeta meta(Script script) {
         return JavaAdapter.extractMeta(script);
     }
-
-    public static RideRepl repl(RideVersion version) {
-        return JavaAdapter.repl(version);
-    }
-
-    public static RideRepl repl(RideVersion version, NodeConnectionSettings settings) {
-        return JavaAdapter.repl(version, settings);
-    }
 }

@@ -13,11 +13,8 @@ import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, De
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
-import com.wavesplatform.lang.v1.repl.{Repl, _}
 import com.wavesplatform.lang.v1.traits.Environment
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.jdk.CollectionConverters._
 
 object JavaAdapter {
@@ -155,18 +152,4 @@ object JavaAdapter {
         new ScriptMeta(signatures.version, mappedSignatures.asJava)
       }
       .fold(error => throw new RideException(error.m), identity)
-
-  def repl(version: RideVersion): RideRepl =
-    repl(version, None)
-
-  def repl(version: RideVersion, settings: NodeConnectionSettings): RideRepl =
-    repl(version, Some(settings))
-
-  def repl(version: RideVersion, settings: Option[NodeConnectionSettings]): RideRepl = {
-    val directiveSet = DirectiveSet(version.internal, Account, Expression).explicitGet()
-    val ctx          = buildCtx(directiveSet)
-    val environment  = buildEnvironment(settings)
-    val replCtx      = (ctx.compilerContext, ctx.evaluationContext(environment))
-    new RideRepl(Repl(settings, replCtx))
-  }
 }
