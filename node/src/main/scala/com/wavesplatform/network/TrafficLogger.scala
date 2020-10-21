@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
-import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.network.BasicMessagesRepo.specsByCodes
 import com.wavesplatform.network.message.{Message => ScorexMessage}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
@@ -44,10 +44,10 @@ class TrafficLogger(settings: TrafficLogger.Settings) extends ChannelDuplexHandl
   }
 
   private def stringify(msg: Any): String = msg match {
-    case tx: Transaction   => tx.json().toString()
-    case b: Block          => s"${b.id()}, header: ${BlockHeaderSerializer.toJson(b.header, b.bytes().length, b.transactionData.length, b.signature).toString}"
-    case RawBytes(_, data) => Base64.encode(data)
-    case other             => other.toString
+    case tx: Transaction    => s"Transaction(${tx.id()})"
+    case b: Block           => s"${b.id()}, header: ${BlockHeaderSerializer.toJson(b.header, b.bytes().length, b.transactionData.length, b.signature).toString}"
+    case RawBytes(code, data) => s"RawBytes(${specsByCodes(code).messageName}, ${data.length} bytes)"
+    case other              => other.toString
   }
 }
 
