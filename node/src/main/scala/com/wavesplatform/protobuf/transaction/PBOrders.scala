@@ -1,5 +1,7 @@
 package com.wavesplatform.protobuf.transaction
+
 import com.wavesplatform.account.{AddressScheme, PublicKey}
+import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.order.AssetPair
 import com.wavesplatform.{transaction => vt}
 

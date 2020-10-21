@@ -294,7 +294,7 @@ object Importer extends ScorexLogging {
           e.getKey match {
             case Array(_, _, 0, 0, 0, 1) => // Skip genesis
             case _ =>
-              val meta = com.wavesplatform.database.readBlockMeta(1)(e.getValue)
+              val meta = com.wavesplatform.database.readBlockMeta(e.getValue)
               result += meta.size + 4
           }
         }

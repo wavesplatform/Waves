@@ -5,9 +5,8 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.v1.traits.domain.{Burn, Issue, Reissue, SponsorFee}
-import com.wavesplatform.protobuf.Amount
+import com.wavesplatform.protobuf.{Amount, _}
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
-import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.transaction.Asset
