@@ -86,7 +86,7 @@ case class TransactionsApiRoute(
               case a: Alias => blockchain.resolveAlias(a).fold(_ => a.stringRepr, _.stringRepr)
               case a => a.stringRepr
             }),
-            "feeIncreaseFactor" -> invoke.feeIncreaseFactor,
+            "extraFeePerStep" -> invoke.extraFeePerStep,
             "feeAssetId" -> invoke.feeAssetId
           )
           case _ => ???
