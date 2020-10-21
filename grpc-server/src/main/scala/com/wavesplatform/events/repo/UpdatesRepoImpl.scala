@@ -2,21 +2,21 @@ package com.wavesplatform.events.repo
 
 import java.nio.{ByteBuffer, ByteOrder}
 
-import scala.jdk.CollectionConverters._
-import scala.util.{Failure, Success, Try}
-
 import com.wavesplatform.Shutdownable
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events._
-import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
 import com.wavesplatform.events.protobuf.serde._
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
+import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 
+import scala.jdk.CollectionConverters._
+import scala.util.{Failure, Success, Try}
+
 class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
-  extends UpdatesRepo.Read
+    extends UpdatesRepo.Read
     with UpdatesRepo.Write
     with UpdatesRepo.Stream
     with ScorexLogging
@@ -185,11 +185,11 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
   override def stream(fromHeight: Int): Observable[BlockchainUpdated] = {
 
     /**
-     * reads from level db by synchronous batches each using one iterator
-     * each batch gets a read lock
-     * @param from batch start height
-     * @return Task to be consumed by Observable.unfoldEval
-     */
+      * reads from level db by synchronous batches each using one iterator
+      * each batch gets a read lock
+      * @param from batch start height
+      * @return Task to be consumed by Observable.unfoldEval
+      */
     def readBatch(from: Int): (Seq[BlockchainUpdated], Option[Int]) =
       readLockCond {
         def isLastBatch(data: Seq[_]): Boolean = data.length < LevelDBReadBatchSize

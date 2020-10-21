@@ -1,4 +1,4 @@
-package com.wavesplatform.events.repo
+package com.wavesplatform.utils
 
 import java.util.concurrent.locks.StampedLock
 
