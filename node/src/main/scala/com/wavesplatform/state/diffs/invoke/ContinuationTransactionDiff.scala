@@ -17,7 +17,7 @@ import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, ContinuationState, Diff}
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
+import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction, WavesEnvironment, buildThisValue}
@@ -25,7 +25,9 @@ import monix.eval.Coeval
 import shapeless.Coproduct
 
 object ContinuationTransactionDiff {
-  def apply(blockchain: Blockchain, blockTime: Long, verifyAssets: Boolean = true)(tx: ContinuationTransaction): TracedResult[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain, blockTime: Long, verifyAssets: Boolean = true)(
+      tx: ContinuationTransaction
+  ): TracedResult[ValidationError, Diff] = {
     val (invokeHeight, foundTx, _) = blockchain.transactionInfo(tx.invokeScriptTransactionId).get
     val invokeScriptTransaction    = foundTx.asInstanceOf[InvokeScriptTransaction]
     for {
@@ -74,7 +76,7 @@ object ContinuationTransactionDiff {
             limit,
             continuationFirstStepMode = false
           )
-          .leftMap { case (error, log) => ScriptExecutionError.dAppExecution(error, log) }
+          .leftMap { case (error, log) => FailedTransactionError.dAppExecution(error, 0, log) }
         TracedResult(
           r,
           List(InvokeScriptTrace(invokeScriptTransaction.dAppAddressOrAlias, invokeScriptTransaction.funcCall, r.map(_._1), r.fold(_.log, _._2)))
@@ -85,14 +87,11 @@ object ContinuationTransactionDiff {
         InvokeDiffsCommon.getInvocationComplexity(blockchain, invokeScriptTransaction, callableComplexities, dAppAddress)
       )
 
-      feeInfo <- TracedResult(InvokeDiffsCommon.calcFee(blockchain, invokeScriptTransaction))
-
       doProcessActions = InvokeDiffsCommon.processActions(
         _,
         script.stdLibVersion,
         dAppAddress,
         dAppPublicKey,
-        feeInfo,
         invocationComplexity,
         invokeScriptTransaction,
         blockchain,
@@ -102,17 +101,28 @@ object ContinuationTransactionDiff {
 
       resultDiff <- scriptResult._1 match {
         case ScriptResultV3(dataItems, transfers) =>
-          doProcessActions(dataItems ::: transfers).map(_.copy(transactions = Map()) |+| finishContinuation(tx))
+          val diff = doProcessActions(dataItems ::: transfers)
+          finishContinuation(diff, tx)
         case ScriptResultV4(actions) =>
-          doProcessActions(actions).map(_.copy(transactions = Map()) |+| finishContinuation(tx))
+          val diff = doProcessActions(actions)
+          finishContinuation(diff, tx)
         case ir: IncompleteResult =>
           TracedResult.wrapValue[Diff, ValidationError](
-            Diff.stateOps(continuationStates = Map(tx.invokeScriptTransactionId -> ContinuationState.InProgress(tx.nonce + 1, ir.expr, ir.unusedComplexity, tx.id.value())))
+            Diff.stateOps(
+              continuationStates =
+                Map(tx.invokeScriptTransactionId -> ContinuationState.InProgress(tx.nonce + 1, ir.expr, ir.unusedComplexity, tx.id.value()))
+            )
           )
       }
     } yield resultDiff
   }
 
-  private def finishContinuation(tx: ContinuationTransaction) =
-    Diff.stateOps(continuationStates = Map(tx.invokeScriptTransactionId -> ContinuationState.Finished(tx.id.value())))
+  private def finishContinuation(
+      diff: TracedResult[ValidationError, Diff],
+      tx: ContinuationTransaction
+  ): TracedResult[ValidationError, Diff] =
+    diff.map(
+      _.copy(transactions = Map(), continuationStates = Map(tx.invokeScriptTransactionId -> ContinuationState.Finished(tx.id.value())))
+        .bindOldTransaction(tx.invokeScriptTransactionId)
+    )
 }

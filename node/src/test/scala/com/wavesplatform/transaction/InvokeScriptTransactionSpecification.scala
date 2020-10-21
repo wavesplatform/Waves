@@ -55,7 +55,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
             Some(PBRecipients.create(tx.dAppAddressOrAlias)),
             ByteString.copyFrom(Deser.serializeOption(tx.funcCallOpt)(Serde.serialize(_))),
             tx.payments.map(p => Amount.of(PBAmounts.toPBAssetId(p.assetId), p.amount)),
-            tx.feeIncreaseFactor
+            tx.extraFeePerStep
           )
         )
       )
@@ -154,7 +154,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
         Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
         100000,
         Waves,
-        feeIncreaseFactor = InvokeScriptTransaction.DefaultFeeIncreaseFactor,
+        extraFeePerStep = InvokeScriptTransaction.DefaultExtraFeePerStep,
         1526910778245L
       )
       .explicitGet()
@@ -194,7 +194,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
         Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
         100000,
         Waves,
-        feeIncreaseFactor = InvokeScriptTransaction.DefaultFeeIncreaseFactor,
+        extraFeePerStep = InvokeScriptTransaction.DefaultExtraFeePerStep,
         1526910778245L
       )
       .explicitGet()
@@ -212,7 +212,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       senderPublicKey = publicKey,
       fee = 1,
       feeAssetId = None,
-      feeIncreaseFactor = None,
+      extraFeePerStep = None,
       call = Some(
         InvokeScriptRequest.FunctionCallPart(
           "bar",
@@ -240,7 +240,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       Seq(),
       1,
       Waves,
-      feeIncreaseFactor = InvokeScriptTransaction.DefaultFeeIncreaseFactor,
+      extraFeePerStep = InvokeScriptTransaction.DefaultExtraFeePerStep,
       1,
       Proofs.empty
     ) should produce("more than 22 arguments")
@@ -262,7 +262,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
         Seq(),
         1,
         Waves,
-        feeIncreaseFactor = InvokeScriptTransaction.DefaultFeeIncreaseFactor,
+        extraFeePerStep = InvokeScriptTransaction.DefaultExtraFeePerStep,
         1,
         Proofs.empty
       )
@@ -285,7 +285,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       Seq(),
       1,
       Waves,
-      feeIncreaseFactor = InvokeScriptTransaction.DefaultFeeIncreaseFactor,
+      extraFeePerStep = InvokeScriptTransaction.DefaultExtraFeePerStep,
       1,
       Proofs.empty,
     ) should produce("is unsupported")
@@ -303,7 +303,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       Seq(),
       1,
       Waves,
-      feeIncreaseFactor = InvokeScriptTransaction.DefaultFeeIncreaseFactor,
+      extraFeePerStep = InvokeScriptTransaction.DefaultExtraFeePerStep,
       1,
       Proofs.empty
     ) should produce("TooBigArray")
@@ -316,7 +316,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       senderPublicKey = publicKey,
       fee = 1,
       feeAssetId = None,
-      feeIncreaseFactor = None,
+      extraFeePerStep = None,
       call = Some(
         InvokeScriptRequest.FunctionCallPart(
           "bar",
@@ -340,7 +340,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       senderPublicKey = publicKey,
       fee = 1,
       feeAssetId = None,
-      feeIncreaseFactor = None,
+      extraFeePerStep = None,
       call = Some(
         InvokeScriptRequest.FunctionCallPart(
           "bar",

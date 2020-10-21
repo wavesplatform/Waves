@@ -1,11 +1,14 @@
 #!/bin/bash
+shopt -s nullglob
 NETWORKS="mainnet testnet stagenet"
 
 mkdir -p /var/lib/waves/log
 if [ ! -f /etc/waves/waves.conf ]; then
   echo "Custom '/etc/waves/waves.conf' not found. Using a default one for '${WAVES_NETWORK,,}' network." | tee -a /var/log/waves/waves.log
   if [[ $NETWORKS == *"${WAVES_NETWORK,,}"* ]]; then
-    cp /usr/share/waves/conf/waves-${WAVES_NETWORK}.conf /etc/waves/waves.conf
+    touch /etc/waves/waves.conf
+    echo "waves.blockchain.type=${WAVES_NETWORK}" >> /etc/waves/waves.conf
+
     sed -i 's/include "local.conf"//' /etc/waves/waves.conf
     for f in /etc/waves/ext/*.conf; do
       echo "Adding $f extension config to waves.conf";
@@ -21,7 +24,7 @@ else
 fi
 
 if [ "${WAVES_VERSION}" == "latest" ]; then
-  filename=$(find /usr/share/waves/lib -name waves-all* -printf '%f\n')
+  filename=$(find /usr/share/waves/lib -name 'waves-all*' -printf '%f\n')
   export WAVES_VERSION=$(echo ${filename##*-} | cut -d\. -f1-3)
 fi
 

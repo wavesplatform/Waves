@@ -147,10 +147,10 @@ case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: Ass
 sealed trait ContinuationState
 object ContinuationState {
   case class InProgress(
-    nonce: Int,
-    expr: EXPR,
-    residualComplexity: Int,
-    lastTransactionId: ByteStr
+      nonce: Int,
+      expr: EXPR,
+      residualComplexity: Int,
+      lastTransactionId: ByteStr
   ) extends ContinuationState
 
   case class Finished(transactionId: ByteStr) extends ContinuationState
@@ -171,10 +171,16 @@ case class Diff(
     scriptsRun: Int,
     scriptsComplexity: Long,
     scriptResults: Map[ByteStr, InvokeScriptResult],
-    continuationStates: Map[ByteStr, ContinuationState]
+    continuationStates: Map[ByteStr, ContinuationState],
+    addressTransactionBindings: Map[ByteStr, Set[Address]]
 ) {
   def bindTransaction(tx: Transaction): Diff =
     copy(transactions = transactions.concat(Map(Diff.toDiffTxData(tx, portfolios, accountData))))
+
+  def bindOldTransaction(id: ByteStr): Diff = {
+    val idWithAddresses = (id, (portfolios.keys ++ accountData.keys).toSet)
+    copy(addressTransactionBindings = addressTransactionBindings + idWithAddresses)
+  }
 }
 
 object Diff {
@@ -191,7 +197,8 @@ object Diff {
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
       scriptsRun: Int = 0,
-      continuationStates: Map[ByteStr, ContinuationState] = Map.empty
+      continuationStates: Map[ByteStr, ContinuationState] = Map.empty,
+      addressTransactionBindings: Map[ByteStr, Set[Address]] = Map.empty
   ): Diff =
     Diff(
       transactions = mutable.LinkedHashMap(),
@@ -208,7 +215,8 @@ object Diff {
       scriptsRun = scriptsRun,
       scriptResults = scriptResults,
       scriptsComplexity = 0,
-      continuationStates = continuationStates
+      continuationStates = continuationStates,
+      addressTransactionBindings = addressTransactionBindings
     )
 
   def apply(
@@ -244,7 +252,8 @@ object Diff {
       scriptsRun = scriptsRun,
       scriptResults = scriptResults,
       scriptsComplexity = scriptsComplexity,
-      continuationStates = continuationStates
+      continuationStates = continuationStates,
+      addressTransactionBindings = Map.empty
     )
 
   private def toDiffTxData(
@@ -270,6 +279,7 @@ object Diff {
       0,
       0,
       Map.empty,
+      Map.empty,
       Map.empty
     )
 
@@ -292,7 +302,8 @@ object Diff {
         scriptsRun = older.scriptsRun.combine(newer.scriptsRun),
         scriptResults = older.scriptResults.combine(newer.scriptResults),
         scriptsComplexity = older.scriptsComplexity + newer.scriptsComplexity,
-        continuationStates = older.continuationStates ++ newer.continuationStates
+        continuationStates = older.continuationStates ++ newer.continuationStates,
+        addressTransactionBindings = older.addressTransactionBindings ++ newer.addressTransactionBindings
       )
   }
 

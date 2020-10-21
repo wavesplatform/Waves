@@ -692,11 +692,11 @@ object SyncHttpApi extends Assertions {
         payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
         fee: Long = smartMinFee,
         feeAssetId: Option[String] = None,
-        feeIncreaseFactor: Int = InvokeScriptTransaction.DefaultFeeIncreaseFactor,
+        extraFeePerStep: Int = InvokeScriptTransaction.DefaultExtraFeePerStep,
         version: TxVersion = TxVersion.V1,
         waitForTx: Boolean = false
     ): (Transaction, JsValue) = {
-      sync(async(n).invokeScript(caller, dappAddress, func, args, payment, fee, feeAssetId, feeIncreaseFactor, version)) match {
+      sync(async(n).invokeScript(caller, dappAddress, func, args, payment, fee, feeAssetId, extraFeePerStep, version)) match {
         case (tx, js) => maybeWaitForTransaction(tx, waitForTx) -> js
       }
     }

@@ -245,7 +245,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         ).signWith(master.privateKey),
         CreateAliasTransaction(TxVersion.V3, master.publicKey, invChainAlias.name, amount, timestamp, Proofs.empty, invChainId).signWith(master.privateKey),
         LeaseTransaction(TxVersion.V3, master.publicKey, invChainAddrOrAlias, amount, amount, timestamp, Proofs.empty, invChainId).signWith(master.privateKey),
-        InvokeScriptTransaction(TxVersion.V2, master.publicKey, invChainAddrOrAlias, None, Nil, amount, Waves, feeIncreaseFactor = InvokeScriptTransaction.DefaultFeeIncreaseFactor, timestamp, Proofs.empty, invChainId)
+        InvokeScriptTransaction(TxVersion.V2, master.publicKey, invChainAddrOrAlias, None, Nil, amount, Waves, extraFeePerStep = InvokeScriptTransaction.DefaultExtraFeePerStep, timestamp, Proofs.empty, invChainId)
           .signWith(master.privateKey),
         exchangeV1GeneratorP(master, recipient, asset, Waves, None, invChainId).sample.get,
         IssueTransaction(
