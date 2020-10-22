@@ -117,7 +117,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       args = List(CONST_BOOLEAN(true)),
       payment = Seq(Payment(1.waves, Waves)),
       fee = 1.waves,
-      version = TxVersion.V2,
+      version = TxVersion.V3,
       waitForTx = true
     )._1
     waitForContinuation(invoke.id, shouldBeFailed = true)
