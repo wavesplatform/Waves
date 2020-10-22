@@ -80,7 +80,7 @@ case class TransactionsApiRoute(
         val isId = t.invokeScriptTransactionId
         blockchain.transactionInfo(isId) match {
           case Some((_, invoke: smart.InvokeScriptTransaction, _)) => Json.obj(
-            "сontinuationTransactionIds" -> commonApi.continuations(isId).map(_.toString),
+            "continuationTransactionIds" -> commonApi.continuations(isId).map(_.toString),
             "call" -> invoke.funcCallOpt.map(functionCallToJson),
             "dApp" -> (invoke.dAppAddressOrAlias match {
               case a: Alias => blockchain.resolveAlias(a).fold(_ => a.stringRepr, _.stringRepr)
@@ -91,7 +91,7 @@ case class TransactionsApiRoute(
           )
           case _ => ???
         }
-      case t: smart.InvokeScriptTransaction if t.version == TxVersion.V3 => Json.obj("сontinuationTransactionIds" -> commonApi.continuations(t.id()).map(_.toString))
+      case t: smart.InvokeScriptTransaction if t.version == TxVersion.V3 => Json.obj("continuationTransactionIds" -> commonApi.continuations(t.id()).map(_.toString))
       case _ => Json.obj()
     }
   }

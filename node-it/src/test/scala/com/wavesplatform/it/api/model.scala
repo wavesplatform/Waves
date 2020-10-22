@@ -451,7 +451,7 @@ case class DebugStateChanges(
     script: Option[String],
     stateChanges: Option[StateChangesDetails],
     applicationStatus: Option[String],
-    сontinuationTransactionIds: Option[Seq[String]]
+    continuationTransactionIds: Option[Seq[String]]
 ) extends TxInfo
 object DebugStateChanges {
   implicit val debugStateChanges: Reads[DebugStateChanges] =
@@ -469,7 +469,7 @@ object DebugStateChanges {
           script                     <- (jsv \ "script").validateOpt[String]
           stateChanges               <- (jsv \ "stateChanges").validateOpt[StateChangesDetails]
           applicationStatus          <- (jsv \ "applicationStatus").validateOpt[String]
-          сontinuationTransactionIds <- (jsv \ "сontinuationTransactionIds").validateOpt[Seq[String]]
+          continuationTransactionIds <- (jsv \ "continuationTransactionIds").validateOpt[Seq[String]]
         } yield DebugStateChanges(
           _type,
           id,
@@ -482,7 +482,7 @@ object DebugStateChanges {
           script,
           stateChanges,
           applicationStatus,
-          сontinuationTransactionIds
+          continuationTransactionIds
         )
     )
 }

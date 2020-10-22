@@ -205,7 +205,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
             .blockSeq(invoke.height, completionHeight)
             .flatMap(_.transactions)
             .filter(tx => tx._type == ContinuationTransaction.typeId && tx.invokeScriptTransactionId.contains(invokeId))
-        for((t,b) <- invoke.сontinuationTransactionIds.get.zip(continuations.map(_.id))) {
+        for((t,b) <- invoke.continuationTransactionIds.get.zip(continuations.map(_.id))) {
           t shouldBe b
         }
 
