@@ -86,7 +86,7 @@ package object grpc {
               drainQueue()
               Ack.Continue
             },
-        err => cso.onError(err),
+        err => cso.onError(GRPCErrors.toStatusException(err)),
         () => cso.onCompleted()
       )
 
