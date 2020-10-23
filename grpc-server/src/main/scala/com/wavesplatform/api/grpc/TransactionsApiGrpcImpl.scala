@@ -52,7 +52,7 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
           .map {
             case (h, tx, ScriptExecutionFailed)     => TransactionResponse(tx.id().toByteString, h, Some(tx.toPB), ApplicationStatus.SCRIPT_EXECUTION_FAILED)
             case (h, tx, Succeeded)                 => TransactionResponse(tx.id().toByteString, h, Some(tx.toPB), ApplicationStatus.SUCCEEDED)
-            case (h, tx, ScriptExecutionInProgress) => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB), ApplicationStatus.SCRIPT_EXECUTION_IN_PROGRESS)
+            case (h, tx, ScriptExecutionInProgress) => TransactionResponse(tx.id().toByteString, h, Some(tx.toPB), ApplicationStatus.SCRIPT_EXECUTION_IN_PROGRESS)
           }
       )
     }
