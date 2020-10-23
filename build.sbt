@@ -9,7 +9,6 @@
 import sbt.Keys._
 import sbt._
 import sbtcrossproject.CrossPlugin.autoImport.{CrossType, crossProject}
-import sbtcrossproject.CrossProject
 
 val langPublishSettings = Seq(
   coverageExcludedPackages := "",
@@ -82,8 +81,6 @@ lazy val `node-it`        = project.dependsOn(node, `grpc-server`)
 lazy val `node-generator` = project.dependsOn(node, `node` % "compile")
 lazy val benchmark        = project.dependsOn(node % "compile;test->test")
 
-lazy val `blockchain-updates` = project.dependsOn(node % "compile;test->test;runtime->provided")
-
 lazy val root = (project in file("."))
   .aggregate(
     `lang-js`,
@@ -93,8 +90,7 @@ lazy val root = (project in file("."))
     node,
     `node-it`,
     `node-generator`,
-    benchmark,
-    `blockchain-updates`
+    benchmark
   )
 
 inScope(Global)(
@@ -102,7 +98,7 @@ inScope(Global)(
     scalaVersion := "2.13.3",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
-    V.fallback := (1, 2, 13),
+    V.fallback := (1, 2, 14),
     organizationHomepage := Some(url("https://wavesplatform.com")),
     scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/Waves"), "git@github.com:wavesplatform/Waves.git", None)),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
@@ -156,8 +152,6 @@ packageAll := Def
       (node / Debian / packageBin).value
       (`grpc-server` / Universal / packageZipTarball).value
       (`grpc-server` / Debian / packageBin).value
-      (`blockchain-updates` / Universal / packageZipTarball).value
-      (`blockchain-updates` / Debian / packageBin).value
     }
   )
   .value
@@ -170,6 +164,7 @@ checkPRRaw := Def
       (Test / compile).value
       (`lang-tests` / Test / test).value
       (`lang-js` / Compile / fastOptJS).value
+      (`grpc-server` / Test / test).value
       (node / Test / test).value
     }
   )

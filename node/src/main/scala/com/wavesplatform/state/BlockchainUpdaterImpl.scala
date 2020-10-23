@@ -564,8 +564,9 @@ class BlockchainUpdaterImpl(
   override def wavesAmount(height: Int): BigInt = readLock {
     ngState match {
       case Some(ng) if this.height == height =>
-        leveldb.wavesAmount(height - 1) + ng.reward.fold(BigInt(0))(BigInt(_))
-      case _ => leveldb.wavesAmount(height)
+        leveldb.wavesAmount(height - 1) + BigInt(ng.reward.getOrElse(0L))
+      case _ =>
+        leveldb.wavesAmount(height)
     }
   }
 

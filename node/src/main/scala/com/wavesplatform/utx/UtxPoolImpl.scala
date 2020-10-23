@@ -523,6 +523,11 @@ class UtxPoolImpl(
 }
 
 object UtxPoolImpl {
+  private implicit class DiffExt(val diff: Diff) extends AnyVal {
+    def contains(txId: ByteStr): Boolean     = diff.transactions.contains(txId)
+    def transactionsValues: Seq[Transaction] = diff.transactions.values.map(_.transaction).toVector
+  }
+
   private case class PackResult(
       transactions: Option[Seq[Transaction]],
       totalDiff: Diff,
