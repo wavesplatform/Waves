@@ -603,11 +603,6 @@ class UtxPoolImpl(
     cleanupScheduler.shutdown()
   }
 
-  private[this] implicit class DiffExt(diff: Diff) {
-    def contains(txId: ByteStr): Boolean     = diff.transactions.contains(txId)
-    def transactionsValues: Seq[Transaction] = diff.transactions.values.map(_.transaction).toVector
-  }
-
   //noinspection TypeAnnotation
   private[this] object PoolMetrics {
     private[this] val SampleInterval: Duration = Duration.of(500, ChronoUnit.MILLIS)
@@ -653,6 +648,11 @@ class UtxPoolImpl(
 }
 
 object UtxPoolImpl {
+  private implicit class DiffExt(val diff: Diff) extends AnyVal {
+    def contains(txId: ByteStr): Boolean     = diff.transactions.contains(txId)
+    def transactionsValues: Seq[Transaction] = diff.transactions.values.map(_.transaction).toVector
+  }
+
   private case class PackResult(
       transactions: Option[Seq[Transaction]],
       totalDiff: Diff,

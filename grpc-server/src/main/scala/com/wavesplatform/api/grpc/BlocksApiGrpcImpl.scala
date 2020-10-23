@@ -7,6 +7,7 @@ import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.grpc.BlockRangeRequest.Filter
 import com.wavesplatform.api.grpc.BlockRequest.Request
 import com.wavesplatform.api.http.ApiError.BlockDoesNotExist
+import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.block.PBBlock
 import com.wavesplatform.transaction.{ApplicationStatus, Transaction}
 import io.grpc.stub.StreamObserver
@@ -31,7 +32,7 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
         commonApi
           .metaRange(request.fromHeight, request.toHeight)
           .map { meta =>
-            BlockWithHeight(Some(PBBlock(Some(meta.header.toPBHeader), meta.signature)), meta.height)
+            BlockWithHeight(Some(PBBlock(Some(meta.header.toPBHeader), meta.signature.toByteString)), meta.height)
           }
 
     responseObserver.completeWith(request.filter match {
@@ -45,7 +46,7 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
     val result = request.request match {
       case Request.BlockId(blockId) =>
         commonApi
-          .block(blockId)
+          .block(blockId.toByteStr)
           .map(toBlockWithHeight)
 
       case Request.Height(height) =>
@@ -65,6 +66,6 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
 
 object BlocksApiGrpcImpl {
   private def toBlockWithHeight(v: (BlockMeta, Seq[(Transaction, ApplicationStatus)])) = {
-    BlockWithHeight(Some(PBBlock(Some(v._1.header.toPBHeader), v._1.signature.toPBByteString, v._2.map(_._1.toPB))), v._1.height)
+    BlockWithHeight(Some(PBBlock(Some(v._1.header.toPBHeader), v._1.signature.toByteString, v._2.map(_._1.toPB))), v._1.height)
   }
 }

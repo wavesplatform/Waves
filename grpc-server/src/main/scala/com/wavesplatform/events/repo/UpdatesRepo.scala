@@ -1,9 +1,9 @@
 package com.wavesplatform.events.repo
 
-import com.wavesplatform.events.{BlockAppended, BlockchainUpdated, MicroBlockAppended, MicroBlockRollbackCompleted, RollbackCompleted}
-import monix.reactive.Observable
-
 import scala.util.Try
+
+import com.wavesplatform.events._
+import monix.reactive.Observable
 
 object UpdatesRepo {
   trait Read {
@@ -12,7 +12,7 @@ object UpdatesRepo {
     def updateForHeight(height: Int): Try[Option[BlockAppended]]
 
     // inclusive from both sides
-    def updatesRange(from: Int, to: Int): Try[Seq[BlockAppended]]
+    def updatesRange(from: Int, to: Int): Observable[BlockAppended]
   }
 
   trait Write {

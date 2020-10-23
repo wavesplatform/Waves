@@ -401,7 +401,7 @@ object Functions {
     val args = Seq(("addressOrAlias", addressOrAliasType))
     NativeFunction.withEnvironment[Environment](
       "wavesBalance",
-      Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 10L, V5 -> 10L),
+      10,
       ACCOUNTWAVESBALANCE,
       balanceDetailsType,
       args: _*
