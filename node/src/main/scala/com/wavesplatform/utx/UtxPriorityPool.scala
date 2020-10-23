@@ -2,7 +2,6 @@ package com.wavesplatform.utx
 
 import java.time.Duration
 import java.time.temporal.ChronoUnit
-import java.util.concurrent.locks.StampedLock
 
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
@@ -10,13 +9,11 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
 
-final class UtxPriorityPool(base: Blockchain) extends ScorexLogging {
-  private[this] val lock = new StampedLock
-
+final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with OptimisticLockable {
   @volatile private[this] var priorityDiffs         = Vector.empty[Diff]
   @volatile private[this] var priorityDiffsCombined = Monoid.combineAll(priorityDiffs)
 
@@ -25,32 +22,11 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging {
 
   def compositeBlockchain: CompositeBlockchain = CompositeBlockchain(base, Some(priorityDiffsCombined))
 
-  def lockedWrite[T](f: => T): T = {
-    val stamp = lock.writeLock()
-    try {
-      f
-    } finally {
-      lock.unlockWrite(stamp)
-    }
-  }
+  def lockedWrite[T](f: => T): T =
+    this.writeLock(f)
 
-  def optimisticRead[T](f: => T)(shouldRecheck: T => Boolean): T = {
-    def lockedRead(): T = {
-      val stamp = lock.readLock()
-      try {
-        f
-      } finally {
-        lock.unlockRead(stamp)
-      }
-    }
-
-    val stamp = lock.tryOptimisticRead()
-    if (stamp != 0) {
-      val value = f
-      if (lock.validate(stamp) || !shouldRecheck(value)) value
-      else lockedRead()
-    } else lockedRead()
-  }
+  def optimisticRead[T](f: => T)(shouldRecheck: T => Boolean): T =
+    this.readLockCond(f)(shouldRecheck)
 
   def addPriorityDiffs(discDiffs: Seq[Diff]): Unit = {
     if (discDiffs.nonEmpty) {
