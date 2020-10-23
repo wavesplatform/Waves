@@ -522,13 +522,8 @@ class UtxPoolImpl(
   }
 }
 
-object UtxPoolImpl {
-  private implicit class DiffExt(val diff: Diff) extends AnyVal {
-    def contains(txId: ByteStr): Boolean     = diff.transactions.contains(txId)
-    def transactionsValues: Seq[Transaction] = diff.transactions.values.map(_.transaction).toVector
-  }
-
-  private case class PackResult(
+private object UtxPoolImpl {
+  case class PackResult(
       transactions: Option[Seq[Transaction]],
       totalDiff: Diff,
       constraint: MultiDimensionalMiningConstraint,
@@ -538,7 +533,7 @@ object UtxPoolImpl {
       removedTransactions: Set[ByteStr]
   )
 
-  private class PessimisticPortfolios(spendableBalanceChanged: Observer[(Address, Asset)], isTxKnown: ByteStr => Boolean) {
+  class PessimisticPortfolios(spendableBalanceChanged: Observer[(Address, Asset)], isTxKnown: ByteStr => Boolean) {
     private type Portfolios = Map[Address, Portfolio]
     private val transactionPortfolios = new ConcurrentHashMap[ByteStr, Portfolios]()
     private val transactions          = new ConcurrentHashMap[Address, Set[ByteStr]]()

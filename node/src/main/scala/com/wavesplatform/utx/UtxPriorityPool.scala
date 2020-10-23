@@ -14,6 +14,8 @@ import kamon.Kamon
 import kamon.metric.MeasurementUnit
 
 final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with OptimisticLockable {
+  import UtxPriorityPool._
+
   @volatile private[this] var priorityDiffs         = Vector.empty[Diff]
   @volatile private[this] var priorityDiffsCombined = Monoid.combineAll(priorityDiffs)
 
@@ -85,11 +87,6 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
     priorityDiffs.headOption.map(_.transactions.size)
   }
 
-  private[this] implicit class DiffExt(diff: Diff) {
-    def contains(txId: ByteStr): Boolean     = diff.transactions.contains(txId)
-    def transactionsValues: Seq[Transaction] = diff.transactions.values.map(_.transaction).toVector
-  }
-
   //noinspection TypeAnnotation
   private[this] object PoolMetrics {
     private[this] val SampleInterval: Duration = Duration.of(500, ChronoUnit.MILLIS)
@@ -107,5 +104,12 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
       prioritySizeStats.decrement()
       priorityBytesStats.decrement(tx.bytes().length)
     }
+  }
+}
+
+private object UtxPriorityPool {
+  implicit class DiffExt(private val diff: Diff) extends AnyVal {
+    def contains(txId: ByteStr): Boolean     = diff.transactions.contains(txId)
+    def transactionsValues: Seq[Transaction] = diff.transactions.values.map(_.transaction).toVector
   }
 }
