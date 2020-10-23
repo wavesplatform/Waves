@@ -497,7 +497,7 @@ class BlockchainUpdaterImpl(
               val transactionsRoot = ng.createTransactionsRoot(microBlock)
               blockchainUpdateTriggers.onProcessMicroBlock(microBlock, detailedDiff, this, blockId, transactionsRoot)
 
-              ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis, Some(blockId))
+              this.ngState = Some(ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis, Some(blockId)))
 
               log.info(s"${microBlock.stringRepr(blockId)} appended, diff=${diff.hashString}")
               internalLastBlockInfo.onNext(LastBlockInfo(blockId, height, score, ready = true))
@@ -693,6 +693,7 @@ class BlockchainUpdaterImpl(
   private[this] def compositeBlockchain =
     ngState.fold(leveldb: Blockchain)(CompositeBlockchain(leveldb, _))
 
+  //noinspection ScalaStyle,TypeAnnotation
   private[this] object metrics {
     val blockMicroForkStats       = Kamon.counter("blockchain-updater.block-micro-fork").withoutTags()
     val microMicroForkStats       = Kamon.counter("blockchain-updater.micro-micro-fork").withoutTags()
