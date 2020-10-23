@@ -1,17 +1,15 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.api.http.ApiError.{ScriptExecutionError, TransactionNotAllowedByAssetScript}
+import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.it.sync.{issueFee, setAssetScriptFee, setScriptFee, smartFee, smartMinFee}
-import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.sync.{issueFee, setScriptFee, smartFee}
+import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 
 class PaymentValidationSuite extends BaseTransactionSuite {
 

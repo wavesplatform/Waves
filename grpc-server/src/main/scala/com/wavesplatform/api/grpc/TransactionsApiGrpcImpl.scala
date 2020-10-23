@@ -1,7 +1,10 @@
 package com.wavesplatform.api.grpc
 
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.common.CommonTransactionsApi
+import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction._
+import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBRecipientImplicitConversionOps
 import com.wavesplatform.transaction.{Authorized, ScriptExecutionFailed, ScriptExecutionInProgress, Succeeded}
 import io.grpc.stub.StreamObserver
 import io.grpc.{Status, StatusRuntimeException}
@@ -18,7 +21,9 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
       val stream = request.recipient match {
         case Some(subject) =>
           commonApi.transactionsByAddress(
-            subject.toAddressOrAlias,
+            subject
+              .toAddressOrAlias(AddressScheme.current.chainId)
+              .fold(e => throw new IllegalArgumentException(e.toString), identity),
             Option(request.sender).collect { case s if !s.isEmpty => s.toAddress },
             Set.empty,
             None
@@ -45,8 +50,8 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
         stream
           .filter { case (_, t, _) => transactionIdSet.isEmpty || transactionIdSet(t.id()) }
           .map {
-            case (h, tx, ScriptExecutionFailed)     => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB), ApplicationStatus.SCRIPT_EXECUTION_FAILED)
-            case (h, tx, Succeeded)                 => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB), ApplicationStatus.SUCCEEDED)
+            case (h, tx, ScriptExecutionFailed)     => TransactionResponse(tx.id().toByteString, h, Some(tx.toPB), ApplicationStatus.SCRIPT_EXECUTION_FAILED)
+            case (h, tx, Succeeded)                 => TransactionResponse(tx.id().toByteString, h, Some(tx.toPB), ApplicationStatus.SUCCEEDED)
             case (h, tx, ScriptExecutionInProgress) => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB), ApplicationStatus.SCRIPT_EXECUTION_IN_PROGRESS)
           }
       )
@@ -64,7 +69,7 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
       }
 
       responseObserver.completeWith(
-        Observable.fromIterable(unconfirmedTransactions.map(t => TransactionResponse(t.id().toPBByteString, transaction = Some(t.toPB))))
+        Observable.fromIterable(unconfirmedTransactions.map(t => TransactionResponse(t.id().toByteString, transaction = Some(t.toPB))))
       )
     }
 
@@ -86,10 +91,10 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
     responseObserver.interceptErrors {
       val result = Observable(request.transactionIds: _*).map { txId =>
         commonApi
-          .unconfirmedTransactionById(txId)
+          .unconfirmedTransactionById(txId.toByteStr)
           .map(_ => TransactionStatus(txId, TransactionStatus.Status.UNCONFIRMED))
           .orElse {
-            commonApi.transactionById(txId).map {
+            commonApi.transactionById(txId.toByteStr).map {
               case (h, _, ScriptExecutionFailed)     => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h, ApplicationStatus.SCRIPT_EXECUTION_FAILED)
               case (h, _, ScriptExecutionInProgress) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h, ApplicationStatus.SCRIPT_EXECUTION_IN_PROGRESS)
               case (h, _, Succeeded)                 => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h, ApplicationStatus.SUCCEEDED)

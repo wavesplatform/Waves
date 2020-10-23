@@ -1,19 +1,20 @@
 package com.wavesplatform.events
 
+import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
+
 import cats.Monoid
 import cats.syntax.monoid._
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.protobuf._
+import com.wavesplatform.state.{AccountDataInfo, AssetDescription, AssetScriptInfo, Blockchain, DataEntry, Diff, DiffToStateApplier, LeaseBalance}
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{AccountDataInfo, AssetDescription, AssetScriptInfo, Blockchain, DataEntry, Diff, DiffToStateApplier, LeaseBalance}
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-
-import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
 
 final case class AssetStateUpdate(
     asset: IssuedAsset,
@@ -118,8 +119,8 @@ object StateUpdate {
     } yield AssetStateUpdate(
       a,
       decimals,
-      ByteStr(name.toByteArray),
-      ByteStr(description.toByteArray),
+      name.toByteStr,
+      description.toByteStr,
       reissuable,
       totalVolume,
       script,
@@ -169,6 +170,17 @@ sealed trait BlockchainUpdated extends Product with Serializable {
   def toHeight: Int
 }
 
+object BlockchainUpdated {
+  implicit class BlockchainUpdatedExt(private val bu: BlockchainUpdated) extends AnyVal {
+    def references(other: BlockchainUpdated): Boolean = bu match {
+      case b: BlockAppended                 => b.block.header.reference == other.toId
+      case mb: MicroBlockAppended           => mb.microBlock.reference == other.toId
+      case rb: RollbackCompleted            => rb.toHeight < other.toHeight
+      case mrb: MicroBlockRollbackCompleted => mrb.toHeight == other.toHeight
+    }
+  }
+}
+
 final case class BlockAppended(
     toId: ByteStr,
     toHeight: Int,
@@ -188,7 +200,7 @@ object BlockAppended {
       // genesis case
       case 0 => block.transactionData.collect { case GenesisTransaction(_, amount, _, _, _) => amount }.sum
       // miner reward case
-      case _ => blockchainBeforeWithMinerReward.wavesAmount(blockchainBeforeWithMinerReward.height).toLong + minerReward.getOrElse(0L)
+      case height => blockchainBeforeWithMinerReward.wavesAmount(height).toLong
     }
 
     BlockAppended(block.id.value(), blockchainBeforeWithMinerReward.height + 1, block, updatedWavesAmount, blockStateUpdate, txsStateUpdates)
@@ -214,7 +226,7 @@ object MicroBlockAppended {
   ): MicroBlockAppended = {
     val (microBlockStateUpdate, txsStateUpdates) =
       StateUpdate.container(blockchainBeforeWithMinerReward, diff, microBlock.transactionData, microBlock.sender.toAddress)
-    
+
     MicroBlockAppended(
       totalBlockId,
       blockchainBeforeWithMinerReward.height,

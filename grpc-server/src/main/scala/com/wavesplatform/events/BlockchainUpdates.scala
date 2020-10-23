@@ -12,21 +12,21 @@ import com.wavesplatform.events.settings.BlockchainUpdatesSettings
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{Schedulers, ScorexLogging}
 import io.grpc.Server
 import io.grpc.netty.NettyServerBuilder
 import monix.execution.Scheduler
 import net.ceedubs.ficus.Ficus._
 
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 class BlockchainUpdates(private val context: Context) extends Extension with ScorexLogging with BlockchainUpdateTriggers {
-  implicit val scheduler: Scheduler = Scheduler(context.actorSystem.dispatcher)
+  private[this] implicit val scheduler = Schedulers.fixedPool(sys.runtime.availableProcessors(), "blockchain-updates")
 
-  private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("blockchain-updates")
-
-  private[this] val repo = new UpdatesRepoImpl(s"${context.settings.directory}/blockchain-updates")
+  private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("waves.blockchain-updates")
+  private[this] val repo     = new UpdatesRepoImpl(s"${context.settings.directory}/blockchain-updates")
 
   private[this] var grpcServer: Server = null
 
@@ -98,16 +98,20 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     log.info(s"BlockchainUpdates extension started gRPC API on port ${settings.grpcPort}")
   }
 
-  override def shutdown(): Future[Unit] = Future {
-    log.info(s"BlockchainUpdates extension shutting down, last persisted height ${repo.height.get - 1}")
+  override def shutdown(): Future[Unit] =
+    Future {
+      log.info(s"BlockchainUpdates extension shutting down, last persisted height ${repo.height.get - 1}")
 
-    if (grpcServer != null) {
-      grpcServer.shutdown()
-      grpcServer.awaitTermination(10L, TimeUnit.SECONDS)
-    }
+      if (grpcServer != null) {
+        grpcServer.shutdown()
+        grpcServer.awaitTermination(10, TimeUnit.SECONDS)
+        grpcServer = null
+      }
 
-    repo.shutdown()
-  }
+      scheduler.shutdown()
+      scheduler.awaitTermination(10 seconds)
+      repo.shutdown()
+    }(Scheduler.global)
 
   override def onProcessBlock(
       block: Block,

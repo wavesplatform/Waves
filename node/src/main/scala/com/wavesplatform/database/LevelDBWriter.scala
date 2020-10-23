@@ -283,7 +283,8 @@ abstract class LevelDBWriter private[database] (
     readOnly(_.get(Keys.continuationState(invokeTxId)))
 
   override def wavesAmount(height: Int): BigInt = readOnly { db =>
-    if (db.has(Keys.wavesAmount(height))) db.get(Keys.wavesAmount(height))
+    val factHeight = height.min(this.height)
+    if (db.has(Keys.wavesAmount(factHeight))) db.get(Keys.wavesAmount(factHeight))
     else BigInt(Constants.UnitsInWave * Constants.TotalWaves)
   }
 
