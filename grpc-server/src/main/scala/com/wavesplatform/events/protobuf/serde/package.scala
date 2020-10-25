@@ -1,52 +1,35 @@
 package com.wavesplatform.events.protobuf
 
-import java.nio.charset.StandardCharsets
-
-import cats.kernel.Monoid
+import cats.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
-import com.wavesplatform.events.{
-  AssetStateUpdate => VanillaAssetStateUpdate,
-  StateUpdate => VanillaStateUpdate,
-  BlockchainUpdated => VanillaBlockchainUpdated,
-  BlockAppended => VanillaBlockAppended,
-  MicroBlockAppended => VanillaMicroBlockAppended,
-  RollbackCompleted => VanillaRollbackCompleted,
-  MicroBlockRollbackCompleted => VanillaMicroBlockRollbackCompleted
-}
 import com.wavesplatform.events.protobuf.BlockchainUpdated.{Append, Rollback, Update}
 import com.wavesplatform.events.protobuf.StateUpdate.AssetStateUpdate.AssetScriptInfo
 import com.wavesplatform.events.protobuf.StateUpdate.{AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeasingUpdate}
+import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.block.{PBBlocks, PBMicroBlocks}
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions}
 import com.wavesplatform.state.{LeaseBalance, AssetScriptInfo => VanillaAssetScriptInfo}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.{events => ve}
 
 import scala.util.{Failure, Try}
 
-trait Protobuf[A] {
-  def protobuf: A
-}
-
-trait Vanilla[A] {
-  def vanilla: Try[A]
-}
-
-object serde {
+package object serde {
 
   import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 
-  implicit class BlockchainUpdatedProtobuf(self: VanillaBlockchainUpdated) extends Protobuf[BlockchainUpdated] {
+  implicit class BlockchainUpdatedProtobuf(val self: ve.BlockchainUpdated) extends AnyVal {
 
     import BlockchainUpdatedProtobuf._
 
-    override def protobuf: BlockchainUpdated =
+    def protobuf: BlockchainUpdated =
       self match {
-        case VanillaBlockAppended(id, height, block, updatedWavesAmount, blockStateUpdate, transactionStateUpdates) =>
+        case ve.BlockAppended(id, height, block, updatedWavesAmount, blockStateUpdate, transactionStateUpdates) =>
           val blockUpdate = Some(blockStateUpdate).filterNot(_.isEmpty).map(_.protobuf)
           val txsUpdates  = transactionStateUpdates.map(_.protobuf)
 
@@ -67,7 +50,7 @@ object serde {
               )
             )
           )
-        case VanillaMicroBlockAppended(totalBlockId, height, microBlock, microBlockStateUpdate, transactionStateUpdates, totalTransactionsRoot) =>
+        case ve.MicroBlockAppended(totalBlockId, height, microBlock, microBlockStateUpdate, transactionStateUpdates, totalTransactionsRoot) =>
           val microBlockUpdate = Some(microBlockStateUpdate).filterNot(_.isEmpty).map(_.protobuf)
           val txsUpdates       = transactionStateUpdates.map(_.protobuf)
 
@@ -88,7 +71,7 @@ object serde {
               )
             )
           )
-        case VanillaRollbackCompleted(to, height) =>
+        case ve.RollbackCompleted(to, height) =>
           BlockchainUpdated(
             id = to.toByteString,
             height = height,
@@ -96,7 +79,7 @@ object serde {
               Rollback(Rollback.RollbackType.BLOCK)
             )
           )
-        case VanillaMicroBlockRollbackCompleted(toSig, height) =>
+        case ve.MicroBlockRollbackCompleted(toSig, height) =>
           BlockchainUpdated(
             id = toSig.toByteString,
             height = height,
@@ -111,65 +94,62 @@ object serde {
     private def getIds(txs: Seq[Transaction]): Seq[ByteString] = txs.map(t => ByteString.copyFrom(t.id().arr))
   }
 
-  implicit class BlockchainUpdatedVanilla(self: BlockchainUpdated) extends Vanilla[VanillaBlockchainUpdated] {
-    private[this] lazy val error: IllegalArgumentException = {
-      val base58Id = ByteStr(self.id.toByteArray).toString
-      new IllegalArgumentException(s"Invalid protobuf BlockchainUpdated at height ${self.height}, id $base58Id")
+  implicit class BlockchainUpdatedVanilla(val self: BlockchainUpdated) extends AnyVal {
+    private def throwError() = {
+      val base58Id = self.id.toByteStr.toString
+      throw new IllegalArgumentException(s"Invalid protobuf BlockchainUpdated at height ${self.height}, id $base58Id")
     }
 
-    override def vanilla: Try[VanillaBlockchainUpdated] =
+    def vanilla: Try[ve.BlockchainUpdated] =
       Try {
         self.update match {
           case Update.Append(append) =>
             append.body match {
               case Body.Block(body) =>
-                VanillaBlockAppended(
-                  toId = ByteStr(self.id.toByteArray),
+                ve.BlockAppended(
+                  toId = self.id.toByteStr,
                   toHeight = self.height,
                   block = PBBlocks.vanilla(body.block.get, unsafe = true).get,
                   updatedWavesAmount = body.updatedWavesAmount,
-                  blockStateUpdate = append.stateUpdate.map(_.vanilla.get).getOrElse(Monoid[VanillaStateUpdate].empty),
+                  blockStateUpdate = append.stateUpdate.fold(Monoid[ve.StateUpdate].empty)(_.vanilla.get),
                   transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get)
                 )
               case Body.MicroBlock(body) =>
-                VanillaMicroBlockAppended(
-                  toId = ByteStr(self.id.toByteArray),
+                ve.MicroBlockAppended(
+                  toId = self.id.toByteStr,
                   toHeight = self.height,
                   microBlock = PBMicroBlocks.vanilla(body.microBlock.get, unsafe = true).get.microblock,
-                  microBlockStateUpdate = append.stateUpdate.map(_.vanilla.get).getOrElse(Monoid[VanillaStateUpdate].empty),
+                  microBlockStateUpdate = append.stateUpdate.fold(Monoid[ve.StateUpdate].empty)(_.vanilla.get),
                   transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get),
-                  totalTransactionsRoot = ByteStr(body.updatedTransactionsRoot.toByteArray)
+                  totalTransactionsRoot = body.updatedTransactionsRoot.toByteStr
                 )
-              case Body.Empty => throw error
+              case Body.Empty => throwError()
             }
           case Update.Rollback(rollback) =>
             rollback.`type` match {
               case RollbackType.BLOCK =>
-                VanillaRollbackCompleted(
-                  toId = ByteStr(self.id.toByteArray),
+                ve.RollbackCompleted(
+                  toId = self.id.toByteStr,
                   toHeight = self.height
                 )
               case RollbackType.MICROBLOCK =>
-                VanillaMicroBlockRollbackCompleted(
-                  toId = ByteStr(self.id.toByteArray),
+                ve.MicroBlockRollbackCompleted(
+                  toId = self.id.toByteStr,
                   toHeight = self.height
                 )
-              case RollbackType.Unrecognized(_) => throw error
+              case RollbackType.Unrecognized(_) => throwError()
             }
-          case Update.Empty => throw error
+          case Update.Empty => throwError()
         }
-      } recoverWith { case _: Throwable => Failure(error) }
+      } recoverWith { case _: Throwable => Try(throwError()) }
   }
 
-  implicit class AssetStateUpdateProtobuf(self: VanillaAssetStateUpdate) extends Protobuf[AssetStateUpdate] {
-
-    import AssetStateUpdateProtobuf._
-
-    override def protobuf: AssetStateUpdate = AssetStateUpdate(
+  implicit class AssetStateUpdateProtobuf(val self: ve.AssetStateUpdate) extends AnyVal {
+    def protobuf: AssetStateUpdate = AssetStateUpdate(
       assetId = self.asset.id.toByteString,
       decimals = self.decimals,
-      name = toStringUtf8(self.name),
-      description = toStringUtf8(self.description),
+      name = self.name.toUTF8String,
+      description = self.description.toUTF8String,
       reissuable = self.reissuable,
       volume = self.volume.longValue,
       scriptInfo = self.scriptInfo.map(_.protobuf),
@@ -180,17 +160,13 @@ object serde {
     )
   }
 
-  object AssetStateUpdateProtobuf {
-    private def toStringUtf8(bytes: ByteStr): String = new String(bytes.arr, StandardCharsets.UTF_8)
-  }
-
-  implicit class AssetStateUpdateVanilla(self: AssetStateUpdate) extends Vanilla[VanillaAssetStateUpdate] {
+  implicit class AssetStateUpdateVanilla(val self: AssetStateUpdate) extends AnyVal {
     import AssetStateUpdateVanilla._
-    override def vanilla: Try[VanillaAssetStateUpdate] =
+    def vanilla: Try[ve.AssetStateUpdate] =
       Try {
         PBAmounts.toVanillaAssetId(self.assetId) match {
           case a: IssuedAsset =>
-            VanillaAssetStateUpdate(
+            ve.AssetStateUpdate(
               asset = a,
               decimals = self.decimals,
               name = ByteStr(self.name.getBytes()),
@@ -211,16 +187,16 @@ object serde {
     private lazy val error = new IllegalArgumentException(s"Invalid protobuf AssetStateUpdate")
   }
 
-  implicit class AssetScriptInfoProtobuf(self: VanillaAssetScriptInfo) extends Protobuf[AssetScriptInfo] {
-    override def protobuf: AssetScriptInfo = AssetScriptInfo(
+  implicit class AssetScriptInfoProtobuf(val self: VanillaAssetScriptInfo) extends AnyVal {
+    def protobuf: AssetScriptInfo = AssetScriptInfo(
       script = PBTransactions.toPBScript(Some(self.script)),
       complexity = self.complexity
     )
   }
 
-  implicit class AssetScriptInfoVanilla(self: AssetScriptInfo) extends Vanilla[VanillaAssetScriptInfo] {
+  implicit class AssetScriptInfoVanilla(val self: AssetScriptInfo) extends AnyVal {
     import AssetScriptInfoVanilla._
-    override def vanilla: Try[VanillaAssetScriptInfo] =
+    def vanilla: Try[VanillaAssetScriptInfo] =
       Try {
         VanillaAssetScriptInfo(
           script = PBTransactions.toVanillaScript(self.script).get,
@@ -233,8 +209,8 @@ object serde {
     private lazy val error = new IllegalArgumentException(s"Invalid protobuf AssetScriptInfo")
   }
 
-  implicit class StateUpdateProtobuf(self: VanillaStateUpdate) extends Protobuf[StateUpdate] {
-    override def protobuf: StateUpdate = StateUpdate(
+  implicit class StateUpdateProtobuf(val self: ve.StateUpdate) extends AnyVal {
+    def protobuf: StateUpdate = StateUpdate(
       balances = self.balances.map {
         case (addr, assetId, amt) =>
           BalanceUpdate(address = addr, amount = Some((assetId, amt)))
@@ -250,11 +226,11 @@ object serde {
     )
   }
 
-  implicit class StateUpdateVanilla(self: StateUpdate) extends Vanilla[VanillaStateUpdate] {
+  implicit class StateUpdateVanilla(val self: StateUpdate) extends AnyVal {
     import StateUpdateVanilla._
-    override def vanilla: Try[VanillaStateUpdate] =
+    def vanilla: Try[ve.StateUpdate] =
       Try {
-        VanillaStateUpdate(
+        ve.StateUpdate(
           balances = self.balances.map { b =>
             val (asset, balance) = PBAmounts.toAssetAndAmount(b.amount.get)
             val address          = toAddress(b.address).get
@@ -278,5 +254,4 @@ object serde {
 
     def toAddress(bs: ByteString): Try[Address] = Address.fromBytes(bs.toByteArray).left.map(_ => error).toTry
   }
-
 }

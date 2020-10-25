@@ -280,7 +280,8 @@ abstract class LevelDBWriter private[database] (
   }
 
   override def wavesAmount(height: Int): BigInt = readOnly { db =>
-    if (db.has(Keys.wavesAmount(height))) db.get(Keys.wavesAmount(height))
+    val factHeight = height.min(this.height)
+    if (db.has(Keys.wavesAmount(factHeight))) db.get(Keys.wavesAmount(factHeight))
     else BigInt(Constants.UnitsInWave * Constants.TotalWaves)
   }
 
@@ -793,7 +794,7 @@ abstract class LevelDBWriter private[database] (
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
     for {
       TransactionMeta(height, num, TransferTransaction.typeId, _) <- db.get(Keys.transactionMetaById(TransactionId @@ id))
-      tx <- db.get(Keys.transactionAt(Height(height), TxNum(num.toShort))).collect { case (t: TransferTransaction, true) => t }
+      tx                                                          <- db.get(Keys.transactionAt(Height(height), TxNum(num.toShort))).collect { case (t: TransferTransaction, true) => t }
     } yield (height, tx)
   }
 

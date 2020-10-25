@@ -1,15 +1,11 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.api.http.ApiError.{ScriptExecutionError, TransactionNotAllowedByAssetScript}
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.it.sync.{issueFee, scriptBase64, smartMinFee}
-import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.api.http.ApiError.ScriptExecutionError
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.it.sync.{issueFee, smartMinFee}
+import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.state
-import com.wavesplatform.state.BooleanDataEntry
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class TypeEntrySuite extends BaseTransactionSuite {
