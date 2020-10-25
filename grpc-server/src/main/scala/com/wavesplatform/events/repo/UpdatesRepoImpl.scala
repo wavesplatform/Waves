@@ -48,18 +48,20 @@ class UpdatesRepoImpl(directory: String)(implicit val scheduler: Scheduler)
   override def height: Try[Int] = Try {
     liquidState.map(_.keyBlock.toHeight).getOrElse {
       val iter = db.iterator()
-      try {
-        iter.seekToLast()
-        if (iter.hasNext) {
-          val blockBytes = iter.next.getValue
-          val lastUpdate = PBBlockchainUpdated.parseFrom(blockBytes).vanilla.get
-          lastUpdate.toHeight
-        } else {
-          0
-        }
-      } finally {
-        iter.close()
+
+      def parseHeight(blockBytes: Array[Byte]) = {
+        val lastUpdate = PBBlockchainUpdated.parseFrom(blockBytes).vanilla.get
+        lastUpdate.toHeight
       }
+
+      try Try(iter.seekToLast()).fold(
+        _ =>
+          iter.asScala
+            .foldLeft(Option.empty[Array[Byte]]) { case (_, e) => Some(e.getValue) }
+            .fold(0)(parseHeight),
+        _ => if (iter.hasNext) parseHeight(iter.next.getValue) else 0
+      )
+      finally iter.close()
     }
   }
 
