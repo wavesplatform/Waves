@@ -2074,7 +2074,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         | getBooleanValue(entries, "boolean") == true      &&
         | getBooleanValue(entries, 3)         == true      &&
         | getBinaryValue(entries, "binary")   == base58'a' &&
-        | getBinaryValue(entries, 4)          == base58'a'
+        | getBinaryValue(entries, 4)          == base58'a' &&
+        | entries[0] == deleteEntry
       """.stripMargin
 
     val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())

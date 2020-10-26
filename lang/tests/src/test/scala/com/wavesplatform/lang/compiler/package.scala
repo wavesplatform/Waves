@@ -21,19 +21,16 @@ package object compiler {
   val listOfLongs = LIST
   val idT = NativeFunction[NoContext]("idT", 1, 10000: Short, TYPEPARAM('T'), ("p1", TYPEPARAM('T'))) {
     case a :: Nil => Right(a)
-    case _ => ???
+    case _        => ???
   }
   val returnsListLong =
     NativeFunction[NoContext]("undefinedOptionLong", 1, 1002: Short, LIST(LONG): TYPE) { case _ => ??? }
   val idOptionLong =
     NativeFunction[NoContext]("idOptionLong", 1, 1003: Short, UNIT, ("opt", UNION(LONG, UNIT))) { case _ => Right(unit) }
   val functionWithTwoPrarmsOfTheSameType =
-    NativeFunction[NoContext]("functionWithTwoPrarmsOfTheSameType",
-                   1,
-                   1005: Short,
-                   TYPEPARAM('T'),
-                   ("p1", TYPEPARAM('T')),
-                   ("p2", TYPEPARAM('T'))) { case l => Right(l.head) }
+    NativeFunction[NoContext]("functionWithTwoPrarmsOfTheSameType", 1, 1005: Short, TYPEPARAM('T'), ("p1", TYPEPARAM('T')), ("p2", TYPEPARAM('T'))) {
+      case l => Right(l.head)
+    }
 
   private val arr = ARR(IndexedSeq[EVALUATED](Common.pointAInstance, Common.pointAInstance), false).explicitGet()
 
@@ -57,6 +54,6 @@ package object compiler {
       ))
   }
 
-  val compilerContext = getTestContext(V3).compilerContext
+  val compilerContext   = getTestContext(V3).compilerContext
   val compilerContextV4 = getTestContext(V4).compilerContext
 }
