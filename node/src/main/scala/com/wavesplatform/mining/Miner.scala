@@ -2,10 +2,12 @@ package com.wavesplatform.mining
 
 import java.time.LocalTime
 
+import scala.concurrent.duration._
+
 import cats.implicits._
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.block.Block._
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
+import com.wavesplatform.block.Block._
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.features.BlockchainFeatures
@@ -15,8 +17,8 @@ import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.transaction.TxValidationError.BlockFromFuture
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.TxValidationError.BlockFromFuture
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool.PackStrategy
 import com.wavesplatform.utx.UtxPoolImpl
@@ -26,8 +28,6 @@ import kamon.Kamon
 import monix.eval.Task
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.SchedulerService
-
-import scala.concurrent.duration._
 
 trait Miner {
   def scheduleMining(blockchain: Option[Blockchain] = None): Unit
@@ -78,7 +78,7 @@ class MinerImpl(
     settings.minerSettings,
     minerScheduler,
     appenderScheduler,
-    () => utx.priorityPool.nextMicroBlockSize()
+    utx.priorityPool.nextMicroBlockSize
   )
 
   def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] =

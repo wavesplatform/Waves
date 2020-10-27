@@ -3,11 +3,13 @@ package com.wavesplatform.utx
 import java.time.Duration
 import java.time.temporal.ChronoUnit
 
+import scala.annotation.tailrec
+
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 import kamon.Kamon
@@ -16,7 +18,7 @@ import kamon.metric.MeasurementUnit
 final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with OptimisticLockable {
   import UtxPriorityPool._
 
-  @volatile private[this] var priorityDiffs         = Vector.empty[Diff]
+  @volatile private[this] var priorityDiffs         = Seq.empty[Diff]
   @volatile private[this] var priorityDiffsCombined = Monoid.combineAll(priorityDiffs)
 
   def priorityTransactions: Seq[Transaction] = priorityDiffs.flatMap(_.transactionsValues)
@@ -46,30 +48,33 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
   }
 
   def removeIds(removed: Set[ByteStr]): (Set[Transaction], Set[Transaction]) = {
-    val (diffsToReset, diffsToKeep) = priorityDiffs.partition(pd => removed.exists(pd.contains))
-    val factRemoved                 = Set.newBuilder[Transaction]
-    val notRemoved                  = Set.newBuilder[Transaction]
+    case class RemoveResult(diffsRest: Seq[Diff], removed: Set[Transaction], resorted: Set[Transaction])
 
-    diffsToReset.foreach { diff =>
-      val fullyReset: Boolean = diff.transactions.keySet.forall(removed)
-      diff.transactionsValues.foreach { tx =>
-        PoolMetrics.removeTransactionPriority(tx)
-        factRemoved += tx
-      }
-      if (!fullyReset) {
-        val txsToAdd = diff.transactions.view.filterKeys(!removed(_)).values.map(_.transaction)
-        log.warn {
-          val added      = txsToAdd.map(_.id())
-          val removedIds = diff.transactions.keySet.intersect(removed)
-          s"Resetting diff ${diff.hashString} partially: removed = [${removedIds.mkString(", ")}], resorted = [${added.mkString(", ")}]"
-        }
-        notRemoved ++= txsToAdd
-      }
+    @tailrec
+    def removeRec(diffs: Seq[Diff], cleanRemoved: Set[Transaction] = Set.empty): RemoveResult = diffs match {
+      case Nil =>
+        RemoveResult(Nil, cleanRemoved, Set.empty)
+
+      case diff +: rest if diff.transactionIds.subsetOf(removed) =>
+        removeRec(rest, cleanRemoved ++ diff.transactionsValues)
+
+      case _ if cleanRemoved.map(_.id()) == removed =>
+        RemoveResult(diffs, cleanRemoved, Set.empty)
+
+      case _ => // Partial remove, drop entire priority pool
+        val (restRemoved, resorted) = diffs.flatMap(_.transactionsValues).partition(tx => removed(tx.id()))
+        RemoveResult(Nil, cleanRemoved ++ restRemoved, resorted.toSet)
     }
-    priorityDiffs = diffsToKeep
+
+    val result = removeRec(this.priorityDiffs)
+
+    val txsToReset = result.resorted ++ result.removed
+    txsToReset.foreach(PoolMetrics.removeTransactionPriority)
+
+    priorityDiffs = result.diffsRest
     priorityDiffsCombined = Monoid.combineAll(priorityDiffs)
 
-    (factRemoved.result(), notRemoved.result())
+    (result.removed, result.resorted)
   }
 
   def transactionById(txId: ByteStr): Option[Transaction] =
@@ -83,8 +88,16 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
       (a, pf) <- diff.portfolios if a == addr
     } yield pf.pessimistic
 
-  def nextMicroBlockSize(): Option[Int] = {
-    priorityDiffs.headOption.map(_.transactions.size)
+  def nextMicroBlockSize(limit: Int): Int = {
+    val sizes = priorityDiffs.map(_.transactions.size)
+
+    sizes
+      .scanLeft(0) { case (count, size) => count + size }
+      .tail
+      .takeWhile(_ <= limit)
+      .lastOption
+      .orElse(sizes.headOption)
+      .getOrElse(limit)
   }
 
   //noinspection TypeAnnotation
@@ -111,5 +124,6 @@ private object UtxPriorityPool {
   implicit class DiffExt(private val diff: Diff) extends AnyVal {
     def contains(txId: ByteStr): Boolean     = diff.transactions.contains(txId)
     def transactionsValues: Seq[Transaction] = diff.transactions.values.map(_.transaction).toVector
+    def transactionIds: collection.Set[ByteStr] = diff.transactions.keySet
   }
 }

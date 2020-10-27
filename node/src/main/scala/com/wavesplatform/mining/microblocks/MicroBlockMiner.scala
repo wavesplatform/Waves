@@ -29,7 +29,7 @@ object MicroBlockMiner {
       settings: MinerSettings,
       minerScheduler: SchedulerService,
       appenderScheduler: SchedulerService,
-      nextMicroBlockHint: () => Option[Int]
+      nextMicroBlockSize: Int => Int = identity
   ): MicroBlockMiner =
     new MicroBlockMinerImpl(
       setDebugState,
@@ -39,6 +39,6 @@ object MicroBlockMiner {
       settings,
       minerScheduler,
       appenderScheduler,
-      nextMicroBlockHint
+      nextMicroBlockSize
     )
 }

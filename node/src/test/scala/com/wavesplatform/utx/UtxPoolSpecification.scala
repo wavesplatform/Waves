@@ -2,7 +2,12 @@ package com.wavesplatform.utx
 
 import java.nio.file.{Files, Path}
 
+import scala.collection.mutable.ListBuffer
+import scala.concurrent.duration._
+import scala.util.Random
+
 import cats.data.NonEmptyList
+import cats.kernel.Monoid
 import com.wavesplatform
 import com.wavesplatform._
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
@@ -10,7 +15,7 @@ import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.{PoSSelector, TransactionsOrdering}
-import com.wavesplatform.database.{LevelDBWriter, TestStorageFactory, openDB}
+import com.wavesplatform.database.{openDB, LevelDBWriter, TestStorageFactory}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
@@ -19,8 +24,8 @@ import com.wavesplatform.history.randomSig
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.mining._
 import com.wavesplatform.network.{InvalidBlockStorage, PeerDatabase}
@@ -29,30 +34,26 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.appender.{ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.utils.TestLevelDB
+import com.wavesplatform.transaction.{Asset, Transaction, _}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.{GenericError, SenderIsBlacklisted}
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{Asset, Transaction, _}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool.PackStrategy
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.subjects.PublishSubject
 import org.iq80.leveldb.DB
-import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.{EitherValues, FreeSpec, Matchers}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.PatienceConfiguration.{Interval, Timeout}
-import org.scalatest.{EitherValues, FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-
-import scala.collection.mutable.ListBuffer
-import scala.concurrent.duration._
-import scala.util.Random
 
 private object UtxPoolSpecification {
   private val ignoreSpendableBalanceChanged = PublishSubject[(Address, Asset)]()
@@ -882,7 +883,16 @@ class UtxPoolSpecification
 
         "retries until estimate" in withDomain() { d =>
           val settings =
-            UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false, fastLaneAddresses = Set.empty)
+            UtxSettings(
+              10,
+              PoolDefaultMaxBytes,
+              1000,
+              Set.empty,
+              Set.empty,
+              allowTransactionsFromSmartAccounts = true,
+              allowSkipChecks = false,
+              fastLaneAddresses = Set.empty
+            )
           val utxPool     = new UtxPoolImpl(ntpTime, d.blockchainUpdater, ignoreSpendableBalanceChanged, settings)
           val startTime   = System.nanoTime()
           val (result, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Estimate(3 seconds))
@@ -1015,16 +1025,16 @@ class UtxPoolSpecification
           utx.all shouldBe expectedTxs
           assertPortfolios(utx, expectedTxs)
 
-          val (left, right) = {
-            val (left, right) = minedTxs.zipWithIndex.partition(kv => kv._2 % 2 == 0)
-            (left.map(_._1), right.map(_._1))
-          }
+          val (left, right) = minedTxs.splitAt(minedTxs.length / 2)
 
           utx.removeAll(left)
+          utx.priorityPool.priorityTransactions should not be empty
+          
           val expectedTxs1 = right :+ tx1
           assertPortfolios(utx, expectedTxs1)
           all(right.map(utx.putIfNew(_).resultE)) shouldBe Right(false)
-          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(expectedTxs1)
+          val test = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1
+          test shouldBe Some(expectedTxs1)
           utx.all shouldBe expectedTxs1
           assertPortfolios(utx, expectedTxs1)
 
@@ -1071,9 +1081,25 @@ class UtxPoolSpecification
           val utx =
             new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
           utx.addPriorityTxs(Seq(tx1))
-          utx.putNewTx(tx2, false, false).resultE should beRight
+          utx.putNewTx(tx2, verify = false, forceValidate = false).resultE should beRight
           utx.nonPriorityTransactions shouldBe Seq(tx2)
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(tx1 :: tx2 :: Nil)
+      }
+
+      "counts microblock size from priority diffs" in {
+        val blockchain = createState(TxHelpers.defaultSigner.toAddress)
+        val utx =
+          new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
+
+        def createDiff(): Diff =
+          Monoid.combineAll((1 to 5).map(_ => Diff(TxHelpers.issue())))
+
+        utx.priorityPool.addPriorityDiffs(Seq(createDiff(), createDiff()))
+        utx.priorityPool.nextMicroBlockSize(3) shouldBe 5
+        utx.priorityPool.nextMicroBlockSize(5) shouldBe 5
+        utx.priorityPool.nextMicroBlockSize(8) shouldBe 5
+        utx.priorityPool.nextMicroBlockSize(10) shouldBe 10
+        utx.priorityPool.nextMicroBlockSize(12) shouldBe 10
       }
 
       "runs cleanup on priority pool" in forAll(genDependent) {
@@ -1087,6 +1113,19 @@ class UtxPoolSpecification
           utx.runCleanup()
 
           eventually(Timeout(5 seconds), Interval(50 millis))(utx.all shouldBe empty)
+      }
+
+      "drops priority pool on different microblock" in forAll(genDependent) {
+        case (tx1, tx2) =>
+          val blockchain = createState(tx1.sender.toAddress)
+
+          val utx =
+            new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
+          utx.addPriorityTxs(Seq(tx1, tx2))
+          utx.removeAll(Seq(TxHelpers.issue()))
+
+          utx.priorityPool.priorityTransactions shouldBe empty
+          utx.all.toSet shouldBe Set(tx1, tx2)
       }
 
       val genChain = for {
@@ -1154,10 +1193,11 @@ class UtxPoolSpecification
             utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(expectedTxs1)
 
             mbs2.foreach(microBlockAppender(_).runSyncUnsafe() should beRight)
-            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(mbs1.last.transactionData)
+            utx.priorityPool.priorityTransactions shouldBe empty
+            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1.get.toSet shouldBe mbs1.last.transactionData.toSet
 
             extAppender(Seq(block3)).runSyncUnsafe() should beRight
-            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(mbs1.last.transactionData)
+            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1.get.toSet shouldBe mbs1.last.transactionData.toSet
 
             // Not supported at the moment
             //extAppender(Seq(block4)).runSyncUnsafe() should beRight
