@@ -143,6 +143,8 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
              |         case entry: BooleanEntry =>
              |           entry.key == "key" &&
              |           entry.value == true
+             |         case entry: DeleteEntry =>
+             |           entry.key == "key"
              |       }
              |   case _ =>
              |     sigVerify(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)
