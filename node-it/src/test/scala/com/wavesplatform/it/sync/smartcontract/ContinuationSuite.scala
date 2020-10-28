@@ -196,7 +196,8 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       _.forall(identity)
     )
 
-  private def assertContinuationChain(invokeId: String, completionHeight: Int, shouldBeFailed: Boolean): Unit =
+  private def assertContinuationChain(invokeId: String, completionHeight: Int, shouldBeFailed: Boolean): Unit = {
+    import play.api.libs.json._
     nodes.foreach {
       node =>
         val invoke = node.transactionInfo[DebugStateChanges](invokeId)
@@ -207,6 +208,10 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
             .filter(tx => tx._type == ContinuationTransaction.typeId && tx.invokeScriptTransactionId.contains(invokeId))
         for((t,b) <- invoke.continuationTransactionIds.get.zip(continuations.map(_.id))) {
           t shouldBe b
+          val cont = node.transactionInfo[JsObject](t)
+          (cont \ "version").as[Int] shouldBe 1
+          (cont \ "height").asOpt[Int].nonEmpty shouldBe true
+          (cont \ "extraFeePerStep").asOpt[Long].nonEmpty shouldBe true
         }
 
         invoke.applicationStatus.value shouldBe "script_execution_in_progress"
@@ -215,6 +220,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         continuations.map(_.nonce.value) shouldBe continuations.indices
         invoke.timestamp +: continuations.map(_.timestamp) shouldBe sorted
     }
+  }
 
   private def assertAbsenceOfTransactions(fromHeight: Int, toHeight: Int): Unit =
     nodes.foreach {
