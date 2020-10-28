@@ -109,6 +109,14 @@ object Decompiler {
   val MatchRef = """(\$match\d*)""".r
 
   private[lang] def expr(e: Coeval[EXPR], ctx: DecompilerContext, braces: BlockBraces, firstLinePolicy: FirstLinePolicy): Coeval[String] = {
+    def checkBrackets(expr: EXPR) = expr match {
+      case Terms.FUNCTION_CALL(FunctionHeader.Native(id), _) if ctx.binaryOps.contains(id) /* || ctx.unaryOps.contains(id) */ => ("(", ")")
+      case Terms.IF(_, _, _) => ("(", ")")
+      case Terms.LET_BLOCK(_, _) => ("(", ")")
+      case Terms.BLOCK(_, _) => ("(", ")")
+      case _ => ("", "")
+    }
+
     def argsStr(args: List[EXPR]) = args.map(argStr).toVector.sequence
     def listStr(elems: List[EXPR]) = argsStr(elems).map(_.mkString("[", ", ", "]"))
     def argStr(elem: EXPR) = expr(pure(elem), ctx, BracesWhenNeccessary, DontIndentFirstLine)
@@ -150,7 +158,9 @@ object Decompiler {
       case Terms.CONST_STRING(s)         => pureOut("\"" ++ s ++ "\"", i)
       case Terms.CONST_BYTESTR(bs)       => pureOut(if(bs.size <= 128) { "base58'" ++ bs.toString ++ "'" } else { "base64'" ++ bs.base64Raw ++ "'" }, i)
       case Terms.REF(ref)                => pureOut(ref, i)
-      case Terms.GETTER(getExpr, fld)    => expr(pure(getExpr), ctx, BracesWhenNeccessary, firstLinePolicy).map(a => a + "." + fld)
+      case Terms.GETTER(getExpr, fld)    =>
+        val (bs, be) = checkBrackets(getExpr)
+        expr(pure(getExpr), ctx, NoBraces /*BracesWhenNeccessary*/, firstLinePolicy).map(a => s"$bs$a$be.$fld")
       case Terms.IF(cond, it, iff) =>
         for {
           c   <- expr(pure(cond), ctx, BracesWhenNeccessary, DontIndentFirstLine)
@@ -167,7 +177,8 @@ object Decompiler {
           case (elems, Some(listVar))      => listStr(elems).map(v => s"$v :: $listVar")
         }
       case FUNCTION_CALL(`listElem`, List(list, index)) =>
-        for (l <- argStr(list); i <- argStr(index)) yield s"$l[$i]"
+        val (bs,be) = checkBrackets(list)
+        for (l <- argStr(list); i <- argStr(index)) yield s"$bs$l$be[$i]"
       case Terms.FUNCTION_CALL(func, args) =>
         val argsCoeval = argsStr(args)
         func match {
