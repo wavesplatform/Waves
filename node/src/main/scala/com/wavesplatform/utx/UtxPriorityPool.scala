@@ -3,17 +3,17 @@ package com.wavesplatform.utx
 import java.time.Duration
 import java.time.temporal.ChronoUnit
 
-import scala.annotation.tailrec
-
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
+
+import scala.annotation.tailrec
 
 final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with OptimisticLockable {
   import UtxPriorityPool._
@@ -47,7 +47,7 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
     }
   }
 
-  def removeIds(removed: Set[ByteStr]): (Set[Transaction], Set[Transaction]) = {
+  private[utx] def removeIds(removed: Set[ByteStr]): (Set[Transaction], Set[Transaction]) = {
     case class RemoveResult(diffsRest: Seq[Diff], removed: Set[Transaction], resorted: Set[Transaction])
 
     @tailrec
@@ -67,12 +67,16 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
     }
 
     val result = removeRec(this.priorityDiffs)
+    log.trace(s"Removing diffs from priority pool: resorted txs: [${result.resorted.map(_.id()).mkString(", ")}], removed txs: [${result.removed
+      .map(_.id())
+      .mkString(", ")}], remaining diffs: [${result.diffsRest.map(_.hashString).mkString(", ")}]")
 
     val txsToReset = result.resorted ++ result.removed
     txsToReset.foreach(PoolMetrics.removeTransactionPriority)
 
     priorityDiffs = result.diffsRest
     priorityDiffsCombined = Monoid.combineAll(priorityDiffs)
+    log.trace(s"Priority pool transactions order: ${priorityTransactionIds.mkString(", ")}")
 
     (result.removed, result.resorted)
   }
@@ -89,15 +93,23 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
     } yield pf.pessimistic
 
   def nextMicroBlockSize(limit: Int): Int = {
-    val sizes = priorityDiffs.map(_.transactions.size)
+    @tailrec
+    def nextMicroBlockSizeRec(last: Int, diffs: Seq[Diff]): Int = diffs match {
+      case Nil => last.max(limit)
+      case diff +: _ if last + diff.transactions.size > limit =>
+        if (last == 0) diff.transactions.size // First micro
+        else last
+      case diff +: rest => nextMicroBlockSizeRec(last + diff.transactions.size, rest)
+    }
+    nextMicroBlockSizeRec(0, priorityDiffs)
+  }
 
-    sizes
-      .scanLeft(0) { case (count, size) => count + size }
-      .tail
-      .takeWhile(_ <= limit)
-      .lastOption
-      .orElse(sizes.headOption)
-      .getOrElse(limit)
+  private[utx] def clear(): Seq[Transaction] = {
+    val txs = priorityDiffs.flatMap(_.transactionsValues)
+    priorityDiffsCombined = Diff.empty
+    priorityDiffs = Nil
+    log.trace("Priority pool cleared")
+    txs
   }
 
   //noinspection TypeAnnotation
@@ -122,8 +134,8 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
 
 private object UtxPriorityPool {
   implicit class DiffExt(private val diff: Diff) extends AnyVal {
-    def contains(txId: ByteStr): Boolean     = diff.transactions.contains(txId)
-    def transactionsValues: Seq[Transaction] = diff.transactions.values.map(_.transaction).toVector
+    def contains(txId: ByteStr): Boolean        = diff.transactions.contains(txId)
+    def transactionsValues: Seq[Transaction]    = diff.transactions.values.map(_.transaction).toVector
     def transactionIds: collection.Set[ByteStr] = diff.transactions.keySet
   }
 }
