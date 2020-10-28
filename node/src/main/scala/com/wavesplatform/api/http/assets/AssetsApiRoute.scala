@@ -32,6 +32,7 @@ import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
+import io.netty.util.concurrent.DefaultThreadFactory
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import play.api.libs.json._
@@ -50,10 +51,16 @@ case class AssetsApiRoute(
     with BroadcastRoute
     with AuthRoute {
 
-  private[this] val distributionTaskScheduler = {
-    val executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue[Runnable](AssetsApiRoute.MAX_DISTRIBUTION_TASKS))
-    Scheduler(executor)
-  }
+  private[this] val distributionTaskScheduler = Scheduler(
+    new ThreadPoolExecutor(
+      1,
+      1,
+      0L,
+      TimeUnit.MILLISECONDS,
+      new LinkedBlockingQueue[Runnable](AssetsApiRoute.MAX_DISTRIBUTION_TASKS),
+      new DefaultThreadFactory("balance-distribution", true)
+    )
+  )
 
   private def deprecatedRoute: Route =
     (path("transfer") & withAuth) {
