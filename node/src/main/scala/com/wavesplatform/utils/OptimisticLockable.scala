@@ -23,7 +23,7 @@ trait OptimisticLockable {
       if (!lock.validate(stamp) && shouldRecheck(result)) readLocked()
       else result
     } catch {
-      case NonFatal(_) =>
+      case NonFatal(_) if !lock.validate(stamp) =>
         readLocked()
     }
   }
