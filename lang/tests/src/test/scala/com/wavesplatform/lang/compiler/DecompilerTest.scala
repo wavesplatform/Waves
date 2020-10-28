@@ -6,9 +6,8 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
-import com.wavesplatform.lang.directives.values.{DApp => DAppType}
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -18,7 +17,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation.NE_OP
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.{CTX, FunctionHeader, compiler}
+import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -30,18 +29,8 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     def shouldEq(s2: String) = sp.replaceAllIn(s1, "") shouldEqual sp.replaceAllIn(s2, "")
   }
 
-  def getCtx(v: StdLibVersion): CTX[Environment] = {
-    Monoid.combineAll(
-      Seq(
-        getTestContext(v).withEnvironment[Environment],
-        CryptoContext.build(Global, v).withEnvironment[Environment],
-        WavesContext.build(DirectiveSet(v, Account, DAppType).explicitGet())
-      )
-    )
-  }
-
-  val decompilerContextV3 = getCtx(V3).decompilerContext
-  val decompilerContextV4 = getCtx(V4).decompilerContext
+  val decompilerContextV3 = getTestContext(V3).decompilerContext
+  val decompilerContextV4 = getTestContext(V4).decompilerContext
 
   property("successful on very deep expressions (stack overflow check)") {
     val expr = (1 to 10000).foldLeft[EXPR](CONST_LONG(0)) { (acc, _) =>
@@ -541,7 +530,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
   def compileExpr(code: String, v: StdLibVersion = V3): Either[String, (EXPR, TYPE)] = {
     val untyped = Parser.parseExpr(code).get.value
-    val typed   = ExpressionCompiler(getCtx(v).compilerContext, untyped)
+    val typed   = ExpressionCompiler(getTestContext(v).compilerContext, untyped)
     typed
   }
 
