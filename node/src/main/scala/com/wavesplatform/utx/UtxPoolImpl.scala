@@ -20,7 +20,7 @@ import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{Blockchain, ContinuationState, Diff, Portfolio}
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AlreadyInTheState, GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction.TxWithFee.InCustomAsset
 import com.wavesplatform.transaction._
@@ -222,7 +222,7 @@ class UtxPoolImpl(
   private[utx] def addTransaction(tx: Transaction, verify: Boolean, forceValidate: Boolean = false): TracedResult[ValidationError, Boolean] = {
     val checkIfContinuationIsActual =
       tx match {
-        case ContinuationTransaction(invokeId, _, nonce) =>
+        case ContinuationTransaction(invokeId, _, nonce, _, _) =>
           val newNonce =
             continuationNonces.compute(
               invokeId,
@@ -470,7 +470,7 @@ class UtxPoolImpl(
       blockchain.continuationStates
         .foreach {
           case (invokeId, ContinuationState.InProgress(nonce, _, _, _)) =>
-            val tx = ContinuationTransaction(invokeId, time.getTimestamp(), nonce)
+            val tx = ContinuationTransaction(invokeId, time.getTimestamp(), nonce, 0L, Waves)
             addTransaction(tx, verify = false)
           case (invokeId, ContinuationState.Finished(_)) =>
             continuationNonces.remove(invokeId)

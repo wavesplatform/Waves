@@ -9,7 +9,7 @@ object ContinuationTxSerializer {
     Json.obj(
       "type"                      -> builder.typeId,
       "id"                        -> id().toString,
-      "fee"                       -> 0,
+      "fee"                       -> fee,
       "timestamp"                 -> timestamp,
       "nonce"                     -> nonce,
       "invokeScriptTransactionId" -> invokeScriptTransactionId.toString
