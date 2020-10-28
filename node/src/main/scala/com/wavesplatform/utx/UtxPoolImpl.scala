@@ -180,6 +180,11 @@ class UtxPoolImpl(
     removeIds(ids)
   }
 
+  def resetPriorityPool(): Unit = {
+    val txs = priorityPool.clear()
+    txs.foreach(addTransaction(_, verify = false))
+  }
+
   private[this] def removeFromOrdPool(txId: ByteStr): Option[Transaction] = {
     for (tx <- Option(transactions.remove(txId))) yield {
       PoolMetrics.removeTransaction(tx)
