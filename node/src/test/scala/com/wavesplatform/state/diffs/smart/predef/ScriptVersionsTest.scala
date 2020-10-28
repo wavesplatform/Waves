@@ -160,7 +160,7 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
         isDApp      <- List(true, false)
         version     <- DirectiveDictionary[StdLibVersion].all.filter(if (isDApp) _ >= V3 else _ => true)
         activateFix <- List(true, false)
-        entry       <- List(
+        entry <- List(
           StringDataEntry("key", "value"),
           IntegerDataEntry("key", 1),
           BinaryDataEntry("key", ByteStr.decodeBase58("aaaa").get),
@@ -168,12 +168,12 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
           EmptyDataEntry("key")
         )
       } {
-        val tx = dataTransactionGen(1, withDeleteEntry = true).sample.get.copy(data = Seq(entry))
+        val tx         = dataTransactionGen(1, withDeleteEntry = true).sample.get.copy(data = Seq(entry))
         val blockchain = if (activateFix) fixedBlockchain else EmptyBlockchain
         if (version >= V4) {
-          if (!activateFix && isDApp && !entry.isInstanceOf[EmptyDataEntry]){
+          if (!activateFix && isDApp && !entry.isInstanceOf[EmptyDataEntry])
             eval(script(isDApp, version), tx, blockchain) should produce("Match error")
-          } else
+          else
             eval(script(isDApp, version), tx, blockchain) shouldBe Testing.evaluated(true)
         } else
           (the[RuntimeException] thrownBy script(isDApp, version)).getMessage should include("Undefined type")
