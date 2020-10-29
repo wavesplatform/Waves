@@ -4,10 +4,11 @@ import cats.Id
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{Account, Asset, Expression}
+import com.wavesplatform.lang.directives.values.{Account, Asset, Expression, V3}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, TRUE}
@@ -77,11 +78,16 @@ object ScriptRunner {
         val partialEvaluate: (DirectiveSet, EvaluationContext[Environment, Id]) => Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] = {
           (directives, ctx) =>
             val verify = ContractEvaluator.verify(decls, vf, ctx, evaluate, _)
+            val bindingsVersion =
+              if (blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction))
+                directives.stdLibVersion
+              else
+                V3
             in.eliminate(
               t =>
                 RealTransactionWrapper(t, blockchain, directives.stdLibVersion, DAppTarget)
                   .leftMap((_, Nil))
-                  .flatMap(tx => verify(Bindings.transactionObject(tx, proofsEnabled = true))),
+                  .flatMap(tx => verify(Bindings.transactionObject(tx, proofsEnabled = true, bindingsVersion))),
               _.eliminate(
                 t => verify(Bindings.orderObject(RealTransactionWrapper.ord(t), proofsEnabled = true)),
                 _ => ???

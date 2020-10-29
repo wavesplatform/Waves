@@ -645,6 +645,9 @@ object SyncHttpApi extends Assertions {
     def waitFor[A](desc: String)(f: Node => A, cond: A => Boolean, retryInterval: FiniteDuration): A =
       sync(async(n).waitFor[A](desc)(x => Future.successful(f(x.n)), cond, retryInterval), 5.minutes)
 
+    def waitForEmptyUtx(): Unit =
+      sync(async(n).waitFor("empty utx")(_.utxSize, (_: Int) == 0, 1 second), 5 minutes)
+
     def waitForBlackList(blackList: Int): Seq[BlacklistedPeer] =
       sync(async(n).waitForBlackList(blackList))
 
@@ -766,6 +769,9 @@ object SyncHttpApi extends Assertions {
         async(nodes).waitFor(desc)(retryInterval)((n: Node) => Future(request(n))(scala.concurrent.ExecutionContext.Implicits.global), cond),
         ConditionAwaitTime
       )
+
+    def waitForEmptyUtx(): Unit =
+      waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
 
     def rollbackWithoutBlacklisting(height: Int, returnToUTX: Boolean = true): Unit = {
       sync(

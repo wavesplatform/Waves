@@ -31,9 +31,12 @@ lazy val lang =
       inConfig(Compile)(
         Seq(
           sourceGenerators += Tasks.docSource,
-          PB.targets += scalapb.gen(flatPackage = true) -> (sourceManaged).value,
+          PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
           PB.protoSources := Seq(PB.externalIncludePath.value, baseDirectory.value.getParentFile / "shared" / "src" / "main" / "protobuf"),
-          includeFilter in PB.generate := new SimpleFileFilter((f: File) => f.getName == "DAppMeta.proto" || (f.getName.endsWith(".proto") && f.getParent.endsWith("waves"))),
+          includeFilter in PB.generate := { (f: File) =>
+            (** / "DAppMeta.proto").matches(f.toPath) ||
+              (** / "waves" / "*.proto").matches(f.toPath)
+          },
           PB.deleteTargetDirectory := false
         )
       )
@@ -78,8 +81,6 @@ lazy val `node-it`        = project.dependsOn(node, `grpc-server`)
 lazy val `node-generator` = project.dependsOn(node, `node` % "compile")
 lazy val benchmark        = project.dependsOn(node % "compile;test->test")
 
-lazy val `blockchain-updates` = project.dependsOn(node % "compile;test->test;runtime->provided")
-
 lazy val root = (project in file("."))
   .aggregate(
     `lang-js`,
@@ -89,8 +90,7 @@ lazy val root = (project in file("."))
     node,
     `node-it`,
     `node-generator`,
-    benchmark,
-    `blockchain-updates`
+    benchmark
   )
 
 inScope(Global)(
@@ -98,7 +98,7 @@ inScope(Global)(
     scalaVersion := "2.13.3",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
-    V.fallback := (1, 2, 12),
+    V.fallback := (1, 2, 14),
     organizationHomepage := Some(url("https://wavesplatform.com")),
     scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/Waves"), "git@github.com:wavesplatform/Waves.git", None)),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
@@ -161,10 +161,10 @@ checkPRRaw := Def
   .sequential(
     root / clean,
     Def.task {
-      (`lang-jvm` / Compile / PB.generate).value
       (Test / compile).value
       (`lang-tests` / Test / test).value
       (`lang-js` / Compile / fastOptJS).value
+      (`grpc-server` / Test / test).value
       (node / Test / test).value
     }
   )
