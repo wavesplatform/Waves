@@ -91,7 +91,7 @@ package object appender extends ScorexLogging {
     utx.priorityPool.lockedWrite {
       metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify)).map { discDiffs =>
         utx.removeAll(block.transactionData)
-        utx.priorityPool.addPriorityDiffs(discDiffs)
+        utx.setPriorityDiffs(discDiffs)
         utx.runCleanup()
         Some(blockchainUpdater.height)
       }

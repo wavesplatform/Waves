@@ -180,6 +180,11 @@ class UtxPoolImpl(
     removeIds(ids)
   }
 
+  def setPriorityDiffs(discDiffs: Seq[Diff]): Unit = {
+    val txs = priorityPool.setPriorityDiffs(discDiffs)
+    txs.foreach(addTransaction(_, verify = false))
+  }
+
   def resetPriorityPool(): Unit = {
     val txs = priorityPool.clear()
     txs.foreach(addTransaction(_, verify = false))
@@ -424,7 +429,7 @@ class UtxPoolImpl(
     )
 
     if (packResult.removedTransactions.nonEmpty) log.trace(s"Removing invalid transactions: ${packResult.removedTransactions.mkString(", ")}")
-    removeIds(packResult.removedTransactions)
+    priorityPool.invalidateTxs(packResult.removedTransactions)
     packResult.transactions.map(_.reverse) -> packResult.constraint
   }
 
