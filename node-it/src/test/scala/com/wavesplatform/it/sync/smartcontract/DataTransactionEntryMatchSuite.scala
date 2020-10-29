@@ -48,6 +48,8 @@ class DataTransactionEntryMatchSuite extends BaseTransactionSuite {
          |           throw("unexpected BinaryEntry")
          |         case _: BooleanEntry =>
          |           throw("unexpected BooleanEntry")
+         |         case _: DeleteEntry =>
+         |           throw("unexpected DeleteEntry")
          |       }
          |   case _ =>
          |     sigVerify(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)

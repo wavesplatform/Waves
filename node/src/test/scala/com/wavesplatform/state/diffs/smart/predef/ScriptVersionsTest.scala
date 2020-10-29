@@ -15,7 +15,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.state.{BinaryDataEntry, Blockchain, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, Blockchain, BooleanDataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.{ScriptCompiler, ScriptRunner}
 import com.wavesplatform.utils.EmptyBlockchain
@@ -143,6 +143,8 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
              |         case entry: BooleanEntry =>
              |           entry.key == "key" &&
              |           entry.value == true
+             |         case entry: DeleteEntry =>
+             |           entry.key == "key"
              |       }
              |   case _ =>
              |     sigVerify(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)
@@ -158,17 +160,18 @@ class ScriptVersionsTest extends FreeSpec with PropertyChecks with Matchers with
         isDApp      <- List(true, false)
         version     <- DirectiveDictionary[StdLibVersion].all.filter(if (isDApp) _ >= V3 else _ => true)
         activateFix <- List(true, false)
-        entry       <- List(
+        entry <- List(
           StringDataEntry("key", "value"),
           IntegerDataEntry("key", 1),
           BinaryDataEntry("key", ByteStr.decodeBase58("aaaa").get),
-          BooleanDataEntry("key", true)
+          BooleanDataEntry("key", true),
+          EmptyDataEntry("key")
         )
       } {
-        val tx = dataTransactionGen.sample.get.copy(data = Seq(entry))
+        val tx         = dataTransactionGen(1, withDeleteEntry = true).sample.get.copy(data = Seq(entry))
         val blockchain = if (activateFix) fixedBlockchain else EmptyBlockchain
         if (version >= V4) {
-          if (!activateFix && isDApp)
+          if (!activateFix && isDApp && !entry.isInstanceOf[EmptyDataEntry])
             eval(script(isDApp, version), tx, blockchain) should produce("Match error")
           else
             eval(script(isDApp, version), tx, blockchain) shouldBe Testing.evaluated(true)
