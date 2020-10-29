@@ -35,34 +35,21 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
   def optimisticRead[T](f: => T)(shouldRecheck: T => Boolean): T =
     this.readLockCond(f)(shouldRecheck)
 
-  private[utx] def setPriorityDiffs(discDiffs: Seq[Diff]): Seq[Transaction] = {
-    if (discDiffs.isEmpty) return Nil
+  private[utx] def setPriorityDiffs(discDiffs: Seq[Diff]): Set[Transaction] = {
+    if (discDiffs.isEmpty) return Set.empty
 
-    val transactions = this.clear()
-    priorityDiffs = discDiffs.map(PriorityData(_))
-    priorityDiffsCombined = Monoid.combineAll(validPriorityDiffs)
-
-    discDiffs.foreach { diff =>
-      diff.transactionsValues.foreach(PoolMetrics.addTransactionPriority(_))
-      log.trace(s"Priority diff ${diff.hashString} added: ${diff.transactions.keys.mkString(", ")}")
-    }
-
-    log.trace(s"Priority pool transactions order: ${priorityTransactionIds.mkString(", ")}")
-    transactions.filterNot(tx => discDiffs.exists(_.contains(tx.id())))
+    val transactions = updateDiffs(_ => discDiffs.map(PriorityData(_)))
+    log.trace(s"Priority pool updated with diffs: [${discDiffs.map(_.hashString).mkString(", ")}], transactions order: [${priorityTransactionIds.mkString(", ")}]")
+    transactions
   }
 
-  private[utx] def invalidateTxs(removed: Set[ByteStr]): Unit = {
-    priorityDiffs = priorityDiffs
-      .map { pd =>
-        if (pd.diff.transactionIds.exists(removed)) {
-          val (drop, keep) = pd.diff.transactions.partition { case (id, _) => removed(id) }
-          drop.foreach { case (_, txi) => PoolMetrics.removeTransactionPriority(txi.transaction) }
-          pd.copy(pd.diff.copy(keep), isValid = false)
-        } else pd
-      }
-      .filterNot(_.diff.transactions.isEmpty)
-    priorityDiffsCombined = Monoid.combineAll(validPriorityDiffs)
-  }
+  private[utx] def invalidateTxs(removed: Set[ByteStr]): Unit =
+    updateDiffs(_.map { pd =>
+      if (pd.diff.transactionIds.exists(removed)) {
+        val keep = pd.diff.transactions.filterNot { case (id, _) => removed(id) }
+        pd.copy(pd.diff.copy(keep), isValid = false)
+      } else pd
+    })
 
   private[utx] def removeIds(removed: Set[ByteStr]): (Set[Transaction], Set[Transaction]) = {
     case class RemoveResult(diffsRest: Seq[Diff], removed: Set[Transaction], resorted: Set[Transaction])
@@ -88,11 +75,7 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
       .map(_.id())
       .mkString(", ")}], remaining diffs: [${result.diffsRest.map(_.hashString).mkString(", ")}]")
 
-    val txsToReset = result.resorted ++ result.removed
-    txsToReset.foreach(PoolMetrics.removeTransactionPriority)
-
-    priorityDiffs = result.diffsRest.map(PriorityData(_))
-    priorityDiffsCombined = Monoid.combineAll(validPriorityDiffs)
+    updateDiffs(_ => result.diffsRest.map(PriorityData(_)))
     log.trace(s"Priority pool transactions order: ${priorityTransactionIds.mkString(", ")}")
 
     (result.removed, result.resorted)
@@ -123,11 +106,22 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
 
   private[utx] def clear(): Seq[Transaction] = {
     val txs = this.priorityTransactions
-    priorityDiffsCombined = Diff.empty
-    priorityDiffs = Nil
-    log.trace("Priority pool cleared")
-    txs.foreach(PoolMetrics.removeTransactionPriority)
+    updateDiffs(_ => Nil)
     txs
+  }
+
+  private[this] def updateDiffs(f: Seq[PriorityData] => Seq[PriorityData]): Set[Transaction] = {
+    val oldTxs = priorityTransactions.toSet
+
+    priorityDiffs = f(priorityDiffs).filterNot(_.diff.transactions.isEmpty)
+    priorityDiffsCombined = Monoid.combineAll(validPriorityDiffs)
+
+    val newTxs = priorityTransactions.toSet
+
+    val removed = oldTxs diff newTxs
+    removed.foreach(PoolMetrics.removeTransactionPriority)
+    (newTxs diff oldTxs).foreach(PoolMetrics.addTransactionPriority)
+    removed
   }
 
   //noinspection TypeAnnotation
