@@ -110,7 +110,7 @@ object Decompiler {
 
   private[lang] def expr(e: Coeval[EXPR], ctx: DecompilerContext, braces: BlockBraces, firstLinePolicy: FirstLinePolicy): Coeval[String] = {
     def checkBrackets(expr: EXPR) = expr match {
-      case Terms.FUNCTION_CALL(FunctionHeader.Native(id), _) if ctx.binaryOps.contains(id) /* || ctx.unaryOps.contains(id) */ => ("(", ")")
+      // no need while all binaty ops is bracked. // case Terms.FUNCTION_CALL(FunctionHeader.Native(id), _) if ctx.binaryOps.contains(id) /* || ctx.unaryOps.contains(id) */ => ("(", ")")
       case Terms.IF(_, _, _) => ("(", ")")
       case Terms.LET_BLOCK(_, _) => ("(", ")")
       case Terms.BLOCK(_, _) => ("(", ")")
@@ -121,7 +121,7 @@ object Decompiler {
     def listStr(elems: List[EXPR]) = argsStr(elems).map(_.mkString("[", ", ", "]"))
     def argStr(elem: EXPR) = expr(pure(elem), ctx, BracesWhenNeccessary, DontIndentFirstLine)
 
-    val i = if (firstLinePolicy == DontIndentFirstLine /*braces == BracesWhenNeccessary*/) 0 else ctx.ident
+    val i = if (firstLinePolicy == DontIndentFirstLine) 0 else ctx.ident
 
     e flatMap {
       case Terms.BLOCK(Terms.LET(MatchRef(name), e), body) => matchBlock(name, pure(body), ctx.incrementIdent()) flatMap { b =>
@@ -160,7 +160,7 @@ object Decompiler {
       case Terms.REF(ref)                => pureOut(ref, i)
       case Terms.GETTER(getExpr, fld)    =>
         val (bs, be) = checkBrackets(getExpr)
-        expr(pure(getExpr), ctx, NoBraces /*BracesWhenNeccessary*/, firstLinePolicy).map(a => s"$bs$a$be.$fld")
+        expr(pure(getExpr), ctx, NoBraces, firstLinePolicy).map(a => s"$bs$a$be.$fld")
       case Terms.IF(cond, it, iff) =>
         for {
           c   <- expr(pure(cond), ctx, BracesWhenNeccessary, DontIndentFirstLine)
