@@ -10,6 +10,7 @@ object Types {
   sealed trait FINAL extends TYPE {
     def fields: List[(String, FINAL)] = List()
     def typeList: List[REAL]
+    def unfold: FINAL = this
     def union: UNION = UNION(typeList)
     def name: String
     override def toString: String = name
@@ -29,8 +30,9 @@ object Types {
     override lazy val name: String    = "List[" ++ innerType.toString ++ "]"
     override def typeList: List[REAL] = List(this)
   }
-  case object ANY extends REAL /*FINAL*/ { override val name = "Any"; override val typeList = List(this) }
-  case class UNION(override val typeList: List[REAL], n: Option[String] = None) extends FINAL {
+  sealed trait UNIONLIKE extends FINAL
+  case object ANY extends UNIONLIKE { override val name = "Any"; override val typeList = List() }
+  case class UNION(override val typeList: List[REAL], n: Option[String] = None) extends UNIONLIKE {
     override lazy val fields = typeList.map(_.fields.toSet).reduce(_ intersect _).toList
     override val name        = if (n.nonEmpty) n.get else typeList.sortBy(_.toString).mkString("|")
 
@@ -40,7 +42,7 @@ object Types {
         case _ => false
       }
 
-    def unfold: UNION = {
+    override def unfold: UNIONLIKE = {
       val unfolded = typeList.flatMap {
         case t: TUPLE =>
           t.unfold match {
@@ -66,7 +68,7 @@ object Types {
                          \/
         (A1, ..., Z1) | ... | (A1, ..., Zk) | ... | (An, ..., Zk)
     */
-    def unfold: FINAL = {
+    override def unfold: FINAL = {
       def combine(accTypes: List[TUPLE], nextTypes: List[REAL]): List[TUPLE] =
         if (accTypes.isEmpty)
           nextTypes.map(t => TUPLE(List(t)))
@@ -98,26 +100,27 @@ object Types {
   }
 
   object UNION {
-    def create(l: Seq[FINAL], n: Option[String] = None): UNION = {
-      UNION((if(l.contains(ANY)) {
-               List(ANY)
-             } else {
-               l.flatMap {
+    def create(l: Seq[FINAL], n: Option[String] = None): UNIONLIKE = {
+      if(l.contains(ANY)) {
+        ANY
+      } else {
+        new UNION(l.flatMap {
                      case NOTHING         => List.empty
                      case UNION(inner, _) => inner
                      case s: REAL         => List(s)
+                     case ANY             => ???
                    }
                    .toList
-                   .distinct
-             }),
-             n)
+                   .distinct ,
+              n)
+      }
     }
-    def apply(l: FINAL*): UNION = create(l.toList)
 
-    def reduce(u: UNION): FINAL = u.typeList match {
-      case Nil      => throw new Exception("Empty union")
-      case x :: Nil => x
-      case u if u.contains(ANY) => ANY
+    def apply(l: FINAL*): UNIONLIKE = create(l.toList)
+
+    def reduce(u: UNIONLIKE): FINAL = u match {
+      case UNION(Nil, _) => throw new Exception("Empty union")
+      case UNION(x :: Nil, _) => x
       case _        => u
     }
   }

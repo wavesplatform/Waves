@@ -24,6 +24,7 @@ object TypeInferrer {
                 val commonTypeExists = checkTuplesCommonType(matchingTuples, commonTuple)
                 typeMatchResult(matchResults, h.name, commonTuple, commonTypeExists)
               case p: SINGLE => Right(p)
+              case ANY => Right(ANY)
               case u @ UNION(plainTypes, _) =>
                 val commonTypeExists = plainTypes.exists { p =>
                   matchResults.map(_.tpe).forall(e => e >= p)
@@ -108,6 +109,7 @@ object TypeInferrer {
               val nonMatchedArgTypes = argType match {
                 case NOTHING            => ???
                 case UNION(argTypes, _) => UNION(argTypes.filterNot(concretes.typeList.contains))
+                case ANY                => ANY
                 case s: SINGLE          => s
               }
               matchTypes(nonMatchedArgTypes, singlePlaceholder, knownTypes)

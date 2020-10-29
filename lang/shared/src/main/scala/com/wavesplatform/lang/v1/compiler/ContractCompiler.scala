@@ -251,6 +251,9 @@ object ContractCompiler {
 
       case Expressions.Tuple(types) =>
         argTypesError(func, funcName, types.mkString("(", ", ", ")"))
+
+      case Expressions.AnyType(pos) =>
+        List.empty[(PART.VALID[String], Option[PART.VALID[Type]])].pure[CompileM]
     }
 
   private def checkAnnotatedParamType(t: (String, Option[Type])): Boolean = {
