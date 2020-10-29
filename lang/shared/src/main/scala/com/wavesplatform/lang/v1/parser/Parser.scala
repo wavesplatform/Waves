@@ -532,4 +532,83 @@ object Parser {
       case Parsed.Failure(m, o, e) => Parsed.Failure(m, o, e)
     }
   }
+
+  type RemovedCharPos = Pos
+
+  def parseExpressionWithErrorRecovery(scriptStr: String): Either[Throwable, (SCRIPT, Option[RemovedCharPos])] = {
+
+    def parse(str: String): Either[Parsed.Failure, SCRIPT] =
+      parseExpr(str) match {
+        case Parsed.Success(resExpr, _) => Right(SCRIPT(resExpr.position, resExpr))
+        case f @ Parsed.Failure(_, _, _) => Left(f)
+      }
+
+    parseWithError[SCRIPT](
+      new StringBuilder(scriptStr),
+      parse,
+      SCRIPT(Pos(0, scriptStr.length - 1), INVALID(Pos(0, scriptStr.length - 1), "Parsing failed. Unknown error."))
+    ).map {
+      exprAndErrorIndexes =>
+        val removedCharPosOpt = if (exprAndErrorIndexes._2.isEmpty) None else Some(Pos(exprAndErrorIndexes._2.min, exprAndErrorIndexes._2.max))
+        (exprAndErrorIndexes._1, removedCharPosOpt)
+    }
+  }
+
+  def parseDAPPWithErrorRecovery(scriptStr: String): Either[Throwable, (DAPP, Option[RemovedCharPos])] = {
+
+    def parse(str: String): Either[Parsed.Failure, DAPP] =
+      parseContract(str) match {
+        case Parsed.Success(resDAPP, _) => Right(resDAPP)
+        case f @ Parsed.Failure(_, _, _) => Left(f)
+      }
+
+    parseWithError[DAPP](
+      new StringBuilder(scriptStr),
+      parse,
+      DAPP(Pos(0, scriptStr.length - 1), List.empty, List.empty)
+    ).map {
+      dAppAndErrorIndexes =>
+        val removedCharPosOpt = if (dAppAndErrorIndexes._2.isEmpty) None else Some(Pos(dAppAndErrorIndexes._2.min, dAppAndErrorIndexes._2.max))
+        (dAppAndErrorIndexes._1, removedCharPosOpt)
+    }
+  }
+
+  private def clearChar(source: StringBuilder, pos: Int): Int = {
+    if (pos >= 0) {
+      if (" \n\r".contains(source.charAt(pos))) {
+        clearChar(source, pos - 1)
+      } else {
+        source.setCharAt(pos, ' ')
+        pos
+      }
+    } else {
+      0
+    }
+  }
+
+  private def parseWithError[T](
+                                 source: StringBuilder,
+                                 parse: String => Either[Parsed.Failure, T],
+                                 defaultResult: T
+                               ): Either[Throwable, (T, Iterable[Int])] = {
+    parse(source.toString())
+      .map(dApp => (dApp, Nil))
+      .left
+      .flatMap {
+        case ex: Parsed.Failure => {
+          val errorLastPos = ex.index
+          val lastRemovedCharPos = clearChar(source, errorLastPos - 1)
+          val posList = Set(errorLastPos, lastRemovedCharPos)
+          if (lastRemovedCharPos > 0) {
+            parseWithError(source, parse, defaultResult)
+              .map(dAppAndErrorIndexes => (dAppAndErrorIndexes._1, posList ++ dAppAndErrorIndexes._2.toList))
+          } else {
+            Right((defaultResult, posList))
+          }
+
+
+        }
+        case _ => Left(new Exception("Unknown parsing error."))
+      }
+  }
 }

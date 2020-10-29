@@ -3,9 +3,6 @@ package com.wavesplatform
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction._
 import com.wavesplatform.utils.Paged
 import play.api.libs.json._
 import supertagged.TaggedType
@@ -15,12 +12,6 @@ import scala.util.Try
 
 package object state {
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
-
-  implicit class EitherExt[L <: ValidationError, R](ei: Either[L, R]) {
-    def liftValidationError[T <: Transaction](t: T): Either[ValidationError, R] = {
-      ei.left.map(e => GenericError(e.toString))
-    }
-  }
 
   implicit class Cast[A](a: A) {
     def cast[B: ClassTag]: Option[B] = {

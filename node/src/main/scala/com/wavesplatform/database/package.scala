@@ -19,6 +19,7 @@ import com.wavesplatform.crypto._
 import com.wavesplatform.database.protobuf.DataEntry.Value
 import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
+import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state.StateHash.SectionId
@@ -293,7 +294,7 @@ package object database extends ScorexLogging {
   def readAssetStaticInfo(bb: Array[Byte]): AssetStaticInfo = {
     val sai = pb.StaticAssetInfo.parseFrom(bb)
     AssetStaticInfo(
-      TransactionId(ByteStr(sai.sourceId.toByteArray)),
+      TransactionId(sai.sourceId.toByteStr),
       PublicKey(sai.issuerPublicKey.toByteArray),
       sai.decimals,
       sai.isNft
@@ -314,18 +315,18 @@ package object database extends ScorexLogging {
       )
       .toByteArray
 
-  def readBlockMeta(height: Int)(bs: Array[Byte]): BlockMeta = {
+  def readBlockMeta(bs: Array[Byte]): BlockMeta = {
     val pbbm = pb.BlockMeta.parseFrom(bs)
     BlockMeta(
       PBBlocks.vanilla(pbbm.header.get),
-      ByteStr(pbbm.signature.toByteArray),
-      Option(pbbm.headerHash).collect { case bs if !bs.isEmpty => ByteStr(bs.toByteArray) },
+      pbbm.signature.toByteStr,
+      Option(pbbm.headerHash).collect { case bs if !bs.isEmpty => bs.toByteStr },
       pbbm.height,
       pbbm.size,
       pbbm.transactionCount,
       pbbm.totalFeeInWaves,
       Option(pbbm.reward).filter(_ >= 0),
-      Option(pbbm.vrf).collect { case bs if !bs.isEmpty => ByteStr(bs.toByteArray) }
+      Option(pbbm.vrf).collect { case bs if !bs.isEmpty => bs.toByteStr }
     )
   }
 
@@ -388,7 +389,7 @@ package object database extends ScorexLogging {
       case Value.Empty              => EmptyDataEntry(key)
       case Value.IntValue(value)    => IntegerDataEntry(key, value)
       case Value.BoolValue(value)   => BooleanDataEntry(key, value)
-      case Value.BinaryValue(value) => BinaryDataEntry(key, ByteStr(value.toByteArray))
+      case Value.BinaryValue(value) => BinaryDataEntry(key, value.toByteStr)
       case Value.StringValue(value) => StringDataEntry(key, value)
     }
 
