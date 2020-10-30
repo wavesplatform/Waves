@@ -16,15 +16,20 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 1.8
-      - name: Cache
-        id: cache
+      - name: Cache SBT
         uses: actions/cache@v2
         with:
           path: |
             ~/.sbt
             ~/.cache/coursier
             **/target
-          key: ${{ runner.os }}-${{ hashFiles('lang/**/*.scala', 'lang/**/*.java') }}
+          key: ${{ hashFiles('**/build.sbt', 'project/Dependencies.scala') }}
+      - name: Check lang changes
+        id: lang-changes
+        uses: actions/cache@v2
+        with:
+          path: lang/**/target
+          key: ${{ hashFiles('lang/**/*.scala', 'lang/**/*.java') }}
       - name: Set version
         id: version
         run: |
@@ -79,6 +84,6 @@ jobs:
                                            "${{ secrets.OSSRH_USERNAME }}",
                                            "${{ secrets.OSSRH_PASSWORD }}")' > ~/.sbt/1.0/sonatype.sbt
       - name: Release SBT package
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.lang-changes.outputs.cache-hit != 'true'
         run: |
           sbt 'set ThisBuild/version := "${{ env.version }}"; lang/publishLocal'
