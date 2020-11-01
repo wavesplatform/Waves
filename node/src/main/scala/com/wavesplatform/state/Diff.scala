@@ -172,7 +172,8 @@ case class Diff(
     scriptsComplexity: Long,
     scriptResults: Map[ByteStr, InvokeScriptResult],
     continuationStates: Map[ByteStr, ContinuationState],
-    addressTransactionBindings: Map[ByteStr, Set[Address]]
+    addressTransactionBindings: Map[ByteStr, Set[Address]],
+    replacingTransactions: List[Transaction]
 ) {
   def bindTransaction(tx: Transaction): Diff =
     copy(transactions = transactions.concat(Map(Diff.toDiffTxData(tx, portfolios, accountData))))
@@ -198,7 +199,8 @@ object Diff {
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
       scriptsRun: Int = 0,
       continuationStates: Map[ByteStr, ContinuationState] = Map.empty,
-      addressTransactionBindings: Map[ByteStr, Set[Address]] = Map.empty
+      addressTransactionBindings: Map[ByteStr, Set[Address]] = Map.empty,
+      replacingTransactions: List[Transaction] = Nil
   ): Diff =
     Diff(
       transactions = mutable.LinkedHashMap(),
@@ -216,7 +218,8 @@ object Diff {
       scriptResults = scriptResults,
       scriptsComplexity = 0,
       continuationStates = continuationStates,
-      addressTransactionBindings = addressTransactionBindings
+      addressTransactionBindings = addressTransactionBindings,
+      replacingTransactions = replacingTransactions
     )
 
   def apply(
@@ -253,7 +256,8 @@ object Diff {
       scriptResults = scriptResults,
       scriptsComplexity = scriptsComplexity,
       continuationStates = continuationStates,
-      addressTransactionBindings = Map.empty
+      addressTransactionBindings = Map.empty,
+      replacingTransactions = Nil
     )
 
   private def toDiffTxData(
@@ -280,7 +284,8 @@ object Diff {
       0,
       Map.empty,
       Map.empty,
-      Map.empty
+      Map.empty,
+      Nil
     )
 
   implicit val diffMonoid: Monoid[Diff] = new Monoid[Diff] {
@@ -303,7 +308,8 @@ object Diff {
         scriptResults = older.scriptResults.combine(newer.scriptResults),
         scriptsComplexity = older.scriptsComplexity + newer.scriptsComplexity,
         continuationStates = older.continuationStates ++ newer.continuationStates,
-        addressTransactionBindings = older.addressTransactionBindings ++ newer.addressTransactionBindings
+        addressTransactionBindings = older.addressTransactionBindings ++ newer.addressTransactionBindings,
+        replacingTransactions = older.replacingTransactions ++ newer.replacingTransactions
       )
   }
 

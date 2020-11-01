@@ -179,7 +179,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       failedTransactionIds: Set[ByteStr],
       stateHash: StateHashBuilder.Result,
       continuationStates: Map[ByteStr, ContinuationState],
-      addressTransactionBindings: Map[AddressId, Seq[TransactionId]]
+      addressTransactionBindings: Map[AddressId, Seq[TransactionId]],
+      replacingTransactions: List[Transaction]
   ): Unit
 
   override def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], hitSource: ByteStr, block: Block): Unit = {
@@ -316,7 +317,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       failedTransactionIds,
       stateHash.result(),
       diff.continuationStates,
-      addressTransactionBindings
+      addressTransactionBindings,
+      diff.replacingTransactions
     )
 
     val emptyData = Map.empty[(Address, String), Option[DataEntry[_]]]

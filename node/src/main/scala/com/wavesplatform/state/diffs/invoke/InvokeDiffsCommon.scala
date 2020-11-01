@@ -76,7 +76,6 @@ object InvokeDiffsCommon {
               (feeInWaves, portfolioDiff)
             }
         }
-
         _ <- {
           val dAppFee    = (FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + tx.extraFeePerStep) * stepsNumber
           val issuesFee  = issueList.count(!blockchain.isNFT(_)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
@@ -184,17 +183,14 @@ object InvokeDiffsCommon {
       )
       _ <- TracedResult(checkOverflow(transferList.map(_.amount))).leftMap(FailedTransactionError.dAppExecution(_, invocationComplexity))
 
-      smartAssetInvocations = tx.checkedAssets ++
+      actionAssets = tx.checkedAssets ++
         transferList.flatMap(_.assetId).map(IssuedAsset) ++
         reissueList.map(r => IssuedAsset(r.assetId)) ++
         burnList.map(b => IssuedAsset(b.assetId)) ++
         sponsorFeeList.map(sf => IssuedAsset(sf.assetId))
 
-      actionScriptsInvoked = smartAssetInvocations.count(blockchain.hasAssetScript) +
-        (if (blockchain.hasAccountScript(tx.sender.toAddress))
-           1
-         else
-           0)
+      actionScriptsInvoked = actionAssets.count(blockchain.hasAssetScript) +
+        (if (blockchain.hasAccountScript(tx.sender.toAddress)) 1 else 0)
 
       stepLimit = ContractLimits.MaxComplexityByVersion(version)
       feeDiff <- calcAndCheckFee(
