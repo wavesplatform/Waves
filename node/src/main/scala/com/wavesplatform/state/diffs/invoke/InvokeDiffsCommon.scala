@@ -238,7 +238,29 @@ object InvokeDiffsCommon {
     } yield resultDiff
   }
 
-  def paymentsPart(
+  def finishContinuation(
+    diff: Diff,
+    tx: ContinuationTransaction,
+    blockchain: Blockchain,
+    baseStepFee: Long
+  ): Diff = {
+    val scriptResult = diff.scriptResults.head._2
+    val assetActions =
+      scriptResult.transfers.flatMap(_.asset.fold(Option.empty[IssuedAsset])(Some(_))) ++
+        scriptResult.burns.map(b => IssuedAsset(b.assetId)) ++
+        scriptResult.reissues.map(r => IssuedAsset(r.assetId)) ++
+        scriptResult.sponsorFees.map(sf => IssuedAsset(sf.assetId))
+    val smartAssetsInvocationFee = assetActions.count(blockchain.hasAssetScript) * ScriptExtraFee
+    val issuesFee                = scriptResult.issues.count(!blockchain.isNFT(_)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
+    diff
+      .copy(
+        continuationStates = Map(tx.invokeScriptTransactionId -> ContinuationState.Finished(tx.id.value())),
+        replacingTransactions = List(tx.copy(fee = baseStepFee + smartAssetsInvocationFee + issuesFee))
+      )
+      .bindOldTransaction(tx.invokeScriptTransactionId)
+  }
+
+  private def paymentsPart(
       tx: InvokeScriptTransaction,
       dAppAddress: Address,
       feePart: Map[Address, Portfolio]

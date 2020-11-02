@@ -10,7 +10,8 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
-import com.wavesplatform.state.diffs.invoke.{ContinuationTransactionDiff, InvokeScriptTransactionDiff}
+import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
+import com.wavesplatform.state.diffs.invoke.{ContinuationTransactionDiff, InvokeDiffsCommon, InvokeScriptTransactionDiff}
 import com.wavesplatform.state.{Blockchain, ContinuationState, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
@@ -259,10 +260,12 @@ object TransactionDiffer {
 
       tx match {
         case c: ContinuationTransaction =>
-          val finishContinuation = Diff.stateOps(
-            continuationStates = Map(c.invokeScriptTransactionId -> ContinuationState.Finished(tx.id.value()))
-          )
-          diff.bindOldTransaction(c.invokeScriptTransactionId) |+| finishContinuation
+          val extraFeePerStep =
+            blockchain.transactionInfo(c.invokeScriptTransactionId)
+              .map(_._2)
+              .collect { case i: InvokeScriptTransaction => i.extraFeePerStep }
+              .getOrElse(throw new IllegalArgumentException(s"Couldn't find Invoke Transaction with id = ${c.invokeScriptTransactionId}"))
+          InvokeDiffsCommon.finishContinuation(diff, c, blockchain, FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + extraFeePerStep)
         case _ =>
           diff
       }

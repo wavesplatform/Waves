@@ -13,14 +13,12 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.Environment.Tthis
-import com.wavesplatform.lang.v1.traits.domain.Recipient
+import com.wavesplatform.lang.v1.traits.domain.{CallableAction, Recipient}
 import com.wavesplatform.lang.{Global, ValidationError}
-import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit, ScriptExtraFee}
+import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, ContinuationState, Diff}
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
-import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction, WavesEnvironment, buildThisValue}
@@ -90,8 +88,10 @@ object ContinuationTransactionDiff {
         InvokeDiffsCommon.getInvocationComplexity(blockchain, invokeScriptTransaction, callableComplexities, dAppAddress)
       )
 
+      baseStepFee = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + invokeScriptTransaction.extraFeePerStep
+
       doProcessActions = InvokeDiffsCommon.processActions(
-        _,
+        _: List[CallableAction],
         script.stdLibVersion,
         dAppAddress,
         dAppPublicKey,
@@ -100,17 +100,13 @@ object ContinuationTransactionDiff {
         blockchain,
         blockTime,
         verifyAssets
-      )
-
-      baseStepFee = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + invokeScriptTransaction.extraFeePerStep
+      ).map(InvokeDiffsCommon.finishContinuation(_, tx, blockchain, baseStepFee).copy(transactions = Map()))
 
       resultDiff <- scriptResult._1 match {
         case ScriptResultV3(dataItems, transfers) =>
-          val diff = doProcessActions(dataItems ::: transfers)
-          finishContinuation(diff, tx, blockchain, baseStepFee)
+          doProcessActions(dataItems ::: transfers)
         case ScriptResultV4(actions) =>
-          val diff = doProcessActions(actions)
-          finishContinuation(diff, tx, blockchain, baseStepFee)
+          doProcessActions(actions)
         case ir: IncompleteResult =>
           val newState = ContinuationState.InProgress(tx.nonce + 1, ir.expr, ir.unusedComplexity, tx.id.value())
           TracedResult.wrapValue[Diff, ValidationError](
@@ -122,28 +118,4 @@ object ContinuationTransactionDiff {
       }
     } yield resultDiff
   }
-
-  private def finishContinuation(
-      diffE: TracedResult[ValidationError, Diff],
-      tx: ContinuationTransaction,
-      blockchain: Blockchain,
-      baseStepFee: Long
-  ): TracedResult[ValidationError, Diff] =
-    diffE.map { diff =>
-      val scriptResult = diff.scriptResults.head._2
-      val assetActions =
-        scriptResult.transfers.flatMap(_.asset.fold(Option.empty[IssuedAsset])(Some(_))) ++
-        scriptResult.burns.map(b => IssuedAsset(b.assetId)) ++
-        scriptResult.reissues.map(r => IssuedAsset(r.assetId)) ++
-        scriptResult.sponsorFees.map(sf => IssuedAsset(sf.assetId))
-      val smartAssetsInvocationFee = assetActions.count(blockchain.hasAssetScript) * ScriptExtraFee
-      val issuesFee                = scriptResult.issues.count(!blockchain.isNFT(_)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
-      diff
-        .copy(
-          transactions = Map(),
-          continuationStates = Map(tx.invokeScriptTransactionId -> ContinuationState.Finished(tx.id.value())),
-          replacingTransactions = List(tx.copy(fee = baseStepFee + smartAssetsInvocationFee + issuesFee))
-        )
-        .bindOldTransaction(tx.invokeScriptTransactionId)
-    }
 }
