@@ -122,9 +122,8 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     )._1
     waitForContinuation(invoke.id, shouldBeFailed = true)
     assertContinuationChain(invoke.id, sender.height, shouldBeFailed = true)
-
-    // TODO after fill fee
-    // sender.transactionsByAddress(caller.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
+    sender.transactionsByAddress(dApp.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe None
+    sender.transactionsByAddress(caller.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
   }
 
   test("hold transactions from DApp address until continuation is completed") {

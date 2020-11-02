@@ -242,7 +242,7 @@ object InvokeDiffsCommon {
     diff: Diff,
     tx: ContinuationTransaction,
     blockchain: Blockchain,
-    baseStepFee: Long
+    stepFee: Long
   ): Diff = {
     val scriptResult = diff.scriptResults.head._2
     val assetActions =
@@ -255,7 +255,7 @@ object InvokeDiffsCommon {
     diff
       .copy(
         continuationStates = Map(tx.invokeScriptTransactionId -> ContinuationState.Finished(tx.id.value())),
-        replacingTransactions = List(tx.copy(fee = baseStepFee + smartAssetsInvocationFee + issuesFee))
+        replacingTransactions = List(tx.copy(fee = stepFee + smartAssetsInvocationFee + issuesFee))
       )
       .bindOldTransaction(tx.invokeScriptTransactionId)
   }
