@@ -3,7 +3,7 @@ package com.wavesplatform.api.http
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.{Directive1, ExceptionHandler, Route}
 import com.google.common.util.concurrent.{ExecutionError, UncheckedExecutionException}
-import com.wavesplatform.utils.Schedulers
+import com.wavesplatform.utils.Schedulers.ExecutorExt
 import monix.execution.Scheduler
 
 import scala.concurrent.ExecutionException
@@ -16,7 +16,7 @@ trait TimeLimitedRoute { self: ApiRoute =>
       case _: InterruptedException | _: ExecutionException | _: ExecutionError | _: UncheckedExecutionException =>
         complete(ApiError.CustomValidationError("The request took too long to complete"))
     }
-    handleExceptions(handler) & onSuccess(Schedulers.executeCatchingInterruptedException(limitedScheduler)(f))
+    handleExceptions(handler) & onSuccess(limitedScheduler.executeCatchingInterruptedException(f))
   }
 
   def completeLimited(f: => ToResponseMarshallable): Route =

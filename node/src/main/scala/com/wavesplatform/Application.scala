@@ -10,6 +10,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import cats.instances.all._
 import cats.syntax.option._
+import com.google.common.cache.CacheBuilder
 import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
@@ -51,8 +52,8 @@ import kamon.Kamon
 import monix.eval.{Coeval, Task}
 import monix.execution.UncaughtExceptionReporter
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
-import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
+import monix.reactive.{Observable, OverflowStrategy}
 import org.influxdb.dto.Point
 import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
@@ -60,7 +61,6 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject, time: NTP) extends ScorexLogging {
@@ -71,19 +71,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val db = openDB(settings.dbSettings.directory)
 
-  private val LocalScoreBroadcastDebounce = 1.second
-
   private val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Asset)]
 
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
 
-  private val wallet: Wallet = try {
-    Wallet(settings.walletSettings)
-  } catch {
-    case NonFatal(e) =>
-      log.error(s"Failed to open wallet file '${settings.walletSettings.file.get.getAbsolutePath}", e)
-      throw e
-  }
+  private val wallet: Wallet = Wallet(settings.walletSettings)
 
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
 
@@ -137,23 +129,19 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     maybeUtx = Some(utxStorage)
 
     val timer                 = new HashedWheelTimer()
-    val utxSynchronizerLogger = LoggerFacade(LoggerFactory.getLogger(classOf[UtxPoolSynchronizerImpl]))
-    val utxSynchronizerScheduler =
+    val utxSynchronizerLogger = LoggerFacade(LoggerFactory.getLogger(classOf[UtxPoolSynchronizer]))
+    val timedTxValidator =
       Schedulers.timeBoundedFixedPool(
         timer,
         5.seconds,
         settings.synchronizationSettings.utxSynchronizer.maxThreads,
-        "utx-pool-synchronizer",
+        "time-bounded-tx-validator",
         reporter = utxSynchronizerLogger.trace("Uncaught exception in UTX Synchronizer", _)
       )
-    val utxSynchronizer =
-      UtxPoolSynchronizer(
-        utxStorage,
-        settings.synchronizationSettings.utxSynchronizer,
-        allChannels,
-        blockchainUpdater.lastBlockInfo,
-        utxSynchronizerScheduler
-      )
+
+    val utxSynchronizer = new UtxPoolSynchronizer(utxStorage, allChannels, timedTxValidator)
+    def publishTransaction(tx: Transaction) =
+      utxSynchronizer.processIncomingTransaction(tx, settings.synchronizationSettings.utxSynchronizer.allowTxRebroadcasting, None)
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
 
@@ -178,7 +166,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       .share(scheduler)
 
     lastScore
-      .debounce(LocalScoreBroadcastDebounce)
+      .debounce(1.second)
       .foreach { x =>
         allChannels.broadcast(LocalScoreChanged(x))
       }(scheduler)
@@ -208,10 +196,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def wallet: Wallet                                                               = app.wallet
       override def utx: UtxPool                                                                 = utxStorage
       override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] =
-        Await.result(utxSynchronizer.publish(tx), Duration.Inf) // TODO: Replace with async if possible
-      override def spendableBalanceChanged: Observable[(Address, Asset)]                         = app.spendableBalanceChanged
-      override def actorSystem: ActorSystem                                                      = app.actorSystem
-      override def utxEvents: Observable[UtxEvent]                                               = app.utxEvents
+        Await.result(publishTransaction(tx), Duration.Inf) // TODO: Replace with async if possible
+      override def spendableBalanceChanged: Observable[(Address, Asset)] = app.spendableBalanceChanged
+      override def actorSystem: ActorSystem                              = app.actorSystem
+      override def utxEvents: Observable[UtxEvent]                       = app.utxEvents
 
       override val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
         blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
@@ -219,7 +207,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         blockchainUpdater,
         utxStorage,
         wallet,
-        utxSynchronizer.publish,
+        publishTransaction,
         loadBlockAt(db, blockchainUpdater)
       )
       override val blocksApi: CommonBlocksApi =
@@ -286,17 +274,41 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     rxExtensionLoaderShutdown = Some(sh)
 
-    transactions.foreach {
-      case (channel, transaction) => utxSynchronizer.tryPublish(transaction, channel)
+    val dummy = new Object()
+    val knownTransactions = CacheBuilder
+      .newBuilder()
+      .maximumSize(settings.synchronizationSettings.utxSynchronizer.networkTxCacheSize)
+      .build[ByteStr, Object]
+
+    lastBlockInfo.map(_.height).distinctUntilChanged.foreach { h =>
+      log.trace(s"Invalidating known transactions at height $h")
+      knownTransactions.invalidateAll()
     }
 
-    val microBlockSink = microblockData
-      .mapEval(processMicroBlock.tupled)
+    def transactionIsNew(txId: ByteStr): Boolean = {
+      var isNew = false
+      knownTransactions.get(txId, { () =>
+        isNew = true; dummy
+      })
+      isNew
+    }
 
-    val blockSink = newBlocks
-      .mapEval(processBlock.tupled)
+    transactions
+      .filter {
+        case (_, tx) => transactionIsNew(tx.id())
+      }
+      .whileBusyBuffer(OverflowStrategy.DropNew(settings.synchronizationSettings.utxSynchronizer.maxQueueSize))
+      .mapParallelUnorderedF(settings.synchronizationSettings.utxSynchronizer.maxThreads) {
+        case (channel, tx) => utxSynchronizer.processIncomingTransaction(tx, allowRebroadcast = false, Some(channel))
+      }
+      .subscribe()
 
-    Observable(microBlockSink, blockSink).merge
+    Observable(
+      microblockData
+        .mapEval(processMicroBlock.tupled),
+      newBlocks
+        .mapEval(processBlock.tupled)
+    ).merge
       .onErrorHandle(stopOnAppendError.reportFailure)
       .subscribe()
 
@@ -308,13 +320,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     // API start
     if (settings.restAPISettings.enable) {
-      if (settings.restAPISettings.apiKeyHash == "H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu") {
-        log.error(
-          "Usage of the default api key hash (H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu) is prohibited, please change it in the waves.conf"
-        )
-        forceStopApplication(Misconfiguration)
-      }
-
       def loadBalanceHistory(address: Address): Seq[(Int, Long)] = db.readOnly { rdb =>
         rdb.get(Keys.addressId(address)).fold(Seq.empty[(Int, Long)]) { aid =>
           rdb.get(Keys.wavesBalanceHistory(aid)).map { h =>
@@ -386,8 +391,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       )
 
       val httpService = CompositeHttpService(apiRoutes, settings.restAPISettings)
-      val combinedRoute = httpService.loggingCompositeRoute
-      val httpFuture    = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
+      val httpFuture  = Http().bindAndHandle(httpService.loggingCompositeRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       serverBinding = Await.result(httpFuture, 20.seconds)
       serverBinding.whenTerminated.foreach(_ => httpService.scheduler.shutdown())
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
@@ -501,6 +505,12 @@ object Application extends ScorexLogging {
 
     if (config.getBoolean("kamon.enable")) {
       Kamon.loadModules()
+    }
+
+    val DisabledHash = "H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu"
+    if (settings.restAPISettings.enable && settings.restAPISettings.apiKeyHash == DisabledHash) {
+      log.error(s"Usage of the default api key hash ($DisabledHash) is prohibited, please change it in the waves.conf")
+      forceStopApplication(Misconfiguration)
     }
 
     settings
