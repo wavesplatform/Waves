@@ -200,13 +200,16 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     nodes.foreach {
       node =>
         val invoke = node.transactionInfo[DebugStateChanges](invokeId)
+        invoke.applicationStatus.value shouldBe "script_execution_in_progress"
+
         val continuations =
           node
             .blockSeq(invoke.height, completionHeight)
             .flatMap(_.transactions)
             .filter(tx => tx._type == ContinuationTransaction.typeId && tx.invokeScriptTransactionId.contains(invokeId))
 
-        invoke.applicationStatus.value shouldBe "script_execution_in_progress"
+        val pureInvokeFee = invokeFee - smartFee
+        continuations.foreach(_.fee shouldBe pureInvokeFee)
         continuations.dropRight(1).foreach(_.applicationStatus.value shouldBe "script_execution_in_progress")
         continuations.last.applicationStatus.value shouldBe (if (shouldBeFailed) "script_execution_failed" else "succeeded")
         continuations.map(_.nonce.value) shouldBe continuations.indices
