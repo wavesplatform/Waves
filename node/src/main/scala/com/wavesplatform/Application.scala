@@ -33,7 +33,6 @@ import com.wavesplatform.http.{DebugApiRoute, NodeApiRoute}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerDebugInfo, MinerImpl}
-import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
@@ -104,7 +103,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val (blockchainUpdater, levelDB) =
     StorageFactory(settings, db, time, spendableBalanceChanged, BlockchainUpdateTriggers.combined(triggers), bc => miner.scheduleMining(bc))
 
-  private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
   private var maybeUtx: Option[UtxPool]                                        = None
   private var maybeNetwork: Option[NS]                                         = None
 
@@ -253,7 +251,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       microblockResponses,
       microblockSynchronizerScheduler
     )
-    val (newBlocks, extLoaderState, sh) = RxExtensionLoader(
+    val (newBlocks, extLoaderState, _) = RxExtensionLoader(
       settings.synchronizationSettings.synchronizationTimeout,
       Coeval(blockchainUpdater.lastBlockIds(settings.synchronizationSettings.maxRollback)),
       peerDatabase,
@@ -270,8 +268,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           case Some(e) => Task(stopOnAppendError.reportFailure(e))
         }
     }
-
-    rxExtensionLoaderShutdown = Some(sh)
 
     val dummy = new Object()
     val knownTransactions = CacheBuilder
@@ -411,8 +407,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       spendableBalanceChanged.onComplete()
       utx.close()
 
-      shutdownAndWait(historyRepliesScheduler, "HistoryReplier", 5.minutes.some)
-
       log.info("Closing REST API")
       if (settings.restAPISettings.enable)
         Try(Await.ready(serverBinding.unbind(), 2.minutes)).failed.map(e => log.error("Failed to unbind REST API port", e))
@@ -425,21 +419,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       log.debug("Node's actor system shutdown successful")
 
       blockchainUpdater.shutdown()
-      rxExtensionLoaderShutdown.foreach(_.shutdown())
 
       log.info("Stopping network services")
       network.shutdown()
 
-      shutdownAndWait(minerScheduler, "Miner")
-      shutdownAndWait(microblockSynchronizerScheduler, "MicroblockSynchronizer")
-      shutdownAndWait(scoreObserverScheduler, "ScoreObserver")
-      shutdownAndWait(extensionLoaderScheduler, "ExtensionLoader")
-
-      appenderScheduler.execute(() => levelDB.close())
-
-      shutdownAndWait(appenderScheduler, "Appender", 5.minutes.some, tryForce = false)
+      shutdownAndWait(appenderScheduler, "Appender", 5.minutes.some)
 
       log.info("Closing storage")
+      levelDB.close()
       db.close()
 
       // extensions should be shut down last, after all node functionality, to guarantee no data loss
@@ -452,7 +439,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       log.info("Shutdown complete")
     }
 
-  private def shutdownAndWait(scheduler: SchedulerService, name: String, timeout: Option[FiniteDuration] = none, tryForce: Boolean = true): Unit = {
+  private def shutdownAndWait(scheduler: SchedulerService, name: String, timeout: Option[FiniteDuration], tryForce: Boolean = true): Unit = {
     log.debug(s"Shutting down $name")
     scheduler match {
       case es: ExecutorScheduler if tryForce => es.executor.shutdownNow()
