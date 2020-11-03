@@ -6,7 +6,6 @@ import com.wavesplatform.api.http.{ApiError, ApiRoute, jsonPost}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import play.api.libs.json._
 
 import scala.concurrent.Future
@@ -14,8 +13,9 @@ import scala.concurrent.Future
 trait BroadcastRoute { _: ApiRoute =>
   def utxPoolSynchronizer: UtxPoolSynchronizer
 
-  private def broadcastTransaction(tx: Transaction): ToResponseMarshallable = {
-    utxPoolSynchronizer.processIncomingTransaction()
+  private def broadcastTransaction(tx: Transaction): Future[ToResponseMarshallable] = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+    utxPoolSynchronizer.processIncomingTransaction(tx, None).map(_.leftMap(ApiError.fromValidationError))
   }
 
   def broadcast[A: Reads](f: A => Either[ValidationError, Transaction]): Route =

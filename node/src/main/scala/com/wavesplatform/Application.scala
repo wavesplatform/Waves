@@ -139,9 +139,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         reporter = utxSynchronizerLogger.trace("Uncaught exception in UTX Synchronizer", _)
       )
 
-    val utxSynchronizer = new UtxPoolSynchronizer(utxStorage, allChannels, timedTxValidator)
-    def publishTransaction(tx: Transaction) =
-      utxSynchronizer.processIncomingTransaction(tx, settings.synchronizationSettings.utxSynchronizer.allowTxRebroadcasting, None)
+    val utxSynchronizer =
+      UtxPoolSynchronizer(utxStorage.putIfNew, allChannels.broadcast, timedTxValidator, settings.synchronizationSettings.utxSynchronizer.allowTxRebroadcasting)
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
 
@@ -196,7 +195,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def wallet: Wallet                                                               = app.wallet
       override def utx: UtxPool                                                                 = utxStorage
       override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] =
-        Await.result(publishTransaction(tx), Duration.Inf) // TODO: Replace with async if possible
+        Await.result(utxSynchronizer.processIncomingTransaction(tx, None), Duration.Inf) // TODO: Replace with async if possible
       override def spendableBalanceChanged: Observable[(Address, Asset)] = app.spendableBalanceChanged
       override def actorSystem: ActorSystem                              = app.actorSystem
       override def utxEvents: Observable[UtxEvent]                       = app.utxEvents
@@ -207,7 +206,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         blockchainUpdater,
         utxStorage,
         wallet,
-        publishTransaction,
+        tx => utxSynchronizer.processIncomingTransaction(tx, None),
         loadBlockAt(db, blockchainUpdater)
       )
       override val blocksApi: CommonBlocksApi =
@@ -299,7 +298,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       }
       .whileBusyBuffer(OverflowStrategy.DropNew(settings.synchronizationSettings.utxSynchronizer.maxQueueSize))
       .mapParallelUnorderedF(settings.synchronizationSettings.utxSynchronizer.maxThreads) {
-        case (channel, tx) => utxSynchronizer.processIncomingTransaction(tx, allowRebroadcast = false, Some(channel))
+        case (channel, tx) => utxSynchronizer.processIncomingTransaction(tx, Some(channel))
       }
       .subscribe()
 
