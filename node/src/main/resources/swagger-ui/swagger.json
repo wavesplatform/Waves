@@ -3329,7 +3329,7 @@
           {
             "name": "full",
             "in": "query",
-            "description": "false",
+            "description": "If true, the response contains `scriptDetails` for scripted asset. False by default",
             "schema": {
               "type": "boolean"
             }
@@ -3375,7 +3375,7 @@
           {
             "name": "full",
             "in": "query",
-            "description": "false",
+            "description": "If true, the response contains `scriptDetails` for scripted assets. False by default",
             "schema": {
               "type": "boolean"
             }
