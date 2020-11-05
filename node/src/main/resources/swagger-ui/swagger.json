@@ -2812,7 +2812,7 @@
           "200": {
             "description": "successful operation",
             "content": {
-              "text/plain": {
+              "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HashedMessage"
                 }
@@ -6619,10 +6619,6 @@
           "height": {
             "type": "integer",
             "format": "int32"
-          },
-          "balance": {
-            "type": "integer",
-            "format": "int64"
           }
         }
       },
@@ -6795,20 +6791,6 @@
               "error": 2,
               "message": "Provided API key is not correct"
             }
-          },
-          "reward": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "desiredReward": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "VRF": {
-              "type": "string"
-          },
-          "transactionsRoot": {
-              "type": "string"
           }
         }
       },
@@ -6821,13 +6803,6 @@
             }
           }
         }
-      }
-    },
-    "securitySchemes": {
-      "APIKey": {
-        "type": "apiKey",
-        "name": "X-API-Key",
-        "in": "header"
       }
     },
     "parameters": {
