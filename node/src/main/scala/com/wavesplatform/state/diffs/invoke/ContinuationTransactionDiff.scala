@@ -15,7 +15,6 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.Environment.Tthis
 import com.wavesplatform.lang.v1.traits.domain.{CallableAction, Recipient}
 import com.wavesplatform.lang.{Global, ValidationError}
-import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, ContinuationState, Diff}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
@@ -88,8 +87,6 @@ object ContinuationTransactionDiff {
         InvokeDiffsCommon.getInvocationComplexity(blockchain, invokeScriptTransaction, callableComplexities, dAppAddress)
       )
 
-      baseStepFee = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + invokeScriptTransaction.extraFeePerStep
-
       doProcessActions = InvokeDiffsCommon.processActions(
         _: List[CallableAction],
         script.stdLibVersion,
@@ -100,7 +97,7 @@ object ContinuationTransactionDiff {
         blockchain,
         blockTime,
         verifyAssets
-      ).map(InvokeDiffsCommon.finishContinuation(_, tx, blockchain, baseStepFee).copy(transactions = Map()))
+      ).map(InvokeDiffsCommon.finishContinuation(_, tx, blockchain, invokeScriptTransaction, failed = false).copy(transactions = Map()))
 
       resultDiff <- scriptResult._1 match {
         case ScriptResultV3(dataItems, transfers) =>
@@ -112,7 +109,7 @@ object ContinuationTransactionDiff {
           TracedResult.wrapValue[Diff, ValidationError](
             Diff.stateOps(
               continuationStates = Map(tx.invokeScriptTransactionId -> newState),
-              replacingTransactions = List(tx.copy(fee = baseStepFee))
+              replacingTransactions = List(tx.copy(fee = InvokeDiffsCommon.stepFee(invokeScriptTransaction)))
             )
           )
       }

@@ -10,7 +10,6 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
-import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.invoke.{ContinuationTransactionDiff, InvokeDiffsCommon, InvokeScriptTransactionDiff}
 import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -250,9 +249,8 @@ object TransactionDiffer {
       portfolios <- feePortfolios(blockchain, tx)
       maybeDApp  <- extractDAppAddress
     } yield {
-      val diff =
+      val commonDiff =
         Diff.empty.copy(
-          transactions = mutable.LinkedHashMap((tx.id(), NewTransactionInfo(tx, (portfolios.keys ++ maybeDApp.toList).toSet, ScriptExecutionFailed))),
           portfolios = portfolios,
           scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
           scriptsComplexity = spentComplexity
@@ -261,9 +259,11 @@ object TransactionDiffer {
       tx match {
         case c: ContinuationTransaction =>
           val invoke = resolveInvoke(blockchain, c)
-          InvokeDiffsCommon.finishContinuation(diff, c, blockchain, FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + invoke.extraFeePerStep)
+          InvokeDiffsCommon.finishContinuation(commonDiff, c, blockchain, invoke, failed = true)
         case _ =>
-          diff
+          commonDiff |+| Diff.empty.copy(
+            transactions = mutable.LinkedHashMap((tx.id(), NewTransactionInfo(tx, (portfolios.keys ++ maybeDApp.toList).toSet, ScriptExecutionFailed))),
+          )
       }
     }
   }
