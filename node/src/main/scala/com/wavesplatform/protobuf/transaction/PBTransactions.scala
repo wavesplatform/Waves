@@ -637,7 +637,7 @@ object PBTransactions {
       dAppAddress: AddressOrAlias,
       fcOpt: Option[FUNCTION_CALL],
       payment: Seq[Payment],
-      extraFeePerStep: Int
+      extraFeePerStep: Long
   ): InvokeScriptTransactionData = {
     import com.wavesplatform.lang.v1.Serde
 
