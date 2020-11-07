@@ -109,7 +109,7 @@ object ContinuationTransactionDiff {
           TracedResult.wrapValue[Diff, ValidationError](
             Diff.stateOps(
               continuationStates = Map(tx.invokeScriptTransactionId -> newState),
-              replacingTransactions = List(tx.copy(fee = InvokeDiffsCommon.stepFee(invokeScriptTransaction)))
+              replacingTransactions = List(tx.copy(fee = InvokeDiffsCommon.expectedStepFeeInAttachedAsset(invokeScriptTransaction, blockchain)))
             )
           )
       }

@@ -257,9 +257,9 @@ object TransactionDiffer {
         )
 
       tx match {
-        case c: ContinuationTransaction =>
-          val invoke = resolveInvoke(blockchain, c)
-          InvokeDiffsCommon.finishContinuation(commonDiff, c, blockchain, invoke, failed = true)
+        case ctx: ContinuationTransaction =>
+          val invoke = resolveInvoke(blockchain, ctx)
+          InvokeDiffsCommon.finishContinuation(commonDiff, ctx, blockchain, invoke, failed = true)
         case _ =>
           commonDiff |+| Diff.empty.copy(
             transactions = mutable.LinkedHashMap((tx.id(), NewTransactionInfo(tx, (portfolios.keys ++ maybeDApp.toList).toSet, ScriptExecutionFailed))),

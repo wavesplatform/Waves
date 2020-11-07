@@ -116,6 +116,7 @@ class Transaction(
     val id: String,
     val chainId: Option[Byte],
     val fee: Long,
+    val feeAssetId: Option[String],
     val timestamp: Long,
     val sender: Option[String],
     val version: Option[Byte],
@@ -155,6 +156,7 @@ object Transaction {
       id: String,
       chainId: Option[Byte],
       fee: Long,
+      feeAssetId: Option[String],
       timestamp: Long,
       sender: Option[String],
       version: Option[Byte],
@@ -182,6 +184,7 @@ object Transaction {
     id,
     chainId,
     fee,
+    feeAssetId,
     timestamp,
     sender,
     version,
@@ -214,6 +217,7 @@ object Transaction {
           id          <- (jsv \ "id").validate[String]
           chainId     <- (jsv \ "chainId").validateOpt[Byte]
           fee         <- (jsv \ "fee").validate[Long]
+          feeAssetId  <- (jsv \ "feeAssetId").validateOpt[String]
           timestamp   <- (jsv \ "timestamp").validate[Long]
           sender      <- (jsv \ "sender").validateOpt[String]
           version     <- (jsv \ "version").validateOpt[Byte]
@@ -244,6 +248,7 @@ object Transaction {
           id,
           chainId,
           fee,
+          feeAssetId,
           timestamp,
           sender,
           version,
