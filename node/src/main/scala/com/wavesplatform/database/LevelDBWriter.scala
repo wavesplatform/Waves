@@ -530,7 +530,9 @@ abstract class LevelDBWriter private[database] (
         val txsByHeight =
           txIds
             .map { txId =>
-              val TransactionMeta(txHeight, num, typeId, _) = rw.get(Keys.transactionMetaById(txId)).get
+              val TransactionMeta(txHeight, num, typeId, _) =
+                rw.get(Keys.transactionMetaById(txId))
+                  .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction with id=$txId"))
               (txHeight, num, typeId)
             }
             .groupBy(_._1)
