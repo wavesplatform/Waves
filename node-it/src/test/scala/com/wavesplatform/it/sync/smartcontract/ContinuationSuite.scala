@@ -97,7 +97,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     scriptInfo.script.get.startsWith("base64:") shouldBe true
   }
 
-  ignore("successful continuation") {
+  test("successful continuation") {
     val invoke = sender
       .invokeScript(
         caller,
@@ -120,7 +120,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     sender.transactionsByAddress(caller.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
   }
 
-  ignore("successful continuation with sponsored asset") {
+  test("successful continuation with sponsored asset") {
     val invoke = sender
       .invokeScript(
         caller,
@@ -185,7 +185,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     sender.transactionsByAddress(caller.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
   }
 
-  ignore("hold transactions from DApp address until continuation is completed") {
+  test("hold transactions from DApp address until continuation is completed") {
     val startHeight = sender.height
     val invoke = sender.invokeScript(
       caller,
@@ -204,7 +204,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     assertExistenceOfTransactions(dApp, startHeight, sender.height)
   }
 
-  ignore("don't forbid transactions from other addresses while continuation is not completed") {
+  test("don't forbid transactions from other addresses while continuation is not completed") {
     val startHeight = sender.height
     sender.invokeScript(
       caller,
@@ -220,7 +220,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     assertExistenceOfTransactions(caller, startHeight, sender.height)
   }
 
-  ignore("insufficient fee") {
+  test("insufficient fee") {
     lazy val invokeScriptTx = sender.invokeScript(
       caller,
       dApp.toAddress.toString,
