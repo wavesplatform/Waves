@@ -91,7 +91,7 @@ object InvokeDiffsCommon {
                 ""
 
             val extraFeePerStepInfo =
-              if (stepsNumber > 1 && tx.extraFeePerStep > 100)
+              if (tx.extraFeePerStep > InvokeScriptTransaction.DefaultExtraFeePerStep)
                 s" with extra fee per step = ${tx.extraFeePerStep}"
               else
                 ""
