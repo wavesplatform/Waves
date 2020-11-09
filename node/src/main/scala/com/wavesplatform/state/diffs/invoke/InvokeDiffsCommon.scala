@@ -31,11 +31,10 @@ import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.validation.impl.SponsorFeeTxValidator
-import com.wavesplatform.transaction.{Asset, ScriptExecutionFailed}
+import com.wavesplatform.transaction.{Asset, ScriptExecutionFailed, Succeeded}
 import com.wavesplatform.utils._
 import shapeless.Coproduct
 
-import scala.collection.mutable
 import scala.util.{Failure, Right, Success, Try}
 
 object InvokeDiffsCommon {
@@ -292,10 +291,7 @@ object InvokeDiffsCommon {
     diff
       .copy(
         continuationStates = Map(tx.invokeScriptTransactionId -> ContinuationState.Finished(tx.id.value())),
-        replacingTransactions = if (failed) Nil else List(tx.copy(fee = totalFee)),
-        transactions =
-          if (failed) mutable.LinkedHashMap((tx.id(), NewTransactionInfo(tx.copy(fee = totalFee), diff.portfolios.keySet, ScriptExecutionFailed)))
-          else Map()
+        replacingTransactions = List((tx.copy(fee = totalFee), if (failed) ScriptExecutionFailed else Succeeded))
       )
       .bindOldTransaction(tx.invokeScriptTransactionId)
   }

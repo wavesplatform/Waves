@@ -159,7 +159,6 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       ._1
     waitForContinuation(invoke.id, shouldBeFailed = true)
     assertContinuationChain(invoke.id, sender.height, shouldBeFailed = true, feeAssetInfo = None)
-    sender.waitForHeight(sender.height + 1)
     sender.transactionsByAddress(dApp.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe None
     sender.transactionsByAddress(caller.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
   }
@@ -180,7 +179,6 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       ._1
     waitForContinuation(invoke.id, shouldBeFailed = true)
     assertContinuationChain(invoke.id, sender.height, shouldBeFailed = true, feeAssetInfo = Some((sponsoredAssetId, minSponsoredAssetFee)))
-    sender.waitForHeight(sender.height + 1)
     sender.transactionsByAddress(dApp.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe None
     sender.transactionsByAddress(caller.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
   }

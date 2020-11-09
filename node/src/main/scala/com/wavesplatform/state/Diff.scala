@@ -173,7 +173,7 @@ case class Diff(
     scriptResults: Map[ByteStr, InvokeScriptResult],
     continuationStates: Map[ByteStr, ContinuationState],
     addressTransactionBindings: Map[ByteStr, Set[Address]],
-    replacingTransactions: List[Transaction]
+    replacingTransactions: List[(Transaction, ApplicationStatus)]
 ) {
   def bindTransaction(tx: Transaction): Diff =
     copy(transactions = transactions.concat(Map(Diff.toDiffTxData(tx, portfolios, accountData))))
@@ -200,7 +200,7 @@ object Diff {
       scriptsRun: Int = 0,
       continuationStates: Map[ByteStr, ContinuationState] = Map.empty,
       addressTransactionBindings: Map[ByteStr, Set[Address]] = Map.empty,
-      replacingTransactions: List[Transaction] = Nil
+      replacingTransactions: List[(Transaction, ApplicationStatus)] = Nil
   ): Diff =
     Diff(
       transactions = mutable.LinkedHashMap(),

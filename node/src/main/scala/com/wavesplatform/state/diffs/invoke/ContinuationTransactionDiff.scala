@@ -16,7 +16,7 @@ import com.wavesplatform.lang.v1.traits.Environment.Tthis
 import com.wavesplatform.lang.v1.traits.domain.{CallableAction, Recipient}
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, ContinuationState, Diff}
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.{ScriptExecutionInProgress, Transaction}
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
@@ -106,10 +106,11 @@ object ContinuationTransactionDiff {
           doProcessActions(actions)
         case ir: IncompleteResult =>
           val newState = ContinuationState.InProgress(tx.nonce + 1, ir.expr, ir.unusedComplexity, tx.id.value())
+          val stepFee  = InvokeDiffsCommon.expectedStepFeeInAttachedAsset(invokeScriptTransaction, blockchain)
           TracedResult.wrapValue[Diff, ValidationError](
             Diff.stateOps(
               continuationStates = Map(tx.invokeScriptTransactionId -> newState),
-              replacingTransactions = List(tx.copy(fee = InvokeDiffsCommon.expectedStepFeeInAttachedAsset(invokeScriptTransaction, blockchain)))
+              replacingTransactions = List((tx.copy(fee = stepFee), ScriptExecutionInProgress))
             )
           )
       }
