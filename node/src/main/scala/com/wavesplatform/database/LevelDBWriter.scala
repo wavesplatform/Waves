@@ -381,7 +381,8 @@ abstract class LevelDBWriter private[database] (
       failedTransactionIds: Set[ByteStr],
       stateHash: StateHashBuilder.Result,
       continuationStates: Map[ByteStr, ContinuationState],
-      addressTransactionBindings: Map[AddressId, Seq[TransactionId]]
+      addressTransactionBindings: Map[AddressId, Seq[TransactionId]],
+      replacingTransactions: List[Transaction]
   ): Unit = {
     log.trace(s"Persisting block ${block.id()} at height $height")
     readWrite { rw =>
@@ -529,7 +530,9 @@ abstract class LevelDBWriter private[database] (
         val txsByHeight =
           txIds
             .map { txId =>
-              val TransactionMeta(txHeight, num, typeId, _) = rw.get(Keys.transactionMetaById(txId)).get
+              val TransactionMeta(txHeight, num, typeId, _) =
+                rw.get(Keys.transactionMetaById(txId))
+                  .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction with id=$txId"))
               (txHeight, num, typeId)
             }
             .groupBy(_._1)
@@ -552,6 +555,19 @@ abstract class LevelDBWriter private[database] (
       for ((id, (tx, num, succeeded)) <- transactions) {
         rw.put(Keys.transactionAt(Height(height), num), Some((tx, succeeded)))
         rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.typeId, succeeded)))
+      }
+
+      for (replacingTx <- replacingTransactions) {
+        val txId = replacingTx.id.value()
+        val (height, num, status) =
+          transactions.get(TransactionId(txId))
+              .map { case (_, num, status) => (this.height, num, status) }
+              .orElse(
+                rw.get(Keys.transactionMetaById(TransactionId(replacingTx.id.value())))
+                  .map { case TransactionMeta(height, num, _, status) => (height, TxNum(num.toShort), fromDb(status)) }
+              )
+              .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction with id=$txId"))
+        rw.put(Keys.transactionAt(Height(height), num), Some((replacingTx, status)))
       }
 
       val activationWindowSize = settings.functionalitySettings.activationWindowSize(height)

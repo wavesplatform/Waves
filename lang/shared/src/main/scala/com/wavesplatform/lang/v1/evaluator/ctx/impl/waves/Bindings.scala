@@ -191,7 +191,7 @@ object Bindings {
       version
     )
 
-  def transactionObject(tx: Tx, proofsEnabled: Boolean, version: StdLibVersion = V3): CaseObj =
+  def transactionObject(tx: Tx, proofsEnabled: Boolean, version: StdLibVersion): CaseObj =
     tx match {
       case Tx.Genesis(h, amount, recipient) =>
         CaseObj(genesisTransactionType, Map("amount" -> CONST_LONG(amount)) ++ headerPart(h) + mapRecipient(recipient))

@@ -23,7 +23,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.DiffsCommon
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.{Asset, ScriptExecutionFailed}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -35,6 +35,7 @@ import com.wavesplatform.transaction.validation.impl.SponsorFeeTxValidator
 import com.wavesplatform.utils._
 import shapeless.Coproduct
 
+import scala.collection.mutable
 import scala.util.{Failure, Right, Success, Try}
 
 object InvokeDiffsCommon {
@@ -76,9 +77,8 @@ object InvokeDiffsCommon {
               (feeInWaves, portfolioDiff)
             }
         }
-
         _ <- {
-          val dAppFee    = (FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + tx.extraFeePerStep) * stepsNumber
+          val dAppFee    = stepFee(tx) * stepsNumber
           val issuesFee  = issueList.count(!blockchain.isNFT(_)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
           val actionsFee = actionScriptsInvoked * ScriptExtraFee
           val minFee     = dAppFee + issuesFee + actionsFee
@@ -124,6 +124,9 @@ object InvokeDiffsCommon {
         }
       } yield portfolioDiff
     }
+
+  def stepFee(tx: InvokeScriptTransaction): Long =
+    FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + tx.extraFeePerStep
 
   def getInvocationComplexity(
       blockchain: Blockchain,
@@ -184,17 +187,14 @@ object InvokeDiffsCommon {
       )
       _ <- TracedResult(checkOverflow(transferList.map(_.amount))).leftMap(FailedTransactionError.dAppExecution(_, invocationComplexity))
 
-      smartAssetInvocations = tx.checkedAssets ++
+      actionAssets = tx.checkedAssets ++
         transferList.flatMap(_.assetId).map(IssuedAsset) ++
         reissueList.map(r => IssuedAsset(r.assetId)) ++
         burnList.map(b => IssuedAsset(b.assetId)) ++
         sponsorFeeList.map(sf => IssuedAsset(sf.assetId))
 
-      actionScriptsInvoked = smartAssetInvocations.count(blockchain.hasAssetScript) +
-        (if (blockchain.hasAccountScript(tx.sender.toAddress))
-           1
-         else
-           0)
+      actionScriptsInvoked = actionAssets.count(blockchain.hasAssetScript) +
+        (if (blockchain.hasAccountScript(tx.sender.toAddress)) 1 else 0)
 
       stepLimit = ContractLimits.MaxComplexityByVersion(version)
       feeDiff <- calcAndCheckFee(
@@ -242,7 +242,32 @@ object InvokeDiffsCommon {
     } yield resultDiff
   }
 
-  def paymentsPart(
+  def finishContinuation(
+    diff: Diff,
+    tx: ContinuationTransaction,
+    blockchain: Blockchain,
+    invoke: InvokeScriptTransaction,
+    failed: Boolean
+  ): Diff = {
+    val scriptResult = diff.scriptResults.head._2
+    val assetActions =
+      scriptResult.transfers.flatMap(_.asset.fold(Option.empty[IssuedAsset])(Some(_))) ++
+        scriptResult.burns.map(b => IssuedAsset(b.assetId)) ++
+        scriptResult.reissues.map(r => IssuedAsset(r.assetId)) ++
+        scriptResult.sponsorFees.map(sf => IssuedAsset(sf.assetId))
+    val smartAssetsInvocationFee = assetActions.count(blockchain.hasAssetScript) * ScriptExtraFee
+    val issuesFee                = scriptResult.issues.count(!blockchain.isNFT(_)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
+    val totalFee                 = stepFee(invoke) + smartAssetsInvocationFee + issuesFee
+    diff
+      .copy(
+        continuationStates = Map(tx.invokeScriptTransactionId -> ContinuationState.Finished(tx.id.value())),
+        replacingTransactions = if (failed) Nil else List(tx.copy(fee = totalFee)),
+        transactions = if (failed) mutable.LinkedHashMap((tx.id(), NewTransactionInfo(tx.copy(fee = totalFee), diff.portfolios.keySet, ScriptExecutionFailed))) else Map()
+      )
+      .bindOldTransaction(tx.invokeScriptTransactionId)
+  }
+
+  private def paymentsPart(
       tx: InvokeScriptTransaction,
       dAppAddress: Address,
       feePart: Map[Address, Portfolio]

@@ -13,7 +13,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.Environment.Tthis
-import com.wavesplatform.lang.v1.traits.domain.Recipient
+import com.wavesplatform.lang.v1.traits.domain.{CallableAction, Recipient}
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, ContinuationState, Diff}
 import com.wavesplatform.transaction.Transaction
@@ -88,7 +88,7 @@ object ContinuationTransactionDiff {
       )
 
       doProcessActions = InvokeDiffsCommon.processActions(
-        _,
+        _: List[CallableAction],
         script.stdLibVersion,
         dAppAddress,
         dAppPublicKey,
@@ -97,32 +97,22 @@ object ContinuationTransactionDiff {
         blockchain,
         blockTime,
         verifyAssets
-      )
+      ).map(InvokeDiffsCommon.finishContinuation(_, tx, blockchain, invokeScriptTransaction, failed = false).copy(transactions = Map()))
 
       resultDiff <- scriptResult._1 match {
         case ScriptResultV3(dataItems, transfers) =>
-          val diff = doProcessActions(dataItems ::: transfers)
-          finishContinuation(diff, tx)
+          doProcessActions(dataItems ::: transfers)
         case ScriptResultV4(actions) =>
-          val diff = doProcessActions(actions)
-          finishContinuation(diff, tx)
+          doProcessActions(actions)
         case ir: IncompleteResult =>
+          val newState = ContinuationState.InProgress(tx.nonce + 1, ir.expr, ir.unusedComplexity, tx.id.value())
           TracedResult.wrapValue[Diff, ValidationError](
             Diff.stateOps(
-              continuationStates =
-                Map(tx.invokeScriptTransactionId -> ContinuationState.InProgress(tx.nonce + 1, ir.expr, ir.unusedComplexity, tx.id.value()))
+              continuationStates = Map(tx.invokeScriptTransactionId -> newState),
+              replacingTransactions = List(tx.copy(fee = InvokeDiffsCommon.stepFee(invokeScriptTransaction)))
             )
           )
       }
     } yield resultDiff
   }
-
-  private def finishContinuation(
-      diff: TracedResult[ValidationError, Diff],
-      tx: ContinuationTransaction
-  ): TracedResult[ValidationError, Diff] =
-    diff.map(
-      _.copy(transactions = Map(), continuationStates = Map(tx.invokeScriptTransactionId -> ContinuationState.Finished(tx.id.value())))
-        .bindOldTransaction(tx.invokeScriptTransactionId)
-    )
 }

@@ -4,7 +4,6 @@ import cats.implicits._
 import com.google.common.primitives.Ints
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.{ContinuationTxSerializer, PBTransactionSerializer}
 import com.wavesplatform.transaction.validation.TxValidator
@@ -16,9 +15,12 @@ import scala.util.Try
 case class ContinuationTransaction(
     invokeScriptTransactionId: ByteStr,
     timestamp: TxTimestamp,
-    nonce: Int
+    nonce: Int,
+    fee: TxAmount,
+    feeAssetId: Asset
 ) extends Transaction
-    with VersionedTransaction {
+    with VersionedTransaction
+    with TxWithFee.InCustomAsset {
 
   override val builder                        = ContinuationTransaction
   override val json: Coeval[JsObject]         = Coeval(builder.serializer.toJson(this))
@@ -33,9 +35,6 @@ case class ContinuationTransaction(
 
   override val id: Coeval[ByteStr] =
     Coeval.now(FastHashId.create(invokeScriptTransactionId.arr ++ Ints.toByteArray(nonce)))
-
-  override def assetFee: (Asset, Long) =
-    (Waves, 0)
 }
 
 object ContinuationTransaction extends TransactionParser {

@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats.implicits._
 import cats.kernel.Monoid
-import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures.BlockV5
 import com.wavesplatform.lang.ValidationError
@@ -10,8 +10,8 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
-import com.wavesplatform.state.diffs.invoke.{ContinuationTransactionDiff, InvokeScriptTransactionDiff}
-import com.wavesplatform.state.{Blockchain, ContinuationState, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
+import com.wavesplatform.state.diffs.invoke.{ContinuationTransactionDiff, InvokeDiffsCommon, InvokeScriptTransactionDiff}
+import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
@@ -249,9 +249,8 @@ object TransactionDiffer {
       portfolios <- feePortfolios(blockchain, tx)
       maybeDApp  <- extractDAppAddress
     } yield {
-      val diff =
+      val commonDiff =
         Diff.empty.copy(
-          transactions = mutable.LinkedHashMap((tx.id(), NewTransactionInfo(tx, (portfolios.keys ++ maybeDApp.toList).toSet, ScriptExecutionFailed))),
           portfolios = portfolios,
           scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
           scriptsComplexity = spentComplexity
@@ -259,12 +258,12 @@ object TransactionDiffer {
 
       tx match {
         case c: ContinuationTransaction =>
-          val finishContinuation = Diff.stateOps(
-            continuationStates = Map(c.invokeScriptTransactionId -> ContinuationState.Finished(tx.id.value()))
-          )
-          diff.bindOldTransaction(c.invokeScriptTransactionId) |+| finishContinuation
+          val invoke = resolveInvoke(blockchain, c)
+          InvokeDiffsCommon.finishContinuation(commonDiff, c, blockchain, invoke, failed = true)
         case _ =>
-          diff
+          commonDiff |+| Diff.empty.copy(
+            transactions = mutable.LinkedHashMap((tx.id(), NewTransactionInfo(tx, (portfolios.keys ++ maybeDApp.toList).toSet, ScriptExecutionFailed))),
+          )
       }
     }
   }
@@ -283,28 +282,38 @@ object TransactionDiffer {
   // helpers
   private def feePortfolios(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Map[Address, Portfolio]] =
     tx match {
-      case _: GenesisTransaction | _: ContinuationTransaction => Map.empty[Address, Portfolio].asRight
+      case _: GenesisTransaction                              => Map.empty[Address, Portfolio].asRight
       case ptx: PaymentTransaction                            => Map(ptx.sender.toAddress -> Portfolio(balance = -ptx.fee, LeaseBalance.empty, assets = Map.empty)).asRight
-      case ptx: ProvenTransaction =>
-        ptx.assetFee match {
-          case (Waves, fee) => Map(ptx.sender.toAddress -> Portfolio(-fee, LeaseBalance.empty, Map.empty)).asRight
-          case (asset @ IssuedAsset(_), fee) =>
-            for {
-              assetInfo <- blockchain
-                .assetDescription(asset)
-                .toRight(GenericError(s"Asset $asset does not exist, cannot be used to pay fees"))
-              wavesFee <- Either.cond(
-                assetInfo.sponsorship > 0,
-                Sponsorship.toWaves(fee, assetInfo.sponsorship),
-                GenericError(s"Asset $asset is not sponsored, cannot be used to pay fees")
-              )
-            } yield Monoid.combine(
-              Map(ptx.sender.toAddress       -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -fee))),
-              Map(assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> fee)))
-            )
-        }
-      case _ => UnsupportedTransactionType.asLeft
+      case ptx: ProvenTransaction                             => makeFeePortfolios(blockchain, ptx, ptx.sender)
+      case ctx: ContinuationTransaction                       => makeFeePortfolios(blockchain, tx, resolveInvoke(blockchain, ctx).sender)
+      case _                                                  => UnsupportedTransactionType.asLeft
     }
+
+  private def makeFeePortfolios(blockchain: Blockchain, tx: Transaction, sender: PublicKey): Either[GenericError, Map[Address, Portfolio]] =
+    tx.assetFee match {
+      case (Waves, fee) => Map(sender.toAddress -> Portfolio(-fee, LeaseBalance.empty, Map.empty)).asRight
+      case (asset @ IssuedAsset(_), fee) =>
+        for {
+          assetInfo <- blockchain
+            .assetDescription(asset)
+            .toRight(GenericError(s"Asset $asset does not exist, cannot be used to pay fees"))
+          wavesFee <- Either.cond(
+            assetInfo.sponsorship > 0,
+            Sponsorship.toWaves(fee, assetInfo.sponsorship),
+            GenericError(s"Asset $asset is not sponsored, cannot be used to pay fees")
+          )
+        } yield Monoid.combine(
+          Map(sender.toAddress           -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -fee))),
+          Map(assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> fee)))
+        )
+    }
+
+  private def resolveInvoke(blockchain: Blockchain, ctx: ContinuationTransaction) =
+    blockchain
+      .transactionInfo(ctx.invokeScriptTransactionId)
+      .map(_._2)
+      .collect { case i: InvokeScriptTransaction => i }
+      .getOrElse(throw new IllegalArgumentException(s"Couldn't find Invoke Transaction with id = ${ctx.invokeScriptTransactionId}"))
 
   private implicit final class EitherOps[E, A](val ei: Either[E, A]) extends AnyVal {
     def traced: TracedResult[E, A] = TracedResult.wrapE(ei)

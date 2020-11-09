@@ -10,7 +10,7 @@ object ContinuationTxSerializer {
       "version"                   -> tx.version,
       "type"                      -> builder.typeId,
       "id"                        -> id().toString,
-      "fee"                       -> 0,
+      "fee"                       -> fee,
       "timestamp"                 -> timestamp,
       "nonce"                     -> nonce,
       "invokeScriptTransactionId" -> invokeScriptTransactionId.toString
