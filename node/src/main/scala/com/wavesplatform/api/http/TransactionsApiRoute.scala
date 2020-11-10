@@ -91,7 +91,7 @@ case class TransactionsApiRoute(
           )
           case _ => ???
         }
-      case t: smart.InvokeScriptTransaction if t.version == TxVersion.V3 => Json.obj("continuationTransactionIds" -> commonApi.continuations(t.id()).map(_.toString))
+      case t: smart.InvokeScriptTransaction /* if t.version == TxVersion.V3 */ => Json.obj("continuationTransactionIds" -> commonApi.continuations(t.id()).map(_.toString))
       case _ => Json.obj()
     }
   }
