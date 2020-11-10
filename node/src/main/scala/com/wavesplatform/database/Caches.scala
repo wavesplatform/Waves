@@ -13,7 +13,7 @@ import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.{Asset, ScriptExecutionFailed, Transaction}
+import com.wavesplatform.transaction.{ApplicationStatus, Asset, ScriptExecutionFailed, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
 
@@ -180,7 +180,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       stateHash: StateHashBuilder.Result,
       continuationStates: Map[ByteStr, ContinuationState],
       addressTransactionBindings: Map[AddressId, Seq[TransactionId]],
-      replacingTransactions: List[Transaction]
+      replacingTransactions: List[(Transaction, ApplicationStatus)]
   ): Unit
 
   override def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], hitSource: ByteStr, block: Block): Unit = {

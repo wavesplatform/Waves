@@ -382,7 +382,7 @@ abstract class LevelDBWriter private[database] (
       stateHash: StateHashBuilder.Result,
       continuationStates: Map[ByteStr, ContinuationState],
       addressTransactionBindings: Map[AddressId, Seq[TransactionId]],
-      replacingTransactions: List[Transaction]
+      replacingTransactions: List[(Transaction, ApplicationStatus)]
   ): Unit = {
     log.trace(s"Persisting block ${block.id()} at height $height")
     readWrite { rw =>
@@ -557,14 +557,14 @@ abstract class LevelDBWriter private[database] (
         rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.typeId, succeeded)))
       }
 
-      for (replacingTx <- replacingTransactions) {
+      for ((replacingTx, status) <- replacingTransactions) {
         val txId = replacingTx.id.value()
-        val (height, num, status) =
+        val (height, num) =
           transactions.get(TransactionId(txId))
-              .map { case (_, num, status) => (this.height, num, status) }
+              .map { case (_, num, _) => (this.height, num) }
               .orElse(
                 rw.get(Keys.transactionMetaById(TransactionId(replacingTx.id.value())))
-                  .map { case TransactionMeta(height, num, _, status) => (height, TxNum(num.toShort), fromDb(status)) }
+                  .map { case TransactionMeta(height, num, _, _) => (height, TxNum(num.toShort)) }
               )
               .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction with id=$txId"))
         rw.put(Keys.transactionAt(Height(height), num), Some((replacingTx, status)))

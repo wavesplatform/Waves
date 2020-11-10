@@ -71,6 +71,15 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     ScriptCompiler.compile(scriptText, dummyEstimator).explicitGet()._1.bytes().base64
   }
 
+  private val minSponsoredAssetFee = 10000
+  private val sponsoredAssetAmount = 10.waves
+  private lazy val sponsoredAssetId = {
+    val id = sender.issue(thirdKeyPair, quantity = sponsoredAssetAmount, waitForTx = true).id
+    sender.sponsorAsset(thirdKeyPair, id, baseFee = minSponsoredAssetFee, waitForTx = true)
+    sender.transfer(thirdKeyPair, caller.toAddress.stringRepr, sponsoredAssetAmount, assetId = Some(id), waitForTx = true)
+    id
+  }
+
   test("can't set continuation before activation") {
     assertBadRequestAndMessage(
       sender.setScript(dApp, Some(script), setScriptFee),
@@ -89,18 +98,44 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   }
 
   test("successful continuation") {
-    val invoke = sender.invokeScript(
-      caller,
-      dApp.toAddress.toString,
-      func = Some("foo"),
-      args = List(CONST_BOOLEAN(false)),
-      payment = Seq(Payment(1.waves, Waves)),
-      fee = 1.waves,
-      version = TxVersion.V3,
-      waitForTx = true
-    )._1
+    val invoke = sender
+      .invokeScript(
+        caller,
+        dApp.toAddress.toString,
+        func = Some("foo"),
+        args = List(CONST_BOOLEAN(false)),
+        payment = Seq(Payment(1.waves, Waves)),
+        fee = 1.waves,
+        version = TxVersion.V2,
+        waitForTx = true
+      )
+      ._1
     waitForContinuation(invoke.id, shouldBeFailed = false)
-    assertContinuationChain(invoke.id, sender.height, shouldBeFailed = false)
+    assertContinuationChain(invoke.id, sender.height, shouldBeFailed = false, feeAssetInfo = None)
+    nodes.foreach { node =>
+      node.getDataByKey(dApp.toAddress.toString, "a") shouldBe BooleanDataEntry("a", true)
+      node.getDataByKey(dApp.toAddress.toString, "sender") shouldBe BinaryDataEntry("sender", ByteStr(Base58.decode(caller.toAddress.toString)))
+    }
+    sender.transactionsByAddress(dApp.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
+    sender.transactionsByAddress(caller.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
+  }
+
+  test("successful continuation with sponsored asset") {
+    val invoke = sender
+      .invokeScript(
+        caller,
+        dApp.toAddress.toString,
+        func = Some("foo"),
+        args = List(CONST_BOOLEAN(false)),
+        payment = Seq(Payment(1.waves, Waves)),
+        fee = 1.waves,
+        feeAssetId = Some(sponsoredAssetId),
+        version = TxVersion.V2,
+        waitForTx = true
+      )
+      ._1
+    waitForContinuation(invoke.id, shouldBeFailed = false)
+    assertContinuationChain(invoke.id, sender.height, shouldBeFailed = false, feeAssetInfo = Some((sponsoredAssetId, minSponsoredAssetFee)))
     nodes.foreach { node =>
       node.getDataByKey(dApp.toAddress.toString, "a") shouldBe BooleanDataEntry("a", true)
       node.getDataByKey(dApp.toAddress.toString, "sender") shouldBe BinaryDataEntry("sender", ByteStr(Base58.decode(caller.toAddress.toString)))
@@ -110,19 +145,40 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   }
 
   test("failed continuation") {
-    val invoke = sender.invokeScript(
-      caller,
-      dApp.toAddress.toString,
-      func = Some("foo"),
-      args = List(CONST_BOOLEAN(true)),
-      payment = Seq(Payment(1.waves, Waves)),
-      fee = 1.waves,
-      version = TxVersion.V3,
-      waitForTx = true
-    )._1
+    val invoke = sender
+      .invokeScript(
+        caller,
+        dApp.toAddress.toString,
+        func = Some("foo"),
+        args = List(CONST_BOOLEAN(true)),
+        payment = Seq(Payment(1.waves, Waves)),
+        fee = 1.waves,
+        version = TxVersion.V2,
+        waitForTx = true
+      )
+      ._1
     waitForContinuation(invoke.id, shouldBeFailed = true)
-    assertContinuationChain(invoke.id, sender.height, shouldBeFailed = true)
-    sender.waitForHeight(sender.height + 1)
+    assertContinuationChain(invoke.id, sender.height, shouldBeFailed = true, feeAssetInfo = None)
+    sender.transactionsByAddress(dApp.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe None
+    sender.transactionsByAddress(caller.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
+  }
+
+  test("failed continuation with sponsored asset") {
+    val invoke = sender
+      .invokeScript(
+        caller,
+        dApp.toAddress.toString,
+        func = Some("foo"),
+        args = List(CONST_BOOLEAN(true)),
+        payment = Seq(Payment(1.waves, Waves)),
+        fee = 1.waves,
+        feeAssetId = Some(sponsoredAssetId),
+        version = TxVersion.V2,
+        waitForTx = true
+      )
+      ._1
+    waitForContinuation(invoke.id, shouldBeFailed = true)
+    assertContinuationChain(invoke.id, sender.height, shouldBeFailed = true, feeAssetInfo = Some((sponsoredAssetId, minSponsoredAssetFee)))
     sender.transactionsByAddress(dApp.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe None
     sender.transactionsByAddress(caller.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
   }
@@ -187,16 +243,16 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     )(
       _.blockSeq(sender.height - 2, sender.height)
         .flatMap(_.transactions)
-        .exists { tx =>
+        .exists ( tx =>
           tx._type == ContinuationTransaction.typeId &&
           tx.applicationStatus.contains(if (shouldBeFailed) "script_execution_failed" else "succeeded") &&
           tx.invokeScriptTransactionId.contains(invokeId)
-        }
+        )
     )(
       _.forall(identity)
     )
 
-  private def assertContinuationChain(invokeId: String, completionHeight: Int, shouldBeFailed: Boolean): Unit = {
+  private def assertContinuationChain(invokeId: String, completionHeight: Int, shouldBeFailed: Boolean, feeAssetInfo: Option[(String, Long)]): Unit = {
     import play.api.libs.json._
     nodes.foreach {
       node =>
@@ -216,42 +272,42 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
           (cont \ "extraFeePerStep").asOpt[Long].nonEmpty shouldBe true
         }
 
-        val pureInvokeFee = invokeFee - smartFee
-        continuations.foreach(_.fee shouldBe pureInvokeFee)
-        continuations.dropRight(1).foreach(_.applicationStatus.value shouldBe "script_execution_in_progress")
-        continuations.last.applicationStatus.value shouldBe (if (shouldBeFailed) "script_execution_failed" else "succeeded")
-        continuations.map(_.nonce.value) shouldBe continuations.indices
-        invoke.timestamp +: continuations.map(_.timestamp) shouldBe sorted
+      val pureInvokeFee = invokeFee - smartFee
+      val correctedFee  = feeAssetInfo.fold(pureInvokeFee) { case (_, sponsorship) => Sponsorship.fromWaves(pureInvokeFee, sponsorship) }
+      continuations.foreach(_.fee shouldBe correctedFee)
+      // TODO continuations.foreach(_.feeAssetId shouldBe feeAssetInfo.map(_._1))
+      continuations.dropRight(1).foreach(_.applicationStatus.value shouldBe "script_execution_in_progress")
+      continuations.last.applicationStatus.value shouldBe (if (shouldBeFailed) "script_execution_failed" else "succeeded")
+      continuations.map(_.nonce.value) shouldBe continuations.indices
+      invoke.timestamp +: continuations.map(_.timestamp) shouldBe sorted
     }
   }
 
   private def assertAbsenceOfTransactions(fromHeight: Int, toHeight: Int): Unit =
-    nodes.foreach {
-      node =>
-        val transactions =
-          node
-            .blockSeq(fromHeight, toHeight)
-            .flatMap(_.transactions)
+    nodes.foreach { node =>
+      val transactions =
+        node
+          .blockSeq(fromHeight, toHeight)
+          .flatMap(_.transactions)
 
-        val invokeIndex           = transactions.indexWhere(_._type == smart.InvokeScriptTransaction.typeId)
-        val lastContinuationIndex = transactions.lastIndexWhere(_._type == ContinuationTransaction.typeId)
+      val invokeIndex           = transactions.indexWhere(_._type == smart.InvokeScriptTransaction.typeId)
+      val lastContinuationIndex = transactions.lastIndexWhere(_._type == ContinuationTransaction.typeId)
 
-        val otherTransactionsExist =
-          transactions
-            .slice(invokeIndex, lastContinuationIndex)
-            .exists(tx => tx._type != smart.InvokeScriptTransaction.typeId && tx._type != ContinuationTransaction.typeId)
+      val otherTransactionsExist =
+        transactions
+          .slice(invokeIndex, lastContinuationIndex)
+          .exists(tx => tx._type != smart.InvokeScriptTransaction.typeId && tx._type != ContinuationTransaction.typeId)
 
-        otherTransactionsExist shouldBe false
+      otherTransactionsExist shouldBe false
     }
 
   private def assertExistenceOfTransactions(txSender: KeyPair, fromHeight: Int, toHeight: Int): Unit =
-    nodes.foreach {
-      node =>
-        val transactions = node.blockSeq(fromHeight, toHeight).flatMap(_.transactions)
-        val publicKey    = txSender.toAddress.toString
-        transactions.exists(tx => tx._type == DataTransaction.typeId && tx.sender.get == publicKey) shouldBe true
-        transactions.exists(tx => tx._type == TransferTransaction.typeId && tx.sender.get == publicKey) shouldBe true
-        transactions.exists(tx => tx._type == CreateAliasTransaction.typeId && tx.sender.get == publicKey) shouldBe true
+    nodes.foreach { node =>
+      val transactions = node.blockSeq(fromHeight, toHeight).flatMap(_.transactions)
+      val publicKey    = txSender.toAddress.toString
+      transactions.exists(tx => tx._type == DataTransaction.typeId && tx.sender.get == publicKey) shouldBe true
+      transactions.exists(tx => tx._type == TransferTransaction.typeId && tx.sender.get == publicKey) shouldBe true
+      transactions.exists(tx => tx._type == CreateAliasTransaction.typeId && tx.sender.get == publicKey) shouldBe true
     }
 
   private def sendTransactions(txSender: KeyPair) = {

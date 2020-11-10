@@ -692,7 +692,7 @@ object SyncHttpApi extends Assertions {
         payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
         fee: Long = smartMinFee,
         feeAssetId: Option[String] = None,
-        extraFeePerStep: Int = InvokeScriptTransaction.DefaultExtraFeePerStep,
+        extraFeePerStep: Long = InvokeScriptTransaction.DefaultExtraFeePerStep,
         version: TxVersion = TxVersion.V1,
         waitForTx: Boolean = false
     ): (Transaction, JsValue) = {
