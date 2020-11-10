@@ -128,7 +128,7 @@ object CommonTransactionsApi {
 
     override def continuations(invokeTransactionId: ByteStr): List[ByteStr] = {
       def cId(sern: Int): ByteStr = {
-         ContinuationTransaction(invokeTransactionId, 0L, sern).id()
+         ContinuationTransaction(invokeTransactionId, 0L, sern, 0, Asset.Waves).id()
       }
       def cts(sern: Int): LazyList[ByteStr] = cId(sern) #:: cts(sern + 1)
       cts(0).takeWhile(blockchain.transactionMeta(_).nonEmpty).toList
