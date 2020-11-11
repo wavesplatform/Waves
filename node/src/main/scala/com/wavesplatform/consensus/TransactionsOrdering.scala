@@ -1,7 +1,8 @@
 package com.wavesplatform.consensus
 
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction}
 import com.wavesplatform.transaction.{Authorized, Transaction}
 
 object TransactionsOrdering {
@@ -11,7 +12,12 @@ object TransactionsOrdering {
     private def orderBy(t: Transaction): (Boolean, Double, Long, Long) = {
       val byWhiteList = !isWhitelisted(t) // false < true
       val size        = t.bytes().length
-      val byFee       = if (t.assetFee._1 != Waves) 0 else -t.assetFee._2
+      val commonFee   = if (t.assetFee._1 != Waves) 0 else -t.assetFee._2
+      val extraFee = t match {
+        case i: InvokeScriptTransaction if i.assetFee._1 == Waves => -i.extraFeePerStep
+        case _                                                    => 0
+      }
+      val byFee       = commonFee + extraFee
       val byTimestamp = txTimestampOrder(t.timestamp)
 
       (byWhiteList, byFee.toDouble / size.toDouble, byFee, byTimestamp)
@@ -27,12 +33,13 @@ object TransactionsOrdering {
     override def txTimestampOrder(ts: Long): Long = -ts
   }
 
-  case class InUTXPool(whitelistAddresses: Set[String]) extends WavesOrdering {
+  case class InUTXPool(whitelistAddresses: Set[String], blockchain: Blockchain) extends WavesOrdering {
     override def isWhitelisted(t: Transaction): Boolean =
       t match {
         case _ if whitelistAddresses.isEmpty                                                            => false
         case a: Authorized if whitelistAddresses.contains(a.sender.toAddress.stringRepr)                => true
         case i: InvokeScriptTransaction if whitelistAddresses.contains(i.dAppAddressOrAlias.stringRepr) => true
+        case c: ContinuationTransaction                                                                 => isWhitelisted(c.resolveInvoke(blockchain)._2)
         case _                                                                                          => false
       }
     override def txTimestampOrder(ts: Long): Long = ts
