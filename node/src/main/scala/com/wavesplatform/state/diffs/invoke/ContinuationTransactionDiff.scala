@@ -16,11 +16,11 @@ import com.wavesplatform.lang.v1.traits.Environment.Tthis
 import com.wavesplatform.lang.v1.traits.domain.{CallableAction, Recipient}
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, ContinuationState, Diff}
-import com.wavesplatform.transaction.{ScriptExecutionInProgress, Transaction}
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
-import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction, WavesEnvironment, buildThisValue}
+import com.wavesplatform.transaction.smart.{ContinuationTransaction, WavesEnvironment, buildThisValue}
+import com.wavesplatform.transaction.{ScriptExecutionInProgress, Transaction}
 import monix.eval.Coeval
 import shapeless.Coproduct
 
@@ -28,8 +28,7 @@ object ContinuationTransactionDiff {
   def apply(blockchain: Blockchain, blockTime: Long, verifyAssets: Boolean = true)(
       tx: ContinuationTransaction
   ): TracedResult[ValidationError, Diff] = {
-    val (invokeHeight, foundTx, _) = blockchain.transactionInfo(tx.invokeScriptTransactionId).get
-    val invokeScriptTransaction    = foundTx.asInstanceOf[InvokeScriptTransaction]
+    val (invokeHeight, invokeScriptTransaction) = tx.resolveInvoke(blockchain)
     for {
       dAppAddress <- TracedResult(blockchain.resolveAlias(invokeScriptTransaction.dAppAddressOrAlias))
       scriptInfo <- TracedResult(

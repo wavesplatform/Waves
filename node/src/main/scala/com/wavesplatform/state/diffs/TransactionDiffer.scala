@@ -258,11 +258,12 @@ object TransactionDiffer {
 
       tx match {
         case ctx: ContinuationTransaction =>
-          val invoke = resolveInvoke(blockchain, ctx)
+          val invoke = ctx.resolveInvoke(blockchain)._2
           InvokeDiffsCommon.finishContinuation(commonDiff, ctx, blockchain, invoke, failed = true)
         case _ =>
           commonDiff |+| Diff.empty.copy(
-            transactions = mutable.LinkedHashMap((tx.id(), NewTransactionInfo(tx, (portfolios.keys ++ maybeDApp.toList).toSet, ScriptExecutionFailed))),
+            transactions =
+              mutable.LinkedHashMap((tx.id(), NewTransactionInfo(tx, (portfolios.keys ++ maybeDApp.toList).toSet, ScriptExecutionFailed)))
           )
       }
     }
@@ -282,11 +283,11 @@ object TransactionDiffer {
   // helpers
   private def feePortfolios(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Map[Address, Portfolio]] =
     tx match {
-      case _: GenesisTransaction                              => Map.empty[Address, Portfolio].asRight
-      case ptx: PaymentTransaction                            => Map(ptx.sender.toAddress -> Portfolio(balance = -ptx.fee, LeaseBalance.empty, assets = Map.empty)).asRight
-      case ptx: ProvenTransaction                             => makeFeePortfolios(blockchain, ptx, ptx.sender)
-      case ctx: ContinuationTransaction                       => makeFeePortfolios(blockchain, tx, resolveInvoke(blockchain, ctx).sender)
-      case _                                                  => UnsupportedTransactionType.asLeft
+      case _: GenesisTransaction        => Map.empty[Address, Portfolio].asRight
+      case ptx: PaymentTransaction      => Map(ptx.sender.toAddress -> Portfolio(balance = -ptx.fee, LeaseBalance.empty, assets = Map.empty)).asRight
+      case ptx: ProvenTransaction       => makeFeePortfolios(blockchain, ptx, ptx.sender)
+      case ctx: ContinuationTransaction => makeFeePortfolios(blockchain, tx, ctx.resolveInvoke(blockchain)._2.sender)
+      case _                            => UnsupportedTransactionType.asLeft
     }
 
   private def makeFeePortfolios(blockchain: Blockchain, tx: Transaction, sender: PublicKey): Either[GenericError, Map[Address, Portfolio]] =
@@ -307,13 +308,6 @@ object TransactionDiffer {
           Map(assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> fee)))
         )
     }
-
-  private def resolveInvoke(blockchain: Blockchain, ctx: ContinuationTransaction) =
-    blockchain
-      .transactionInfo(ctx.invokeScriptTransactionId)
-      .map(_._2)
-      .collect { case i: InvokeScriptTransaction => i }
-      .getOrElse(throw new IllegalArgumentException(s"Couldn't find Invoke Transaction with id = ${ctx.invokeScriptTransactionId}"))
 
   private implicit final class EitherOps[E, A](val ei: Either[E, A]) extends AnyVal {
     def traced: TracedResult[E, A] = TracedResult.wrapE(ei)
