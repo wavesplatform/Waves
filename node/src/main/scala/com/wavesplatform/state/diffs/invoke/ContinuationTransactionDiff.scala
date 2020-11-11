@@ -7,6 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, DApp}
 import com.wavesplatform.lang.v1.ContractLimits
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.evaluator.ctx.LazyVal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -27,6 +28,22 @@ import shapeless.Coproduct
 object ContinuationTransactionDiff {
   def apply(blockchain: Blockchain, blockTime: Long, verifyAssets: Boolean = true)(
       tx: ContinuationTransaction
+  ): TracedResult[ValidationError, Diff] = {
+    blockchain.continuationStates(tx.invokeScriptTransactionId) match {
+      case ContinuationState.InProgress(nonce, expr, residualComplexity, _) if nonce == tx.nonce =>
+        applyDiff(blockchain, blockTime, verifyAssets, tx, expr, residualComplexity)
+      case _ =>
+        TracedResult.wrapValue(Diff.empty)
+    }
+  }
+
+  private def applyDiff(
+      blockchain: Blockchain,
+      blockTime: Long,
+      verifyAssets: Boolean,
+      tx: ContinuationTransaction,
+      expr: Terms.EXPR,
+      residualComplexity: Int
   ): TracedResult[ValidationError, Diff] = {
     val (invokeHeight, invokeScriptTransaction) = tx.resolveInvoke(blockchain)
     for {
@@ -58,11 +75,8 @@ object ContinuationTransactionDiff {
       scriptResult <- {
         val ctx =
           PureContext.build(script.stdLibVersion).withEnvironment[Environment] |+|
-          CryptoContext.build(Global, script.stdLibVersion).withEnvironment[Environment] |+|
-          WavesContext.build(directives).copy(vars = Map())
-
-        val ContinuationState.InProgress(_, expr, residualComplexity, _) =
-          blockchain.continuationStates(tx.invokeScriptTransactionId).asInstanceOf[ContinuationState.InProgress]
+            CryptoContext.build(Global, script.stdLibVersion).withEnvironment[Environment] |+|
+            WavesContext.build(directives).copy(vars = Map())
 
         val limit = ContractLimits.MaxComplexityByVersion(script.stdLibVersion) + residualComplexity
         val r = ContractEvaluator
@@ -86,17 +100,19 @@ object ContinuationTransactionDiff {
         InvokeDiffsCommon.getInvocationComplexity(blockchain, invokeScriptTransaction, callableComplexities, dAppAddress)
       )
 
-      doProcessActions = InvokeDiffsCommon.processActions(
-        _: List[CallableAction],
-        script.stdLibVersion,
-        dAppAddress,
-        dAppPublicKey,
-        invocationComplexity,
-        invokeScriptTransaction,
-        blockchain,
-        blockTime,
-        verifyAssets
-      ).map(InvokeDiffsCommon.finishContinuation(_, tx, blockchain, invokeScriptTransaction, failed = false).copy(transactions = Map()))
+      doProcessActions = InvokeDiffsCommon
+        .processActions(
+          _: List[CallableAction],
+          script.stdLibVersion,
+          dAppAddress,
+          dAppPublicKey,
+          invocationComplexity,
+          invokeScriptTransaction,
+          blockchain,
+          blockTime,
+          verifyAssets
+        )
+        .map(InvokeDiffsCommon.finishContinuation(_, tx, blockchain, invokeScriptTransaction, failed = false).copy(transactions = Map()))
 
       resultDiff <- scriptResult._1 match {
         case ScriptResultV3(dataItems, transfers) =>
