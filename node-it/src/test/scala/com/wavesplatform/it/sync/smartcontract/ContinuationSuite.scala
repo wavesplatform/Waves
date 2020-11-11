@@ -106,7 +106,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         args = List(CONST_BOOLEAN(false)),
         payment = Seq(Payment(1.waves, Waves)),
         fee = 1.waves,
-        version = TxVersion.V2,
+        version = TxVersion.V3,
         waitForTx = true
       )
       ._1
@@ -130,7 +130,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         payment = Seq(Payment(1.waves, Waves)),
         fee = 1.waves,
         feeAssetId = Some(sponsoredAssetId),
-        version = TxVersion.V2,
+        version = TxVersion.V3,
         waitForTx = true
       )
       ._1
@@ -153,7 +153,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         args = List(CONST_BOOLEAN(true)),
         payment = Seq(Payment(1.waves, Waves)),
         fee = 1.waves,
-        version = TxVersion.V2,
+        version = TxVersion.V3,
         waitForTx = true
       )
       ._1
