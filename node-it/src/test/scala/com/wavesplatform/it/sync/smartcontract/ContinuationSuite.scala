@@ -173,7 +173,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         payment = Seq(Payment(1.waves, Waves)),
         fee = 1.waves,
         feeAssetId = Some(sponsoredAssetId),
-        version = TxVersion.V2,
+        version = TxVersion.V3,
         waitForTx = true
       )
       ._1
@@ -256,7 +256,8 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     import play.api.libs.json._
     nodes.foreach {
       node =>
-        val invoke = node.transactionInfo[DebugStateChanges](invokeId)
+        val invokeRaw = node.transactionInfo[JsObject](invokeId)
+        val invoke = invokeRaw.as[DebugStateChanges]
         invoke.applicationStatus.value shouldBe "script_execution_in_progress"
 
         val continuations =
@@ -270,6 +271,8 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
           (cont \ "version").as[Int] shouldBe 1
           (cont \ "height").asOpt[Int].nonEmpty shouldBe true
           (cont \ "extraFeePerStep").asOpt[Long].nonEmpty shouldBe true
+          (cont \ "call").as[JsObject] shouldBe (invokeRaw \ "call").as[JsObject]
+          (cont \ "dApp").as[String] shouldBe (invokeRaw \ "dApp").as[String]
         }
 
       val pureInvokeFee = invokeFee - smartFee
