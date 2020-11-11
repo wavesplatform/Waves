@@ -64,7 +64,6 @@ class UtxPoolImpl(
 
   // State
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
-  private[this] val continuationNonces    = new ConcurrentHashMap[ByteStr, Int]()
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionMeta(_).isDefined) // TODO delete in the future
 
   private[this] val priorityDiffs          = mutable.LinkedHashSet.empty[Diff]
@@ -220,56 +219,33 @@ class UtxPoolImpl(
   }
 
   private[utx] def addTransaction(tx: Transaction, verify: Boolean, forceValidate: Boolean = false): TracedResult[ValidationError, Boolean] = {
-    val checkIfContinuationIsActual =
-      tx match {
-        case ContinuationTransaction(invokeId, _, nonce, _, _) =>
-          val newNonce =
-            continuationNonces.compute(
-              invokeId,
-              (_, expectingNonce) =>
-                if (nonce >= expectingNonce) {
-                  nonce + 1
-                } else {
-                  expectingNonce
-                }
-            )
-          lazy val checkState =
-            blockchain.continuationStates
-              .get(invokeId)
-              .collect { case ContinuationState.InProgress(stateNonce, _, _, _) => nonce >= stateNonce }
-              .getOrElse(false)
+    tx match {
+      case c: ContinuationTransaction if blockchain.containsTransaction(c) =>
+        TracedResult.wrapValue(false)
+      case _ =>
+        val diffEi = priorityDiffs.synchronized {
+          val patchedBlockchain = CompositeBlockchain(blockchain, Some(Monoid.combineAll(priorityDiffs)))
 
-          newNonce > nonce && checkState
-        case _ =>
-          true
-      }
+          if (forceValidate)
+            TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(patchedBlockchain, tx)
+          else
+            TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(patchedBlockchain, tx)
+        }
 
-    if (checkIfContinuationIsActual) {
-      val diffEi = priorityDiffs.synchronized {
-        val patchedBlockchain = CompositeBlockchain(blockchain, Some(Monoid.combineAll(priorityDiffs)))
+        def addPortfolio(): Unit = diffEi.map { diff =>
+          pessimisticPortfolios.add(tx.id(), diff)
+          onEvent(UtxEvent.TxAdded(tx, diff))
+        }
 
-        if (forceValidate)
-          TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(patchedBlockchain, tx)
-        else
-          TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(patchedBlockchain, tx)
-      }
+        if (!verify || diffEi.resultE.isRight) {
+          transactions.computeIfAbsent(tx.id(), { _ =>
+            PoolMetrics.addTransaction(tx)
+            addPortfolio()
+            tx
+          })
+        }
 
-      def addPortfolio(): Unit = diffEi.map { diff =>
-        pessimisticPortfolios.add(tx.id(), diff)
-        onEvent(UtxEvent.TxAdded(tx, diff))
-      }
-
-      if (!verify || diffEi.resultE.isRight) {
-        transactions.computeIfAbsent(tx.id(), { _ =>
-          PoolMetrics.addTransaction(tx)
-          addPortfolio()
-          tx
-        })
-      }
-
-      diffEi.map(_ => true)
-    } else {
-      TracedResult.wrapValue(false)
+        diffEi.map(_ => true)
     }
   }
 
@@ -444,6 +420,14 @@ class UtxPoolImpl(
       def loop(seed: PackResult): PackResult = {
         def allValidated(seed: PackResult) = (transactions.keys().asScala ++ priorityTransactionIds).forall(seed.validatedTransactions)
 
+        blockchain.continuationStates
+          .foreach {
+            case (invokeId, ContinuationState.InProgress(nonce, _, _, _)) =>
+              val tx = ContinuationTransaction(invokeId, time.getTimestamp(), nonce, 0L, Waves)
+              addTransaction(tx, verify = false)
+            case _ =>
+          }
+
         val newSeed = packIteration(
           seed.copy(checkedAddresses = Set.empty),
           this.createTxEntrySeq().iterator
@@ -468,15 +452,6 @@ class UtxPoolImpl(
           }
         }
       }
-
-      blockchain.continuationStates
-        .foreach {
-          case (invokeId, ContinuationState.InProgress(nonce, _, _, _)) =>
-            val tx = ContinuationTransaction(invokeId, time.getTimestamp(), nonce, 0L, Waves)
-            addTransaction(tx, verify = false)
-          case (invokeId, ContinuationState.Finished(_)) =>
-            continuationNonces.remove(invokeId)
-        }
 
       loop(PackResult(None, Monoid[Diff].empty, initialConstraint, 0, Set.empty, Set.empty, Set.empty))
     }
