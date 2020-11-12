@@ -30,7 +30,7 @@ object ContinuationTransactionDiff {
       tx: ContinuationTransaction
   ): TracedResult[ValidationError, Diff] = {
     blockchain.continuationStates(tx.invokeScriptTransactionId) match {
-      case (nonce, ContinuationState.InProgress(expr, residualComplexity, _)) if nonce <= tx.nonce =>
+      case (_, ContinuationState.InProgress(expr, residualComplexity, _)) =>
         applyDiff(blockchain, blockTime, verifyAssets, tx, expr, residualComplexity)
       case _ =>
         TracedResult.wrapValue(Diff.empty)
