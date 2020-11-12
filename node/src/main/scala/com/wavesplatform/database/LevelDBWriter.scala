@@ -777,15 +777,11 @@ abstract class LevelDBWriter private[database] (
 
                 case tx: InvokeScriptTransaction =>
                   rw.delete(Keys.invokeScriptResult(h, num))
-/*
                   rw.delete(Keys.continuationState(TransactionId(tx.id.value()), nonce = 0))
-*/
 
                 case c: ContinuationTransaction =>
-                /*
                   rw.delete(Keys.invokeScriptResult(h, num))
                   rw.delete(Keys.continuationState(TransactionId(c.invokeScriptTransactionId), c.nonce))
-                 */
 
                 case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))
                 case tx: ExchangeTransaction =>
