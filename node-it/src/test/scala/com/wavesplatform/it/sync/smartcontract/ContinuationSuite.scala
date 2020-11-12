@@ -98,6 +98,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   }
 
   test("continuation with rollback") {
+    sender.waitForHeight(sender.height + 1)
     val startHeight = sender.height
     val invoke = sender
       .invokeScript(
