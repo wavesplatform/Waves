@@ -34,7 +34,7 @@ class AssetsBroadcastRouteSpec
   private[this] val route = AssetsApiRoute(
     restAPISettings,
     stub[Wallet],
-    DummyUtxPoolSynchronizer.rejecting(tx => TransactionValidationError(GenericError("foo"), tx)),
+    DummyTransactionPublisher.rejecting(tx => TransactionValidationError(GenericError("foo"), tx)),
     stub[Blockchain],
     stub[Time],
     stub[CommonAccountsApi],
@@ -174,7 +174,7 @@ class AssetsBroadcastRouteSpec
     val route = AssetsApiRoute(
       restAPISettings,
       stub[Wallet],
-      DummyUtxPoolSynchronizer.accepting,
+      DummyTransactionPublisher.accepting,
       stub[Blockchain],
       stub[Time],
       stub[CommonAccountsApi],

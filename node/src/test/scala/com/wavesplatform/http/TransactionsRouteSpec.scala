@@ -13,7 +13,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL}
-import com.wavesplatform.network.TransactionValidator
+import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.{Asset, Proofs, TxVersion}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -47,7 +47,7 @@ class TransactionsRouteSpec
     with NoShrink {
 
   private val blockchain          = mock[Blockchain]
-  private val utxPoolSynchronizer = mock[TransactionValidator]
+  private val utxPoolSynchronizer = mock[TransactionPublisher]
   private val addressTransactions = mock[CommonTransactionsApi]
   private val utxPoolSize         = mockFunction[Int]
   private val testTime            = new TestTime

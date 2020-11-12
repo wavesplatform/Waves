@@ -102,8 +102,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val (blockchainUpdater, levelDB) =
     StorageFactory(settings, db, time, spendableBalanceChanged, BlockchainUpdateTriggers.combined(triggers), bc => miner.scheduleMining(bc))
 
-  private var maybeUtx: Option[UtxPool]                                        = None
-  private var maybeNetwork: Option[NS]                                         = None
+  private var maybeUtx: Option[UtxPool] = None
+  private var maybeNetwork: Option[NS]  = None
 
   def apiShutdown(): Unit = {
     for {
@@ -126,18 +126,23 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     maybeUtx = Some(utxStorage)
 
     val timer                 = new HashedWheelTimer()
-    val utxSynchronizerLogger = LoggerFacade(LoggerFactory.getLogger(classOf[TransactionValidator]))
+    val utxSynchronizerLogger = LoggerFacade(LoggerFactory.getLogger(classOf[TransactionPublisher]))
     val timedTxValidator =
       Schedulers.timeBoundedFixedPool(
         timer,
         5.seconds,
         settings.synchronizationSettings.utxSynchronizer.maxThreads,
-        "time-bounded-tx-validator",
+        "utx-time-bounded-tx-validator",
         reporter = utxSynchronizerLogger.trace("Uncaught exception in UTX Synchronizer", _)
       )
 
     val utxSynchronizer =
-      TransactionValidator.timeBounded(utxStorage.putIfNew, allChannels.broadcast, timedTxValidator, settings.synchronizationSettings.utxSynchronizer.allowTxRebroadcasting)
+      TransactionPublisher.timeBounded(
+        utxStorage.putIfNew,
+        allChannels.broadcast,
+        timedTxValidator,
+        settings.synchronizationSettings.utxSynchronizer.allowTxRebroadcasting
+      )
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
 
@@ -268,8 +273,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         }
     }
 
-    TransactionSynchronizer(settings.synchronizationSettings.utxSynchronizer,
-      lastBlockInfo.map(_.height).distinctUntilChanged, transactions, utxSynchronizer)
+    TransactionSynchronizer(
+      settings.synchronizationSettings.utxSynchronizer,
+      lastBlockInfo.map(_.height).distinctUntilChanged,
+      transactions,
+      utxSynchronizer
+    )
 
     Observable(
       microblockData

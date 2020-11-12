@@ -20,7 +20,7 @@ import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.{BroadcastRoute, CustomJson}
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.network.TransactionValidator
+import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -42,7 +42,7 @@ import scala.concurrent.Future
 case class AssetsApiRoute(
     settings: RestAPISettings,
     wallet: Wallet,
-    utxPoolSynchronizer: TransactionValidator,
+    transactionPublisher: TransactionPublisher,
     blockchain: Blockchain,
     time: Time,
     commonAccountApi: CommonAccountsApi,

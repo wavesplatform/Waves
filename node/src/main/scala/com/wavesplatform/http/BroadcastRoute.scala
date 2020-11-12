@@ -4,7 +4,7 @@ import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshal
 import akka.http.scaladsl.server.{Directive1, Route}
 import com.wavesplatform.api.http.{ApiError, ApiRoute, jsonPostD}
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.network.TransactionValidator
+import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import play.api.libs.json._
@@ -12,12 +12,12 @@ import play.api.libs.json._
 import scala.concurrent.Future
 
 trait BroadcastRoute { _: ApiRoute =>
-  def utxPoolSynchronizer: TransactionValidator
+  def transactionPublisher: TransactionPublisher
 
   private def broadcastTransaction(tx: Transaction, includeTrace: Boolean): Future[ToResponseMarshallable] = {
     import scala.concurrent.ExecutionContext.Implicits.global
     implicit val trw: ToResponseMarshaller[TracedResult[ApiError, Transaction]] = tracedResultMarshaller(includeTrace)
-    utxPoolSynchronizer.validateAndBroadcast(tx, None).map(_.leftMap(ApiError.fromValidationError).map(_ => tx))
+    transactionPublisher.validateAndBroadcast(tx, None).map(_.leftMap(ApiError.fromValidationError).map(_ => tx))
   }
 
   private def extractTraceParameter(tx: Transaction): Directive1[ToResponseMarshallable] =

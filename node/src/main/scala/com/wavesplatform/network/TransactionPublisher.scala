@@ -12,11 +12,11 @@ import monix.execution.Scheduler
 import scala.concurrent.{ExecutionException, Future}
 import scala.util.Success
 
-trait TransactionValidator {
+trait TransactionPublisher {
   def validateAndBroadcast(tx: Transaction, source: Option[Channel]): Future[TracedResult[ValidationError, Boolean]]
 }
 
-object TransactionValidator extends ScorexLogging {
+object TransactionPublisher extends ScorexLogging {
 
   import Scheduler.Implicits.global
 
@@ -25,7 +25,7 @@ object TransactionValidator extends ScorexLogging {
       broadcast: (Transaction, Option[Channel]) => Unit,
       timedScheduler: Scheduler,
       allowRebroadcast: Boolean
-  ): TransactionValidator = { (tx, source) =>
+  ): TransactionPublisher = { (tx, source) =>
     timedScheduler
       .executeCatchingInterruptedException(putIfNew(tx, source.isEmpty))
       .recover {

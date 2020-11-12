@@ -25,7 +25,7 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
       60,
       TimeUnit.SECONDS,
       new LinkedBlockingQueue[Runnable],
-      new DefaultThreadFactory("heavy-request-processor", true), { (r: Runnable, executor: ThreadPoolExecutor) =>
+      new DefaultThreadFactory("rest-heavy-request-processor", true), { (r: Runnable, executor: ThreadPoolExecutor) =>
         log.error(s"$r has been rejected from $executor")
         throw new RejectedExecutionException
       }

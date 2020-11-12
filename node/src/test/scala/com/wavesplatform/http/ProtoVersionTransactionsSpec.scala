@@ -9,7 +9,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, FUNCTION_CALL}
-import com.wavesplatform.network.TransactionValidator
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.settings.Constants
@@ -18,7 +17,6 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
@@ -54,11 +52,9 @@ class ProtoVersionTransactionsSpec
   private val blockchain: Blockchain = mock[Blockchain]
   private val utx: UtxPool           = mock[UtxPool]
 
-  private val utxPoolSynchronizer: TransactionValidator = DummyUtxPoolSynchronizer.accepting
-
   private val transactionsApi = mock[CommonTransactionsApi]
   private val route: Route =
-    TransactionsApiRoute(restAPISettings, transactionsApi, testWallet, blockchain, () => utx.size, utxPoolSynchronizer, ntpTime).route
+    TransactionsApiRoute(restAPISettings, transactionsApi, testWallet, blockchain, () => utx.size, DummyTransactionPublisher.accepting, ntpTime).route
 
   "Proto transactions should be able to broadcast " - {
     "CreateAliasTransaction" in {

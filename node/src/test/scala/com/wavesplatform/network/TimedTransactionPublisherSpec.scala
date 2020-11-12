@@ -14,7 +14,7 @@ import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
 
 import scala.concurrent.duration._
 
-class TimedTransactionValidatorSpec extends FreeSpec with Matchers with BeforeAndAfterAll {
+class TimedTransactionPublisherSpec extends FreeSpec with Matchers with BeforeAndAfterAll {
   private[this] val timer     = new HashedWheelTimer
   private[this] val scheduler = Schedulers.timeBoundedFixedPool(timer, 1.second, 1, "test-utx-sync")
 
@@ -47,8 +47,8 @@ class TimedTransactionValidatorSpec extends FreeSpec with Matchers with BeforeAn
     }
   }
 
-  private def withUPS(putIfNew: Transaction => TracedResult[ValidationError, Boolean])(f: TransactionValidator => Unit): Unit =
-    f(TransactionValidator.timeBounded((tx, _) => putIfNew(tx), (_, _) => (), scheduler, false))
+  private def withUPS(putIfNew: Transaction => TracedResult[ValidationError, Boolean])(f: TransactionPublisher => Unit): Unit =
+    f(TransactionPublisher.timeBounded((tx, _) => putIfNew(tx), (_, _) => (), scheduler, false))
 
   override protected def afterAll(): Unit = {
     super.afterAll()

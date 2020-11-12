@@ -17,7 +17,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.http.BroadcastRoute
-import com.wavesplatform.network.TransactionValidator
+import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
@@ -37,7 +37,7 @@ case class TransactionsApiRoute(
     wallet: Wallet,
     blockchain: Blockchain,
     utxPoolSize: () => Int,
-    utxPoolSynchronizer: TransactionValidator,
+    transactionPublisher: TransactionPublisher,
     time: Time
 ) extends ApiRoute
     with BroadcastRoute

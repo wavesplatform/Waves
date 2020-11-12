@@ -14,7 +14,7 @@ object TransactionSynchronizer extends LazyLogging {
       settings: UtxSynchronizerSettings,
       lastHeight: Observable[Int],
       transactions: Observable[(Channel, Transaction)],
-      transactionValidator: TransactionValidator
+      transactionValidator: TransactionPublisher
   )(implicit scheduler: Scheduler): Cancelable = {
     val dummy = new Object()
     val knownTransactions = CacheBuilder
