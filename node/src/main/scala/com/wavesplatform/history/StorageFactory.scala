@@ -21,7 +21,7 @@ object StorageFactory extends ScorexLogging {
       spendableBalanceChanged: Observer[(Address, Asset)],
       blockchainUpdateTriggers: BlockchainUpdateTriggers,
       miner: Miner = _ => ()
-  ): (BlockchainUpdaterImpl, AutoCloseable) = {
+  ): (BlockchainUpdaterImpl, LevelDBWriter with AutoCloseable) = {
     checkVersion(db)
     val levelDBWriter = LevelDBWriter(db, spendableBalanceChanged, settings)
     val bui = new BlockchainUpdaterImpl(

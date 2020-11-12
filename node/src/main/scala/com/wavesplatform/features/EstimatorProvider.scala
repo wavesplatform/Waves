@@ -9,14 +9,14 @@ import com.wavesplatform.state.Blockchain
 
 object EstimatorProvider {
   implicit class EstimatorBlockchainExt(b: Blockchain) {
-    val estimator: ScriptEstimator =
+    def estimator: ScriptEstimator =
       if (b.isFeatureActivated(BlockV5)) ScriptEstimatorV3
       else if (b.isFeatureActivated(BlockReward)) ScriptEstimatorV2
       else ScriptEstimatorV1
   }
 
   implicit class EstimatorWavesSettingsExt(ws: WavesSettings) {
-    val estimator: ScriptEstimator =
+    def estimator: ScriptEstimator =
       if (ws.featuresSettings.supported.contains(BlockV5.id)) ScriptEstimatorV3
       else if (ws.featuresSettings.supported.contains(BlockReward.id)) ScriptEstimatorV2
       else ScriptEstimatorV1

@@ -8,7 +8,7 @@ object Dependencies {
   def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.6.4"
 
   private def akkaHttpModule(module: String)               = "com.typesafe.akka"             %% module            % "10.1.12"
-  private def nettyModule(module: String)                  = "io.netty"                      % s"netty-$module"   % "4.1.33.Final"
+  private def nettyModule(module: String)                  = "io.netty"                      % s"netty-$module"   % "4.1.51.Final"
   private def kamonModule(module: String)                  = "io.kamon"                      %% s"kamon-$module"  % "2.1.0"
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.11.0"
   private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
@@ -101,10 +101,10 @@ object Dependencies {
       bouncyCastle("bcprov"),
       kindProjector,
       compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
-      "com.softwaremill.sttp" %%% "core" % "1.6.4",
-      "com.wavesplatform"     % "zwaves" % "0.1.0-SNAPSHOT",
+      "com.softwaremill.sttp" %%% "core"       % "1.6.4",
+      "com.wavesplatform"     % "zwaves"       % "0.1.0-SNAPSHOT",
       "com.wavesplatform"     % "zwaves-bn256" % "0.1.5-SNAPSHOT",
-      "org.web3j" % "crypto" % "4.5.18"
+      "org.web3j"             % "crypto"       % "4.5.18"
     ) ++ scalapbRuntime.value ++ circe.value ++ protobuf.value
   )
 
@@ -160,11 +160,11 @@ object Dependencies {
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test,
       ("org.iq80.leveldb" % "leveldb" % "0.12").exclude("com.google.guava", "guava") % Test
-    ) ++ test ++ console ++ logDeps ++ levelDBJNA
+    ) ++ test ++ console ++ logDeps ++ levelDBJNA ++ protobuf.value
   )
 
   private[this] val protoSchemasLib =
-     "com.wavesplatform" % "protobuf-schemas" % "1.2.6" classifier "proto"
+    "com.wavesplatform" % "protobuf-schemas" % "1.2.8" classifier "proto" intransitive()
 
   lazy val scalapbRuntime = Def.setting {
     val version = scalapb.compiler.Version.scalapbVersion
@@ -180,7 +180,7 @@ object Dependencies {
   }
 
   lazy val grpc: Seq[ModuleID] = Seq(
-    "io.grpc"              % "grpc-netty" % scalapb.compiler.Version.grpcJavaVersion,
+    "io.grpc"              % "grpc-netty" % "1.31.1" /* scalapb.compiler.Version.grpcJavaVersion */,
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion,
     protoSchemasLib        % "protobuf"
   )
