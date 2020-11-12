@@ -1,12 +1,14 @@
 package com.wavesplatform.it.grpc
 
+import com.google.common.primitives.Ints
 import com.typesafe.config.Config
-import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.api.grpc.{BlockRangeRequest, BlockRequest, BlocksApiGrpc}
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync.grpc.GrpcBaseTransactionSuite
 import com.wavesplatform.protobuf.block._
+import com.wavesplatform.protobuf.transaction.PBRecipients
 import org.scalatest.Matchers
 
 class BlocksApiSuite extends GrpcBaseTransactionSuite with Matchers {
@@ -14,9 +16,11 @@ class BlocksApiSuite extends GrpcBaseTransactionSuite with Matchers {
   private val BlockV5Height = 5
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
-      .overrideBase(_.raw(
-        s"""waves {
-          |  miner.quorum = 0
+      .overrideBase(_.raw(s"""waves {
+          |  miner { 
+          |    quorum = 0
+          |    max-transactions-in-micro-block = 1
+          |  }
           |  blockchain.custom.functionality.pre-activated-features {
           |    14 = $BlockV4Height
           |    15 = $BlockV5Height
@@ -27,16 +31,31 @@ class BlocksApiSuite extends GrpcBaseTransactionSuite with Matchers {
 
   private lazy val blocksApi = BlocksApiGrpc.blockingStub(sender.grpcChannel)
 
-
   private def validateHeaders(range: Range)(assertion: PBBlockHeader => Unit): Unit = {
     val headersByHeight = range.map(height => blocksApi.getBlock(BlockRequest(request = BlockRequest.Request.Height(height))))
-    val headersRange = blocksApi.getBlockRange(BlockRangeRequest(range.min, range.max))
+    val headersRange    = blocksApi.getBlockRange(BlockRangeRequest(range.min, range.max))
 
     headersByHeight zip headersRange foreach {
-      case (h1, h2) => h1 shouldEqual h2
+      case (h1, h2) =>
+        h1.getBlock.header shouldEqual h2.getBlock.header
+        h1.getBlock.signature shouldEqual h2.getBlock.signature
+        h1.getBlock.transactions should be(empty)
+        h1.height shouldEqual h2.height
     }
 
     (headersByHeight ++ headersRange).foreach(bwh => assertion(bwh.block.get.header.get))
+  }
+
+  protected override def beforeAll(): Unit = {
+    super.beforeAll()
+    1 to 100 foreach { i =>
+      sender.broadcastTransfer(
+        sender.keyPair,
+        PBRecipients.create(PublicKey(Ints.toByteArray(i) ++ new Array[Byte](28)).toAddress),
+        100000000L,
+        100000L
+      )
+    }
   }
 
   test("Validate Block v3 header fields") {
