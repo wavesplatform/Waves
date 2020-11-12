@@ -168,8 +168,8 @@ object InvokeScriptTransactionDiff {
               case ScriptResultV3(dataItems, transfers) => doProcessActions(dataItems ::: transfers)
               case ScriptResultV4(actions)              => doProcessActions(actions)
               case ir: IncompleteResult =>
-                val state = ContinuationState.InProgress(nonce = 0, ir.expr, residualComplexity = ir.unusedComplexity, tx.id.value())
-                TracedResult.wrapValue(Diff(tx = tx, continuationStates = Map(tx.id.value() -> state)))
+                val state = ContinuationState.InProgress(ir.expr, residualComplexity = ir.unusedComplexity, tx.id.value())
+                TracedResult.wrapValue(Diff(tx = tx, continuationStates = Map((tx.id.value(), 0) -> state)))
             }
           } yield resultDiff
         } yield result

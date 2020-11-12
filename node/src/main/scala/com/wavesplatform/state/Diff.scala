@@ -146,14 +146,8 @@ case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: Ass
 
 sealed trait ContinuationState
 object ContinuationState {
-  case class InProgress(
-      nonce: Int,
-      expr: EXPR,
-      residualComplexity: Int,
-      lastTransactionId: ByteStr
-  ) extends ContinuationState
-
-  case class Finished(transactionId: ByteStr) extends ContinuationState
+  case class InProgress(expr: EXPR, residualComplexity: Int, transactionId: ByteStr) extends ContinuationState
+  case class Finished(transactionId: ByteStr)                                        extends ContinuationState
 }
 
 case class Diff(
@@ -171,10 +165,18 @@ case class Diff(
     scriptsRun: Int,
     scriptsComplexity: Long,
     scriptResults: Map[ByteStr, InvokeScriptResult],
-    continuationStates: Map[ByteStr, ContinuationState],
+    continuationStates: Map[(ByteStr, Int), ContinuationState],
     addressTransactionBindings: Map[ByteStr, Set[Address]],
     replacingTransactions: List[(Transaction, ApplicationStatus)]
 ) {
+  lazy val continuationCurrentStates: Map[ByteStr, (Int, ContinuationState)] =
+    continuationStates
+      .groupBy { case ((invokeId, _), _) => invokeId }
+      .map { case (invokeId, states) =>
+        val ((_, nonce), currentState) = states.maxBy { case ((_, nonce), _) => nonce }
+        (invokeId, (nonce, currentState))
+      }
+
   def bindTransaction(tx: Transaction): Diff =
     copy(transactions = transactions.concat(Map(Diff.toDiffTxData(tx, portfolios, accountData))))
 
@@ -198,7 +200,7 @@ object Diff {
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
       scriptsRun: Int = 0,
-      continuationStates: Map[ByteStr, ContinuationState] = Map.empty,
+      continuationStates: Map[(ByteStr, Int), ContinuationState] = Map.empty,
       addressTransactionBindings: Map[ByteStr, Set[Address]] = Map.empty,
       replacingTransactions: List[(Transaction, ApplicationStatus)] = Nil
   ): Diff =
@@ -237,7 +239,7 @@ object Diff {
       scriptsRun: Int = 0,
       scriptsComplexity: Long = 0,
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
-      continuationStates: Map[ByteStr, ContinuationState] = Map.empty
+      continuationStates: Map[(ByteStr, Int), ContinuationState] = Map.empty
   ): Diff =
     Diff(
       // should be changed to VectorMap after 2.13 https://github.com/scala/scala/pull/6854

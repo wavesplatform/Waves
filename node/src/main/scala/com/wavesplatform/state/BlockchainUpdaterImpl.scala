@@ -687,7 +687,7 @@ class BlockchainUpdaterImpl(
     }
   }
 
-  override def continuationStates: Map[ByteStr, ContinuationState] = readLock {
+  override def continuationStates: Map[ByteStr, (Int, ContinuationState)] = readLock {
     compositeBlockchain.continuationStates
   }
 

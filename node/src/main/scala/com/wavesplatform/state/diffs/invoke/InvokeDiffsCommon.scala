@@ -290,7 +290,7 @@ object InvokeDiffsCommon {
     val totalFee                 = expectedStepFeeInAttachedAsset(invoke, blockchain) + wavesToAttachedAsset(invoke, blockchain, smartAssetsInvocationFee + issuesFee)
     diff
       .copy(
-        continuationStates = Map(tx.invokeScriptTransactionId -> ContinuationState.Finished(tx.id.value())),
+        continuationStates = Map((tx.invokeScriptTransactionId, tx.nonce + 1) -> ContinuationState.Finished(tx.id.value())),
         replacingTransactions = List((tx.copy(fee = totalFee), if (failed) ScriptExecutionFailed else Succeeded))
       )
       .bindOldTransaction(tx.invokeScriptTransactionId)

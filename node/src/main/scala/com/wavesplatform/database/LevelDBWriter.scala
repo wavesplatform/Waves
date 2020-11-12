@@ -279,8 +279,11 @@ abstract class LevelDBWriter private[database] (
     stateFeatures ++ settings.functionalitySettings.preActivatedFeatures
   }
 
-  override protected def loadContinuationStates(invokeTxId: TransactionId): ContinuationState =
-    readOnly(_.get(Keys.continuationState(invokeTxId)))
+  override protected def loadContinuationStates(invokeTxId: TransactionId): (Int, ContinuationState) = {
+    val lastNonce = readOnly(_.get(Keys.continuationLastNonce(invokeTxId)))
+    val state = readOnly(_.get(Keys.continuationState(invokeTxId, lastNonce)))
+    (lastNonce, state)
+  }
 
   override def wavesAmount(height: Int): BigInt = readOnly { db =>
     val factHeight = height.min(this.height)
@@ -380,7 +383,7 @@ abstract class LevelDBWriter private[database] (
       scriptResults: Map[ByteStr, InvokeScriptResult],
       failedTransactionIds: Set[ByteStr],
       stateHash: StateHashBuilder.Result,
-      continuationStates: Map[ByteStr, ContinuationState],
+      continuationStates: Map[(ByteStr, Int), ContinuationState],
       addressTransactionBindings: Map[AddressId, Seq[TransactionId]],
       replacingTransactions: List[(Transaction, ApplicationStatus)]
   ): Unit = {
@@ -398,9 +401,9 @@ abstract class LevelDBWriter private[database] (
 
       val transactions: Map[TransactionId, (Transaction, TxNum, ApplicationStatus)] =
         block.transactionData.zipWithIndex.map { in =>
-          def checkExecutionStatus(invokeId: ByteStr, tx: Transaction): ApplicationStatus =
+          def checkExecutionStatus(invokeId: ByteStr, tx: Transaction, nonce: Int): ApplicationStatus =
             continuationStates
-              .get(invokeId)
+              .get((invokeId, nonce))
               .map {
                 case ContinuationState.Finished(transactionId) if transactionId == tx.id.value() =>
                   Succeeded
@@ -415,8 +418,8 @@ abstract class LevelDBWriter private[database] (
               ScriptExecutionFailed
             else
               tx match {
-                case tx: ContinuationTransaction => checkExecutionStatus(tx.invokeScriptTransactionId, tx)
-                case tx: InvokeScriptTransaction => checkExecutionStatus(tx.id.value(), tx)
+                case tx: ContinuationTransaction => checkExecutionStatus(tx.invokeScriptTransactionId, tx, tx.nonce)
+                case tx: InvokeScriptTransaction => checkExecutionStatus(tx.id.value(), tx, 0)
                 case _                           => Succeeded
               }
           val k = TransactionId(tx.id())
@@ -629,8 +632,9 @@ abstract class LevelDBWriter private[database] (
 
       continuationStates
         .foreach {
-          case (invokeTxId, state) =>
-            rw.put(Keys.continuationState(TransactionId(invokeTxId)), state)
+          case ((invokeTxId, nonce), state) =>
+            rw.put(Keys.continuationLastNonce(TransactionId(invokeTxId)), nonce)
+            rw.put(Keys.continuationState(TransactionId(invokeTxId), nonce), state)
         }
 
       expiredKeys.foreach(rw.delete(_, "expired-keys"))
@@ -771,9 +775,17 @@ abstract class LevelDBWriter private[database] (
 
                 case _: DataTransaction => // see changed data keys removal
 
-                case _: InvokeScriptTransaction =>
-                  val k = Keys.invokeScriptResult(h, num)
-                  rw.delete(k)
+                case tx: InvokeScriptTransaction =>
+                  rw.delete(Keys.invokeScriptResult(h, num))
+/*
+                  rw.delete(Keys.continuationState(TransactionId(tx.id.value()), nonce = 0))
+*/
+
+                case c: ContinuationTransaction =>
+                /*
+                  rw.delete(Keys.invokeScriptResult(h, num))
+                  rw.delete(Keys.continuationState(TransactionId(c.invokeScriptTransactionId), c.nonce))
+                 */
 
                 case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))
                 case tx: ExchangeTransaction =>

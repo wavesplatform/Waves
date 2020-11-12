@@ -70,7 +70,7 @@ trait Blockchain {
 
   def balance(address: Address, mayBeAssetId: Asset = Waves): Long
 
-  def continuationStates: Map[ByteStr, ContinuationState]
+  def continuationStates: Map[ByteStr, (Int, ContinuationState)]
 }
 
 object Blockchain {

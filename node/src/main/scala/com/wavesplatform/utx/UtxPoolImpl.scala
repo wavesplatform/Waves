@@ -422,7 +422,7 @@ class UtxPoolImpl(
 
         blockchain.continuationStates
           .foreach {
-            case (invokeId, ContinuationState.InProgress(nonce, _, _, _)) =>
+            case (invokeId, (nonce, ContinuationState.InProgress(_, _, _))) =>
               val tx = ContinuationTransaction(invokeId, time.getTimestamp(), nonce, 0L, Waves)
               addTransaction(tx, verify = false)
             case _ =>
@@ -498,7 +498,7 @@ class UtxPoolImpl(
         case authorized: AuthorizedTransaction =>
           blockchain.continuationStates
             .exists {
-              case (invokeId, _: ContinuationState.InProgress) =>
+              case (invokeId, (_, _: ContinuationState.InProgress)) =>
                 val txSender    = authorized.sender.toAddress
                 val invoke      = blockchain.transactionInfo(invokeId).get._2.asInstanceOf[InvokeScriptTransaction]
                 val dAppAddress = blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()

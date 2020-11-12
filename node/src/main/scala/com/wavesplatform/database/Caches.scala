@@ -149,10 +149,10 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
   @volatile
-  protected var continuationStatesCache: LoadingCache[ByteStr, ContinuationState] =
+  protected var continuationStatesCache: LoadingCache[ByteStr,  (Int, ContinuationState)] =
     cache(dbSettings.maxCacheSize, invokeTxId => loadContinuationStates(TransactionId(invokeTxId)))
-  protected def loadContinuationStates(invokeTxId: TransactionId): ContinuationState
-  override def continuationStates: Map[ByteStr, ContinuationState] =
+  protected def loadContinuationStates(invokeTxId: TransactionId): (Int, ContinuationState)
+  override def continuationStates: Map[ByteStr, (Int, ContinuationState)] =
     continuationStatesCache.asMap.asScala.toMap
 
   //noinspection ScalaStyle
@@ -178,7 +178,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       scriptResults: Map[ByteStr, InvokeScriptResult],
       failedTransactionIds: Set[ByteStr],
       stateHash: StateHashBuilder.Result,
-      continuationStates: Map[ByteStr, ContinuationState],
+      continuationStates: Map[(ByteStr, Int), ContinuationState],
       addressTransactionBindings: Map[AddressId, Seq[TransactionId]],
       replacingTransactions: List[(Transaction, ApplicationStatus)]
   ): Unit
@@ -349,7 +349,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     blocksTs.put(newHeight, block.header.timestamp)
 
     accountDataCache.putAll(newData.asJava)
-    continuationStatesCache.putAll(diff.continuationStates.asJava)
+    continuationStatesCache.putAll(diff.continuationCurrentStates.asJava)
 
     forgetBlocks()
   }

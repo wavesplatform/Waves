@@ -251,17 +251,18 @@ package object database extends ScorexLogging {
   }
 
   def readContinuationState(bytes: Array[Byte]): ContinuationState = {
+    //TODO remove nonce if needed
     val pb.ContinuationState(nonce, exprBytes, residualComplexity, lastTransactionId) =
       pb.ContinuationState.parseFrom(bytes)
     val expr = Serde.deserialize(exprBytes.asReadOnlyByteBuffer()).explicitGet()
-    ContinuationState.InProgress(nonce, expr, residualComplexity, ByteStr(lastTransactionId.toByteArray))
+    ContinuationState.InProgress(expr, residualComplexity, ByteStr(lastTransactionId.toByteArray))
   }
 
   def writeContinuationState(continuationState: ContinuationState): Array[Byte] = {
     continuationState match {
-      case ContinuationState.InProgress(nonce, expr, residualComplexity, lastTransactionId) =>
+      case ContinuationState.InProgress(expr, residualComplexity, lastTransactionId) =>
         pb.ContinuationState(
-          nonce,
+          0,
           ByteString.copyFrom(Serde.serialize(expr, allowObjects = true)),
           residualComplexity,
           ByteString.copyFrom(lastTransactionId.arr)
