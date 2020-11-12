@@ -10,7 +10,7 @@ import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.requests.CreateAliasRequest
 import com.wavesplatform.http.BroadcastRoute
-import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.network.TransactionValidator
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
@@ -19,12 +19,12 @@ import com.wavesplatform.wallet.Wallet
 import play.api.libs.json.{JsString, JsValue, Json}
 
 case class AliasApiRoute(
-    settings: RestAPISettings,
-    commonApi: CommonTransactionsApi,
-    wallet: Wallet,
-    utxPoolSynchronizer: UtxPoolSynchronizer,
-    time: Time,
-    blockchain: Blockchain
+                          settings: RestAPISettings,
+                          commonApi: CommonTransactionsApi,
+                          wallet: Wallet,
+                          utxPoolSynchronizer: TransactionValidator,
+                          time: Time,
+                          blockchain: Blockchain
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {

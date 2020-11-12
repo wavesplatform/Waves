@@ -17,7 +17,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.http.BroadcastRoute
-import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.network.TransactionValidator
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
@@ -32,13 +32,13 @@ import scala.concurrent.Future
 import scala.util.Success
 
 case class TransactionsApiRoute(
-    settings: RestAPISettings,
-    commonApi: CommonTransactionsApi,
-    wallet: Wallet,
-    blockchain: Blockchain,
-    utxPoolSize: () => Int,
-    utxPoolSynchronizer: UtxPoolSynchronizer,
-    time: Time
+                                 settings: RestAPISettings,
+                                 commonApi: CommonTransactionsApi,
+                                 wallet: Wallet,
+                                 blockchain: Blockchain,
+                                 utxPoolSize: () => Int,
+                                 utxPoolSynchronizer: TransactionValidator,
+                                 time: Time
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {

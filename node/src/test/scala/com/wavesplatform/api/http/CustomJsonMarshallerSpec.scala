@@ -11,7 +11,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.http.{ApiErrorMatchers, RestAPISettingsHelper}
-import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.network.TransactionValidator
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.Asset
@@ -40,7 +40,7 @@ class CustomJsonMarshallerSpec
     with TransactionGen {
   private val blockchain      = mock[Blockchain]
   private val utx             = mock[UtxPool]
-  private val utxSynchronizer = mock[UtxPoolSynchronizer]
+  private val utxSynchronizer = mock[TransactionValidator]
   private val transactionsApi = mock[CommonTransactionsApi]
   private val accountsApi     = mock[CommonAccountsApi]
   private val assetsApi       = mock[CommonAssetsApi]

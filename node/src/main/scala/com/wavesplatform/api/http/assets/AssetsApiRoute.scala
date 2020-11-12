@@ -20,7 +20,7 @@ import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.{BroadcastRoute, CustomJson}
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.network.TransactionValidator
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -40,13 +40,13 @@ import play.api.libs.json._
 import scala.concurrent.Future
 
 case class AssetsApiRoute(
-    settings: RestAPISettings,
-    wallet: Wallet,
-    utxPoolSynchronizer: UtxPoolSynchronizer,
-    blockchain: Blockchain,
-    time: Time,
-    commonAccountApi: CommonAccountsApi,
-    commonAssetsApi: CommonAssetsApi
+                           settings: RestAPISettings,
+                           wallet: Wallet,
+                           utxPoolSynchronizer: TransactionValidator,
+                           blockchain: Blockchain,
+                           time: Time,
+                           commonAccountApi: CommonAccountsApi,
+                           commonAssetsApi: CommonAssetsApi
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {

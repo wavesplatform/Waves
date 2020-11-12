@@ -17,7 +17,7 @@ import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.meta.FunctionSignatures
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.{Global, ValidationError}
-import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.network.TransactionValidator
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{Blockchain, DataEntry}
 import com.wavesplatform.state.diffs.FeeValidation
@@ -32,13 +32,13 @@ import play.api.libs.json._
 import scala.util.{Success, Try}
 
 case class AddressApiRoute(
-    settings: RestAPISettings,
-    wallet: Wallet,
-    blockchain: Blockchain,
-    utxPoolSynchronizer: UtxPoolSynchronizer,
-    time: Time,
-    limitedScheduler: Scheduler,
-    commonAccountsApi: CommonAccountsApi
+                            settings: RestAPISettings,
+                            wallet: Wallet,
+                            blockchain: Blockchain,
+                            utxPoolSynchronizer: TransactionValidator,
+                            time: Time,
+                            limitedScheduler: Scheduler,
+                            commonAccountsApi: CommonAccountsApi
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute

@@ -10,7 +10,6 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import cats.instances.all._
 import cats.syntax.option._
-import com.google.common.cache.CacheBuilder
 import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
@@ -51,8 +50,8 @@ import kamon.Kamon
 import monix.eval.{Coeval, Task}
 import monix.execution.UncaughtExceptionReporter
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
+import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
-import monix.reactive.{Observable, OverflowStrategy}
 import org.influxdb.dto.Point
 import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
@@ -127,7 +126,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     maybeUtx = Some(utxStorage)
 
     val timer                 = new HashedWheelTimer()
-    val utxSynchronizerLogger = LoggerFacade(LoggerFactory.getLogger(classOf[UtxPoolSynchronizer]))
+    val utxSynchronizerLogger = LoggerFacade(LoggerFactory.getLogger(classOf[TransactionValidator]))
     val timedTxValidator =
       Schedulers.timeBoundedFixedPool(
         timer,
@@ -138,7 +137,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       )
 
     val utxSynchronizer =
-      UtxPoolSynchronizer(utxStorage.putIfNew, allChannels.broadcast, timedTxValidator, settings.synchronizationSettings.utxSynchronizer.allowTxRebroadcasting)
+      TransactionValidator.timeBounded(utxStorage.putIfNew, allChannels.broadcast, timedTxValidator, settings.synchronizationSettings.utxSynchronizer.allowTxRebroadcasting)
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
 
@@ -193,7 +192,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def wallet: Wallet                                                               = app.wallet
       override def utx: UtxPool                                                                 = utxStorage
       override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] =
-        Await.result(utxSynchronizer.processIncomingTransaction(tx, None), Duration.Inf) // TODO: Replace with async if possible
+        Await.result(utxSynchronizer.validate(tx, None), Duration.Inf) // TODO: Replace with async if possible
       override def spendableBalanceChanged: Observable[(Address, Asset)] = app.spendableBalanceChanged
       override def actorSystem: ActorSystem                              = app.actorSystem
       override def utxEvents: Observable[UtxEvent]                       = app.utxEvents
@@ -204,7 +203,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         blockchainUpdater,
         utxStorage,
         wallet,
-        tx => utxSynchronizer.processIncomingTransaction(tx, None),
+        tx => utxSynchronizer.validate(tx, None),
         loadBlockAt(db, blockchainUpdater)
       )
       override val blocksApi: CommonBlocksApi =
@@ -269,34 +268,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         }
     }
 
-    val dummy = new Object()
-    val knownTransactions = CacheBuilder
-      .newBuilder()
-      .maximumSize(settings.synchronizationSettings.utxSynchronizer.networkTxCacheSize)
-      .build[ByteStr, Object]
-
-    lastBlockInfo.map(_.height).distinctUntilChanged.foreach { h =>
-      log.trace(s"Invalidating known transactions at height $h")
-      knownTransactions.invalidateAll()
-    }
-
-    def transactionIsNew(txId: ByteStr): Boolean = {
-      var isNew = false
-      knownTransactions.get(txId, { () =>
-        isNew = true; dummy
-      })
-      isNew
-    }
-
-    transactions
-      .filter {
-        case (_, tx) => transactionIsNew(tx.id())
-      }
-      .whileBusyBuffer(OverflowStrategy.DropNew(settings.synchronizationSettings.utxSynchronizer.maxQueueSize))
-      .mapParallelUnorderedF(settings.synchronizationSettings.utxSynchronizer.maxThreads) {
-        case (channel, tx) => utxSynchronizer.processIncomingTransaction(tx, Some(channel))
-      }
-      .subscribe()
+    TransactionSynchronizer(settings.synchronizationSettings.utxSynchronizer,
+      lastBlockInfo.map(_.height).distinctUntilChanged, transactions, utxSynchronizer)
 
     Observable(
       microblockData

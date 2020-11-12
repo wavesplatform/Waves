@@ -7,7 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
-import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.network.TransactionValidator
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -31,7 +31,7 @@ class AssetsApiRouteSpec
 
   private val assetsApi = stub[CommonAssetsApi]
   private val route =
-    AssetsApiRoute(restAPISettings, testWallet, mock[UtxPoolSynchronizer], blockchain, new TestTime, mock[CommonAccountsApi], assetsApi).route
+    AssetsApiRoute(restAPISettings, testWallet, mock[TransactionValidator], blockchain, new TestTime, mock[CommonAccountsApi], assetsApi).route
 
   private val smartIssueAndDetailsGen = for {
     script       <- scriptGen

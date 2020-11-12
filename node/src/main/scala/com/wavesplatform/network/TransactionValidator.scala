@@ -12,20 +12,20 @@ import monix.execution.Scheduler
 import scala.concurrent.{ExecutionException, Future}
 import scala.util.Success
 
-trait UtxPoolSynchronizer {
-  def processIncomingTransaction(tx: Transaction, source: Option[Channel]): Future[TracedResult[ValidationError, Boolean]]
+trait TransactionValidator {
+  def validate(tx: Transaction, source: Option[Channel]): Future[TracedResult[ValidationError, Boolean]]
 }
 
-object UtxPoolSynchronizer extends ScorexLogging {
+object TransactionValidator extends ScorexLogging {
 
   import Scheduler.Implicits.global
 
-  def apply(
+  def timeBounded(
       putIfNew: (Transaction, Boolean) => TracedResult[ValidationError, Boolean],
       broadcast: (Transaction, Option[Channel]) => Unit,
       timedScheduler: Scheduler,
       allowRebroadcast: Boolean
-  ): UtxPoolSynchronizer = { (tx, source) =>
+  ): TransactionValidator = { (tx, source) =>
     timedScheduler
       .executeCatchingInterruptedException(putIfNew(tx, source.isEmpty))
       .recover {

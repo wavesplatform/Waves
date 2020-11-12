@@ -5,7 +5,7 @@ import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.requests.{LeaseCancelRequest, LeaseRequest}
 import com.wavesplatform.http.BroadcastRoute
-import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.network.TransactionValidator
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
@@ -15,12 +15,12 @@ import com.wavesplatform.wallet.Wallet
 import play.api.libs.json.JsNumber
 
 case class LeaseApiRoute(
-    settings: RestAPISettings,
-    wallet: Wallet,
-    blockchain: Blockchain,
-    utxPoolSynchronizer: UtxPoolSynchronizer,
-    time: Time,
-    commonAccountApi: CommonAccountsApi
+                          settings: RestAPISettings,
+                          wallet: Wallet,
+                          blockchain: Blockchain,
+                          utxPoolSynchronizer: TransactionValidator,
+                          time: Time,
+                          commonAccountApi: CommonAccountsApi
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {

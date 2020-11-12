@@ -14,39 +14,41 @@ import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
 
 import scala.concurrent.duration._
 
-class UtxPoolSynchronizerSpec extends FreeSpec with Matchers with BeforeAndAfterAll {
+class TimedTransactionValidatorSpec extends FreeSpec with Matchers with BeforeAndAfterAll {
   private[this] val timer     = new HashedWheelTimer
-  private[this] val scheduler = Schedulers.timeBoundedFixedPool(timer, 1.second, 2, "test-utx-sync")
+  private[this] val scheduler = Schedulers.timeBoundedFixedPool(timer, 1.second, 1, "test-utx-sync")
 
   "UtxPoolSynchronizer" - {
     val latch   = new CountDownLatch(5)
     val counter = AtomicInt(10)
 
     def countTransactions(tx: Transaction): TracedResult[ValidationError, Boolean] = {
-      if (counter.getAndDecrement() > 5)
-        while (!Thread.currentThread().isInterrupted) {} else
-        latch.countDown()
+      // the first 5 transactions will take too long to validate
+      if (counter.getAndDecrement() > 5) {
+        while (!Thread.currentThread().isInterrupted) {
+          Thread.sleep(100)
+        }
+      }
+
+      latch.countDown()
 
       TracedResult(Right(true))
     }
 
     "accepts only those transactions from network which can be validated quickly" in withUPS(countTransactions) { ups =>
       1 to 10 foreach { i =>
-        ups.processIncomingTransaction(
+        ups.validate(
           GenesisTransaction.create(PublicKey(new Array[Byte](32)).toAddress, i * 10L, 0L).explicitGet(),
           Some(new EmbeddedChannel)
         )
       }
-      latch.await()
-      counter.get() shouldEqual 0
+      latch.await()               // 5 transactions have completed validation process
+      counter.get() shouldEqual 0 // all 10 transactions have been processed
     }
   }
 
-  private def withUPS(putIfNew: Transaction => TracedResult[ValidationError, Boolean])(f: UtxPoolSynchronizer => Unit): Unit = {
-    val ups =
-      UtxPoolSynchronizer((tx, _) => putIfNew(tx), (_, _) => (), scheduler, false)
-    f(ups)
-  }
+  private def withUPS(putIfNew: Transaction => TracedResult[ValidationError, Boolean])(f: TransactionValidator => Unit): Unit =
+    f(TransactionValidator.timeBounded((tx, _) => putIfNew(tx), (_, _) => (), scheduler, false))
 
   override protected def afterAll(): Unit = {
     super.afterAll()
