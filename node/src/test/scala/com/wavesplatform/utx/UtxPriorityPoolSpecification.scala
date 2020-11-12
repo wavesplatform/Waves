@@ -219,6 +219,7 @@ class UtxPriorityPoolSpecification
     "invalidates priority pool on different microblock" in forAll(genDependent) {
       case (tx1, tx2) =>
         val blockchain = createState(tx1.sender.toAddress, setBalance = false)
+        (blockchain.balance _).when(TxHelpers.defaultSigner.toAddress, *).returning(ENOUGH_AMT)
         (blockchain.balance _).when(*, *).returning(0L)
 
         val utx =
@@ -229,8 +230,12 @@ class UtxPriorityPoolSpecification
 
         utx.priorityPool.validPriorityDiffs shouldBe empty
         utx.priorityPool.priorityTransactions shouldBe Seq(tx1, tx2)
-        utx.all shouldBe Seq(tx1, tx2)
-        utx.putIfNew(tx2).resultE should beLeft
+
+        val profitableTx = TxHelpers.issue()
+        utx.putIfNew(profitableTx).resultE should beRight
+
+        utx.all shouldBe Seq(tx1, tx2, profitableTx)
+        utx.putIfNew(tx2).resultE should beLeft // Diff not counted
     }
 
     val genChain = for {
