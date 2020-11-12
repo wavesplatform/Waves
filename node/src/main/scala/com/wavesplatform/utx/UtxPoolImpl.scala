@@ -199,9 +199,7 @@ class UtxPoolImpl(
   }
 
   private[this] def removeIds(removed: Set[ByteStr]): Unit = {
-    val (priorityRemoved, priorityResorted) = priorityPool.removeIds(removed)
-    priorityResorted.foreach(addTransaction(_, verify = false))
-
+    val priorityRemoved = priorityPool.removeIds(removed)
     val factRemoved = priorityRemoved ++ removed.flatMap(id => removeFromOrdPool(id))
     factRemoved.foreach(tx => onEvent(UtxEvent.TxRemoved(tx, None)))
   }

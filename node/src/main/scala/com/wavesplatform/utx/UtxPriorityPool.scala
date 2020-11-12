@@ -39,7 +39,9 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
     if (discDiffs.isEmpty) return Set.empty
 
     val transactions = updateDiffs(_ => discDiffs.map(PriorityData(_)))
-    log.trace(s"Priority pool updated with diffs: [${discDiffs.map(_.hashString).mkString(", ")}], transactions order: [${priorityTransactionIds.mkString(", ")}]")
+    log.trace(
+      s"Priority pool updated with diffs: [${discDiffs.map(_.hashString).mkString(", ")}], transactions order: [${priorityTransactionIds.mkString(", ")}]"
+    )
     transactions
   }
 
@@ -51,34 +53,33 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
       } else pd
     })
 
-  private[utx] def removeIds(removed: Set[ByteStr]): (Set[Transaction], Set[Transaction]) = {
-    case class RemoveResult(diffsRest: Seq[Diff], removed: Set[Transaction], resorted: Set[Transaction])
+  private[utx] def removeIds(removed: Set[ByteStr]): Set[Transaction] = {
+    case class RemoveResult(diffsRest: Seq[PriorityData], removed: Set[Transaction])
 
     @tailrec
-    def removeRec(diffs: Seq[Diff], cleanRemoved: Set[Transaction] = Set.empty): RemoveResult = diffs match {
+    def removeRec(diffs: Seq[PriorityData], cleanRemoved: Set[Transaction] = Set.empty): RemoveResult = diffs match {
       case Nil =>
-        RemoveResult(Nil, cleanRemoved, Set.empty)
+        RemoveResult(Nil, cleanRemoved)
 
-      case diff +: rest if diff.transactionIds.subsetOf(removed) =>
-        removeRec(rest, cleanRemoved ++ diff.transactionsValues)
+      case pd +: rest if pd.diff.transactionIds.subsetOf(removed) =>
+        removeRec(rest, cleanRemoved ++ pd.diff.transactionsValues)
 
       case _ if cleanRemoved.map(_.id()) == removed =>
-        RemoveResult(diffs, cleanRemoved, Set.empty)
+        RemoveResult(diffs, cleanRemoved)
 
-      case _ => // Partial remove, drop entire priority pool
-        val (restRemoved, resorted) = diffs.flatMap(_.transactionsValues).partition(tx => removed(tx.id()))
-        RemoveResult(Nil, cleanRemoved ++ restRemoved, resorted.toSet)
+      case _ => // Partial remove, invalidate priority pool
+        RemoveResult(diffs.map(_.copy(isValid = false)), cleanRemoved)
     }
 
-    val result = removeRec(this.priorityDiffs.map(_.diff))
-    log.trace(s"Removing diffs from priority pool: resorted txs: [${result.resorted.map(_.id()).mkString(", ")}], removed txs: [${result.removed
-      .map(_.id())
-      .mkString(", ")}], remaining diffs: [${result.diffsRest.map(_.hashString).mkString(", ")}]")
+    val result = removeRec(this.priorityDiffs)
+    log.trace(
+      s"Removing diffs from priority pool: removed txs: [${result.removed.map(_.id()).mkString(", ")}], remaining diffs: [${result.diffsRest.map(_.diff.hashString).mkString(", ")}]"
+    )
 
-    updateDiffs(_ => result.diffsRest.map(PriorityData(_)))
+    updateDiffs(_ => result.diffsRest)
     log.trace(s"Priority pool transactions order: ${priorityTransactionIds.mkString(", ")}")
 
-    (result.removed, result.resorted)
+    result.removed
   }
 
   def transactionById(txId: ByteStr): Option[Transaction] =
