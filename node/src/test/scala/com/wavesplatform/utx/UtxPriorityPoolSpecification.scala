@@ -216,17 +216,21 @@ class UtxPriorityPoolSpecification
         eventually(Timeout(5 seconds), Interval(50 millis))(utx.all shouldBe empty)
     }
 
-    "drops priority pool on different microblock" in forAll(genDependent) {
+    "invalidates priority pool on different microblock" in forAll(genDependent) {
       case (tx1, tx2) =>
-        val blockchain = createState(tx1.sender.toAddress)
+        val blockchain = createState(tx1.sender.toAddress, setBalance = false)
+        (blockchain.balance _).when(*, *).returning(0L)
 
         val utx =
           new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
+
         utx.setPriorityTxs(Seq(tx1, tx2))
         utx.removeAll(Seq(TxHelpers.issue()))
 
-        utx.priorityPool.priorityTransactions shouldBe empty
-        utx.all.toSet shouldBe Set(tx1, tx2)
+        utx.priorityPool.validPriorityDiffs shouldBe empty
+        utx.priorityPool.priorityTransactions shouldBe Seq(tx1, tx2)
+        utx.all shouldBe Seq(tx1, tx2)
+        utx.putIfNew(tx2).resultE should beLeft
     }
 
     val genChain = for {
@@ -294,12 +298,11 @@ class UtxPriorityPoolSpecification
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(expectedTxs1)
 
           mbs2.foreach(microBlockAppender(_).runSyncUnsafe() should beRight)
-          utx.priorityPool.priorityTransactions shouldBe empty
+          utx.priorityPool.priorityTransactions shouldBe mbs1.last.transactionData
           utx
             .packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)
             ._1
-            .get
-            .toSet shouldBe mbs1.last.transactionData.toSet
+            .get shouldBe mbs1.last.transactionData
 
           extAppender(Seq(block3)).runSyncUnsafe() should beRight
           utx
