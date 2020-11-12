@@ -7,7 +7,7 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.DebugStateChanges
+import com.wavesplatform.it.api.{DebugStateChanges, Transaction}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -24,7 +24,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, TxVersion, smart}
 import monix.eval.Coeval
-import org.scalatest.OptionValues
+import org.scalatest.{Assertion, OptionValues}
 
 class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   private val activationHeight = 5
@@ -97,7 +97,8 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     scriptInfo.script.get.startsWith("base64:") shouldBe true
   }
 
-  test("successful continuation") {
+  test("continuation with rollback") {
+    val startHeight = sender.height
     val invoke = sender
       .invokeScript(
         caller,
@@ -118,9 +119,11 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     }
     sender.transactionsByAddress(dApp.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
     sender.transactionsByAddress(caller.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
+
+    testRollback(startHeight, invoke)
   }
 
-  test("successful continuation with sponsored asset") {
+  test("continuation with sponsored asset") {
     val invoke = sender
       .invokeScript(
         caller,
@@ -198,7 +201,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     waitForContinuation(invoke._1.id, shouldBeFailed = false)
     assertAbsenceOfTransactions(startHeight, sender.height)
 
-    sender.waitForHeight(sender.height + 2)
+    nodes.waitForHeight(sender.height + 2)
     assertExistenceOfTransactions(dApp, startHeight, sender.height)
   }
 
@@ -272,6 +275,16 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       continuations.map(_.nonce.value) shouldBe continuations.indices
       invoke.timestamp +: continuations.map(_.timestamp) shouldBe sorted
     }
+
+  private def testRollback(startHeight: Int, invoke: Transaction): Assertion = {
+    nodes.rollback(startHeight - 1, returnToUTX = false)
+    nodes.waitForHeight(sender.height + 1)
+
+    sender.getData(dApp.toAddress.toString) shouldBe Nil
+    sender.transactionsByAddress(dApp.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe None
+    sender.transactionsByAddress(caller.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe None
+    sender.blockSeq(startHeight, sender.height).flatMap(_.transactions) shouldBe Nil
+  }
 
   private def assertAbsenceOfTransactions(fromHeight: Int, toHeight: Int): Unit =
     nodes.foreach { node =>
