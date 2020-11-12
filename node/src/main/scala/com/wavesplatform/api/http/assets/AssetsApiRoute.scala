@@ -40,13 +40,13 @@ import play.api.libs.json._
 import scala.concurrent.Future
 
 case class AssetsApiRoute(
-                           settings: RestAPISettings,
-                           wallet: Wallet,
-                           utxPoolSynchronizer: TransactionValidator,
-                           blockchain: Blockchain,
-                           time: Time,
-                           commonAccountApi: CommonAccountsApi,
-                           commonAssetsApi: CommonAssetsApi
+    settings: RestAPISettings,
+    wallet: Wallet,
+    utxPoolSynchronizer: TransactionValidator,
+    blockchain: Blockchain,
+    time: Time,
+    commonAccountApi: CommonAccountsApi,
+    commonAssetsApi: CommonAssetsApi
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {

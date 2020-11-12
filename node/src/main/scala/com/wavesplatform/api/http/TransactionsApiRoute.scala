@@ -32,13 +32,13 @@ import scala.concurrent.Future
 import scala.util.Success
 
 case class TransactionsApiRoute(
-                                 settings: RestAPISettings,
-                                 commonApi: CommonTransactionsApi,
-                                 wallet: Wallet,
-                                 blockchain: Blockchain,
-                                 utxPoolSize: () => Int,
-                                 utxPoolSynchronizer: TransactionValidator,
-                                 time: Time
+    settings: RestAPISettings,
+    commonApi: CommonTransactionsApi,
+    wallet: Wallet,
+    blockchain: Blockchain,
+    utxPoolSize: () => Int,
+    utxPoolSynchronizer: TransactionValidator,
+    time: Time
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {

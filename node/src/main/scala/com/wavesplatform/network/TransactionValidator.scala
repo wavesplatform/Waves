@@ -13,7 +13,7 @@ import scala.concurrent.{ExecutionException, Future}
 import scala.util.Success
 
 trait TransactionValidator {
-  def validate(tx: Transaction, source: Option[Channel]): Future[TracedResult[ValidationError, Boolean]]
+  def validateAndBroadcast(tx: Transaction, source: Option[Channel]): Future[TracedResult[ValidationError, Boolean]]
 }
 
 object TransactionValidator extends ScorexLogging {

@@ -17,7 +17,7 @@ trait BroadcastRoute { _: ApiRoute =>
   private def broadcastTransaction(tx: Transaction, includeTrace: Boolean): Future[ToResponseMarshallable] = {
     import scala.concurrent.ExecutionContext.Implicits.global
     implicit val trw: ToResponseMarshaller[TracedResult[ApiError, Transaction]] = tracedResultMarshaller(includeTrace)
-    utxPoolSynchronizer.validate(tx, None).map(_.leftMap(ApiError.fromValidationError).map(_ => tx))
+    utxPoolSynchronizer.validateAndBroadcast(tx, None).map(_.leftMap(ApiError.fromValidationError).map(_ => tx))
   }
 
   private def extractTraceParameter(tx: Transaction): Directive1[ToResponseMarshallable] =

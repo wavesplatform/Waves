@@ -473,7 +473,7 @@ class TransactionsRouteSpec
 
     "shows trace when trace is enabled" in withInvokeScriptTransaction { (sender, ist) =>
       val accountTrace = AccountVerifierTrace(sender.toAddress, Some(GenericError("Error in account script")))
-      (utxPoolSynchronizer.validate _)
+      (utxPoolSynchronizer.validateAndBroadcast _)
         .expects(*, None)
         .returning(
           Future.successful(TracedResult(Right(true), List(accountTrace)))
@@ -486,7 +486,7 @@ class TransactionsRouteSpec
 
     "does not show trace when trace is disabled" in withInvokeScriptTransaction { (sender, ist) =>
       val accountTrace = AccountVerifierTrace(sender.toAddress, Some(GenericError("Error in account script")))
-      (utxPoolSynchronizer.validate _)
+      (utxPoolSynchronizer.validateAndBroadcast _)
         .expects(*, None)
         .returning(
           Future.successful(TracedResult(Right(true), List(accountTrace)))

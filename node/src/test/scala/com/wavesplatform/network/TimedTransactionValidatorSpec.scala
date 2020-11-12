@@ -37,7 +37,7 @@ class TimedTransactionValidatorSpec extends FreeSpec with Matchers with BeforeAn
 
     "accepts only those transactions from network which can be validated quickly" in withUPS(countTransactions) { ups =>
       1 to 10 foreach { i =>
-        ups.validate(
+        ups.validateAndBroadcast(
           GenesisTransaction.create(PublicKey(new Array[Byte](32)).toAddress, i * 10L, 0L).explicitGet(),
           Some(new EmbeddedChannel)
         )

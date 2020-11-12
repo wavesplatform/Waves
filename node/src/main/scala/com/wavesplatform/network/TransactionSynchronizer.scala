@@ -41,7 +41,7 @@ object TransactionSynchronizer extends LazyLogging {
       }
       .whileBusyBuffer(OverflowStrategy.DropNew(settings.maxQueueSize))
       .mapParallelUnorderedF(settings.maxThreads) {
-        case (channel, tx) => transactionValidator.validate(tx, Some(channel))
+        case (channel, tx) => transactionValidator.validateAndBroadcast(tx, Some(channel))
       }
       .subscribe()
   }

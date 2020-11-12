@@ -32,13 +32,13 @@ import play.api.libs.json._
 import scala.util.{Success, Try}
 
 case class AddressApiRoute(
-                            settings: RestAPISettings,
-                            wallet: Wallet,
-                            blockchain: Blockchain,
-                            utxPoolSynchronizer: TransactionValidator,
-                            time: Time,
-                            limitedScheduler: Scheduler,
-                            commonAccountsApi: CommonAccountsApi
+    settings: RestAPISettings,
+    wallet: Wallet,
+    blockchain: Blockchain,
+    utxPoolSynchronizer: TransactionValidator,
+    time: Time,
+    limitedScheduler: Scheduler,
+    commonAccountsApi: CommonAccountsApi
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute

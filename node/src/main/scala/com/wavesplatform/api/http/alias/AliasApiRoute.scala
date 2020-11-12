@@ -19,12 +19,12 @@ import com.wavesplatform.wallet.Wallet
 import play.api.libs.json.{JsString, JsValue, Json}
 
 case class AliasApiRoute(
-                          settings: RestAPISettings,
-                          commonApi: CommonTransactionsApi,
-                          wallet: Wallet,
-                          utxPoolSynchronizer: TransactionValidator,
-                          time: Time,
-                          blockchain: Blockchain
+    settings: RestAPISettings,
+    commonApi: CommonTransactionsApi,
+    wallet: Wallet,
+    utxPoolSynchronizer: TransactionValidator,
+    time: Time,
+    blockchain: Blockchain
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {
