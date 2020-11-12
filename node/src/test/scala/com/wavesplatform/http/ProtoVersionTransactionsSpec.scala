@@ -179,8 +179,8 @@ class ProtoVersionTransactionsSpec
       val seller    = accountGen.sample.get
       val assetPair = assetPairGen.sample.get
 
-      val buyOrder  = Order.buy(Order.V3, buyer, account.publicKey, assetPair, Order.MaxAmount / 2, 100, Now, Now + Order.MaxLiveTime, MinFee * 3)
-      val sellOrder = Order.sell(Order.V3, seller, account.publicKey, assetPair, Order.MaxAmount / 2, 100, Now, Now + Order.MaxLiveTime, MinFee * 3)
+      val buyOrder  = Order.buy(Order.V3, buyer, account.publicKey, assetPair, Order.MaxAmount / 2, 100L, Now, Now + Order.MaxLiveTime, MinFee * 3)
+      val sellOrder = Order.sell(Order.V3, seller, account.publicKey, assetPair, Order.MaxAmount / 2, 100L, Now, Now + Order.MaxLiveTime, MinFee * 3)
 
       val exchangeTx =
         ExchangeTransaction
@@ -209,7 +209,7 @@ class ProtoVersionTransactionsSpec
           account.publicKey,
           dapp,
           Some(FUNCTION_CALL(User("hello"), List(CONST_LONG(42L)))),
-          Seq(Payment(100, Asset.Waves)),
+          Seq(InvokeScriptTransaction.Payment(100L, Asset.Waves)),
           InvokeScriptTxFee,
           IssuedAsset(feeAssetId),
           Now,
@@ -238,7 +238,7 @@ class ProtoVersionTransactionsSpec
     "LeaseTransaction/LeaseCancelTransaction" in {
       val recipient = accountOrAliasGen.sample.get
 
-      val leaseTxUnsigned = LeaseTransaction.create(TxVersion.V3, account.publicKey, recipient, 100, MinFee, Now, Proofs.empty).explicitGet()
+      val leaseTxUnsigned = LeaseTransaction.create(TxVersion.V3, account.publicKey, recipient, 100L, MinFee, Now, Proofs.empty).explicitGet()
 
       val (leaseProofs, leaseTxJson) = Post(routePath("/sign"), leaseTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
         checkProofs(response, leaseTxUnsigned)
@@ -283,7 +283,7 @@ class ProtoVersionTransactionsSpec
 
       val transferTxUnsigned =
         TransferTransaction
-          .create(TxVersion.V3, account.publicKey, recipient, asset, 100, Asset.Waves, MinFee, ByteStr(attachment), Now, Proofs.empty)
+          .create(TxVersion.V3, account.publicKey, recipient, asset, 100L, Asset.Waves, MinFee, ByteStr(attachment), Now, Proofs.empty)
           .explicitGet()
 
       val (proofs, transferTxJson) = Post(routePath("/sign"), transferTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
@@ -380,7 +380,7 @@ class ProtoVersionTransactionsSpec
       val asset = IssuedAsset(bytes32gen.map(ByteStr(_)).sample.get)
 
       val sponsorshipTxUnsigned =
-        SponsorFeeTransaction.create(TxVersion.V2, account.publicKey, asset, Some(100), MinFee, Now, Proofs.empty).explicitGet()
+        SponsorFeeTransaction.create(TxVersion.V2, account.publicKey, asset, Some(100L), MinFee, Now, Proofs.empty).explicitGet()
 
       val (proofs, sponsorshipTxJson) = Post(routePath("/sign"), sponsorshipTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
         checkProofs(response, sponsorshipTxUnsigned)
