@@ -176,8 +176,7 @@ class UtxPriorityPoolSpecification
       case (tx1, tx2) =>
         val blockchain = createState(tx1.sender.toAddress, setBalance = false)
         (blockchain.balance _).when(tx1.sender.toAddress, *).returning(ENOUGH_AMT)
-        (blockchain.balance _).when(tx2.sender.toAddress, *).returning(ENOUGH_AMT).noMoreThanOnce() // initial validation
-        (blockchain.balance _).when(tx2.sender.toAddress, *).returning(0)                           // Should be overriden in composite blockchain
+        (blockchain.balance _).when(*, *).returning(0) // Should be overriden in composite blockchain
 
         val utx =
           new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
