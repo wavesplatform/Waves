@@ -455,24 +455,26 @@ case class DebugStateChanges(
     recipient: Option[String],
     script: Option[String],
     stateChanges: Option[StateChangesDetails],
-    applicationStatus: Option[String]
+    applicationStatus: Option[String],
+    continuationTransactionIds: Option[Seq[String]]
 ) extends TxInfo
 object DebugStateChanges {
   implicit val debugStateChanges: Reads[DebugStateChanges] =
     Reads(
       jsv =>
         for {
-          _type                <- (jsv \ "type").validate[Int]
-          id                   <- (jsv \ "id").validate[String]
-          fee                  <- (jsv \ "fee").validate[Long]
-          timestamp            <- (jsv \ "timestamp").validate[Long]
-          sender               <- (jsv \ "sender").validateOpt[String]
-          height               <- (jsv \ "height").validate[Int]
-          minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
-          recipient            <- (jsv \ "recipient").validateOpt[String]
-          script               <- (jsv \ "script").validateOpt[String]
-          stateChanges         <- (jsv \ "stateChanges").validateOpt[StateChangesDetails]
-          applicationStatus    <- (jsv \ "applicationStatus").validateOpt[String]
+          _type                      <- (jsv \ "type").validate[Int]
+          id                         <- (jsv \ "id").validate[String]
+          fee                        <- (jsv \ "fee").validate[Long]
+          timestamp                  <- (jsv \ "timestamp").validate[Long]
+          sender                     <- (jsv \ "sender").validateOpt[String]
+          height                     <- (jsv \ "height").validate[Int]
+          minSponsoredAssetFee       <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
+          recipient                  <- (jsv \ "recipient").validateOpt[String]
+          script                     <- (jsv \ "script").validateOpt[String]
+          stateChanges               <- (jsv \ "stateChanges").validateOpt[StateChangesDetails]
+          applicationStatus          <- (jsv \ "applicationStatus").validateOpt[String]
+          continuationTransactionIds <- (jsv \ "continuationTransactionIds").validateOpt[Seq[String]]
         } yield DebugStateChanges(
           _type,
           id,
@@ -484,7 +486,8 @@ object DebugStateChanges {
           recipient,
           script,
           stateChanges,
-          applicationStatus
+          applicationStatus,
+          continuationTransactionIds
         )
     )
 }

@@ -8,7 +8,7 @@ import cats.instances.try_._
 import cats.syntax.alternative._
 import cats.syntax.either._
 import cats.syntax.traverse._
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.block.Block
@@ -66,21 +66,45 @@ case class TransactionsApiRoute(
     } ~ path(TransactionId) { id =>
       commonApi.transactionById(id) match {
         case Some((h, either, succeeded)) =>
-          complete(txToExtendedJson(either.fold(identity, _._1)) ++ applicationStatusJsField(isBlockV5(h), succeeded) + ("height" -> JsNumber(h)))
+          val tx = either.fold(identity, _._1)
+          complete(txToExtendedJson(tx) ++ enrich(tx) ++ applicationStatusJsField(isBlockV5(h), succeeded) + ("height" -> JsNumber(h)))
         case None => complete(ApiError.TransactionDoesNotExist)
       }
+    }
+  }
+
+  private def enrich(t: Transaction) = {
+    t match {
+      case t: smart.ContinuationTransaction => 
+        import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer.functionCallToJson
+        val isId = t.invokeScriptTransactionId
+        blockchain.transactionInfo(isId) match {
+          case Some((_, invoke: smart.InvokeScriptTransaction, _)) => Json.obj(
+            "continuationTransactionIds" -> commonApi.continuations(isId).map(_.toString),
+            "call" -> invoke.funcCallOpt.map(functionCallToJson),
+            "dApp" -> (invoke.dAppAddressOrAlias match {
+              case a: Alias => blockchain.resolveAlias(a).fold(_ => a.stringRepr, _.stringRepr)
+              case a => a.stringRepr
+            }),
+            "extraFeePerStep" -> invoke.extraFeePerStep,
+            "feeAssetId" -> invoke.feeAssetId
+          )
+          case _ => ???
+        }
+      case t: smart.InvokeScriptTransaction if t.version == TxVersion.V3 => Json.obj("continuationTransactionIds" -> commonApi.continuations(t.id()).map(_.toString))
+      case _ => Json.obj()
     }
   }
 
   private def loadTransactionStatus(id: ByteStr): JsObject = {
     import Status._
     val statusJson = blockchain.transactionInfo(id) match {
-      case Some((height, _, succeeded)) =>
+      case Some((height, t, succeeded)) =>
         Json.obj(
           "status"        -> Confirmed,
           "height"        -> height,
           "confirmations" -> (blockchain.height - height).max(0)
-        ) ++ applicationStatusJsField(isBlockV5(height), succeeded)
+        ) ++ applicationStatusJsField(isBlockV5(height), succeeded) ++ enrich(t)
       case None =>
         commonApi.unconfirmedTransactionById(id) match {
           case Some(_) => Json.obj("status" -> Unconfirmed)
@@ -128,7 +152,7 @@ case class TransactionsApiRoute(
       path(TransactionId) { id =>
         commonApi.unconfirmedTransactionById(id) match {
           case Some(tx) =>
-            complete(txToExtendedJson(tx))
+            complete(txToExtendedJson(tx) ++ enrich(tx))
           case None =>
             complete(ApiError.TransactionDoesNotExist)
         }
