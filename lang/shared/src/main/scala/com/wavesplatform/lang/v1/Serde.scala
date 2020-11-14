@@ -166,8 +166,8 @@ object Serde {
       .map((_, bb.remaining()))
   }
 
-  def deserialize(bb: ByteBuffer): Either[String, EXPR] =
-    Try(desAux(bb).value()).toEither.left.map(_.getMessage)
+  def deserialize(bb: ByteBuffer, allowObjects: Boolean): Either[String, EXPR] =
+    Try(desAux(bb, allowObjects).value()).toEither.left.map(_.getMessage)
 
   def serAux(out: ByteArrayOutputStream, acc: Coeval[Unit], expr: EXPR, allowObjects: Boolean = false): Coeval[Unit] = acc.flatMap { _ =>
     expr match {

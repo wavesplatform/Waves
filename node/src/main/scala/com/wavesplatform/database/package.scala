@@ -254,7 +254,7 @@ package object database extends ScorexLogging {
     //TODO remove nonce if needed
     val pb.ContinuationState(nonce, exprBytes, residualComplexity, lastTransactionId) =
       pb.ContinuationState.parseFrom(bytes)
-    val expr = Serde.deserialize(exprBytes.asReadOnlyByteBuffer()).explicitGet()
+    val expr = Serde.deserialize(exprBytes.asReadOnlyByteBuffer(), allowObjects = true).explicitGet()
     ContinuationState.InProgress(expr, residualComplexity, ByteStr(lastTransactionId.toByteArray))
   }
 

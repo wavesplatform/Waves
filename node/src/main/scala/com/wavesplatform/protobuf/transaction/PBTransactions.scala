@@ -258,7 +258,7 @@ object PBTransactions {
           dApp <- PBRecipients.toAddressOrAlias(dAppAddress, chainId)
 
           fcOpt <- Deser
-            .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
+            .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize(_, allowObjects = false))
             .sequence
             .left
             .map(e => GenericError(s"Invalid InvokeScript function call: $e"))
@@ -482,7 +482,7 @@ object PBTransactions {
           sender,
           PBRecipients.toAddressOrAlias(dAppAddress, chainId).explicitGet(),
           Deser
-            .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
+            .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize(_, allowObjects = false))
             .map(_.explicitGet().asInstanceOf[FUNCTION_CALL]),
           payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
           feeAmount,

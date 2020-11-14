@@ -95,7 +95,7 @@ object InvokeScriptTxSerializer {
 
     val sender       = buf.getPublicKey
     val dApp         = buf.getAddressOrAlias
-    val functionCall = Deser.parseOption(buf)(Serde.deserialize(_).explicitGet().asInstanceOf[FUNCTION_CALL])
+    val functionCall = Deser.parseOption(buf)(Serde.deserialize(_, allowObjects = false).explicitGet().asInstanceOf[FUNCTION_CALL])
     val payments     = Deser.parseArrays(buf).map(parsePayment)
     val fee          = buf.getLong
     val feeAssetId   = buf.getAsset
