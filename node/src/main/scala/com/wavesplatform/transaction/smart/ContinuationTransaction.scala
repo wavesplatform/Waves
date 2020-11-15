@@ -41,7 +41,7 @@ case class ContinuationTransaction(
     blockchain
       .transactionInfo(invokeScriptTransactionId)
       .collect { case (height, i: InvokeScriptTransaction, _) => (height, i) }
-      .getOrElse(throw new IllegalArgumentException(s"Couldn't find Invoke Transaction with id = ${invokeScriptTransactionId}"))
+      .getOrElse(throw new IllegalArgumentException(s"Couldn't find Invoke Transaction with id = $invokeScriptTransactionId"))
 }
 
 object ContinuationTransaction extends TransactionParser {
