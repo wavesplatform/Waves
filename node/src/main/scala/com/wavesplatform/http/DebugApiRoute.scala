@@ -247,7 +247,7 @@ case class DebugApiRoute(
   def stateChangesById: Route = (get & path("stateChanges" / "info" / TransactionId)) { id =>
     transactionsApi.transactionById(id) match {
       case Some((height, Right((ist, isr)), succeeded)) =>
-        complete(ist.json() ++ applicationStatusJsField(isBlockV5(height), succeeded) ++ Json.obj("height" -> height.toInt, "stateChanges" -> isr))
+        complete(ist.json() ++ TransactionsApiRoute.continuationJsFields(ist, transactionsApi) ++ applicationStatusJsField(isBlockV5(height), succeeded) ++ Json.obj("height" -> height.toInt, "stateChanges" -> isr))
       case Some(_) => complete(ApiError.UnsupportedTransactionType)
       case None    => complete(ApiError.TransactionDoesNotExist)
     }
@@ -266,9 +266,15 @@ case class DebugApiRoute(
                   .invokeScriptResults(address, None, Set.empty, afterOpt)
                   .map {
                     case (height, Right((ist, isr)), succeeded) =>
-                      ist.json() ++ applicationStatusJsField(isBlockV5(height), succeeded) ++ Json.obj("height" -> JsNumber(height), "stateChanges" -> isr)
+                      ist.json() ++
+                        TransactionsApiRoute.continuationJsFields(ist, transactionsApi) ++
+                        applicationStatusJsField(isBlockV5(height), succeeded) ++
+                        Json.obj("height" -> JsNumber(height), "stateChanges" -> isr)
                     case (height, Left(tx), succeeded) =>
-                      tx.json() ++ applicationStatusJsField(isBlockV5(height), succeeded) ++ Json.obj("height" -> JsNumber(height))
+                      tx.json() ++
+                        TransactionsApiRoute.continuationJsFields(tx, transactionsApi) ++
+                        applicationStatusJsField(isBlockV5(height), succeeded) ++
+                        Json.obj("height" -> JsNumber(height))
                   }
                   .toReactivePublisher
               )

@@ -287,6 +287,10 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
             c.fee shouldBe feeInAttachedAsset
             c.version.value shouldBe TxVersion.V1
             c.nonce.value shouldBe i
+            c.extraFeePerStep.value shouldBe 0
+            c.feeAssetId shouldBe feeAssetInfo.map(_._1)
+            c.call shouldBe invoke.call
+            c.dApp shouldBe invoke.dApp
 
             val expectedStatus = if (i == continuations.size - 1) endStatus else inProgressStatus
             c.applicationStatus.value shouldBe expectedStatus
@@ -294,12 +298,6 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
             val txInfo = node.transactionInfo[DebugStateChanges](c.id)
             txInfo.height should (be >= invoke.height and be <= completionHeight)
             txInfo.continuationTransactionIds.value shouldBe continuationIds
-
-            //TODO: should be in block !!!
-            txInfo.extraFeePerStep.value shouldBe 0
-            txInfo.feeAssetId shouldBe feeAssetInfo.map(_._1)
-            txInfo.call shouldBe invoke.call
-            txInfo.dApp shouldBe invoke.dApp
         }
     }
   }
