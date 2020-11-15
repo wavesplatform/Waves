@@ -137,8 +137,11 @@ class Transaction(
     val recipient: Option[String],
     val proofs: Option[Seq[String]],
     val applicationStatus: Option[String],
-    val invokeScriptTransactionId: Option[String], // for ContinuationTransaction
-    val nonce: Option[Int]                         // for ContinuationTransaction
+    val invokeScriptTransactionId: Option[String],
+    val nonce: Option[Int],
+    val extraFeePerStep: Option[Long],
+    val call: Option[JsObject],
+    val dApp: Option[String]
 ) {
   import Transaction._
   override def toString: String = Json.toJson(this).toString
@@ -178,7 +181,10 @@ object Transaction {
       proofs: Option[Seq[String]],
       applicationStatus: Option[String],
       invokeScriptTransactionId: Option[String],
-      nonce: Option[Int]
+      nonce: Option[Int],
+      extraFeePerStep: Option[Long],
+      call: Option[JsObject],
+      dApp: Option[String]
   ): Transaction = new Transaction(
     _type,
     id,
@@ -206,7 +212,10 @@ object Transaction {
     proofs,
     applicationStatus,
     invokeScriptTransactionId,
-    nonce
+    nonce,
+    extraFeePerStep,
+    call,
+    dApp
   )
 
   implicit val transactionFormat: Format[Transaction] = Format(
@@ -243,6 +252,9 @@ object Transaction {
           applicationStatus         <- (jsv \ "applicationStatus").validateOpt[String]
           invokeScriptTransactionId <- (jsv \ "invokeScriptTransactionId").validateOpt[String]
           nonce                     <- (jsv \ "nonce").validateOpt[Int]
+          extraFeePerStep           <- (jsv \ "extraFeePerStep").validateOpt[Long]
+          call                      <- (jsv \ "call").validateOpt[JsObject]
+          dApp                      <- (jsv \ "dApp").validateOpt[String]
         } yield new Transaction(
           _type,
           id,
@@ -270,7 +282,10 @@ object Transaction {
           proofs,
           applicationStatus,
           invokeScriptTransactionId,
-          nonce
+          nonce,
+          extraFeePerStep,
+          call,
+          dApp
         )
     ),
     Writes { t =>
@@ -448,6 +463,7 @@ case class DebugStateChanges(
     _type: Int,
     id: String,
     fee: Long,
+    feeAssetId: Option[String],
     timestamp: Long,
     sender: Option[String],
     height: Int,
@@ -456,7 +472,10 @@ case class DebugStateChanges(
     script: Option[String],
     stateChanges: Option[StateChangesDetails],
     applicationStatus: Option[String],
-    continuationTransactionIds: Option[Seq[String]]
+    continuationTransactionIds: Option[Seq[String]],
+    call: Option[JsObject],
+    dApp: Option[String],
+    extraFeePerStep: Option[Long]
 ) extends TxInfo
 object DebugStateChanges {
   implicit val debugStateChanges: Reads[DebugStateChanges] =
@@ -466,6 +485,7 @@ object DebugStateChanges {
           _type                      <- (jsv \ "type").validate[Int]
           id                         <- (jsv \ "id").validate[String]
           fee                        <- (jsv \ "fee").validate[Long]
+          feeAssetId                 <- (jsv \ "feeAssetId").validateOpt[String]
           timestamp                  <- (jsv \ "timestamp").validate[Long]
           sender                     <- (jsv \ "sender").validateOpt[String]
           height                     <- (jsv \ "height").validate[Int]
@@ -475,10 +495,14 @@ object DebugStateChanges {
           stateChanges               <- (jsv \ "stateChanges").validateOpt[StateChangesDetails]
           applicationStatus          <- (jsv \ "applicationStatus").validateOpt[String]
           continuationTransactionIds <- (jsv \ "continuationTransactionIds").validateOpt[Seq[String]]
+          call                       <- (jsv \ "call").validateOpt[JsObject]
+          dApp                       <- (jsv \ "dApp").validateOpt[String]
+          extraFeePerStep            <- (jsv \ "extraFeePerStep").validateOpt[Long]
         } yield DebugStateChanges(
           _type,
           id,
           fee,
+          feeAssetId,
           timestamp,
           sender,
           height,
@@ -487,7 +511,10 @@ object DebugStateChanges {
           script,
           stateChanges,
           applicationStatus,
-          continuationTransactionIds
+          continuationTransactionIds,
+          call,
+          dApp,
+          extraFeePerStep
         )
     )
 }

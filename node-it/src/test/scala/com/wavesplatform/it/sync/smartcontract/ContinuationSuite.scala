@@ -7,8 +7,8 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.{DebugStateChanges, Transaction}
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.{DebugStateChanges, Transaction}
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -247,46 +247,60 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     )(
       _.blockSeq(sender.height - 2, sender.height)
         .flatMap(_.transactions)
-        .exists ( tx =>
-          tx._type == ContinuationTransaction.typeId &&
-          tx.applicationStatus.contains(if (shouldBeFailed) "script_execution_failed" else "succeeded") &&
-          tx.invokeScriptTransactionId.contains(invokeId)
+        .exists(
+          tx =>
+            tx._type == ContinuationTransaction.typeId &&
+            tx.applicationStatus.contains(if (shouldBeFailed) "script_execution_failed" else "succeeded") &&
+            tx.invokeScriptTransactionId.contains(invokeId)
         )
     )(
       _.forall(identity)
     )
 
-  private def assertContinuationChain(invokeId: String, completionHeight: Int, shouldBeFailed: Boolean, feeAssetInfo: Option[(String, Long)]): Unit = {
-    import play.api.libs.json._
-    nodes.foreach {
-      node =>
-        val invokeRaw = node.transactionInfo[JsObject](invokeId)
-        val invoke = invokeRaw.as[DebugStateChanges]
-        invoke.applicationStatus.value shouldBe "script_execution_in_progress"
+  private def assertContinuationChain(
+      invokeId: String,
+      completionHeight: Int,
+      shouldBeFailed: Boolean,
+      feeAssetInfo: Option[(String, Long)]
+  ): Unit = {
+    nodes.foreach { node =>
+      val pureInvokeFee      = invokeFee - smartFee
+      val feeInAttachedAsset = feeAssetInfo.fold(pureInvokeFee) { case (_, sponsorship) => Sponsorship.fromWaves(pureInvokeFee, sponsorship) }
+      val endStatus          = if (shouldBeFailed) "script_execution_failed" else "succeeded"
+      val inProgressStatus   = "script_execution_in_progress"
 
-        val continuations =
-          node
-            .blockSeq(invoke.height, completionHeight)
-            .flatMap(_.transactions)
-            .filter(tx => tx._type == ContinuationTransaction.typeId && tx.invokeScriptTransactionId.contains(invokeId))
-        for((t,b) <- invoke.continuationTransactionIds.get.zip(continuations.map(_.id))) {
-          t shouldBe b
-          val cont = node.transactionInfo[JsObject](t)
-          (cont \ "version").as[Int] shouldBe 1
-          (cont \ "height").asOpt[Int].nonEmpty shouldBe true
-          (cont \ "extraFeePerStep").asOpt[Long].nonEmpty shouldBe true
-          (cont \ "call").as[JsObject] shouldBe (invokeRaw \ "call").as[JsObject]
-          (cont \ "dApp").as[String] shouldBe (invokeRaw \ "dApp").as[String]
-        }
+      val invoke = node.transactionInfo[DebugStateChanges](invokeId)
+      val continuations =
+        node
+          .blockSeq(invoke.height, completionHeight)
+          .flatMap(_.transactions)
+          .filter(tx => tx._type == ContinuationTransaction.typeId && tx.invokeScriptTransactionId.contains(invokeId))
+      val continuationIds = continuations.map(_.id)
 
-      val pureInvokeFee = invokeFee - smartFee
-      val correctedFee  = feeAssetInfo.fold(pureInvokeFee) { case (_, sponsorship) => Sponsorship.fromWaves(pureInvokeFee, sponsorship) }
-      continuations.foreach(_.fee shouldBe correctedFee)
-      // TODO continuations.foreach(_.feeAssetId shouldBe feeAssetInfo.map(_._1))
-      continuations.dropRight(1).foreach(_.applicationStatus.value shouldBe "script_execution_in_progress")
-      continuations.last.applicationStatus.value shouldBe (if (shouldBeFailed) "script_execution_failed" else "succeeded")
-      continuations.map(_.nonce.value) shouldBe continuations.indices
+      invoke.applicationStatus.value shouldBe inProgressStatus
       invoke.timestamp +: continuations.map(_.timestamp) shouldBe sorted
+      invoke.continuationTransactionIds.value shouldBe continuationIds
+
+      continuations.zipWithIndex
+        .foreach {
+          case (c, i) =>
+            c.fee shouldBe feeInAttachedAsset
+            c.version.value shouldBe TxVersion.V1
+            c.nonce.value shouldBe i
+
+            val expectedStatus = if (i == continuations.size - 1) endStatus else inProgressStatus
+            c.applicationStatus.value shouldBe expectedStatus
+
+            val txInfo = node.transactionInfo[DebugStateChanges](c.id)
+            txInfo.height should (be >= invoke.height and be <= completionHeight)
+            txInfo.continuationTransactionIds.value shouldBe continuationIds
+
+            //TODO: should be in block !!!
+            txInfo.extraFeePerStep.value shouldBe 0
+            txInfo.feeAssetId shouldBe feeAssetInfo.map(_._1)
+            txInfo.call shouldBe invoke.call
+            txInfo.dApp shouldBe invoke.dApp
+        }
     }
   }
 
