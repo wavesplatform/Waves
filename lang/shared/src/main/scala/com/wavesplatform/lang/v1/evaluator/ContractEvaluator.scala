@@ -30,6 +30,10 @@ object ContractEvaluator {
       feeAssetId: Option[ByteStr]
   )
 
+  def buildExprFromDappAndCall(contract: DApp, call: EXPR): EXPR = {
+    foldDeclarations(contract.decs, BLOCK(LET("__synthetic_call", TRUE), call))
+  }
+
   private def buildExprFromInvocation(c: DApp, i: Invocation, version: StdLibVersion): Either[String, EXPR] = {
     val functionName = i.funcCall.function.funcName
 

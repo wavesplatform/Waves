@@ -3,24 +3,41 @@ package com.wavesplatform.api.http
 import java.security.SecureRandom
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.server.Route
-import com.wavesplatform.api.http.ApiError.{ScriptCompilerError, TooBigArrayAllocation}
-import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
+import akka.http.scaladsl.server.{Directive, Route}
+import cats.implicits._
+import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, ScriptCompilerError, TooBigArrayAllocation}
+import com.wavesplatform.api.http.requests.{ScriptWithImportsRequest, byteStrFormat}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.Global
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
+import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2}
+import com.wavesplatform.lang.v1.parser.Expressions.PART
+import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
+import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v1.traits.domain.Recipient
+import com.wavesplatform.lang.v1.{FunctionHeader, Serde}
+import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
+import com.wavesplatform.transaction.smart.BlockchainContext
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Time
-import com.wavesplatform.state.Blockchain
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.directives.values._
+import fastparse.Parsed
+import monix.eval.Coeval
 import monix.execution.Scheduler
 import play.api.libs.json._
+import shapeless.Coproduct
 
 case class UtilsApiRoute(
     timeService: Time,
@@ -41,7 +58,7 @@ case class UtilsApiRoute(
   }
 
   override val route: Route = pathPrefix("utils") {
-    decompile ~ compile ~ compileCode ~ compileWithImports ~ scriptMeta ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ transactionSerialize
+    decompile ~ compile ~ compileCode ~ compileWithImports ~ scriptMeta ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ transactionSerialize ~ evaluate
   }
 
   def decompile: Route = path("script" / "decompile") {
@@ -94,7 +111,12 @@ case class UtilsApiRoute(
 
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String])) { code =>
-      def stdLib: StdLibVersion = if(blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) { V4 } else { StdLibVersion.VersionDic.default }
+      def stdLib: StdLibVersion =
+        if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {
+          V4
+        } else {
+          StdLibVersion.VersionDic.default
+        }
       executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator, defaultStdLib = stdLib)) { result =>
         complete(
           result
@@ -206,6 +228,98 @@ case class UtilsApiRoute(
     path("transactionSerialize")(jsonPost[JsObject] { jsv =>
       parseOrCreateTransaction(jsv)(tx => Json.obj("bytes" -> tx.bodyBytes().map(_.toInt & 0xff)))
     })
+
+  def evaluate: Route =
+    path("script" / "evaluate" / AddrSegment).flatMap(scriptedAddress).apply { (address: Address, script: Script) =>
+      jsonPost[JsObject] { obj =>
+        def serializeResult(e: EVALUATED): JsValue = e match { // TODO: Tuple?
+          case Terms.CONST_LONG(t)               => Json.obj("type" -> "Int", "value"        -> t)
+          case constbytestr: Terms.CONST_BYTESTR => Json.obj("type" -> "ByteVector", "value" -> constbytestr.bs.toString)
+          case conststring: Terms.CONST_STRING   => Json.obj("type" -> "String", "value"     -> conststring.s)
+          case Terms.CONST_BOOLEAN(b)            => Json.obj("type" -> "Boolean", "value"    -> b)
+          case Terms.CaseObj(caseType, fields) =>
+            Json.obj("type" -> caseType.name, "value" -> JsObject(fields.view.mapValues(serializeResult).toSeq))
+          case Terms.ARR(xs)      => Json.obj("type"  -> "Array", "value"                          -> xs.map(serializeResult))
+          case Terms.FAIL(reason) => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "error" -> reason)
+        }
+
+        def parseTextCall(str: String): Either[ValidationError, EXPR] = {
+          // TODO: Invent something more smart, like ExpressionCompiler.compile(str) but with acknowledge of existing contract functions
+
+          Parser.parseExpr(str) match {
+            case Parsed.Success(Expressions.FUNCTION_CALL(_, PART.VALID(_, name), args, _, _), _) =>
+              for (argsConv <- args.map {
+                     case Expressions.FALSE(_, _)                           => Right(Terms.CONST_BOOLEAN(false))
+                     case Expressions.TRUE(_, _)                            => Right(Terms.CONST_BOOLEAN(true))
+                     case Expressions.CONST_BYTESTR(_, PART.VALID(_, v), _) => Terms.CONST_BYTESTR(v).left.map(GenericError(_))
+                     case Expressions.CONST_STRING(_, PART.VALID(_, v), _)  => Terms.CONST_STRING(v).left.map(GenericError(_))
+                     case Expressions.CONST_LONG(_, value, _)               => Right(Terms.CONST_LONG(value))
+                     case e                                                 => Left(GenericError(s"Couldn't parse $e as argument"))
+                   }.sequence) yield Terms.FUNCTION_CALL(FunctionHeader.User(name), argsConv)
+
+            case failure: Parsed.Failure => Left(GenericError(failure.longMsg))
+            case value                   => Left(GenericError(s"Can't parse $value as function call"))
+          }
+        }
+
+        def parseBinaryCall(bs: ByteStr): Either[ValidationError, EXPR] = {
+          Serde
+            .deserialize(bs.arr)
+            .left
+            .map(GenericError(_))
+            .map(_._1)
+        }
+
+        val binaryCall = (obj \ "expr")
+          .asOpt[ByteStr]
+          .toRight(GenericError("Unable to parse expr bytes"))
+          .flatMap(parseBinaryCall)
+
+        val textCall = (obj \ "expr")
+          .asOpt[String]
+          .toRight(GenericError("Unable to read expr string"))
+          .flatMap(parseTextCall)
+
+        val result =
+          for {
+            expr <- binaryCall.orElse(textCall)
+            ctx <- BlockchainContext
+              .build(
+                script.stdLibVersion,
+                AddressScheme.current.chainId,
+                Coeval.raiseError(new IllegalStateException("No input entity available")),
+                Coeval.evalOnce(blockchain.height),
+                blockchain,
+                isTokenContext = false,
+                isContract = true,
+                Coproduct[Environment.Tthis](Recipient.Address(ByteStr(address.bytes))),
+                ByteStr.empty
+              )
+              .left
+              .map(GenericError(_))
+            call = ContractEvaluator.buildExprFromDappAndCall(script.expr.asInstanceOf[DApp], expr)
+            result <- EvaluatorV2.applyCompleted(ctx, call, script.stdLibVersion).left.map { case (err, log) => ScriptExecutionError(err, log, None) }
+          } yield result._1
+
+        result
+          .map(serializeResult)
+          .recover {
+            case e: ScriptExecutionError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.error)
+            case other                   => ApiError.fromValidationError(other).json
+          }
+          .explicitGet()
+          .as[JsObject] ++ Json.obj("address" -> address.stringRepr, "expr" -> (obj \ "expr").as[String])
+      }
+    }
+
+  private[this] def scriptedAddress(address: Address): Directive[(Address, Script)] = blockchain.accountScript(address) match {
+    case Some(value) if value.script.expr.isInstanceOf[DApp] =>
+      tprovide(address -> value.script)
+
+    case None =>
+      entity(as[JsObject])
+        .flatMap(obj => complete(CustomValidationError(s"Address $address is not dApp").json ++ Json.obj("address" -> address) ++ obj))
+  }
 }
 
 object UtilsApiRoute {

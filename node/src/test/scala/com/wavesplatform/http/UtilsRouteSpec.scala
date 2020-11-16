@@ -3,6 +3,7 @@ package com.wavesplatform.http
 import akka.http.scaladsl.testkit.RouteTestTimeout
 import cats.implicits._
 import com.google.protobuf.ByteString
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
 import com.wavesplatform.api.http.UtilsApiRoute
 import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
@@ -25,15 +26,16 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
-import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.{Schedulers, Time}
 import io.netty.util.HashedWheelTimer
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json.{JsArray, JsObject, JsString, JsValue}
+import play.api.libs.json._
 
 import scala.concurrent.duration._
 class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks with PathMockFactory {
@@ -41,10 +43,12 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   implicit val timeout          = routeTestTimeout.duration
 
   private val estimator = ScriptEstimatorV2
-  private val route = UtilsApiRoute(
+
+  private val utilsApi: UtilsApiRoute = UtilsApiRoute(
     new Time {
       def correctedTime(): Long = System.currentTimeMillis()
-      def getTimestamp(): Long  = System.currentTimeMillis()
+
+      def getTimestamp(): Long = System.currentTimeMillis()
     },
     restAPISettings,
     estimator,
@@ -55,7 +59,8 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       "rest-time-limited"
     ),
     stub[Blockchain]("globalBlockchain")
-  ).route
+  )
+  private val route = utilsApi.route
 
   val script = FUNCTION_CALL(
     function = PureContext.eq.header,
@@ -671,6 +676,64 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         val seed = Base58.tryDecodeWithLimit((responseAs[JsValue] \ "seed").as[String])
         seed.get.length shouldEqual l
       }
+    }
+  }
+
+  // Evaluate
+  private[this] val testScript = {
+    val str = """
+                |{-# STDLIB_VERSION 3 #-}
+                |{-# CONTENT_TYPE DAPP #-}
+                |{-# SCRIPT_TYPE ACCOUNT #-}
+                |
+                |func test(i: Int) = i * 10
+                |func testB() = true
+                |func testBS() = base58'MATCHER'
+                |func testS() = "Test"
+                |func testF() = throw("Test")
+                |""".stripMargin
+
+    val script = ScriptCompiler.compile(str, ScriptEstimatorV2).explicitGet()._1
+    AccountScriptInfo(PublicKey(new Array[Byte](32)), script, 0, Map.empty)
+  }
+
+  private[this] def evalScript(text: String) =
+    Post(routePath(s"/script/evaluate/${TxHelpers.defaultSigner.toAddress.stringRepr}"), Json.obj("expr" -> text))
+
+  routePath("/script/evaluate/{address}") in {
+    def responseJson: JsObject = {
+      val fullJson = responseAs[JsObject]
+      (fullJson \ "address").as[String] shouldBe TxHelpers.defaultSigner.toAddress.stringRepr
+      (fullJson \ "expr").as[String] should not be empty
+      fullJson - "address" - "expr"
+    }
+
+    (utilsApi.blockchain.accountScript _).when(TxHelpers.defaultSigner.toAddress).returning(None).once()
+
+    evalScript("testNone()") ~> route ~> check {
+      responseJson shouldBe Json.obj("error" -> 199, "message" -> "Address 3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9 is not dApp")
+    }
+
+    (utilsApi.blockchain.accountScript _).when(TxHelpers.defaultSigner.toAddress).returning(Some(testScript))
+
+    evalScript("testF()") ~> route ~> check {
+      responseJson shouldBe Json.obj("error" -> 306, "message" -> "Test")
+    }
+
+    evalScript("test(123)") ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Int", "value" -> 1230)
+    }
+
+    evalScript("testS()") ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "String", "value" -> "Test")
+    }
+
+    evalScript("testB()") ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Boolean", "value" -> true)
+    }
+
+    evalScript("testBS()") ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "ByteVector", "value" -> "MATCHER")
     }
   }
 
