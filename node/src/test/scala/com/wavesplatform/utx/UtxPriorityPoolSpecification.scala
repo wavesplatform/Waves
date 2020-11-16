@@ -30,8 +30,8 @@ import org.scalacheck.Gen.chooseNum
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.PatienceConfiguration.{Interval, Timeout}
-import org.scalatest.prop.PropertyChecks
 import org.scalatest.{EitherValues, FreeSpec, Matchers}
+import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 import scala.concurrent.duration._
 
@@ -40,7 +40,7 @@ class UtxPriorityPoolSpecification
     with Matchers
     with EitherMatchers
     with MockFactory
-    with PropertyChecks
+    with ScalaCheckDrivenPropertyChecks
     with TransactionGen
     with NoShrink
     with BlocksTransactionsHelpers
