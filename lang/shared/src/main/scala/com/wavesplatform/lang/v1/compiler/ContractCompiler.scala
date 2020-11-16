@@ -15,7 +15,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, PART, Type}
-import com.wavesplatform.lang.v1.parser.{Expressions, Parser, ParserV2}
+import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 
@@ -335,7 +335,7 @@ object ContractCompiler {
       version: StdLibVersion,
       saveExprContext: Boolean = true
   ): Either[String, (Option[DApp], Expressions.DAPP, Iterable[CompilationError])] = {
-    ParserV2.parseDAPP(input) match {
+    Parser.parseDAPPWithErrorRecovery(input) match {
       case Right((parseResult, removedCharPosOpt)) =>
         compileContract(ctx, parseResult, version, saveExprContext)
           .run(ctx)
