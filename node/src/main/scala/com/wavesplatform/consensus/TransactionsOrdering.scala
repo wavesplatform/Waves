@@ -28,7 +28,7 @@ object TransactionsOrdering {
     @tailrec private def extraFee(t: Transaction): Long =
       t match {
         case i: InvokeScriptTransaction if i.assetFee._1 == Waves => -i.extraFeePerStep
-        case i: ContinuationTransaction                           => extraFee(i.resolveInvoke(blockchain))
+        case i: ContinuationTransaction                           => extraFee(i.resolveInvoke(blockchain, utxTransactions))
         case _                                                    => 0
       }
 
@@ -52,7 +52,7 @@ object TransactionsOrdering {
         case _ if whitelistAddresses.isEmpty                                                            => false
         case a: Authorized if whitelistAddresses.contains(a.sender.toAddress.stringRepr)                => true
         case i: InvokeScriptTransaction if whitelistAddresses.contains(i.dAppAddressOrAlias.stringRepr) => true
-        case c: ContinuationTransaction                                                                 => isWhitelisted(c.resolveInvoke(blockchain))
+        case c: ContinuationTransaction                                                                 => isWhitelisted(c.resolveInvoke(blockchain, utxTransactions))
         case _                                                                                          => false
       }
     override def txTimestampOrder(ts: Long): Long = ts
