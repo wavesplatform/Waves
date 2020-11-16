@@ -36,6 +36,7 @@ import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import scala.jdk.CollectionConverters._
 import scala.util.Try
@@ -281,7 +282,7 @@ abstract class LevelDBWriter private[database] (
 
   override protected def loadContinuationStates(invokeTxId: TransactionId): (Int, ContinuationState) = {
     val lastNonce = readOnly(_.get(Keys.continuationLastNonce(invokeTxId)))
-    val state = readOnly(_.get(Keys.continuationState(invokeTxId, lastNonce)))
+    val state     = readOnly(_.get(Keys.continuationState(invokeTxId, lastNonce)))
     (lastNonce, state)
   }
 
@@ -668,6 +669,8 @@ abstract class LevelDBWriter private[database] (
     readOnly(_.get(Keys.heightOf(targetBlockId))).fold(Seq.empty[(Block, ByteStr)]) { targetHeight =>
       log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
+      val continuationLastNonces  = mutable.Map[TransactionId, Int]()
+
       val discardedBlocks: Seq[(Block, ByteStr)] = for (currentHeight <- height until targetHeight by -1) yield {
         val balancesToInvalidate    = Seq.newBuilder[(Address, Asset)]
         val ordersToInvalidate      = Seq.newBuilder[ByteStr]
@@ -779,9 +782,15 @@ abstract class LevelDBWriter private[database] (
                   rw.delete(Keys.invokeScriptResult(h, num))
                   rw.delete(Keys.continuationState(TransactionId(tx.id.value()), nonce = 0))
 
-                case c: ContinuationTransaction =>
+                case tx: ContinuationTransaction =>
+                  val id = TransactionId(tx.invokeScriptTransactionId)
+                  continuationLastNonces.updateWith(id) { currentNonceOpt =>
+                    val currentNonce = currentNonceOpt.getOrElse(rw.get(Keys.continuationLastNonce(id)))
+                    val newNonce     = if (tx.nonce < currentNonce) tx.nonce else currentNonce
+                    Some(newNonce)
+                  }
+                  rw.delete(Keys.continuationState(id, tx.nonce + 1))
                   rw.delete(Keys.invokeScriptResult(h, num))
-                  rw.delete(Keys.continuationState(TransactionId(c.invokeScriptTransactionId), c.nonce))
 
                 case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))
                 case tx: ExchangeTransaction =>
@@ -819,6 +828,12 @@ abstract class LevelDBWriter private[database] (
         assetScriptsToDiscard.result().foreach(discardAssetScript)
         accountDataToInvalidate.result().foreach(discardAccountData)
         discardedBlock
+      }
+
+      continuationLastNonces.foreach {
+        case (id, nonce) =>
+          readWrite(_.put(Keys.continuationLastNonce(id), nonce))
+          continuationStatesCache.refresh(id)
       }
 
       log.debug(s"Rollback to block $targetBlockId at $targetHeight completed")

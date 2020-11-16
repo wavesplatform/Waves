@@ -24,10 +24,10 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, TxVersion, smart}
 import monix.eval.Coeval
-import org.scalatest.{Assertion, OptionValues}
+import org.scalatest.OptionValues
 
 class ContinuationSuite extends BaseTransactionSuite with OptionValues {
-  private val activationHeight = 10
+  private val activationHeight = 1
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
@@ -121,7 +121,8 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     sender.transactionsByAddress(dApp.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
     sender.transactionsByAddress(caller.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
 
-    testRollback(startHeight, invoke)
+    testPartialRollback(startHeight, invoke)
+    testFullRollback(startHeight, invoke)
   }
 
   test("continuation with sponsored asset") {
@@ -277,10 +278,6 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
           .filter(tx => tx._type == ContinuationTransaction.typeId && tx.invokeScriptTransactionId.contains(invokeId))
       val continuationIds = continuations.map(_.id)
 
-      invoke.applicationStatus.value shouldBe inProgressStatus
-      invoke.timestamp +: continuations.map(_.timestamp) shouldBe sorted
-      invoke.continuationTransactionIds.value shouldBe continuationIds
-
       continuations.zipWithIndex
         .foreach {
           case (c, i) =>
@@ -299,10 +296,31 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
             txInfo.height should (be >= invoke.height and be <= completionHeight)
             txInfo.continuationTransactionIds.value shouldBe continuationIds
         }
+
+      invoke.applicationStatus.value shouldBe inProgressStatus
+      invoke.timestamp +: continuations.map(_.timestamp) shouldBe sorted
+      invoke.continuationTransactionIds.value shouldBe continuationIds
     }
   }
 
-  private def testRollback(startHeight: Int, invoke: Transaction): Assertion = {
+  private def testPartialRollback(startHeight: Int, invoke: Transaction): Unit = {
+    nodes.rollback(startHeight + 1, returnToUTX = false)
+    nodes.waitForHeight(sender.height + 1)
+    val continuations =
+      sender
+        .blockSeq(startHeight, sender.height)
+        .flatMap(_.transactions)
+        .filter(tx => tx._type == ContinuationTransaction.typeId && tx.invokeScriptTransactionId.contains(invoke.id))
+
+    continuations should not be empty
+    continuations.foreach(_.applicationStatus.value shouldBe "script_execution_in_progress")
+
+    sender.getData(dApp.toAddress.toString) shouldBe Nil
+    waitForContinuation(invoke.id, shouldBeFailed = false)
+    assertContinuationChain(invoke.id, sender.height, shouldBeFailed = false, None)
+  }
+
+  private def testFullRollback(startHeight: Int, invoke: Transaction): Unit = {
     nodes.rollback(startHeight - 1, returnToUTX = false)
     nodes.waitForHeight(sender.height + 1)
 
