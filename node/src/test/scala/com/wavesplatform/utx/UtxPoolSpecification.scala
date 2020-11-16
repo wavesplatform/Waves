@@ -493,7 +493,7 @@ class UtxPoolSpecification
           val gen = for {
             headTransaction <- transfer(sender, senderBalance / 2, time)
             vipTransaction <- transfer(sender, senderBalance / 2, time)
-              .suchThat(TransactionsOrdering.InUTXPool(Set.empty, null).compare(_, headTransaction) < 0)
+              .suchThat(TransactionsOrdering.InUTXPool(Set.empty, null, null).compare(_, headTransaction) < 0)
           } yield (headTransaction, vipTransaction)
 
           forAll(gen, Gen.choose(0, 1).label("allowSkipChecks")) {

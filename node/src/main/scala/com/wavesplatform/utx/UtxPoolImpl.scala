@@ -70,7 +70,7 @@ class UtxPoolImpl(
   private[this] def priorityTransactionIds = priorityDiffs.synchronized(priorityDiffs.toVector.flatMap(_.transactions.keys))
   private[this] def priorityTransactions   = priorityDiffs.synchronized(priorityDiffs.toVector.flatMap(_.transactionsValues))
 
-  private[this] val inUTXPoolOrdering = TransactionsOrdering.InUTXPool(utxSettings.fastLaneAddresses, blockchain)
+  private[this] val inUTXPoolOrdering = TransactionsOrdering.InUTXPool(utxSettings.fastLaneAddresses, blockchain, transactions.asScala)
 
   override def putIfNew(tx: Transaction, forceValidate: Boolean): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id()) || priorityDiffs.exists(_.contains(tx.id()))) TracedResult.wrapValue(false)
@@ -284,7 +284,7 @@ class UtxPoolImpl(
       Set(i.sender.toAddress)
         .filter(blockchain.hasAccountScript) ++ blockchain.resolveAlias(i.dAppAddressOrAlias).fold[Set[Address]](_ => Set.empty, Set(_))
     case c: ContinuationTransaction =>
-      scriptedAddresses(c.resolveInvoke(blockchain)._2)
+      scriptedAddresses(c.resolveInvoke(blockchain, transactions.asScala))
     case e: ExchangeTransaction =>
       Set(e.sender.toAddress, e.buyOrder.sender.toAddress, e.sellOrder.sender.toAddress).filter(blockchain.hasAccountScript)
     case a: Authorized if blockchain.hasAccountScript(a.sender.toAddress) => Set(a.sender.toAddress)

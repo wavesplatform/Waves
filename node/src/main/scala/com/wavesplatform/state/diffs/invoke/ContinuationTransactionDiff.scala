@@ -45,7 +45,7 @@ object ContinuationTransactionDiff {
       expr: Terms.EXPR,
       residualComplexity: Int
   ): TracedResult[ValidationError, Diff] = {
-    val (invokeHeight, invokeScriptTransaction) = tx.resolveInvoke(blockchain)
+    val invokeScriptTransaction = tx.resolveInvoke(blockchain)
     for {
       dAppAddress <- TracedResult(blockchain.resolveAlias(invokeScriptTransaction.dAppAddressOrAlias))
       scriptInfo <- TracedResult(
@@ -63,6 +63,7 @@ object ContinuationTransactionDiff {
         buildThisValue(Coproduct[TxOrd](invokeScriptTransaction: Transaction), blockchain, directives, rideAddress).left.map(GenericError(_))
       )
 
+      invokeHeight = blockchain.transactionMeta(invokeScriptTransaction.id.value()).get._1
       environment = new WavesEnvironment(
         AddressScheme.current.chainId,
         Coeval.evalOnce(input),

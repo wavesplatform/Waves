@@ -1,15 +1,18 @@
 package com.wavesplatform.consensus
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction}
 import com.wavesplatform.transaction.{Authorized, Transaction}
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 
 object TransactionsOrdering {
   trait WavesOrdering extends Ordering[Transaction] {
     def blockchain: Blockchain
+    def utxTransactions: mutable.Map[ByteStr, Transaction]
     def isWhitelisted(t: Transaction): Boolean = false
     def txTimestampOrder(ts: Long): Long
     private def orderBy(t: Transaction): (Boolean, Double, Long, Long) = {
@@ -25,7 +28,7 @@ object TransactionsOrdering {
     @tailrec private def extraFee(t: Transaction): Long =
       t match {
         case i: InvokeScriptTransaction if i.assetFee._1 == Waves => -i.extraFeePerStep
-        case i: ContinuationTransaction                           => extraFee(i.resolveInvoke(blockchain)._2)
+        case i: ContinuationTransaction                           => extraFee(i.resolveInvoke(blockchain))
         case _                                                    => 0
       }
 
@@ -37,17 +40,19 @@ object TransactionsOrdering {
 
   object InBlock extends WavesOrdering {
     // sorting from network start
-    override def txTimestampOrder(ts: Long): Long = -ts
-    override def blockchain: Blockchain           = ???
+    override def txTimestampOrder(ts: Long): Long                   = -ts
+    override def blockchain: Blockchain                             = ???
+    override def utxTransactions: mutable.Map[ByteStr, Transaction] = ???
   }
 
-  case class InUTXPool(whitelistAddresses: Set[String], blockchain: Blockchain) extends WavesOrdering {
+  case class InUTXPool(whitelistAddresses: Set[String], blockchain: Blockchain, utxTransactions: mutable.Map[ByteStr, Transaction])
+      extends WavesOrdering {
     override def isWhitelisted(t: Transaction): Boolean =
       t match {
         case _ if whitelistAddresses.isEmpty                                                            => false
         case a: Authorized if whitelistAddresses.contains(a.sender.toAddress.stringRepr)                => true
         case i: InvokeScriptTransaction if whitelistAddresses.contains(i.dAppAddressOrAlias.stringRepr) => true
-        case c: ContinuationTransaction                                                                 => isWhitelisted(c.resolveInvoke(blockchain)._2)
+        case c: ContinuationTransaction                                                                 => isWhitelisted(c.resolveInvoke(blockchain))
         case _                                                                                          => false
       }
     override def txTimestampOrder(ts: Long): Long = ts

@@ -11,6 +11,7 @@ import com.wavesplatform.transaction.validation.TxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
+import scala.collection.mutable
 import scala.util.Try
 
 case class ContinuationTransaction(
@@ -37,10 +38,11 @@ case class ContinuationTransaction(
   override val id: Coeval[ByteStr] =
     Coeval.now(FastHashId.create(invokeScriptTransactionId.arr ++ Ints.toByteArray(nonce)))
 
-  def resolveInvoke(blockchain: Blockchain): (Int, InvokeScriptTransaction) =
-    blockchain
-      .transactionInfo(invokeScriptTransactionId)
-      .collect { case (height, i: InvokeScriptTransaction, _) => (height, i) }
+  def resolveInvoke(blockchain: Blockchain, transactions: mutable.Map[ByteStr, Transaction] = mutable.Map()): InvokeScriptTransaction =
+    transactions
+      .get(invokeScriptTransactionId)
+      .orElse(blockchain.transactionInfo(invokeScriptTransactionId).map(_._2))
+      .collect { case i: InvokeScriptTransaction => i }
       .getOrElse(throw new IllegalArgumentException(s"Couldn't find Invoke Transaction with id = $invokeScriptTransactionId"))
 }
 
