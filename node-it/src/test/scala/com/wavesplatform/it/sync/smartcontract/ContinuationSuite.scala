@@ -14,7 +14,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
@@ -49,13 +49,16 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     ): Either[String, Long] = Right(1)
   }
 
-  private val script = {
-    val scriptText =
+  private def compile(scriptText: String): String =
+    ScriptCompiler.compile(scriptText, dummyEstimator).explicitGet()._1.bytes().base64
+
+  private val script =
+    compile(
       s"""
          |{-# STDLIB_VERSION 4 #-}
          |{-# CONTENT_TYPE DAPP #-}
          |
-         | @Callable(inv)
+         | @Callable(i)
          | func foo(fail: Boolean) = {
          |  let a =
          |    getInteger(Address(base58''), "key") == unit &&
@@ -64,12 +67,31 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
          |    then
          |      throw("fail")
          |    else
-         |      [BooleanEntry("a", a), BinaryEntry("sender", inv.caller.bytes)]
+         |      [BooleanEntry("a", a), BinaryEntry("sender", i.caller.bytes)]
+         | }
+         |
+         | @Callable(i)
+         | func setIsAllowedTrue() = {
+         |    let a = !(${List.fill(150)("sigVerify(base64'',base64'',base64'')").mkString("||")})
+         |    if (a)
+         |      then
+         |        [BooleanEntry("isAllowed", true)]
+         |      else
+         |        throw("unexpected")
+         | }
+         |
+         | @Callable(i)
+         | func performActionWithAsset(assetId: ByteVector) = {
+         |    let a = !(${List.fill(150)("sigVerify(base64'',base64'',base64'')").mkString("||")})
+         |    if (a)
+         |      then
+         |        [Burn(assetId, 1)]
+         |      else
+         |        throw("unexpected")
          | }
          |
        """.stripMargin
-    ScriptCompiler.compile(scriptText, dummyEstimator).explicitGet()._1.bytes().base64
-  }
+    )
 
   private val minSponsoredAssetFee = 10000
   private val sponsoredAssetAmount = 10.waves
@@ -114,7 +136,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       ._1
     waitForContinuation(invoke.id, shouldBeFailed = false)
     sender.waitForHeight(sender.height + 1)
-    assertContinuationChain(invoke.id, sender.height, shouldBeFailed = false, feeAssetInfo = None)
+    assertContinuationChain(invoke.id, sender.height)
     nodes.foreach { node =>
       node.getDataByKey(dApp.toAddress.toString, "a") shouldBe BooleanDataEntry("a", true)
       node.getDataByKey(dApp.toAddress.toString, "sender") shouldBe BinaryDataEntry("sender", ByteStr(Base58.decode(caller.toAddress.toString)))
@@ -142,7 +164,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       ._1
     waitForContinuation(invoke.id, shouldBeFailed = false)
     sender.waitForHeight(sender.height + 1)
-    assertContinuationChain(invoke.id, sender.height, shouldBeFailed = false, feeAssetInfo = Some((sponsoredAssetId, minSponsoredAssetFee)))
+    assertContinuationChain(invoke.id, sender.height, feeAssetInfo = Some((sponsoredAssetId, minSponsoredAssetFee)))
     nodes.foreach { node =>
       node.getDataByKey(dApp.toAddress.toString, "a") shouldBe BooleanDataEntry("a", true)
       node.getDataByKey(dApp.toAddress.toString, "sender") shouldBe BinaryDataEntry("sender", ByteStr(Base58.decode(caller.toAddress.toString)))
@@ -166,7 +188,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       ._1
     waitForContinuation(invoke.id, shouldBeFailed = true)
     sender.waitForHeight(sender.height + 1)
-    assertContinuationChain(invoke.id, sender.height, shouldBeFailed = true, feeAssetInfo = None)
+    assertContinuationChain(invoke.id, sender.height, shouldBeFailed = true)
     sender.transactionsByAddress(dApp.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe None
     sender.transactionsByAddress(caller.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
   }
@@ -190,6 +212,38 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     assertContinuationChain(invoke.id, sender.height, shouldBeFailed = true, feeAssetInfo = Some((sponsoredAssetId, minSponsoredAssetFee)))
     sender.transactionsByAddress(dApp.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe None
     sender.transactionsByAddress(caller.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
+  }
+
+  test("continuation prioritization") {
+    val assetScript = compile(s"""getBooleanValue(Address(base58'${dApp.toAddress.toString}'), "isAllowed")""")
+    val assetId = sender.issue(dApp, quantity = 100, script = Some(assetScript), fee = issueFee + smartFee, waitForTx = true).id
+
+    val entry = List(BooleanDataEntry("isAllowed", value = false))
+    sender.putData(dApp, entry, calcDataFee(entry, TxVersion.V1) + smartFee, waitForTx = true)
+
+    val invoke1 = sender.invokeScript(
+      caller,
+      dApp.toAddress.toString,
+      Some("performActionWithAsset"),
+      List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet()),
+      fee = invokeFee * 10,
+      version = TxVersion.V3
+    )._1
+
+    val invoke2 = sender.invokeScript(
+      caller,
+      dApp.toAddress.toString,
+      Some("setIsAllowedTrue"),
+      fee = invokeFee * 10,
+      extraFeePerStep = invokeFee / 10,
+      version = TxVersion.V3
+    )._1
+
+    waitForContinuation(invoke2.id, shouldBeFailed = false)
+    waitForContinuation(invoke1.id, shouldBeFailed = false)
+
+    assertContinuationChain(invoke1.id, sender.height)
+    assertContinuationChain(invoke2.id, sender.height, extraFeePerStep = invokeFee / 10)
   }
 
   test("hold transactions from DApp address until continuation is completed") {
@@ -265,8 +319,9 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   private def assertContinuationChain(
       invokeId: String,
       completionHeight: Int,
-      shouldBeFailed: Boolean,
-      feeAssetInfo: Option[(String, Long)]
+      shouldBeFailed: Boolean = false,
+      feeAssetInfo: Option[(String, Long)] = None,
+      extraFeePerStep: Long = 0
   ): Unit = {
     nodes.foreach { node =>
       val pureInvokeFee      = invokeFee - smartFee
@@ -285,10 +340,10 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       continuations.zipWithIndex
         .foreach {
           case (c, i) =>
-            c.fee shouldBe feeInAttachedAsset
+            c.fee shouldBe feeInAttachedAsset + extraFeePerStep
             c.version.value shouldBe TxVersion.V1
             c.nonce.value shouldBe i
-            c.extraFeePerStep.value shouldBe 0
+            c.extraFeePerStep.value shouldBe extraFeePerStep
             c.feeAssetId shouldBe feeAssetInfo.map(_._1)
             c.call shouldBe invoke.call
             c.dApp shouldBe invoke.dApp
