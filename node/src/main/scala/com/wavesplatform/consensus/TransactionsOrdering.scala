@@ -9,7 +9,7 @@ import scala.annotation.tailrec
 
 object TransactionsOrdering {
   trait WavesOrdering extends Ordering[Transaction] {
-    val blockchain: Blockchain
+    def blockchain: Blockchain
     def isWhitelisted(t: Transaction): Boolean = false
     def txTimestampOrder(ts: Long): Long
     private def orderBy(t: Transaction): (Boolean, Double, Long, Long) = {
@@ -38,7 +38,7 @@ object TransactionsOrdering {
   object InBlock extends WavesOrdering {
     // sorting from network start
     override def txTimestampOrder(ts: Long): Long = -ts
-    override val blockchain: Blockchain           = ???
+    override def blockchain: Blockchain           = ???
   }
 
   case class InUTXPool(whitelistAddresses: Set[String], blockchain: Blockchain) extends WavesOrdering {
