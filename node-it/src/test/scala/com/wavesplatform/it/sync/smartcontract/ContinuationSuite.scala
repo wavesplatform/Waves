@@ -216,33 +216,37 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
 
   test("continuation prioritization") {
     val assetScript = compile(s"""getBooleanValue(Address(base58'${dApp.toAddress.toString}'), "isAllowed")""")
-    val assetId = sender.issue(dApp, quantity = 100, script = Some(assetScript), fee = issueFee + smartFee, waitForTx = true).id
+    val assetId     = sender.issue(dApp, quantity = 100, script = Some(assetScript), fee = issueFee + smartFee, waitForTx = true).id
 
     val entry = List(BooleanDataEntry("isAllowed", value = false))
     sender.putData(dApp, entry, calcDataFee(entry, TxVersion.V1) + smartFee, waitForTx = true)
 
-    val invoke1 = sender.invokeScript(
-      caller,
-      dApp.toAddress.toString,
-      Some("performActionWithAsset"),
-      List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet()),
-      fee = invokeFee * 10,
-      version = TxVersion.V3
-    )._1
+    val invoke1 = sender
+      .invokeScript(
+        caller,
+        dApp.toAddress.toString,
+        Some("performActionWithAsset"),
+        List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet()),
+        fee = invokeFee * 10,
+        version = TxVersion.V3
+      )
+      ._1
 
-    val invoke2 = sender.invokeScript(
-      caller,
-      dApp.toAddress.toString,
-      Some("setIsAllowedTrue"),
-      fee = invokeFee * 10,
-      extraFeePerStep = invokeFee / 10,
-      version = TxVersion.V3
-    )._1
+    val invoke2 = sender
+      .invokeScript(
+        caller,
+        dApp.toAddress.toString,
+        Some("setIsAllowedTrue"),
+        fee = invokeFee * 10,
+        extraFeePerStep = invokeFee / 10,
+        version = TxVersion.V3
+      )
+      ._1
 
     waitForContinuation(invoke2.id, shouldBeFailed = false)
     waitForContinuation(invoke1.id, shouldBeFailed = false)
 
-    assertContinuationChain(invoke1.id, sender.height)
+    assertContinuationChain(invoke1.id, sender.height, actions = 1)
     assertContinuationChain(invoke2.id, sender.height, extraFeePerStep = invokeFee / 10)
   }
 
@@ -321,13 +325,13 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       completionHeight: Int,
       shouldBeFailed: Boolean = false,
       feeAssetInfo: Option[(String, Long)] = None,
-      extraFeePerStep: Long = 0
+      extraFeePerStep: Long = 0,
+      actions: Int = 0
   ): Unit = {
     nodes.foreach { node =>
-      val pureInvokeFee      = invokeFee - smartFee
-      val feeInAttachedAsset = feeAssetInfo.fold(pureInvokeFee) { case (_, sponsorship) => Sponsorship.fromWaves(pureInvokeFee, sponsorship) }
-      val endStatus          = if (shouldBeFailed) "script_execution_failed" else "succeeded"
-      val inProgressStatus   = "script_execution_in_progress"
+      val pureInvokeFee    = invokeFee - smartFee
+      val endStatus        = if (shouldBeFailed) "script_execution_failed" else "succeeded"
+      val inProgressStatus = "script_execution_in_progress"
 
       val invoke = node.transactionInfo[DebugStateChanges](invokeId)
       val continuations =
@@ -340,13 +344,18 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       continuations.zipWithIndex
         .foreach {
           case (c, i) =>
-            c.fee shouldBe feeInAttachedAsset + extraFeePerStep
             c.version.value shouldBe TxVersion.V1
             c.nonce.value shouldBe i
             c.extraFeePerStep.value shouldBe extraFeePerStep
             c.feeAssetId shouldBe feeAssetInfo.map(_._1)
             c.call shouldBe invoke.call
             c.dApp shouldBe invoke.dApp
+
+            val expectedFeeInWaves = if (i == continuations.size - 1) pureInvokeFee + actions * smartFee else pureInvokeFee
+            val expectedFeeInAttachedAsset =
+              feeAssetInfo.fold(expectedFeeInWaves) { case (_, sponsorship) => Sponsorship.fromWaves(expectedFeeInWaves, sponsorship) }
+            val totalExpectedFee = expectedFeeInAttachedAsset + extraFeePerStep
+            c.fee shouldBe totalExpectedFee
 
             val expectedStatus = if (i == continuations.size - 1) endStatus else inProgressStatus
             c.applicationStatus.value shouldBe expectedStatus
