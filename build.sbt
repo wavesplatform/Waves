@@ -96,7 +96,7 @@ lazy val root = (project in file("."))
 inScope(Global)(
   Seq(
     scalaVersion := "2.13.3",
-    organization := "com.wavesplatform",
+    organization := "com.github.karasiq",
     organizationName := "Waves Platform",
     V.fallback := (1, 2, 13),
     organizationHomepage := Some(url("https://wavesplatform.com")),
