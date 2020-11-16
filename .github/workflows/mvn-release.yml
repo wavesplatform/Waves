@@ -89,8 +89,14 @@ jobs:
       - name: Release SBT package
         if: steps.lang-changes.outputs.cache-hit != 'true'
         run: |
-          export GPG_TTY=$(tty)
-          sbt 'set ThisBuild/version := "${{ env.version }}";
+          # See https://github.com/sbt/sbt-pgp/issues/173
+
+          echo '#! /bin/sh
+                gpg --pinentry-mode loopback $@' > gpg.sh
+          chmod +x gpg.sh
+
+          sbt 'set Global/PgpKeys.gpgCommand := (baseDirectory.value / "gpg.sh").getAbsolutePath;
+               set ThisBuild/version := "${{ env.version }}";
                set pgpPassphrase := Some("${{ secrets.OSSRH_GPG_PASSPHRASE }}".toCharArray);
                lang/publishSigned'
 
