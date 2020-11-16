@@ -142,6 +142,7 @@ inScope(Global)(
 // ThisBuild options
 git.useGitDescribe := true
 git.uncommittedSignifier := Some("DIRTY")
+isSnapshot := version.value.endsWith("SNAPSHOT")
 
 lazy val packageAll = taskKey[Unit]("Package all artifacts")
 packageAll := Def
