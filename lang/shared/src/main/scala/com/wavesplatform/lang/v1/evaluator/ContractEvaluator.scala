@@ -30,7 +30,7 @@ object ContractEvaluator {
       feeAssetId: Option[ByteStr]
   )
 
-  def buildExprFromDappAndCall(contract: DApp, call: EXPR): EXPR = {
+  def buildSyntheticCall(contract: DApp, call: EXPR): EXPR = {
     foldDeclarations(contract.decs, BLOCK(LET("__synthetic_call", TRUE), call))
   }
 

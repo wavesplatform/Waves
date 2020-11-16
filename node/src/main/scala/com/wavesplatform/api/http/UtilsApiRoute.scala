@@ -230,7 +230,7 @@ case class UtilsApiRoute(
     })
 
   def evaluate: Route =
-    path("script" / "evaluate" / AddrSegment).flatMap(scriptedAddress).apply { (address: Address, script: Script) =>
+    path("script" / "evaluate" / AddrSegment).flatMap(onlyScriptedAddress).apply { (address: Address, script: Script) =>
       jsonPost[JsObject] { obj =>
         def serializeResult(e: EVALUATED): JsValue = e match { // TODO: Tuple?
           case Terms.CONST_LONG(t)               => Json.obj("type" -> "Int", "value"        -> t)
@@ -243,63 +243,25 @@ case class UtilsApiRoute(
           case Terms.FAIL(reason) => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "error" -> reason)
         }
 
-        def parseTextCall(str: String): Either[ValidationError, EXPR] = {
-          // TODO: Invent something more smart, like ExpressionCompiler.compile(str) but with acknowledge of existing contract functions
+        def parseCall(js: JsReadable) = {
+          val binaryCall = js
+            .asOpt[ByteStr]
+            .toRight(GenericError("Unable to parse expr bytes"))
+            .flatMap(ScriptCallEvaluator.parseBinaryCall)
 
-          Parser.parseExpr(str) match {
-            case Parsed.Success(Expressions.FUNCTION_CALL(_, PART.VALID(_, name), args, _, _), _) =>
-              for (argsConv <- args.map {
-                     case Expressions.FALSE(_, _)                           => Right(Terms.CONST_BOOLEAN(false))
-                     case Expressions.TRUE(_, _)                            => Right(Terms.CONST_BOOLEAN(true))
-                     case Expressions.CONST_BYTESTR(_, PART.VALID(_, v), _) => Terms.CONST_BYTESTR(v).left.map(GenericError(_))
-                     case Expressions.CONST_STRING(_, PART.VALID(_, v), _)  => Terms.CONST_STRING(v).left.map(GenericError(_))
-                     case Expressions.CONST_LONG(_, value, _)               => Right(Terms.CONST_LONG(value))
-                     case e                                                 => Left(GenericError(s"Couldn't parse $e as argument"))
-                   }.sequence) yield Terms.FUNCTION_CALL(FunctionHeader.User(name), argsConv)
+          val textCall = js
+            .asOpt[String]
+            .toRight(GenericError("Unable to read expr string"))
+            .flatMap(ScriptCallEvaluator.parseTextCall)
 
-            case failure: Parsed.Failure => Left(GenericError(failure.longMsg))
-            case value                   => Left(GenericError(s"Can't parse $value as function call"))
-          }
+          binaryCall.orElse(textCall)
         }
-
-        def parseBinaryCall(bs: ByteStr): Either[ValidationError, EXPR] = {
-          Serde
-            .deserialize(bs.arr)
-            .left
-            .map(GenericError(_))
-            .map(_._1)
-        }
-
-        val binaryCall = (obj \ "expr")
-          .asOpt[ByteStr]
-          .toRight(GenericError("Unable to parse expr bytes"))
-          .flatMap(parseBinaryCall)
-
-        val textCall = (obj \ "expr")
-          .asOpt[String]
-          .toRight(GenericError("Unable to read expr string"))
-          .flatMap(parseTextCall)
 
         val result =
           for {
-            expr <- binaryCall.orElse(textCall)
-            ctx <- BlockchainContext
-              .build(
-                script.stdLibVersion,
-                AddressScheme.current.chainId,
-                Coeval.raiseError(new IllegalStateException("No input entity available")),
-                Coeval.evalOnce(blockchain.height),
-                blockchain,
-                isTokenContext = false,
-                isContract = true,
-                Coproduct[Environment.Tthis](Recipient.Address(ByteStr(address.bytes))),
-                ByteStr.empty
-              )
-              .left
-              .map(GenericError(_))
-            call = ContractEvaluator.buildExprFromDappAndCall(script.expr.asInstanceOf[DApp], expr)
-            result <- EvaluatorV2.applyCompleted(ctx, call, script.stdLibVersion).left.map { case (err, log) => ScriptExecutionError(err, log, None) }
-          } yield result._1
+            expr <- parseCall(obj \ "expr")
+            result <- ScriptCallEvaluator.executeExpression(blockchain, script, address)(expr)
+          } yield result
 
         result
           .map(serializeResult)
@@ -308,11 +270,11 @@ case class UtilsApiRoute(
             case other                   => ApiError.fromValidationError(other).json
           }
           .explicitGet()
-          .as[JsObject] ++ Json.obj("address" -> address.stringRepr, "expr" -> (obj \ "expr").as[String])
+          .as[JsObject] ++ Json.obj("address" -> address.stringRepr) ++ obj
       }
     }
 
-  private[this] def scriptedAddress(address: Address): Directive[(Address, Script)] = blockchain.accountScript(address) match {
+  private[this] def onlyScriptedAddress(address: Address): Directive[(Address, Script)] = blockchain.accountScript(address) match {
     case Some(value) if value.script.expr.isInstanceOf[DApp] =>
       tprovide(address -> value.script)
 
@@ -325,4 +287,54 @@ case class UtilsApiRoute(
 object UtilsApiRoute {
   val MaxSeedSize     = 1024
   val DefaultSeedSize = 32
+
+  private object ScriptCallEvaluator {
+    def parseTextCall(str: String): Either[ValidationError, EXPR] = {
+      // TODO: Invent something more smart, like ExpressionCompiler.compile(str) but with acknowledge of existing contract functions
+
+      Parser.parseExpr(str) match {
+        case Parsed.Success(Expressions.FUNCTION_CALL(_, PART.VALID(_, name), args, _, _), _) =>
+          for (argsConv <- args.map {
+                 case Expressions.FALSE(_, _)                           => Right(Terms.CONST_BOOLEAN(false))
+                 case Expressions.TRUE(_, _)                            => Right(Terms.CONST_BOOLEAN(true))
+                 case Expressions.CONST_BYTESTR(_, PART.VALID(_, v), _) => Terms.CONST_BYTESTR(v).left.map(GenericError(_))
+                 case Expressions.CONST_STRING(_, PART.VALID(_, v), _)  => Terms.CONST_STRING(v).left.map(GenericError(_))
+                 case Expressions.CONST_LONG(_, value, _)               => Right(Terms.CONST_LONG(value))
+                 case e                                                 => Left(GenericError(s"Couldn't parse $e as argument"))
+               }.sequence) yield Terms.FUNCTION_CALL(FunctionHeader.User(name), argsConv)
+
+        case failure: Parsed.Failure => Left(GenericError(failure.longMsg))
+        case value                   => Left(GenericError(s"Can't parse $value as function call"))
+      }
+    }
+
+    def parseBinaryCall(bs: ByteStr): Either[ValidationError, EXPR] = {
+      Serde
+        .deserialize(bs.arr)
+        .left
+        .map(GenericError(_))
+        .map(_._1)
+    }
+
+    def executeExpression(blockchain: Blockchain, script: Script, address: Address)(expr: EXPR): Either[ValidationError, EVALUATED] = {
+      for {
+        ctx <- BlockchainContext
+          .build(
+            script.stdLibVersion,
+            AddressScheme.current.chainId,
+            Coeval.raiseError(new IllegalStateException("No input entity available")),
+            Coeval.evalOnce(blockchain.height),
+            blockchain,
+            isTokenContext = false,
+            isContract = true,
+            Coproduct[Environment.Tthis](Recipient.Address(ByteStr(address.bytes))),
+            ByteStr.empty
+          )
+          .left
+          .map(GenericError(_))
+        call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)
+        result <- EvaluatorV2.applyCompleted(ctx, call, script.stdLibVersion).left.map { case (err, log) => ScriptExecutionError(err, log, None) }
+      } yield result._1
+    }
+  }
 }

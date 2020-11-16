@@ -716,6 +716,10 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
     (utilsApi.blockchain.accountScript _).when(TxHelpers.defaultSigner.toAddress).returning(Some(testScript))
 
+    evalScript("testNone()") ~> route ~> check {
+      responseJson shouldBe Json.obj("error" -> 306, "message" -> "Function or type 'testNone' not found")
+    }
+
     evalScript("testF()") ~> route ~> check {
       responseJson shouldBe Json.obj("error" -> 306, "message" -> "Test")
     }
