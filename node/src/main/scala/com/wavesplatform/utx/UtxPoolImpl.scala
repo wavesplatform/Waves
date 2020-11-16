@@ -219,7 +219,7 @@ class UtxPoolImpl(
   }
 
   private[utx] def addTransaction(tx: Transaction, verify: Boolean, forceValidate: Boolean = false): TracedResult[ValidationError, Boolean] = {
-    def containsInUtx(c: ContinuationTransaction) =
+    def containedInUtx(c: ContinuationTransaction) =
       transactions.asScala.exists {
         case (_, existing: ContinuationTransaction) if existing.invokeScriptTransactionId == c.invokeScriptTransactionId && existing.nonce >= c.nonce =>
           true
@@ -228,7 +228,7 @@ class UtxPoolImpl(
       }
 
     tx match {
-      case c: ContinuationTransaction if containsInUtx(c) || blockchain.containsTransaction(c) =>
+      case c: ContinuationTransaction if containedInUtx(c) || blockchain.containsTransaction(c) =>
         TracedResult.wrapValue(false)
       case _ =>
         val diffEi = priorityDiffs.synchronized {
