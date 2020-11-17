@@ -23,7 +23,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: |
-            ~/.sbt
+            ~/.sbt/boot
             ~/.cache/coursier
             **/target
           key: ${{ hashFiles('**/build.sbt', 'project/Dependencies.scala') }}
