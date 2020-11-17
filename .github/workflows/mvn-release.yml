@@ -102,5 +102,5 @@ jobs:
                lang/publishSigned'
 
           if [[ "${{ env.skip_publish }}" != "true" ]]; then
-            sbt sonatypeDrop
+            sbt sonatypeRelease
           fi
