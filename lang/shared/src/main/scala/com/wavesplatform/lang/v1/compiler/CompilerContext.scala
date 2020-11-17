@@ -3,14 +3,14 @@ package com.wavesplatform.lang.v1.compiler
 import cats.Monoid
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
-import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL}
+import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, FunctionTypeSignature}
 import com.wavesplatform.lang.v1.parser.Expressions.Pos
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import shapeless._
 
-case class CompilerContext(predefTypes: Map[String, FINAL], varDefs: VariableTypes, functionDefs: FunctionTypes, tmpArgsIdx: Int = 0) {
+case class CompilerContext(predefTypes: Map[String, FINAL], varDefs: VariableTypes, functionDefs: FunctionTypes, tmpArgsIdx: Int = 0, arbitraryFunctions: Boolean = false) {
   private lazy val allFuncDefs: FunctionTypes =
     predefTypes.collect {
       case (_, t @ CASETYPEREF(typeName, fields, false)) =>
@@ -18,7 +18,26 @@ case class CompilerContext(predefTypes: Map[String, FINAL], varDefs: VariableTyp
           FunctionInfo(AnyPos, List(FunctionTypeSignature(CASETYPEREF(typeName, fields), fields, FunctionHeader.User(typeName))))
     } ++ functionDefs
 
-  def functionTypeSignaturesByName(name: String): List[FunctionTypeSignature] = allFuncDefs.getOrElse(name, FunctionInfo(AnyPos, List.empty)).fSigList
+  private def resolveFunction(name: String): FunctionInfo =
+    if (arbitraryFunctions) {
+      val primitives = List(LONG, BYTESTR, BOOLEAN, STRING)
+      val maybeAllTypes = UNION(
+        UNION(primitives),
+        UNION(primitives.map(LIST(_))),
+        UNION.create(predefTypes.values.toSeq)
+      )
+      def signature(name: String, i: Int) = {
+        FunctionTypeSignature(BOOLEAN, Seq.fill(i)(("arg", maybeAllTypes)), FunctionHeader.User(name))
+      }
+      allFuncDefs
+        .withDefault(name => FunctionInfo(AnyPos, (0 to 22).map(i => signature(name, i)).toList))
+        .apply(name)
+    } else {
+      allFuncDefs.getOrElse(name, FunctionInfo(AnyPos, List.empty))
+    }
+
+  def functionTypeSignaturesByName(name: String): List[FunctionTypeSignature] =
+    resolveFunction(name).fSigList
 
   def getSimpleContext(): Map[String, Pos] = {
     (varDefs.map(el => el._1 -> el._2.pos) ++ functionDefs.map(el => el._1 -> el._2.pos))

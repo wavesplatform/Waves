@@ -16,11 +16,16 @@ import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
-import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.compiler.CompilerContext.FunctionInfo
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
+import com.wavesplatform.lang.v1.compiler.Types.NOTHING
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2}
 import com.wavesplatform.lang.v1.parser.Expressions.PART
+import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
@@ -252,7 +257,7 @@ case class UtilsApiRoute(
           val textCall = js
             .asOpt[String]
             .toRight(GenericError("Unable to read expr string"))
-            .flatMap(ScriptCallEvaluator.parseTextCall)
+            .flatMap(ScriptCallEvaluator.compile)
 
           binaryCall.orElse(textCall)
         }
@@ -289,23 +294,9 @@ object UtilsApiRoute {
   val DefaultSeedSize = 32
 
   private object ScriptCallEvaluator {
-    def parseTextCall(str: String): Either[ValidationError, EXPR] = {
-      // TODO: Invent something more smart, like ExpressionCompiler.compile(str) but with acknowledge of existing contract functions
-
-      Parser.parseExpr(str) match {
-        case Parsed.Success(Expressions.FUNCTION_CALL(_, PART.VALID(_, name), args, _, _), _) =>
-          for (argsConv <- args.map {
-                 case Expressions.FALSE(_, _)                           => Right(Terms.CONST_BOOLEAN(false))
-                 case Expressions.TRUE(_, _)                            => Right(Terms.CONST_BOOLEAN(true))
-                 case Expressions.CONST_BYTESTR(_, PART.VALID(_, v), _) => Terms.CONST_BYTESTR(v).left.map(GenericError(_))
-                 case Expressions.CONST_STRING(_, PART.VALID(_, v), _)  => Terms.CONST_STRING(v).left.map(GenericError(_))
-                 case Expressions.CONST_LONG(_, value, _)               => Right(Terms.CONST_LONG(value))
-                 case e                                                 => Left(GenericError(s"Couldn't parse $e as argument"))
-               }.sequence) yield Terms.FUNCTION_CALL(FunctionHeader.User(name), argsConv)
-
-        case failure: Parsed.Failure => Left(GenericError(failure.longMsg))
-        case value                   => Left(GenericError(s"Can't parse $value as function call"))
-      }
+    def compile(str: String): Either[GenericError, EXPR] = {
+      val ctx = PureContext.build(V4).compilerContext.copy(arbitraryFunctions = true)
+      ExpressionCompiler.compile(str, ctx).leftMap(GenericError(_))
     }
 
     def parseBinaryCall(bs: ByteStr): Either[ValidationError, EXPR] = {
