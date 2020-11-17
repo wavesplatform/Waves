@@ -13,7 +13,13 @@ import sbtcrossproject.CrossPlugin.autoImport.{CrossType, crossProject}
 val langPublishSettings = Seq(
   coverageExcludedPackages := "",
   publishMavenStyle := true,
-  publishTo := Some("Sonatype Nexus" at "https://oss.sonatype.org/service/local/staging/deploy/maven2"),
+  publishTo := {
+    val nexus = "https://oss.sonatype.org/"
+    if (isSnapshot.value)
+      Some("snapshots" at nexus + "content/repositories/snapshots")
+    else
+      Some("releases" at nexus + "service/local/staging/deploy/maven2")
+  },
   homepage := Some(url("https://docs.wavesplatform.com/en/technical-details/waves-contracts-language-description/maven-compiler-package.html")),
   developers := List(
     Developer("petermz", "Peter Zhelezniakov", "peterz@rambler.ru", url("https://wavesplatform.com"))
@@ -135,14 +141,14 @@ inScope(Global)(
     network := Network(sys.props.get("network")),
     resolvers += Resolver.sonatypeRepo("snapshots"),
     sources in (Compile, doc) := Seq.empty,
-    publishArtifact in (Compile, packageDoc) := false
+    publishArtifact in (Compile, packageDoc) := false,
+    isSnapshot := version.value.endsWith("SNAPSHOT")
   )
 )
 
 // ThisBuild options
 git.useGitDescribe := true
 git.uncommittedSignifier := Some("DIRTY")
-isSnapshot := version.value.endsWith("SNAPSHOT")
 
 lazy val packageAll = taskKey[Unit]("Package all artifacts")
 packageAll := Def
