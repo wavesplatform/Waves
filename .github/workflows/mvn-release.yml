@@ -35,6 +35,8 @@ jobs:
           key: ${{ hashFiles('lang/**/*.scala', 'lang/**/*.java') }}
       - name: Set version
         id: version
+        env:
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: true
         run: |
           if [[ "${{github.event_name}}" == "pull_request" ]]; then
             ref="${{github.head_ref}}"
