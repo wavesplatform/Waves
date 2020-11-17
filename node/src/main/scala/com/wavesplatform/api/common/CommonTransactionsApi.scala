@@ -51,7 +51,7 @@ trait CommonTransactionsApi {
 
   def transactionProofs(transactionIds: List[ByteStr]): List[TransactionProof]
 
-  def continuations(invokeTransactionId: ByteStr): List[ByteStr] 
+  def continuations(invokeTransactionId: ByteStr): Seq[ByteStr]
 }
 
 object CommonTransactionsApi {
@@ -126,12 +126,15 @@ object CommonTransactionsApi {
         transactionProof         <- block.transactionProof(transaction, allTransactions)
       } yield transactionProof
 
-    override def continuations(invokeTransactionId: ByteStr): List[ByteStr] = {
-      def cId(sern: Int): ByteStr = {
-         ContinuationTransaction(invokeTransactionId, 0L, sern, 0, Asset.Waves).id()
-      }
-      def cts(sern: Int): LazyList[ByteStr] = cId(sern) #:: cts(sern + 1)
-      cts(0).takeWhile(blockchain.transactionMeta(_).nonEmpty).toList
+    override def continuations(invokeTransactionId: ByteStr): Seq[ByteStr] = {
+      def continuationByNonce(nonce: Int): ContinuationTransaction =
+         ContinuationTransaction(invokeTransactionId, 0L, nonce, 0L, Asset.Waves)
+      def continuationsFrom(startNonce: Int): LazyList[ContinuationTransaction] =
+        continuationByNonce(startNonce) #:: continuationsFrom(startNonce + 1)
+
+      continuationsFrom(0)
+        .takeWhile(blockchain.containsTransaction)
+        .map(_.id.value())
     }
   }
 }
