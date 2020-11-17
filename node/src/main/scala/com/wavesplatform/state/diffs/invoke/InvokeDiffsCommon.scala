@@ -58,7 +58,7 @@ object InvokeDiffsCommon {
 
       for {
         (attachedFeeInWaves, portfolioDiff) <- tx.assetFee._1 match {
-          case Waves => Right((attachedFee, Map(tx.sender.toAddress -> Portfolio(-attachedFee, LeaseBalance.empty, Map.empty))))
+          case Waves => Right((attachedFee, Map(tx.sender.toAddress -> Portfolio(-attachedFee))))
           case asset @ IssuedAsset(_) =>
             for {
               assetInfo <- blockchain
@@ -71,8 +71,8 @@ object InvokeDiffsCommon {
               )
             } yield {
               val portfolioDiff =
-                Map(tx.sender.toAddress          -> Portfolio(0, LeaseBalance.empty, Map(asset           -> -attachedFee))) |+|
-                  Map(assetInfo.issuer.toAddress -> Portfolio(-feeInWaves, LeaseBalance.empty, Map(asset -> attachedFee)))
+                Map(tx.sender.toAddress          -> Portfolio(assets = Map(asset -> -attachedFee))) |+|
+                  Map(assetInfo.issuer.toAddress -> Portfolio(-feeInWaves, assets = Map(asset -> attachedFee)))
               (feeInWaves, portfolioDiff)
             }
         }
@@ -183,7 +183,8 @@ object InvokeDiffsCommon {
       tx: InvokeScriptTransaction,
       blockchain: Blockchain,
       blockTime: Long,
-      limitedExecution: Boolean = false
+      useFeeDiff: Boolean, // TODO refactor
+      limitedExecution: Boolean
   ): TracedResult[ValidationError, Diff] = {
     val complexityLimit =
       if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - invocationComplexity.toInt
@@ -237,7 +238,7 @@ object InvokeDiffsCommon {
         actionScriptsInvoked
       )
 
-      paymentsAndFeeDiff = paymentsPart(tx, dAppAddress, feeDiff)
+      paymentsAndFeeDiff = paymentsPart(tx, dAppAddress, if (useFeeDiff) feeDiff else Map())
 
       compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey)(actions, paymentsAndFeeDiff, complexityLimit)
         .leftMap(_.addComplexity(invocationComplexity))
@@ -291,10 +292,22 @@ object InvokeDiffsCommon {
     diff
       .copy(
         continuationStates = Map((tx.invokeScriptTransactionId, tx.nonce + 1) -> ContinuationState.Finished(tx.id.value())),
-        replacingTransactions = List((tx.copy(fee = totalFee), if (failed) ScriptExecutionFailed else Succeeded))
+        replacingTransactions = List((tx.copy(fee = totalFee), if (failed) ScriptExecutionFailed else Succeeded)),
+        portfolios = oneStepFeePortfolios(totalFee, invoke, blockchain)
       )
       .bindOldTransaction(tx.invokeScriptTransactionId)
   }
+
+  def oneStepFeePortfolios(stepFee: Long, invoke: InvokeScriptTransaction, blockchain: Blockchain): Map[Address, Portfolio] =
+    invoke.assetFee._1 match {
+      case Waves =>
+        Map(invoke.sender.toAddress -> Portfolio(-stepFee))
+      case asset @ IssuedAsset(_) =>
+        val assetInfo  = blockchain.assetDescription(asset).get
+        val feeInWaves = Sponsorship.toWaves(stepFee, assetInfo.sponsorship)
+        Map(invoke.sender.toAddress      -> Portfolio(assets = Map(asset              -> -stepFee))) |+|
+          Map(assetInfo.issuer.toAddress -> Portfolio(-feeInWaves, assets = Map(asset -> stepFee)))
+    }
 
   private def paymentsPart(
       tx: InvokeScriptTransaction,
@@ -306,11 +319,11 @@ object InvokeDiffsCommon {
         case InvokeScriptTransaction.Payment(amt, assetId) =>
           assetId match {
             case asset @ IssuedAsset(_) =>
-              Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))) |+|
-                Map(dAppAddress       -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
+              Map(tx.sender.toAddress -> Portfolio(assets = Map(asset -> -amt))) |+|
+                Map(dAppAddress       -> Portfolio(assets = Map(asset -> amt)))
             case Waves =>
-              Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty)) |+|
-                Map(dAppAddress       -> Portfolio(amt, LeaseBalance.empty, Map.empty))
+              Map(tx.sender.toAddress -> Portfolio(-amt)) |+|
+                Map(dAppAddress       -> Portfolio(amt))
           }
       }
       .foldLeft(Map[Address, Portfolio]())(_ |+| _)
@@ -420,15 +433,15 @@ object InvokeDiffsCommon {
               case Waves =>
                 val r = Diff.stateOps(
                   portfolios =
-                    Map(address       -> Portfolio(amount, LeaseBalance.empty, Map.empty)) |+|
-                      Map(dAppAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty))
+                    Map(address       -> Portfolio(amount)) |+|
+                      Map(dAppAddress -> Portfolio(-amount))
                 )
                 TracedResult.wrapValue(r)
               case a @ IssuedAsset(id) =>
                 val nextDiff = Diff.stateOps(
                   portfolios =
-                    Map(address       -> Portfolio(0, LeaseBalance.empty, Map(a -> amount))) |+|
-                      Map(dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount)))
+                    Map(address       -> Portfolio(assets = Map(a -> amount))) |+|
+                      Map(dAppAddress -> Portfolio(assets = Map(a -> -amount)))
                 )
                 blockchain.assetScript(a).fold(TracedResult(nextDiff.asRight[FailedTransactionError])) {
                   case AssetScriptInfo(script, complexity) =>
@@ -437,8 +450,8 @@ object InvokeDiffsCommon {
                       else
                         nextDiff.copy(
                           portfolios = Map(
-                            address     -> Portfolio(0, LeaseBalance.empty, Map(a -> amount)),
-                            dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount))
+                            address     -> Portfolio(assets = Map(a -> amount)),
+                            dAppAddress -> Portfolio(assets = Map(a -> -amount))
                           )
                         )
                     val pseudoTx = ScriptTransfer(

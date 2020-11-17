@@ -161,7 +161,8 @@ object InvokeScriptTransactionDiff {
               tx,
               blockchain,
               blockTime,
-              limitedExecution
+              useFeeDiff = true,
+              limitedExecution = limitedExecution
             )
 
             resultDiff <- scriptResult._1 match {

@@ -26,12 +26,12 @@ import monix.eval.Coeval
 import shapeless.Coproduct
 
 object ContinuationTransactionDiff {
-  def apply(blockchain: Blockchain, blockTime: Long, verifyAssets: Boolean = true)(
+  def apply(blockchain: Blockchain, blockTime: Long, limitedExecution: Boolean = true)(
       tx: ContinuationTransaction
   ): TracedResult[ValidationError, Diff] = {
     blockchain.continuationStates(tx.invokeScriptTransactionId) match {
       case (_, ContinuationState.InProgress(expr, residualComplexity, _)) =>
-        applyDiff(blockchain, blockTime, verifyAssets, tx, expr, residualComplexity)
+        applyDiff(blockchain, blockTime, limitedExecution, tx, expr, residualComplexity)
       case _ =>
         TracedResult.wrapValue(Diff.empty)
     }
@@ -40,14 +40,14 @@ object ContinuationTransactionDiff {
   private def applyDiff(
       blockchain: Blockchain,
       blockTime: Long,
-      verifyAssets: Boolean,
+      limitedExecution: Boolean,
       tx: ContinuationTransaction,
       expr: Terms.EXPR,
       residualComplexity: Int
   ): TracedResult[ValidationError, Diff] = {
-    val invokeScriptTransaction = tx.resolveInvoke(blockchain)
+    val invoke = tx.resolveInvoke(blockchain)
     for {
-      dAppAddress <- TracedResult(blockchain.resolveAlias(invokeScriptTransaction.dAppAddressOrAlias))
+      dAppAddress <- TracedResult(blockchain.resolveAlias(invoke.dAppAddressOrAlias))
       scriptInfo <- TracedResult(
         blockchain
           .accountScript(dAppAddress)
@@ -60,10 +60,10 @@ object ContinuationTransactionDiff {
 
       rideAddress = Coproduct[Tthis](Recipient.Address(ByteStr(dAppAddress.bytes)))
       input <- TracedResult(
-        buildThisValue(Coproduct[TxOrd](invokeScriptTransaction: Transaction), blockchain, directives, rideAddress).left.map(GenericError(_))
+        buildThisValue(Coproduct[TxOrd](invoke: Transaction), blockchain, directives, rideAddress).left.map(GenericError(_))
       )
 
-      invokeHeight = blockchain.transactionMeta(invokeScriptTransaction.id.value()).get._1
+      invokeHeight = blockchain.transactionMeta(invoke.id.value()).get._1
       environment = new WavesEnvironment(
         AddressScheme.current.chainId,
         Coeval.evalOnce(input),
@@ -93,12 +93,12 @@ object ContinuationTransactionDiff {
           .leftMap { case (error, log) => FailedTransactionError.dAppExecution(error, 0, log) }
         TracedResult(
           r,
-          List(InvokeScriptTrace(invokeScriptTransaction.dAppAddressOrAlias, invokeScriptTransaction.funcCall, r.map(_._1), r.fold(_.log, _._2)))
+          List(InvokeScriptTrace(invoke.dAppAddressOrAlias, invoke.funcCall, r.map(_._1), r.fold(_.log, _._2)))
         )
       }
 
       invocationComplexity <- TracedResult(
-        InvokeDiffsCommon.getInvocationComplexity(blockchain, invokeScriptTransaction, callableComplexities, dAppAddress)
+        InvokeDiffsCommon.getInvocationComplexity(blockchain, invoke, callableComplexities, dAppAddress)
       )
 
       doProcessActions = InvokeDiffsCommon
@@ -108,12 +108,13 @@ object ContinuationTransactionDiff {
           dAppAddress,
           dAppPublicKey,
           invocationComplexity,
-          invokeScriptTransaction,
+          invoke,
           blockchain,
           blockTime,
-          verifyAssets
+          useFeeDiff = false,
+          limitedExecution
         )
-        .map(InvokeDiffsCommon.finishContinuation(_, tx, blockchain, invokeScriptTransaction, failed = false).copy(transactions = Map()))
+        .map(InvokeDiffsCommon.finishContinuation(_, tx, blockchain, invoke, failed = false).copy(transactions = Map()))
 
       resultDiff <- scriptResult._1 match {
         case ScriptResultV3(dataItems, transfers) =>
@@ -122,11 +123,12 @@ object ContinuationTransactionDiff {
           doProcessActions(actions)
         case ir: IncompleteResult =>
           val newState = ContinuationState.InProgress(ir.expr, ir.unusedComplexity, tx.id.value())
-          val stepFee  = InvokeDiffsCommon.expectedStepFeeInAttachedAsset(invokeScriptTransaction, blockchain)
+          val stepFee  = InvokeDiffsCommon.expectedStepFeeInAttachedAsset(invoke, blockchain)
           TracedResult.wrapValue[Diff, ValidationError](
             Diff.stateOps(
               continuationStates = Map((tx.invokeScriptTransactionId, tx.nonce + 1) -> newState),
-              replacingTransactions = List((tx.copy(fee = stepFee), ScriptExecutionInProgress))
+              replacingTransactions = List((tx.copy(fee = stepFee), ScriptExecutionInProgress)),
+              portfolios = InvokeDiffsCommon.oneStepFeePortfolios(stepFee, invoke, blockchain)
             )
           )
       }
