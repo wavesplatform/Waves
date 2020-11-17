@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract
 
+import cats.implicits._
 import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
@@ -17,9 +18,7 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.ContinuationTransaction
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, TxVersion, smart}
@@ -102,6 +101,8 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     id
   }
 
+  private val pureInvokeFee = invokeFee - smartFee
+
   test("can't set continuation before activation") {
     assertBadRequestAndMessage(
       sender.setScript(dApp, Some(script), setScriptFee),
@@ -120,22 +121,29 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   }
 
   test("continuation with rollback") {
-    sender.waitForHeight(sender.height + 1)
-    val startHeight = sender.height
+    val startHeight = sender.height + 1
+    sender.waitForHeight(startHeight)
+
+    val enoughFee    = pureInvokeFee * 8
+    val redundantFee = pureInvokeFee * 7
+
     val invoke = sender
       .invokeScript(
         caller,
         dApp.toAddress.toString,
         func = Some("foo"),
         args = List(CONST_BOOLEAN(false)),
-        payment = Seq(Payment(1.waves, Waves)),
-        fee = 1.waves,
+        fee = enoughFee + redundantFee,
         version = TxVersion.V3,
         waitForTx = true
       )
       ._1
+
     waitForContinuation(invoke.id, shouldBeFailed = false)
-    sender.waitForHeight(sender.height + 1)
+    val endHeight = sender.height + 1
+    sender.waitForHeight(endHeight)
+
+    assertBalances(startHeight, endHeight, enoughFee)
     assertContinuationChain(invoke.id, sender.height)
     nodes.foreach { node =>
       node.getDataByKey(dApp.toAddress.toString, "a") shouldBe BooleanDataEntry("a", true)
@@ -155,7 +163,6 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         dApp.toAddress.toString,
         func = Some("foo"),
         args = List(CONST_BOOLEAN(false)),
-        payment = Seq(Payment(1.waves, Waves)),
         fee = 1.waves,
         feeAssetId = Some(sponsoredAssetId),
         version = TxVersion.V3,
@@ -179,7 +186,6 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         dApp.toAddress.toString,
         func = Some("foo"),
         args = List(CONST_BOOLEAN(true)),
-        payment = Seq(Payment(1.waves, Waves)),
         fee = 1.waves,
         version = TxVersion.V3,
         waitForTx = true
@@ -198,7 +204,6 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         dApp.toAddress.toString,
         func = Some("foo"),
         args = List(CONST_BOOLEAN(true)),
-        payment = Seq(Payment(1.waves, Waves)),
         fee = 1.waves,
         feeAssetId = Some(sponsoredAssetId),
         version = TxVersion.V3,
@@ -288,7 +293,6 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       dApp.toAddress.toString,
       func = Some("foo"),
       args = List(CONST_BOOLEAN(false)),
-      payment = Seq(Payment(1.waves, Waves)),
       fee = invokeFee,
       version = TxVersion.V3
     )
@@ -326,7 +330,6 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       actions: Int = 0
   ): Unit = {
     nodes.foreach { node =>
-      val pureInvokeFee    = invokeFee - smartFee
       val endStatus        = if (shouldBeFailed) "script_execution_failed" else "succeeded"
       val inProgressStatus = "script_execution_in_progress"
 
@@ -366,6 +369,34 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       invoke.timestamp +: continuations.map(_.timestamp) shouldBe sorted
       invoke.continuationTransactionIds.value shouldBe continuationIds
     }
+  }
+
+  private def assertBalances(startHeight: Int, endHeight: Int, expectingFee: Long): Unit = {
+    val startCallerBalance    = sender.balanceAtHeight(caller.toAddress.toString, startHeight)
+    val resultCallerBalance   = sender.balanceAtHeight(caller.toAddress.toString, endHeight)
+    val callerBalanceDecrease = startCallerBalance - resultCallerBalance
+
+    val minersBalanceIncrease =
+      nodes.map { node =>
+        val startBalance  = sender.balanceAtHeight(node.address, startHeight)
+        val resultBalance = sender.balanceAtHeight(node.address, endHeight)
+        node.address -> (resultBalance - startBalance)
+      }.toMap
+
+    val blockReward = miner.lastBlock().reward.value
+    val (blockRewardDistribution, _) =
+      miner
+        .blockSeq(startHeight, endHeight - 1)
+        .foldLeft((Map[String, Long](), 0L)) {
+          case ((balances, previousBlockReward), block) =>
+            val transactionsReward = block.transactions.map(_ => pureInvokeFee).sum * 2 / 5
+            val result = balances |+| Map(block.generator -> (previousBlockReward + transactionsReward + blockReward))
+            (result, transactionsReward * 3 / 2)
+        }
+
+    callerBalanceDecrease shouldBe expectingFee
+    minersBalanceIncrease.values.sum shouldBe expectingFee + (endHeight - startHeight) * blockReward
+    blockRewardDistribution should contain theSameElementsAs minersBalanceIncrease
   }
 
   private def testPartialRollback(startHeight: Int, invoke: Transaction): Unit = {

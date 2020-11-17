@@ -123,12 +123,12 @@ object ContinuationTransactionDiff {
           doProcessActions(actions)
         case ir: IncompleteResult =>
           val newState = ContinuationState.InProgress(ir.expr, ir.unusedComplexity, tx.id.value())
-          val stepFee  = InvokeDiffsCommon.expectedStepFeeInAttachedAsset(invoke, blockchain)
+          val stepFee  = InvokeDiffsCommon.stepTotalFee(Diff.empty, blockchain, invoke)
           TracedResult.wrapValue[Diff, ValidationError](
             Diff.stateOps(
               continuationStates = Map((tx.invokeScriptTransactionId, tx.nonce + 1) -> newState),
               replacingTransactions = List((tx.copy(fee = stepFee), ScriptExecutionInProgress)),
-              portfolios = InvokeDiffsCommon.oneStepFeePortfolios(stepFee, invoke, blockchain)
+              portfolios = InvokeDiffsCommon.stepFeePortfolios(stepFee, invoke, blockchain)
             )
           )
       }

@@ -169,8 +169,11 @@ object InvokeScriptTransactionDiff {
               case ScriptResultV3(dataItems, transfers) => doProcessActions(dataItems ::: transfers)
               case ScriptResultV4(actions)              => doProcessActions(actions)
               case ir: IncompleteResult =>
-                val state = ContinuationState.InProgress(ir.expr, residualComplexity = ir.unusedComplexity, tx.id.value())
-                TracedResult.wrapValue(Diff(tx = tx, continuationStates = Map((tx.id.value(), 0) -> state)))
+                val state      = ContinuationState.InProgress(ir.expr, residualComplexity = ir.unusedComplexity, tx.id.value())
+                val stateDiff  = Diff(tx = tx, continuationStates = Map((tx.id.value(), 0) -> state))
+                val stepFee    = InvokeDiffsCommon.stepTotalFee(stateDiff, blockchain, tx)
+                val portfolios = Diff.stateOps(portfolios = InvokeDiffsCommon.stepFeePortfolios(stepFee, tx, blockchain))
+                TracedResult.wrapValue(stateDiff |+| portfolios)
             }
           } yield resultDiff
         } yield result

@@ -8,11 +8,13 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.invoke.InvokeDiffsCommon
 import com.wavesplatform.state.patch._
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{ActivationError, _}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction}
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 
@@ -131,6 +133,19 @@ object BlockDiffer extends ScorexLogging {
       case _ => transactionFee
     }
 
+  private def maybeContinuation(blockchain: Blockchain, tx: Transaction, txDiff: Diff): Option[(Asset, Long)] =
+    tx match {
+      case i: InvokeScriptTransaction if txDiff.continuationStates.nonEmpty =>
+        val fee = InvokeDiffsCommon.stepTotalFee(txDiff, blockchain, i)
+        Some((i.assetFee._1, fee))
+      case c: ContinuationTransaction =>
+        val invoke = c.resolveInvoke(blockchain)
+        val fee    = InvokeDiffsCommon.stepTotalFee(txDiff, blockchain, invoke)
+        Some((c.assetFee._1, fee))
+      case _ =>
+        None
+    }
+
   private[this] def apply(
       blockchain: Blockchain,
       initConstraint: MiningConstraint,
@@ -160,8 +175,9 @@ object BlockDiffer extends ScorexLogging {
             if (updatedConstraint.isOverfilled)
               TracedResult(Left(GenericError(s"Limit of txs was reached: $initConstraint -> $updatedConstraint")))
             else {
-              val (feeAsset, feeAmount) = maybeApplySponsorship(currBlockchain, hasSponsorship, tx.assetFee)
-              val currentBlockFee       = CurrentBlockFeePart(feeAmount)
+              val (feeAsset, feeAmount) = maybeContinuation(blockchain, tx, thisTxDiff)
+                .getOrElse(maybeApplySponsorship(currBlockchain, hasSponsorship, tx.assetFee))
+              val currentBlockFee = CurrentBlockFeePart(feeAmount)
 
               // unless NG is activated, miner has already received all the fee from this block by the time the first
               // transaction is processed (see abode), so there's no need to include tx fee into portfolio.
