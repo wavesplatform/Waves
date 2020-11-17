@@ -1,9 +1,9 @@
 name: Maven release
 
 on:
-  pull_request:
-    branches:
-      - master
+  #pull_request: # Uncomment to enable PR publishing
+  #  branches:
+  #    - master
   push:
     branches:
       - master
