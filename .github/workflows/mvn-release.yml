@@ -61,7 +61,6 @@ jobs:
             git fetch --prune --unshallow
             git checkout master
             version=$(./setversion.sh snapshot)
-            git checkout "$ref"
           fi
 
           if test -z "$version"; then exit 1; fi
