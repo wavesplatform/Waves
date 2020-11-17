@@ -41,7 +41,7 @@ lazy val lang =
           PB.protoSources := Seq(PB.externalIncludePath.value, baseDirectory.value.getParentFile / "shared" / "src" / "main" / "protobuf"),
           includeFilter in PB.generate := { (f: File) =>
             (** / "DAppMeta.proto").matches(f.toPath) ||
-              (** / "waves" / "*.proto").matches(f.toPath)
+            (** / "waves" / "*.proto").matches(f.toPath)
           },
           PB.deleteTargetDirectory := false
         )
@@ -54,13 +54,21 @@ lazy val `lang-jvm` = lang.jvm
     name := "RIDE Compiler",
     normalizedName := "lang",
     description := "The RIDE smart contract language compiler",
-    libraryDependencies += "org.scala-js" %% "scalajs-stubs" % "1.0.0" % Provided
+    coverageExcludedPackages := "",
+    libraryDependencies ++=
+      Seq(
+        "org.scala-js"                      %% "scalajs-stubs" % "1.0.0" % Provided,
+        "com.github.spullara.mustache.java" % "compiler"       % "0.9.5"
+      )
   )
 
 lazy val `lang-js` = lang.js
   .enablePlugins(VersionObject)
   .settings(
-    libraryDependencies += Dependencies.circeJsInterop.value
+    libraryDependencies += Dependencies.circeJsInterop.value,
+    scalaJSLinkerConfig ~= {
+      _.withModuleKind(ModuleKind.CommonJSModule)
+    }
   )
 
 lazy val `lang-testkit` = project
@@ -141,8 +149,7 @@ inScope(Global)(
     network := Network(sys.props.get("network")),
     resolvers += Resolver.sonatypeRepo("snapshots"),
     sources in (Compile, doc) := Seq.empty,
-    publishArtifact in (Compile, packageDoc) := false,
-    isSnapshot := version.value.endsWith("SNAPSHOT")
+    publishArtifact in (Compile, packageDoc) := false
   )
 )
 
