@@ -6,12 +6,14 @@ import com.wavesplatform.block
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.database.{DBExt, Keys}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
-import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, ContinuationTransaction}
+import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult, TransactionId}
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction}
 import com.wavesplatform.transaction.{ApplicationStatus, Asset, CreateAliasTransaction, Transaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -75,8 +77,9 @@ object CommonTransactionsApi {
         sender: Option[Address],
         transactionTypes: Set[Byte],
         fromId: Option[ByteStr] = None
-    ): Observable[(Height, Transaction, ApplicationStatus)] = resolve(subject).fold(Observable.empty[(Height, Transaction, ApplicationStatus)]) { subjectAddress =>
-      common.addressTransactions(db, maybeDiff, subjectAddress, sender, transactionTypes, fromId)
+    ): Observable[(Height, Transaction, ApplicationStatus)] = resolve(subject).fold(Observable.empty[(Height, Transaction, ApplicationStatus)]) {
+      subjectAddress =>
+        common.addressTransactions(db, maybeDiff, subjectAddress, sender, transactionTypes, fromId)
     }
 
     override def transactionById(transactionId: ByteStr): Option[TransactionMeta] =
@@ -126,10 +129,13 @@ object CommonTransactionsApi {
         transactionProof         <- block.transactionProof(transaction, allTransactions)
       } yield transactionProof
 
-    override def continuations(invokeTransactionId: ByteStr): Seq[ByteStr] =
-      LazyList.from(0)
-        .map(ContinuationTransaction(invokeTransactionId, 0L, _, 0L, Asset.Waves))
-        .takeWhile(blockchain.containsTransaction)
-        .map(_.id.value())
+    override def continuations(invokeTransactionId: ByteStr): Seq[ByteStr] = {
+      val key = Keys.continuationLastNonce(TransactionId(invokeTransactionId))
+      if (db.has(key)) {
+        val lastNonce = db.get(key)
+        (0 until lastNonce).map(ContinuationTransaction(invokeTransactionId, 0L, _, 0L, Waves).id.value())
+      } else
+        Nil
+    }
   }
 }
