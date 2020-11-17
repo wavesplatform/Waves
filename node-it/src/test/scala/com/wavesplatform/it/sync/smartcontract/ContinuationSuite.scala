@@ -125,7 +125,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     sender.waitForHeight(startHeight)
 
     val enoughFee    = pureInvokeFee * 8
-    val redundantFee = pureInvokeFee * 7
+    val redundantFee = 12345678
 
     val invoke = sender
       .invokeScript(
@@ -372,7 +372,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   }
 
   private def assertBalances(startHeight: Int, endHeight: Int, expectingFee: Long): Unit = {
-    val startCallerBalance    = sender.balanceAtHeight(caller.toAddress.toString, startHeight)
+    val startCallerBalance    = sender.balanceAtHeight(caller.toAddress.toString, startHeight - 1)
     val resultCallerBalance   = sender.balanceAtHeight(caller.toAddress.toString, endHeight)
     val callerBalanceDecrease = startCallerBalance - resultCallerBalance
 
