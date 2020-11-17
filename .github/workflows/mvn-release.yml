@@ -102,6 +102,6 @@ jobs:
                set pgpPassphrase := Some("${{ secrets.OSSRH_GPG_PASSPHRASE }}".toCharArray);
                lang/publishSigned'
 
-          if [[ "${{ env.SKIP_PUBLISH }}" != "true" ]]; then
+          if [[ "${{ env.skip_publish }}" != "true" ]]; then
             sbt sonatypeDrop
           fi
