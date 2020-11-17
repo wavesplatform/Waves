@@ -182,7 +182,7 @@ class UtxPoolImpl(
 
   def setPriorityDiffs(discDiffs: Seq[Diff]): Unit = {
     val txs = priorityPool.setPriorityDiffs(discDiffs)
-    txs.foreach(addTransaction(_, verify = false))
+    txs.foreach(addTransaction(_, verify = false, canLock = false))
   }
 
   def resetPriorityPool(): Unit = {
@@ -200,17 +200,27 @@ class UtxPoolImpl(
 
   private[this] def removeIds(removed: Set[ByteStr]): Unit = {
     val priorityRemoved = priorityPool.removeIds(removed)
-    val factRemoved = priorityRemoved ++ removed.flatMap(id => removeFromOrdPool(id))
+    val factRemoved     = priorityRemoved ++ removed.flatMap(id => removeFromOrdPool(id))
     factRemoved.foreach(tx => onEvent(UtxEvent.TxRemoved(tx, None)))
   }
 
-  private[utx] def addTransaction(tx: Transaction, verify: Boolean, forceValidate: Boolean = false): TracedResult[ValidationError, Boolean] = {
-    val diffEi = priorityPool.optimisticRead {
-      if (forceValidate)
-        TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(priorityPool.compositeBlockchain, tx)
-      else
-        TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(priorityPool.compositeBlockchain, tx)
-    }(_.resultE.isLeft)
+  private[utx] def addTransaction(
+      tx: Transaction,
+      verify: Boolean,
+      forceValidate: Boolean = false,
+      canLock: Boolean = true
+  ): TracedResult[ValidationError, Boolean] = {
+    val diffEi = {
+      def calculateDiff() = {
+        if (forceValidate)
+          TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(priorityPool.compositeBlockchain, tx)
+        else
+          TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(priorityPool.compositeBlockchain, tx)
+      }
+
+      if (canLock) priorityPool.optimisticRead(calculateDiff())(_.resultE.isLeft)
+      else calculateDiff()
+    }
 
     def addPortfolio(): Unit = diffEi.map { diff =>
       pessimisticPortfolios.add(tx.id(), diff)
