@@ -126,15 +126,10 @@ object CommonTransactionsApi {
         transactionProof         <- block.transactionProof(transaction, allTransactions)
       } yield transactionProof
 
-    override def continuations(invokeTransactionId: ByteStr): Seq[ByteStr] = {
-      def continuationByNonce(nonce: Int): ContinuationTransaction =
-         ContinuationTransaction(invokeTransactionId, 0L, nonce, 0L, Asset.Waves)
-      def continuationsFrom(startNonce: Int): LazyList[ContinuationTransaction] =
-        continuationByNonce(startNonce) #:: continuationsFrom(startNonce + 1)
-
-      continuationsFrom(0)
+    override def continuations(invokeTransactionId: ByteStr): Seq[ByteStr] =
+      LazyList.from(0)
+        .map(ContinuationTransaction(invokeTransactionId, 0L, _, 0L, Asset.Waves))
         .takeWhile(blockchain.containsTransaction)
         .map(_.id.value())
-    }
   }
 }
