@@ -314,8 +314,8 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         .exists(
           tx =>
             tx._type == ContinuationTransaction.typeId &&
-            tx.applicationStatus.contains(if (shouldBeFailed) "script_execution_failed" else "succeeded") &&
-            tx.invokeScriptTransactionId.contains(invokeId)
+              tx.applicationStatus.contains(if (shouldBeFailed) "script_execution_failed" else "succeeded") &&
+              tx.invokeScriptTransactionId.contains(invokeId)
         )
     )(
       _.forall(identity)
@@ -372,7 +372,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   }
 
   private def assertBalances(startHeight: Int, endHeight: Int, expectingFee: Long): Unit = {
-    val startCallerBalance    = sender.balanceAtHeight(caller.toAddress.toString, startHeight - 1)
+    val startCallerBalance    = sender.balanceAtHeight(caller.toAddress.toString, startHeight)
     val resultCallerBalance   = sender.balanceAtHeight(caller.toAddress.toString, endHeight)
     val callerBalanceDecrease = startCallerBalance - resultCallerBalance
 
@@ -386,11 +386,12 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     val blockReward = miner.lastBlock().reward.value
     val (blockRewardDistribution, _) =
       miner
-        .blockSeq(startHeight, endHeight - 1)
+        .blockSeq(startHeight + 1, endHeight)
         .foldLeft((Map[String, Long](), 0L)) {
           case ((balances, previousBlockReward), block) =>
             val transactionsReward = block.transactions.map(_ => pureInvokeFee).sum * 2 / 5
-            val result = balances |+| Map(block.generator -> (previousBlockReward + transactionsReward + blockReward))
+            val totalReward        = previousBlockReward + transactionsReward + blockReward
+            val result             = balances |+| Map(block.generator -> totalReward)
             (result, transactionsReward * 3 / 2)
         }
 
