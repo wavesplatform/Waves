@@ -121,7 +121,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   }
 
   test("continuation with rollback") {
-    val startHeight = sender.height + 1
+    val startHeight = sender.height + 2
     sender.waitForHeight(startHeight)
 
     val enoughFee    = pureInvokeFee * 8
@@ -140,8 +140,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       ._1
 
     waitForContinuation(invoke.id, shouldBeFailed = false)
-    val endHeight = sender.height + 1
-    sender.waitForHeight(endHeight)
+    val endHeight = sender.height
 
     assertBalances(startHeight, endHeight, enoughFee)
     assertContinuationChain(invoke.id, sender.height)
@@ -372,13 +371,13 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   }
 
   private def assertBalances(startHeight: Int, endHeight: Int, expectingFee: Long): Unit = {
-    val startCallerBalance    = sender.balanceAtHeight(caller.toAddress.toString, startHeight)
+    val startCallerBalance    = sender.balanceAtHeight(caller.toAddress.toString, startHeight - 1)
     val resultCallerBalance   = sender.balanceAtHeight(caller.toAddress.toString, endHeight)
     val callerBalanceDecrease = startCallerBalance - resultCallerBalance
 
     val minersBalanceIncrease =
       nodes.map { node =>
-        val startBalance  = sender.balanceAtHeight(node.address, startHeight)
+        val startBalance  = sender.balanceAtHeight(node.address, startHeight - 1)
         val resultBalance = sender.balanceAtHeight(node.address, endHeight)
         node.address -> (resultBalance - startBalance)
       }.toMap
@@ -386,7 +385,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     val blockReward = miner.lastBlock().reward.value
     val (blockRewardDistribution, _) =
       miner
-        .blockSeq(startHeight + 1, endHeight)
+        .blockSeq(startHeight, endHeight)
         .foldLeft((Map[String, Long](), 0L)) {
           case ((balances, previousBlockReward), block) =>
             val transactionsReward = block.transactions.map(_ => pureInvokeFee).sum * 2 / 5
@@ -396,7 +395,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         }
 
     callerBalanceDecrease shouldBe expectingFee
-    minersBalanceIncrease.values.sum shouldBe expectingFee + (endHeight - startHeight) * blockReward
+    blockRewardDistribution.values.sum shouldBe expectingFee + (endHeight - startHeight + 1) * blockReward
     blockRewardDistribution should contain theSameElementsAs minersBalanceIncrease
   }
 
