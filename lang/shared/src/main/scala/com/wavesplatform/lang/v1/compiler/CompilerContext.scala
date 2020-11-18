@@ -27,7 +27,7 @@ case class CompilerContext(predefTypes: Map[String, FINAL], varDefs: VariableTyp
         UNION.create(predefTypes.values.toSeq)
       )
       def signature(name: String, i: Int) = {
-        FunctionTypeSignature(BOOLEAN, Seq.fill(i)(("arg", maybeAllTypes)), FunctionHeader.User(name))
+        FunctionTypeSignature(maybeAllTypes, Seq.fill(i)(("arg", maybeAllTypes)), FunctionHeader.User(name))
       }
       allFuncDefs
         .withDefault(name => FunctionInfo(AnyPos, (0 to 22).map(i => signature(name, i)).toList))

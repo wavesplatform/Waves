@@ -11,8 +11,7 @@ import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
-import com.wavesplatform.lang.v1.BaseGlobal.DAppInfo
-import com.wavesplatform.lang.v1.BaseGlobal.ArrayView
+import com.wavesplatform.lang.v1.BaseGlobal.{ArrayView, DAppInfo}
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
@@ -133,7 +132,7 @@ trait BaseGlobal {
   }
 
   val compileExpression =
-    compile(_, _, _, _, ExpressionCompiler.compile)
+    compile(_, _, _, _, ExpressionCompiler.compileBoolean)
 
   val compileDecls =
     compile(_, _, _, _, ExpressionCompiler.compileDecls)
