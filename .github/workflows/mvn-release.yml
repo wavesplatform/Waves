@@ -19,12 +19,6 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 1.8
-      - name: Check lang changes
-        id: lang-changes
-        uses: actions/cache@v2
-        with:
-          path: lang/**/target
-          key: ${{ hashFiles('lang/*/src/**/*.scala', 'lang/*/src/**/*.java') }}
       - name: Cache SBT
         uses: actions/cache@v2
         with:
@@ -32,7 +26,13 @@ jobs:
             ~/.sbt/boot
             ~/.cache/coursier
             **/target
-          key: ${{ hashFiles('**/build.sbt', 'project/Dependencies.scala') }}
+          key: waves-${{ hashFiles('**/build.sbt', 'project/Dependencies.scala') }}
+      - name: Check lang changes
+        id: lang-changes
+        uses: actions/cache@v2
+        with:
+          path: lang/**/target
+          key: lang-${{ hashFiles('lang/*/src/main/**/*.scala', 'lang/*/src/main/**/*.java') }}
       - name: Set version
         id: version
         env:
