@@ -148,8 +148,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def loadActivatedFeatures(): Map[Short, Int]
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
-  @volatile
-  protected var continuationStatesCache: LoadingCache[ByteStr,  (Int, ContinuationState)] =
+  protected val continuationStatesCache: LoadingCache[ByteStr,  (Int, ContinuationState)] =
     cache(dbSettings.maxCacheSize, invokeTxId => loadContinuationStates(TransactionId(invokeTxId)))
   protected def loadContinuationStates(invokeTxId: TransactionId): (Int, ContinuationState)
   override def continuationStates: Map[ByteStr, (Int, ContinuationState)] =
