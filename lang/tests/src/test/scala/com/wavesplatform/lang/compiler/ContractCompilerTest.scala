@@ -968,6 +968,6 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         |
       """.stripMargin
 
-    Global.compileContract(dApp, dAppV4Ctx, V4, ScriptEstimatorV3.instance) should produce("Script is too large: 37551 bytes > 32768 bytes")
+    Global.compileContract(dApp, dAppV4Ctx, V4, ScriptEstimatorV3) should produce("Script is too large: 37551 bytes > 32768 bytes")
   }
 }

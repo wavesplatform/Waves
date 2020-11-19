@@ -46,7 +46,7 @@ class FunctionComplexityTest extends PropSpec with PropertyChecks with Matchers 
         .foreach { function =>
           val expr = FUNCTION_CALL(function.header, List.fill(function.args.size)(Terms.TRUE))
           val estimatedCost = ScriptEstimatorV3
-            .instance(
+            .apply(
               varNames(ds.stdLibVersion, ds.contentType),
               functionCosts(ds.stdLibVersion),
               expr

@@ -4,7 +4,7 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.utils.functionCosts
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 
-class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3.instance) {
+class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3) {
   property("multiple func calls") {
     val script =
       """

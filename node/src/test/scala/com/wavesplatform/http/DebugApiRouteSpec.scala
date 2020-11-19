@@ -146,7 +146,7 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
       (blockchain.balance _).when(TxHelpers.defaultSigner.publicKey.toAddress, *).returns(Long.MaxValue)
       (() => blockchain.continuationStates).when().returning(Map.empty)
 
-      val (assetScript, comp) = ScriptCompiler.compile("if true then throw(\"error\") else false", ScriptEstimatorV3.instance).explicitGet()
+      val (assetScript, comp) = ScriptCompiler.compile("if true then throw(\"error\") else false", ScriptEstimatorV3).explicitGet()
       (blockchain.assetScript _).when(TestValues.asset).returns(Some(AssetScriptInfo(assetScript, comp)))
       (blockchain.assetDescription _)
         .when(TestValues.asset)

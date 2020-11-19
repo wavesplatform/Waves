@@ -18,5 +18,5 @@ trait ScriptEstimator {
 
 object ScriptEstimator {
   val all: List[ScriptEstimator] =
-    List(ScriptEstimatorV1, ScriptEstimatorV2, ScriptEstimatorV3.instance)
+    List(ScriptEstimatorV1, ScriptEstimatorV2, ScriptEstimatorV3)
 }

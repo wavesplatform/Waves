@@ -8,7 +8,7 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
-import com.wavesplatform.lang.v1.estimator.v3.{FunctionInfo, ScriptEstimatorV3}
+import com.wavesplatform.lang.v1.estimator.v3.{ContinuationFirstStepEstimator, FunctionInfo, ScriptEstimatorV3}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -117,7 +117,7 @@ package object utils {
 
     val vars      = varNames(version, DApp)
     val costs     = functionCosts(version)
-    val estimator = ScriptEstimatorV3.continuationFirstModeInstance
+    val estimator = ContinuationFirstStepEstimator
 
     (functionsCostsWithExprs ++ constructorCosts)
       .map {

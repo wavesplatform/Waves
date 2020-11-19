@@ -9,7 +9,7 @@ import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.lang.v1.estimator.v3.ContinuationFirstStepEstimator
 import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
 import monix.eval.Coeval
 
@@ -174,7 +174,7 @@ object ContractScript {
     for {
       firstStepComplexities <- estimateDeclarations(
         dApp,
-        ScriptEstimatorV3.estimateFirstContinuationStep(functionNativeCosts(version).value(), _),
+        ContinuationFirstStepEstimator.estimate(functionNativeCosts(version).value(), _),
         multiStepCallables
       )
       exceedingFunctions = firstStepComplexities

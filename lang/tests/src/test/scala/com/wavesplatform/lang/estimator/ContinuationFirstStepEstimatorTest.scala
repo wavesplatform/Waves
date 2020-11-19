@@ -2,11 +2,11 @@ package com.wavesplatform.lang.estimator
 
 import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.utils.functionNativeCosts
-import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.lang.v1.estimator.v3.ContinuationFirstStepEstimator
 
-class ScriptEstimatorV3ContinuationFirstStepTest extends ScriptEstimatorTestBase(ScriptEstimatorV3.continuationFirstModeInstance) {
+class ContinuationFirstStepEstimatorTest extends ScriptEstimatorTestBase(ContinuationFirstStepEstimator) {
   private def estimate(script: String) =
-    ScriptEstimatorV3.estimateFirstContinuationStep(functionNativeCosts(V4).value(), compile(script))
+    ContinuationFirstStepEstimator.estimate(functionNativeCosts(V4).value(), compile(script))
 
   property("simple let") {
     val script =

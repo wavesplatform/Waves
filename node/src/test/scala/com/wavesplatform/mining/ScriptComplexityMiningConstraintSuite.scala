@@ -29,7 +29,7 @@ class ScriptComplexityMiningConstraintSuite
   private val maxTxs     = OneDimensionalMiningConstraint(3, TxEstimators.one, "MaxTxsInMicroBlock")
   private val constraint = MultiDimensionalMiningConstraint(complexity, maxTxs)
 
-  val (script, _) = ScriptCompiler.compile("true", ScriptEstimatorV3.instance).explicitGet()
+  val (script, _) = ScriptCompiler.compile("true", ScriptEstimatorV3).explicitGet()
 
   "ScriptComplexityMiningConstraint" should "accept non-scripted txs after limit" in {
     forAll(preconditions) {

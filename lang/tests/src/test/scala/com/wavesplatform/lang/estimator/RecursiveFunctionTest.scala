@@ -9,7 +9,7 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 
-class RecursiveFunctionTest extends ScriptEstimatorTestBase(ScriptEstimatorV1, ScriptEstimatorV2, ScriptEstimatorV3.instance) {
+class RecursiveFunctionTest extends ScriptEstimatorTestBase(ScriptEstimatorV1, ScriptEstimatorV2, ScriptEstimatorV3) {
   property("recursive func block") {
     val expr = BLOCK(
       FUNC("x", List.empty, FUNCTION_CALL(FunctionHeader.User("y"), List.empty)),
