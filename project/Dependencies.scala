@@ -14,7 +14,7 @@ object Dependencies {
   private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
 
   private def catsModule(module: String, version: String = "2.1.0") = Def.setting("org.typelevel" %%% s"cats-$module"  % version)
-  def monixModule(module: String)                                   = Def.setting("io.monix"      %%% s"monix-$module" % "3.2.1")
+  def monixModule(module: String)                                   = Def.setting("io.monix"      %%% s"monix-$module" % "3.3.0")
 
   private val kindProjector = compilerPlugin("org.typelevel" % "kind-projector" % "0.11.0" cross CrossVersion.full)
 
