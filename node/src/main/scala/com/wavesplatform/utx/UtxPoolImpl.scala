@@ -219,42 +219,29 @@ class UtxPoolImpl(
   }
 
   private[utx] def addTransaction(tx: Transaction, verify: Boolean, forceValidate: Boolean = false): TracedResult[ValidationError, Boolean] = {
-    def containedInUtx(c: ContinuationTransaction) =
-      transactions.asScala.exists {
-        case (_, existing: ContinuationTransaction) if existing.invokeScriptTransactionId == c.invokeScriptTransactionId && existing.nonce >= c.nonce =>
-          true
-        case _ =>
-          false
-      }
+    val diffEi = priorityDiffs.synchronized {
+      val patchedBlockchain = CompositeBlockchain(blockchain, Some(Monoid.combineAll(priorityDiffs)))
 
-    tx match {
-      case c: ContinuationTransaction if containedInUtx(c) || blockchain.containsTransaction(c) =>
-        TracedResult.wrapValue(false)
-      case _ =>
-        val diffEi = priorityDiffs.synchronized {
-          val patchedBlockchain = CompositeBlockchain(blockchain, Some(Monoid.combineAll(priorityDiffs)))
-
-          if (forceValidate)
-            TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(patchedBlockchain, tx)
-          else
-            TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(patchedBlockchain, tx)
-        }
-
-        def addPortfolio(): Unit = diffEi.map { diff =>
-          pessimisticPortfolios.add(tx.id(), diff)
-          onEvent(UtxEvent.TxAdded(tx, diff))
-        }
-
-        if (!verify || diffEi.resultE.isRight) {
-          transactions.computeIfAbsent(tx.id(), { _ =>
-            PoolMetrics.addTransaction(tx)
-            addPortfolio()
-            tx
-          })
-        }
-
-        diffEi.map(_ => true)
+      if (forceValidate)
+        TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(patchedBlockchain, tx)
+      else
+        TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(patchedBlockchain, tx)
     }
+
+    def addPortfolio(): Unit = diffEi.map { diff =>
+      pessimisticPortfolios.add(tx.id(), diff)
+      onEvent(UtxEvent.TxAdded(tx, diff))
+    }
+
+    if (!verify || diffEi.resultE.isRight) {
+      transactions.computeIfAbsent(tx.id(), { _ =>
+        PoolMetrics.addTransaction(tx)
+        addPortfolio()
+        tx
+      })
+    }
+
+    diffEi.map(_ => true)
   }
 
   override def spendableBalance(addr: Address, assetId: Asset): Long =
@@ -274,13 +261,13 @@ class UtxPoolImpl(
     Monoid.combineAll(diffPf :+ pessimistic)
   }
 
-  private[utx] def nonPriorityTransactions: Seq[Transaction] = {
-    transactions.values.asScala.toVector
+  private[utx] def nonPriorityTransactions(continuations: Iterable[ContinuationTransaction] = Nil): Seq[Transaction] = {
+    (transactions.values.asScala.toVector ++ continuations)
       .sorted(inUTXPoolOrdering)
   }
 
   override def all: Seq[Transaction] =
-    (priorityTransactions ++ nonPriorityTransactions).distinct
+    (priorityTransactions ++ nonPriorityTransactions()).distinct
 
   override def size: Int = transactions.size
 
@@ -301,10 +288,9 @@ class UtxPoolImpl(
 
   private[this] case class TxEntry(tx: Transaction, priority: Boolean)
 
-  private[this] def createTxEntrySeq(): Seq[TxEntry] =
-    priorityTransactions.map(TxEntry(_, priority = true)) ++ nonPriorityTransactions.map(
-      TxEntry(_, priority = false)
-    )
+  private[this] def createTxEntrySeq(continuations: Iterable[ContinuationTransaction]): Seq[TxEntry] =
+    priorityTransactions.map(TxEntry(_, priority = true)) ++
+      nonPriorityTransactions(continuations).map(TxEntry(_, priority = false))
 
   override def packUnconfirmed(
       initialConstraint: MultiDimensionalMiningConstraint,
@@ -351,7 +337,7 @@ class UtxPoolImpl(
           .foldLeft[PackResult](prevResult) {
             case (r, TxEntry(tx, priority)) =>
               def isLimitReached   = r.transactions.exists(_.nonEmpty) && isTimeLimitReached
-              def isAlreadyRemoved = !priority && !transactions.containsKey(tx.id())
+              def isAlreadyRemoved = !priority && !transactions.containsKey(tx.id()) && !tx.isInstanceOf[ContinuationTransaction]
 
               if (r.constraint.isFull || isLimitReached || isAlreadyRemoved || cancelled())
                 r // don't run any checks here to speed up mining
@@ -426,19 +412,20 @@ class UtxPoolImpl(
 
       @tailrec
       def loop(seed: PackResult): PackResult = {
-        def allValidated(seed: PackResult) = (transactions.keys().asScala ++ priorityTransactionIds).forall(seed.validatedTransactions)
+        val continuations: Iterable[ContinuationTransaction] =
+          blockchain.continuationStates
+            .collect {
+              case (invokeId, (nonce, ContinuationState.InProgress(_, _, _))) =>
+                ContinuationTransaction(invokeId, time.getTimestamp(), nonce, 0L, Waves)
+            }
 
-        blockchain.continuationStates
-          .foreach {
-            case (invokeId, (nonce, ContinuationState.InProgress(_, _, _))) =>
-              val tx = ContinuationTransaction(invokeId, time.getTimestamp(), nonce, 0L, Waves)
-              addTransaction(tx, verify = false)
-            case _ =>
-          }
+        def allValidated(seed: PackResult) =
+          (transactions.keys().asScala ++ priorityTransactionIds ++ continuations.map(_.id.value()))
+            .forall(seed.validatedTransactions)
 
         val newSeed = packIteration(
           seed.copy(checkedAddresses = Set.empty),
-          this.createTxEntrySeq().iterator
+          this.createTxEntrySeq(continuations).iterator
         )
         if (newSeed.constraint.isFull) {
           log.trace(s"Block is full: ${newSeed.constraint}")
