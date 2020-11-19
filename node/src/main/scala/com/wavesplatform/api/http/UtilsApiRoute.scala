@@ -16,20 +16,14 @@ import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
-import com.wavesplatform.lang.v1.compiler.CompilerContext.FunctionInfo
-import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
-import com.wavesplatform.lang.v1.compiler.Types.NOTHING
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2}
-import com.wavesplatform.lang.v1.parser.Expressions.PART
-import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
-import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
-import com.wavesplatform.lang.v1.{FunctionHeader, Serde}
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
@@ -38,7 +32,6 @@ import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExec
 import com.wavesplatform.transaction.smart.BlockchainContext
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Time
-import fastparse.Parsed
 import monix.eval.Coeval
 import monix.execution.Scheduler
 import play.api.libs.json._
@@ -257,15 +250,15 @@ case class UtilsApiRoute(
           val textCall = js
             .asOpt[String]
             .toRight(GenericError("Unable to read expr string"))
-            .flatMap(ScriptCallEvaluator.compile)
+            .flatMap(ScriptCallEvaluator.compile(script.stdLibVersion))
 
           binaryCall.orElse(textCall)
         }
 
         val result =
           for {
-            expr <- parseCall(obj \ "expr")
-            result <- ScriptCallEvaluator.executeExpression(blockchain, script, address)(expr)
+            expr   <- parseCall(obj \ "expr")
+            result <- ScriptCallEvaluator.executeExpression(blockchain, script, address, settings.evaluateScriptComplexityLimit)(expr)
           } yield result
 
         result
@@ -294,9 +287,9 @@ object UtilsApiRoute {
   val DefaultSeedSize = 32
 
   private object ScriptCallEvaluator {
-    def compile(str: String): Either[GenericError, EXPR] = {
-      val ctx = PureContext.build(V4).compilerContext.copy(arbitraryFunctions = true)
-      ExpressionCompiler.compile(str, ctx).leftMap(GenericError(_))
+    def compile(stdLibVersion: StdLibVersion)(str: String): Either[GenericError, EXPR] = {
+      val ctx = PureContext.build(stdLibVersion).compilerContext.copy(arbitraryFunctions = true)
+      ExpressionCompiler.compileUntyped(str, ctx).leftMap(GenericError(_))
     }
 
     def parseBinaryCall(bs: ByteStr): Either[ValidationError, EXPR] = {
@@ -307,7 +300,7 @@ object UtilsApiRoute {
         .map(_._1)
     }
 
-    def executeExpression(blockchain: Blockchain, script: Script, address: Address)(expr: EXPR): Either[ValidationError, EVALUATED] = {
+    def executeExpression(blockchain: Blockchain, script: Script, address: Address, limit: Int)(expr: EXPR): Either[ValidationError, EVALUATED] = {
       for {
         ctx <- BlockchainContext
           .build(
@@ -323,9 +316,16 @@ object UtilsApiRoute {
           )
           .left
           .map(GenericError(_))
+
         call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)
-        result <- EvaluatorV2.applyCompleted(ctx, call, script.stdLibVersion).left.map { case (err, log) => ScriptExecutionError(err, log, None) }
-      } yield result._1
+        limitedResult <- EvaluatorV2
+          .applyLimited(call, limit, ctx, script.stdLibVersion)
+          .leftMap { case (err, log) => ScriptExecutionError.dAppExecution(err, log) }
+        result <- limitedResult match {
+          case (eval: EVALUATED, _, _) => Right(eval)
+          case (_: EXPR, _, log)       => Left(ScriptExecutionError.dAppExecution(s"Calculation complexity limit exceeded", log))
+        }
+      } yield result
     }
   }
 }

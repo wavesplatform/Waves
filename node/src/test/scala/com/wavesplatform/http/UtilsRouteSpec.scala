@@ -681,7 +681,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
   // Evaluate
   private[this] val testScript = {
-    val str = """
+    val str = s"""
                 |{-# STDLIB_VERSION 3 #-}
                 |{-# CONTENT_TYPE DAPP #-}
                 |{-# SCRIPT_TYPE ACCOUNT #-}
@@ -691,9 +691,10 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
                 |func testBS() = base58'MATCHER'
                 |func testS() = "Test"
                 |func testF() = throw("Test")
+                |func testCompl() = ${"sigVerify(base58'', base58'', base58'') ||" * 100} true
                 |""".stripMargin
 
-    val script = ScriptCompiler.compile(str, ScriptEstimatorV2).explicitGet()._1
+    val (script, _) = ScriptCompiler.compile(str, ScriptEstimatorV2).explicitGet()
     AccountScriptInfo(PublicKey(new Array[Byte](32)), script, 0, Map.empty)
   }
 
@@ -720,6 +721,10 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       responseJson shouldBe Json.obj("error" -> 306, "message" -> "Function or type 'testNone' not found")
     }
 
+    evalScript("testCompl()") ~> route ~> check {
+      responseJson shouldBe Json.obj("error" -> 306, "message" -> "Calculation complexity limit exceeded")
+    }
+
     evalScript("testF()") ~> route ~> check {
       responseJson shouldBe Json.obj("error" -> 306, "message" -> "Test")
     }
@@ -738,6 +743,14 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
     evalScript("testBS()") ~> route ~> check {
       responseJson shouldBe Json.obj("type" -> "ByteVector", "value" -> "MATCHER")
+    }
+
+    evalScript(
+      """match test(123) {
+        |  case i: Int => i * 123
+        |  case _ => throw("")
+        |}""".stripMargin) ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Int", "value" -> 151290)
     }
   }
 
