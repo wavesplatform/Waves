@@ -308,7 +308,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     nodes.waitFor(
       s"chain of continuation for InvokeScript Transaction with id = $invokeId is completed"
     )(
-      _.blockSeq(sender.height - 2, sender.height)
+      _.blockSeq(sender.height - 4, sender.height)
         .flatMap(_.transactions)
         .exists(
           tx =>
@@ -376,10 +376,13 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     val callerBalanceDecrease = startCallerBalance - resultCallerBalance
 
     val minersBalanceIncrease =
-      nodes.map { node =>
+      nodes.flatMap { node =>
         val startBalance  = sender.balanceAtHeight(node.address, startHeight - 1)
         val resultBalance = sender.balanceAtHeight(node.address, endHeight)
-        node.address -> (resultBalance - startBalance)
+        if (resultBalance == startBalance)
+          Nil
+        else
+          Seq(node.address -> (resultBalance - startBalance))
       }.toMap
 
     val blockReward = miner.lastBlock().reward.value
@@ -401,13 +404,13 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
 
   private def testPartialRollback(startHeight: Int, invoke: Transaction): Unit = {
     nodes.rollback(startHeight + 1, returnToUTX = false)
-    nodes.waitForHeight(sender.height + 1)
     val continuations =
       sender
         .blockSeq(startHeight, sender.height)
         .flatMap(_.transactions)
         .filter(tx => tx._type == ContinuationTransaction.typeId && tx.invokeScriptTransactionId.contains(invoke.id))
 
+    //pre-check
     continuations should not be empty
     continuations.foreach(_.applicationStatus.value shouldBe "script_execution_in_progress")
 
