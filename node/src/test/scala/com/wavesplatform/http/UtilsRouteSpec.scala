@@ -24,6 +24,7 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v1.{FunctionHeader, Serde}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.state.diffs.FeeValidation
@@ -679,29 +680,33 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     }
   }
 
-  // Evaluate
-  private[this] val testScript = {
-    val str = s"""
-                |{-# STDLIB_VERSION 3 #-}
-                |{-# CONTENT_TYPE DAPP #-}
-                |{-# SCRIPT_TYPE ACCOUNT #-}
-                |
-                |func test(i: Int) = i * 10
-                |func testB() = true
-                |func testBS() = base58'MATCHER'
-                |func testS() = "Test"
-                |func testF() = throw("Test")
-                |func testCompl() = ${"sigVerify(base58'', base58'', base58'') ||" * 100} true
-                |""".stripMargin
-
-    val (script, _) = ScriptCompiler.compile(str, ScriptEstimatorV2).explicitGet()
-    AccountScriptInfo(PublicKey(new Array[Byte](32)), script, 0, Map.empty)
-  }
-
-  private[this] def evalScript(text: String) =
-    Post(routePath(s"/script/evaluate/${TxHelpers.defaultSigner.toAddress.stringRepr}"), Json.obj("expr" -> text))
-
   routePath("/script/evaluate/{address}") in {
+    val testScript = {
+      val str = s"""
+                   |{-# STDLIB_VERSION 3 #-}
+                   |{-# CONTENT_TYPE DAPP #-}
+                   |{-# SCRIPT_TYPE ACCOUNT #-}
+                   |
+                   |func test(i: Int) = i * 10
+                   |func testB() = true
+                   |func testBS() = base58'MATCHER'
+                   |func testS() = "Test"
+                   |func testF() = throw("Test")
+                   |func testCompl() = ${"sigVerify(base58'', base58'', base58'') ||" * 100} true
+                   |""".stripMargin
+
+      val (script, _) = ScriptCompiler.compile(str, ScriptEstimatorV2).explicitGet()
+      AccountScriptInfo(PublicKey(new Array[Byte](32)), script, 0, Map.empty)
+    }
+
+    def evalScript(text: String) =
+      Post(routePath(s"/script/evaluate/${TxHelpers.defaultSigner.toAddress.stringRepr}"), Json.obj("expr" -> text))
+
+    def evalBin(expr: EXPR) = {
+      val serialized = ByteStr(Serde.serialize(expr))
+      Post(routePath(s"/script/evaluate/${TxHelpers.defaultSigner.toAddress.stringRepr}"), Json.obj("expr" -> serialized.toString))
+    }
+
     def responseJson: JsObject = {
       val fullJson = responseAs[JsObject]
       (fullJson \ "address").as[String] shouldBe TxHelpers.defaultSigner.toAddress.stringRepr
@@ -730,6 +735,10 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     }
 
     evalScript("test(123)") ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Int", "value" -> 1230)
+    }
+
+    evalBin(FUNCTION_CALL(FunctionHeader.User("test"), List(CONST_LONG(123)))) ~> route ~> check {
       responseJson shouldBe Json.obj("type" -> "Int", "value" -> 1230)
     }
 
