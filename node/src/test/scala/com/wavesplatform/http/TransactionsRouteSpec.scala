@@ -15,7 +15,8 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.state.{Blockchain, Height}
-import com.wavesplatform.transaction.{Asset, ScriptExecutionFailed, Succeeded}
+import com.wavesplatform.transaction.ApplicationStatus.{ScriptExecutionFailed, Succeeded}
+import com.wavesplatform.transaction.{Asset}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment

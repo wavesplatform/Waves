@@ -9,8 +9,8 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, Height}
+import com.wavesplatform.transaction.ApplicationStatus.Succeeded
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.Succeeded
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.{NoShrink, TestTime, TestValues, TestWallet, TransactionGen}
 import monix.reactive.Observable

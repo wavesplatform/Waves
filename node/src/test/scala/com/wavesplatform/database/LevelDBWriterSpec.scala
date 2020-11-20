@@ -17,10 +17,11 @@ import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loa
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.utils._
 import com.wavesplatform.state.{BlockchainUpdaterImpl, Height, TransactionId, TxNum}
+import com.wavesplatform.transaction.ApplicationStatus.{ScriptExecutionFailed, Succeeded}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, ScriptExecutionFailed, Succeeded, TxVersion}
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.{EitherMatchers, RequestGen, TransactionGen, WithDB, database}
 import org.scalacheck.{Arbitrary, Gen}
@@ -279,7 +280,7 @@ class LevelDBWriterSpec
 
       forAll(randomTransactionGen) { tx =>
         val transactionId = tx.id()
-        db.put(Keys.transactionMetaById(TransactionId @@ transactionId).keyBytes, TransactionMeta(1, 0, tx.typeId, ScriptExecutionFailed).toByteArray)
+        db.put(Keys.transactionMetaById(TransactionId @@ transactionId).keyBytes, TransactionMeta(1, 0, tx.typeId, false, toDb(ScriptExecutionFailed)).toByteArray)
         db.put(Keys.transactionAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](1, 2, 3, 4, 5, 6))
 
         writer.transferById(transactionId) shouldBe None
@@ -310,7 +311,7 @@ class LevelDBWriterSpec
         case (tx, s) =>
           val transactionId = tx.id()
           val status = if (s) Succeeded else ScriptExecutionFailed
-          db.put(Keys.transactionMetaById(TransactionId(transactionId)).keyBytes, TransactionMeta(1, 0, tx.typeId, status).toByteArray)
+          db.put(Keys.transactionMetaById(TransactionId(transactionId)).keyBytes, TransactionMeta(1, 0, tx.typeId, false, toDb(status)).toByteArray)
           db.put(Keys.transactionAt(Height(1), TxNum(0.toShort)).keyBytes, database.writeTransaction((tx, status)))
 
           writer.transactionInfo(transactionId) shouldBe Some((1, tx, status))

@@ -14,7 +14,8 @@ import com.wavesplatform.http.{ApiErrorMatchers, RestAPISettingsHelper}
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{Blockchain, Height}
-import com.wavesplatform.transaction.{Asset, Succeeded}
+import com.wavesplatform.transaction.ApplicationStatus.Succeeded
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NTPTime, NoShrink, TestWallet, TransactionGen}
