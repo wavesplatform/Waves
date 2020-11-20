@@ -5,8 +5,8 @@ import com.wavesplatform.api.common.CommonAssetsApi.AssetInfo
 import com.wavesplatform.crypto
 import com.wavesplatform.database.{AddressId, KeyTags}
 import com.wavesplatform.state.{AssetDescription, Blockchain, Diff, Portfolio}
+import com.wavesplatform.transaction.ApplicationStatus.Succeeded
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.Succeeded
 import com.wavesplatform.transaction.assets.IssueTransaction
 import monix.reactive.Observable
 import org.iq80.leveldb.DB

@@ -23,6 +23,8 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.DiffsCommon
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.transaction.ApplicationStatus.{ScriptExecutionFailed, Succeeded}
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -31,7 +33,6 @@ import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.validation.impl.SponsorFeeTxValidator
-import com.wavesplatform.transaction.{Asset, ScriptExecutionFailed, Succeeded}
 import com.wavesplatform.utils._
 import shapeless.Coproduct
 

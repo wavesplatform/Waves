@@ -10,8 +10,9 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.transaction.ApplicationStatus.Succeeded
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{ApplicationStatus, Asset, Succeeded, Transaction}
+import com.wavesplatform.transaction.{ApplicationStatus, Asset, Transaction}
 import play.api.libs.json._
 
 import scala.collection.mutable

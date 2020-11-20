@@ -23,8 +23,9 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain}
+import com.wavesplatform.transaction.ApplicationStatus.ScriptExecutionFailed
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{ScriptExecutionFailed, TransactionFactory}
+import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order

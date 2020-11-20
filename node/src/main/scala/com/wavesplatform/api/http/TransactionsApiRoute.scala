@@ -20,6 +20,7 @@ import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.transaction.ApplicationStatus.{ScriptExecutionFailed, ScriptExecutionInProgress, Succeeded}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer.functionCallToJson

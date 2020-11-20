@@ -12,8 +12,9 @@ import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.ApplicationStatus.ScriptExecutionFailed
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.{ApplicationStatus, Asset, ScriptExecutionFailed, Transaction}
+import com.wavesplatform.transaction.{ApplicationStatus, Asset, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
 

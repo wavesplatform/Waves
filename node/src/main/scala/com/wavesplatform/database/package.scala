@@ -28,7 +28,8 @@ import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{ApplicationStatus, GenesisTransaction, LegacyPBSwitch, PaymentTransaction, ScriptExecutionFailed, ScriptExecutionInProgress, Succeeded, Transaction, TransactionParsers, TxValidationError}
+import com.wavesplatform.transaction.{ApplicationStatus, GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
+import com.wavesplatform.transaction.ApplicationStatus._
 import com.wavesplatform.utils.{ScorexLogging, _}
 import monix.eval.Task
 import monix.reactive.Observable

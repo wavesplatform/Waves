@@ -17,11 +17,12 @@ import com.wavesplatform.lang.v1.traits.Environment.Tthis
 import com.wavesplatform.lang.v1.traits.domain.{CallableAction, Recipient}
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, ContinuationState, Diff}
+import com.wavesplatform.transaction.ApplicationStatus.ScriptExecutionInProgress
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{ContinuationTransaction, WavesEnvironment, buildThisValue}
-import com.wavesplatform.transaction.{ScriptExecutionInProgress, Transaction}
 import monix.eval.Coeval
 import shapeless.Coproduct
 

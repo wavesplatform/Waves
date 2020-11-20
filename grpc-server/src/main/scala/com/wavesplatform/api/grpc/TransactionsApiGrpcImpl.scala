@@ -5,7 +5,8 @@ import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBRecipientImplicitConversionOps
-import com.wavesplatform.transaction.{Authorized, ScriptExecutionFailed, ScriptExecutionInProgress, Succeeded}
+import com.wavesplatform.transaction.ApplicationStatus._
+import com.wavesplatform.transaction.Authorized
 import io.grpc.stub.StreamObserver
 import io.grpc.{Status, StatusRuntimeException}
 import monix.execution.Scheduler
