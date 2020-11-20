@@ -534,7 +534,7 @@ abstract class LevelDBWriter private[database] (
         val txsByHeight =
           txIds
             .map { txId =>
-              val TransactionMeta(txHeight, num, typeId, _) =
+              val TransactionMeta(txHeight, num, typeId, _, _) =
                 rw.get(Keys.transactionMetaById(txId))
                   .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction with id=$txId"))
               (txHeight, num, typeId)
@@ -558,7 +558,7 @@ abstract class LevelDBWriter private[database] (
 
       for ((id, (tx, num, succeeded)) <- transactions) {
         rw.put(Keys.transactionAt(Height(height), num), Some((tx, succeeded)))
-        rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.typeId, succeeded)))
+        rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.typeId, applicationStatus = toDb(succeeded))))
       }
 
       for ((replacingTx, status) <- replacingTransactions) {
@@ -568,7 +568,7 @@ abstract class LevelDBWriter private[database] (
               .map { case (_, num, _) => (this.height, num) }
               .orElse(
                 rw.get(Keys.transactionMetaById(TransactionId(replacingTx.id.value())))
-                  .map { case TransactionMeta(height, num, _, _) => (height, TxNum(num.toShort)) }
+                  .map { case TransactionMeta(height, num, _, _, _) => (height, TxNum(num.toShort)) }
               )
               .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction with id=$txId"))
         rw.put(Keys.transactionAt(Height(height), num), Some((replacingTx, status)))
@@ -620,7 +620,7 @@ abstract class LevelDBWriter private[database] (
             .get(TransactionId(txId))
             .map { case (_, txNum, _) => (height, txNum) }
             .orElse(rw.get(Keys.transactionMetaById(TransactionId(txId))).map {
-              case TransactionMeta(height, txNum, _, _) => (height, TxNum(txNum.toShort))
+              case TransactionMeta(height, txNum, _, _, _) => (height, TxNum(txNum.toShort))
             })
             .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
 
@@ -885,8 +885,8 @@ abstract class LevelDBWriter private[database] (
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
     for {
-      TransactionMeta(height, num, TransferTransaction.typeId, _) <- db.get(Keys.transactionMetaById(TransactionId @@ id))
-      tx                                                          <- db.get(Keys.transactionAt(Height(height), TxNum(num.toShort))).collect { case (t: TransferTransaction, Succeeded) => t }
+      TransactionMeta(height, num, TransferTransaction.typeId, _, _) <- db.get(Keys.transactionMetaById(TransactionId @@ id))
+      tx                                                             <- db.get(Keys.transactionAt(Height(height), TxNum(num.toShort))).collect { case (t: TransferTransaction, Succeeded) => t }
     } yield (height, tx)
   }
 
@@ -895,16 +895,16 @@ abstract class LevelDBWriter private[database] (
   protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(Int, Transaction, ApplicationStatus)] = {
     val txId = TransactionId(id)
     for {
-      TransactionMeta(height, num, _, status) <- db.get(Keys.transactionMetaById(txId))
-      (tx, _)                                 <- db.get(Keys.transactionAt(Height(height), TxNum(num.toShort)))
+      TransactionMeta(height, num, _, _, _) <- db.get(Keys.transactionMetaById(txId))
+      (tx, status)                          <- db.get(Keys.transactionAt(Height(height), TxNum(num.toShort)))
     } yield (height, tx, status)
   }
 
   override def transactionMeta(id: ByteStr): Option[(Int, ApplicationStatus)] = readOnly { db =>
     db.get(Keys.transactionMetaById(TransactionId(id)))
       .map {
-        case TransactionMeta(height, _, _, status) =>
-          (height, status)
+        case TransactionMeta(height, _, _, failed, status) =>
+          (height, fromDb(failed, status))
       }
   }
 

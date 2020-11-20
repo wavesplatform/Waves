@@ -20,8 +20,8 @@ import com.wavesplatform.database.protobuf.ApplicationStatus.{SCRIPT_EXECUTION_F
 import com.wavesplatform.database.protobuf.DataEntry.Value
 import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
-import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.lang.v1.Serde
+import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state.StateHash.SectionId
@@ -525,12 +525,13 @@ package object database extends ScorexLogging {
   def readTransaction(b: Array[Byte]): (Transaction, ApplicationStatus) = {
     import pb.TransactionData.Transaction._
     val data = pb.TransactionData.parseFrom(b)
-    val status = data.applicationStatus
-    data.transaction match {
-      case tx: LegacyBytes    => (TransactionParsers.parseBytes(tx.value.toByteArray).get, status)
-      case tx: NewTransaction => (PBTransactions.vanilla(tx.value).explicitGet(), status)
+    val status = fromDb(data.failed, data.applicationStatus)
+    val tx = data.transaction match {
+      case tx: LegacyBytes    => TransactionParsers.parseBytes(tx.value.toByteArray).get
+      case tx: NewTransaction => PBTransactions.vanilla(tx.value).explicitGet()
       case _                  => throw new IllegalArgumentException("Illegal transaction data")
     }
+    (tx, status)
   }
 
   def writeTransaction(v: (Transaction, ApplicationStatus)): Array[Byte] = {
@@ -542,7 +543,7 @@ package object database extends ScorexLogging {
       case _: PaymentTransaction                         => LegacyBytes(ByteString.copyFrom(tx.bytes()))
       case _                                             => NewTransaction(PBTransactions.protobuf(tx))
     }
-    pb.TransactionData(status, ptx).toByteArray
+    pb.TransactionData(applicationStatus = toDb(status), transaction = ptx).toByteArray
   }
 
   /** Returns status (succeed - true, failed -false) and bytes (left - legacy format bytes, right - new format bytes) */
@@ -571,7 +572,7 @@ package object database extends ScorexLogging {
         val statusFieldTag  = coded.readTag()
         val statusFieldNum  = WireFormat.getTagFieldNumber(statusFieldTag)
         val statusFieldType = WireFormat.getTagWireType(statusFieldTag)
-        require(statusFieldNum == APPLICATION_STATUS_FIELD_NUMBER, "Unknown `application_status` field in transaction data")
+        require(statusFieldNum == FAILED_FIELD_NUMBER, "Unknown `failed` field in transaction data")
         require(statusFieldType == WireFormat.WIRETYPE_VARINT, "Can't parse `failed` field in transaction data")
         !coded.readBool()
       }
@@ -641,8 +642,8 @@ package object database extends ScorexLogging {
       id          <- leaseIds
       leaseStatus <- fromHistory(r, Keys.leaseStatusHistory(id), Keys.leaseStatus(id))
       if leaseStatus
-      pb.TransactionMeta(h, n, _, _) <- r.get(Keys.transactionMetaById(TransactionId(id)))
-      tx                             <- r.get(Keys.transactionAt(Height(h), TxNum(n.toShort)))
+      pb.TransactionMeta(h, n, _, _, _) <- r.get(Keys.transactionMetaById(TransactionId(id)))
+      tx                                <- r.get(Keys.transactionAt(Height(h), TxNum(n.toShort)))
     } yield tx).collect {
       case (lt: LeaseTransaction, Succeeded) => lt
     }.toSeq
@@ -662,14 +663,20 @@ package object database extends ScorexLogging {
     def toByteArray: Array[Byte] = Longs.toByteArray(l)
   }
 
-  implicit def toDb(status: ApplicationStatus): protobuf.ApplicationStatus =
+  def toDb(status: ApplicationStatus): protobuf.ApplicationStatus =
     status match {
       case Succeeded                 => SUCCEEDED
       case ScriptExecutionFailed     => SCRIPT_EXECUTION_FAILED
       case ScriptExecutionInProgress => SCRIPT_EXECUTION_IN_PROGRESS
     }
 
-  implicit def fromDb(status: protobuf.ApplicationStatus): ApplicationStatus =
+  def fromDb(failed: Boolean, status: protobuf.ApplicationStatus): ApplicationStatus =
+    if (status == SUCCEEDED) fromDb(failed) else fromDb(status)
+
+  private def fromDb(failed: Boolean): ApplicationStatus =
+    if (failed) ScriptExecutionFailed else Succeeded
+
+  private def fromDb(status: protobuf.ApplicationStatus): ApplicationStatus =
     status match {
       case SUCCEEDED                    => Succeeded
       case SCRIPT_EXECUTION_FAILED      => ScriptExecutionFailed

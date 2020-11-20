@@ -52,8 +52,8 @@ object AddressTransactions {
 
   private def loadInvokeScriptResult(resource: DBResource, txId: ByteStr): Option[InvokeScriptResult] =
     for {
-      pb.TransactionMeta(h, txNum, InvokeScriptTransaction.typeId, _) <- resource.get(Keys.transactionMetaById(TransactionId(txId)))
-      r                                                               <- resource.get(Keys.invokeScriptResult(h, TxNum(txNum.toShort)))
+      pb.TransactionMeta(h, txNum, InvokeScriptTransaction.typeId, _, _) <- resource.get(Keys.transactionMetaById(TransactionId(txId)))
+      r                                                                  <- resource.get(Keys.invokeScriptResult(h, TxNum(txNum.toShort)))
     } yield r
 
   def loadInvokeScriptResult(db: DB, txId: ByteStr): Option[InvokeScriptResult] =
