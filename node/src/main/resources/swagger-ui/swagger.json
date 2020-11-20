@@ -365,7 +365,7 @@
           {
             "name": "height",
             "in": "query",
-            "description": "For balance at height requests. No more than 2000 back from the current",
+            "description": "For balance at height requests. Max number of blocks back from the current height is set by `waves.db.max-rollback-depth`, 2000 by default",
             "schema": {
               "type": "integer"
             }
@@ -395,7 +395,7 @@
           "addresses"
         ],
         "summary": "Multiple accounts balances",
-        "description": "Get multiple accounts balances. Max for 1000 addresses",
+        "description": "Get multiple accounts balances. Max number of addresses is set by `waves.rest-api.transactions-by-address-limit`, 1000 by default",
         "operationId": "balance_4",
         "requestBody": {
           "content": {
@@ -418,7 +418,7 @@
                   },
                   "height": {
                     "type": "integer",
-                    "description": "For balance at height requests. No more than 2000 back from the current"
+                    "description": "For balance at height requests. Max number of blocks back from the current height is set by `waves.db.max-rollback-depth`, 2000 by default"
                   }
                 }
               }
@@ -474,8 +474,8 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Complete Data",
-        "description": "Read all data posted by an account",
+        "summary": "Data by keys or regexp",
+        "description": "Read account data entries by given keys or a regular expression",
         "operationId": "getData_1",
         "parameters": [
           {
@@ -523,8 +523,8 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Complete Data",
-        "description": "Read all data posted by an account",
+        "summary": "Data by keys",
+        "description": "Read account data entries by given keys",
         "operationId": "postData_1",
         "parameters": [
           {
@@ -972,7 +972,7 @@
           "addresses"
         ],
         "summary": "Confirmed regular balance in WAVES",
-        "description": "Get the minimum regular balance at a given address for {confirmations} blocks back from the current height. {confirmations} is up to 2000 blocks",
+        "description": "Get the minimum regular balance at a given address for {confirmations} blocks back from the current height. Max number of confirmations is set by `waves.db.max-rollback-depth`, 2000 by default",
         "operationId": "balanceWithConfirmations_1",
         "parameters": [
           {
@@ -1008,7 +1008,7 @@
           "addresses"
         ],
         "summary": "Confirmed effective balance in WAVES",
-        "description": "Get the minimum effective balance at a given address for {confirmations} blocks from the current height. {confirmations} is up to 2000 blocks",
+        "description": "Get the minimum effective balance at a given address for {confirmations} blocks from the current height. Max number of confirmations is set by `waves.db.max-rollback-depth`, 2000 by default",
         "operationId": "effectiveBalanceWithConfirmations_1",
         "parameters": [
           {
@@ -1043,8 +1043,8 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Data by Key",
-        "description": "Read data stored in account by key",
+        "summary": "Data by key",
+        "description": "Read account data entries by a given key",
         "operationId": "getDataItem_1",
         "parameters": [
           {
@@ -1366,7 +1366,7 @@
           "blocks"
         ],
         "summary": "Last block",
-        "description": "Get the last block",
+        "description": "Get the block at the current blockchain height",
         "operationId": "last_1",
         "responses": {
           "200": {
@@ -1388,7 +1388,7 @@
           "blocks"
         ],
         "summary": "Block height",
-        "description": "Get a height of a block by its ID",
+        "description": "Get the height of a block by its ID",
         "operationId": "heightEncoded_1",
         "parameters": [
           {
@@ -1456,8 +1456,8 @@
         "tags": [
           "blocks"
         ],
-        "summary": "Block header by id",
-        "description": "Get header of specified block",
+        "summary": "Block headers by ID",
+        "description": "Get headers of a given block",
         "operationId": "block_header_by_id",
         "parameters": [
           {
@@ -1483,7 +1483,7 @@
         "tags": [
           "blocks"
         ],
-        "summary": "Block header range",
+        "summary": "Block headers at range",
         "description": "Get block headers at a given range of heights. Max range {from}-{to} is 100 blocks",
         "operationId": "seqHeaderOnly_1",
         "parameters": [
@@ -1528,8 +1528,8 @@
         "tags": [
           "blocks"
         ],
-        "summary": "Last block header",
-        "description": "Get the last block header",
+        "summary": "Last block headers",
+        "description": "Get headers of the block at the current blockchain height",
         "operationId": "lastHeaderOnly_1",
         "responses": {
           "200": {
@@ -3272,7 +3272,7 @@
           {
             "name": "height",
             "in": "path",
-            "description": "For balance at height requests. No more than 2000 blocks back from the current height",
+            "description": "For balance at height requests. Max number of blocks back from the current height is set by `waves.db.max-rollback-depth`, 2000 by default",
             "required": true,
             "schema": {
               "type": "integer"
@@ -3951,8 +3951,8 @@
         "tags": [
           "debug"
         ],
-        "summary": "Blacklist given peer",
-        "description": "Moving peer to blacklist",
+        "summary": "Blacklist peer",
+        "description": "Move a given peer to the blacklist for the time specified in `waves.network.black-list-residence-time`, 15 min by default. The connection to the peer is immediately closed (if it was open)",
         "operationId": "blacklist_1",
         "requestBody": {
           "description": "IP address of node",
@@ -4172,8 +4172,8 @@
         "tags": [
           "debug"
         ],
-        "summary": "History of the regular balance",
-        "description": "History of the regular balance for the last 3000 blocks",
+        "summary": "History of regular balance",
+        "description": "Get history of the regular balance at a given address. Max depth is set by `waves.db.max-rollback-depth`, 2000 by default",
         "operationId": "balanceHistory_1",
         "parameters": [
           {
@@ -4217,7 +4217,7 @@
           "debug"
         ],
         "summary": "Regular address balance at the height",
-        "description": "Regular address balance at the height. No more than 2000 blocks back",
+        "description": "Regular address balance at the height. Max number of blocks back from the current height is set by `waves.db.max-rollback-depth`, 2000 by default",
         "operationId": "stateWaves_1",
         "parameters": [
           {
@@ -4267,7 +4267,7 @@
           "debug"
         ],
         "summary": "Rollback to height",
-        "description": "Removes all blocks after a given height. Max for 2000 blocks",
+        "description": "Removes all blocks after a given height. Max number of blocks back from the current height is set by `waves.db.max-rollback-depth`, 2000 by default",
         "operationId": "rollback_1",
         "requestBody": {
           "description": "JSON with data",
