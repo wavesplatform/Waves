@@ -24,7 +24,7 @@ case class TransactionsOrdering(whitelistAddresses: Set[String], blockchain: Blo
   @tailrec private def extraFee(t: Transaction): Long =
     t match {
       case i: InvokeScriptTransaction if i.assetFee._1 == Waves => -i.extraFeePerStep
-      case i: ContinuationTransaction                           => extraFee(i.resolveInvoke(blockchain, utxTransactions))
+      case c: ContinuationTransaction                           => extraFee(blockchain.resolveInvoke(c))
       case _                                                    => 0
     }
 
@@ -38,7 +38,7 @@ case class TransactionsOrdering(whitelistAddresses: Set[String], blockchain: Blo
       case _ if whitelistAddresses.isEmpty                                                            => false
       case a: Authorized if whitelistAddresses.contains(a.sender.toAddress.stringRepr)                => true
       case i: InvokeScriptTransaction if whitelistAddresses.contains(i.dAppAddressOrAlias.stringRepr) => true
-      case c: ContinuationTransaction                                                                 => isWhitelisted(c.resolveInvoke(blockchain, utxTransactions))
+      case c: ContinuationTransaction                                                                 => isWhitelisted(blockchain.resolveInvoke(c))
       case _                                                                                          => false
     }
 }

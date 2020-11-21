@@ -139,7 +139,7 @@ object BlockDiffer extends ScorexLogging {
         val fee = InvokeDiffsCommon.stepTotalFee(txDiff, blockchain, i)
         Some((i.assetFee._1, fee))
       case c: ContinuationTransaction =>
-        val invoke = c.resolveInvoke(blockchain)
+        val invoke = blockchain.resolveInvoke(c)
         val fee    = InvokeDiffsCommon.stepTotalFee(txDiff, blockchain, invoke)
         Some((c.assetFee._1, fee))
       case _ =>

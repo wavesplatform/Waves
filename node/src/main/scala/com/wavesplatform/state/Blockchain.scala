@@ -13,8 +13,11 @@ import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{ApplicationStatus, Asset, Transaction}
+
+import scala.collection.mutable
 
 trait Blockchain {
   def settings: BlockchainSettings
@@ -179,5 +182,10 @@ object Blockchain {
       else if (blockchain.settings.functionalitySettings.blockVersion3AfterHeight + 1 < height) NgBlockVersion
       else if (height > 1) PlainBlockVersion
       else GenesisBlockVersion
+
+    def resolveInvoke(c: ContinuationTransaction): InvokeScriptTransaction =
+      blockchain.transactionInfo(c.invokeScriptTransactionId)
+        .collect { case (_, i: InvokeScriptTransaction, _) => i }
+        .getOrElse(throw new IllegalArgumentException(s"Couldn't find Invoke Transaction with id = ${c.invokeScriptTransactionId}"))
   }
 }

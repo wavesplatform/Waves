@@ -277,9 +277,9 @@ object TransactionDiffer {
         )
 
       tx match {
-        case ctx: ContinuationTransaction =>
-          val invoke = ctx.resolveInvoke(blockchain)
-          InvokeDiffsCommon.finishContinuation(commonDiff, ctx, blockchain, invoke, failed = true)
+        case c: ContinuationTransaction =>
+          val invoke = blockchain.resolveInvoke(c)
+          InvokeDiffsCommon.finishContinuation(commonDiff, c, blockchain, invoke, failed = true)
         case _ =>
           commonDiff |+| Diff.empty.copy(
             transactions =
@@ -306,7 +306,7 @@ object TransactionDiffer {
       case _: GenesisTransaction        => Map.empty[Address, Portfolio].asRight
       case ptx: PaymentTransaction      => Map(ptx.sender.toAddress -> Portfolio(balance = -ptx.fee, LeaseBalance.empty, assets = Map.empty)).asRight
       case ptx: ProvenTransaction       => makeFeePortfolios(blockchain, ptx, ptx.sender)
-      case ctx: ContinuationTransaction => makeFeePortfolios(blockchain, tx, ctx.resolveInvoke(blockchain).sender)
+      case c: ContinuationTransaction   => makeFeePortfolios(blockchain, c, blockchain.resolveInvoke(c).sender)
       case _                            => UnsupportedTransactionType.asLeft
     }
 
