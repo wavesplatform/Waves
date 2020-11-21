@@ -37,17 +37,28 @@ object TransactionDiffer {
       case result => result
     }
 
-  def forceValidate(prevBlockTs: Option[Long], currentBlockTs: Long)(
+  def forceValidate(prevBlockTs: Option[Long], currentBlockTs: Long, checkForContinuations: Boolean = true)(
       blockchain: Blockchain,
       tx: Transaction
   ): TracedResult[ValidationError, Diff] =
-    validate(prevBlockTs, currentBlockTs, verify = true, limitedExecution = false)(blockchain, tx)
+    validate(prevBlockTs, currentBlockTs, verify = true, limitedExecution = false, checkForContinuations)(blockchain, tx)
 
-  def limitedExecution(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, verify: Boolean = true)(
+  def limitedExecution(
+      prevBlockTimestamp: Option[Long],
+      currentBlockTimestamp: Long,
+      verify: Boolean = true,
+      checkForContinuations: Boolean = true
+  )(
       blockchain: Blockchain,
       tx: Transaction
   ): TracedResult[ValidationError, Diff] = {
-    validate(prevBlockTimestamp, currentBlockTimestamp, verify = verify, limitedExecution = mayFail(tx) && acceptFailed(blockchain))(blockchain, tx)
+    validate(
+      prevBlockTimestamp,
+      currentBlockTimestamp,
+      verify,
+      limitedExecution = mayFail(tx) && acceptFailed(blockchain),
+      checkForContinuations
+    )(blockchain, tx)
   }
 
   /**
@@ -55,13 +66,19 @@ object TransactionDiffer {
     * @param limitedExecution skip execution of the DApp and asset scripts
     * @param verify validate common checks, proofs and asset scripts execution. If `skipFailing` is true asset scripts will not be executed
     */
-  private def validate(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, verify: Boolean, limitedExecution: Boolean)(
+  private def validate(
+      prevBlockTimestamp: Option[Long],
+      currentBlockTimestamp: Long,
+      verify: Boolean,
+      limitedExecution: Boolean,
+      checkForContinuations: Boolean = true
+  )(
       blockchain: Blockchain,
       tx: Transaction
   ): TracedResult[ValidationError, Diff] = {
     val verifyAssets = verify || (mayFail(tx) && acceptFailed(blockchain))
     val result = for {
-      _               <- validateCommon(blockchain, tx, prevBlockTimestamp, currentBlockTimestamp, verify).traced
+      _               <- validateCommon(blockchain, tx, prevBlockTimestamp, currentBlockTimestamp, verify, checkForContinuations).traced
       _               <- validateFunds(blockchain, tx).traced
       verifierDiff    <- if (verify) verifierDiff(blockchain, tx) else Right(Diff.empty).traced
       transactionDiff <- transactionDiff(blockchain, tx, verifierDiff, currentBlockTimestamp, limitedExecution)
@@ -78,7 +95,8 @@ object TransactionDiffer {
       tx: Transaction,
       prevBlockTs: Option[Long],
       currentBlockTs: Long,
-      verify: Boolean
+      verify: Boolean,
+      checkForContinuations: Boolean
   ): Either[ValidationError, Unit] =
     if (verify)
       stats.commonValidation
@@ -90,6 +108,7 @@ object TransactionDiffer {
             _ <- CommonValidation.disallowBeforeActivationTime(blockchain, tx)
             _ <- CommonValidation.disallowDuplicateIds(blockchain, tx)
             _ <- CommonValidation.disallowSendingGreaterThanBalance(blockchain, currentBlockTs, tx)
+            _ <- if (checkForContinuations) CommonValidation.disallowIfContinuationInProgress(blockchain, tx) else Right(())
             _ <- FeeValidation(blockchain, tx)
           } yield ()
         } else Right(())

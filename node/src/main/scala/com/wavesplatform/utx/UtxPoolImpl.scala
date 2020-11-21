@@ -8,7 +8,6 @@ import cats.Monoid
 import cats.syntax.monoid._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.lang.ValidationError
@@ -21,8 +20,7 @@ import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationErro
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{Blockchain, ContinuationState, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError.{AlreadyInTheState, GenericError, SenderIsBlacklisted}
-import com.wavesplatform.transaction.TxWithFee.InCustomAsset
+import com.wavesplatform.transaction.TxValidationError.{AlreadyInTheState, BlockedByContinuation, GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.ReissueTransaction
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -223,9 +221,9 @@ class UtxPoolImpl(
       val patchedBlockchain = CompositeBlockchain(blockchain, Some(Monoid.combineAll(priorityDiffs)))
 
       if (forceValidate)
-        TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(patchedBlockchain, tx)
+        TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime(), checkForContinuations = false)(patchedBlockchain, tx)
       else
-        TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(patchedBlockchain, tx)
+        TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify, checkForContinuations = false)(patchedBlockchain, tx)
     }
 
     def addPortfolio(): Unit = diffEi.map { diff =>
@@ -346,9 +344,6 @@ class UtxPoolImpl(
                 this.removeFromOrdPool(tx.id())
                 onEvent(UtxEvent.TxRemoved(tx, Some(GenericError("Expired"))))
                 r.copy(iterations = r.iterations + 1, removedTransactions = r.removedTransactions + tx.id())
-              } else if (TxCheck.isBlockedByContinuation(tx)) {
-                log.trace(s"Transaction ${tx.id()} is blocked due to evaluation of continuation")
-                r.copy(iterations = r.iterations + 1)
               } else {
                 val newScriptedAddresses = scriptedAddresses(tx)
                 if (!priority && r.checkedAddresses.intersect(newScriptedAddresses).nonEmpty) r
@@ -393,6 +388,10 @@ class UtxPoolImpl(
                       log.trace(s"Transaction $txId already validated in priority pool")
                       removeFromOrdPool(tx.id())
                       r
+
+                    case Left(TransactionValidationError(BlockedByContinuation, _)) =>
+                      log.trace(s"Transaction ${tx.id()} is blocked due to evaluation of continuation")
+                      r.copy(iterations = r.iterations + 1)
 
                     case Left(error) =>
                       log.debug(s"Transaction ${tx.id()} removed due to ${extractErrorMessage(error)}")
@@ -486,34 +485,6 @@ class UtxPoolImpl(
         case _: ExchangeTransaction     => false
         case a: AuthorizedTransaction   => blockchain.hasAccountScript(a.sender.toAddress)
         case _                          => false
-      }
-
-    def isBlockedByContinuation(transaction: Transaction): Boolean =
-      transaction match {
-        case authorized: AuthorizedTransaction =>
-          blockchain.continuationStates
-            .exists {
-              case (invokeId, (_, _: ContinuationState.InProgress)) =>
-                val txSender    = authorized.sender.toAddress
-                val invoke      = blockchain.transactionInfo(invokeId).get._2.asInstanceOf[InvokeScriptTransaction]
-                val dAppAddress = blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
-                lazy val specificCases =
-                  authorized match {
-                    case e: ExchangeTransaction =>
-                      dAppAddress == e.order1.sender.toAddress || dAppAddress == e.order2.sender.toAddress
-                    case i: InvokeScriptTransaction =>
-                      dAppAddress == blockchain.resolveAlias(i.dAppAddressOrAlias).explicitGet()
-                    case a: InCustomAsset =>
-                      a.assetFee._1.fold(onWaves = false)(asset => dAppAddress == blockchain.assetDescription(asset).get.issuer.toAddress)
-                    case _ =>
-                      false
-                  }
-                dAppAddress == txSender || specificCases
-              case _ =>
-                false
-            }
-        case _ =>
-          false
       }
 
     def canCreateAlias(alias: Alias): Boolean =

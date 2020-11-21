@@ -27,6 +27,7 @@ object TxValidationError {
   case object MissingSenderPrivateKey                          extends ValidationError
   case object UnsupportedTransactionType                       extends ValidationError
   case object InvalidRequestSignature                          extends ValidationError
+  case object BlockedByContinuation                            extends ValidationError
   case class BlockFromFuture(ts: Long)                         extends ValidationError
   case class AlreadyInTheState(txId: ByteStr, txHeight: Int)   extends ValidationError
   case class AccountBalanceError(errs: Map[Address, String])   extends ValidationError

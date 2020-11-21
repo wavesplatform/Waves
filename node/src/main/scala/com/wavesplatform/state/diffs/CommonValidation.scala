@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats._
 import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.OverdraftValidationProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.ValidationError
@@ -13,6 +14,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction.TxWithFee.InCustomAsset
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
@@ -262,4 +264,40 @@ object CommonValidation {
         )
       case _ => Right(tx)
     }
+
+  def disallowIfContinuationInProgress[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] = {
+    val isBlockedByContinuation = tx match {
+      case authorized: AuthorizedTransaction =>
+        blockchain.continuationStates
+          .exists {
+            case (invokeId, (_, _: ContinuationState.InProgress)) =>
+              val txSender    = authorized.sender.toAddress
+              val invoke      = blockchain.transactionInfo(invokeId).get._2.asInstanceOf[InvokeScriptTransaction]
+              val dAppAddress = blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
+              lazy val specificCases =
+                authorized match {
+                  case e: ExchangeTransaction =>
+                    dAppAddress == e.order1.sender.toAddress || dAppAddress == e.order2.sender.toAddress
+                  case i: InvokeScriptTransaction =>
+                    dAppAddress == blockchain.resolveAlias(i.dAppAddressOrAlias).explicitGet()
+                  case a: InCustomAsset =>
+                    a.assetFee._1.fold(onWaves = false)(asset => {
+                      val issuer = blockchain.assetDescription(asset).get.issuer.toAddress
+                      dAppAddress == issuer
+                    })
+                  case _ =>
+                    false
+                }
+              dAppAddress == txSender || specificCases
+            case _ =>
+              false
+          }
+      case _ =>
+        false
+    }
+    if (isBlockedByContinuation)
+      Left(BlockedByContinuation)
+    else
+      Right(tx)
+  }
 }
