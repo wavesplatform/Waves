@@ -6,10 +6,10 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.serialization.impl.{ContinuationTxSerializer, PBTransactionSerializer}
+import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
 import com.wavesplatform.transaction.validation.TxValidator
 import monix.eval.Coeval
-import play.api.libs.json.JsObject
+import play.api.libs.json.{JsObject, Json}
 
 import scala.collection.mutable
 import scala.util.Try
@@ -25,9 +25,21 @@ case class ContinuationTransaction(
     with TxWithFee.InCustomAsset {
 
   override val builder                        = ContinuationTransaction
-  override val json: Coeval[JsObject]         = Coeval(builder.serializer.toJson(this))
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(PBTransactionSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(PBTransactionSerializer.bytes(this))
+
+  override val json: Coeval[JsObject] =
+    Coeval.evalOnce(
+      Json.obj(
+        "version"                   -> version,
+        "type"                      -> builder.typeId,
+        "id"                        -> id().toString,
+        "fee"                       -> fee,
+        "timestamp"                 -> timestamp,
+        "nonce"                     -> nonce,
+        "invokeScriptTransactionId" -> invokeScriptTransactionId.toString
+      )
+    )
 
   override def chainId: Byte =
     AddressScheme.current.chainId
@@ -47,8 +59,6 @@ case class ContinuationTransaction(
 }
 
 object ContinuationTransaction extends TransactionParser {
-  val serializer = ContinuationTxSerializer
-
   override type TransactionT = ContinuationTransaction
 
   override def typeId: TxType = 18: Byte
