@@ -17,8 +17,6 @@ import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScrip
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{ApplicationStatus, Asset, Transaction}
 
-import scala.collection.mutable
-
 trait Blockchain {
   def settings: BlockchainSettings
 

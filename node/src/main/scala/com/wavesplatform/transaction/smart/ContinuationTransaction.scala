@@ -4,14 +4,12 @@ import cats.implicits._
 import com.google.common.primitives.Ints
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
 import com.wavesplatform.transaction.validation.TxValidator
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
-import scala.collection.mutable
 import scala.util.Try
 
 case class ContinuationTransaction(
