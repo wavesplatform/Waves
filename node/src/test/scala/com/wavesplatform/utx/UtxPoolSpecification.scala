@@ -493,7 +493,7 @@ class UtxPoolSpecification
           val gen = for {
             headTransaction <- transfer(sender, senderBalance / 2, time)
             vipTransaction <- transfer(sender, senderBalance / 2, time)
-              .suchThat(TransactionsOrdering(Set.empty, null, null).compare(_, headTransaction) < 0)
+              .suchThat(TransactionsOrdering(Set.empty, null).compare(_, headTransaction) < 0)
           } yield (headTransaction, vipTransaction)
 
           forAll(gen, Gen.choose(0, 1).label("allowSkipChecks")) {
@@ -1030,7 +1030,7 @@ class UtxPoolSpecification
           utx.all shouldBe expectedTxs1
           assertPortfolios(utx, expectedTxs1)
 
-          val expectedTxs2 = expectedTxs1 ++ left.sorted(TransactionsOrdering(Set(), null, null))
+          val expectedTxs2 = expectedTxs1 ++ left.sorted(TransactionsOrdering(Set(), null))
           utx.removeAll(expectedTxs2)
           left.foreach(utx.putIfNew(_).resultE should beRight)
           utx.addPriorityTxs(expectedTxs1)
@@ -1151,7 +1151,7 @@ class UtxPoolSpecification
 
             mbs2.head.transactionData.foreach(utx.putIfNew(_).resultE should beRight)
             extAppender(Seq(block2)).runSyncUnsafe() should beRight
-            val expectedTxs1 = mbs1.last.transactionData ++ mbs2.head.transactionData.sorted(TransactionsOrdering(Set(), null, null))
+            val expectedTxs1 = mbs1.last.transactionData ++ mbs2.head.transactionData.sorted(TransactionsOrdering(Set(), null))
             utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(expectedTxs1)
 
             mbs2.foreach(microBlockAppender(_).runSyncUnsafe() should beRight)

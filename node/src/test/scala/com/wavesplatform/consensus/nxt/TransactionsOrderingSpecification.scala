@@ -84,7 +84,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
         .explicitGet()
     )
 
-    val sorted = Random.shuffle(correctSeq).sorted(TransactionsOrdering(Set.empty, null, null))
+    val sorted = Random.shuffle(correctSeq).sorted(TransactionsOrdering(Set.empty, null))
 
     sorted shouldBe correctSeq
   }
@@ -119,6 +119,6 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
         )
         .explicitGet()
     )
-    Random.shuffle(correctSeq).sorted(TransactionsOrdering(Set(whitelisted.toAddress.stringRepr), null, null)) shouldBe correctSeq
+    Random.shuffle(correctSeq).sorted(TransactionsOrdering(Set(whitelisted.toAddress.stringRepr), null)) shouldBe correctSeq
   }
 }

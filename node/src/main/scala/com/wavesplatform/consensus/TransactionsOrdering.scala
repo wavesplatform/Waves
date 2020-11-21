@@ -1,15 +1,13 @@
 package com.wavesplatform.consensus
 
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction}
 import com.wavesplatform.transaction.{Authorized, Transaction}
 
 import scala.annotation.tailrec
-import scala.collection.mutable
 
-case class TransactionsOrdering(whitelistAddresses: Set[String], blockchain: Blockchain, utxTransactions: mutable.Map[ByteStr, Transaction])
+case class TransactionsOrdering(whitelistAddresses: Set[String], blockchain: Blockchain)
     extends Ordering[Transaction] {
 
   private def orderBy(t: Transaction): (Boolean, Double, Long, Long) = {
