@@ -274,7 +274,7 @@ object CommonValidation {
               val txSender    = authorized.sender.toAddress
               val invoke      = blockchain.transactionInfo(invokeId).get._2.asInstanceOf[InvokeScriptTransaction]
               val dAppAddress = blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
-              lazy val specificCases =
+              def specificCases =
                 authorized match {
                   case e: ExchangeTransaction =>
                     dAppAddress == e.order1.sender.toAddress || dAppAddress == e.order2.sender.toAddress
