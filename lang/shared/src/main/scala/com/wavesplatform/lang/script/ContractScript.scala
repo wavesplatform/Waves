@@ -134,16 +134,16 @@ object ContractScript {
   ): Either[String, Unit] =
     for {
       _ <- if (useReducedVerifierLimit) estimateVerifierReduced(dApp, complexities, version) else Right(())
-      limit = if (allowContinuation)
-        MaxComplexityByVersion(version) * MaxContinuationSteps
-      else
-        MaxComplexityByVersion(version)
-      _ <- Either.cond(
-        maxComplexity._2 <= limit,
-        (),
-        s"Contract function (${maxComplexity._1}) is too complex: ${maxComplexity._2} > $limit"
-      )
-      _ <- if (allowContinuation) checkContinuationFirstStep(version, dApp, complexities) else Right(())
+      _ <- if (allowContinuation)
+        checkContinuationFirstStep(version, dApp, complexities)
+      else {
+        val limit = MaxComplexityByVersion(version)
+        Either.cond(
+          maxComplexity._2 <= limit,
+          (),
+          s"Contract function (${maxComplexity._1}) is too complex: ${maxComplexity._2} > $limit"
+        )
+      }
     } yield ()
 
   private def estimateVerifierReduced(
