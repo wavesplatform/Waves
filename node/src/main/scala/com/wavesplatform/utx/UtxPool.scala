@@ -6,6 +6,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utx.UtxPool.PackStrategy
 
@@ -25,6 +26,7 @@ trait UtxPool extends AutoCloseable {
       cancelled: () => Boolean = () => false
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint)
   def nextMicroBlockSize(): Option[Int]
+  def resolveInvoke(c: ContinuationTransaction): InvokeScriptTransaction
 }
 
 object UtxPool {

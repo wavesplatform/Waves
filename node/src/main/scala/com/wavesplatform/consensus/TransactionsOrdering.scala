@@ -1,13 +1,13 @@
 package com.wavesplatform.consensus
 
-import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction}
 import com.wavesplatform.transaction.{Authorized, Transaction}
+import com.wavesplatform.utx.UtxPool
 
 import scala.annotation.tailrec
 
-case class TransactionsOrdering(whitelistAddresses: Set[String], blockchain: Blockchain)
+case class TransactionsOrdering(whitelistAddresses: Set[String], utxPool: UtxPool)
     extends Ordering[Transaction] {
 
   private def orderBy(t: Transaction): (Boolean, Double, Long, Long) = {
@@ -22,7 +22,7 @@ case class TransactionsOrdering(whitelistAddresses: Set[String], blockchain: Blo
   @tailrec private def extraFee(t: Transaction): Long =
     t match {
       case i: InvokeScriptTransaction if i.assetFee._1 == Waves => -i.extraFeePerStep
-      case c: ContinuationTransaction                           => extraFee(blockchain.resolveInvoke(c))
+      case c: ContinuationTransaction                           => extraFee(utxPool.resolveInvoke(c))
       case _                                                    => 0
     }
 
@@ -36,7 +36,7 @@ case class TransactionsOrdering(whitelistAddresses: Set[String], blockchain: Blo
       case _ if whitelistAddresses.isEmpty                                                            => false
       case a: Authorized if whitelistAddresses.contains(a.sender.toAddress.stringRepr)                => true
       case i: InvokeScriptTransaction if whitelistAddresses.contains(i.dAppAddressOrAlias.stringRepr) => true
-      case c: ContinuationTransaction                                                                 => isWhitelisted(blockchain.resolveInvoke(c))
+      case c: ContinuationTransaction                                                                 => isWhitelisted(utxPool.resolveInvoke(c))
       case _                                                                                          => false
     }
 }
