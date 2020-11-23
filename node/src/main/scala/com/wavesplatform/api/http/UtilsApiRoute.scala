@@ -317,7 +317,7 @@ object UtilsApiRoute {
           .left
           .map(GenericError(_))
 
-        call = ContractEvaluator.buildSyntheticCall(ByteStr(address.bytes), script.expr.asInstanceOf[DApp], expr)
+        call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)
         limitedResult <- EvaluatorV2
           .applyLimited(call, limit, ctx, script.stdLibVersion)
           .leftMap { case (err, log) => ScriptExecutionError.dAppExecution(err, log) }

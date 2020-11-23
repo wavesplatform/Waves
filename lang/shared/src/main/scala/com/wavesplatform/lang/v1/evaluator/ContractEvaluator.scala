@@ -30,7 +30,7 @@ object ContractEvaluator {
       feeAssetId: Option[ByteStr]
   )
 
-  def buildSyntheticCall(dAppAddress: ByteStr, contract: DApp, call: EXPR): EXPR = {
+  def buildSyntheticCall(contract: DApp, call: EXPR): EXPR = {
     val callables = contract.callableFuncs.flatMap { cf =>
       val argName = cf.annotation.invocationArgName
       val invocation = Invocation(
@@ -38,7 +38,7 @@ object ContractEvaluator {
         Recipient.Address(ByteStr(new Array[Byte](26))),
         ByteStr(new Array[Byte](32)),
         AttachedPayments.Single(None),
-        dAppAddress,
+        null,
         ByteStr(new Array[Byte](32)),
         0L,
         None
