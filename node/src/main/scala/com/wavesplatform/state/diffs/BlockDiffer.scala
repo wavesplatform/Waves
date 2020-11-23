@@ -133,14 +133,17 @@ object BlockDiffer extends ScorexLogging {
       case _ => transactionFee
     }
 
-  private def maybeContinuation(blockchain: Blockchain, tx: Transaction, txDiff: Diff): Option[(Asset, Long)] =
+  private def maybeContinuation(blockchain: Blockchain, transactions: Seq[Transaction], tx: Transaction, txDiff: Diff): Option[(Asset, Long)] =
     tx match {
       case i: InvokeScriptTransaction if txDiff.continuationStates.nonEmpty =>
         val fee = InvokeDiffsCommon.stepTotalFee(txDiff, blockchain, i)
         Some((i.assetFee._1, fee))
       case c: ContinuationTransaction =>
-        val invoke = blockchain.resolveInvoke(c)
-        val fee    = InvokeDiffsCommon.stepTotalFee(txDiff, blockchain, invoke)
+        val invoke =
+          transactions
+            .collectFirst { case i: InvokeScriptTransaction if i.id.value() == c.invokeScriptTransactionId => i }
+            .getOrElse(blockchain.resolveInvoke(c))
+        val fee = InvokeDiffsCommon.stepTotalFee(txDiff, blockchain, invoke)
         Some((c.assetFee._1, fee))
       case _ =>
         None
@@ -175,7 +178,7 @@ object BlockDiffer extends ScorexLogging {
             if (updatedConstraint.isOverfilled)
               TracedResult(Left(GenericError(s"Limit of txs was reached: $initConstraint -> $updatedConstraint")))
             else {
-              val (feeAsset, feeAmount) = maybeContinuation(blockchain, tx, thisTxDiff)
+              val (feeAsset, feeAmount) = maybeContinuation(blockchain, txs, tx, thisTxDiff)
                 .getOrElse(maybeApplySponsorship(currBlockchain, hasSponsorship, tx.assetFee))
               val currentBlockFee = CurrentBlockFeePart(feeAmount)
 
