@@ -26,10 +26,10 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.ApplicationStatus._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.{ApplicationStatus, GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
-import com.wavesplatform.transaction.ApplicationStatus._
 import com.wavesplatform.utils.{ScorexLogging, _}
 import monix.eval.Task
 import monix.reactive.Observable
@@ -263,11 +263,12 @@ package object database extends ScorexLogging {
     continuationState match {
       case ContinuationState.InProgress(expr, residualComplexity, lastTransactionId) =>
         pb.ContinuationState(
-          0,
-          ByteString.copyFrom(Serde.serialize(expr, allowObjects = true)),
-          residualComplexity,
-          ByteString.copyFrom(lastTransactionId.arr)
-        ).toByteArray
+            0,
+            ByteString.copyFrom(Serde.serialize(expr, allowObjects = true)),
+            residualComplexity,
+            ByteString.copyFrom(lastTransactionId.arr)
+          )
+          .toByteArray
 
       case _: ContinuationState.Finished =>
         Array.empty
@@ -387,11 +388,11 @@ package object database extends ScorexLogging {
   }
 
   def readStateHash(bs: Array[Byte]): StateHash = {
-    val ndi = newDataInput(bs)
+    val ndi           = newDataInput(bs)
     val sectionsCount = ndi.readByte()
     val sections = (0 until sectionsCount).map { _ =>
       val sectionId = ndi.readByte()
-      val value = ndi.readByteStr(DigestLength)
+      val value     = ndi.readByteStr(DigestLength)
       SectionId(sectionId) -> value
     }
     val totalHash = ndi.readByteStr(DigestLength)
@@ -400,11 +401,12 @@ package object database extends ScorexLogging {
 
   def writeStateHash(sh: StateHash): Array[Byte] = {
     val sorted = sh.sectionHashes.toSeq.sortBy(_._1)
-    val ndo = newDataOutput(crypto.DigestLength + 1 + sorted.length * (1 + crypto.DigestLength))
+    val ndo    = newDataOutput(crypto.DigestLength + 1 + sorted.length * (1 + crypto.DigestLength))
     ndo.writeByte(sorted.length)
-    sorted.foreach { case (sectionId, value) =>
-      ndo.writeByte(sectionId.id.toByte)
-      ndo.writeByteStr(value.ensuring(_.arr.length == DigestLength))
+    sorted.foreach {
+      case (sectionId, value) =>
+        ndo.writeByte(sectionId.id.toByte)
+        ndo.writeByteStr(value.ensuring(_.arr.length == DigestLength))
     }
     ndo.writeByteStr(sh.totalHash.ensuring(_.arr.length == DigestLength))
     ndo.toByteArray
@@ -525,7 +527,7 @@ package object database extends ScorexLogging {
 
   def readTransaction(b: Array[Byte]): (Transaction, ApplicationStatus) = {
     import pb.TransactionData.Transaction._
-    val data = pb.TransactionData.parseFrom(b)
+    val data   = pb.TransactionData.parseFrom(b)
     val status = fromDb(data.failed, data.applicationStatus)
     val tx = data.transaction match {
       case tx: LegacyBytes    => TransactionParsers.parseBytes(tx.value.toByteArray).get
@@ -573,9 +575,12 @@ package object database extends ScorexLogging {
         val statusFieldTag  = coded.readTag()
         val statusFieldNum  = WireFormat.getTagFieldNumber(statusFieldTag)
         val statusFieldType = WireFormat.getTagWireType(statusFieldTag)
-        require(statusFieldNum == FAILED_FIELD_NUMBER, "Unknown `failed` field in transaction data")
-        require(statusFieldType == WireFormat.WIRETYPE_VARINT, "Can't parse `failed` field in transaction data")
-        !coded.readBool()
+        require(statusFieldType == WireFormat.WIRETYPE_VARINT, "Can't parse application status field in transaction data")
+        statusFieldNum match {
+          case FAILED_FIELD_NUMBER             => !coded.readBool()
+          case APPLICATION_STATUS_FIELD_NUMBER => protobuf.ApplicationStatus.fromValue(coded.readEnum()) != SCRIPT_EXECUTION_FAILED
+          case _                               => throw new IllegalArgumentException("Unknown application status field in transaction data")
+        }
       }
 
     (succeed, bytes)
