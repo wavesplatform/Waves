@@ -415,7 +415,7 @@ class UtxPoolImpl(
           blockchain.continuationStates
             .collect {
               case (invokeId, (nonce, ContinuationState.InProgress(_, _, _))) =>
-                ContinuationTransaction(invokeId, time.getTimestamp(), nonce, 0L, Waves)
+                ContinuationTransaction(invokeId, time.correctedTime(), nonce, 0L, Waves)
             }
 
         def allValidated(seed: PackResult) =
