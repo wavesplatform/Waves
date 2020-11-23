@@ -364,6 +364,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
             txInfo.continuationTransactionIds.value shouldBe continuationIds
         }
 
+      invoke.extraFeePerStep.value shouldBe extraFeePerStep
       invoke.applicationStatus.value shouldBe inProgressStatus
       invoke.timestamp +: continuations.map(_.timestamp) shouldBe sorted
       invoke.continuationTransactionIds.value shouldBe continuationIds
