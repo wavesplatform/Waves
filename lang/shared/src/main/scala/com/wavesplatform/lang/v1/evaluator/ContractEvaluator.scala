@@ -24,7 +24,6 @@ object ContractEvaluator {
       caller: Recipient.Address,
       callerPk: ByteStr,
       payments: AttachedPayments,
-      dappAddress: ByteStr,
       transactionId: ByteStr,
       fee: Long,
       feeAssetId: Option[ByteStr]
@@ -38,7 +37,6 @@ object ContractEvaluator {
         Recipient.Address(ByteStr(new Array[Byte](26))),
         ByteStr(new Array[Byte](32)),
         AttachedPayments.Single(None),
-        null,
         ByteStr(new Array[Byte](32)),
         0L,
         None
