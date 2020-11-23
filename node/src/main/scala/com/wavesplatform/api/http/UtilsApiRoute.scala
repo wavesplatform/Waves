@@ -261,14 +261,14 @@ case class UtilsApiRoute(
             result <- ScriptCallEvaluator.executeExpression(blockchain, script, address, settings.evaluateScriptComplexityLimit)(expr)
           } yield result
 
+        val requestData = obj ++ Json.obj("address" -> address.stringRepr)
         result
-          .map(serializeResult)
+          .map(r => Json.obj("result" -> serializeResult(r)))
           .recover {
             case e: ScriptExecutionError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.error)
             case other                   => ApiError.fromValidationError(other).json
           }
-          .explicitGet()
-          .as[JsObject] ++ Json.obj("address" -> address.stringRepr) ++ obj
+          .explicitGet() ++ requestData
       }
     }
 

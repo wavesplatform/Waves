@@ -717,7 +717,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       val fullJson = responseAs[JsObject]
       (fullJson \ "address").as[String] shouldBe TxHelpers.defaultSigner.toAddress.stringRepr
       (fullJson \ "expr").as[String] should not be empty
-      fullJson - "address" - "expr"
+      (fullJson \ "result").asOpt[JsObject].getOrElse(fullJson - "address" - "expr")
     }
 
     (utilsApi.blockchain.accountScript _).when(TxHelpers.defaultSigner.toAddress).returning(None).once()
@@ -729,7 +729,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     (utilsApi.blockchain.accountScript _).when(TxHelpers.defaultSigner.toAddress).returning(Some(testScript))
 
     evalScript("testCallable()") ~> route ~> check {
-      responseAs[String] shouldBe "{\"type\":\"WriteSet\",\"value\":{\"data\":{\"type\":\"Array\",\"value\":[{\"type\":\"DataEntry\",\"value\":{\"key\":{\"type\":\"String\",\"value\":\"test\"},\"value\":{\"type\":\"ByteVector\",\"value\":\"11111111111111111111111111\"}}}]}},\"address\":\"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9\",\"expr\":\"testCallable()\"}"
+      responseAs[String] shouldBe "{\"result\":{\"type\":\"WriteSet\",\"value\":{\"data\":{\"type\":\"Array\",\"value\":[{\"type\":\"DataEntry\",\"value\":{\"key\":{\"type\":\"String\",\"value\":\"test\"},\"value\":{\"type\":\"ByteVector\",\"value\":\"11111111111111111111111111\"}}}]}}},\"expr\":\"testCallable()\",\"address\":\"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9\"}"
     }
 
     evalScript("testNone()") ~> route ~> check {
