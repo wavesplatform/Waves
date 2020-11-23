@@ -693,6 +693,12 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
                    |func testS() = "Test"
                    |func testF() = throw("Test")
                    |func testCompl() = ${"sigVerify(base58'', base58'', base58'') ||" * 100} true
+                   |
+                   |@Callable(i)
+                   |func testCallable1() = WriteSet([])
+                   |
+                   |@Callable(i)
+                   |func testCallable() = WriteSet([DataEntry("test", i.caller.bytes)])
                    |""".stripMargin
 
       val (script, _) = ScriptCompiler.compile(str, ScriptEstimatorV2).explicitGet()
@@ -721,6 +727,10 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     }
 
     (utilsApi.blockchain.accountScript _).when(TxHelpers.defaultSigner.toAddress).returning(Some(testScript))
+
+    evalScript("testCallable()") ~> route ~> check {
+      responseAs[String] shouldBe "{\"type\":\"WriteSet\",\"value\":{\"data\":{\"type\":\"Array\",\"value\":[{\"type\":\"DataEntry\",\"value\":{\"key\":{\"type\":\"String\",\"value\":\"test\"},\"value\":{\"type\":\"ByteVector\",\"value\":\"11111111111111111111111111\"}}}]}},\"address\":\"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9\",\"expr\":\"testCallable()\"}"
+    }
 
     evalScript("testNone()") ~> route ~> check {
       responseJson shouldBe Json.obj("error" -> 306, "message" -> "Function or type 'testNone' not found")

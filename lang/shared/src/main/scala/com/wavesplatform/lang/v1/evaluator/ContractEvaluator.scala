@@ -30,8 +30,23 @@ object ContractEvaluator {
       feeAssetId: Option[ByteStr]
   )
 
-  def buildSyntheticCall(contract: DApp, call: EXPR): EXPR = {
-    foldDeclarations(contract.decs, BLOCK(LET("__synthetic_call", TRUE), call))
+  def buildSyntheticCall(dAppAddress: ByteStr, contract: DApp, call: EXPR): EXPR = {
+    val callables = contract.callableFuncs.flatMap { cf =>
+      val argName = cf.annotation.invocationArgName
+      val invocation = Invocation(
+        null,
+        Recipient.Address(ByteStr(new Array[Byte](26))),
+        ByteStr(new Array[Byte](32)),
+        AttachedPayments.Single(None),
+        dAppAddress,
+        ByteStr(new Array[Byte](32)),
+        0L,
+        None
+      )
+      LET(argName, Bindings.buildInvocation(invocation, StdLibVersion.VersionDic.default)) :: cf.u :: Nil
+    }
+
+    foldDeclarations(contract.decs ++ callables, BLOCK(LET("__synthetic_call", TRUE), call))
   }
 
   private def buildExprFromInvocation(c: DApp, i: Invocation, version: StdLibVersion): Either[String, EXPR] = {
@@ -122,7 +137,8 @@ object ContractEvaluator {
         case (buildingExpr, (letName, letValue)) =>
           BLOCK(LET(letName, letValue.value.value.explicitGet()), buildingExpr)
       }
-    EvaluatorV2.applyLimited(exprWithLets, limit, ctx, version)
+    EvaluatorV2
+      .applyLimited(exprWithLets, limit, ctx, version)
       .flatMap {
         case (expr, unusedComplexity, log) =>
           val result =
@@ -130,7 +146,7 @@ object ContractEvaluator {
               case value: EVALUATED => ScriptResult.fromObj(ctx, transactionId, value, version)
               case expr: EXPR       => Right(IncompleteResult(expr, unusedComplexity))
             }
-        result.bimap((_, log), (_, log))
+          result.bimap((_, log), (_, log))
       }
-   }
+  }
 }
