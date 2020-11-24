@@ -26,7 +26,7 @@ import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ApplicationStatus.ScriptExecutionInProgress
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.{Transaction, TxVersion}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
@@ -63,6 +63,13 @@ object InvokeScriptTransactionDiff {
           }
 
           stepLimit = ContractLimits.MaxComplexityByVersion(version)
+
+          _ <- TracedResult(Either.cond(
+            invocationComplexity <= stepLimit || tx.version >= TxVersion.V3,
+            (),
+            GenericError("Continuation is not allowed for Invoke Script Transaction with version below V3")
+          ))
+
           _ <- InvokeDiffsCommon.calcAndCheckFee(
             (message, _) => GenericError(message),
             tx,

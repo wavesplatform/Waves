@@ -120,6 +120,20 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     scriptInfo.script.get.startsWith("base64:") shouldBe true
   }
 
+  test("can't invoke continuation if tx version below V3") {
+    def invoke =
+      sender.invokeScript(
+        caller,
+        dApp.toAddress.toString,
+        func = Some("foo"),
+        args = List(CONST_BOOLEAN(false)),
+        fee = pureInvokeFee * 8,
+        version = TxVersion.V2,
+        waitForTx = true
+      )
+    assertBadRequestAndMessage(invoke, "Continuation is not allowed for Invoke Script Transaction with version below V3")
+  }
+
   test("continuation with rollback") {
     val startHeight = sender.height + 2
     sender.waitForHeight(startHeight)
