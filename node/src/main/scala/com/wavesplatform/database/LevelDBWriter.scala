@@ -767,7 +767,6 @@ abstract class LevelDBWriter private[database] (
                 case _: DataTransaction => // see changed data keys removal
 
                 case tx: InvokeScriptTransaction =>
-                  println("!!! I'M HERE???")
                   val id = TransactionId(tx.id.value())
                   rw.delete(Keys.invokeScriptResult(h, num))
                   rw.delete(Keys.continuationState(id, nonce = 0))
@@ -780,7 +779,6 @@ abstract class LevelDBWriter private[database] (
                     val newNonce     = if (tx.nonce < currentNonce) tx.nonce else currentNonce
                     Some(newNonce)
                   }
-                  println(s"!!! DELETE STATE WITH NONCE=${tx.nonce + 1}")
                   rw.delete(Keys.continuationState(id, tx.nonce + 1))
                   rw.delete(Keys.invokeScriptResult(h, num))
 
