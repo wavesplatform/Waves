@@ -23,7 +23,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, TxVersion, smart}
 import monix.eval.Coeval
-import org.scalatest.OptionValues
+import org.scalatest.{CancelAfterFailure, OptionValues}
 
 class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   private val activationHeight = 10
@@ -125,7 +125,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     sender.waitForHeight(startHeight)
 
     val enoughFee    = pureInvokeFee * 8
-    val redundantFee = 12345678
+    val redundantFee = 123456789
 
     val invoke = sender
       .invokeScript(
@@ -138,6 +138,8 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         waitForTx = true
       )
       ._1
+
+    sender.transactionStatus(invoke.id).applicationStatus.value shouldBe "script_execution_in_progress"
 
     waitForContinuation(invoke.id, shouldBeFailed = false)
     val endHeight = sender.height
@@ -308,16 +310,9 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     nodes.waitFor(
       s"chain of continuation for InvokeScript Transaction with id = $invokeId is completed"
     )(
-      _.blockSeq(sender.height - 4, sender.height)
-        .flatMap(_.transactions)
-        .exists(
-          tx =>
-            tx._type == ContinuationTransaction.typeId &&
-              tx.applicationStatus.contains(if (shouldBeFailed) "script_execution_failed" else "succeeded") &&
-              tx.invokeScriptTransactionId.contains(invokeId)
-        )
+      _.transactionStatus(invokeId).applicationStatus.value
     )(
-      _.forall(identity)
+      _.forall(_ == (if (shouldBeFailed) "script_execution_failed" else "succeeded"))
     )
 
   private def assertContinuationChain(
@@ -329,8 +324,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       actions: Int = 0
   ): Unit = {
     nodes.foreach { node =>
-      val endStatus        = if (shouldBeFailed) "script_execution_failed" else "succeeded"
-      val inProgressStatus = "script_execution_in_progress"
+      val endStatus = if (shouldBeFailed) "script_execution_failed" else "succeeded"
 
       val invoke = node.transactionInfo[DebugStateChanges](invokeId)
       val continuations =
@@ -356,7 +350,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
             val totalExpectedFee = expectedFeeInAttachedAsset + extraFeePerStep
             c.fee shouldBe totalExpectedFee
 
-            val expectedStatus = if (i == continuations.size - 1) endStatus else inProgressStatus
+            val expectedStatus = if (i == continuations.size - 1) endStatus else "succeeded"
             c.applicationStatus.value shouldBe expectedStatus
 
             val txInfo = node.transactionInfo[DebugStateChanges](c.id)
@@ -365,7 +359,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         }
 
       invoke.extraFeePerStep.value shouldBe extraFeePerStep
-      invoke.applicationStatus.value shouldBe inProgressStatus
+      invoke.applicationStatus.value shouldBe endStatus
       invoke.timestamp +: continuations.map(_.timestamp) shouldBe sorted
       invoke.continuationTransactionIds.value shouldBe continuationIds
     }
@@ -405,17 +399,10 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
 
   private def testPartialRollback(startHeight: Int, invoke: Transaction): Unit = {
     nodes.rollback(startHeight + 1, returnToUTX = false)
-    val continuations =
-      sender
-        .blockSeq(startHeight, sender.height)
-        .flatMap(_.transactions)
-        .filter(tx => tx._type == ContinuationTransaction.typeId && tx.invokeScriptTransactionId.contains(invoke.id))
 
-    //pre-check
-    continuations should not be empty
-    continuations.foreach(_.applicationStatus.value shouldBe "script_execution_in_progress")
-
+    sender.transactionStatus(invoke.id).applicationStatus.value shouldBe "script_execution_in_progress"
     sender.getData(dApp.toAddress.toString) shouldBe Nil
+
     waitForContinuation(invoke.id, shouldBeFailed = false)
     assertContinuationChain(invoke.id, sender.height, shouldBeFailed = false, None)
   }

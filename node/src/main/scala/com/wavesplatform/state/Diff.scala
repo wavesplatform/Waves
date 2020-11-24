@@ -167,8 +167,7 @@ case class Diff(
     scriptsComplexity: Long,
     scriptResults: Map[ByteStr, InvokeScriptResult],
     continuationStates: Map[(ByteStr, Int), ContinuationState],
-    addressTransactionBindings: Map[ByteStr, Set[Address]],
-    replacingTransactions: List[(Transaction, ApplicationStatus)]
+    replacingTransactions: Seq[NewTransactionInfo]
 ) {
   lazy val continuationCurrentStates: Map[ByteStr, (Int, ContinuationState)] =
     continuationStates
@@ -180,11 +179,6 @@ case class Diff(
 
   def bindTransaction(tx: Transaction): Diff =
     copy(transactions = transactions.concat(Map(Diff.toDiffTxData(tx, portfolios, accountData))))
-
-  def bindOldTransaction(id: ByteStr): Diff = {
-    val idWithAddresses = (id, (portfolios.keys ++ accountData.keys).toSet)
-    copy(addressTransactionBindings = addressTransactionBindings + idWithAddresses)
-  }
 }
 
 object Diff {
@@ -202,8 +196,7 @@ object Diff {
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
       scriptsRun: Int = 0,
       continuationStates: Map[(ByteStr, Int), ContinuationState] = Map.empty,
-      addressTransactionBindings: Map[ByteStr, Set[Address]] = Map.empty,
-      replacingTransactions: List[(Transaction, ApplicationStatus)] = Nil
+      replacingTransactions: Seq[NewTransactionInfo] = Seq()
   ): Diff =
     Diff(
       transactions = mutable.LinkedHashMap(),
@@ -221,7 +214,6 @@ object Diff {
       scriptResults = scriptResults,
       scriptsComplexity = 0,
       continuationStates = continuationStates,
-      addressTransactionBindings = addressTransactionBindings,
       replacingTransactions = replacingTransactions
     )
 
@@ -259,8 +251,7 @@ object Diff {
       scriptResults = scriptResults,
       scriptsComplexity = scriptsComplexity,
       continuationStates = continuationStates,
-      addressTransactionBindings = Map.empty,
-      replacingTransactions = Nil
+      replacingTransactions = Seq()
     )
 
   private def toDiffTxData(
@@ -287,8 +278,7 @@ object Diff {
       0,
       Map.empty,
       Map.empty,
-      Map.empty,
-      Nil
+      Seq()
     )
 
   implicit val diffMonoid: Monoid[Diff] = new Monoid[Diff] {
@@ -311,7 +301,6 @@ object Diff {
         scriptResults = older.scriptResults.combine(newer.scriptResults),
         scriptsComplexity = older.scriptsComplexity + newer.scriptsComplexity,
         continuationStates = older.continuationStates ++ newer.continuationStates,
-        addressTransactionBindings = older.addressTransactionBindings ++ newer.addressTransactionBindings,
         replacingTransactions = older.replacingTransactions ++ newer.replacingTransactions
       )
   }

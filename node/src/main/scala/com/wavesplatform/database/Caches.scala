@@ -14,7 +14,7 @@ import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ApplicationStatus.ScriptExecutionFailed
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.{ApplicationStatus, Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
 
@@ -180,7 +180,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       stateHash: StateHashBuilder.Result,
       continuationStates: Map[(ByteStr, Int), ContinuationState],
       addressTransactionBindings: Map[AddressId, Seq[TransactionId]],
-      replacingTransactions: List[(Transaction, ApplicationStatus)]
+      replacingTransactions: Seq[NewTransactionInfo]
   ): Unit
 
   override def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], hitSource: ByteStr, block: Block): Unit = {
@@ -236,10 +236,9 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
         .toMap
 
     val addressTransactionBindings: Map[AddressId, Seq[TransactionId]] =
-      diff.addressTransactionBindings
-        .toList
-        .flatMap { case (txId, addresses) =>
-          addresses.map(address => addressId(address).get -> TransactionId(txId))
+      diff.replacingTransactions
+        .flatMap { case NewTransactionInfo(tx, addresses, _) =>
+          addresses.map(address => addressId(address).get -> TransactionId(tx.id.value()))
         }
         .groupBy(_._1)
         .view

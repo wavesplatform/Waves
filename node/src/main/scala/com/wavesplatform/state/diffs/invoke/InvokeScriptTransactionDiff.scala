@@ -25,6 +25,7 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.ApplicationStatus.ScriptExecutionInProgress
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
@@ -170,7 +171,10 @@ object InvokeScriptTransactionDiff {
               case ScriptResultV4(actions)              => doProcessActions(actions)
               case ir: IncompleteResult =>
                 val state      = ContinuationState.InProgress(ir.expr, residualComplexity = ir.unusedComplexity, tx.id.value())
-                val stateDiff  = Diff(tx = tx, continuationStates = Map((tx.id.value(), 0) -> state))
+                val stateDiff  = Diff.empty.copy(
+                  transactions = Map(tx.id.value() -> NewTransactionInfo(tx, Set(), ScriptExecutionInProgress)),
+                  continuationStates = Map((tx.id.value(), 0) -> state)
+                )
                 val stepFee    = InvokeDiffsCommon.stepTotalFee(stateDiff, blockchain, tx)
                 val portfolios = Diff.stateOps(portfolios = InvokeDiffsCommon.stepFeePortfolios(stepFee, tx, blockchain))
                 TracedResult.wrapValue(stateDiff |+| portfolios)

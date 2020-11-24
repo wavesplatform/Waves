@@ -282,13 +282,18 @@ object InvokeDiffsCommon {
       failed: Boolean
   ): Diff = {
     val totalFee = stepTotalFee(diff, blockchain, invoke)
-    diff
-      .copy(
+    val status   = if (failed) ScriptExecutionFailed else Succeeded
+    val resultDiff =
+      diff.copy(
         continuationStates = Map((tx.invokeScriptTransactionId, tx.nonce + 1) -> ContinuationState.Finished(tx.id.value())),
-        replacingTransactions = List((tx.copy(fee = totalFee), if (failed) ScriptExecutionFailed else Succeeded)),
         portfolios = stepFeePortfolios(totalFee, invoke, blockchain)
       )
-      .bindOldTransaction(tx.invokeScriptTransactionId)
+    resultDiff.copy(
+      replacingTransactions = Seq(
+        NewTransactionInfo(tx.copy(fee = totalFee), Set(), status),
+        NewTransactionInfo(invoke, (resultDiff.portfolios.keys ++ resultDiff.accountData.keys).toSet, status)
+      )
+    )
   }
 
   def stepTotalFee(
@@ -304,12 +309,11 @@ object InvokeDiffsCommon {
         scriptResult.reissues.map(r => IssuedAsset(r.assetId)) ++
         scriptResult.sponsorFees.map(sf => IssuedAsset(sf.assetId))
     val smartAccountCount =
-      diff.continuationStates
-        .headOption
+      diff.continuationStates.headOption
         .collect { case ((_, nonce), _) if nonce == 0 && blockchain.hasAccountScript(invoke.sender.toAddress) => 1 }
         .getOrElse(0)
-    val assetActionsFee       = (assetActions.count(blockchain.hasAssetScript) + smartAccountCount) * ScriptExtraFee
-    val issuesFee             = scriptResult.issues.count(!blockchain.isNFT(_)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
+    val assetActionsFee = (assetActions.count(blockchain.hasAssetScript) + smartAccountCount) * ScriptExtraFee
+    val issuesFee       = scriptResult.issues.count(!blockchain.isNFT(_)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
     expectedStepFeeInAttachedAsset(invoke, blockchain) + wavesToAttachedAsset(invoke, blockchain, assetActionsFee + issuesFee)
   }
 

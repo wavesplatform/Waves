@@ -387,7 +387,7 @@ abstract class LevelDBWriter private[database] (
       stateHash: StateHashBuilder.Result,
       continuationStates: Map[(ByteStr, Int), ContinuationState],
       addressTransactionBindings: Map[AddressId, Seq[TransactionId]],
-      replacingTransactions: List[(Transaction, ApplicationStatus)]
+      replacingTransactions: Seq[NewTransactionInfo]
   ): Unit = {
     log.trace(s"Persisting block ${block.id()} at height $height")
     readWrite { rw =>
@@ -402,31 +402,17 @@ abstract class LevelDBWriter private[database] (
       }
 
       val transactions: Map[TransactionId, (Transaction, TxNum, ApplicationStatus)] =
-        block.transactionData.zipWithIndex.map { in =>
-          def checkExecutionStatus(invokeId: ByteStr, tx: Transaction, nonce: Int): ApplicationStatus =
-            continuationStates
-              .get((invokeId, nonce))
-              .map {
-                case ContinuationState.Finished(transactionId) if transactionId == tx.id.value() =>
-                  Succeeded
-                case _ =>
-                  ScriptExecutionInProgress
-              }
-              .getOrElse(Succeeded)
-
-          val (tx, idx) = in
-          val status =
-            if (failedTransactionIds.contains(tx.id()))
-              ScriptExecutionFailed
-            else
+        block.transactionData.zipWithIndex.map {
+          case (tx, idx) =>
+            val status =
               tx match {
-                case tx: ContinuationTransaction => checkExecutionStatus(tx.invokeScriptTransactionId, tx, tx.nonce)
-                case tx: InvokeScriptTransaction => checkExecutionStatus(tx.id.value(), tx, 0)
-                case _                           => Succeeded
+                case _ if failedTransactionIds.contains(tx.id())                                  => ScriptExecutionFailed
+                case i: InvokeScriptTransaction if continuationStates.contains((i.id.value(), 0)) => ScriptExecutionInProgress
+                case _                                                                            => Succeeded
               }
-          val k = TransactionId(tx.id())
-          val v = (tx, TxNum(idx.toShort), status)
-          k -> v
+            val k = TransactionId(tx.id())
+            val v = (tx, TxNum(idx.toShort), status)
+            k -> v
         }.toMap
 
       rw.put(
@@ -557,22 +543,23 @@ abstract class LevelDBWriter private[database] (
         rw.put(Keys.addressIdOfAlias(alias), Some(addressId))
       }
 
-      for ((id, (tx, num, succeeded)) <- transactions) {
-        rw.put(Keys.transactionAt(Height(height), num), Some((tx, succeeded)))
-        rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.typeId, applicationStatus = toDb(succeeded))))
+      for ((id, (tx, num, status)) <- transactions) {
+        rw.put(Keys.transactionAt(Height(height), num), Some((tx, status)))
+        rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.typeId, applicationStatus = toDb(status))))
       }
 
-      for ((replacingTx, status) <- replacingTransactions) {
-        val txId = replacingTx.id.value()
+      for (NewTransactionInfo(tx, _, newStatus) <- replacingTransactions) {
+        val txId = TransactionId(tx.id.value())
         val (height, num) =
-          transactions.get(TransactionId(txId))
-              .map { case (_, num, _) => (this.height, num) }
-              .orElse(
-                rw.get(Keys.transactionMetaById(TransactionId(replacingTx.id.value())))
-                  .map { case TransactionMeta(height, num, _, _, _) => (height, TxNum(num.toShort)) }
-              )
-              .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction with id=$txId"))
-        rw.put(Keys.transactionAt(Height(height), num), Some((replacingTx, status)))
+          transactions.get(txId)
+            .map { case (_, num, _) => (this.height, num) }
+            .orElse(
+              rw.get(Keys.transactionMetaById(txId))
+                .map { case TransactionMeta(height, num, _, _, _) => (height, TxNum(num.toShort)) }
+            )
+            .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction with id=$txId"))
+        rw.put(Keys.transactionAt(Height(height), num), Some((tx, newStatus)))
+        rw.put(Keys.transactionMetaById(txId), Some(TransactionMeta(height, num, tx.typeId, applicationStatus = toDb(newStatus))))
       }
 
       val activationWindowSize = settings.functionalitySettings.activationWindowSize(height)
@@ -670,7 +657,7 @@ abstract class LevelDBWriter private[database] (
     readOnly(_.get(Keys.heightOf(targetBlockId))).fold(Seq.empty[(Block, ByteStr)]) { targetHeight =>
       log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
-      val continuationLastNonces  = mutable.Map[TransactionId, Int]()
+      val continuationLastNonces = mutable.Map[TransactionId, Int]()
 
       val discardedBlocks: Seq[(Block, ByteStr)] = for (currentHeight <- height until targetHeight by -1) yield {
         val balancesToInvalidate    = Seq.newBuilder[(Address, Asset)]
@@ -780,8 +767,11 @@ abstract class LevelDBWriter private[database] (
                 case _: DataTransaction => // see changed data keys removal
 
                 case tx: InvokeScriptTransaction =>
+                  println("!!! I'M HERE???")
+                  val id = TransactionId(tx.id.value())
                   rw.delete(Keys.invokeScriptResult(h, num))
-                  rw.delete(Keys.continuationState(TransactionId(tx.id.value()), nonce = 0))
+                  rw.delete(Keys.continuationState(id, nonce = 0))
+                  rw.delete(Keys.continuationLastNonce(id))
 
                 case tx: ContinuationTransaction =>
                   val id = TransactionId(tx.invokeScriptTransactionId)
@@ -790,6 +780,7 @@ abstract class LevelDBWriter private[database] (
                     val newNonce     = if (tx.nonce < currentNonce) tx.nonce else currentNonce
                     Some(newNonce)
                   }
+                  println(s"!!! DELETE STATE WITH NONCE=${tx.nonce + 1}")
                   rw.delete(Keys.continuationState(id, tx.nonce + 1))
                   rw.delete(Keys.invokeScriptResult(h, num))
 
@@ -833,8 +824,20 @@ abstract class LevelDBWriter private[database] (
 
       continuationLastNonces.foreach {
         case (id, nonce) =>
-          readWrite(_.put(Keys.continuationLastNonce(id), nonce))
-          continuationStatesCache.refresh(id)
+          if (readOnly(_.has(Keys.continuationLastNonce(id)))) {
+            readWrite { rw =>
+              val TransactionMeta(height, num, _, _, _) = rw.get(Keys.transactionMetaById(id)).get
+              val txNum                                 = TxNum(num.toShort)
+              val (tx, _)                               = rw.get(Keys.transactionAt(Height(height), txNum)).get
+              rw.put(Keys.transactionAt(Height(height), txNum), Some((tx, ScriptExecutionInProgress)))
+              val meta = TransactionMeta(height, num, tx.typeId, applicationStatus = toDb(ScriptExecutionInProgress))
+              rw.put(Keys.transactionMetaById(id), Some(meta))
+              rw.put(Keys.continuationLastNonce(id), nonce)
+            }
+            continuationStatesCache.refresh(id)
+          } else {
+            continuationStatesCache.invalidate(id)
+          }
       }
 
       log.debug(s"Rollback to block $targetBlockId at $targetHeight completed")
