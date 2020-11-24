@@ -543,7 +543,7 @@ abstract class LevelDBWriter private[database] (
           }
 
         if (txsByHeight.nonEmpty)
-          rw.put(kk, nextSeqNr + txsByHeight.size)
+          rw.put(kk, nextSeqNr + txsByHeight.size - 1)
       }
 
       for ((alias, addressId) <- aliases) {
