@@ -123,7 +123,7 @@ object ContinuationTransactionDiff {
         case ScriptResultV4(actions) =>
           doProcessActions(actions)
         case ir: IncompleteResult =>
-          val newState = ContinuationState.InProgress(ir.expr, ir.unusedComplexity, tx.id.value())
+          val newState = ContinuationState.InProgress(ir.expr, ir.unusedComplexity)
           val stepFee  = InvokeDiffsCommon.stepTotalFee(Diff.empty, blockchain, invoke)
           TracedResult.wrapValue[Diff, ValidationError](
             Diff.stateOps(
