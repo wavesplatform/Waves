@@ -92,6 +92,23 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
        """.stripMargin
     )
 
+  private val scriptWithTooManyStateCalls =
+    compile(
+      s"""
+         |{-# STDLIB_VERSION 4 #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |
+         | @Callable(i)
+         | func foo() = {
+         |  let a =
+         |    ${List.fill(70)("transferTransactionById(base58'') == unit").mkString(" && ")} &&
+         |    !(${List.fill(150)("sigVerify(base64'',base64'',base64'')").mkString("||")})
+         |  if (a) then throw("fail") else []
+         | }
+         |
+       """.stripMargin
+    )
+
   private val minSponsoredAssetFee = 10000
   private val sponsoredAssetAmount = 10.waves
   private lazy val sponsoredAssetId = {
@@ -118,6 +135,11 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     scriptInfo.script.isEmpty shouldBe false
     scriptInfo.scriptText.isEmpty shouldBe false
     scriptInfo.script.get.startsWith("base64:") shouldBe true
+  }
+
+  test("can't set continuation with state calls complexity exceeding limit") {
+    def setScript = sender.setScript(dApp, Some(scriptWithTooManyStateCalls), setScriptFee, waitForTx = true)
+    assertBadRequestAndMessage(setScript, "Complexity of state calls exceeding limit = 4000 for function(s): foo = 4200")
   }
 
   test("can't invoke continuation if tx version below V3") {
@@ -161,8 +183,8 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     assertBalances(startHeight, endHeight, enoughFee)
     assertContinuationChain(invoke.id, sender.height)
     nodes.foreach { node =>
-      node.getDataByKey(dApp.toAddress.toString, "a") shouldBe BooleanDataEntry("a", true)
-      node.getDataByKey(dApp.toAddress.toString, "sender") shouldBe BinaryDataEntry("sender", ByteStr(Base58.decode(caller.toAddress.toString)))
+      node.getDataByKey(dApp.toAddress.toString, "entry1") shouldBe BooleanDataEntry("entry1", true)
+      node.getDataByKey(dApp.toAddress.toString, "entry2") shouldBe BinaryDataEntry("entry2", ByteStr(Base58.decode(caller.toAddress.toString)))
     }
     sender.transactionsByAddress(dApp.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
     sender.transactionsByAddress(caller.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
@@ -187,8 +209,8 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     waitForContinuation(invoke.id, shouldBeFailed = false)
     assertContinuationChain(invoke.id, sender.height, feeAssetInfo = Some((sponsoredAssetId, minSponsoredAssetFee)))
     nodes.foreach { node =>
-      node.getDataByKey(dApp.toAddress.toString, "a") shouldBe BooleanDataEntry("a", true)
-      node.getDataByKey(dApp.toAddress.toString, "sender") shouldBe BinaryDataEntry("sender", ByteStr(Base58.decode(caller.toAddress.toString)))
+      node.getDataByKey(dApp.toAddress.toString, "entry1") shouldBe BooleanDataEntry("entry1", true)
+      node.getDataByKey(dApp.toAddress.toString, "entry2") shouldBe BinaryDataEntry("entry2", ByteStr(Base58.decode(caller.toAddress.toString)))
     }
     sender.transactionsByAddress(dApp.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined
     sender.transactionsByAddress(caller.toAddress.toString, limit = 10).find(_.id == invoke.id) shouldBe defined

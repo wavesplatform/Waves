@@ -178,7 +178,7 @@ object ContractScript {
         multiStepCallables
       )
       exceedingFunctions = firstStepComplexities
-        .collect { case (functionName, nativeCost) if nativeCost > limit => (functionName, nativeCost) }
+        .collect { case (functionName, nativeCost) if nativeCost > limit => s"$functionName = $nativeCost" }
         .mkString(", ")
       _ <- Either.cond(
         exceedingFunctions.isEmpty,
