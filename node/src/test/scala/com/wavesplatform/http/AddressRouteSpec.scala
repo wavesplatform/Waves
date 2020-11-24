@@ -92,6 +92,10 @@ class AddressRouteSpec
     Get(routePath("/seq/1/9000")) ~> route ~> check {
       responseAs[JsObject] shouldBe Json.obj("error" -> 10, "message" -> "Too big sequences requested")
     }
+
+    Get(routePath("/seq/10/1")) ~> route ~> check {
+      responseAs[JsObject] shouldBe Json.obj("error" -> 10, "message" -> "Too big sequences requested")
+    }
   }
 
   routePath("/validate/{address}") in {
