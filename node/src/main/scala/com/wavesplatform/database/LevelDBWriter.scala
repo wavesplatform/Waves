@@ -599,7 +599,7 @@ abstract class LevelDBWriter private[database] (
         case (txId, result) =>
           val (txHeight, txNum) = transactions
             .get(TransactionId(txId))
-            .map { case (_, txNum, _, _) => (height, txNum) }
+            .map { case (_, txNum, height, _) => (height, txNum) }
             .orElse(rw.get(Keys.transactionMetaById(TransactionId(txId))).map {
               case TransactionMeta(height, txNum, _, _, _) => (height, TxNum(txNum.toShort))
             })
