@@ -282,9 +282,9 @@ abstract class LevelDBWriter private[database] (
   }
 
   override protected def loadContinuationStates(invokeTxId: TransactionId): (Int, ContinuationState) = {
-    val lastNonce = readOnly(_.get(Keys.continuationLastNonce(invokeTxId)))
-    val state     = readOnly(_.get(Keys.continuationState(invokeTxId, lastNonce)))
-    (lastNonce, state)
+    val lastStep = readOnly(_.get(Keys.continuationLastStep(invokeTxId)))
+    val state     = readOnly(_.get(Keys.continuationState(invokeTxId, lastStep)))
+    (lastStep, state)
   }
 
   override def wavesAmount(height: Int): BigInt = readOnly { db =>
@@ -614,9 +614,9 @@ abstract class LevelDBWriter private[database] (
 
       continuationStates
         .foreach {
-          case ((invokeTxId, nonce), state) =>
-            rw.put(Keys.continuationLastNonce(TransactionId(invokeTxId)), nonce)
-            rw.put(Keys.continuationState(TransactionId(invokeTxId), nonce), state)
+          case ((invokeTxId, step), state) =>
+            rw.put(Keys.continuationLastStep(TransactionId(invokeTxId)), step)
+            rw.put(Keys.continuationState(TransactionId(invokeTxId), step), state)
         }
 
       expiredKeys.foreach(rw.delete(_, "expired-keys"))
@@ -650,7 +650,7 @@ abstract class LevelDBWriter private[database] (
     readOnly(_.get(Keys.heightOf(targetBlockId))).fold(Seq.empty[(Block, ByteStr)]) { targetHeight =>
       log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
-      val continuationLastNonces = mutable.Map[TransactionId, Int]()
+      val continuationLastSteps = mutable.Map[TransactionId, Int]()
 
       val discardedBlocks: Seq[(Block, ByteStr)] = for (currentHeight <- height until targetHeight by -1) yield {
         val balancesToInvalidate    = Seq.newBuilder[(Address, Asset)]
@@ -762,17 +762,17 @@ abstract class LevelDBWriter private[database] (
                 case tx: InvokeScriptTransaction =>
                   val id = TransactionId(tx.id.value())
                   rw.delete(Keys.invokeScriptResult(h, num))
-                  rw.delete(Keys.continuationState(id, nonce = 0))
-                  rw.delete(Keys.continuationLastNonce(id))
+                  rw.delete(Keys.continuationState(id, step = 0))
+                  rw.delete(Keys.continuationLastStep(id))
 
                 case tx: ContinuationTransaction =>
                   val id = TransactionId(tx.invokeScriptTransactionId)
-                  continuationLastNonces.updateWith(id) { currentNonceOpt =>
-                    val currentNonce = currentNonceOpt.getOrElse(rw.get(Keys.continuationLastNonce(id)))
-                    val newNonce     = if (tx.nonce < currentNonce) tx.nonce else currentNonce
-                    Some(newNonce)
+                  continuationLastSteps.updateWith(id) { currentStepOpt =>
+                    val currentStep = currentStepOpt.getOrElse(rw.get(Keys.continuationLastStep(id)))
+                    val newStep     = if (tx.step < currentStep) tx.step else currentStep
+                    Some(newStep)
                   }
-                  rw.delete(Keys.continuationState(id, tx.nonce + 1))
+                  rw.delete(Keys.continuationState(id, tx.step + 1))
                   rw.delete(Keys.invokeScriptResult(h, num))
 
                 case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))
@@ -813,9 +813,9 @@ abstract class LevelDBWriter private[database] (
         discardedBlock
       }
 
-      continuationLastNonces.foreach {
-        case (id, nonce) =>
-          if (readOnly(_.has(Keys.continuationLastNonce(id)))) {
+      continuationLastSteps.foreach {
+        case (id, step) =>
+          if (readOnly(_.has(Keys.continuationLastStep(id)))) {
             readWrite { rw =>
               val TransactionMeta(height, num, _, _, _) = rw.get(Keys.transactionMetaById(id)).get
               val txNum                                 = TxNum(num.toShort)
@@ -823,7 +823,7 @@ abstract class LevelDBWriter private[database] (
               rw.put(Keys.transactionAt(Height(height), txNum), Some((tx, ScriptExecutionInProgress)))
               val meta = TransactionMeta(height, num, tx.typeId, applicationStatus = toDb(ScriptExecutionInProgress))
               rw.put(Keys.transactionMetaById(id), Some(meta))
-              rw.put(Keys.continuationLastNonce(id), nonce)
+              rw.put(Keys.continuationLastStep(id), step)
             }
             continuationStatesCache.refresh(id)
           } else {

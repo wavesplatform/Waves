@@ -31,8 +31,8 @@ object ContinuationTransactionDiff {
       tx: ContinuationTransaction
   ): TracedResult[ValidationError, Diff] = {
     blockchain.continuationStates(tx.invokeScriptTransactionId) match {
-      case (_, ContinuationState.InProgress(expr, residualComplexity, _)) =>
-        applyDiff(blockchain, blockTime, limitedExecution, tx, expr, residualComplexity)
+      case (_, ContinuationState.InProgress(expr, remainingComplexity)) =>
+        applyDiff(blockchain, blockTime, limitedExecution, tx, expr, remainingComplexity)
       case _ =>
         TracedResult.wrapValue(Diff.empty)
     }
@@ -44,7 +44,7 @@ object ContinuationTransactionDiff {
       limitedExecution: Boolean,
       tx: ContinuationTransaction,
       expr: Terms.EXPR,
-      residualComplexity: Int
+      remainingComplexity: Int
   ): TracedResult[ValidationError, Diff] = {
     val invoke = blockchain.resolveInvoke(tx)
     for {
@@ -80,7 +80,7 @@ object ContinuationTransactionDiff {
             CryptoContext.build(Global, script.stdLibVersion).withEnvironment[Environment] |+|
             WavesContext.build(directives).copy(vars = Map())
 
-        val limit = ContractLimits.MaxComplexityByVersion(script.stdLibVersion) + residualComplexity
+        val limit = ContractLimits.MaxComplexityByVersion(script.stdLibVersion) + remainingComplexity
         val r = ContractEvaluator
           .applyV2(
             ctx.evaluationContext(environment),
@@ -127,7 +127,7 @@ object ContinuationTransactionDiff {
           val stepFee  = InvokeDiffsCommon.stepTotalFee(Diff.empty, blockchain, invoke)
           TracedResult.wrapValue[Diff, ValidationError](
             Diff.stateOps(
-              continuationStates = Map((tx.invokeScriptTransactionId, tx.nonce + 1) -> newState),
+              continuationStates = Map((tx.invokeScriptTransactionId, tx.step + 1) -> newState),
               replacingTransactions = Seq(NewTransactionInfo(tx.copy(fee = stepFee), Set(), Succeeded)),
               portfolios = InvokeDiffsCommon.stepFeePortfolios(stepFee, invoke, blockchain)
             )

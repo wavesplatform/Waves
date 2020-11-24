@@ -338,7 +338,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         .foreach {
           case (c, i) =>
             c.version.value shouldBe TxVersion.V1
-            c.nonce.value shouldBe i
+            c.step.value shouldBe i
             c.extraFeePerStep.value shouldBe extraFeePerStep
             c.feeAssetId shouldBe feeAssetInfo.map(_._1)
             c.call shouldBe invoke.call

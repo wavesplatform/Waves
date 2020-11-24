@@ -147,8 +147,8 @@ case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: Ass
 
 sealed trait ContinuationState
 object ContinuationState {
-  case class InProgress(expr: EXPR, residualComplexity: Int, transactionId: ByteStr) extends ContinuationState
-  case class Finished(transactionId: ByteStr)                                        extends ContinuationState
+  case class InProgress(expr: EXPR, remainingComplexity: Int) extends ContinuationState
+  case class Finished(transactionId: ByteStr)                 extends ContinuationState
 }
 
 case class Diff(
@@ -173,8 +173,8 @@ case class Diff(
     continuationStates
       .groupBy { case ((invokeId, _), _) => invokeId }
       .map { case (invokeId, states) =>
-        val ((_, nonce), currentState) = states.maxBy { case ((_, nonce), _) => nonce }
-        (invokeId, (nonce, currentState))
+        val ((_, step), currentState) = states.maxBy { case ((_, step), _) => step }
+        (invokeId, (step, currentState))
       }
 
   def bindTransaction(tx: Transaction): Diff =

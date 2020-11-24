@@ -130,10 +130,10 @@ object CommonTransactionsApi {
       } yield transactionProof
 
     override def continuations(invokeTransactionId: ByteStr): Seq[ByteStr] = {
-      val key = Keys.continuationLastNonce(TransactionId(invokeTransactionId))
+      val key = Keys.continuationLastStep(TransactionId(invokeTransactionId))
       if (db.has(key)) {
-        val lastNonce = db.get(key)
-        (0 until lastNonce).map(ContinuationTransaction(invokeTransactionId, 0L, _, 0L, Waves).id.value())
+        val lastStep = db.get(key)
+        (0 until lastStep).map(ContinuationTransaction(invokeTransactionId, 0L, _, 0L, Waves).id.value())
       } else
         Nil
     }

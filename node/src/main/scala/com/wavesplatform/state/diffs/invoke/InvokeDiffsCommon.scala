@@ -285,7 +285,7 @@ object InvokeDiffsCommon {
     val status   = if (failed) ScriptExecutionFailed else Succeeded
     val resultDiff =
       diff.copy(
-        continuationStates = Map((tx.invokeScriptTransactionId, tx.nonce + 1) -> ContinuationState.Finished(tx.id.value())),
+        continuationStates = Map((tx.invokeScriptTransactionId, tx.step + 1) -> ContinuationState.Finished(tx.id.value())),
         portfolios = stepFeePortfolios(totalFee, invoke, blockchain)
       )
     resultDiff.copy(
@@ -310,7 +310,7 @@ object InvokeDiffsCommon {
         scriptResult.sponsorFees.map(sf => IssuedAsset(sf.assetId))
     val smartAccountCount =
       diff.continuationStates.headOption
-        .collect { case ((_, nonce), _) if nonce == 0 && blockchain.hasAccountScript(invoke.sender.toAddress) => 1 }
+        .collect { case ((_, step), _) if step == 0 && blockchain.hasAccountScript(invoke.sender.toAddress) => 1 }
         .getOrElse(0)
     val assetActionsFee = (assetActions.count(blockchain.hasAssetScript) + smartAccountCount) * ScriptExtraFee
     val issuesFee       = scriptResult.issues.count(!blockchain.isNFT(_)) * FeeConstants(IssueTransaction.typeId) * FeeUnit

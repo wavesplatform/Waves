@@ -77,8 +77,6 @@ message DataEntry {
 }
 
 message ContinuationState {
-    int32 nonce = 1;
-    bytes expr = 2;
-    int32 residual_complexity = 3;
-    bytes last_transaction_id = 4;
+    bytes expr = 1;
+    int32 remaining_complexity = 2;
 }
