@@ -2,6 +2,7 @@ package com.wavesplatform.database
 
 import java.util
 
+import cats.Semigroup
 import cats.data.Ior
 import cats.implicits._
 import com.google.common.cache._
@@ -179,7 +180,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       failedTransactionIds: Set[ByteStr],
       stateHash: StateHashBuilder.Result,
       continuationStates: Map[(ByteStr, Int), ContinuationState],
-      addressTransactionBindings: Map[AddressId, Seq[TransactionId]],
       replacingTransactions: Seq[NewTransactionInfo]
   ): Unit
 
@@ -299,7 +299,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       newAddressIds,
       updatedBalances.map { case (a, v) => addressIdWithFallback(a, newAddressIds) -> v },
       leaseBalances,
-      addressTransactions,
+      addressTransactions |+| addressTransactionBindings,
       diff.leaseState,
       diff.issuedAssets,
       diff.updatedAssets,
@@ -316,7 +316,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       failedTransactionIds,
       stateHash.result(),
       diff.continuationStates,
-      addressTransactionBindings,
       diff.replacingTransactions
     )
 
@@ -387,4 +386,6 @@ object Caches {
 
   def observedCache[K <: AnyRef, V <: AnyRef](maximumSize: Int, changed: Observer[K], loader: K => V)(implicit ct: ClassTag[K]): LoadingCache[K, V] =
     new ObservedLoadingCache(cache(maximumSize, loader), changed)
+
+  implicit def seqSemigroup[A]: Semigroup[Seq[A]] = _ ++ _
 }

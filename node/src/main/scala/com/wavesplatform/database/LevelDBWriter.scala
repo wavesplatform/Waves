@@ -386,7 +386,6 @@ abstract class LevelDBWriter private[database] (
       failedTransactionIds: Set[ByteStr],
       stateHash: StateHashBuilder.Result,
       continuationStates: Map[(ByteStr, Int), ContinuationState],
-      addressTransactionBindings: Map[AddressId, Seq[TransactionId]],
       replacingTransactions: Seq[NewTransactionInfo]
   ): Unit = {
     log.trace(s"Persisting block ${block.id()} at height $height")
@@ -401,7 +400,7 @@ abstract class LevelDBWriter private[database] (
         rw.put(Keys.safeRollbackHeight, height - dbSettings.maxRollbackDepth)
       }
 
-      val transactions: Map[TransactionId, (Transaction, TxNum, ApplicationStatus)] =
+      val newTransactions: Map[TransactionId, (Transaction, TxNum, Int, ApplicationStatus)] =
         block.transactionData.zipWithIndex.map {
           case (tx, idx) =>
             val status =
@@ -411,9 +410,27 @@ abstract class LevelDBWriter private[database] (
                 case _                                                                            => Succeeded
               }
             val k = TransactionId(tx.id())
-            val v = (tx, TxNum(idx.toShort), status)
+            val v = (tx, TxNum(idx.toShort), this.height, status)
             k -> v
         }.toMap
+
+      val replacingTransactionsMap: Map[TransactionId, (Transaction, TxNum, Int, ApplicationStatus)] =
+        replacingTransactions.map {
+          case NewTransactionInfo(tx, _, newStatus) =>
+            val txId = TransactionId(tx.id.value())
+            val (height, num) =
+              newTransactions
+                .get(txId)
+                .map { case (_, num, height, _) => (height, num) }
+                .orElse(
+                  rw.get(Keys.transactionMetaById(txId))
+                    .map { case TransactionMeta(height, num, _, _, _) => (height, TxNum(num.toShort)) }
+                )
+                .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction with id=$txId"))
+            (txId, (tx, num, height, newStatus))
+        }.toMap
+
+      val transactions = newTransactions ++ replacingTransactionsMap
 
       rw.put(
         Keys.blockMetaAt(Height(height)),
@@ -438,7 +455,7 @@ abstract class LevelDBWriter private[database] (
 
       appendBalances(balances, issuedAssets, rw, threshold, balanceThreshold)
 
-      val changedAddresses = (addressTransactions.keys ++ addressTransactionBindings.keys ++ balances.keys).toSet
+      val changedAddresses = (addressTransactions.keys ++ balances.keys).toSet
       rw.put(Keys.changedAddresses(height), changedAddresses.toSeq)
 
       // leases
@@ -507,59 +524,35 @@ abstract class LevelDBWriter private[database] (
       if (dbSettings.storeTransactionsByAddress) for ((addressId, txIds) <- addressTransactions) {
         val kk        = Keys.addressTransactionSeqNr(addressId)
         val nextSeqNr = rw.get(kk) + 1
-        val txTypeNumSeq = txIds.map { txId =>
-          val (tx, num, _) = transactions(txId)
-          (tx.typeId, num)
-        }
-        rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
-        rw.put(kk, nextSeqNr)
-      }
-
-      if (dbSettings.storeTransactionsByAddress) for ((addressId, txIds) <- addressTransactionBindings) {
-        val kk           = Keys.addressTransactionSeqNr(addressId)
-        val currentSeqNr = rw.get(kk)
         val txsByHeight =
           txIds
-            .map { txId =>
-              val TransactionMeta(txHeight, num, typeId, _, _) =
-                rw.get(Keys.transactionMetaById(txId))
-                  .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction with id=$txId"))
-              (txHeight, num, typeId)
+            .groupMap(transactions(_)._3) { txId =>
+              val (tx, num, _, _) = transactions(txId)
+              (tx.typeId, num)
             }
-            .groupBy(_._1)
             .zipWithIndex
-        rw.put(kk, currentSeqNr + txsByHeight.size)
+
         txsByHeight
           .foreach {
-            case ((txHeight, txs), i) =>
+            case ((height, txTypeNumSeq), i) =>
               rw.put(
-                Keys.addressTransactionHN(addressId, currentSeqNr + i + 1),
-                Some((Height(txHeight), txs.map { case (_, num, typeId) => (typeId.toByte, TxNum(num.toShort)) }))
+                Keys.addressTransactionHN(addressId, nextSeqNr + i),
+                Some((Height(height), txTypeNumSeq.sortBy(-_._2)))
               )
+              rw.put(kk, nextSeqNr)
           }
+
+        if (txsByHeight.nonEmpty)
+          rw.put(kk, nextSeqNr + txsByHeight.size)
       }
 
       for ((alias, addressId) <- aliases) {
         rw.put(Keys.addressIdOfAlias(alias), Some(addressId))
       }
 
-      for ((id, (tx, num, status)) <- transactions) {
+      for ((id, (tx, num, height, status)) <- transactions) {
         rw.put(Keys.transactionAt(Height(height), num), Some((tx, status)))
         rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.typeId, applicationStatus = toDb(status))))
-      }
-
-      for (NewTransactionInfo(tx, _, newStatus) <- replacingTransactions) {
-        val txId = TransactionId(tx.id.value())
-        val (height, num) =
-          transactions.get(txId)
-            .map { case (_, num, _) => (this.height, num) }
-            .orElse(
-              rw.get(Keys.transactionMetaById(txId))
-                .map { case TransactionMeta(height, num, _, _, _) => (height, TxNum(num.toShort)) }
-            )
-            .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction with id=$txId"))
-        rw.put(Keys.transactionAt(Height(height), num), Some((tx, newStatus)))
-        rw.put(Keys.transactionMetaById(txId), Some(TransactionMeta(height, num, tx.typeId, applicationStatus = toDb(newStatus))))
       }
 
       val activationWindowSize = settings.functionalitySettings.activationWindowSize(height)
@@ -606,7 +599,7 @@ abstract class LevelDBWriter private[database] (
         case (txId, result) =>
           val (txHeight, txNum) = transactions
             .get(TransactionId(txId))
-            .map { case (_, txNum, _) => (height, txNum) }
+            .map { case (_, txNum, _, _) => (height, txNum) }
             .orElse(rw.get(Keys.transactionMetaById(TransactionId(txId))).map {
               case TransactionMeta(height, txNum, _, _, _) => (height, TxNum(txNum.toShort))
             })
