@@ -19,8 +19,8 @@ import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.{Blockchain, DataEntry}
 import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.state.{Blockchain, DataEntry}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{Asset, TransactionFactory}
@@ -49,7 +49,7 @@ case class AddressApiRoute(
   val MaxAddressesPerRequest = 1000
 
   override lazy val route: Route =
-    pathPrefix("addresses") {
+    (pathPrefix("addresses") & handleExceptions(jsonExceptionHandler)) {
       balanceDetails ~ validate ~ seed ~ balanceWithConfirmations ~ balance ~ balances ~ balancesPost ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
         signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ postData ~ scriptInfo ~ scriptMeta
     } ~ root ~ create

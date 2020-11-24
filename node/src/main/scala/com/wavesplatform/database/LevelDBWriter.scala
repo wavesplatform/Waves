@@ -844,6 +844,9 @@ abstract class LevelDBWriter private[database] (
     .build[(Int, AddressId), LeaseBalance]()
 
   override def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = readOnly { db =>
+    if (height < this.height - balanceSnapshotMaxRollbackDepth)
+      throw new IllegalArgumentException(s"Unable to get balance past height ${this.height - balanceSnapshotMaxRollbackDepth}")
+
     db.get(Keys.addressId(address)).flatMap { addressId =>
       assetId match {
         case Waves =>
@@ -861,6 +864,9 @@ abstract class LevelDBWriter private[database] (
   }
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = readOnly { db =>
+    if (from < this.height - balanceSnapshotMaxRollbackDepth)
+      throw new IllegalArgumentException(s"Unable to get balance past height ${this.height - balanceSnapshotMaxRollbackDepth}")
+
     db.get(Keys.addressId(address)).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>
       val toHeigth = to.flatMap(this.heightOf).getOrElse(this.height)
       val wbh      = slice(db.get(Keys.wavesBalanceHistory(addressId)), from, toHeigth)

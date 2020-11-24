@@ -24,6 +24,9 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       .get
   }
 
+  def liquidDiff: Diff =
+    blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty)
+
   def effBalance(a: Address): Long = blockchainUpdater.effectiveBalance(a, 1000)
 
   def appendBlock(b: Block): Seq[Diff] = blockchainUpdater.processBlock(b).explicitGet()
@@ -102,7 +105,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 object Domain {
   implicit class BlockchainUpdaterExt[A <: BlockchainUpdater](bcu: A) {
     def processBlock(block: Block): Either[ValidationError, Seq[Diff]] =
-      bcu.processBlock(block, block.header.generationSignature)
+      bcu.processBlock(block, block.header.generationSignature, verify = false)
   }
 
   def portfolio(address: Address, db: DB, blockchainUpdater: BlockchainUpdaterImpl): Seq[(IssuedAsset, Long)] = db.withResource { resource =>
