@@ -170,7 +170,7 @@ object InvokeScriptTransactionDiff {
               case ScriptResultV3(dataItems, transfers) => doProcessActions(dataItems ::: transfers)
               case ScriptResultV4(actions)              => doProcessActions(actions)
               case ir: IncompleteResult =>
-                val state      = ContinuationState.InProgress(ir.expr, remainingComplexity = ir.unusedComplexity)
+                val state      = ContinuationState.InProgress(ir.expr, unusedComplexity = ir.unusedComplexity)
                 val stateDiff  = Diff.empty.copy(
                   transactions = Map(tx.id.value() -> NewTransactionInfo(tx, Set(), ScriptExecutionInProgress)),
                   continuationStates = Map((tx.id.value(), 0) -> state)

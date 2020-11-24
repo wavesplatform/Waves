@@ -31,8 +31,8 @@ object ContinuationTransactionDiff {
       tx: ContinuationTransaction
   ): TracedResult[ValidationError, Diff] = {
     blockchain.continuationStates(tx.invokeScriptTransactionId) match {
-      case (_, ContinuationState.InProgress(expr, remainingComplexity)) =>
-        applyDiff(blockchain, blockTime, limitedExecution, tx, expr, remainingComplexity)
+      case (_, ContinuationState.InProgress(expr, unusedComplexity)) =>
+        applyDiff(blockchain, blockTime, limitedExecution, tx, expr, unusedComplexity)
       case _ =>
         TracedResult.wrapValue(Diff.empty)
     }
@@ -44,7 +44,7 @@ object ContinuationTransactionDiff {
       limitedExecution: Boolean,
       tx: ContinuationTransaction,
       expr: Terms.EXPR,
-      remainingComplexity: Int
+      unusedComplexity: Int
   ): TracedResult[ValidationError, Diff] = {
     val invoke = blockchain.resolveInvoke(tx)
     for {
@@ -80,7 +80,7 @@ object ContinuationTransactionDiff {
             CryptoContext.build(Global, script.stdLibVersion).withEnvironment[Environment] |+|
             WavesContext.build(directives).copy(vars = Map())
 
-        val limit = ContractLimits.MaxComplexityByVersion(script.stdLibVersion) + remainingComplexity
+        val limit = ContractLimits.MaxComplexityByVersion(script.stdLibVersion) + unusedComplexity
         val r = ContractEvaluator
           .applyV2(
             ctx.evaluationContext(environment),

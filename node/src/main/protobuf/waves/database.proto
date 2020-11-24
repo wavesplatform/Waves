@@ -78,5 +78,5 @@ message DataEntry {
 
 message ContinuationState {
     bytes expr = 1;
-    int32 remaining_complexity = 2;
+    int32 unused_complexity = 2;
 }
