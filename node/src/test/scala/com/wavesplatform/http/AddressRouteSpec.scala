@@ -88,6 +88,10 @@ class AddressRouteSpec
     }
 
     r1 shouldNot contain allElementsOf r2
+
+    Get(routePath("/seq/1/9000")) ~> route ~> check {
+      responseAs[JsObject] shouldBe Json.obj("error" -> 10, "message" -> "Too big sequences requested")
+    }
   }
 
   routePath("/validate/{address}") in {
@@ -229,7 +233,10 @@ class AddressRouteSpec
 
     val contractScript       = ContractScript(V3, contractWithMeta).explicitGet()
     val callableComplexities = Map("a" -> 1L, "b" -> 2L, "c" -> 3L, "d" -> 100L, "verify" -> 11L)
-    (commonAccountApi.script _).expects(allAccounts(3).toAddress).returning(Some(AccountScriptInfo(allAccounts(3).publicKey, contractScript, 11L))).once()
+    (commonAccountApi.script _)
+      .expects(allAccounts(3).toAddress)
+      .returning(Some(AccountScriptInfo(allAccounts(3).publicKey, contractScript, 11L)))
+      .once()
     (blockchain.accountScript _)
       .when(allAccounts(3).toAddress)
       .returns(Some(AccountScriptInfo(allAccounts(3).publicKey, contractScript, 11L, complexitiesByEstimator = Map(1 -> callableComplexities))))
@@ -287,7 +294,7 @@ class AddressRouteSpec
       (json \ "message").as[String] shouldBe "The request took too long to complete"
     }
 
-    val contractWithoutVerifier = contractWithMeta.copy(verifierFuncOpt = None)
+    val contractWithoutVerifier             = contractWithMeta.copy(verifierFuncOpt = None)
     val contractWithoutVerifierComplexities = Map("a" -> 1L, "b" -> 2L, "c" -> 3L)
     (blockchain.accountScript _)
       .when(allAccounts(6).toAddress)

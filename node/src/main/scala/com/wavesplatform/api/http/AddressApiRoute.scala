@@ -19,8 +19,8 @@ import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.{Blockchain, DataEntry}
 import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.state.{Blockchain, DataEntry}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{Asset, TransactionFactory}
@@ -205,7 +205,7 @@ case class AddressApiRoute(
   def seq: Route = {
     (path("seq" / IntNumber / IntNumber) & get) {
       case (start, end) =>
-        if (start >= 0 && end >= 0 && start - end < MaxAddressesPerRequest) {
+        if (start >= 0 && end >= 0 && start <= end && end - start < MaxAddressesPerRequest) {
           complete(wallet.privateKeyAccounts.map(_.toAddress).slice(start, end))
         } else complete(TooBigArrayAllocation)
     }
