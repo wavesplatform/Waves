@@ -27,12 +27,23 @@ jobs:
             ~/.cache/coursier
             **/target
           key: waves-${{ hashFiles('**/build.sbt', 'project/Dependencies.scala') }}
+      - env:
+          - ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+        run: |
+          if [[ "${{github.event_name}}" == "pull_request" ]]; then
+            event=pull_request
+          elif [[ "${{github.ref}}" == "refs/tags/"* ]]; then
+            event=release
+          else
+            event=snapshot
+          fi
+          echo "::set-env name=event::$event"
       - name: Check lang changes
         id: lang-changes
         uses: actions/cache@v2
         with:
           path: lang/**/target
-          key: lang-${{ hashFiles('lang/*/src/main/**/*.scala', 'lang/*/src/main/**/*.java') }}
+          key: lang-${{ env.event }}-${{ hashFiles('lang/*/src/main/**/*.scala', 'lang/*/src/main/**/*.java') }}
       - name: Set version
         id: version
         env:
