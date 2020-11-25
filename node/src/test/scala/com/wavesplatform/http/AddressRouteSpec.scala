@@ -63,7 +63,8 @@ class AddressRouteSpec
       1,
       "rest-time-limited"
     ),
-    commonAccountApi
+    commonAccountApi,
+    5
   )
   private val route = seal(addressApiRoute.route)
 
@@ -73,22 +74,20 @@ class AddressRouteSpec
     message <- Gen.listOfN(length, Gen.alphaNumChar).map(_.mkString).label("message")
   } yield (account, message)
 
-  routePath("/balance/{address}/{confirmations}") in withDomain(
-    defaultDomainSettings.copy(dbSettings = defaultDomainSettings.dbSettings.copy(maxRollbackDepth = 0))
-  ) { d =>
+  routePath("/balance/{address}/{confirmations}") in withDomain() { d =>
     val route =
       addressApiRoute.copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(d.liquidDiff, d.db, d.blockchainUpdater)).route
     val address = TxHelpers.signer(1).toAddress
 
     d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress, 10000.waves))
-    for (_ <- 1 to 1100) d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, address))
+    for (_ <- 1 until 10) d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, address))
 
-    Get(routePath(s"/balance/$address/1010")) ~> route ~> check {
-      responseAs[JsObject] shouldBe Json.obj("error" -> 199, "message" -> "Unable to get balance past height 100")
+    Get(routePath(s"/balance/$address/10")) ~> route ~> check {
+      responseAs[JsObject] shouldBe Json.obj("error" -> 199, "message" -> "Unable to get balance past height 5")
     }
 
-    Get(routePath(s"/balance?address=$address&height=90")) ~> route ~> check {
-      responseAs[JsObject] shouldBe Json.obj("error" -> 199, "message" -> "Unable to get balance past height 100")
+    Get(routePath(s"/balance?address=$address&height=1")) ~> route ~> check {
+      responseAs[JsObject] shouldBe Json.obj("error" -> 199, "message" -> "Unable to get balance past height 5")
     }
   }
 

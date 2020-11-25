@@ -348,7 +348,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         WalletApiRoute(settings.restAPISettings, wallet),
         UtilsApiRoute(time, settings.restAPISettings, blockchainUpdater.estimator, limitedScheduler, blockchainUpdater),
         PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
-        AddressApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time, limitedScheduler, extensionContext.accountsApi),
+        AddressApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time, limitedScheduler, extensionContext.accountsApi, settings.dbSettings.maxRollbackDepth),
         DebugApiRoute(
           settings,
           time,

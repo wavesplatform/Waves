@@ -38,7 +38,8 @@ case class AddressApiRoute(
     utxPoolSynchronizer: UtxPoolSynchronizer,
     time: Time,
     limitedScheduler: Scheduler,
-    commonAccountsApi: CommonAccountsApi
+    commonAccountsApi: CommonAccountsApi,
+    maxBalanceDepth: Int
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute
@@ -222,6 +223,8 @@ case class AddressApiRoute(
     if (addresses.length > settings.transactionsByAddressLimit) TooBigArrayAllocation
     else if (height < 1 || height > blockchain.height) CustomValidationError(s"Illegal height: $height")
     else {
+      assertBalanceDepth(height)
+
       implicit val balancesWrites: Writes[(String, Long)] = Writes[(String, Long)] { b =>
         Json.obj("id" -> b._1, "balance" -> b._2)
       }
@@ -234,8 +237,10 @@ case class AddressApiRoute(
       ToResponseMarshallable(balances)
     }
 
-  private def balanceJson(acc: Address, confirmations: Int) =
+  private def balanceJson(acc: Address, confirmations: Int) = {
+    assertBalanceDepth(blockchain.height - confirmations)
     Balance(acc.stringRepr, confirmations, commonAccountsApi.balance(acc, confirmations))
+  }
 
   private def balanceJson(acc: Address) = Balance(acc.stringRepr, 0, commonAccountsApi.balance(acc))
 
@@ -250,7 +255,13 @@ case class AddressApiRoute(
   }
 
   private def effectiveBalanceJson(acc: Address, confirmations: Int) = {
+    assertBalanceDepth(blockchain.height - confirmations)
     Balance(acc.stringRepr, confirmations, commonAccountsApi.effectiveBalance(acc, confirmations))
+  }
+
+  private[this] def assertBalanceDepth(height: Int): Unit = {
+    if (height < blockchain.height - maxBalanceDepth)
+      throw new IllegalArgumentException(s"Unable to get balance past height ${blockchain.height - maxBalanceDepth}")
   }
 
   private def accountData(address: Address)(implicit sc: Scheduler) =
