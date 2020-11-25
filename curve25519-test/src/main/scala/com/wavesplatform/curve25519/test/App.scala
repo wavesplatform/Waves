@@ -2,60 +2,106 @@ package com.wavesplatform.curve25519.test
 
 import java.io.{BufferedOutputStream, DataOutputStream, File, FileOutputStream}
 import java.util
-import java.util.concurrent.{ConcurrentHashMap, Executors, ThreadLocalRandom}
+import java.util.concurrent._
+import java.util.concurrent.atomic.AtomicLong
 
-import com.google.common.io.BaseEncoding
+import com.google.common.io.{BaseEncoding, CountingOutputStream}
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.typesafe.scalalogging.StrictLogging
 import monix.eval.Task
+import monix.execution.Scheduler
 import monix.execution.Scheduler.Implicits.global
-import monix.execution.{Ack, ExecutionModel, Scheduler}
-import monix.reactive.observers.Subscriber
-import monix.reactive.{Consumer, Observable}
+import monix.reactive.Observable
 import org.whispersystems.curve25519.{Curve25519Provider, JavaCurve25519Provider, NativeCurve25519Provider}
 
+import scala.annotation.tailrec
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
 import scala.reflect.ClassTag
 
-class TestDataWriter(randomSeed: Long, outputFileName: String) extends Subscriber[Seq[(Int, Int, Array[Byte])]] {
-  private val outputStream = new DataOutputStream(
-    new BufferedOutputStream(
-      new FileOutputStream(new File(outputFileName), false),
-      1024 * 1024
-    )
-  )
+object App extends StrictLogging {
 
-  outputStream.writeLong(randomSeed)
-
-  override implicit val scheduler = Scheduler(
-    Executors.newFixedThreadPool(1, new ThreadFactoryBuilder().setDaemon(true).build()),
-    ExecutionModel.AlwaysAsyncExecution
-  )
-
-  override def onNext(elem: Seq[(Int, Int, Array[Byte])]): Future[Ack] =
-    Future {
-      for ((seedNr, msgSize, signature) <- elem) {
-        outputStream.writeInt(seedNr)
-        outputStream.writeInt(msgSize)
-        outputStream.write(signature)
+  class Writer(queue: BlockingQueue[Seq[CheckResult]], latch: CountDownLatch, out: DataOutputStream) extends Runnable {
+    override def run(): Unit = while (latch.getCount > 0) {
+      for (r <- queue.take()) {
+        out.writeInt(r.seedNr)
+        out.writeInt(r.messageNr)
+        out.write(r.signature)
       }
-    }.flatMap(_ => Ack.Continue)
-
-  private def stop(): Unit = {
-    Await.result(Future {
-      outputStream.flush()
-      outputStream.close()
-    }, Duration.Inf)
+      out.flush()
+    }
   }
 
-  override def onError(ex: Throwable): Unit = stop()
+  class Dispatcher(startWith: Int, modulus: Int, itemCount: Option[Int] = None) {
+    @volatile var maxSeedNr = startWith
+    private[this] val iterator =
+      Iterator
+        .from(startWith)
+        .flatMap { maxSeedNr =>
+          (0 until modulus * (maxSeedNr + 1)).iterator.map { msgLength =>
+            Input(maxSeedNr, maxSeedNr - msgLength / modulus, msgLength)
+          }
+        }
+        .zipWithIndex
+        .takeWhile { case (_, seqNr) => itemCount.forall(_ > seqNr) }
+        .map(_._1)
 
-  override def onComplete(): Unit = stop()
-}
+    def nextBatch(batchSize: Int): Seq[Input] = iterator.synchronized {
+      val batch = iterator.take(batchSize).toSeq
+      maxSeedNr = batch.last.maxSeedNr
+      batch
+    }
+  }
 
-object App extends StrictLogging {
+  class Worker(
+      latch: CountDownLatch,
+      queue: Option[BlockingQueue[Seq[CheckResult]]],
+      counter: AtomicLong,
+      randomSeed: Long,
+      nativeProvider: Curve25519Provider,
+      javaProvider: Curve25519Provider,
+      nextBatch: () => Seq[Input]
+  ) extends Runnable {
+    private val messageTemplate = {
+      val seedSeq   = Longs.toByteArray(randomSeed)
+      val remainder = MaxMessageLength % Longs.BYTES
+      Array.fill(MaxMessageLength / Longs.BYTES + (if (remainder > 0) 1 else 0))(seedSeq).flatten
+    }
+
+    private def mkMsg(seqNr: Int): Array[Byte] = {
+      val length    = seqNr % MaxMessageLength + 1
+      val seedBytes = Ints.toByteArray(seqNr / MaxMessageLength).reverse
+      val result    = new Array[Byte](length)
+
+      System.arraycopy(seedBytes, 0, result, 0, math.min(Ints.BYTES, length))
+      if (length > Ints.BYTES) {
+        System.arraycopy(messageTemplate, 0, result, Ints.BYTES, length - Ints.BYTES)
+      }
+
+      result
+    }
+
+    @tailrec
+    private def checkTask(batch: Seq[Input]): Unit =
+      if (batch.isEmpty) {
+        logger.info("No more values to check")
+      } else {
+        queue.foreach(
+          _.put(batch.map { input =>
+            val signarure = signAndCheck(mkAccountSeed(randomSeed)(input.seedNr), mkMsg(input.msgLength), nativeProvider, javaProvider)
+            CheckResult(input.seedNr, input.msgLength, signarure)
+          })
+        )
+
+        counter.updateAndGet(_ + batch.size)
+        checkTask(nextBatch())
+      }
+
+    override def run(): Unit = {
+      checkTask(nextBatch())
+      latch.countDown()
+    }
+  }
+
   def provider[A <: Curve25519Provider: ClassTag]: A = {
     val ctor = implicitly[ClassTag[A]].runtimeClass.getDeclaredConstructor()
     ctor.setAccessible(true)
@@ -85,62 +131,79 @@ object App extends StrictLogging {
 
   private val allSeeds = new ConcurrentHashMap[Int, Array[Byte]](1000, 0.9f, 8)
 
-  def mkMessage(seedSeq: Seq[Byte])(seqNr: Int): Array[Byte] = {
+  def mkMessage(seedSeq: Array[Byte])(seqNr: Int): Array[Byte] = {
     val length    = seqNr % MaxMessageLength + 1
-    val seedBytes = Ints.toByteArray(seqNr / MaxMessageLength).reverseIterator
+    val seedBytes = Ints.toByteArray(seqNr / MaxMessageLength).reverse
+    val result    = new Array[Byte](length)
 
-    (seedBytes ++ Iterator.continually(seedSeq).flatten.drop(4)).take(length).toArray
+    System.arraycopy(seedBytes, 0, result, 0, math.min(Ints.BYTES, length))
+
+    (0 to (length - Ints.BYTES) / Longs.BYTES) foreach { i =>
+      val offset = Ints.BYTES + Longs.BYTES * i
+      if (offset < length) {
+        System.arraycopy(seedSeq, 0, result, offset, math.min(Longs.BYTES, math.max(0, length - offset)))
+      }
+    }
+
+    result
   }
 
   private val allMessages = new ConcurrentHashMap[Int, Array[Byte]](150000, 0.9f, 8)
 
-  private def signAndCheck(randomSeed: Long, nativeProvider: Curve25519Provider, javaProvider: Curve25519Provider) = {
-    val SeedSeq = Longs.toByteArray(randomSeed).toSeq
-    (input: Input) =>
-      Task {
-        val seed    = allSeeds.computeIfAbsent(input.seedNr, mkAccountSeed(randomSeed)(_))
-        val message = allMessages.computeIfAbsent(input.msgLength, mkMessage(SeedSeq)(_))
+  private def signAndCheck(
+      seed: Array[Byte],
+      message: Array[Byte],
+      nativeProvider: Curve25519Provider,
+      javaProvider: Curve25519Provider
+  ): Array[Byte] = {
+    val privateKey = nativeProvider.generatePrivateKey(seed)
+    val publicKey  = javaProvider.generatePublicKey(privateKey)
+    val random     = new Array[Byte](64)
+    ThreadLocalRandom.current().nextBytes(random)
 
-        val privateKey = nativeProvider.generatePrivateKey(seed)
-        val publicKey  = javaProvider.generatePublicKey(privateKey)
-        val random     = new Array[Byte](64)
-        ThreadLocalRandom.current().nextBytes(random)
+    val nativeSignature = nativeProvider.calculateSignature(random, privateKey, message)
+    val javaSignature   = javaProvider.calculateSignature(random, privateKey, message)
+    var result          = 0
 
-        val nativeSignature = nativeProvider.calculateSignature(random, privateKey, message)
-        val javaSignature   = javaProvider.calculateSignature(random, privateKey, message)
-        var result          = 0
+    if (!util.Arrays.equals(nativeSignature, javaSignature)) {}
 
-        if (!util.Arrays.equals(nativeSignature, javaSignature)) {}
+    if (!javaProvider.verifySignature(publicKey, message, nativeSignature)) {
+      logger.error(s"NSJV: pk=${toHex(publicKey)},msg=${toHex(message)},ns=${toHex(nativeSignature)}")
+      result |= NativeSignerJavaVerifier
+    }
 
-        if (!javaProvider.verifySignature(publicKey, message, nativeSignature)) {
-          logger.error(s"NSJV: pk=${toHex(publicKey)},msg=${toHex(message)},ns=${toHex(nativeSignature)}")
-          result |= NativeSignerJavaVerifier
-        }
+    if (!nativeProvider.verifySignature(publicKey, message, javaSignature)) {
+      logger.error(s"JSNV: pk=${toHex(publicKey)},msg=${toHex(message)},js=${toHex(javaSignature)}")
+      result |= JavaSignerNativeVerifier
+    }
 
-        if (!nativeProvider.verifySignature(publicKey, message, javaSignature)) {
-          logger.error(s"JSNV: pk=${toHex(publicKey)},msg=${toHex(message)},js=${toHex(javaSignature)}")
-          result |= JavaSignerNativeVerifier
-        }
+    val alteredMessage = util.Arrays.copyOf(message, message.length)
 
-        val alteredMessage = util.Arrays.copyOf(message, message.length)
+    if (alteredMessage(0) == 0) alteredMessage(0) = 1.toByte else alteredMessage(0) = 0
 
-        if (alteredMessage(0) == 0) alteredMessage(0) = 1.toByte else alteredMessage(0) = 0
+    if (nativeProvider.verifySignature(publicKey, alteredMessage, javaSignature)) {
+      logger.error(s"MMNJ: pk=${toHex(publicKey)},msg=${toHex(alteredMessage)},js=${toHex(javaSignature)}")
+      result |= JavaSignerNativeVerifierAlteredMessage
+    }
 
-        if (nativeProvider.verifySignature(publicKey, alteredMessage, javaSignature)) {
-          logger.error(s"MMNJ: pk=${toHex(publicKey)},msg=${toHex(alteredMessage)},js=${toHex(javaSignature)}")
-          result |= JavaSignerNativeVerifierAlteredMessage
-        }
+    if (javaProvider.verifySignature(publicKey, alteredMessage, nativeSignature)) {
+      logger.error(s"MMJN: pk=${toHex(publicKey)},msg=${toHex(alteredMessage)},ns=${toHex(nativeSignature)}")
+      result |= NativeSignerJavaVerifierAlteredMessage
+    }
 
-        if (javaProvider.verifySignature(publicKey, alteredMessage, nativeSignature)) {
-          logger.error(s"MMJN: pk=${toHex(publicKey)},msg=${toHex(alteredMessage)},ns=${toHex(nativeSignature)}")
-          result |= NativeSignerJavaVerifierAlteredMessage
-        }
+    if (result != 0) {
+      logger.error(s"""MISMATCH ($result):
+                      |seed=${toHex(seed)}, message=${toHex(message)}
+                      |  sk=${toHex(privateKey)}
+                      |  pk=${toHex(publicKey)}
+                      |native_sig=${toHex(nativeSignature)}
+                      |  java_sig=${toHex(javaSignature)}""".stripMargin)
+    }
 
-        (input.maxSeedNr, CheckResult(input.seedNr, input.msgLength, result, nativeSignature, javaSignature))
-      }
+    nativeSignature
   }
 
-  case class CheckResult(seedNr: Int, messageNr: Int, resultFlags: Int, nativeSignature: Array[Byte], javaSignature: Array[Byte])
+  case class CheckResult(seedNr: Int, messageNr: Int, signature: Array[Byte])
 
   case class Input(maxSeedNr: Int, seedNr: Int, msgLength: Int)
 
@@ -157,59 +220,7 @@ object App extends StrictLogging {
 
   private val HexPattern = "0x([0-9A-Fa-f]+)[Ll]*".r
 
-  def check(
-      randomSeed: Long,
-      nativeProvider: Curve25519Provider,
-      javaProvider: Curve25519Provider,
-      iterator: () => Iterator[Input],
-      outputFileName: Option[String] = None
-  ): Unit = {
-    val validation = Observable
-      .fromIterator(Task(iterator()))
-      .mapParallelUnordered(Runtime.getRuntime.availableProcessors())(signAndCheck(randomSeed, nativeProvider, javaProvider))
-      .share
-
-    val f = outputFileName.map { fn =>
-      val writer = new TestDataWriter(randomSeed, fn)
-      validation
-        .map { case (_, result) => (result.seedNr, result.messageNr, result.nativeSignature) }
-        .bufferTimedAndCounted(1.minute, 100000)
-        .consumeWith(Consumer.fromObserver(_ => writer))
-        .runToFuture
-    }
-
-    Await.result(
-      validation
-        .doOnNext {
-          case (_, result) if result.resultFlags != 0 =>
-            Task {
-              val seedBytes  = allSeeds.get(result.seedNr)
-              val privateKey = nativeProvider.generatePrivateKey(seedBytes)
-              val publicKey  = nativeProvider.generatePublicKey(privateKey)
-              logger.error(s"""MISMATCH (${result.resultFlags}):
-                              |seed=${toHex(seedBytes)}, message=${toHex(allMessages.get(result.messageNr))}
-                              |  sk=${toHex(privateKey)}
-                              |  pk=${toHex(publicKey)}
-                              |native_sig=${toHex(result.nativeSignature)}
-                              |  java_sig=${toHex(result.javaSignature)}""".stripMargin)
-            }
-          case _ => Task.unit
-        }
-        .bufferTimedAndCounted(1.minute, 100000)
-        .scan((0, 0)) {
-          case ((count, _), items) => (count + items.length, items.last._1)
-        }
-        .foreach {
-          case (count, last) => logger.debug(s"Checked $count cases, last seed: $last")
-        },
-      Duration.Inf
-    )
-
-    for (s <- f) {
-      Await.result(s, 10.seconds)
-      logger.info(s"Shutdown successful")
-    }
-  }
+  private val workerCount: Int = Runtime.getRuntime.availableProcessors()
 
   def generateSignatures(
       randomSeed: Long,
@@ -217,11 +228,11 @@ object App extends StrictLogging {
       iterator: () => Iterator[Input],
       outputFileName: String
   ): Unit = {
-    val SeedSeq = Longs.toByteArray(randomSeed).toSeq
+    val SeedSeq = Longs.toByteArray(randomSeed)
 
     val generatedSignatures = Observable
       .fromIterator(Task(iterator()))
-      .mapParallelUnordered(Runtime.getRuntime.availableProcessors())(
+      .mapParallelUnordered(workerCount)(
         (input: Input) =>
           Task {
             val random = new Array[Byte](64)
@@ -235,10 +246,10 @@ object App extends StrictLogging {
           }
       )
 
-    val writeFuture = generatedSignatures.share
-      .bufferTimedAndCounted(1.minute, 1000000)
-      .consumeWith(Consumer.fromObserver(_ => new TestDataWriter(randomSeed, outputFileName)))
-      .runToFuture
+//    val writeFuture = generatedSignatures.share
+//      .bufferTimedAndCounted(1.minute, 1000000)
+//      .consumeWith(Consumer.fromObserver(_ => new TestDataWriter(randomSeed, outputFileName)))
+//      .runToFuture
 
     generatedSignatures
       .scan(0) {
@@ -247,7 +258,7 @@ object App extends StrictLogging {
       .bufferTimedAndCounted(1.minute, 100000)
       .foreach(b => logger.info(s"Generated ${b.last} signatures"))
 
-    Await.result(writeFuture, Duration.Inf)
+//    Await.result(writeFuture, Duration.Inf)
   }
 
   def main(args: Array[String]): Unit = {
@@ -263,9 +274,6 @@ object App extends StrictLogging {
     val modulus   = args(3).toInt
 
     args(0).toLowerCase match {
-      case "check" =>
-        logger.info(s"Random seed is 0x${randomSeed.toHexString}, starting with seed #$startWith, $modulus messages per step")
-        check(randomSeed, nativeProvider, javaProvider, () => iter(modulus, startWith).take(args.lift(5).fold(Int.MaxValue)(_.toInt)), args.lift(4))
       case "generate" =>
         val outputFileName = args(4)
         val count          = args(5).toInt
@@ -273,8 +281,44 @@ object App extends StrictLogging {
           s"Random seed is 0x${randomSeed.toHexString}, starting with seed #$startWith, $modulus messages per step, saving $count entries to $outputFileName"
         )
         generateSignatures(randomSeed, nativeProvider, () => iter(modulus, startWith).take(count), outputFileName)
-    }
+      case "check" =>
+        val count = args.lift(5).map(_.toInt)
+        logger.info(s"Item count: $count")
+        val dispatcher = new Dispatcher(startWith, modulus, count)
+        val latch      = new CountDownLatch(workerCount)
+        val counter    = new AtomicLong()
 
-    if (args.length == 3) {} else if (args.length == 5) {}
+        val maybeOut = args.lift(4).map { outputFileName =>
+          val queue  = new LinkedBlockingQueue[Seq[CheckResult]]()
+          val out    = new CountingOutputStream(new BufferedOutputStream(new FileOutputStream(new File(outputFileName)), 100000))
+          val writer = new Thread(new Writer(queue, latch, new DataOutputStream(out)))
+          writer.setName("writer")
+          writer.start()
+
+          (out, writer, queue)
+        }
+
+        (1 to workerCount) foreach { i =>
+          logger.info(s"Starting worker $i")
+          val t =
+            new Thread(new Worker(latch, maybeOut.map(_._3), counter, randomSeed, nativeProvider, javaProvider, () => dispatcher.nextBatch(1000)))
+          t.setDaemon(true)
+          t.setName(s"worker-$i")
+          t.start()
+        }
+
+        Scheduler.global.scheduleWithFixedDelay(1.minute, 1.minute)(
+          logger.info(s"Max seed nr: ${dispatcher.maxSeedNr}. Checked ${counter.get()} values${maybeOut.fold("")(c => s", written ${c._1.getCount} bytes")}")
+        )
+        latch.await()
+
+        maybeOut.foreach {
+          case (out, writer, _) =>
+            writer.join()
+
+            out.flush()
+            out.close()
+        }
+    }
   }
 }
