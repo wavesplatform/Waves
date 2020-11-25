@@ -125,9 +125,6 @@ object InvokeDiffsCommon {
       } yield portfolioDiff
     }
 
-  private def expectedStepFeeInAttachedAsset(tx: InvokeScriptTransaction, blockchain: Blockchain): Long =
-    wavesToAttachedAsset(tx, blockchain, FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit) + tx.extraFeePerStep
-
   private def expectedStepFeeInWaves(tx: InvokeScriptTransaction, blockchain: Blockchain): Long =
     FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + attachedAssetToWaves(tx, blockchain, tx.extraFeePerStep)
 
@@ -300,6 +297,13 @@ object InvokeDiffsCommon {
       diff: Diff,
       blockchain: Blockchain,
       invoke: InvokeScriptTransaction
+  ): Long =
+    wavesToAttachedAsset(invoke, blockchain, stepTotalFeeInWaves(diff, blockchain, invoke))
+
+  def stepTotalFeeInWaves(
+      diff: Diff,
+      blockchain: Blockchain,
+      invoke: InvokeScriptTransaction
   ): Long = {
     val scriptResult = diff.scriptResults.headOption.map(_._2).getOrElse(InvokeScriptResult())
     val assetActions =
@@ -314,7 +318,7 @@ object InvokeDiffsCommon {
         .getOrElse(0)
     val assetActionsFee = (assetActions.count(blockchain.hasAssetScript) + smartAccountCount) * ScriptExtraFee
     val issuesFee       = scriptResult.issues.count(!blockchain.isNFT(_)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
-    expectedStepFeeInAttachedAsset(invoke, blockchain) + wavesToAttachedAsset(invoke, blockchain, assetActionsFee + issuesFee)
+    expectedStepFeeInWaves(invoke, blockchain) + assetActionsFee + issuesFee
   }
 
   def stepFeePortfolios(stepFee: Long, invoke: InvokeScriptTransaction, blockchain: Blockchain): Map[Address, Portfolio] =
