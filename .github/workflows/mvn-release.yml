@@ -27,8 +27,9 @@ jobs:
             ~/.cache/coursier
             **/target
           key: waves-${{ hashFiles('**/build.sbt', 'project/Dependencies.scala') }}
-      - env:
-          - ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+      - name: Check event source
+        env:
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: true
         run: |
           if [[ "${{github.event_name}}" == "pull_request" ]]; then
             event=pull_request
