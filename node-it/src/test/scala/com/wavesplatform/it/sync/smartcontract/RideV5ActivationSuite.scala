@@ -149,8 +149,4 @@ class RideV5ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
 
     sender.invokeScript(callerAcc, smartAccV5.toAddress.toString, waitForTx = true)
   }
-
-  test("can't use V5 features in V4 even after activation") {
-    //TODO
-  }
 }
