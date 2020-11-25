@@ -267,7 +267,7 @@ package object database extends ScorexLogging {
           )
           .toByteArray
 
-      case _: ContinuationState.Finished =>
+      case ContinuationState.Finished =>
         Array.empty
     }
   }
