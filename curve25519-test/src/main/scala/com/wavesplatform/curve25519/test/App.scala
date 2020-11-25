@@ -167,25 +167,11 @@ object App extends StrictLogging {
     val validation = Observable
       .fromIterator(Task(iterator()))
       .mapParallelUnordered(Runtime.getRuntime.availableProcessors())(signAndCheck(randomSeed, nativeProvider, javaProvider))
-      .doOnNext {
-        case (_, result) if result.resultFlags != 0 =>
-          Task {
-            val seedBytes  = allSeeds.get(result.seedNr)
-            val privateKey = nativeProvider.generatePrivateKey(seedBytes)
-            val publicKey  = nativeProvider.generatePublicKey(privateKey)
-            logger.error(s"""MISMATCH (${result.resultFlags}):
-                          |seed=${toHex(seedBytes)}, message=${toHex(allMessages.get(result.messageNr))}
-                          |  sk=${toHex(privateKey)}
-                          |  pk=${toHex(publicKey)}
-                          |native_sig=${toHex(result.nativeSignature)}
-                          |  java_sig=${toHex(result.javaSignature)}""".stripMargin)
-          }
-        case _ => Task.unit
-      }
+      .share
 
     val f = outputFileName.map { fn =>
       val writer = new TestDataWriter(randomSeed, fn)
-      validation.share
+      validation
         .map { case (_, result) => (result.seedNr, result.messageNr, result.nativeSignature) }
         .bufferTimedAndCounted(1.minute, 100000)
         .consumeWith(Consumer.fromObserver(_ => writer))
@@ -194,6 +180,21 @@ object App extends StrictLogging {
 
     Await.result(
       validation
+        .doOnNext {
+          case (_, result) if result.resultFlags != 0 =>
+            Task {
+              val seedBytes  = allSeeds.get(result.seedNr)
+              val privateKey = nativeProvider.generatePrivateKey(seedBytes)
+              val publicKey  = nativeProvider.generatePublicKey(privateKey)
+              logger.error(s"""MISMATCH (${result.resultFlags}):
+                              |seed=${toHex(seedBytes)}, message=${toHex(allMessages.get(result.messageNr))}
+                              |  sk=${toHex(privateKey)}
+                              |  pk=${toHex(publicKey)}
+                              |native_sig=${toHex(result.nativeSignature)}
+                              |  java_sig=${toHex(result.javaSignature)}""".stripMargin)
+            }
+          case _ => Task.unit
+        }
         .bufferTimedAndCounted(1.minute, 100000)
         .scan((0, 0)) {
           case ((count, _), items) => (count + items.length, items.last._1)
