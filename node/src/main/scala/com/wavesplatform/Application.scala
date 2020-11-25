@@ -377,7 +377,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           blockchainUpdater,
           time,
           extensionContext.accountsApi,
-          extensionContext.assetsApi
+          extensionContext.assetsApi,
+          settings.dbSettings.maxRollbackDepth
         ),
         ActivationApiRoute(settings.restAPISettings, settings.featuresSettings, blockchainUpdater),
         LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time, extensionContext.accountsApi),
