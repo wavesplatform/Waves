@@ -77,7 +77,7 @@ class BlockchainUpdaterImpl(
     readLock(
       ngState
         .flatMap(_.totalDiffOf(id))
-        .map { case (_, diff, _, _, _) => diff.transactions.values.toSeq.map(info => (info.transaction, info.applied)) }
+        .map { case (_, diff, _, _, _) => diff.transactions.values.toSeq.map(info => (info.transaction, info.status)) }
     )
 
   def liquidBlockMeta: Option[BlockMeta] =

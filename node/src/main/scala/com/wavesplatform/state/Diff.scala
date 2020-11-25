@@ -141,7 +141,7 @@ object Sponsorship {
     }
 }
 
-case class NewTransactionInfo(transaction: Transaction, affected: Set[Address], applied: ApplicationStatus)
+case class NewTransactionInfo(transaction: Transaction, affected: Set[Address], status: ApplicationStatus)
 
 case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: AssetVolumeInfo)
 
