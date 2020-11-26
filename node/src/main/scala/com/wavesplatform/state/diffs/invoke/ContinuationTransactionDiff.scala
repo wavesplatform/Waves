@@ -49,12 +49,11 @@ object ContinuationTransactionDiff {
     val invoke = blockchain.resolveInvoke(tx)
     for {
       dAppAddress <- TracedResult(blockchain.resolveAlias(invoke.dAppAddressOrAlias))
-      scriptInfo <- TracedResult(
+      AccountScriptInfo(dAppPublicKey, script, _, callableComplexities) <- TracedResult(
         blockchain
           .accountScript(dAppAddress)
           .toRight(GenericError(s"Cannot find dApp with address=$dAppAddress"))
       )
-      AccountScriptInfo(dAppPublicKey, script, _, callableComplexities) = scriptInfo
       directives <- TracedResult(
         DirectiveSet(script.stdLibVersion, Account, DApp).left.map(GenericError(_))
       )
