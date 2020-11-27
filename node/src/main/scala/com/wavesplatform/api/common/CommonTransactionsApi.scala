@@ -53,7 +53,7 @@ trait CommonTransactionsApi {
 }
 
 object CommonTransactionsApi {
-  type TransactionMeta = (Height, Either[Transaction, (InvokeScriptTransaction, Option[InvokeScriptResult])], Boolean)
+  final case class TransactionMeta(height: Height, transaction: Transaction, invokeScriptResult: Option[InvokeScriptResult], succeeded: Boolean)
 
   def apply(
       maybeDiff: => Option[(Height, Diff)],

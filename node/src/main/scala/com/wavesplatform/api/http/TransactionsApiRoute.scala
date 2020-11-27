@@ -22,6 +22,7 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
@@ -65,8 +66,10 @@ case class TransactionsApiRoute(
       complete(InvalidTransactionId("Transaction ID was not specified"))
     } ~ path(TransactionId) { id =>
       commonApi.transactionById(id) match {
-        case Some((h, either, succeeded)) =>
-          complete(txToExtendedJson(either.fold(identity, _._1)) ++ applicationStatus(isBlockV5(h), succeeded) + ("height" -> JsNumber(h)))
+        case Some(meta) =>
+          complete(
+            txToExtendedJson(meta.transaction) ++ applicationStatus(isBlockV5(meta.height), meta.succeeded) + ("height" -> JsNumber(meta.height))
+          )
         case None => complete(ApiError.TransactionDoesNotExist)
       }
     }
@@ -184,13 +187,17 @@ case class TransactionsApiRoute(
       case _ => InvalidSignature
     }
 
-  private def txToExtendedJson(tx: Transaction): JsObject = tx match {
+  private[this] def txToExtendedJson(tx: Transaction): JsObject = tx match {
     case lease: LeaseTransaction =>
       import com.wavesplatform.api.http.TransactionsApiRoute.LeaseStatus._
       lease.json() ++ Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) Active else Canceled))
 
     case leaseCancel: LeaseCancelTransaction =>
       leaseCancel.json() ++ Json.obj("lease" -> blockchain.transactionInfo(leaseCancel.leaseId).map(_._2.json()).getOrElse[JsValue](JsNull))
+
+    case invokeScript: InvokeScriptTransaction =>
+      val invokeResult = commonApi.transactionById(tx.id()).flatMap(_.invokeScriptResult)
+      invokeScript.json() ++ Json.obj("stateChanges" -> invokeResult)
 
     case t => t.json()
   }

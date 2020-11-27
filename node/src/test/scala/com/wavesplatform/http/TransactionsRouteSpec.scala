@@ -3,6 +3,7 @@ package com.wavesplatform.http
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonTransactionsApi
+import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.block.Block
@@ -270,9 +271,7 @@ class TransactionsRouteSpec
 
       forAll(txAvailability) {
         case (tx, succeed, height, acceptFailedActivationHeight) =>
-          val h: Height           = Height(height)
-          val info                = if (tx.typeId == InvokeScriptTransaction.typeId) Right((tx.asInstanceOf[InvokeScriptTransaction], None)) else Left(tx)
-          (addressTransactions.transactionById _).expects(tx.id()).returning(Some((h, info, succeed))).once()
+          (addressTransactions.transactionById _).expects(tx.id()).returning(Some(TransactionMeta(Height(height), tx, None, succeed))).once()
           (() => blockchain.activatedFeatures)
             .expects()
             .returning(Map(BlockchainFeatures.BlockV5.id -> acceptFailedActivationHeight))

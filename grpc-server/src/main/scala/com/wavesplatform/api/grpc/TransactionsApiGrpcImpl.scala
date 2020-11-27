@@ -30,8 +30,8 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
           )
         case None =>
           if (request.sender.isEmpty) {
-            Observable.fromIterable(transactionIds.flatMap(commonApi.transactionById)).map {
-              case (h, e, s) => (h, e.fold(identity, _._1), s)
+            Observable.fromIterable(transactionIds.flatMap(commonApi.transactionById)).map { meta =>
+              (meta.height, meta.transaction, meta.succeeded)
             }
           } else {
             val senderAddress = request.sender.toAddress
@@ -79,8 +79,8 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
       val result = Observable(request.transactionIds: _*)
         .flatMap(txId => Observable.fromIterable(commonApi.transactionById(txId.toByteStr)))
         .collect {
-          case (_, Right((tx, Some(isr))), _) =>
-            InvokeScriptResultResponse.of(Some(PBTransactions.protobuf(tx)), Some(VISR.toPB(isr)))
+          case CommonTransactionsApi.TransactionMeta(_, transaction, Some(invokeScriptResult), _) =>
+            InvokeScriptResultResponse.of(Some(PBTransactions.protobuf(transaction)), Some(VISR.toPB(invokeScriptResult)))
         }
 
       responseObserver.completeWith(result)
@@ -93,9 +93,9 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
           .unconfirmedTransactionById(txId.toByteStr)
           .map(_ => TransactionStatus(txId, TransactionStatus.Status.UNCONFIRMED))
           .orElse {
-            commonApi.transactionById(txId.toByteStr).map {
-              case (h, _, false) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h, ApplicationStatus.SCRIPT_EXECUTION_FAILED)
-              case (h, _, _)     => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h, ApplicationStatus.SUCCEEDED)
+            commonApi.transactionById(txId.toByteStr).map { m =>
+              val status = if (m.succeeded) ApplicationStatus.SUCCEEDED else ApplicationStatus.SCRIPT_EXECUTION_FAILED
+              TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, m.height, status)
             }
           }
           .getOrElse(TransactionStatus(txId, TransactionStatus.Status.NOT_EXISTS))
