@@ -20,7 +20,7 @@ import com.wavesplatform.state.{BlockchainUpdaterImpl, Height, TransactionId, Tx
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.{EitherMatchers, RequestGen, TransactionGen, WithDB, database}
 import org.scalacheck.{Arbitrary, Gen}
@@ -119,11 +119,27 @@ class LevelDBWriterSpec
 
   }
 
+  "wavesAmount" - {
+    "counts genesis" in {
+      val gen = for (signer <- accountGen) yield {
+        val genesis = TestBlock.create(signer, Seq(TxHelpers.genesis(signer.toAddress, 1234), TxHelpers.genesis(signer.toAddress, 1234)))
+        signer -> List(genesis, TestBlock.create(System.currentTimeMillis(), genesis.id(), Nil))
+      }
+
+      baseTest(_ => gen) {
+        case (writer, _) =>
+          writer.wavesAmount(1) shouldBe BigInt(1234 * 2)
+          writer.wavesAmount(2) shouldBe BigInt(1234 * 2)
+      }
+    }
+  }
+
   def baseTest(gen: Time => Gen[(KeyPair, Seq[Block])])(f: (LevelDBWriter, KeyPair) => Unit): Unit = {
     val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
-    val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
+    val bcu =
+      new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
     try {
       val (account, blocks) = gen(ntpTime).sample.get
 
@@ -143,7 +159,8 @@ class LevelDBWriterSpec
     val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
-    val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
+    val bcu =
+      new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
     try {
       val (account, blocks) = gen(ntpTime).sample.get
 
