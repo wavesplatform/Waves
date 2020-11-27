@@ -5,11 +5,11 @@ import sbt._
 //noinspection TypeAnnotation
 object Dependencies {
 
-  def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.6.4"
+  def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.5.31"
 
   private def akkaHttpModule(module: String)               = "com.typesafe.akka"             %% module            % "10.1.12"
   private def nettyModule(module: String)                  = "io.netty"                      % s"netty-$module"   % "4.1.51.Final"
-  private def kamonModule(module: String)                  = "io.kamon"                      %% s"kamon-$module"  % "2.1.0"
+  private def kamonModule(module: String)                  = "io.kamon"                      %% s"kamon-$module"  % "2.1.9"
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.11.0"
   private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
 
@@ -145,6 +145,7 @@ object Dependencies {
       kamonCore,
       kamonModule("system-metrics"),
       kamonModule("influxdb"),
+      kamonModule("akka-http"),
       "org.influxdb" % "influxdb-java" % "2.14",
       googleGuava,
       "com.google.code.findbugs" % "jsr305"         % "3.0.2" % Compile, // javax.annotation stubs

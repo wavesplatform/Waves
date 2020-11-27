@@ -26,6 +26,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{Asset, TransactionFactory}
 import com.wavesplatform.utils.{Time, _}
 import com.wavesplatform.wallet.Wallet
+import kamon.Kamon
 import monix.execution.Scheduler
 import play.api.libs.json._
 
@@ -109,6 +110,7 @@ case class AddressApiRoute(
   }
 
   def balance: Route = (path("balance" / AddrSegment) & get) { address =>
+    Kamon.currentSpan().mark("prepare.balanceJson")
     complete(balanceJson(address))
   }
 

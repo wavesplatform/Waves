@@ -12,6 +12,7 @@ import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain,
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.utils.ScorexLogging
+import kamon.Kamon
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
@@ -51,7 +52,8 @@ object CommonAccountsApi extends ScorexLogging {
   def apply(diff: => Diff, db: DB, blockchain: Blockchain): CommonAccountsApi = new CommonAccountsApi {
 
     override def balance(address: Address, confirmations: Int = 0): Long = {
-      blockchain.balance(address, blockchain.height, confirmations)
+      Kamon.currentSpan().mark("commonAccountsApi.balance")
+      blockchain.balance(address)
     }
 
     override def effectiveBalance(address: Address, confirmations: Int = 0): Long = {
