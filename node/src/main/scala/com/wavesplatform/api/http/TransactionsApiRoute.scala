@@ -10,13 +10,13 @@ import cats.syntax.either._
 import cats.syntax.traverse._
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonTransactionsApi
+import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
@@ -45,6 +45,9 @@ case class TransactionsApiRoute(
     with AuthRoute {
   import TransactionsApiRoute._
 
+  private[this] val serializer                     = TransactionJsonSerializer(blockchain, commonApi)
+  private[this] implicit val transactionMetaWrites = OWrites[TransactionMeta](serializer.txMetaToJson)
+
   override lazy val route: Route =
     pathPrefix("transactions") {
       unconfirmed ~ addressLimit ~ info ~ status ~ sign ~ calculateFee ~ signedBroadcast ~ merkleProof
@@ -62,16 +65,18 @@ case class TransactionsApiRoute(
   }
 
   def info: Route = (pathPrefix("info") & get) {
-    pathEndOrSingleSlash {
-      complete(InvalidTransactionId("Transaction ID was not specified"))
-    } ~ path(TransactionId) { id =>
-      commonApi.transactionById(id) match {
-        case Some(meta) =>
-          complete(
-            txToExtendedJson(meta.transaction) ++ applicationStatus(isBlockV5(meta.height), meta.succeeded) + ("height" -> JsNumber(meta.height))
-          )
-        case None => complete(ApiError.TransactionDoesNotExist)
-      }
+    path(TransactionId) { id =>
+      complete(commonApi.transactionById(id).toRight(ApiError.TransactionDoesNotExist))
+    } ~ (pathEndOrSingleSlash & anyParam("id")) { ids =>
+      val statuses = ids.map(
+        id =>
+          for {
+            id   <- ByteStr.decodeBase58(id).toEither.leftMap(err => CustomValidationError(err.toString))
+            meta <- commonApi.transactionById(id).toRight(ApiError.TransactionDoesNotExist)
+          } yield meta
+      )
+
+      complete(statuses.toList.sequence.map(_.toSeq))
     }
   }
 
@@ -83,7 +88,7 @@ case class TransactionsApiRoute(
           "status"        -> Confirmed,
           "height"        -> height,
           "confirmations" -> (blockchain.height - height).max(0)
-        ) ++ applicationStatus(isBlockV5(height), succeeded)
+        ) ++ serializer.applicationStatus(height, succeeded)
       case None =>
         commonApi.unconfirmedTransactionById(id) match {
           case Some(_) => Json.obj("status" -> Unconfirmed)
@@ -116,7 +121,7 @@ case class TransactionsApiRoute(
 
   def unconfirmed: Route = (pathPrefix("unconfirmed") & get) {
     pathEndOrSingleSlash {
-      complete(JsArray(commonApi.unconfirmedTransactions.map(txToExtendedJson)))
+      complete(JsArray(commonApi.unconfirmedTransactions.map(serializer.unconfirmedTxToExtendedJson)))
     } ~ utxSize ~ utxTransactionInfo
   }
 
@@ -131,7 +136,7 @@ case class TransactionsApiRoute(
       path(TransactionId) { id =>
         commonApi.unconfirmedTransactionById(id) match {
           case Some(tx) =>
-            complete(txToExtendedJson(tx))
+            complete(serializer.unconfirmedTxToExtendedJson(tx))
           case None =>
             complete(ApiError.TransactionDoesNotExist)
         }
@@ -187,21 +192,6 @@ case class TransactionsApiRoute(
       case _ => InvalidSignature
     }
 
-  private[this] def txToExtendedJson(tx: Transaction): JsObject = tx match {
-    case lease: LeaseTransaction =>
-      import com.wavesplatform.api.http.TransactionsApiRoute.LeaseStatus._
-      lease.json() ++ Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) Active else Canceled))
-
-    case leaseCancel: LeaseCancelTransaction =>
-      leaseCancel.json() ++ Json.obj("lease" -> blockchain.transactionInfo(leaseCancel.leaseId).map(_._2.json()).getOrElse[JsValue](JsNull))
-
-    case invokeScript: InvokeScriptTransaction =>
-      val invokeResult = commonApi.transactionById(tx.id()).flatMap(_.invokeScriptResult)
-      invokeScript.json() ++ Json.obj("stateChanges" -> invokeResult)
-
-    case t => t.json()
-  }
-
   def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr])(implicit sc: Scheduler): Future[List[JsObject]] = {
     val aliasesOfAddress =
       commonApi
@@ -219,7 +209,7 @@ case class TransactionsApiRoute(
       import com.wavesplatform.transaction.transfer._
       tx match {
         case mtt: MassTransferTransaction if mtt.sender.toAddress != address => aliasesOfAddress.map(mtt.compactJson)
-        case _                                                               => Task.now(txToExtendedJson(tx))
+        case _                                                               => Task.now(serializer.txToExtendedJson(tx))
       }
     }
 
@@ -228,13 +218,11 @@ case class TransactionsApiRoute(
       .take(limitParam)
       .mapEval {
         case (height, tx, succeeded) =>
-          txToCompactJson(address, tx).map(_ ++ applicationStatus(isBlockV5(height), succeeded) + ("height" -> JsNumber(height)))
+          txToCompactJson(address, tx).map(_ ++ serializer.applicationStatus(height, succeeded) + ("height" -> JsNumber(height)))
       }
       .toListL
       .runToFuture
   }
-
-  private def isBlockV5(height: Int): Boolean = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height)
 }
 
 object TransactionsApiRoute {
@@ -254,12 +242,6 @@ object TransactionsApiRoute {
     val ScriptExecutionFailed = "script_execution_failed"
   }
 
-  def applicationStatus(isBlockV5: Boolean, succeeded: Boolean): JsObject =
-    if (isBlockV5)
-      JsObject(Map("applicationStatus" -> JsString(if (succeeded) ApplicationStatus.Succeeded else ApplicationStatus.ScriptExecutionFailed)))
-    else
-      JsObject.empty
-
   implicit val transactionProofWrites: Writes[TransactionProof] = Writes { mi =>
     Json.obj(
       "id"               -> mi.id.toString,
@@ -275,5 +257,50 @@ object TransactionsApiRoute {
       transactionIndex <- (jsv \ "transactionIndex").validate[Int]
       merkleProof      <- (jsv \ "merkleProof").validate[List[String]].map(_.map(Base58.decode))
     } yield TransactionProof(id, transactionIndex, merkleProof)
+  }
+
+  private[http] object TransactionJsonSerializer {
+    def applicationStatus(isBlockV5: Boolean, succeeded: Boolean): JsObject =
+      if (isBlockV5)
+        JsObject(Map("applicationStatus" -> JsString(if (succeeded) ApplicationStatus.Succeeded else ApplicationStatus.ScriptExecutionFailed)))
+      else
+        JsObject.empty
+  }
+
+  private[http] final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: CommonTransactionsApi) {
+    def txMetaToJson(meta: TransactionMeta): JsObject = {
+      val specificInfo = meta.transaction match {
+        case lease: LeaseTransaction =>
+          import com.wavesplatform.api.http.TransactionsApiRoute.LeaseStatus._
+          Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) Active else Canceled))
+
+        case leaseCancel: LeaseCancelTransaction =>
+          Json.obj("lease" -> blockchain.transactionInfo(leaseCancel.leaseId).map(_._2.json()).getOrElse[JsValue](JsNull))
+
+        case _: InvokeScriptTransaction =>
+          Json.obj("stateChanges" -> meta.invokeScriptResult)
+
+        case _ => JsObject.empty
+      }
+
+      meta.transaction.json() ++ specificInfo ++ applicationStatus(meta.height, meta.succeeded)
+    }
+
+    def txToExtendedJson(tx: Transaction): JsObject = {
+      val meta = commonApi.transactionById(tx.id())
+      meta.fold(tx.json())(txMetaToJson)
+    }
+
+    def unconfirmedTxToExtendedJson(tx: Transaction): JsObject = tx match {
+      case leaseCancel: LeaseCancelTransaction =>
+        leaseCancel.json() ++ Json.obj("lease" -> blockchain.transactionInfo(leaseCancel.leaseId).map(_._2.json()).getOrElse[JsValue](JsNull))
+
+      case t => t.json()
+    }
+
+    def applicationStatus(height: Int, succeeded: Boolean): JsObject =
+      TransactionJsonSerializer.applicationStatus(isBlockV5(height), succeeded)
+
+    private[this] def isBlockV5(height: Int): Boolean = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height)
   }
 }

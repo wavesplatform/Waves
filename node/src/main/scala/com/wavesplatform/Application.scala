@@ -28,7 +28,6 @@ import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{History, StorageFactory}
-import com.wavesplatform.http.{DebugApiRoute, NodeApiRoute}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerDebugInfo, MinerImpl}
@@ -209,9 +208,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def utx: UtxPool                                                                 = utxStorage
       override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] =
         Await.result(utxSynchronizer.publish(tx), Duration.Inf) // TODO: Replace with async if possible
-      override def spendableBalanceChanged: Observable[(Address, Asset)]                         = app.spendableBalanceChanged
-      override def actorSystem: ActorSystem                                                      = app.actorSystem
-      override def utxEvents: Observable[UtxEvent]                                               = app.utxEvents
+      override def spendableBalanceChanged: Observable[(Address, Asset)] = app.spendableBalanceChanged
+      override def actorSystem: ActorSystem                              = app.actorSystem
+      override def utxEvents: Observable[UtxEvent]                       = app.utxEvents
 
       override val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
         blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
@@ -385,7 +384,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         RewardApiRoute(blockchainUpdater)
       )
 
-      val httpService = CompositeHttpService(apiRoutes, settings.restAPISettings)(actorSystem)
+      val httpService   = CompositeHttpService(apiRoutes, settings.restAPISettings)(actorSystem)
       val combinedRoute = httpService.loggingCompositeRoute
       val httpFuture    = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       serverBinding = Await.result(httpFuture, 20.seconds)

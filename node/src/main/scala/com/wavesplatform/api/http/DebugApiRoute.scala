@@ -1,4 +1,4 @@
-package com.wavesplatform.http
+package com.wavesplatform.api.http
 
 import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
@@ -14,10 +14,8 @@ import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi}
-import com.wavesplatform.api.http.TransactionsApiRoute.applicationStatus
-import com.wavesplatform.api.http._
+import com.wavesplatform.api.http.TransactionsApiRoute.TransactionJsonSerializer
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, _}
@@ -26,7 +24,6 @@ import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, Portfolio, StateHash}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
@@ -73,6 +70,10 @@ case class DebugApiRoute(
   private lazy val wavesConfig: JsObject = Json.obj("waves" -> (fullConfig \ "waves").get)
 
   override val settings: RestAPISettings = ws.restAPISettings
+
+  private[this] val serializer                     = TransactionJsonSerializer(blockchain, transactionsApi)
+  private[this] implicit val transactionMetaWrites = OWrites[TransactionMeta](serializer.txMetaToJson)
+
   override lazy val route: Route = pathPrefix("debug") {
     stateChanges ~ balanceHistory ~ stateHash ~ validate ~ withAuth {
       state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ configInfo ~ print
@@ -248,13 +249,9 @@ case class DebugApiRoute(
 
   def stateChangesById: Route = (get & path("stateChanges" / "info" / TransactionId)) { id =>
     transactionsApi.transactionById(id) match {
-      case Some(TransactionMeta(height, transaction, Some(invokeScriptResult), succeeded)) =>
-        complete(
-          transaction.json() ++ applicationStatus(isBlockV5(height), succeeded) ++ Json
-            .obj("height" -> height.toInt, "stateChanges" -> invokeScriptResult)
-        )
-      case Some(_) => complete(ApiError.UnsupportedTransactionType)
-      case None    => complete(ApiError.TransactionDoesNotExist)
+      case Some(meta) if meta.invokeScriptResult.isDefined => complete(meta)
+      case Some(_)                                         => complete(ApiError.UnsupportedTransactionType)
+      case None                                            => complete(ApiError.TransactionDoesNotExist)
     }
   }
 
@@ -269,12 +266,7 @@ case class DebugApiRoute(
               .fromPublisher(
                 transactionsApi
                   .invokeScriptResults(address, None, Set.empty, afterOpt)
-                  .map {
-                    case TransactionMeta(height, ist: InvokeScriptTransaction, Some(isr), succeeded) =>
-                      ist.json() ++ applicationStatus(isBlockV5(height), succeeded) ++ Json.obj("height" -> JsNumber(height), "stateChanges" -> isr)
-                    case TransactionMeta(height, tx, _, succeeded) =>
-                      tx.json() ++ applicationStatus(isBlockV5(height), succeeded) ++ Json.obj("height" -> JsNumber(height))
-                  }
+                  .map(Json.toJsObject(_))
                   .toReactivePublisher
               )
               .take(limit)
@@ -295,8 +287,6 @@ case class DebugApiRoute(
         case None        => complete(StatusCodes.NotFound)
       }
     }
-
-  private def isBlockV5(height: Int): Boolean = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height)
 }
 
 object DebugApiRoute {
@@ -318,6 +308,7 @@ object DebugApiRoute {
     },
     m => Json.toJson(m.map { case (assetId, count) => assetId.toString -> count })
   )
+
   implicit val leaseInfoFormat: Format[LeaseBalance] = Json.format
 
   case class AccountMiningInfo(address: String, miningBalance: Long, timestamp: Long)

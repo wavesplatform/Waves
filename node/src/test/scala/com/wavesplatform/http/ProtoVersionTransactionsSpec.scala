@@ -18,7 +18,6 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
@@ -41,7 +40,7 @@ class ProtoVersionTransactionsSpec
     with Matchers
     with OptionValues
     with TestWallet {
-  import com.wavesplatform.http.ApiMarshallers._
+  import com.wavesplatform.api.http.ApiMarshallers._
 
   private val MinFee: Long            = (0.001 * Constants.UnitsInWave).toLong
   private val DataTxFee: Long         = 15000000

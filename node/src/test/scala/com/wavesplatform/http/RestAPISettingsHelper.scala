@@ -1,6 +1,7 @@
 package com.wavesplatform.http
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.api.http.`X-Api-Key`
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.settings._

@@ -79,16 +79,17 @@ object CommonTransactionsApi {
 
     override def transactionById(transactionId: ByteStr): Option[TransactionMeta] =
       blockchain.transactionInfo(transactionId).map {
-        case (height, ist: InvokeScriptTransaction, status) =>
-          (
-            Height(height),
-            Right(
-              ist -> maybeDiff.flatMap(_._2.scriptResults.get(transactionId)).orElse(AddressTransactions.loadInvokeScriptResult(db, transactionId))
-            ),
-            status
-          )
-        case (height, tx, status) => (Height(height), Left(tx), status)
+        case (height, transaction, succeeded) =>
+          val scriptResult = transaction match {
+            case _: InvokeScriptTransaction =>
+              maybeDiff
+                .flatMap { case (_, diff) => diff.scriptResults.get(transactionId) }
+                .orElse(AddressTransactions.loadInvokeScriptResult(db, transactionId))
 
+            case _ => None
+          }
+
+          TransactionMeta(Height(height), transaction, scriptResult, succeeded)
       }
 
     override def unconfirmedTransactions: Seq[Transaction] = utx.all

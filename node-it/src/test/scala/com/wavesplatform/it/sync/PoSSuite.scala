@@ -2,13 +2,13 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.{KeyPair, PublicKey}
+import com.wavesplatform.api.http.DebugMessage
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.consensus.FairPoSCalculator
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto
-import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.api.AsyncNetworkApi.NodeAsyncNetworkApi
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker

@@ -18,7 +18,6 @@ import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
 import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.http.{BroadcastRoute, CustomJson}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings

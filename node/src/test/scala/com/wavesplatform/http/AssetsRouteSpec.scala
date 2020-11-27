@@ -4,9 +4,9 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
+import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.requests.{TransferV1Request, TransferV2Request}
-import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.transfer._

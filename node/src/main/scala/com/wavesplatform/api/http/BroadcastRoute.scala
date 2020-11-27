@@ -1,9 +1,8 @@
-package com.wavesplatform.http
+package com.wavesplatform.api.http
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import cats.syntax.either._
-import com.wavesplatform.api.http.{ApiError, ApiRoute, jsonParammedPost}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network._
 import com.wavesplatform.transaction.Transaction
