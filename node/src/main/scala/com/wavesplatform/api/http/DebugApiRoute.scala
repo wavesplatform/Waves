@@ -90,8 +90,8 @@ case class DebugApiRoute(
     })
 
   def balanceHistory: Route = (path("balances" / "history" / AddrSegment) & get) { address =>
-    complete(Json.toJson(loadBalanceHistory(address).map {
-      case (h, b) => Json.obj("height" -> h, "balance" -> b)
+    complete(Json.toJson(loadBalanceHistory(address).map { case (h, b) =>
+      Json.obj("height" -> h, "balance" -> b)
     }))
   }
 
@@ -120,8 +120,8 @@ case class DebugApiRoute(
     distribution(height)
   }
 
-  private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean)(
-      implicit ec: ExecutionContext
+  private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean)(implicit
+      ec: ExecutionContext
   ): Future[Either[ValidationError, JsObject]] = {
     rollbackTask(blockId, returnTransactionsToUtx)
       .map(_.map(_ => Json.obj("BlockId" -> blockId.toString)))
@@ -159,17 +159,16 @@ case class DebugApiRoute(
         .map { account =>
           (account.toAddress, miner.getNextBlockGenerationOffset(account))
         }
-        .collect {
-          case (address, Right(offset)) =>
-            AccountMiningInfo(
-              address.toString,
-              blockchain.effectiveBalance(
-                address,
-                ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(blockchain.height),
-                blockchain.microblockIds.lastOption
-              ),
-              System.currentTimeMillis() + offset.toMillis
-            )
+        .collect { case (address, Right(offset)) =>
+          AccountMiningInfo(
+            address.toString,
+            blockchain.effectiveBalance(
+              address,
+              ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(blockchain.height),
+              blockchain.microblockIds.lastOption
+            ),
+            System.currentTimeMillis() + offset.toMillis
+          )
         }
     )
   }
@@ -233,23 +232,25 @@ case class DebugApiRoute(
       val transactionJson = parsedTransaction.fold(_ => jsv, _.json())
 
       val serializer = tracedDiff.resultE
-        .fold(_ => this.serializer, {
-          case (_, diff) =>
+        .fold(
+          _ => this.serializer,
+          { case (_, diff) =>
             val compositeBlockchain = CompositeBlockchain(blockchain, diff)
             this.serializer.copy(blockchain = compositeBlockchain)
-        })
+          }
+        )
 
       val extendedJson = tracedDiff.resultE
         .fold(
-          _ => jsv, {
-            case (tx, diff) =>
-              val meta = tx match {
-                case ist: InvokeScriptTransaction =>
-                  val result = diff.scriptResults.get(ist.id())
-                  TransactionMeta.Invoke(Height(blockchain.height), ist, succeeded = true, diff.scriptsComplexity, result)
-                case tx => TransactionMeta.Default(Height(blockchain.height), tx, succeeded = true, diff.scriptsComplexity)
-              }
-              serializer.transactionWithMetaJson(meta)
+          _ => jsv,
+          { case (tx, diff) =>
+            val meta = tx match {
+              case ist: InvokeScriptTransaction =>
+                val result = diff.scriptResults.get(ist.id())
+                TransactionMeta.Invoke(Height(blockchain.height), ist, succeeded = true, diff.scriptsComplexity, result)
+              case tx => TransactionMeta.Default(Height(blockchain.height), tx, succeeded = true, diff.scriptsComplexity)
+            }
+            serializer.transactionWithMetaJson(meta)
           }
         )
 
@@ -263,8 +264,8 @@ case class DebugApiRoute(
         "height" -> blockchain.height
       )
 
-      error.fold(response ++ extendedJson)(
-        err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)) + ("transaction" -> transactionJson)
+      error.fold(response ++ extendedJson)(err =>
+        response + ("error" -> JsString(ApiError.fromValidationError(err).message)) + ("transaction" -> transactionJson)
       )
     })
 
@@ -356,8 +357,8 @@ object DebugApiRoute {
     })
 
   implicit val assetMapWrites: Writes[Map[IssuedAsset, Long]] = Writes { m =>
-    Json.toJson(m.map {
-      case (asset, balance) => asset.id.toString -> JsNumber(balance)
+    Json.toJson(m.map { case (asset, balance) =>
+      asset.id.toString -> JsNumber(balance)
     })
   }
 

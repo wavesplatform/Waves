@@ -10,6 +10,7 @@ import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.util.concurrent.DefaultThreadFactory
+import kamon.Kamon
 
 import java.util.concurrent.{LinkedBlockingQueue, RejectedExecutionException, ThreadPoolExecutor, TimeUnit}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
@@ -44,9 +45,16 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
           getFromResourceDirectory("swagger-ui")
       }
 
-  val compositeRoute: Route = withExecutionContext(scheduler)(extendRoute(routes.map(_.route).reduce(_ ~ _))) ~ swaggerRoute ~ complete(
-    StatusCodes.NotFound
-  )
+  val compositeRoute: Route = extractRequest { req =>
+    Kamon
+      .currentSpan()
+//      .tagMetrics("http.request_uri", req.uri.toRelative.toString)
+      .mark("processing.start")
+
+    withExecutionContext(scheduler)(extendRoute(routes.map(_.route).reduce(_ ~ _))) ~ swaggerRoute ~ complete(
+      StatusCodes.NotFound
+    )
+  }
 
   val loggingCompositeRoute: Route = Route.seal(DebuggingDirectives.logRequestResult(LoggingMagnet(_ => logRequestResponse))(compositeRoute))
 

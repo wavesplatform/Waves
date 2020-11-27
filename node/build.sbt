@@ -1,9 +1,19 @@
 name       := "waves"
 maintainer := "com.wavesplatform"
 
-enablePlugins(RunApplicationSettings, JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning, VersionObject)
+enablePlugins(
+  RunApplicationSettings,
+  JavaServerAppPackaging,
+  UniversalDeployPlugin,
+  JDebPackaging,
+  SystemdPlugin,
+  GitVersioning,
+  VersionObject,
+  JavaAgent
+)
 
 libraryDependencies ++= Dependencies.node.value
+javaAgents += "io.kamon" % "kanela-agent" % "1.0.14"
 
 inConfig(Compile)(
   Seq(

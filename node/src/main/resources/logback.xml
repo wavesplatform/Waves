@@ -75,4 +75,32 @@
             </logger>
         </then>
     </if>
+
+
+    <appender name="JSON" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>/var/log/waves/waves.json</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- daily rollover -->
+            <fileNamePattern>waves.log.%d{yyyy-MM-dd, UTC}.%i.gz</fileNamePattern>
+
+            <!-- keep 30 days' worth of history capped at 1GB total size -->
+            <maxFileSize>1GB</maxFileSize>
+            <maxHistory>5</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+
+        <encoder>
+            <pattern>%msg%n</pattern>
+        </encoder>
+
+    </appender>
+
+    <appender name="ASYNC-JSON" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="JSON"/>
+    </appender>
+
+    <logger name="com.wavesplatform.metrics.HttpSpanLogger">
+        <appender-ref ref="ASYNC-JSON" />
+    </logger>
+
 </configuration>
