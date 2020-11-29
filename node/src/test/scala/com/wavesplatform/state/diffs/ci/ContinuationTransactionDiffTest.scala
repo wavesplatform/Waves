@@ -112,7 +112,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
       .anyNumberOfTimes()
     (blockchain.hasAccountScript _)
       .expects(invoke.sender.toAddress)
-      .returning(false)
+      .returning(true)
       .anyNumberOfTimes()
     (() => blockchain.settings)
       .expects()
@@ -188,7 +188,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
 
   property("continuation in progress result after invoke") {
     val invoke                         = invokeScriptGen(paymentListGen).sample.get.copy(funcCallOpt = Some(FUNCTION_CALL(User("multiStepExpr"), Nil)))
-    val stepFee                        = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
+    val stepFee                        = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee
     val blockchain                     = blockchainMock(invoke, ("multiStepExpr", 1234L), None)
     val (resultExpr, unusedComplexity) = evaluateInvokeFirstStep(invoke, blockchain)
 
@@ -201,7 +201,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
         transactions = Map(invoke.id.value()            -> NewTransactionInfo(invoke, Set(), ScriptExecutionInProgress)),
         portfolios = Map(invoke.sender.toAddress        -> Portfolio.waves(-stepFee)),
         continuationStates = Map((invoke.id.value(), 0) -> ContinuationState.InProgress(resultExpr, unusedComplexity)),
-        scriptsRun = 1,
+        scriptsRun = 2,
         scriptsComplexity = spentComplexity
       )
     )
