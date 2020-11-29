@@ -300,10 +300,11 @@ object InvokeDiffsCommon {
       blockchain: Blockchain,
       invoke: InvokeScriptTransaction
   ): StepInfo = {
-    val isFirstStep = diff.continuationStates.collectFirst { case ((_, 0), _)                          => true }.getOrElse(false)
-    val isLastStep  = diff.continuationStates.collectFirst { case ((_, _), ContinuationState.Finished) => true }.getOrElse(false)
+    val id = invoke.id.value()
+    val isFirstStep = diff.continuationStates.collectFirst { case ((`id`, 0), _)                          => true }.getOrElse(false)
+    val isLastStep  = diff.continuationStates.collectFirst { case ((`id`, _), ContinuationState.Finished) => true }.getOrElse(false)
 
-    val scriptResult = diff.scriptResults.headOption.map(_._2).getOrElse(InvokeScriptResult())
+    val scriptResult = diff.scriptResults.getOrElse(id, InvokeScriptResult())
     val assetActions =
       if (isLastStep)
         invoke.checkedAssets ++
