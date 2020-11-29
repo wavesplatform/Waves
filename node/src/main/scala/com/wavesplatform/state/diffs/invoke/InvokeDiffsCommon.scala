@@ -181,7 +181,7 @@ object InvokeDiffsCommon {
       tx: InvokeScriptTransaction,
       blockchain: Blockchain,
       blockTime: Long,
-      useFeeDiff: Boolean, // TODO refactor
+      isContinuation: Boolean, // TODO refactor?
       limitedExecution: Boolean
   ): TracedResult[ValidationError, Diff] = {
     val complexityLimit =
@@ -236,7 +236,7 @@ object InvokeDiffsCommon {
         actionScriptsInvoked
       )
 
-      paymentsAndFeeDiff = paymentsPart(tx, dAppAddress, if (useFeeDiff) feeDiff else Map())
+      paymentsAndFeeDiff = paymentsPart(tx, dAppAddress, if (isContinuation) Map() else feeDiff)
 
       compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey)(actions, paymentsAndFeeDiff, complexityLimit)
         .leftMap(_.addComplexity(invocationComplexity))
@@ -264,9 +264,9 @@ object InvokeDiffsCommon {
 
       resultDiff = compositeDiff.copy(
         transactions = updatedTxDiff,
-        scriptsRun = actionScriptsInvoked + 1,
+        scriptsRun = if (isContinuation) 0 else actionScriptsInvoked + 1,
         scriptResults = Map(tx.id() -> isr),
-        scriptsComplexity = invocationComplexity + compositeDiff.scriptsComplexity
+        scriptsComplexity = (if (isContinuation) 0 else invocationComplexity) + compositeDiff.scriptsComplexity
       )
     } yield resultDiff
   }
@@ -279,10 +279,10 @@ object InvokeDiffsCommon {
       spentComplexity: Long,
       failed: Boolean
   ): Diff = {
-    val StepInfo(_, totalFee, scriptsRun) = stepInfo(diff, blockchain, invoke)
+    val StepInfo(_, totalFee, scriptsRun) = stepInfo(diff, blockchain, invoke, isFirstStep = false)
     val status   = if (failed) ScriptExecutionFailed else Succeeded
     val resultDiff =
-      diff.copy(
+      diff |+| Diff.empty.copy(
         continuationStates = Map((tx.invokeScriptTransactionId, tx.step + 1) -> ContinuationState.Finished),
         portfolios = stepFeePortfolios(totalFee, invoke, blockchain),
         scriptsRun = scriptsRun,
@@ -299,19 +299,17 @@ object InvokeDiffsCommon {
   def stepInfo(
       diff: Diff,
       blockchain: Blockchain,
-      invoke: InvokeScriptTransaction
+      invoke: InvokeScriptTransaction,
+      isFirstStep: Boolean
   ): StepInfo = {
     val scriptResult = diff.scriptResults.headOption.map(_._2).getOrElse(InvokeScriptResult())
     val assetActions =
-      invoke.checkedAssets ++
+      if (isFirstStep) invoke.checkedAssets else Seq() ++
         scriptResult.transfers.flatMap(_.asset.fold(Option.empty[IssuedAsset])(Some(_))) ++
         scriptResult.burns.map(b => IssuedAsset(b.assetId)) ++
         scriptResult.reissues.map(r => IssuedAsset(r.assetId)) ++
         scriptResult.sponsorFees.map(sf => IssuedAsset(sf.assetId))
-    val smartAccountCount =
-      diff.continuationStates.headOption
-        .collect { case ((_, step), _) if step == 0 && blockchain.hasAccountScript(invoke.sender.toAddress) => 1 }
-        .getOrElse(0)
+    val smartAccountCount    = if (isFirstStep && blockchain.hasAccountScript(invoke.sender.toAddress)) 1 else 0
     val additionalScriptsRun = assetActions.count(blockchain.hasAssetScript) + smartAccountCount
     val additionalScriptsFee = additionalScriptsRun * ScriptExtraFee
     val issuesFee            = scriptResult.issues.count(!blockchain.isNFT(_)) * FeeConstants(IssueTransaction.typeId) * FeeUnit

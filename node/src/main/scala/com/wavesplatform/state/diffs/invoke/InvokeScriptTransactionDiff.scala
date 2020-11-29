@@ -170,7 +170,7 @@ object InvokeScriptTransactionDiff {
               tx,
               blockchain,
               blockTime,
-              useFeeDiff = true,
+              isContinuation = false,
               limitedExecution = limitedExecution
             )
 
@@ -184,7 +184,7 @@ object InvokeScriptTransactionDiff {
                   continuationStates = Map((tx.id.value(), 0) -> state),
                   scriptsComplexity = fullLimit - ir.unusedComplexity
                 )
-                val StepInfo(_, stepFee, scriptsRun) = InvokeDiffsCommon.stepInfo(stateDiff, blockchain, tx)
+                val StepInfo(_, stepFee, scriptsRun) = InvokeDiffsCommon.stepInfo(stateDiff, blockchain, tx, isFirstStep = true)
                 val portfolios = Diff.stateOps(
                   portfolios = InvokeDiffsCommon.stepFeePortfolios(stepFee, tx, blockchain),
                   scriptsRun = scriptsRun

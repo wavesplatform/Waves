@@ -1,5 +1,7 @@
 package com.wavesplatform.state.diffs.ci
+import cats.data.Ior
 import cats.implicits._
+import com.google.protobuf.ByteString
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
@@ -9,6 +11,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, DApp, V4}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
@@ -17,7 +20,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2, IncompleteResult}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.Recipient
+import com.wavesplatform.lang.v1.traits.domain.{Burn, Recipient, Reissue}
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.{Common, Global}
 import com.wavesplatform.settings.TestSettings
@@ -25,9 +28,12 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.diffs.invoke.{ContinuationTransactionDiff, InvokeScriptTransactionDiff}
 import com.wavesplatform.transaction.ApplicationStatus.{ScriptExecutionInProgress, Succeeded}
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import monix.eval.Coeval
+import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{Matchers, PropSpec}
 import shapeless.Coproduct
@@ -35,6 +41,19 @@ import shapeless.Coproduct
 import scala.util.Random
 
 class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with TransactionGen with Matchers {
+  private val transferAddress = accountGen.sample.get.toAddress
+  private val dAppPk          = accountGen.sample.get.publicKey
+  private val scriptedAssetId = bytes32gen.map(ByteStr(_)).sample.get
+  private val scriptedAsset   = IssuedAsset(scriptedAssetId)
+
+  private val paymentAmount  = 7L
+  private val transferAmount = 10L
+  private val reissueAmount  = 100L
+  private val burnAmount     = 50L
+
+  private val assetScriptComplexity = 123
+  private val invokeGen = invokeScriptGen(Gen.const(Seq(Payment(paymentAmount, scriptedAsset))))
+
   private val dApp =
     compile(
       s"""
@@ -46,7 +65,12 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
         |   let a = !(${List.fill(10)("sigVerify(base64'',base64'',base64'')").mkString("||")})
         |   if (a)
         |     then
-        |       [BooleanEntry("isAllowed", true)]
+        |       [
+        |         BooleanEntry("isAllowed", true),
+        |         Reissue(base58'$scriptedAssetId', $reissueAmount, true),
+        |         Burn(base58'$scriptedAssetId', $burnAmount),
+        |         ScriptTransfer(Address(base58'${transferAddress.stringRepr}'), $transferAmount, base58'$scriptedAssetId')
+        |       ]
         |     else
         |       throw("unexpected")
         | }
@@ -61,7 +85,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
         |       throw("unexpected")
         | }
       """.stripMargin
-    )
+    ).asInstanceOf[ContractScriptImpl]
 
   private lazy val dummyEstimator = new ScriptEstimator {
     override val version: Int = 0
@@ -72,12 +96,11 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
     ): Either[String, Long] = Right(1)
   }
 
-  private def compile(scriptText: String): ContractScriptImpl =
+  private def compile(scriptText: String): Script =
     ScriptCompiler
       .compile(scriptText, dummyEstimator)
       .explicitGet()
       ._1
-      .asInstanceOf[ContractScriptImpl]
 
   private def blockchainMock(invoke: InvokeScriptTransaction, func: (String, Long), exprInfo: Option[(Int, EXPR, Int)]) = {
     val blockchain = mock[Blockchain]
@@ -97,7 +120,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
       .anyNumberOfTimes()
     (blockchain.accountScript _)
       .expects(invoke.dAppAddressOrAlias.asInstanceOf[Address])
-      .returning(Some(AccountScriptInfo(invoke.sender, dApp, 99L, Map(3 -> Map(func)))))
+      .returning(Some(AccountScriptInfo(invoke.sender, dApp, 99L, Map(3 -> Map(func)))))  // verifier complexity counts separately
     (() => blockchain.activatedFeatures)
       .expects()
       .returning(Map(BlockchainFeatures.Ride4DApps.id -> 0, BlockchainFeatures.BlockV5.id -> 0))
@@ -108,7 +131,27 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
       .anyNumberOfTimes()
     (blockchain.assetScript _)
       .expects(*)
-      .returning(None)
+      .returning(Some(AssetScriptInfo(compile("true"), assetScriptComplexity)))
+      .anyNumberOfTimes()
+    (blockchain.assetDescription _)
+      .expects(*)
+      .returning(
+        Some(
+          AssetDescription(
+            ByteStr.empty,
+            dAppPk,
+            ByteString.EMPTY,
+            ByteString.EMPTY,
+            1,
+            true,
+            BigInt(Int.MaxValue),
+            Height(1),
+            Some(AssetScriptInfo(compile("true"), assetScriptComplexity)),
+            0,
+            false
+          )
+        )
+      )
       .anyNumberOfTimes()
     (blockchain.hasAccountScript _)
       .expects(invoke.sender.toAddress)
@@ -187,8 +230,8 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
   }
 
   property("continuation in progress result after invoke") {
-    val invoke                         = invokeScriptGen(paymentListGen).sample.get.copy(funcCallOpt = Some(FUNCTION_CALL(User("multiStepExpr"), Nil)))
-    val stepFee                        = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee
+    val invoke                         = invokeGen.sample.get.copy(funcCallOpt = Some(FUNCTION_CALL(User("multiStepExpr"), Nil)))
+    val stepFee                        = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee * 2
     val blockchain                     = blockchainMock(invoke, ("multiStepExpr", 1234L), None)
     val (resultExpr, unusedComplexity) = evaluateInvokeFirstStep(invoke, blockchain)
 
@@ -201,7 +244,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
         transactions = Map(invoke.id.value()            -> NewTransactionInfo(invoke, Set(), ScriptExecutionInProgress)),
         portfolios = Map(invoke.sender.toAddress        -> Portfolio.waves(-stepFee)),
         continuationStates = Map((invoke.id.value(), 0) -> ContinuationState.InProgress(resultExpr, unusedComplexity)),
-        scriptsRun = 2,
+        scriptsRun = 3,
         scriptsComplexity = spentComplexity
       )
     )
@@ -210,7 +253,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
   property("continuation in progress result after continuation") {
     val expr                             = dApp.expr.callableFuncs.find(_.u.name == "multiStepExpr").get.u.body
     val step                             = Random.nextInt(Int.MaxValue)
-    val invoke                           = invokeScriptGen(paymentListGen).sample.get.copy(funcCallOpt = Some(FUNCTION_CALL(User("multiStepExpr"), Nil)))
+    val invoke                           = invokeGen.sample.get.copy(funcCallOpt = Some(FUNCTION_CALL(User("multiStepExpr"), Nil)))
     val continuation                     = ContinuationTransaction(invoke.id.value(), invoke.timestamp, step, fee = 0L, invoke.feeAssetId)
     val stepFee                          = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
     val startUnusedComplexity            = Random.nextInt(2000)
@@ -232,29 +275,46 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
     )
   }
 
-  property("continuation finish result") {
+  property("continuation finish result with scripted actions and payment") {
+    val dAppAddress              = dAppPk.toAddress
+    val actionScriptInvocations  = 3
+    val stepFee                  = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee * actionScriptInvocations
+    val invoke = invokeGen.sample.get.copy(
+      funcCallOpt = Some(FUNCTION_CALL(User("oneStepExpr"), Nil)),
+      fee = stepFee + ScriptExtraFee * 2, // for account script and payment
+      dAppAddressOrAlias = dAppAddress
+    )
     val step         = Random.nextInt(Int.MaxValue)
-    val invoke       = invokeScriptGen(paymentListGen).sample.get.copy(funcCallOpt = Some(FUNCTION_CALL(User("oneStepExpr"), Nil)))
     val continuation = ContinuationTransaction(invoke.id.value(), invoke.timestamp, step, fee = 0L, invoke.feeAssetId)
-    val stepFee      = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
-    val dAppAddress  = invoke.dAppAddressOrAlias.asInstanceOf[Address]
     val expr         = dApp.expr.callableFuncs.find(_.u.name == "oneStepExpr").get.u.body
 
-    val actualComplexity    = 2015
+    val actualComplexity    = 2018
     val estimatedComplexity = actualComplexity + Random.nextInt(2000)
     val blockchain          = blockchainMock(invoke, ("oneStepExpr", estimatedComplexity), Some((step, expr, 0)))
 
     ContinuationTransactionDiff(blockchain, continuation.timestamp, false)(continuation).resultE shouldBe Right(
       Diff.empty.copy(
-        portfolios = Map(invoke.sender.toAddress -> Portfolio.waves(-stepFee)),
-        accountData = Map(dAppAddress            -> AccountDataInfo(Map("isAllowed" -> BooleanDataEntry("isAllowed", true)))),
-        scriptsRun = 1,
-        scriptResults = Map(invoke.id.value() -> InvokeScriptResult(Seq(BooleanDataEntry("isAllowed", true)))),
-        scriptsComplexity = actualComplexity,
+        portfolios = Map(
+          invoke.sender.toAddress -> Portfolio(-stepFee, assets = Map(scriptedAsset -> -paymentAmount)),
+          dAppAddress             -> Portfolio.build(scriptedAsset, reissueAmount - burnAmount - transferAmount + paymentAmount),
+          transferAddress         -> Portfolio.build(scriptedAsset, transferAmount)
+        ),
+        accountData = Map(dAppAddress -> AccountDataInfo(Map("isAllowed" -> BooleanDataEntry("isAllowed", true)))),
+        scriptsRun = actionScriptInvocations + 1,
+        scriptResults = Map(
+          invoke.id.value() -> InvokeScriptResult(
+            data = Seq(BooleanDataEntry("isAllowed", true)),
+            transfers = Seq(InvokeScriptResult.Payment(transferAddress, scriptedAsset, transferAmount)),
+            reissues = Seq(Reissue(scriptedAssetId, true, reissueAmount)),
+            burns = Seq(Burn(scriptedAssetId, burnAmount))
+          )
+        ),
+        scriptsComplexity = actualComplexity + actionScriptInvocations * assetScriptComplexity,
         continuationStates = Map((invoke.id.value(), continuation.step + 1) -> ContinuationState.Finished),
+        updatedAssets = Map(scriptedAsset                                   -> Ior.Right(AssetVolumeInfo(true, reissueAmount - burnAmount))),
         replacingTransactions = Seq(
           NewTransactionInfo(continuation.copy(fee = stepFee), Set(), Succeeded),
-          NewTransactionInfo(invoke, Set(invoke.sender.toAddress, dAppAddress), Succeeded)
+          NewTransactionInfo(invoke, Set(invoke.sender.toAddress, dAppAddress, transferAddress), Succeeded)
         )
       )
     )
