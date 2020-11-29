@@ -9,7 +9,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{Account, DApp, V4}
+import com.wavesplatform.lang.directives.values.{Account, DApp, V5}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader.User
@@ -176,20 +176,20 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
   }
 
   private def evaluateContinuationStep(expr: EXPR, unusedComplexity: Int): (EXPR, Int) = {
-    val ds        = DirectiveSet(V4, Account, DApp).explicitGet()
+    val ds        = DirectiveSet(V5, Account, DApp).explicitGet()
     val wavesCtx  = WavesContext.build(ds)
     val cryptoCtx = CryptoContext.build(Global, ds.stdLibVersion).withEnvironment[Environment]
     val pureCtx   = PureContext.build(ds.stdLibVersion).withEnvironment[Environment]
     val ctx       = (pureCtx |+| cryptoCtx |+| wavesCtx).evaluationContext(Common.emptyBlockchainEnvironment())
     val (resultExpr, unused, _) =
       EvaluatorV2
-        .applyLimited(expr, ContractLimits.MaxComplexityByVersion(V4) + unusedComplexity, ctx, V4, continuationFirstStepMode = true)
+        .applyLimited(expr, ContractLimits.MaxComplexityByVersion(V5) + unusedComplexity, ctx, V5, continuationFirstStepMode = true)
         .explicitGet()
     (resultExpr, unused)
   }
 
   private def evaluateInvokeFirstStep(invoke: InvokeScriptTransaction, blockchain: Blockchain): (EXPR, Int) = {
-    val ds        = DirectiveSet(V4, Account, DApp).explicitGet()
+    val ds        = DirectiveSet(V5, Account, DApp).explicitGet()
     val wavesCtx  = WavesContext.build(ds)
     val cryptoCtx = CryptoContext.build(Global, ds.stdLibVersion).withEnvironment[Environment]
     val pureCtx   = PureContext.build(ds.stdLibVersion).withEnvironment[Environment]
@@ -198,7 +198,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
       invoke.funcCall,
       Recipient.Address(ByteStr(invoke.sender.toAddress.bytes)),
       invoke.sender,
-      AttachedPaymentExtractor.extractPayments(invoke, V4, blockchain, DAppTarget).explicitGet(),
+      AttachedPaymentExtractor.extractPayments(invoke, V5, blockchain, DAppTarget).explicitGet(),
       ByteStr(invoke.dAppAddressOrAlias.bytes),
       invoke.id.value(),
       invoke.fee,
@@ -219,8 +219,8 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
         wavesCtx.evaluationContext(environment).letDefs,
         dApp.expr,
         invocation,
-        V4,
-        ContractLimits.MaxComplexityByVersion(V4),
+        V5,
+        ContractLimits.MaxComplexityByVersion(V5),
         continuationFirstStepMode = true
       )
       .explicitGet()
@@ -237,7 +237,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
 
     val sigVerifyComplexity = 200
     unusedComplexity should be < sigVerifyComplexity
-    val spentComplexity = ContractLimits.MaxComplexityByVersion(V4) - unusedComplexity
+    val spentComplexity = ContractLimits.MaxComplexityByVersion(V5) - unusedComplexity
 
     InvokeScriptTransactionDiff(blockchain, invoke.timestamp, false)(invoke).resultE shouldBe Right(
       Diff.empty.copy(
@@ -262,7 +262,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
 
     val sigVerifyComplexity = 200
     resultUnusedComplexity should be < sigVerifyComplexity
-    val spentComplexity = ContractLimits.MaxComplexityByVersion(V4) + startUnusedComplexity - resultUnusedComplexity
+    val spentComplexity = ContractLimits.MaxComplexityByVersion(V5) + startUnusedComplexity - resultUnusedComplexity
 
     ContinuationTransactionDiff(blockchain, continuation.timestamp, false)(continuation).resultE shouldBe Right(
       Diff.empty.copy(

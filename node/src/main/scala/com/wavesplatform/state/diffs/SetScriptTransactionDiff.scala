@@ -6,7 +6,7 @@ import com.wavesplatform.features.ComplexityCheckPolicyProvider._
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V5}
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
@@ -16,7 +16,7 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 
 object SetScriptTransactionDiff {
   def apply(blockchain: Blockchain)(tx: SetScriptTransaction): Either[ValidationError, Diff] = {
-    val allowContinuation = blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction)
+    val allowContinuation = blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction) && tx.script.forall(_.stdLibVersion >= V5)
     for {
       callableComplexities <- tx.script match {
         case Some(ContractScriptImpl(version, dApp)) => estimate(blockchain, version, dApp, allowContinuation)

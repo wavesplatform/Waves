@@ -55,7 +55,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   private lazy val script =
     compile(
       s"""
-         |{-# STDLIB_VERSION 4 #-}
+         |{-# STDLIB_VERSION 5 #-}
          |{-# CONTENT_TYPE DAPP #-}
          |
          | @Callable(i)
@@ -102,7 +102,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   private val scriptWithTooManyStateCalls =
     compile(
       s"""
-         |{-# STDLIB_VERSION 4 #-}
+         |{-# STDLIB_VERSION 5 #-}
          |{-# CONTENT_TYPE DAPP #-}
          |
          | @Callable(i)
