@@ -74,12 +74,12 @@ case class InvokeScriptTrace(
 
   private def toJson(v: ScriptResult) =
     v match {
-      case ScriptResultV3(ds, ts) =>
+      case ScriptResultV3(ds, ts, _) =>
         Json.obj(
           "data"      -> ds.map(dataItemJson),
           "transfers" -> ts.map(transferJson)
         )
-      case ScriptResultV4(actions) =>
+      case ScriptResultV4(actions, _) =>
         Json.obj(
           "actions" -> actions.map {
             case transfer: AssetTransfer => transferJson(transfer) + ("type" -> JsString("transfer"))

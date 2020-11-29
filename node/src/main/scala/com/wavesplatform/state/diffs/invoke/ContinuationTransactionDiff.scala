@@ -16,6 +16,7 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.Environment.Tthis
 import com.wavesplatform.lang.v1.traits.domain.{CallableAction, Recipient}
 import com.wavesplatform.lang.{Global, ValidationError}
+import com.wavesplatform.state.diffs.invoke.InvokeDiffsCommon.StepInfo
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, ContinuationState, Diff, NewTransactionInfo}
 import com.wavesplatform.transaction.ApplicationStatus.Succeeded
 import com.wavesplatform.transaction.Transaction
@@ -73,7 +74,7 @@ object ContinuationTransactionDiff {
         directives,
         tx.invokeScriptTransactionId
       )
-      scriptResult <- {
+      (scriptResult, limit) <- {
         val ctx =
           PureContext.build(script.stdLibVersion).withEnvironment[Environment] |+|
             CryptoContext.build(Global, script.stdLibVersion).withEnvironment[Environment] |+|
@@ -92,7 +93,7 @@ object ContinuationTransactionDiff {
           )
           .leftMap { case (error, log) => FailedTransactionError.dAppExecution(error, 0, log) }
         TracedResult(
-          r,
+          r.map((_, limit)),
           List(InvokeScriptTrace(invoke.dAppAddressOrAlias, invoke.funcCall, r.map(_._1), r.fold(_.log, _._2)))
         )
       }
@@ -101,34 +102,40 @@ object ContinuationTransactionDiff {
         InvokeDiffsCommon.getInvocationComplexity(blockchain, invoke, callableComplexities, dAppAddress)
       )
 
-      doProcessActions = InvokeDiffsCommon
-        .processActions(
-          _: List[CallableAction],
-          script.stdLibVersion,
-          dAppAddress,
-          dAppPublicKey,
-          invocationComplexity,
-          invoke,
-          blockchain,
-          blockTime,
-          useFeeDiff = false,
-          limitedExecution
-        )
-        .map(InvokeDiffsCommon.finishContinuation(_, tx, blockchain, invoke, failed = false).copy(transactions = Map()))
+      doProcessActions = (actions: List[CallableAction], unusedComplexity: Int) =>
+        InvokeDiffsCommon
+          .processActions(
+            actions,
+            script.stdLibVersion,
+            dAppAddress,
+            dAppPublicKey,
+            invocationComplexity,
+            invoke,
+            blockchain,
+            blockTime,
+            useFeeDiff = false,
+            limitedExecution
+          )
+          .map(
+            InvokeDiffsCommon.finishContinuation(_, tx, blockchain, invoke, limit - unusedComplexity, failed = false)
+              .copy(transactions = Map())
+          )
 
       resultDiff <- scriptResult._1 match {
-        case ScriptResultV3(dataItems, transfers) =>
-          doProcessActions(dataItems ::: transfers)
-        case ScriptResultV4(actions) =>
-          doProcessActions(actions)
+        case ScriptResultV3(dataItems, transfers, unusedComplexity) =>
+          doProcessActions(dataItems ::: transfers, unusedComplexity)
+        case ScriptResultV4(actions, unusedComplexity) =>
+          doProcessActions(actions, unusedComplexity)
         case ir: IncompleteResult =>
-          val newState = ContinuationState.InProgress(ir.expr, ir.unusedComplexity)
-          val stepFee  = InvokeDiffsCommon.stepTotalFee(Diff.empty, blockchain, invoke)
+          val newState                         = ContinuationState.InProgress(ir.expr, ir.unusedComplexity)
+          val StepInfo(_, stepFee, scriptsRun) = InvokeDiffsCommon.stepInfo(Diff.empty, blockchain, invoke)
           TracedResult.wrapValue[Diff, ValidationError](
-            Diff.stateOps(
+            Diff.empty.copy(
               continuationStates = Map((tx.invokeScriptTransactionId, tx.step + 1) -> newState),
               replacingTransactions = Seq(NewTransactionInfo(tx.copy(fee = stepFee), Set(), Succeeded)),
-              portfolios = InvokeDiffsCommon.stepFeePortfolios(stepFee, invoke, blockchain)
+              portfolios = InvokeDiffsCommon.stepFeePortfolios(stepFee, invoke, blockchain),
+              scriptsRun = scriptsRun,
+              scriptsComplexity = limit - ir.unusedComplexity
             )
           )
       }

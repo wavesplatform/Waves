@@ -276,14 +276,17 @@ object InvokeDiffsCommon {
       tx: ContinuationTransaction,
       blockchain: Blockchain,
       invoke: InvokeScriptTransaction,
+      spentComplexity: Long,
       failed: Boolean
   ): Diff = {
-    val totalFee = stepTotalFee(diff, blockchain, invoke)
+    val StepInfo(_, totalFee, scriptsRun) = stepInfo(diff, blockchain, invoke)
     val status   = if (failed) ScriptExecutionFailed else Succeeded
     val resultDiff =
       diff.copy(
         continuationStates = Map((tx.invokeScriptTransactionId, tx.step + 1) -> ContinuationState.Finished),
-        portfolios = stepFeePortfolios(totalFee, invoke, blockchain)
+        portfolios = stepFeePortfolios(totalFee, invoke, blockchain),
+        scriptsRun = scriptsRun,
+        scriptsComplexity = spentComplexity
       )
     resultDiff.copy(
       replacingTransactions = Seq(
@@ -293,18 +296,11 @@ object InvokeDiffsCommon {
     )
   }
 
-  def stepTotalFee(
+  def stepInfo(
       diff: Diff,
       blockchain: Blockchain,
       invoke: InvokeScriptTransaction
-  ): Long =
-    wavesToAttachedAsset(invoke, blockchain, stepTotalFeeInWaves(diff, blockchain, invoke))
-
-  def stepTotalFeeInWaves(
-      diff: Diff,
-      blockchain: Blockchain,
-      invoke: InvokeScriptTransaction
-  ): Long = {
+  ): StepInfo = {
     val scriptResult = diff.scriptResults.headOption.map(_._2).getOrElse(InvokeScriptResult())
     val assetActions =
       invoke.checkedAssets ++
@@ -316,9 +312,13 @@ object InvokeDiffsCommon {
       diff.continuationStates.headOption
         .collect { case ((_, step), _) if step == 0 && blockchain.hasAccountScript(invoke.sender.toAddress) => 1 }
         .getOrElse(0)
-    val assetActionsFee = (assetActions.count(blockchain.hasAssetScript) + smartAccountCount) * ScriptExtraFee
-    val issuesFee       = scriptResult.issues.count(!blockchain.isNFT(_)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
-    expectedStepFeeInWaves(invoke, blockchain) + assetActionsFee + issuesFee
+    val additionalScriptsRun = assetActions.count(blockchain.hasAssetScript) + smartAccountCount
+    val additionalScriptsFee = additionalScriptsRun * ScriptExtraFee
+    val issuesFee            = scriptResult.issues.count(!blockchain.isNFT(_)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
+    val baseStepFee          = expectedStepFeeInWaves(invoke, blockchain)
+    val feeInWaves           = baseStepFee + additionalScriptsFee + issuesFee
+    val feeInAttachedAsset   = wavesToAttachedAsset(invoke, blockchain, feeInWaves)
+    StepInfo(feeInWaves, feeInAttachedAsset, scriptsRun = 1 + additionalScriptsRun)
   }
 
   def stepFeePortfolios(stepFee: Long, invoke: InvokeScriptTransaction, blockchain: Blockchain): Map[Address, Portfolio] =
@@ -645,4 +645,10 @@ object InvokeDiffsCommon {
       case e: GenericError           => FailedTransactionError.dAppExecution(e.err, 0L)
       case e                         => FailedTransactionError.dAppExecution(e.toString, 0L)
     }
+
+  case class StepInfo(
+      feeInWaves: Long,
+      feeInAttachedAsset: Long,
+      scriptsRun: Int
+  )
 }

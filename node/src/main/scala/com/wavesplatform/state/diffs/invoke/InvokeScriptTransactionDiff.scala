@@ -25,6 +25,7 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.invoke.InvokeDiffsCommon.StepInfo
 import com.wavesplatform.transaction.ApplicationStatus.ScriptExecutionInProgress
 import com.wavesplatform.transaction.{Transaction, TxVersion}
 import com.wavesplatform.transaction.TxValidationError._
@@ -81,7 +82,7 @@ object InvokeScriptTransactionDiff {
           )
 
           result <- for {
-            scriptResult <- {
+            ((scriptResult, fullLimit), _) <- {
               val scriptResultE = stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
                 val invoker = tx.sender.toAddress
                 val invocation = ContractEvaluator.Invocation(
@@ -152,11 +153,11 @@ object InvokeScriptTransactionDiff {
                     case _ =>
                       Right((failFreeResult, Nil))
                   }
-                } yield (result, failFreeLog ::: log)
+                } yield ((result, fullLimit), failFreeLog ::: log)
               })
               TracedResult(
                 scriptResultE,
-                List(InvokeScriptTrace(tx.dAppAddressOrAlias, functionCall, scriptResultE.map(_._1), scriptResultE.fold(_.log, _._2)))
+                List(InvokeScriptTrace(tx.dAppAddressOrAlias, functionCall, scriptResultE.map(_._1._1), scriptResultE.fold(_.log, _._2)))
               )
             }
 
@@ -173,17 +174,21 @@ object InvokeScriptTransactionDiff {
               limitedExecution = limitedExecution
             )
 
-            resultDiff <- scriptResult._1 match {
-              case ScriptResultV3(dataItems, transfers) => doProcessActions(dataItems ::: transfers)
-              case ScriptResultV4(actions)              => doProcessActions(actions)
+            resultDiff <- scriptResult match {
+              case ScriptResultV3(dataItems, transfers, _) => doProcessActions(dataItems ::: transfers)
+              case ScriptResultV4(actions, _)              => doProcessActions(actions)
               case ir: IncompleteResult =>
                 val state      = ContinuationState.InProgress(ir.expr, unusedComplexity = ir.unusedComplexity)
                 val stateDiff  = Diff.empty.copy(
                   transactions = Map(tx.id.value() -> NewTransactionInfo(tx, Set(), ScriptExecutionInProgress)),
-                  continuationStates = Map((tx.id.value(), 0) -> state)
+                  continuationStates = Map((tx.id.value(), 0) -> state),
+                  scriptsComplexity = fullLimit - ir.unusedComplexity
                 )
-                val stepFee    = InvokeDiffsCommon.stepTotalFee(stateDiff, blockchain, tx)
-                val portfolios = Diff.stateOps(portfolios = InvokeDiffsCommon.stepFeePortfolios(stepFee, tx, blockchain))
+                val StepInfo(_, stepFee, scriptsRun) = InvokeDiffsCommon.stepInfo(stateDiff, blockchain, tx)
+                val portfolios = Diff.stateOps(
+                  portfolios = InvokeDiffsCommon.stepFeePortfolios(stepFee, tx, blockchain),
+                  scriptsRun = scriptsRun
+                )
                 TracedResult.wrapValue(stateDiff |+| portfolios)
             }
           } yield resultDiff

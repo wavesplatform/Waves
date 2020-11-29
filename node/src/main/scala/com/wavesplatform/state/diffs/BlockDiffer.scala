@@ -9,6 +9,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.invoke.InvokeDiffsCommon
+import com.wavesplatform.state.diffs.invoke.InvokeDiffsCommon.StepInfo
 import com.wavesplatform.state.patch._
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -136,15 +137,15 @@ object BlockDiffer extends ScorexLogging {
   private def maybeContinuation(blockchain: Blockchain, transactions: Seq[Transaction], tx: Transaction, txDiff: Diff): Option[(Asset, Long)] =
     tx match {
       case i: InvokeScriptTransaction if txDiff.continuationStates.nonEmpty =>
-        val fee = InvokeDiffsCommon.stepTotalFeeInWaves(txDiff, blockchain, i)
-        Some((Waves, fee))
+        val StepInfo(feeInWaves, _, _) = InvokeDiffsCommon.stepInfo(txDiff, blockchain, i)
+        Some((Waves, feeInWaves))
       case c: ContinuationTransaction =>
         val invoke =
           transactions
             .collectFirst { case i: InvokeScriptTransaction if i.id.value() == c.invokeScriptTransactionId => i }
             .getOrElse(blockchain.resolveInvoke(c))
-        val fee = InvokeDiffsCommon.stepTotalFeeInWaves(txDiff, blockchain, invoke)
-        Some((Waves, fee))
+        val StepInfo(feeInWaves, _, _) = InvokeDiffsCommon.stepInfo(txDiff, blockchain, invoke)
+        Some((Waves, feeInWaves))
       case _ =>
         None
     }
