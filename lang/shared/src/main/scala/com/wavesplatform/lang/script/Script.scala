@@ -83,7 +83,7 @@ object Script {
             contract,
             estimator,
             useContractVerifierLimit,
-            allowContinuation = allowContinuation
+            allowContinuation
           )
           complexityInfo = verifierFuncOpt.fold(
             ComplexityInfo(0L, callableComplexities, maxComplexity)
