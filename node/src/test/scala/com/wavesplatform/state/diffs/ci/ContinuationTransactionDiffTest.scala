@@ -231,7 +231,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
 
   property("continuation in progress result after invoke") {
     val invoke                         = invokeGen.sample.get.copy(funcCallOpt = Some(FUNCTION_CALL(User("multiStepExpr"), Nil)))
-    val stepFee                        = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee * 2
+    val stepFee                        = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee
     val blockchain                     = blockchainMock(invoke, ("multiStepExpr", 1234L), None)
     val (resultExpr, unusedComplexity) = evaluateInvokeFirstStep(invoke, blockchain)
 
@@ -244,7 +244,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
         transactions = Map(invoke.id.value()            -> NewTransactionInfo(invoke, Set(), ScriptExecutionInProgress)),
         portfolios = Map(invoke.sender.toAddress        -> Portfolio.waves(-stepFee)),
         continuationStates = Map((invoke.id.value(), 0) -> ContinuationState.InProgress(resultExpr, unusedComplexity)),
-        scriptsRun = 3,
+        scriptsRun = 2,
         scriptsComplexity = spentComplexity
       )
     )
@@ -278,10 +278,10 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
   property("continuation finish result with scripted actions and payment") {
     val dAppAddress              = dAppPk.toAddress
     val actionScriptInvocations  = 3
-    val stepFee                  = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee * actionScriptInvocations
+    val stepFee                  = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee * (actionScriptInvocations + 1)
     val invoke = invokeGen.sample.get.copy(
       funcCallOpt = Some(FUNCTION_CALL(User("oneStepExpr"), Nil)),
-      fee = stepFee + ScriptExtraFee * 2, // for account script and payment
+      fee = stepFee + ScriptExtraFee, // for account script
       dAppAddressOrAlias = dAppAddress
     )
     val step         = Random.nextInt(Int.MaxValue)
@@ -300,7 +300,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
           transferAddress         -> Portfolio.build(scriptedAsset, transferAmount)
         ),
         accountData = Map(dAppAddress -> AccountDataInfo(Map("isAllowed" -> BooleanDataEntry("isAllowed", true)))),
-        scriptsRun = actionScriptInvocations + 1,
+        scriptsRun = actionScriptInvocations + 2, // with payment script
         scriptResults = Map(
           invoke.id.value() -> InvokeScriptResult(
             data = Seq(BooleanDataEntry("isAllowed", true)),

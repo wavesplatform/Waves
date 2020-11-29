@@ -128,7 +128,7 @@ object ContinuationTransactionDiff {
           doProcessActions(actions, unusedComplexity)
         case ir: IncompleteResult =>
           val newState                         = ContinuationState.InProgress(ir.expr, ir.unusedComplexity)
-          val StepInfo(_, stepFee, scriptsRun) = InvokeDiffsCommon.stepInfo(Diff.empty, blockchain, invoke, isFirstStep = false)
+          val StepInfo(_, stepFee, scriptsRun) = InvokeDiffsCommon.stepInfo(Diff.empty, blockchain, invoke)
           TracedResult.wrapValue[Diff, ValidationError](
             Diff.empty.copy(
               continuationStates = Map((tx.invokeScriptTransactionId, tx.step + 1) -> newState),

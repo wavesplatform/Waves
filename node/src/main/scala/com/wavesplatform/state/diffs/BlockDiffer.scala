@@ -137,14 +137,14 @@ object BlockDiffer extends ScorexLogging {
   private def maybeContinuation(blockchain: Blockchain, transactions: Seq[Transaction], tx: Transaction, txDiff: Diff): Option[(Asset, Long)] =
     tx match {
       case i: InvokeScriptTransaction if txDiff.continuationStates.nonEmpty =>
-        val StepInfo(feeInWaves, _, _) = InvokeDiffsCommon.stepInfo(txDiff, blockchain, i, isFirstStep = true)
+        val StepInfo(feeInWaves, _, _) = InvokeDiffsCommon.stepInfo(txDiff, blockchain, i)
         Some((Waves, feeInWaves))
       case c: ContinuationTransaction =>
         val invoke =
           transactions
             .collectFirst { case i: InvokeScriptTransaction if i.id.value() == c.invokeScriptTransactionId => i }
             .getOrElse(blockchain.resolveInvoke(c))
-        val StepInfo(feeInWaves, _, _) = InvokeDiffsCommon.stepInfo(txDiff, blockchain, invoke, isFirstStep = false)
+        val StepInfo(feeInWaves, _, _) = InvokeDiffsCommon.stepInfo(txDiff, blockchain, invoke)
         Some((Waves, feeInWaves))
       case _ =>
         None
