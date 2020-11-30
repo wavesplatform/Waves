@@ -19,8 +19,13 @@ class HttpSpanLogger extends SpanReporter with LazyLogging {
   override def reportSpans(spans: Seq[Span.Finished]): Unit = logger.whenInfoEnabled {
     for (span <- spans if span.isAkkaHttpServer) {
       val code = StatusCodes.getForKey(span.statusCode).fold("<unknown>")(c => c.toString())
-      val timeline = span.marks
-        .map(m => f"${m.key}: +${millisBetween(span.from, m.instant)}%.3f")
+      val timeline = span.marks.reverse
+        .foldLeft((span.from, Seq.newBuilder[String])) {
+          case ((prevInstant, builder), m) =>
+            m.instant -> (builder += f"${m.key}: +${millisBetween(prevInstant, m.instant)}%.3f")
+        }
+        ._2
+        .result()
         .mkString("[", ", ", "]")
       logger.info(
         f"${span.trace.id.string} ${span.method} ${span.operation}: $code in ${millisBetween(span.from, span.to)}%.3f ms $timeline"

@@ -16,6 +16,7 @@ import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
+import kamon.Kamon
 
 final case class CompositeBlockchain(
     inner: Blockchain,
@@ -30,7 +31,13 @@ final case class CompositeBlockchain(
   def diff: Diff = maybeDiff.getOrElse(Diff.empty)
 
   override def balance(address: Address, assetId: Asset): Long =
-    inner.balance(address, assetId) + diff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(assetId)
+    {
+      val innerBalance = inner.balance(address, assetId)
+      Kamon.currentSpan().mark("balance.inner")
+      val diffBalance = diff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(assetId)
+      Kamon.currentSpan().mark("balance.diff")
+      innerBalance + diffBalance
+    }
 
   override def leaseBalance(address: Address): LeaseBalance = {
     cats.Monoid.combine(inner.leaseBalance(address), diff.portfolios.getOrElse(address, Portfolio.empty).lease)

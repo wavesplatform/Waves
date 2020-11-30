@@ -31,6 +31,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
+import kamon.Kamon
 import monix.reactive.Observer
 import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
@@ -235,6 +236,7 @@ abstract class LevelDBWriter private[database] (
 
   protected override def loadBalance(req: (Address, Asset)): Long =
     addressId(req._1).fold(0L) { addressId =>
+      Kamon.currentSpan().mark("leveldb.addressId")
       req._2 match {
         case asset @ IssuedAsset(_) =>
           val kabh = Keys.assetBalanceHistory(addressId, asset)

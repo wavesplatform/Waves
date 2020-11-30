@@ -51,10 +51,11 @@ object CommonAccountsApi extends ScorexLogging {
 
   def apply(diff: => Diff, db: DB, blockchain: Blockchain): CommonAccountsApi = new CommonAccountsApi {
 
-    override def balance(address: Address, confirmations: Int = 0): Long = {
-      Kamon.currentSpan().mark("commonAccountsApi.balance")
-      blockchain.balance(address)
-    }
+    override def balance(address: Address, confirmations: Int = 0): Long =
+      {
+        log.info("BALANCE")
+        Kamon.runWithSpan(Kamon.currentSpan().mark("commonAccountsApi.balance"), false)(blockchain.balance(address))
+      }
 
     override def effectiveBalance(address: Address, confirmations: Int = 0): Long = {
       blockchain.effectiveBalance(address, confirmations)

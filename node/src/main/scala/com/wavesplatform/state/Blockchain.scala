@@ -1,5 +1,6 @@
 package com.wavesplatform.state
 
+import com.typesafe.scalalogging.LazyLogging
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.block.Block.{BlockId, GenesisBlockVersion, NgBlockVersion, PlainBlockVersion, ProtoBlockVersion, RewardBlockVersion}
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
@@ -15,6 +16,7 @@ import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
+import kamon.Kamon
 
 trait Blockchain {
   def settings: BlockchainSettings
@@ -71,7 +73,7 @@ trait Blockchain {
   def balance(address: Address, mayBeAssetId: Asset = Waves): Long
 }
 
-object Blockchain {
+object Blockchain extends LazyLogging {
   implicit class BlockchainExt(private val blockchain: Blockchain) extends AnyVal {
     def isEmpty: Boolean = blockchain.height == 0
 
@@ -112,7 +114,9 @@ object Blockchain {
     def balance(address: Address, atHeight: Int, confirmations: Int): Long = {
       val bottomLimit = (atHeight - confirmations + 1).max(1).min(atHeight)
       val blockId     = blockchain.blockHeader(atHeight).getOrElse(throw new IllegalArgumentException(s"Invalid block height: $atHeight")).id()
+      Kamon.currentSpan().mark("blockchain.blockId")
       val balances    = blockchain.balanceSnapshots(address, bottomLimit, Some(blockId))
+      Kamon.currentSpan().mark("blockchain.balanceSnapshots")
       if (balances.isEmpty) 0L else balances.view.map(_.regularBalance).min
     }
 
