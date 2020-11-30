@@ -140,7 +140,8 @@ object TransactionDiffer {
       initDiff: Diff,
       remainingComplexity: Int
   ): TracedResult[ValidationError, Diff] = {
-    val diff = if (verify) {
+    val isContinuationFirstStep = initDiff.continuationStates.contains((tx.id.value(), 0))
+    val diff = if (verify && !isContinuationFirstStep) {
       Verifier.assets(blockchain, remainingComplexity)(tx).leftMap {
         case (spentComplexity, ScriptExecutionError(error, log, Some(assetId))) if mayFail(tx) && acceptFailed(blockchain) =>
           FailedTransactionError.assetExecution(error, spentComplexity, log, assetId)
@@ -251,7 +252,8 @@ object TransactionDiffer {
     } yield ()
 
   // failed transactions related
-  private def mayFail(tx: Transaction): Boolean = tx.typeId == InvokeScriptTransaction.typeId || tx.typeId == ExchangeTransaction.typeId
+  private def mayFail(tx: Transaction): Boolean =
+    tx.typeId == InvokeScriptTransaction.typeId || tx.typeId == ContinuationTransaction.typeId || tx.typeId == ExchangeTransaction.typeId
 
   private def acceptFailed(blockchain: Blockchain): Boolean = blockchain.isFeatureActivated(BlockV5)
 
