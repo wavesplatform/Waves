@@ -5,7 +5,7 @@ import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.requests.{LeaseCancelRequest, LeaseRequest}
 import com.wavesplatform.http.BroadcastRoute
-import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
@@ -18,7 +18,7 @@ case class LeaseApiRoute(
     settings: RestAPISettings,
     wallet: Wallet,
     blockchain: Blockchain,
-    utxPoolSynchronizer: UtxPoolSynchronizer,
+    transactionPublisher: TransactionPublisher,
     time: Time,
     commonAccountApi: CommonAccountsApi
 ) extends ApiRoute

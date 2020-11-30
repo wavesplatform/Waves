@@ -53,7 +53,7 @@ final case class TracedResult[+E, +A](
 object TracedResult {
   implicit def wrapE[A, E](e: Either[E, A]): TracedResult[E, A] = TracedResult(e)
 
-  implicit def wrapValue[A, E](value: A): TracedResult[E, A] = TracedResult(Right(value))
+  def wrapValue[A, E](value: A): TracedResult[E, A] = TracedResult(Right(value))
 
   implicit def tracedResultSemigroup[A: Semigroup, E]: Semigroup[TracedResult[E, A]] =
     (a, b) =>

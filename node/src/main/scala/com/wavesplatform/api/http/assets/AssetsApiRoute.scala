@@ -20,7 +20,7 @@ import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.{BroadcastRoute, CustomJson}
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain}
 import com.wavesplatform.transaction.ApplicationStatus.ScriptExecutionFailed
@@ -33,6 +33,7 @@ import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
+import io.netty.util.concurrent.DefaultThreadFactory
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import play.api.libs.json._
@@ -42,7 +43,7 @@ import scala.concurrent.Future
 case class AssetsApiRoute(
     settings: RestAPISettings,
     wallet: Wallet,
-    utxPoolSynchronizer: UtxPoolSynchronizer,
+    transactionPublisher: TransactionPublisher,
     blockchain: Blockchain,
     time: Time,
     commonAccountApi: CommonAccountsApi,
@@ -51,10 +52,16 @@ case class AssetsApiRoute(
     with BroadcastRoute
     with AuthRoute {
 
-  private[this] val distributionTaskScheduler = {
-    val executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue[Runnable](AssetsApiRoute.MAX_DISTRIBUTION_TASKS))
-    Scheduler(executor)
-  }
+  private[this] val distributionTaskScheduler = Scheduler(
+    new ThreadPoolExecutor(
+      1,
+      1,
+      0L,
+      TimeUnit.MILLISECONDS,
+      new LinkedBlockingQueue[Runnable](AssetsApiRoute.MAX_DISTRIBUTION_TASKS),
+      new DefaultThreadFactory("balance-distribution", true)
+    )
+  )
 
   private def deprecatedRoute: Route =
     (path("transfer") & withAuth) {
