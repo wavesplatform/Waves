@@ -22,6 +22,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.mining._
 import com.wavesplatform.network.{InvalidBlockStorage, PeerDatabase}
 import com.wavesplatform.settings._
@@ -32,7 +33,7 @@ import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.{GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Transaction, _}
@@ -47,7 +48,7 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.PatienceConfiguration.{Interval, Timeout}
-import org.scalatest.{EitherValues, FreeSpec, Matchers}
+import org.scalatest.{EitherValues, FreeSpec, Inside, Matchers}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.collection.mutable.ListBuffer
@@ -80,7 +81,8 @@ class UtxPoolSpecification
     with BlocksTransactionsHelpers
     with WithDomain
     with EitherValues
-    with Eventually {
+    with Eventually
+    with Inside {
   private val PoolDefaultMaxBytes = 50 * 1024 * 1024 // 50 MB
 
   import FeeValidation.{ScriptExtraFee => extraFee}
@@ -95,9 +97,11 @@ class UtxPoolSpecification
         'T',
         FunctionalitySettings.TESTNET.copy(
           preActivatedFeatures = Map(
-            BlockchainFeatures.MassTransfer.id  -> 0,
-            BlockchainFeatures.SmartAccounts.id -> 0,
-            BlockchainFeatures.Ride4DApps.id    -> 0
+            BlockchainFeatures.MassTransfer.id            -> 0,
+            BlockchainFeatures.SmartAccounts.id           -> 0,
+            BlockchainFeatures.Ride4DApps.id              -> 0,
+            BlockchainFeatures.BlockV5.id                 -> 0,
+            BlockchainFeatures.ContinuationTransaction.id -> 0
           )
         ),
         genesisSettings,
@@ -162,7 +166,9 @@ class UtxPoolSpecification
 
   private def invokeScript(sender: KeyPair, dApp: Address, time: Time) =
     Gen.choose(500000L, 600000L).map { fee =>
-      InvokeScriptTransaction.selfSigned(TxVersion.V1, sender, dApp, None, Seq.empty, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, time.getTimestamp()).explicitGet()
+      InvokeScriptTransaction
+        .selfSigned(TxVersion.V1, sender, dApp, None, Seq.empty, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, time.getTimestamp())
+        .explicitGet()
     }
 
   private def dAppSetScript(sender: KeyPair, time: Time) = {
@@ -882,7 +888,16 @@ class UtxPoolSpecification
 
         "retries until estimate" in withDomain() { d =>
           val settings =
-            UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false, fastLaneAddresses = Set.empty)
+            UtxSettings(
+              10,
+              PoolDefaultMaxBytes,
+              1000,
+              Set.empty,
+              Set.empty,
+              allowTransactionsFromSmartAccounts = true,
+              allowSkipChecks = false,
+              fastLaneAddresses = Set.empty
+            )
           val utxPool     = new UtxPoolImpl(ntpTime, d.blockchainUpdater, ignoreSpendableBalanceChanged, settings)
           val startTime   = System.nanoTime()
           val (result, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Estimate(3 seconds))
@@ -1249,6 +1264,124 @@ class UtxPoolSpecification
               }
             }
         }
+      }
+    }
+
+    "continuations" - {
+      "ordering by extraFeePerStep" in forAll {
+        def compile(scriptText: String): Script =
+          ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()._1
+
+        val dApp =
+          compile(
+            s"""
+               | {-# STDLIB_VERSION 5 #-}
+               | {-# CONTENT_TYPE DAPP #-}
+               |
+               | @Callable(i)
+               | func default() = {
+               |   let a = !(${List.fill(60)("sigVerify(base64'', base64'', base64'')").mkString("||")})
+               |   if (a)
+               |     then
+               |       [BooleanEntry("isAllowed", true)]
+               |     else
+               |       throw("unexpected")
+               | }
+           """.stripMargin
+          )
+
+        for {
+          caller   <- accountGen
+          dAppAcc1 <- accountGen
+          dAppAcc2 <- accountGen
+          fee      <- smallFeeGen
+          time       = new TestTime()
+          setScript1 = SetScriptTransaction.selfSigned(TxVersion.V2, dAppAcc1, Some(dApp), fee, time.getTimestamp()).explicitGet()
+          setScript2 = SetScriptTransaction.selfSigned(TxVersion.V2, dAppAcc2, Some(dApp), fee, time.getTimestamp()).explicitGet()
+          prioritizedInvoke = InvokeScriptTransaction
+            .selfSigned(
+              TxVersion.V3,
+              caller,
+              dAppAcc1.toAddress,
+              None,
+              Nil,
+              fee * 10,
+              Waves,
+              ScriptExtraFee / 10,
+              time.getTimestamp()
+            )
+            .explicitGet()
+          tailInvoke = InvokeScriptTransaction
+            .selfSigned(
+              TxVersion.V3,
+              caller,
+              dAppAcc2.toAddress,
+              None,
+              Nil,
+              fee * 10,
+              Waves,
+              ScriptExtraFee / 100,
+              time.getTimestamp()
+            )
+            .explicitGet()
+        } yield (time, caller.toAddress, dAppAcc1, dAppAcc2, setScript1, setScript2, prioritizedInvoke, tailInvoke)
+      } {
+        case (time, caller, dAppAcc1, dAppAcc2, setScript1, setScript2, prioritizedInvoke, tailInvoke) =>
+          val prioritizedInvokeId = prioritizedInvoke.id.value()
+          val tailInvokeId        = tailInvoke.id.value()
+
+          val bcu = mkBlockchain(Map(caller -> ENOUGH_AMT, dAppAcc1.toAddress -> ENOUGH_AMT, dAppAcc2.toAddress -> ENOUGH_AMT))
+          val precondition = TestBlock.create(
+            time.getTimestamp(),
+            bcu.lastBlockId.get,
+            Seq(setScript1, setScript2, tailInvoke, prioritizedInvoke),
+            dAppAcc1
+          )
+          bcu.processBlock(precondition).explicitGet()
+
+          val utx =
+            new UtxPoolImpl(
+              time,
+              bcu,
+              ignoreSpendableBalanceChanged,
+              UtxSettings(
+                10,
+                PoolDefaultMaxBytes,
+                1000,
+                Set.empty,
+                Set.empty,
+                Set.empty,
+                allowTransactionsFromSmartAccounts = true,
+                allowSkipChecks = false
+              )
+            )
+
+          def nextStep(step: Int) = {
+            val continuations = inside(utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)) {
+              case (
+                  Some(
+                    txs @ Seq(
+                      ContinuationTransaction(`prioritizedInvokeId`, _, `step`, 0, Waves),
+                      ContinuationTransaction(`tailInvokeId`, _, `step`, 0, Waves)
+                    )
+                  ),
+                  _
+                  ) =>
+                txs
+            }
+            val block = TestBlock.create(
+              time.getTimestamp(),
+              bcu.lastBlockId.get,
+              continuations,
+              dAppAcc1
+            )
+            bcu.processBlock(block).explicitGet()
+          }
+
+          (0 to 2).foreach(nextStep)
+          bcu.continuationStates(prioritizedInvokeId) shouldBe (3, ContinuationState.Finished)
+          bcu.continuationStates(tailInvokeId) shouldBe (3, ContinuationState.Finished)
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe None
       }
     }
   }
