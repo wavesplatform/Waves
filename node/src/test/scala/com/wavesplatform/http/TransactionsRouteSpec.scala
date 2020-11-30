@@ -1,6 +1,6 @@
 package com.wavesplatform.http
 
-import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
+import akka.http.scaladsl.model._
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
@@ -15,12 +15,12 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.network.UtxPoolSynchronizer
-import com.wavesplatform.state.{Blockchain, Height}
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.state.{Blockchain, Height, InvokeScriptResult}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.{Asset, TxHelpers}
 import com.wavesplatform.{BlockGen, NoShrink, TestTime, TestWallet, TransactionGen}
 import monix.reactive.Observable
 import org.scalacheck.Gen._
@@ -28,6 +28,7 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Matchers, OptionValues}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
 
 import scala.util.Random
@@ -289,6 +290,35 @@ class TransactionsRouteSpec
 
           Get(routePath(s"/info/${tx.id().toString}")) ~> route ~> check(validateResponse())
       }
+    }
+
+    "handles multiple ids" in {
+      val txCount = 5
+      val txs = (1 to txCount).map(_ => TxHelpers.invoke(TxHelpers.defaultSigner.toAddress, "test"))
+      txs.foreach(
+        tx =>
+          (addressTransactions.transactionById _)
+            .expects(tx.id())
+            .returns(Some(TransactionMeta(Height(1), tx, Some(InvokeScriptResult()), succeeded = true)))
+            .repeat(3)
+      )
+
+      (() => blockchain.activatedFeatures).expects().returns(Map(BlockchainFeatures.BlockV5.id -> 1)).anyNumberOfTimes()
+
+      def checkResponse(): Unit = txs.zip(responseAs[JsArray].value) foreach {
+        case (tx, json) =>
+          val extraFields = Json.obj("height" -> 1, "applicationStatus" -> "succeeded", "stateChanges" -> InvokeScriptResult())
+          json shouldBe (tx.json() ++ extraFields)
+      }
+
+      Get(routePath(s"/info?${txs.map("id=" + _.id()).mkString("&")}")) ~> route ~> check(checkResponse())
+      Post(routePath("/info"), FormData(txs.map("id" -> _.id().toString): _*)) ~> route ~> check(checkResponse())
+      Post(
+        routePath("/info"),
+        HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(txs.map(_.id().toString: JsValueWrapper): _*)).toString())
+      ) ~> route ~> check(
+        checkResponse()
+      )
     }
   }
 
