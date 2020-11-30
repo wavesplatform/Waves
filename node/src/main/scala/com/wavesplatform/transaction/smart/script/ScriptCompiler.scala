@@ -35,7 +35,7 @@ object ScriptCompiler extends ScorexLogging {
       estimator: ScriptEstimator,
       blockchain: Blockchain
   ): Either[String, (Script, Script.ComplexityInfo)] =
-    compileAndEstimate(scriptText, estimator, Map(), Script.complexityInfo(_, _, _), Some(blockchain))
+    compileAndEstimate(scriptText, estimator, Map(), Script.complexityInfo, Some(blockchain))
 
   private def compileAndEstimate[C](
       scriptText: String,
