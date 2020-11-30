@@ -247,6 +247,7 @@ object JsAPI {
               annotatedComplexities,
               verifierComplexity,
               callableComplexities,
+              stateCallsComplexities,
               userFunctionComplexities,
               globalVariableComplexities
             ) =>
@@ -256,6 +257,7 @@ object JsAPI {
                 "complexity"                 -> maxComplexity,
                 "verifierComplexity"         -> verifierComplexity,
                 "callableComplexities"       -> callableComplexities.view.mapValues(c => c: Any).toMap.toJSDictionary,
+                "stateCallsComplexities"     -> stateCallsComplexities.view.mapValues(c => c: Any).toMap.toJSDictionary,
                 "userFunctionComplexities"   -> userFunctionComplexities.view.mapValues(c => c: Any).toMap.toJSDictionary,
                 "globalVariableComplexities" -> globalVariableComplexities.view.mapValues(c => c: Any).toMap.toJSDictionary,
               )

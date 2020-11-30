@@ -167,17 +167,10 @@ object ContractScript {
       complexities: Map[String, Long]
   ): Either[String, Unit] = {
     val limit = MaxComplexityByVersion(version)
-    val multiStepCallables =
-      dApp.callableFuncs
-        .filter(func => complexities(func.u.name) > limit)
-        .map(func => (Some(func.annotation.invocationArgName), func.u))
+    val multiStepCallables = dApp.callableFuncs.filter(func => complexities(func.u.name) > limit)
     for {
-      firstStepComplexities <- estimateDeclarations(
-        dApp,
-        ContinuationFirstStepEstimator.estimate(functionNativeCosts(version).value(), _),
-        multiStepCallables
-      )
-      exceedingFunctions = firstStepComplexities
+      stateCallsComplexities <- estimateStateCalls(version, dApp, multiStepCallables)
+      exceedingFunctions = stateCallsComplexities
         .collect { case (functionName, nativeCost) if nativeCost > limit => s"$functionName = $nativeCost" }
         .mkString(", ")
       _ <- Either.cond(
@@ -187,6 +180,17 @@ object ContractScript {
       )
     } yield ()
   }
+
+  def estimateStateCalls(
+      version: StdLibVersion,
+      dApp: DApp,
+      callables: List[DApp.CallableFunction]
+  ): Either[String, List[(String, Long)]] =
+    estimateDeclarations(
+      dApp,
+      ContinuationFirstStepEstimator.estimate(functionNativeCosts(version).value(), _),
+      callables.map(func => (Some(func.annotation.invocationArgName), func.u))
+    )
 
   private[script] def constructExprFromDeclAndContext(
       dec: List[DECLARATION],
