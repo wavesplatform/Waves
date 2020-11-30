@@ -8,14 +8,17 @@ import com.wavesplatform.db.WithState
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, PaymentTransaction, Proofs, Transaction, TxVersion}
@@ -290,6 +293,68 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(tx))) { blockDiffEi =>
           blockDiffEi should produce("Data from other network")
         }
+    }
+  }
+
+  property("disallow continuation in progress") {
+    def compile(scriptText: String): Script =
+      ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()._1
+
+    val dApp =
+      compile(
+        s"""
+           | {-# STDLIB_VERSION 5 #-}
+           | {-# CONTENT_TYPE DAPP #-}
+           |
+           | @Callable(i)
+           | func default() = {
+           |   let a = !(${List.fill(40)("sigVerify(base64'', base64'', base64'')").mkString("||")})
+           |   if (a)
+           |     then
+           |       [BooleanEntry("isAllowed", true)]
+           |     else
+           |       throw("unexpected")
+           | }
+         """.stripMargin
+      )
+
+    val preconditionsAndPayment = for {
+      master    <- accountGen
+      dAppAcc   <- accountGen
+      timestamp <- positiveLongGen
+      fee       <- smallFeeGen
+      genesis1   = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, timestamp).explicitGet()
+      genesis2   = GenesisTransaction.create(dAppAcc.toAddress, ENOUGH_AMT, timestamp).explicitGet()
+      setScript = SetScriptTransaction.selfSigned(TxVersion.V2, dAppAcc, Some(dApp), fee, timestamp).explicitGet()
+      invoke = InvokeScriptTransaction.selfSigned(TxVersion.V3, master, dAppAcc.toAddress, None, Nil, fee * 10, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, timestamp).explicitGet()
+      continuation = ContinuationTransaction(invoke.id.value(), invoke.timestamp + 1, step = 0, fee = 0L, Waves)
+      transfer = TransferTransaction.selfSigned(TxVersion.V2, dAppAcc, master.toAddress, Waves, 1L, Waves, fee, ByteStr.empty, timestamp).explicitGet()
+    } yield (Seq(genesis1, genesis2), setScript, invoke, continuation, transfer)
+
+    val rideV5Activated = TestFunctionalitySettings.Enabled.copy(
+      preActivatedFeatures = Map(
+        BlockchainFeatures.SmartAccounts.id           -> 0,
+        BlockchainFeatures.Ride4DApps.id              -> 0,
+        BlockchainFeatures.BlockV5.id                 -> 0,
+        BlockchainFeatures.ContinuationTransaction.id -> 0
+      )
+    )
+
+    forAll(preconditionsAndPayment) {
+      case (genesis, setScript, invoke, continuation, transfer) =>
+        assertDiffEi(
+          Seq(TestBlock.create(genesis), TestBlock.create(Seq(setScript, invoke, continuation))),
+          TestBlock.create(Seq(transfer)),
+          rideV5Activated
+        )(_ should produce("BlockedByContinuation"))
+    }
+    forAll(preconditionsAndPayment) {
+      case (genesis, setScript, invoke, continuation, transfer) =>
+        assertDiffEi(
+          Seq(TestBlock.create(genesis), TestBlock.create(Seq(setScript, invoke, continuation, continuation.copy(step = 1)))),
+          TestBlock.create(Seq(transfer)),
+          rideV5Activated
+        )(_ shouldBe Symbol("right"))
     }
   }
 }
