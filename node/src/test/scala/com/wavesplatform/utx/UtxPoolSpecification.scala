@@ -1390,5 +1390,4 @@ class UtxPoolSpecification
     OneDimensionalMiningConstraint(n, TxEstimators.one, "one"),
     OneDimensionalMiningConstraint(n, TxEstimators.one, "one")
   )
-
 }

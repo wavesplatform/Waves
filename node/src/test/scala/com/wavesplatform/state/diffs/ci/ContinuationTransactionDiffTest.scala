@@ -14,7 +14,7 @@ import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.FunctionHeader.User
-import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -28,18 +28,20 @@ import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.diffs.invoke.{ContinuationTransactionDiff, InvokeScriptTransactionDiff}
 import com.wavesplatform.transaction.ApplicationStatus.{ScriptExecutionInProgress, Succeeded}
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxValidationError.FailedTransactionError
+import com.wavesplatform.transaction.TxValidationError.FailedTransactionError.Cause
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.{Inside, Matchers, PropSpec}
 import shapeless.Coproduct
 
 import scala.util.Random
 
-class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with TransactionGen with Matchers {
+class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with TransactionGen with Matchers with Inside {
   private val transferAddress = accountGen.sample.get.toAddress
   private val dAppPk          = accountGen.sample.get.publicKey
   private val scriptedAssetId = bytes32gen.map(ByteStr(_)).sample.get
@@ -70,6 +72,16 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
         |         Burn(base58'$scriptedAssetId', $burnAmount),
         |         ScriptTransfer(Address(base58'${transferAddress.stringRepr}'), $transferAmount, base58'$scriptedAssetId')
         |       ]
+        |     else
+        |       throw("unexpected")
+        | }
+        |
+        | @Callable(i)
+        | func failingExpr() = {
+        |   let a = !(${List.fill(10)("sigVerify(base64'', base64'', base64'')").mkString("||")})
+        |   if (a)
+        |     then
+        |       throw("failed")
         |     else
         |       throw("unexpected")
         | }
@@ -305,5 +317,29 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
         )
       )
     )
+  }
+
+  property("failed continuation") {
+    val dAppAddress              = dAppPk.toAddress
+    val actionScriptInvocations  = 3
+    val stepFee                  = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee * (actionScriptInvocations + 1)
+    val invoke = invokeGen.sample.get.copy(
+      funcCallOpt = Some(FUNCTION_CALL(User("failingExpr"), List(CONST_BOOLEAN(true)))),
+      fee = stepFee + ScriptExtraFee, // for account script
+      dAppAddressOrAlias = dAppAddress
+    )
+    val step         = Random.nextInt(Int.MaxValue)
+    val continuation = ContinuationTransaction(invoke.id.value(), invoke.timestamp, step, fee = 0L, invoke.feeAssetId)
+    val expr         = dApp.expr.callableFuncs.find(_.u.name == "failingExpr").get.u.body
+
+    val actualComplexity    = 2018
+    val estimatedComplexity = actualComplexity + Random.nextInt(2000)
+    val blockchain          = blockchainMock(invoke, ("failingExpr", estimatedComplexity), Some((step, expr, 0)))
+
+    inside(ContinuationTransactionDiff(blockchain, continuation.timestamp, false)(continuation).resultE) {
+      case Left(
+        FailedTransactionError(Cause.DAppExecution, `estimatedComplexity`, _, Some("failed"), None)
+      ) =>
+    }
   }
 }
