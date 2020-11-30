@@ -45,7 +45,9 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
   private val transferAddress = accountGen.sample.get.toAddress
   private val dAppPk          = accountGen.sample.get.publicKey
   private val scriptedAssetId = bytes32gen.map(ByteStr(_)).sample.get
+  private val failingAssetId  = bytes32gen.map(ByteStr(_)).sample.get
   private val scriptedAsset   = IssuedAsset(scriptedAssetId)
+  private val failingAsset    = IssuedAsset(failingAssetId)
 
   private val paymentAmount  = 7L
   private val transferAmount = 10L
@@ -53,7 +55,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
   private val burnAmount     = 50L
 
   private val assetScriptComplexity = 123
-  private val invokeGen = invokeScriptGen(Gen.const(Seq(Payment(paymentAmount, scriptedAsset))))
+  private val invokeGen             = invokeScriptGen(Gen.const(Seq(Payment(paymentAmount, scriptedAsset))))
 
   private val dApp =
     compile(
@@ -85,6 +87,22 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
         |     else
         |       throw("unexpected")
         | }
+        |
+        | @Callable(i)
+        | func failingAssetVerifier() = {
+        |   let a = !(${List.fill(10)("sigVerify(base64'', base64'', base64'')").mkString("||")})
+        |   if (a)
+        |     then
+        |       [
+        |         BooleanEntry("isAllowed", true),
+        |         Reissue(base58'$scriptedAssetId', $reissueAmount, true),
+        |         Burn(base58'$scriptedAssetId', $burnAmount),
+        |         ScriptTransfer(Address(base58'${transferAddress.stringRepr}'), $transferAmount, base58'$failingAssetId')
+        |       ]
+        |     else
+        |       throw("unexpected")
+        | }
+        |
         |
         | @Callable(i)
         | func multiStepExpr() = {
@@ -119,7 +137,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
       .anyNumberOfTimes()
     (blockchain.accountScript _)
       .expects(invoke.dAppAddressOrAlias.asInstanceOf[Address])
-      .returning(Some(AccountScriptInfo(invoke.sender, dApp, 99L, Map(3 -> Map(func)))))  // verifier complexity counts separately
+      .returning(Some(AccountScriptInfo(invoke.sender, dApp, 99L, Map(3 -> Map(func))))) // verifier complexity counts separately in Verifier.scala
     (() => blockchain.activatedFeatures)
       .expects()
       .returning(Map(BlockchainFeatures.Ride4DApps.id -> 0, BlockchainFeatures.BlockV5.id -> 0))
@@ -127,6 +145,17 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
     (() => blockchain.height)
       .expects()
       .returning(1)
+      .anyNumberOfTimes()
+    (blockchain.assetScript _)
+      .expects(failingAsset)
+      .returning(
+        Some(
+          AssetScriptInfo(
+            compile(""" if (true) then throw("failed by asset verifier") else false """),
+            assetScriptComplexity
+          )
+        )
+      )
       .anyNumberOfTimes()
     (blockchain.assetScript _)
       .expects(*)
@@ -275,9 +304,9 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
   }
 
   property("continuation finish result with scripted actions and payment") {
-    val dAppAddress              = dAppPk.toAddress
-    val actionScriptInvocations  = 3
-    val stepFee                  = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee * (actionScriptInvocations + 1)
+    val dAppAddress             = dAppPk.toAddress
+    val actionScriptInvocations = 3
+    val stepFee                 = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee * (actionScriptInvocations + 1)
     val invoke = invokeGen.sample.get.copy(
       funcCallOpt = Some(FUNCTION_CALL(User("oneStepExpr"), Nil)),
       fee = stepFee + ScriptExtraFee, // for account script
@@ -320,9 +349,9 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
   }
 
   property("failed continuation") {
-    val dAppAddress              = dAppPk.toAddress
-    val actionScriptInvocations  = 3
-    val stepFee                  = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee * (actionScriptInvocations + 1)
+    val dAppAddress             = dAppPk.toAddress
+    val actionScriptInvocations = 3
+    val stepFee                 = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee * (actionScriptInvocations + 1)
     val invoke = invokeGen.sample.get.copy(
       funcCallOpt = Some(FUNCTION_CALL(User("failingExpr"), List(CONST_BOOLEAN(true)))),
       fee = stepFee + ScriptExtraFee, // for account script
@@ -338,8 +367,33 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
 
     inside(ContinuationTransactionDiff(blockchain, continuation.timestamp, false)(continuation).resultE) {
       case Left(
-        FailedTransactionError(Cause.DAppExecution, `estimatedComplexity`, _, Some("failed"), None)
-      ) =>
+          FailedTransactionError(Cause.DAppExecution, `estimatedComplexity`, _, Some("failed"), None)
+          ) =>
+    }
+  }
+
+  property("failed by action asset verifier continuation") {
+    val dAppAddress             = dAppPk.toAddress
+    val actionScriptInvocations = 3
+    val stepFee                 = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee * (actionScriptInvocations + 1)
+    val invoke = invokeGen.sample.get.copy(
+      funcCallOpt = Some(FUNCTION_CALL(User("failingAssetVerifier"), List(CONST_BOOLEAN(true)))),
+      fee = stepFee + ScriptExtraFee, // for account script
+      dAppAddressOrAlias = dAppAddress
+    )
+    val step         = Random.nextInt(Int.MaxValue)
+    val continuation = ContinuationTransaction(invoke.id.value(), invoke.timestamp, step, fee = 0L, invoke.feeAssetId)
+    val expr         = dApp.expr.callableFuncs.find(_.u.name == "failingAssetVerifier").get.u.body
+
+    val actualComplexity    = 2018
+    val estimatedComplexity = actualComplexity + Random.nextInt(2000)
+    val blockchain          = blockchainMock(invoke, ("failingAssetVerifier", estimatedComplexity), Some((step, expr, 0)))
+
+    val expectingComplexity = estimatedComplexity + assetScriptComplexity * 3
+    inside(ContinuationTransactionDiff(blockchain, continuation.timestamp, false)(continuation).resultE) {
+      case Left(
+          FailedTransactionError(Cause.AssetScriptInAction, `expectingComplexity`, _, Some("failed by asset verifier"), Some(`failingAssetId`))
+          ) =>
     }
   }
 }
