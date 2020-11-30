@@ -15,15 +15,14 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.{Blockchain, Height}
-import com.wavesplatform.transaction.{Asset, Proofs, TxVersion}
 import com.wavesplatform.transaction.ApplicationStatus.{ScriptExecutionFailed, Succeeded}
-import com.wavesplatform.transaction.{Asset}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.{Asset, Proofs, TxVersion}
 import com.wavesplatform.{BlockGen, NoShrink, TestTime, TestWallet, TransactionGen}
 import monix.reactive.Observable
 import org.scalacheck.Gen._
@@ -468,6 +467,7 @@ class TransactionsRouteSpec
         Seq.empty,
         500000L,
         Asset.Waves,
+        InvokeScriptTransaction.DefaultExtraFeePerStep,
         testTime.getTimestamp(),
         Proofs.empty,
         AddressScheme.current.chainId
