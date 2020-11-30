@@ -44,7 +44,7 @@ class AddressRouteSpec
   private val blockchain   = stub[Blockchain]("globalBlockchain")
   (() => blockchain.activatedFeatures).when().returning(Map())
 
-  private[this] val utxPoolSynchronizer = DummyUtxPoolSynchronizer.accepting
+  private[this] val utxPoolSynchronizer = DummyTransactionPublisher.accepting
 
   private val commonAccountApi = mock[CommonAccountsApi]("globalAccountApi")
 

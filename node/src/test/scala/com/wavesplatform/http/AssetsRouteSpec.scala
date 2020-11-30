@@ -31,7 +31,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
     val route: Route = AssetsApiRoute(
       restAPISettings,
       wallet,
-      DummyUtxPoolSynchronizer.accepting,
+      DummyTransactionPublisher.accepting,
       state,
       new TestTime(),
       mock[CommonAccountsApi],
