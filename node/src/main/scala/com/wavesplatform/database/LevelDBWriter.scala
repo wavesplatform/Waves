@@ -31,7 +31,6 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
-import monix.eval.Coeval
 import monix.reactive.Observer
 import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
@@ -280,22 +279,10 @@ abstract class LevelDBWriter private[database] (
     stateFeatures ++ settings.functionalitySettings.preActivatedFeatures
   }
 
-  private[this] val genesisWavesAmount: Coeval[BigInt] = Coeval(readOnly { db =>
-    var result: BigInt = 0
-    db.iterateOver(KeyTags.NthTransactionInfoAtHeight.prefixBytes ++ Ints.toByteArray(1)) { e =>
-      val (tx, _) = readTransaction(e.getValue)
-      tx match {
-        case g: GenesisTransaction => result += g.amount
-        case _                     => // Should not happen
-      }
-    }
-    result
-  }).memoizeOnSuccess
-
   override def wavesAmount(height: Int): BigInt = readOnly { db =>
     val factHeight = height.min(this.height)
     if (db.has(Keys.wavesAmount(factHeight))) db.get(Keys.wavesAmount(factHeight))
-    else genesisWavesAmount()
+    else settings.genesisSettings.initialBalance
   }
 
   override def blockReward(height: Int): Option[Long] =
