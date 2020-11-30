@@ -37,17 +37,17 @@ object TransactionDiffer {
       case result => result
     }
 
-  def forceValidate(prevBlockTs: Option[Long], currentBlockTs: Long, checkForContinuations: Boolean = true)(
+  def forceValidate(prevBlockTs: Option[Long], currentBlockTs: Long, checkContinuation: Boolean = true)(
       blockchain: Blockchain,
       tx: Transaction
   ): TracedResult[ValidationError, Diff] =
-    validate(prevBlockTs, currentBlockTs, verify = true, limitedExecution = false, checkForContinuations)(blockchain, tx)
+    validate(prevBlockTs, currentBlockTs, verify = true, limitedExecution = false, checkContinuation)(blockchain, tx)
 
   def limitedExecution(
       prevBlockTimestamp: Option[Long],
       currentBlockTimestamp: Long,
       verify: Boolean = true,
-      checkForContinuations: Boolean = true
+      checkContinuation: Boolean = true
   )(
       blockchain: Blockchain,
       tx: Transaction
@@ -57,7 +57,7 @@ object TransactionDiffer {
       currentBlockTimestamp,
       verify,
       limitedExecution = mayFail(tx) && acceptFailed(blockchain),
-      checkForContinuations
+      checkContinuation
     )(blockchain, tx)
   }
 
@@ -65,20 +65,21 @@ object TransactionDiffer {
     * Validates transaction.
     * @param limitedExecution skip execution of the DApp and asset scripts
     * @param verify validate common checks, proofs and asset scripts execution. If `skipFailing` is true asset scripts will not be executed
+    * @param checkContinuation check if evaluation is in progress for continuation transaction
     */
   private def validate(
       prevBlockTimestamp: Option[Long],
       currentBlockTimestamp: Long,
       verify: Boolean,
       limitedExecution: Boolean,
-      checkForContinuations: Boolean = true
+      checkContinuation: Boolean = true
   )(
       blockchain: Blockchain,
       tx: Transaction
   ): TracedResult[ValidationError, Diff] = {
     val verifyAssets = verify || (mayFail(tx) && acceptFailed(blockchain))
     val result = for {
-      _               <- validateCommon(blockchain, tx, prevBlockTimestamp, currentBlockTimestamp, verify, checkForContinuations).traced
+      _               <- validateCommon(blockchain, tx, prevBlockTimestamp, currentBlockTimestamp, verify, checkContinuation).traced
       _               <- validateFunds(blockchain, tx).traced
       verifierDiff    <- if (verify) verifierDiff(blockchain, tx) else Right(Diff.empty).traced
       transactionDiff <- transactionDiff(blockchain, tx, verifierDiff, currentBlockTimestamp, limitedExecution)

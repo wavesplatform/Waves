@@ -221,9 +221,9 @@ class UtxPoolImpl(
       val patchedBlockchain = CompositeBlockchain(blockchain, Some(Monoid.combineAll(priorityDiffs)))
 
       if (forceValidate)
-        TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime(), checkForContinuations = false)(patchedBlockchain, tx)
+        TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime(), checkContinuation = false)(patchedBlockchain, tx)
       else
-        TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify, checkForContinuations = false)(patchedBlockchain, tx)
+        TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify, checkContinuation = false)(patchedBlockchain, tx)
     }
 
     def addPortfolio(): Unit = diffEi.map { diff =>
