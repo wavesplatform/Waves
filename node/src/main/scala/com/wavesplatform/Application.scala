@@ -188,8 +188,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val historyReplier = new HistoryReplier(blockchainUpdater.score, history, settings.synchronizationSettings)(historyRepliesScheduler)
 
     def rollbackTask(blockId: ByteStr, returnTxsToUtx: Boolean) =
-      Task(blockchainUpdater.removeAfter(blockId))
-        .executeOn(appenderScheduler)
+      Task {
+        utxStorage.resetPriorityPool()
+        blockchainUpdater.removeAfter(blockId)
+      }.executeOn(appenderScheduler)
         .asyncBoundary
         .map {
           case Right(discardedBlocks) =>
@@ -209,9 +211,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def utx: UtxPool                                                                 = utxStorage
       override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] =
         Await.result(utxSynchronizer.publish(tx), Duration.Inf) // TODO: Replace with async if possible
-      override def spendableBalanceChanged: Observable[(Address, Asset)]                         = app.spendableBalanceChanged
-      override def actorSystem: ActorSystem                                                      = app.actorSystem
-      override def utxEvents: Observable[UtxEvent]                                               = app.utxEvents
+      override def spendableBalanceChanged: Observable[(Address, Asset)] = app.spendableBalanceChanged
+      override def actorSystem: ActorSystem                              = app.actorSystem
+      override def utxEvents: Observable[UtxEvent]                       = app.utxEvents
 
       override val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
         blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
@@ -385,7 +387,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         RewardApiRoute(blockchainUpdater)
       )
 
-      val httpService = CompositeHttpService(apiRoutes, settings.restAPISettings)(actorSystem)
+      val httpService   = CompositeHttpService(apiRoutes, settings.restAPISettings)(actorSystem)
       val combinedRoute = httpService.loggingCompositeRoute
       val httpFuture    = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       serverBinding = Await.result(httpFuture, 20.seconds)
