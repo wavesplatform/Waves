@@ -16,6 +16,7 @@ import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2, IncompleteResult}
@@ -57,12 +58,12 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
   private val dApp =
     compile(
       s"""
-        | {-# STDLIB_VERSION 4 #-}
+        | {-# STDLIB_VERSION 5 #-}
         | {-# CONTENT_TYPE DAPP #-}
         |
         | @Callable(i)
         | func oneStepExpr() = {
-        |   let a = !(${List.fill(10)("sigVerify(base64'',base64'',base64'')").mkString("||")})
+        |   let a = !(${List.fill(10)("sigVerify(base64'', base64'', base64'')").mkString("||")})
         |   if (a)
         |     then
         |       [
@@ -77,7 +78,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
         |
         | @Callable(i)
         | func multiStepExpr() = {
-        |   let a = !(${List.fill(100)("sigVerify(base64'',base64'',base64'')").mkString("||")})
+        |   let a = !(${List.fill(100)("sigVerify(base64'', base64'', base64'')").mkString("||")})
         |   if (a)
         |     then
         |       [BooleanEntry("isAllowed", true)]
@@ -87,20 +88,8 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
       """.stripMargin
     ).asInstanceOf[ContractScriptImpl]
 
-  private lazy val dummyEstimator = new ScriptEstimator {
-    override val version: Int = 0
-    override def apply(
-        declaredVals: Set[String],
-        functionCosts: Map[FunctionHeader, Coeval[Long]],
-        expr: Terms.EXPR
-    ): Either[String, Long] = Right(1)
-  }
-
   private def compile(scriptText: String): Script =
-    ScriptCompiler
-      .compile(scriptText, dummyEstimator)
-      .explicitGet()
-      ._1
+    ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()._1
 
   private def blockchainMock(invoke: InvokeScriptTransaction, func: (String, Long), exprInfo: Option[(Int, EXPR, Int)]) = {
     val blockchain = mock[Blockchain]

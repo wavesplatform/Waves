@@ -17,6 +17,7 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.ContinuationTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -40,17 +41,8 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   private lazy val dAppAddress: String   = firstAddress
   private lazy val callerAddress: String = secondAddress
 
-  private val dummyEstimator = new ScriptEstimator {
-    override val version: Int = 0
-    override def apply(
-        declaredVals: Set[String],
-        functionCosts: Map[FunctionHeader, Coeval[Long]],
-        expr: Terms.EXPR
-    ): Either[String, Long] = Right(1)
-  }
-
   private def compile(scriptText: String): String =
-    ScriptCompiler.compile(scriptText, dummyEstimator).explicitGet()._1.bytes().base64
+    ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()._1.bytes().base64
 
   private lazy val script =
     compile(
