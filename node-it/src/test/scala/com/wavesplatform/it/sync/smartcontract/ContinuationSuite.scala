@@ -138,7 +138,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   test("can't set continuation before activation") {
     assertBadRequestAndMessage(
       sender.setScript(dApp, Some(script), setScriptFee),
-      "State check failed. Reason: Contract function (foo) is too complex: 30657 > 4000"
+      "State check failed. Reason: ActivationError(Continuation Transaction feature has not been activated yet)"
     )
   }
 
