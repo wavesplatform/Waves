@@ -220,7 +220,7 @@ class ProtoVersionTransactionsSpec
           account.publicKey,
           dapp,
           Some(FUNCTION_CALL(User("hello"), List(CONST_LONG(42L)))),
-          Seq(Payment(100, Asset.Waves)),
+          Seq(InvokeScriptTransaction.Payment(100, Asset.Waves)),
           InvokeScriptTxFee,
           IssuedAsset(feeAssetId),
           Now,

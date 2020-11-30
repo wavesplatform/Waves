@@ -64,23 +64,26 @@ case class TransactionsApiRoute(
     }
   }
 
-  def info: Route = (pathPrefix("info") & get) {
-    path(TransactionId) { id =>
+  private[this] def readTransactionMeta(id: String): Either[ApiError, TransactionMeta] =
+    for {
+      id   <- ByteStr.decodeBase58(id).toEither.leftMap(err => CustomValidationError(err.toString))
+      meta <- commonApi.transactionById(id).toRight(ApiError.TransactionDoesNotExist)
+    } yield meta
+
+  def info: Route = pathPrefix("info") {
+    (get & path(TransactionId)) { id =>
       complete(commonApi.transactionById(id).toRight(ApiError.TransactionDoesNotExist))
     } ~ (pathEndOrSingleSlash & anyParam("id")) { ids =>
-      val statuses = ids.map(
-        id =>
-          for {
-            id   <- ByteStr.decodeBase58(id).toEither.leftMap(err => CustomValidationError(err.toString))
-            meta <- commonApi.transactionById(id).toRight(ApiError.TransactionDoesNotExist)
-          } yield meta
-      )
+      val result = for {
+        _        <- Either.cond(ids.nonEmpty, (), InvalidTransactionId("Transaction ID was not specified"))
+        statuses <- ids.map(readTransactionMeta).toList.sequence
+      } yield statuses
 
-      complete(statuses.toList.sequence.map(_.toSeq))
+      complete(result)
     }
   }
 
-  private def loadTransactionStatus(id: ByteStr): JsObject = {
+  private[this] def loadTransactionStatus(id: ByteStr): JsObject = {
     import Status._
     val statusJson = blockchain.transactionInfo(id) match {
       case Some((height, _, succeeded)) =>
@@ -262,9 +265,12 @@ object TransactionsApiRoute {
   private[http] object TransactionJsonSerializer {
     def applicationStatus(isBlockV5: Boolean, succeeded: Boolean): JsObject =
       if (isBlockV5)
-        JsObject(Map("applicationStatus" -> JsString(if (succeeded) ApplicationStatus.Succeeded else ApplicationStatus.ScriptExecutionFailed)))
+        Json.obj("applicationStatus" -> (if (succeeded) ApplicationStatus.Succeeded else ApplicationStatus.ScriptExecutionFailed))
       else
         JsObject.empty
+
+    def height(height: Int): JsObject =
+      Json.obj("height" -> height)
   }
 
   private[http] final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: CommonTransactionsApi) {
@@ -283,7 +289,8 @@ object TransactionsApiRoute {
         case _ => JsObject.empty
       }
 
-      meta.transaction.json() ++ specificInfo ++ applicationStatus(meta.height, meta.succeeded)
+      Seq(meta.transaction.json(), TransactionJsonSerializer.height(meta.height), applicationStatus(meta.height, meta.succeeded), specificInfo)
+        .reduce(_ ++ _)
     }
 
     def txToExtendedJson(tx: Transaction): JsObject = {
