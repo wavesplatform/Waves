@@ -15,7 +15,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
 
   private val kp: KeyPair = KeyPair(ByteStr(new Array[Byte](32)))
 
-  property("TransactionsOrdering.InUTXPool should sort correctly") {
+  property("TransactionsOrdering should sort correctly") {
     val correctSeq = Seq(
       TransferTransaction
         .selfSigned(
@@ -89,7 +89,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
     sorted shouldBe correctSeq
   }
 
-  property("TransactionsOrdering.InUTXPool should sort txs by ascending block timestamp taking into consideration whitelisted senders") {
+  property("TransactionsOrdering should sort txs by ascending block timestamp taking into consideration whitelisted senders") {
     val whitelisted = KeyPair(Array.fill(32)(1: Byte))
     val correctSeq = Seq(
       TransferTransaction
