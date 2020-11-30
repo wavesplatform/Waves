@@ -11,7 +11,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.http.{ApiErrorMatchers, RestAPISettingsHelper}
-import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.Asset
@@ -40,7 +40,7 @@ class CustomJsonMarshallerSpec
     with TransactionGen {
   private val blockchain      = mock[Blockchain]
   private val utx             = mock[UtxPool]
-  private val utxSynchronizer = mock[UtxPoolSynchronizer]
+  private val publisher       = mock[TransactionPublisher]
   private val transactionsApi = mock[CommonTransactionsApi]
   private val accountsApi     = mock[CommonAccountsApi]
   private val assetsApi       = mock[CommonAssetsApi]
@@ -64,7 +64,7 @@ class CustomJsonMarshallerSpec
   }
 
   private val transactionsRoute =
-    TransactionsApiRoute(restAPISettings, transactionsApi, testWallet, blockchain, () => utx.size, utxSynchronizer, ntpTime).route
+    TransactionsApiRoute(restAPISettings, transactionsApi, testWallet, blockchain, () => utx.size, publisher, ntpTime).route
 
   property("/transactions/info/{id}") {
     forAll(leaseGen) { lt =>
@@ -103,7 +103,7 @@ class CustomJsonMarshallerSpec
     pending // todo: fix when distributions/portfolio become testable
   }
 
-  private val assetsRoute = AssetsApiRoute(restAPISettings, testWallet, utxSynchronizer, blockchain, ntpTime, accountsApi, assetsApi).route
+  private val assetsRoute = AssetsApiRoute(restAPISettings, testWallet, publisher, blockchain, ntpTime, accountsApi, assetsApi).route
 
   property("/assets/{assetId}/distribution/{height}/limit/{limit}") {
     pending // todo: fix when distributions/portfolio become testable

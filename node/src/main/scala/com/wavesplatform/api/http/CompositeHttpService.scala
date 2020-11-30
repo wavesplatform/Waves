@@ -1,8 +1,7 @@
 package com.wavesplatform.api.http
 
-import java.util.concurrent.Executors
+import java.util.concurrent.{LinkedBlockingQueue, RejectedExecutionException, ThreadPoolExecutor, TimeUnit}
 
-import akka.actor.ActorSystem
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
@@ -12,13 +11,25 @@ import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utils.ScorexLogging
+import io.netty.util.concurrent.DefaultThreadFactory
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
 
-case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings)(system: ActorSystem) extends ScorexLogging {
+case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings) extends ScorexLogging {
   // Only affects extractScheduler { implicit sc => ... } routes
-  val scheduler = ExecutionContext.fromExecutorService(
-    Executors.newWorkStealingPool((Runtime.getRuntime.availableProcessors() * 2).min(4)),
+  private[this] val corePoolSize = (Runtime.getRuntime.availableProcessors() * 2).min(4)
+  val scheduler: ExecutionContextExecutorService = ExecutionContext.fromExecutorService(
+    new ThreadPoolExecutor(
+      corePoolSize,
+      corePoolSize,
+      60,
+      TimeUnit.SECONDS,
+      new LinkedBlockingQueue[Runnable],
+      new DefaultThreadFactory("rest-heavy-request-processor", true), { (r: Runnable, executor: ThreadPoolExecutor) =>
+        log.error(s"$r has been rejected from $executor")
+        throw new RejectedExecutionException
+      }
+    ),
     log.error("Error in REST API", _)
   )
 
