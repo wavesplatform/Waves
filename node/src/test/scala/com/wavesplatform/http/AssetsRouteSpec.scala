@@ -48,7 +48,7 @@ class AssetsRouteSpec
   private val route: Route = AssetsApiRoute(
     restAPISettings,
     wallet,
-    DummyUtxPoolSynchronizer.accepting,
+    DummyTransactionPublisher.accepting,
     blockchain,
     new TestTime(),
     mock[CommonAccountsApi],
