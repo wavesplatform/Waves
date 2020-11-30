@@ -337,7 +337,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
     val expr         = dApp.expr.callableFuncs.find(_.u.name == "oneStepExpr").get.u.body
 
     val actualComplexity    = 2018
-    val estimatedComplexity = actualComplexity + Random.nextInt(2000)
+    val estimatedComplexity = actualComplexity + Random.nextInt(1000)
     val blockchain          = blockchainMock(invoke, ("oneStepExpr", estimatedComplexity), Some((step, expr, 0)))
 
     ContinuationTransactionDiff(blockchain, continuation.timestamp, false)(continuation).resultE shouldBe Right(
@@ -382,7 +382,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
     val expr         = dApp.expr.callableFuncs.find(_.u.name == "failingExpr").get.u.body
 
     val actualComplexity    = 2018
-    val estimatedComplexity = actualComplexity + Random.nextInt(2000)
+    val estimatedComplexity = actualComplexity + Random.nextInt(1000)
     val blockchain          = blockchainMock(invoke, ("failingExpr", estimatedComplexity), Some((step, expr, 0)))
 
     inside(ContinuationTransactionDiff(blockchain, continuation.timestamp, false)(continuation).resultE) {
@@ -406,7 +406,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
     val expr         = dApp.expr.callableFuncs.find(_.u.name == "failingAssetVerifier").get.u.body
 
     val actualComplexity    = 2018
-    val estimatedComplexity = actualComplexity + Random.nextInt(2000)
+    val estimatedComplexity = actualComplexity + Random.nextInt(1000)
     val blockchain          = blockchainMock(invoke, ("failingAssetVerifier", estimatedComplexity), Some((step, expr, 0)))
 
     val expectingComplexity = estimatedComplexity + assetScriptComplexity * 3
@@ -431,7 +431,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
     val expr         = dApp.expr.callableFuncs.find(_.u.name == "oneStepExpr").get.u.body
 
     val actualComplexity    = 2018
-    val estimatedComplexity = actualComplexity + Random.nextInt(2000)
+    val estimatedComplexity = actualComplexity + Random.nextInt(1000)
     val blockchain          = blockchainMock(invoke, ("oneStepExpr", estimatedComplexity), Some((step, expr, 0)))
 
     Verifier.assets(blockchain, Int.MaxValue)(continuation).resultE shouldBe
