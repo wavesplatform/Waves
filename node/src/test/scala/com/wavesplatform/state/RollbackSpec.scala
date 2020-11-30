@@ -8,38 +8,43 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures._
-import com.wavesplatform.features._
+import com.wavesplatform.features.{BlockchainFeatures, _}
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, V4}
-import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
+import com.wavesplatform.state.diffs.{ENOUGH_AMT}
+import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.{NoShrink, TestTime, TransactionGen, history}
 import org.scalacheck.Gen.alphaLowerChar
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.{Assertions, FreeSpec, Matchers}
+import org.scalatest.{Assertions, FreeSpec, Inside, Matchers}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class RollbackSpec extends FreeSpec with Matchers with WithDomain with TransactionGen with PropertyChecks with NoShrink {
+class RollbackSpec extends FreeSpec with Matchers with WithDomain with TransactionGen with PropertyChecks with NoShrink with Inside {
   private val time   = new TestTime
   private def nextTs = time.getTimestamp()
 
@@ -809,6 +814,112 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           } catch {
             case e: Throwable => Assertions.assert(e.getMessage.contains("AlreadyInTheState"))
           }
+        }
+    }
+
+    "continuation" in forAll {
+      def compile(scriptText: String): Script =
+        ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()._1
+
+      val dApp =
+        compile(
+          s"""
+             | {-# STDLIB_VERSION 5 #-}
+             | {-# CONTENT_TYPE DAPP #-}
+             |
+             | @Callable(i)
+             | func default() = {
+             |   let a = !(${List.fill(40)("sigVerify(base64'', base64'', base64'')").mkString("||")})
+             |   if (a)
+             |     then
+             |       [BooleanEntry("isAllowed", true)]
+             |     else
+             |       throw("unexpected")
+             | }
+           """.stripMargin
+        )
+
+      for {
+        caller  <- accountGen
+        dAppAcc <- accountGen
+        fee     <- smallFeeGen
+        timestamp = nextTs
+        setScript = SetScriptTransaction.selfSigned(TxVersion.V2, dAppAcc, Some(dApp), fee, timestamp + 1).explicitGet()
+        paymentAmount = 1234567L
+        invoke = InvokeScriptTransaction
+          .selfSigned(
+            TxVersion.V3,
+            caller,
+            dAppAcc.toAddress,
+            None,
+            Seq(Payment(paymentAmount, Waves)),
+            fee * 10,
+            Waves,
+            InvokeScriptTransaction.DefaultExtraFeePerStep,
+            timestamp + 2
+          )
+          .explicitGet()
+        continuation = ContinuationTransaction(invoke.id.value(), invoke.timestamp + 3, step = 0, fee = 0L, Waves)
+      } yield (timestamp, caller.toAddress, dAppAcc.toAddress, setScript, invoke, continuation, paymentAmount)
+    } {
+      case (timestamp, caller, dAppAcc, setScript, invoke, continuation, paymentAmount) =>
+        withDomain(
+          createSettings(
+            BlockchainFeatures.SmartAccounts           -> 0,
+            BlockchainFeatures.Ride4DApps              -> 0,
+            BlockchainFeatures.BlockV5                 -> 0,
+            BlockchainFeatures.ContinuationTransaction -> 0
+          )
+        ) { d =>
+          val invokeId = invoke.id.value()
+
+          d.appendBlock(genesisBlock(timestamp, Map(caller -> ENOUGH_AMT, dAppAcc -> ENOUGH_AMT)))
+          d.appendBlock(setScript)
+          val startCallerBalance = d.balance(caller)
+          val startDAppBalance = d.balance(dAppAcc)
+          val beforeInvoke = d.lastBlockId
+
+          d.appendBlock(invoke)
+          val afterInvoke = d.lastBlockId
+          d.balance(caller) shouldBe startCallerBalance - FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
+          d.balance(dAppAcc) shouldBe startDAppBalance
+          inside(d.blockchainUpdater.continuationStates.toList) {
+            case List((`invokeId`, (0, ContinuationState.InProgress(_, _)))) =>
+          }
+
+          d.appendBlock(continuation)
+          val afterFirstStep = d.lastBlockId
+          d.balance(caller) shouldBe startCallerBalance - 2 * FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
+          d.balance(dAppAcc) shouldBe startDAppBalance
+          inside(d.blockchainUpdater.continuationStates.toList) {
+            case List((`invokeId`, (1, ContinuationState.InProgress(_, _)))) =>
+          }
+
+          d.appendBlock(continuation.copy(step = 1))
+          d.balance(caller) shouldBe startCallerBalance - 3 * FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit - paymentAmount
+          d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
+          d.blockchainUpdater.continuationStates shouldBe Map((invokeId, (2, ContinuationState.Finished)))
+          d.blockchainUpdater.accountData(dAppAcc, "isAllowed") shouldBe Some(BooleanDataEntry("isAllowed", true))
+
+          d.removeAfter(afterFirstStep)
+          d.blockchainUpdater.accountData(dAppAcc, "isAllowed") shouldBe None
+          d.balance(caller) shouldBe startCallerBalance - 2 * FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
+          d.balance(dAppAcc) shouldBe startDAppBalance
+          inside(d.blockchainUpdater.continuationStates.toList) {
+            case List((`invokeId`, (1, ContinuationState.InProgress(_, _)))) =>
+          }
+
+          d.removeAfter(afterInvoke)
+          d.balance(caller) shouldBe startCallerBalance - FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
+          d.balance(dAppAcc) shouldBe startDAppBalance
+          inside(d.blockchainUpdater.continuationStates.toList) {
+            case List((`invokeId`, (0, ContinuationState.InProgress(_, _)))) =>
+          }
+
+          d.removeAfter(beforeInvoke)
+          d.balance(caller) shouldBe startCallerBalance
+          d.balance(dAppAcc) shouldBe startDAppBalance
+          d.blockchainUpdater.continuationStates shouldBe Map()
         }
     }
   }
