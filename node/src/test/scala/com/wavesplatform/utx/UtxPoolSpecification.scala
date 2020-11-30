@@ -1379,8 +1379,8 @@ class UtxPoolSpecification
           }
 
           (0 to 2).foreach(nextStep)
-          bcu.continuationStates(prioritizedInvokeId) shouldBe (3, ContinuationState.Finished)
-          bcu.continuationStates(tailInvokeId) shouldBe (3, ContinuationState.Finished)
+          bcu.continuationStates(prioritizedInvokeId) shouldBe ((3, ContinuationState.Finished))
+          bcu.continuationStates(tailInvokeId) shouldBe ((3, ContinuationState.Finished))
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe None
       }
     }
