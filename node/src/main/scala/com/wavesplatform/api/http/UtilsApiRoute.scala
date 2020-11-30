@@ -13,12 +13,10 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Time
-import com.wavesplatform.state.Blockchain
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.directives.values._
 import monix.execution.Scheduler
 import play.api.libs.json._
 
@@ -94,8 +92,7 @@ case class UtilsApiRoute(
 
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String])) { code =>
-      def stdLib: StdLibVersion = if(blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) { V4 } else { StdLibVersion.VersionDic.default }
-      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator, defaultStdLib = stdLib)) { result =>
+      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator, blockchain)) { result =>
         complete(
           result
             .fold(
@@ -111,9 +108,7 @@ case class UtilsApiRoute(
               }
             )
         )
-
       }
-
     }
   }
 
