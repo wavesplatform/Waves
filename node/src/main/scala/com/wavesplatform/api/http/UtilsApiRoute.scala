@@ -23,7 +23,7 @@ import play.api.libs.json._
 case class UtilsApiRoute(
     timeService: Time,
     settings: RestAPISettings,
-    estimator: ScriptEstimator,
+    estimator: () => ScriptEstimator,
     limitedScheduler: Scheduler,
     blockchain: Blockchain
 ) extends ApiRoute
@@ -72,7 +72,7 @@ case class UtilsApiRoute(
   def compile: Route = path("script" / "compile") {
     (post & entity(as[String])) { code =>
       parameter("assetScript".as[Boolean] ? false) { isAssetScript =>
-        executeLimited(ScriptCompiler(code, isAssetScript, estimator)) { result =>
+        executeLimited(ScriptCompiler(code, isAssetScript, estimator())) { result =>
           complete(
             result.fold(
               e => ScriptCompilerError(e), {
@@ -92,7 +92,7 @@ case class UtilsApiRoute(
 
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String])) { code =>
-      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator, blockchain)) { result =>
+      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator(), blockchain)) { result =>
         complete(
           result
             .fold(
@@ -115,7 +115,7 @@ case class UtilsApiRoute(
   def compileWithImports: Route = path("script" / "compileWithImports") {
     import ScriptWithImportsRequest._
     (post & entity(as[ScriptWithImportsRequest])) { req =>
-      executeLimited(ScriptCompiler.compile(req.script, estimator, req.imports)) { result =>
+      executeLimited(ScriptCompiler.compile(req.script, estimator(), req.imports)) { result =>
         complete(
           result
             .fold(
@@ -141,7 +141,7 @@ case class UtilsApiRoute(
           .left
           .map(_.m)
           .flatMap { script =>
-            Script.complexityInfo(script, estimator, useContractVerifierLimit = false).map((script, _))
+            Script.complexityInfo(script, estimator(), useContractVerifierLimit = false).map((script, _))
           }
       ) { result =>
         complete(
