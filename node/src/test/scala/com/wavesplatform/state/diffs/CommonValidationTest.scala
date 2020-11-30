@@ -248,8 +248,19 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         ).signWith(master.privateKey),
         CreateAliasTransaction(TxVersion.V3, master.publicKey, invChainAlias.name, amount, timestamp, Proofs.empty, invChainId).signWith(master.privateKey),
         LeaseTransaction(TxVersion.V3, master.publicKey, invChainAddrOrAlias, amount, amount, timestamp, Proofs.empty, invChainId).signWith(master.privateKey),
-        InvokeScriptTransaction(TxVersion.V2, master.publicKey, invChainAddrOrAlias, None, Nil, amount, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, timestamp, Proofs.empty, invChainId)
-          .signWith(master.privateKey),
+        InvokeScriptTransaction(
+          TxVersion.V2,
+          master.publicKey,
+          invChainAddrOrAlias,
+          None,
+          Nil,
+          amount,
+          Waves,
+          InvokeScriptTransaction.DefaultExtraFeePerStep,
+          timestamp,
+          Proofs.empty,
+          invChainId
+        ).signWith(master.privateKey),
         exchangeV1GeneratorP(master, recipient, asset, Waves, None, invChainId).sample.get,
         IssueTransaction(
           TxVersion.V2,
@@ -323,12 +334,26 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
       dAppAcc   <- accountGen
       timestamp <- positiveLongGen
       fee       <- smallFeeGen
-      genesis1   = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, timestamp).explicitGet()
-      genesis2   = GenesisTransaction.create(dAppAcc.toAddress, ENOUGH_AMT, timestamp).explicitGet()
+      genesis1  = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, timestamp).explicitGet()
+      genesis2  = GenesisTransaction.create(dAppAcc.toAddress, ENOUGH_AMT, timestamp).explicitGet()
       setScript = SetScriptTransaction.selfSigned(TxVersion.V2, dAppAcc, Some(dApp), fee, timestamp).explicitGet()
-      invoke = InvokeScriptTransaction.selfSigned(TxVersion.V3, master, dAppAcc.toAddress, None, Nil, fee * 10, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, timestamp).explicitGet()
+      invoke = InvokeScriptTransaction
+        .selfSigned(
+          TxVersion.V3,
+          master,
+          dAppAcc.toAddress,
+          None,
+          Nil,
+          fee * 10,
+          Waves,
+          InvokeScriptTransaction.DefaultExtraFeePerStep,
+          timestamp
+        )
+        .explicitGet()
       continuation = ContinuationTransaction(invoke.id.value(), invoke.timestamp + 1, step = 0, fee = 0L, Waves)
-      transfer = TransferTransaction.selfSigned(TxVersion.V2, dAppAcc, master.toAddress, Waves, 1L, Waves, fee, ByteStr.empty, timestamp).explicitGet()
+      transfer = TransferTransaction
+        .selfSigned(TxVersion.V2, dAppAcc, master.toAddress, Waves, 1L, Waves, fee, ByteStr.empty, timestamp)
+        .explicitGet()
     } yield (Seq(genesis1, genesis2), setScript, invoke, continuation, transfer)
 
     val rideV5Activated = TestFunctionalitySettings.Enabled.copy(
