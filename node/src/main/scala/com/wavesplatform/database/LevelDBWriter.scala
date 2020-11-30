@@ -764,6 +764,7 @@ abstract class LevelDBWriter private[database] (
                   rw.delete(Keys.invokeScriptResult(h, num))
                   rw.delete(Keys.continuationState(id, step = 0))
                   rw.delete(Keys.continuationLastStep(id))
+                  continuationStatesCache.invalidate(id)
 
                 case tx: ContinuationTransaction =>
                   val id = TransactionId(tx.invokeScriptTransactionId)
