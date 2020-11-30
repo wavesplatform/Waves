@@ -152,7 +152,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
           Seq.empty,
           fee,
           Waves,
-          extraFeePerStep = InvokeScriptTransaction.DefaultExtraFeePerStep,
+          InvokeScriptTransaction.DefaultExtraFeePerStep,
           ts,
           Proofs.empty,
           AddressScheme.current.chainId
@@ -167,7 +167,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             Seq.empty,
             fee,
             Waves,
-            extraFeePerStep = InvokeScriptTransaction.DefaultExtraFeePerStep,
+            InvokeScriptTransaction.DefaultExtraFeePerStep,
             ts,
             Proofs.empty,
             otherChainId

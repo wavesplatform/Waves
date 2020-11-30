@@ -83,6 +83,6 @@ object TxHelpers {
 
   def invoke(dApp: AddressOrAlias, func: String, args: Seq[EXPR] = Nil, payments: Seq[Payment] = Nil): InvokeScriptTransaction = {
     val fc = FUNCTION_CALL(FunctionHeader.User(func), args.toList)
-    InvokeScriptTransaction.selfSigned(TxVersion.V1, defaultSigner, dApp, Some(fc), payments, TestValues.fee, Asset.Waves, extraFeePerStep = InvokeScriptTransaction.DefaultExtraFeePerStep, timestamp).explicitGet()
+    InvokeScriptTransaction.selfSigned(TxVersion.V1, defaultSigner, dApp, Some(fc), payments, TestValues.fee, Asset.Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, timestamp).explicitGet()
   }
 }

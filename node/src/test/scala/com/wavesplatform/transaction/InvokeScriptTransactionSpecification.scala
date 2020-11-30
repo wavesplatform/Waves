@@ -154,7 +154,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
         Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
         100000,
         Waves,
-        extraFeePerStep = InvokeScriptTransaction.DefaultExtraFeePerStep,
+        InvokeScriptTransaction.DefaultExtraFeePerStep,
         1526910778245L
       )
       .explicitGet()
@@ -194,7 +194,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
         Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
         100000,
         Waves,
-        extraFeePerStep = InvokeScriptTransaction.DefaultExtraFeePerStep,
+        InvokeScriptTransaction.DefaultExtraFeePerStep,
         1526910778245L
       )
       .explicitGet()
@@ -240,7 +240,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       Seq(),
       1,
       Waves,
-      extraFeePerStep = InvokeScriptTransaction.DefaultExtraFeePerStep,
+      InvokeScriptTransaction.DefaultExtraFeePerStep,
       1,
       Proofs.empty
     ) should produce("more than 22 arguments")
@@ -262,7 +262,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
         Seq(),
         1,
         Waves,
-        extraFeePerStep = InvokeScriptTransaction.DefaultExtraFeePerStep,
+        InvokeScriptTransaction.DefaultExtraFeePerStep,
         1,
         Proofs.empty
       )
@@ -285,7 +285,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       Seq(),
       1,
       Waves,
-      extraFeePerStep = InvokeScriptTransaction.DefaultExtraFeePerStep,
+      InvokeScriptTransaction.DefaultExtraFeePerStep,
       1,
       Proofs.empty,
     ) should produce("is unsupported")
@@ -303,7 +303,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       Seq(),
       1,
       Waves,
-      extraFeePerStep = InvokeScriptTransaction.DefaultExtraFeePerStep,
+      InvokeScriptTransaction.DefaultExtraFeePerStep,
       1,
       Proofs.empty
     ) should produce("TooBigArray")
