@@ -13,6 +13,7 @@ import com.wavesplatform.utils.{JsonFileStorage, randomBytes, _}
 import play.api.libs.json._
 
 import scala.collection.concurrent.TrieMap
+import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 trait Wallet {
@@ -48,7 +49,13 @@ object Wallet extends ScorexLogging {
 
   @throws[IllegalArgumentException]("if invalid wallet configuration provided")
   def apply(settings: WalletSettings): Wallet =
-    new WalletImpl(settings.file, settings.password, settings.seed)
+    try {
+      new WalletImpl(settings.file, settings.password, settings.seed)
+    } catch {
+      case NonFatal(e) =>
+        log.error(s"Failed to open wallet file '${settings.file.get.getAbsolutePath}", e)
+        throw e
+    }
 
   private[this] final case class WalletData(seed: ByteStr, accountSeeds: Set[ByteStr], nonce: Int)
 
