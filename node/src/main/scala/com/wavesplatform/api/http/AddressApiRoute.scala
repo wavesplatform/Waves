@@ -2,7 +2,7 @@ package com.wavesplatform.api.http
 
 import akka.NotUsed
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.{Directive0, Route}
 import akka.stream.scaladsl.Source
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.common.CommonAccountsApi
@@ -50,7 +50,7 @@ case class AddressApiRoute(
   val MaxAddressesPerRequest = 1000
 
   override lazy val route: Route =
-    (pathPrefix("addresses") & handleExceptions(jsonExceptionHandler)) {
+    pathPrefix("addresses") {
       balanceDetails ~ validate ~ seed ~ balanceWithConfirmations ~ balance ~ balances ~ balancesPost ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
         signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ postData ~ scriptInfo ~ scriptMeta
     } ~ root ~ create
@@ -114,17 +114,20 @@ case class AddressApiRoute(
   }
 
   def balances: Route = (path("balance") & get & parameters(("height".as[Int].?, "address".as[String].*, "asset".?))) {
-    (height, addresses, assetId) =>
-      complete(
-        balancesJson(height.getOrElse(blockchain.height), addresses.toSeq, assetId.fold(Waves: Asset)(a => IssuedAsset(ByteStr.decodeBase58(a).get)))
+    (maybeHeight, addresses, assetId) =>
+      val height = maybeHeight.getOrElse(blockchain.height)
+      validateBalanceDepth(height)(
+        complete(
+          balancesJson(height, addresses.toSeq, assetId.fold(Waves: Asset)(a => IssuedAsset(ByteStr.decodeBase58(a).get)))
+        )
       )
   }
 
   def balancesPost: Route = (path("balance") & (post & entity(as[JsObject]))) { request =>
-    val height    = (request \ "height").asOpt[Int]
+    val height    = (request \ "height").asOpt[Int].getOrElse(blockchain.height)
     val addresses = (request \ "addresses").as[Seq[String]]
     val assetId   = (request \ "asset").asOpt[String]
-    complete(balancesJson(height.getOrElse(blockchain.height), addresses, assetId.fold(Waves: Asset)(a => IssuedAsset(ByteStr.decodeBase58(a).get))))
+    validateBalanceDepth(height)(complete(balancesJson(height, addresses, assetId.fold(Waves: Asset)(a => IssuedAsset(ByteStr.decodeBase58(a).get)))))
   }
 
   def balanceDetails: Route = (path("balance" / "details" / AddrSegment) & get) { address =>
@@ -138,7 +141,9 @@ case class AddressApiRoute(
   def balanceWithConfirmations: Route = {
     (path("balance" / AddrSegment / IntNumber) & get) {
       case (address, confirmations) =>
-        complete(balanceJson(address, confirmations))
+        validateBalanceDepth(blockchain.height - confirmations)(
+          complete(balanceJson(address, confirmations))
+        )
     }
   }
 
@@ -150,8 +155,8 @@ case class AddressApiRoute(
 
   def effectiveBalanceWithConfirmations: Route = {
     path("effectiveBalance" / AddrSegment / IntNumber) { (address, confirmations) =>
-      complete(
-        effectiveBalanceJson(address, confirmations)
+      validateBalanceDepth(blockchain.height - confirmations)(
+        complete(effectiveBalanceJson(address, confirmations))
       )
     }
   }
@@ -223,8 +228,6 @@ case class AddressApiRoute(
     if (addresses.length > settings.transactionsByAddressLimit) TooBigArrayAllocation
     else if (height < 1 || height > blockchain.height) CustomValidationError(s"Illegal height: $height")
     else {
-      assertBalanceDepth(height)
-
       implicit val balancesWrites: Writes[(String, Long)] = Writes[(String, Long)] { b =>
         Json.obj("id" -> b._1, "balance" -> b._2)
       }
@@ -238,7 +241,6 @@ case class AddressApiRoute(
     }
 
   private def balanceJson(acc: Address, confirmations: Int) = {
-    assertBalanceDepth(blockchain.height - confirmations)
     Balance(acc.stringRepr, confirmations, commonAccountsApi.balance(acc, confirmations))
   }
 
@@ -255,13 +257,14 @@ case class AddressApiRoute(
   }
 
   private def effectiveBalanceJson(acc: Address, confirmations: Int) = {
-    assertBalanceDepth(blockchain.height - confirmations)
     Balance(acc.stringRepr, confirmations, commonAccountsApi.effectiveBalance(acc, confirmations))
   }
 
-  private[this] def assertBalanceDepth(height: Int): Unit = {
+  private[this] def validateBalanceDepth(height: Int): Directive0 = {
     if (height < blockchain.height - maxBalanceDepth)
-      throw new IllegalArgumentException(s"Unable to get balance past height ${blockchain.height - maxBalanceDepth}")
+      complete(CustomValidationError(s"Unable to get balance past height ${blockchain.height - maxBalanceDepth}"))
+    else
+      pass
   }
 
   private def accountData(address: Address)(implicit sc: Scheduler) =
