@@ -105,7 +105,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 object Domain {
   implicit class BlockchainUpdaterExt[A <: BlockchainUpdater](bcu: A) {
     def processBlock(block: Block): Either[ValidationError, Seq[Diff]] =
-      bcu.processBlock(block, block.header.generationSignature, verify = false)
+      bcu.processBlock(block, block.header.generationSignature)
   }
 
   def portfolio(address: Address, db: DB, blockchainUpdater: BlockchainUpdaterImpl): Seq[(IssuedAsset, Long)] = db.withResource { resource =>
