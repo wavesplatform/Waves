@@ -3,7 +3,7 @@ package com.wavesplatform.api.http
 import java.security.SecureRandom
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.server.{Directive, Route}
+import akka.http.scaladsl.server.{PathMatcher1, Route}
 import cats.implicits._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, ScriptCompilerError, TooBigArrayAllocation}
@@ -228,7 +228,7 @@ case class UtilsApiRoute(
     })
 
   def evaluate: Route =
-    path("script" / "evaluate" / AddrSegment).flatMap(onlyScriptedAddress).apply { (address: Address, script: Script) =>
+    path("script" / "evaluate" / ScriptedAddress) { (address: Address, script: Script) =>
       jsonPost[JsObject] { obj =>
         def serializeResult(e: EVALUATED): JsValue = e match { // TODO: Tuple?
           case Terms.CONST_LONG(t)               => Json.obj("type" -> "Int", "value"        -> t)
@@ -272,13 +272,9 @@ case class UtilsApiRoute(
       }
     }
 
-  private[this] def onlyScriptedAddress(address: Address): Directive[(Address, Script)] = blockchain.accountScript(address) match {
-    case Some(value) if value.script.expr.isInstanceOf[DApp] =>
-      tprovide(address -> value.script)
-
-    case None =>
-      entity(as[JsObject])
-        .flatMap(obj => complete(CustomValidationError(s"Address $address is not dApp").json ++ Json.obj("address" -> address) ++ obj))
+  private[this] val ScriptedAddress: PathMatcher1[Address] = AddrSegment.map { address =>
+    if (blockchain.hasAccountScript(address)) address
+    else throw ApiException(CustomValidationError(s"Address $address is not dApp"))
   }
 }
 
