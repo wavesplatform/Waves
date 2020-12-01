@@ -250,6 +250,25 @@ class TransactionsRouteSpec
         }
       }
     }
+
+    "provides stateChanges" in forAll(accountGen) { account =>
+      val transaction = TxHelpers.invoke(account.toAddress, "test")
+
+      (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
+      (addressTransactions.transactionsByAddress _)
+        .expects(account.toAddress, *, *, None)
+        .returning(Observable((1.asInstanceOf[Height], transaction, true)))
+        .once()
+      (addressTransactions.transactionById _)
+        .expects(transaction.id())
+        .returning(Some(TransactionMeta(Height(1), transaction, Some(InvokeScriptResult()), succeeded = true)))
+        .once()
+
+      Get(routePath(s"/address/${account.toAddress}/limit/1")) ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+        (responseAs[JsObject] \ "stateChanges").as[JsObject] shouldBe Json.toJsObject(InvokeScriptResult())
+      }
+    }
   }
 
   routePath("/info/{id}") - {
@@ -294,7 +313,7 @@ class TransactionsRouteSpec
 
     "handles multiple ids" in {
       val txCount = 5
-      val txs = (1 to txCount).map(_ => TxHelpers.invoke(TxHelpers.defaultSigner.toAddress, "test"))
+      val txs     = (1 to txCount).map(_ => TxHelpers.invoke(TxHelpers.defaultSigner.toAddress, "test"))
       txs.foreach(
         tx =>
           (addressTransactions.transactionById _)
