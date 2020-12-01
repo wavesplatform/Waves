@@ -39,6 +39,7 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{Inside, Matchers, PropSpec}
 import shapeless.Coproduct
 
+import scala.collection.immutable.SortedMap
 import scala.util.Random
 
 class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with TransactionGen with Matchers with Inside {
@@ -291,7 +292,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
       Diff.empty.copy(
         transactions = Map(invoke.id.value()            -> NewTransactionInfo(invoke, Set(), ScriptExecutionInProgress)),
         portfolios = Map(invoke.sender.toAddress        -> Portfolio.waves(-stepFee)),
-        continuationStates = Map((invoke.id.value(), 0) -> ContinuationState.InProgress(resultExpr, unusedComplexity)),
+        continuationStates = SortedMap((invoke.id.value(), 0) -> ContinuationState.InProgress(resultExpr, unusedComplexity)),
         scriptsRun = 2,
         scriptsComplexity = spentComplexity
       )
@@ -316,7 +317,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
       Diff.empty.copy(
         portfolios = Map(invoke.sender.toAddress -> Portfolio.waves(-stepFee)),
         replacingTransactions = Seq(NewTransactionInfo(continuation.copy(fee = stepFee), Set(), Succeeded)),
-        continuationStates = Map((invoke.id.value(), continuation.step + 1) -> ContinuationState.InProgress(result, resultUnusedComplexity)),
+        continuationStates = SortedMap((invoke.id.value(), continuation.step + 1) -> ContinuationState.InProgress(result, resultUnusedComplexity)),
         scriptsRun = 1,
         scriptsComplexity = spentComplexity
       )
@@ -358,7 +359,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
           )
         ),
         scriptsComplexity = actualComplexity + actionScriptInvocations * assetScriptComplexity,
-        continuationStates = Map((invoke.id.value(), continuation.step + 1) -> ContinuationState.Finished),
+        continuationStates = SortedMap((invoke.id.value(), continuation.step + 1) -> ContinuationState.Finished),
         updatedAssets = Map(scriptedAsset                                   -> Ior.Right(AssetVolumeInfo(true, reissueAmount - burnAmount))),
         replacingTransactions = Seq(
           NewTransactionInfo(continuation.copy(fee = stepFee), Set(), Succeeded),
