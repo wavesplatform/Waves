@@ -2,13 +2,13 @@ package com.wavesplatform.api.http
 
 import java.security.SecureRandom
 
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.api.http.ApiError.{ScriptCompilerError, TooBigArrayAllocation}
 import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.Global
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
@@ -39,7 +39,7 @@ case class UtilsApiRoute(
   }
 
   override val route: Route = pathPrefix("utils") {
-    decompile ~ compile ~ compileCode ~ compileWithImports ~ scriptMeta ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ transactionSerialize
+    decompile ~ compile ~ compileCode ~ compileWithImports ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ transactionSerialize
   }
 
   def decompile: Route = path("script" / "decompile") {
@@ -160,15 +160,6 @@ case class UtilsApiRoute(
           )
         )
       }
-    }
-  }
-
-  def scriptMeta: Route = path("script" / "meta") {
-    (post & entity(as[String])) { code =>
-      val result: ToResponseMarshallable = Global
-        .dAppFuncTypes(code) // Does not estimate complexity, therefore it should not hang
-        .fold(e => e, r => r)
-      complete(result)
     }
   }
 

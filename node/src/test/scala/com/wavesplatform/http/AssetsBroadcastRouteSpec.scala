@@ -38,7 +38,8 @@ class AssetsBroadcastRouteSpec
     stub[Blockchain],
     stub[Time],
     stub[CommonAccountsApi],
-    stub[CommonAssetsApi]
+    stub[CommonAssetsApi],
+    1000
   ).route
 
   private[this] val fixedIssueGen = for {
@@ -178,7 +179,8 @@ class AssetsBroadcastRouteSpec
       stub[Blockchain],
       stub[Time],
       stub[CommonAccountsApi],
-      stub[CommonAssetsApi]
+      stub[CommonAssetsApi],
+      1000
     ).route
 
     val seed               = "seed".getBytes("UTF-8")
