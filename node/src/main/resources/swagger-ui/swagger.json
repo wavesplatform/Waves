@@ -2726,39 +2726,6 @@
         "x-codegen-request-body-name": "code"
       }
     },
-    "/utils/script/meta": {
-      "post": {
-        "tags": [
-          "utils"
-        ],
-        "summary": "DApp meta",
-        "description": "Extract DApp meta from compiled code in base64 representation",
-        "requestBody": {
-          "description": "Compiled base64 code",
-          "content": {
-            "text/plain": {
-              "schema": {
-                "type": "string"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ScriptMeta"
-                }
-              }
-            }
-          }
-        },
-        "x-codegen-request-body-name": "code"
-      }
-    },
     "/utils/seed": {
       "get": {
         "tags": [
