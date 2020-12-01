@@ -254,6 +254,7 @@ class TransactionsRouteSpec
     "provides stateChanges" in forAll(accountGen) { account =>
       val transaction = TxHelpers.invoke(account.toAddress, "test")
 
+      (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
       (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
       (addressTransactions.transactionsByAddress _)
         .expects(account.toAddress, *, *, None)
@@ -266,7 +267,7 @@ class TransactionsRouteSpec
 
       Get(routePath(s"/address/${account.toAddress}/limit/1")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        (responseAs[JsObject] \ "stateChanges").as[JsObject] shouldBe Json.toJsObject(InvokeScriptResult())
+        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges").as[JsObject] shouldBe Json.toJsObject(InvokeScriptResult())
       }
     }
   }
@@ -308,6 +309,21 @@ class TransactionsRouteSpec
           }
 
           Get(routePath(s"/info/${tx.id().toString}")) ~> route ~> check(validateResponse())
+      }
+    }
+
+    "provides stateChanges" in forAll(accountGen) { account =>
+      val transaction = TxHelpers.invoke(account.toAddress, "test")
+
+      (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
+      (addressTransactions.transactionById _)
+        .expects(transaction.id())
+        .returning(Some(TransactionMeta(Height(1), transaction, Some(InvokeScriptResult()), succeeded = true)))
+        .once()
+
+      Get(routePath(s"/info/${transaction.id()}")) ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+        (responseAs[JsObject] \ "stateChanges").as[JsObject] shouldBe Json.toJsObject(InvokeScriptResult())
       }
     }
 

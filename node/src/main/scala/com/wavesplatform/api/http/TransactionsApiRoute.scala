@@ -50,16 +50,16 @@ case class TransactionsApiRoute(
 
   override lazy val route: Route =
     pathPrefix("transactions") {
-      unconfirmed ~ addressLimit ~ info ~ status ~ sign ~ calculateFee ~ signedBroadcast ~ merkleProof
+      unconfirmed ~ addressWithLimit ~ info ~ status ~ sign ~ calculateFee ~ signedBroadcast ~ merkleProof
     }
 
-  def addressLimit: Route = {
+  def addressWithLimit: Route = {
     (get & path("address" / AddrSegment / "limit" / IntNumber) & parameter("after".?)) { (address, limit, maybeAfter) =>
       val after =
         maybeAfter.map(s => ByteStr.decodeBase58(s).getOrElse(throw ApiException(CustomValidationError(s"Unable to decode transaction id $s"))))
       if (limit > settings.transactionsByAddressLimit) throw ApiException(TooBigArrayAllocation)
       extractScheduler { implicit sc =>
-        complete(transactionsByAddress(address, limit, after).map(txs => List(txs)))
+        complete(transactionsByAddress(address, limit, after).map(txs => List(txs))) // Double list - [ [tx1, tx2, ...] ]
       }
     }
   }
