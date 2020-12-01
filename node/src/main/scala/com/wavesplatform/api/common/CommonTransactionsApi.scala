@@ -133,7 +133,7 @@ object CommonTransactionsApi {
       val key = Keys.continuationLastStep(TransactionId(invokeTransactionId))
       if (db.has(key)) {
         val lastStep = db.get(key)
-        (0 until lastStep).map(ContinuationTransaction(invokeTransactionId, 0L, _, 0L, Waves).id.value())
+        (0 until lastStep).map(ContinuationTransaction(invokeTransactionId, _, 0L, Waves).id.value())
       } else
         Nil
     }

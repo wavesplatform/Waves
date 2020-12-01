@@ -328,12 +328,13 @@ class UtxPoolImpl(
           .filterNot(e => prevResult.validatedTransactions(e.tx.id()))
           .foldLeft[PackResult](prevResult) {
             case (r, TxEntry(tx, priority)) =>
+              val isContinuation   = tx.isInstanceOf[ContinuationTransaction]
               def isLimitReached   = r.transactions.exists(_.nonEmpty) && isTimeLimitReached
-              def isAlreadyRemoved = !priority && !transactions.containsKey(tx.id()) && !tx.isInstanceOf[ContinuationTransaction]
+              def isAlreadyRemoved = !priority && !transactions.containsKey(tx.id()) && !isContinuation
 
               if (r.constraint.isFull || isLimitReached || isAlreadyRemoved || cancelled())
                 r // don't run any checks here to speed up mining
-              else if (TxCheck.isExpired(tx)) {
+              else if (!isContinuation && TxCheck.isExpired(tx)) {
                 log.debug(s"Transaction ${tx.id()} expired")
                 this.removeFromOrdPool(tx.id())
                 onEvent(UtxEvent.TxRemoved(tx, Some(GenericError("Expired"))))
@@ -409,7 +410,7 @@ class UtxPoolImpl(
           blockchain.continuationStates
             .collect {
               case (invokeId, (step, _: ContinuationState.InProgress)) =>
-                ContinuationTransaction(invokeId, time.correctedTime(), step, 0L, Waves)
+                ContinuationTransaction(invokeId, step, 0L, Waves)
             }
 
         def allValidated(seed: PackResult) : Boolean =

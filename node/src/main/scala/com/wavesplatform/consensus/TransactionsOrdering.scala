@@ -5,25 +5,30 @@ import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScrip
 import com.wavesplatform.transaction.{Authorized, Transaction}
 import com.wavesplatform.utx.UtxPool
 
-import scala.annotation.tailrec
-
 case class TransactionsOrdering(whitelistAddresses: Set[String], utxPool: UtxPool)
     extends Ordering[Transaction] {
 
-  private def orderBy(t: Transaction): (Boolean, Double, Long, Long) = {
-    val byWhiteList = !isWhitelisted(t) // false < true
-    val size        = t.bytes().length
-    val commonFee   = if (t.assetFee._1 != Waves) 0 else -t.assetFee._2
-    val byFee       = commonFee + extraFee(t)
+  private def orderBy(tx: Transaction): (Boolean, Double, Long, Long) = {
+    val commonFee   = if (tx.assetFee._1 != Waves) 0 else -tx.assetFee._2
+    val size        = tx.bytes().length
 
-    (byWhiteList, byFee.toDouble / size.toDouble, byFee, t.timestamp)
+    val resolvedTx  = maybeContinuation(tx)
+    val byWhiteList = !isWhitelisted(resolvedTx) // false < true
+    val byFee       = commonFee + extraFee(resolvedTx)
+
+    (byWhiteList, byFee.toDouble / size.toDouble, byFee, resolvedTx.timestamp)
   }
 
-  @tailrec private def extraFee(t: Transaction): Long =
+  private def extraFee(t: Transaction): Long =
     t match {
       case i: InvokeScriptTransaction if i.assetFee._1 == Waves => -i.extraFeePerStep
-      case c: ContinuationTransaction                           => extraFee(utxPool.resolveInvoke(c))
       case _                                                    => 0
+    }
+
+  private def maybeContinuation(t: Transaction): Transaction =
+    t match {
+      case c: ContinuationTransaction => utxPool.resolveInvoke(c)
+      case _                          => t
     }
 
   override def compare(first: Transaction, second: Transaction): Int = {
@@ -32,11 +37,10 @@ case class TransactionsOrdering(whitelistAddresses: Set[String], utxPool: UtxPoo
   }
 
   def isWhitelisted(t: Transaction): Boolean =
-    t match {
+    maybeContinuation(t) match {
       case _ if whitelistAddresses.isEmpty                                                            => false
       case a: Authorized if whitelistAddresses.contains(a.sender.toAddress.stringRepr)                => true
       case i: InvokeScriptTransaction if whitelistAddresses.contains(i.dAppAddressOrAlias.stringRepr) => true
-      case c: ContinuationTransaction                                                                 => isWhitelisted(utxPool.resolveInvoke(c))
       case _                                                                                          => false
     }
 }

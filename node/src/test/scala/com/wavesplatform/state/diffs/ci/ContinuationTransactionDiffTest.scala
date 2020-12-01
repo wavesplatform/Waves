@@ -303,7 +303,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
     val expr                             = dApp.expr.callableFuncs.find(_.u.name == "multiStepExpr").get.u.body
     val step                             = Random.nextInt(Int.MaxValue)
     val invoke                           = invokeGen.sample.get.copy(funcCallOpt = Some(FUNCTION_CALL(User("multiStepExpr"), Nil)))
-    val continuation                     = ContinuationTransaction(invoke.id.value(), invoke.timestamp, step, fee = 0L, invoke.feeAssetId)
+    val continuation                     = ContinuationTransaction(invoke.id.value(), step, fee = 0L, invoke.feeAssetId)
     val stepFee                          = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
     val startUnusedComplexity            = Random.nextInt(2000)
     val (result, resultUnusedComplexity) = evaluateContinuationStep(expr, startUnusedComplexity)
@@ -334,7 +334,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
       dAppAddressOrAlias = dAppAddress
     )
     val step         = Random.nextInt(Int.MaxValue)
-    val continuation = ContinuationTransaction(invoke.id.value(), invoke.timestamp, step, fee = 0L, invoke.feeAssetId)
+    val continuation = ContinuationTransaction(invoke.id.value(), step, fee = 0L, invoke.feeAssetId)
     val expr         = dApp.expr.callableFuncs.find(_.u.name == "oneStepExpr").get.u.body
 
     val actualComplexity    = 2018
@@ -379,7 +379,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
       dAppAddressOrAlias = dAppAddress
     )
     val step         = Random.nextInt(Int.MaxValue)
-    val continuation = ContinuationTransaction(invoke.id.value(), invoke.timestamp, step, fee = 0L, invoke.feeAssetId)
+    val continuation = ContinuationTransaction(invoke.id.value(), step, fee = 0L, invoke.feeAssetId)
     val expr         = dApp.expr.callableFuncs.find(_.u.name == "failingExpr").get.u.body
 
     val actualComplexity    = 2018
@@ -403,7 +403,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
       dAppAddressOrAlias = dAppAddress
     )
     val step         = Random.nextInt(Int.MaxValue)
-    val continuation = ContinuationTransaction(invoke.id.value(), invoke.timestamp, step, fee = 0L, invoke.feeAssetId)
+    val continuation = ContinuationTransaction(invoke.id.value(), step, fee = 0L, invoke.feeAssetId)
     val expr         = dApp.expr.callableFuncs.find(_.u.name == "failingAssetVerifier").get.u.body
 
     val actualComplexity    = 2018
@@ -428,7 +428,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
       dAppAddressOrAlias = dAppAddress
     )
     val step         = Random.nextInt(Int.MaxValue)
-    val continuation = ContinuationTransaction(invoke.id.value(), invoke.timestamp, step, fee = 0L, invoke.feeAssetId)
+    val continuation = ContinuationTransaction(invoke.id.value(), step, fee = 0L, invoke.feeAssetId)
     val expr         = dApp.expr.callableFuncs.find(_.u.name == "oneStepExpr").get.u.body
 
     val actualComplexity    = 2018

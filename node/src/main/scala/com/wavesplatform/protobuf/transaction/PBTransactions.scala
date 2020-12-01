@@ -297,7 +297,7 @@ object PBTransactions {
         )
 
       case Data.Continuation(ContinuationTransactionData(invokeTransactionId, step)) =>
-        Right(ContinuationTransaction(invokeTransactionId.toByteStr, timestamp, step, feeAmount, feeAssetId))
+        Right(ContinuationTransaction(invokeTransactionId.toByteStr, step, feeAmount, feeAssetId))
 
       case _ =>
         Left(TxValidationError.UnsupportedTransactionType)
@@ -622,10 +622,10 @@ object PBTransactions {
 
         PBTransactions.create(sender, chainId, feeAmount, feeAsset, timestamp, version, proofs, Data.UpdateAssetInfo(data))
 
-      case tx @ vt.smart.ContinuationTransaction(invokeScriptTransactionId, timestamp, step, fee, feeAssetId) =>
+      case tx @ vt.smart.ContinuationTransaction(invokeScriptTransactionId, step, fee, feeAssetId) =>
         val data = Data.Continuation(ContinuationTransactionData(invokeScriptTransactionId.toByteString, step))
         new SignedTransaction(
-          Some(Transaction(tx.chainId, timestamp = timestamp, version = tx.version, fee = Some((feeAssetId, fee): Amount), data = data))
+          Some(Transaction(tx.chainId, version = tx.version, fee = Some((feeAssetId, fee): Amount), data = data))
         )
 
       case _ =>

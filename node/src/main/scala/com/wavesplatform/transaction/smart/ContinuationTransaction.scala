@@ -14,7 +14,6 @@ import scala.util.Try
 
 case class ContinuationTransaction(
     invokeScriptTransactionId: ByteStr,
-    timestamp: TxTimestamp,
     step: Int,
     fee: TxAmount,
     feeAssetId: Asset
@@ -47,6 +46,9 @@ case class ContinuationTransaction(
 
   override val id: Coeval[ByteStr] =
     Coeval.now(FastHashId.create(invokeScriptTransactionId.arr ++ Ints.toByteArray(step)))
+
+  override def timestamp: TxTimestamp =
+    0L
 }
 
 object ContinuationTransaction extends TransactionParser {

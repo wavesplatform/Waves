@@ -43,7 +43,7 @@ import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
-import org.scalatest.{EitherValues, FreeSpec, Inside, Matchers}
+import org.scalatest.{EitherValues, FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.collection.mutable.ListBuffer
@@ -76,8 +76,7 @@ class UtxPoolSpecification
     with BlocksTransactionsHelpers
     with WithDomain
     with EitherValues
-    with Eventually
-    with Inside {
+    with Eventually {
   private val PoolDefaultMaxBytes = 50 * 1024 * 1024 // 50 MB
 
   import FeeValidation.{ScriptExtraFee => extraFee}
@@ -129,7 +128,6 @@ class UtxPoolSpecification
       .selfSigned(1.toByte, sender, recipient.toAddress, Waves, amount, Waves, fee, ByteStr.empty, time.getTimestamp())
       .explicitGet())
       .label("transferWithRecipient")
-
 
   private def massTransferWithRecipients(sender: KeyPair, recipients: List[PublicKey], maxAmount: Long, time: Time) = {
     val amount    = maxAmount / (recipients.size + 1)
@@ -1087,18 +1085,12 @@ class UtxPoolSpecification
             )
 
           def nextStep(step: Int) = {
-            val continuations = inside(utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)) {
-              case (
-                  Some(
-                    txs @ Seq(
-                      ContinuationTransaction(`prioritizedInvokeId`, _, `step`, 0, Waves),
-                      ContinuationTransaction(`tailInvokeId`, _, `step`, 0, Waves)
-                    )
-                  ),
-                  _
-                  ) =>
-                txs
-            }
+            val continuations = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1.get
+            continuations shouldBe
+              Seq(
+                ContinuationTransaction(prioritizedInvokeId, step, 0L, Waves),
+                ContinuationTransaction(tailInvokeId, step, 0L, Waves)
+              )
             val block = TestBlock.create(
               time.getTimestamp(),
               bcu.lastBlockId.get,

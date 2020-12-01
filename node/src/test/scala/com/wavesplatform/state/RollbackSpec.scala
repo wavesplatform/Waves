@@ -859,7 +859,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             timestamp + 2
           )
           .explicitGet()
-        continuation = ContinuationTransaction(invoke.id.value(), invoke.timestamp + 3, step = 0, fee = 0L, Waves)
+        continuation = ContinuationTransaction(invoke.id.value(), step = 0, fee = 0L, Waves)
       } yield (timestamp, caller.toAddress, dAppAcc.toAddress, setScript, invoke, continuation, paymentAmount)
     } {
       case (timestamp, caller, dAppAcc, setScript, invoke, continuation, paymentAmount) =>
