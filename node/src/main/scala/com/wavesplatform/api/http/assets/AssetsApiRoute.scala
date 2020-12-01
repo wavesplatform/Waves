@@ -46,7 +46,8 @@ case class AssetsApiRoute(
     blockchain: Blockchain,
     time: Time,
     commonAccountApi: CommonAccountsApi,
-    commonAssetsApi: CommonAssetsApi
+    commonAssetsApi: CommonAssetsApi,
+    maxDistributionDepth: Int
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {
@@ -184,7 +185,7 @@ case class AssetsApiRoute(
     optionalHeaderValueByType[Accept](()) { accept =>
       val paramsEi: Either[ValidationError, DistributionParams] =
         AssetsApiRoute
-          .validateDistributionParams(blockchain, heightParam, limitParam, settings.distributionAddressLimit, afterParam)
+          .validateDistributionParams(blockchain, heightParam, limitParam, settings.distributionAddressLimit, afterParam, maxDistributionDepth)
 
       paramsEi match {
         case Right((height, limit, after)) =>
@@ -270,34 +271,44 @@ object AssetsApiRoute {
       heightParam: Int,
       limitParam: Int,
       maxLimit: Int,
-      afterParam: Option[String]
+      afterParam: Option[String],
+      maxDistributionDepth: Int
   ): Either[ValidationError, DistributionParams] = {
     for {
       limit  <- validateLimit(limitParam, maxLimit)
-      height <- validateHeight(blockchain, heightParam)
+      height <- validateHeight(blockchain, heightParam, maxDistributionDepth)
       after <- afterParam
         .fold[Either[ValidationError, Option[Address]]](Right(None))(addrString => Address.fromString(addrString).map(Some(_)))
     } yield (height, limit, after)
   }
 
-  def validateHeight(blockchain: Blockchain, height: Int): Either[ValidationError, Int] = {
+  def validateHeight(blockchain: Blockchain, height: Int, maxDistributionDepth: Int): Either[ValidationError, Int] = {
     for {
+      _ <- Either.cond(height > 0, (), GenericError(s"Height should be greater than zero"))
+      _ <- Either.cond(
+        height != blockchain.height,
+        (),
+        GenericError(s"Using 'assetDistributionAtHeight' on current height can lead to inconsistent result")
+      )
+      _ <- Either.cond(
+        height < blockchain.height,
+        (),
+        GenericError(s"Asset distribution available only at height not greater than ${blockchain.height - 1}")
+      )
       _ <- Either
-        .cond(height > 0, (), GenericError(s"Height should be greater than zero"))
-      _ <- Either
-        .cond(height != blockchain.height, (), GenericError(s"Using 'assetDistributionAtHeight' on current height can lead to inconsistent result"))
-      _ <- Either
-        .cond(height < blockchain.height, (), GenericError(s"Asset distribution available only at height not greater than ${blockchain.height - 1}"))
+        .cond(
+          height >= blockchain.height - maxDistributionDepth,
+          (),
+          GenericError(s"Unable to get distribution past height ${blockchain.height - maxDistributionDepth}")
+        )
     } yield height
 
   }
 
   def validateLimit(limit: Int, maxLimit: Int): Either[ValidationError, Int] = {
     for {
-      _ <- Either
-        .cond(limit > 0, (), GenericError("Limit should be greater than 0"))
-      _ <- Either
-        .cond(limit < maxLimit, (), GenericError(s"Limit should be less than $maxLimit"))
+      _ <- Either.cond(limit > 0, (), GenericError("Limit should be greater than 0"))
+      _ <- Either.cond(limit <= maxLimit, (), GenericError(s"Limit should be less than or equal to $maxLimit"))
     } yield limit
   }
 

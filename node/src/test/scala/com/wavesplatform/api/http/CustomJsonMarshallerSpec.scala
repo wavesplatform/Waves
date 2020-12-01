@@ -103,7 +103,7 @@ class CustomJsonMarshallerSpec
     pending // todo: fix when distributions/portfolio become testable
   }
 
-  private val assetsRoute = AssetsApiRoute(restAPISettings, testWallet, publisher, blockchain, ntpTime, accountsApi, assetsApi).route
+  private val assetsRoute = AssetsApiRoute(restAPISettings, testWallet, publisher, blockchain, ntpTime, accountsApi, assetsApi, 1000).route
 
   property("/assets/{assetId}/distribution/{height}/limit/{limit}") {
     pending // todo: fix when distributions/portfolio become testable
