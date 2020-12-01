@@ -132,12 +132,11 @@ object ContinuationTransactionDiff {
           val StepInfo(_, stepFee, scriptsRun) = InvokeDiffsCommon.stepInfo(Diff.empty, blockchain, invoke)
           TracedResult.wrapValue[Diff, ValidationError](
             Diff.empty.copy(
-              continuationStates = Map((tx.invokeScriptTransactionId, tx.step + 1) -> newState),
               replacingTransactions = Seq(NewTransactionInfo(tx.copy(fee = stepFee), Set(), Succeeded)),
               portfolios = InvokeDiffsCommon.stepFeePortfolios(stepFee, invoke, blockchain),
               scriptsRun = scriptsRun,
               scriptsComplexity = limit - ir.unusedComplexity
-            )
+            ).addContinuationState(tx.invokeScriptTransactionId, tx.step + 1, newState)
           )
       }
     } yield resultDiff

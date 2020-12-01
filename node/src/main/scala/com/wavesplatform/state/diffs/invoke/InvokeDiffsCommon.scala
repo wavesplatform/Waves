@@ -279,9 +279,7 @@ object InvokeDiffsCommon {
       spentComplexity: Long,
       failed: Boolean
   ): Diff = {
-    val diffWithState = diff.copy(
-      continuationStates = Map((tx.invokeScriptTransactionId, tx.step + 1) -> ContinuationState.Finished)
-    )
+    val diffWithState = diff.addContinuationState(tx.invokeScriptTransactionId, tx.step + 1, ContinuationState.Finished)
     val StepInfo(_, totalFee, scriptsRun) = stepInfo(diffWithState, blockchain, invoke)
     val status                            = if (failed) ScriptExecutionFailed else Succeeded
     diffWithState |+| Diff.empty.copy(

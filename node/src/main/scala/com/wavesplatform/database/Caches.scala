@@ -19,6 +19,7 @@ import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
 
+import scala.collection.immutable.SortedMap
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 import scala.reflect.ClassTag
@@ -179,7 +180,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       scriptResults: Map[ByteStr, InvokeScriptResult],
       failedTransactionIds: Set[ByteStr],
       stateHash: StateHashBuilder.Result,
-      continuationStates: Map[(ByteStr, Int), ContinuationState],
+      continuationStates: SortedMap[(ByteStr, Int), ContinuationState],
       replacingTransactions: Seq[NewTransactionInfo]
   ): Unit
 

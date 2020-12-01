@@ -37,6 +37,7 @@ import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
+import scala.collection.immutable.SortedMap
 import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import scala.jdk.CollectionConverters._
@@ -283,7 +284,7 @@ abstract class LevelDBWriter private[database] (
 
   override protected def loadContinuationStates(invokeTxId: TransactionId): (Int, ContinuationState) = {
     val lastStep = readOnly(_.get(Keys.continuationLastStep(invokeTxId)))
-    val state     = readOnly(_.get(Keys.continuationState(invokeTxId, lastStep)))
+    val state    = readOnly(_.get(Keys.continuationState(invokeTxId, lastStep)))
     (lastStep, state)
   }
 
@@ -385,7 +386,7 @@ abstract class LevelDBWriter private[database] (
       scriptResults: Map[ByteStr, InvokeScriptResult],
       failedTransactionIds: Set[ByteStr],
       stateHash: StateHashBuilder.Result,
-      continuationStates: Map[(ByteStr, Int), ContinuationState],
+      continuationStates: SortedMap[(ByteStr, Int), ContinuationState],
       replacingTransactions: Seq[NewTransactionInfo]
   ): Unit = {
     log.trace(s"Persisting block ${block.id()} at height $height")
@@ -613,10 +614,23 @@ abstract class LevelDBWriter private[database] (
       }
 
       continuationStates
+        .groupBy { case ((invokeId, _), _) => invokeId }
         .foreach {
-          case ((invokeTxId, step), state) =>
-            rw.put(Keys.continuationLastStep(TransactionId(invokeTxId)), step)
-            rw.put(Keys.continuationState(TransactionId(invokeTxId), step), state)
+          case (invokeId, states) =>
+            val id          = TransactionId(invokeId)
+            val lastStepKey = Keys.continuationLastStep(id)
+            val currentStep = if (rw.has(lastStepKey)) rw.get(lastStepKey) else 0
+            val lastStep =
+              states.foldLeft(currentStep) {
+                case (currentStep, ((_, step), state)) =>
+                  if (step == currentStep + 1) {
+                    rw.put(Keys.continuationState(id, step), state)
+                    step
+                  } else {
+                    currentStep
+                  }
+              }
+            rw.put(lastStepKey, lastStep)
         }
 
       expiredKeys.foreach(rw.delete(_, "expired-keys"))

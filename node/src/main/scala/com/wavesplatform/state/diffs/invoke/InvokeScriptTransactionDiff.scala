@@ -27,11 +27,11 @@ import com.wavesplatform.metrics._
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.invoke.InvokeDiffsCommon.StepInfo
 import com.wavesplatform.transaction.ApplicationStatus.ScriptExecutionInProgress
-import com.wavesplatform.transaction.{Transaction, TxVersion}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
+import com.wavesplatform.transaction.{Transaction, TxVersion}
 import monix.eval.Coeval
 import shapeless.Coproduct
 
@@ -65,11 +65,13 @@ object InvokeScriptTransactionDiff {
 
           stepLimit = ContractLimits.MaxComplexityByVersion(version)
 
-          _ <- TracedResult(Either.cond(
-            invocationComplexity <= stepLimit || tx.version >= TxVersion.V3,
-            (),
-            GenericError("Continuation is not allowed for Invoke Script Transaction with version below V3")
-          ))
+          _ <- TracedResult(
+            Either.cond(
+              invocationComplexity <= stepLimit || tx.version >= TxVersion.V3,
+              (),
+              GenericError("Continuation is not allowed for Invoke Script Transaction with version below V3")
+            )
+          )
 
           _ <- InvokeDiffsCommon.calcAndCheckFee(
             (message, _) => GenericError(message),
@@ -178,12 +180,13 @@ object InvokeScriptTransactionDiff {
               case ScriptResultV3(dataItems, transfers, _) => doProcessActions(dataItems ::: transfers)
               case ScriptResultV4(actions, _)              => doProcessActions(actions)
               case ir: IncompleteResult =>
-                val state      = ContinuationState.InProgress(ir.expr, unusedComplexity = ir.unusedComplexity)
-                val stateDiff  = Diff.empty.copy(
-                  transactions = Map(tx.id.value() -> NewTransactionInfo(tx, Set(), ScriptExecutionInProgress)),
-                  continuationStates = Map((tx.id.value(), 0) -> state),
-                  scriptsComplexity = fullLimit - ir.unusedComplexity
-                )
+                val state = ContinuationState.InProgress(ir.expr, unusedComplexity = ir.unusedComplexity)
+                val stateDiff = Diff.empty
+                  .copy(
+                    transactions = Map(tx.id.value() -> NewTransactionInfo(tx, Set(), ScriptExecutionInProgress)),
+                    scriptsComplexity = fullLimit - ir.unusedComplexity
+                  )
+                  .addContinuationState(tx.id.value(), step = 0, state = state)
                 val StepInfo(_, stepFee, scriptsRun) = InvokeDiffsCommon.stepInfo(stateDiff, blockchain, tx)
                 val portfolios = Diff.stateOps(
                   portfolios = InvokeDiffsCommon.stepFeePortfolios(stepFee, tx, blockchain),

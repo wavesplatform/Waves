@@ -15,6 +15,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{ApplicationStatus, Asset, Transaction}
 import play.api.libs.json._
 
+import scala.collection.immutable.SortedMap
 import scala.collection.mutable
 import scala.collection.mutable.LinkedHashMap
 
@@ -166,7 +167,7 @@ case class Diff(
     scriptsRun: Int,
     scriptsComplexity: Long,
     scriptResults: Map[ByteStr, InvokeScriptResult],
-    continuationStates: Map[(ByteStr, Int), ContinuationState],
+    continuationStates: SortedMap[(ByteStr, Int), ContinuationState],
     replacingTransactions: Seq[NewTransactionInfo]
 ) {
   lazy val continuationCurrentStates: Map[ByteStr, (Int, ContinuationState)] =
@@ -174,12 +175,15 @@ case class Diff(
       .groupBy { case ((invokeId, _), _) => invokeId }
       .map {
         case (invokeId, states) =>
-          val ((_, step), currentState) = states.maxBy { case ((_, step), _) => step }
+          val ((_, step), currentState) = states.last
           (invokeId, (step, currentState))
       }
 
   def bindTransaction(tx: Transaction): Diff =
     copy(transactions = transactions.concat(Map(Diff.toDiffTxData(tx, portfolios, accountData))))
+
+  def addContinuationState(invokeId: ByteStr, step: Int, state: ContinuationState): Diff =
+    copy(continuationStates = continuationStates + ((invokeId, step) -> state))
 }
 
 object Diff {
@@ -214,7 +218,7 @@ object Diff {
       scriptsRun = scriptsRun,
       scriptResults = scriptResults,
       scriptsComplexity = 0,
-      continuationStates = continuationStates,
+      continuationStates = Diff.empty.continuationStates ++ continuationStates,
       replacingTransactions = replacingTransactions
     )
 
@@ -251,7 +255,7 @@ object Diff {
       scriptsRun = scriptsRun,
       scriptResults = scriptResults,
       scriptsComplexity = scriptsComplexity,
-      continuationStates = continuationStates,
+      continuationStates = Diff.empty.continuationStates ++ continuationStates,
       replacingTransactions = Seq()
     )
 
@@ -278,7 +282,7 @@ object Diff {
       0,
       0,
       Map.empty,
-      Map.empty,
+      SortedMap.empty,
       Seq()
     )
 
