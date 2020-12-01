@@ -694,8 +694,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
                    |func testF() = throw("Test")
                    |func testCompl() = ${"sigVerify(base58'', base58'', base58'') ||" * 100} true
                    |
-                   |@Callable(i)
-                   |func testCallable1() = WriteSet([])
+                   |func testThis() = this
                    |
                    |@Callable(i)
                    |func testCallable() = WriteSet([DataEntry("test", i.caller.bytes)])
@@ -732,6 +731,13 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       responseAs[String] shouldBe "{\"result\":{\"type\":\"WriteSet\",\"value\":{\"data\":{\"type\":\"Array\",\"value\":[{\"type\":\"DataEntry\",\"value\":{\"key\":{\"type\":\"String\",\"value\":\"test\"},\"value\":{\"type\":\"ByteVector\",\"value\":\"11111111111111111111111111\"}}}]}}},\"expr\":\"testCallable()\",\"address\":\"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9\"}"
     }
 
+    evalScript("testThis()") ~> route ~> check {
+      responseJson shouldBe Json.obj(
+        "type"  -> "Address",
+        "value" -> Json.obj("bytes" -> Json.obj("type" -> "ByteVector", "value" -> "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"))
+      )
+    }
+
     evalScript("testNone()") ~> route ~> check {
       responseJson shouldBe Json.obj("error" -> 306, "message" -> "Function or type 'testNone' not found")
     }
@@ -764,8 +770,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       responseJson shouldBe Json.obj("type" -> "ByteVector", "value" -> "MATCHER")
     }
 
-    evalScript(
-      """match test(123) {
+    evalScript("""match test(123) {
         |  case i: Int => i * 123
         |  case _ => throw("")
         |}""".stripMargin) ~> route ~> check {
