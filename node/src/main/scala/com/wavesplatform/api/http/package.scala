@@ -130,12 +130,12 @@ package object http extends ApiMarshallers with ScorexLogging {
 
   val PublicKeySegment: PathMatcher1[PublicKey] = base58Segment(Some(crypto.KeyLength), _ => InvalidPublicKey).map(s => PublicKey(s))
 
-  private val jsonRejectionHandler = RejectionHandler
+  val jsonRejectionHandler: RejectionHandler = RejectionHandler
     .newBuilder()
     .handle { case ValidationRejection(_, Some(PlayJsonException(cause, errors))) => complete(WrongJson(cause, errors)) }
     .result()
 
-  private val jsonExceptionHandler: ExceptionHandler = ExceptionHandler {
+  val jsonExceptionHandler: ExceptionHandler = ExceptionHandler {
     case JsResultException(err)                                         => complete(WrongJson(errors = err))
     case PlayJsonException(cause, errors)                               => complete(WrongJson(cause, errors))
     case e: NoSuchElementException                                      => complete(WrongJson(Some(e)))
@@ -145,17 +145,13 @@ package object http extends ApiMarshallers with ScorexLogging {
   }
 
   def jsonPost[A: Reads](f: A => ToResponseMarshallable): Route =
+    jsonPostD[A](a => provide(f(a)))
+
+  def jsonPostD[A: Reads](f: A => Directive1[ToResponseMarshallable]): Route =
     post((handleExceptions(jsonExceptionHandler) & handleRejections(jsonRejectionHandler)) {
       entity(as[A]) { a =>
-        complete(f(a))
-      }
-    }) ~ get(complete(StatusCodes.MethodNotAllowed))
-
-  def jsonParammedPost[A: Reads](f: (A, Map[String, String]) => ToResponseMarshallable): Route =
-    post((handleExceptions(jsonExceptionHandler) & handleRejections(jsonRejectionHandler)) {
-      parameterMap { params =>
-        entity(as[A]) { a =>
-          complete(f(a, params))
+        f(a) { result =>
+          complete(result)
         }
       }
     }) ~ get(complete(StatusCodes.MethodNotAllowed))

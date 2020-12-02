@@ -7,7 +7,7 @@ import scala.util.control.NonFatal
 trait OptimisticLockable {
   private[this] val lock = new StampedLock
 
-  protected def readLockCond[A](getValue: => A)(cond: A => Boolean): A = {
+  protected def readLockCond[A](getValue: => A)(shouldRecheck: A => Boolean): A = {
     def readLocked(): A = {
       val stamp = lock.readLockInterruptibly()
       try {
@@ -20,10 +20,10 @@ trait OptimisticLockable {
     val stamp = lock.tryOptimisticRead()
     try {
       val result = getValue
-      if (!lock.validate(stamp) && cond(result)) readLocked()
+      if (!lock.validate(stamp) && shouldRecheck(result)) readLocked()
       else result
     } catch {
-      case NonFatal(_) =>
+      case NonFatal(_) if !lock.validate(stamp) =>
         readLocked()
     }
   }

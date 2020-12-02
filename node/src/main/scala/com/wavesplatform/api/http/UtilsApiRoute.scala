@@ -2,23 +2,21 @@ package com.wavesplatform.api.http
 
 import java.security.SecureRandom
 
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.api.http.ApiError.{ScriptCompilerError, TooBigArrayAllocation}
 import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.Global
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.Time
-import com.wavesplatform.state.Blockchain
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.directives.values._
 import monix.execution.Scheduler
 import play.api.libs.json._
 
@@ -41,7 +39,7 @@ case class UtilsApiRoute(
   }
 
   override val route: Route = pathPrefix("utils") {
-    decompile ~ compile ~ compileCode ~ compileWithImports ~ scriptMeta ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ transactionSerialize
+    decompile ~ compile ~ compileCode ~ compileWithImports ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ transactionSerialize
   }
 
   def decompile: Route = path("script" / "decompile") {
@@ -94,7 +92,12 @@ case class UtilsApiRoute(
 
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String])) { code =>
-      def stdLib: StdLibVersion = if(blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) { V4 } else { StdLibVersion.VersionDic.default }
+      def stdLib: StdLibVersion =
+        if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {
+          V4
+        } else {
+          StdLibVersion.VersionDic.default
+        }
       executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator(), defaultStdLib = stdLib)) { result =>
         complete(
           result
@@ -165,15 +168,6 @@ case class UtilsApiRoute(
           )
         )
       }
-    }
-  }
-
-  def scriptMeta: Route = path("script" / "meta") {
-    (post & entity(as[String])) { code =>
-      val result: ToResponseMarshallable = Global
-        .dAppFuncTypes(code) // Does not estimate complexity, therefore it should not hang
-        .fold(e => e, r => r)
-      complete(result)
     }
   }
 
