@@ -36,17 +36,17 @@ trait ApiMarshallers {
   implicit lazy val ValidationErrorMarshaller: ToResponseMarshaller[ValidationError] =
     ApiErrorMarshaller.compose(ve => ApiError.fromValidationError(ve))
 
-  implicit lazy val TransactionJsonWrites: Writes[Transaction] = Writes(_.json())
+  implicit lazy val TransactionJsonWrites: OWrites[Transaction] = OWrites(_.json())
 
   implicit lazy val logWrites: Writes[TraceStep] = Writes(_.json)
 
-  implicit def tracedResultMarshaller[A](implicit writes: Writes[A]): ToResponseMarshaller[TracedResult[ApiError, A]] =
+  def tracedResultMarshaller[A](includeTrace: Boolean)(implicit writes: OWrites[A]): ToResponseMarshaller[TracedResult[ApiError, A]] =
     fromStatusCodeAndValue[StatusCode, JsValue]
       .compose(
         ae =>
           (
             ae.resultE.fold(_.code, _ => StatusCodes.OK),
-            ae.resultE.fold(_.json, writes.writes)
+            ae.resultE.fold(_.json, writes.writes) ++ (if (includeTrace) Json.obj("trace" -> Json.toJson(ae.trace)) else Json.obj())
           )
       )
 
