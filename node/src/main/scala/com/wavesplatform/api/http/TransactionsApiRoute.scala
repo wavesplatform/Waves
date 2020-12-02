@@ -278,7 +278,8 @@ object TransactionsApiRoute {
               "extraFeePerStep"            -> invoke.extraFeePerStep,
               "feeAssetId"                 -> invoke.feeAssetId
             )
-          case _ => ???
+          case _ =>
+            Json.obj()
         }
       case t: InvokeScriptTransaction if t.version == TxVersion.V3 =>
         Json.obj("continuationTransactionIds" -> transactionsApi.continuations(t.id()).map(_.toString))
