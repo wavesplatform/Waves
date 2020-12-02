@@ -2107,4 +2107,25 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     }
     f([1])""", version = V4) shouldBe Right(CONST_LONG(4))
   }
+
+  property("value(Any)") {
+    eval("""func f(x: Any) = {
+      value(x)
+    }
+    f(1)""", version = V4) shouldBe Symbol("Left")
+  }
+
+  property("default type") {
+    eval("""func f(x: Int| String) = {
+      match x {
+        case i: Int => 1
+        case v =>
+          match v {
+            case j: Int => 2
+            case s: String => 3
+          }
+      }
+    }
+    f("q")""", version = V4) shouldBe Symbol("Left")
+  }
 }
