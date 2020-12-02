@@ -2,7 +2,6 @@ package com.wavesplatform.api.http
 
 import java.security.SecureRandom
 
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.{PathMatcher1, Route}
 import cats.implicits._
 import com.wavesplatform.account.{Address, AddressScheme}
@@ -56,7 +55,7 @@ case class UtilsApiRoute(
   }
 
   override val route: Route = pathPrefix("utils") {
-    decompile ~ compile ~ compileCode ~ compileWithImports ~ scriptMeta ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ transactionSerialize ~ evaluate
+    decompile ~ compile ~ compileCode ~ compileWithImports ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ transactionSerialize ~ evaluate
   }
 
   def decompile: Route = path("script" / "decompile") {
@@ -185,15 +184,6 @@ case class UtilsApiRoute(
           )
         )
       }
-    }
-  }
-
-  def scriptMeta: Route = path("script" / "meta") {
-    (post & entity(as[String])) { code =>
-      val result: ToResponseMarshallable = Global
-        .dAppFuncTypes(code) // Does not estimate complexity, therefore it should not hang
-        .fold(e => e, r => r)
-      complete(result)
     }
   }
 
