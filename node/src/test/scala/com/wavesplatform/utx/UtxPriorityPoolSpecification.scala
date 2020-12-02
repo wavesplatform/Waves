@@ -140,7 +140,7 @@ class UtxPriorityPoolSpecification
         utx.all shouldBe expectedTxs1
         assertPortfolios(utx, expectedTxs1)
 
-        val expectedTxs2 = expectedTxs1 ++ left.sorted(TransactionsOrdering(Set(), utx))
+        val expectedTxs2 = expectedTxs1 ++ left.sorted(TransactionsOrdering(Set(), null))
         utx.removeAll(expectedTxs2)
         left.foreach(utx.putIfNew(_).resultE should beRight)
         utx.setPriorityTxs(expectedTxs1)
@@ -299,7 +299,7 @@ class UtxPriorityPoolSpecification
 
           mbs2.head.transactionData.foreach(utx.putIfNew(_).resultE should beRight)
           extAppender(Seq(block2)).runSyncUnsafe() should beRight
-          val expectedTxs1 = mbs1.last.transactionData ++ mbs2.head.transactionData.sorted(TransactionsOrdering(Set(), utx))
+          val expectedTxs1 = mbs1.last.transactionData ++ mbs2.head.transactionData.sorted(TransactionsOrdering(Set(), null))
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(expectedTxs1)
 
           mbs2.foreach(microBlockAppender(_).runSyncUnsafe() should beRight)

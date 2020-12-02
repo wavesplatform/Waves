@@ -65,7 +65,7 @@ class UtxPoolImpl(
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionMeta(_).isDefined) // TODO delete in the future
 
-  private[this] val inUTXPoolOrdering = TransactionsOrdering(utxSettings.fastLaneAddresses, this)
+  private[this] val inUTXPoolOrdering = TransactionsOrdering(utxSettings.fastLaneAddresses, resolveInvoke)
 
   override def putIfNew(tx: Transaction, forceValidate: Boolean): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id()) || priorityPool.contains(tx.id())) TracedResult.wrapValue(false)
@@ -277,6 +277,12 @@ class UtxPoolImpl(
     case a: Authorized if blockchain.hasAccountScript(a.sender.toAddress) => Set(a.sender.toAddress)
     case _                                                                => Set.empty
   }
+
+  private def resolveInvoke(c: ContinuationTransaction): InvokeScriptTransaction =
+    transactions.asScala.get(c.invokeScriptTransactionId)
+      .orElse(blockchain.resolveInvoke(c))
+      .get
+      .asInstanceOf[InvokeScriptTransaction]
 
   private[this] case class TxEntry(tx: Transaction, priority: Boolean)
 
@@ -514,12 +520,6 @@ class UtxPoolImpl(
   def runCleanup(): Unit = {
     TxCleanup.runCleanupAsync()
   }
-
-  override def resolveInvoke(c: ContinuationTransaction): InvokeScriptTransaction =
-    transactions.asScala.get(c.invokeScriptTransactionId)
-      .orElse(blockchain.resolveInvoke(c))
-      .get
-      .asInstanceOf[InvokeScriptTransaction]
 
   override def close(): Unit = {
     import scala.concurrent.duration._

@@ -25,7 +25,6 @@ trait UtxPool extends AutoCloseable {
       strategy: PackStrategy = PackStrategy.Unlimited,
       cancelled: () => Boolean = () => false
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint)
-  def resolveInvoke(c: ContinuationTransaction): InvokeScriptTransaction
 }
 
 object UtxPool {

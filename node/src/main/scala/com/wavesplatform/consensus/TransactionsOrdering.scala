@@ -3,14 +3,13 @@ package com.wavesplatform.consensus
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction}
 import com.wavesplatform.transaction.{Authorized, Transaction}
-import com.wavesplatform.utx.UtxPool
 
-case class TransactionsOrdering(whitelistAddresses: Set[String], utxPool: UtxPool)
+case class TransactionsOrdering(whitelistAddresses: Set[String], resolveInvoke: ContinuationTransaction => InvokeScriptTransaction)
     extends Ordering[Transaction] {
 
   private def orderBy(tx: Transaction): (Boolean, Double, Long, Long) = {
-    val commonFee   = if (tx.assetFee._1 != Waves) 0 else -tx.assetFee._2
-    val size        = tx.bytes().length
+    val commonFee = if (tx.assetFee._1 != Waves) 0 else -tx.assetFee._2
+    val size      = tx.bytes().length
 
     val resolvedTx  = maybeContinuation(tx)
     val byWhiteList = !isWhitelisted(resolvedTx) // false < true
@@ -27,7 +26,7 @@ case class TransactionsOrdering(whitelistAddresses: Set[String], utxPool: UtxPoo
 
   private def maybeContinuation(t: Transaction): Transaction =
     t match {
-      case c: ContinuationTransaction => utxPool.resolveInvoke(c)
+      case c: ContinuationTransaction => resolveInvoke(c)
       case _                          => t
     }
 
