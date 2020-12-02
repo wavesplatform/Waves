@@ -227,7 +227,7 @@ object Transaction {
           chainId     <- (jsv \ "chainId").validateOpt[Byte]
           fee         <- (jsv \ "fee").validate[Long]
           feeAssetId  <- (jsv \ "feeAssetId").validateOpt[String]
-          timestamp   <- (jsv \ "timestamp").validate[Long]
+          timestamp   <- (jsv \ "timestamp").validateOpt[Long]
           sender      <- (jsv \ "sender").validateOpt[String]
           version     <- (jsv \ "version").validateOpt[Byte]
           name        <- (jsv \ "name").validateOpt[String]
@@ -261,7 +261,7 @@ object Transaction {
           chainId,
           fee,
           feeAssetId,
-          timestamp,
+          timestamp.getOrElse(0),
           sender,
           version,
           name,
@@ -362,7 +362,7 @@ object TransactionInfo {
           _type                <- (jsv \ "type").validate[Int]
           id                   <- (jsv \ "id").validate[String]
           fee                  <- (jsv \ "fee").validate[Long]
-          timestamp            <- (jsv \ "timestamp").validate[Long]
+          timestamp            <- (jsv \ "timestamp").validateOpt[Long]
           sender               <- (jsv \ "sender").validateOpt[String]
           height               <- (jsv \ "height").validate[Int]
           minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
@@ -386,7 +386,7 @@ object TransactionInfo {
           id,
           chainId,
           fee,
-          timestamp,
+          timestamp.getOrElse(0),
           sender,
           name,
           description,
@@ -486,7 +486,7 @@ object DebugStateChanges {
           id                         <- (jsv \ "id").validate[String]
           fee                        <- (jsv \ "fee").validate[Long]
           feeAssetId                 <- (jsv \ "feeAssetId").validateOpt[String]
-          timestamp                  <- (jsv \ "timestamp").validate[Long]
+          timestamp                  <- (jsv \ "timestamp").validateOpt[Long]
           sender                     <- (jsv \ "sender").validateOpt[String]
           height                     <- (jsv \ "height").validate[Int]
           minSponsoredAssetFee       <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
@@ -503,7 +503,7 @@ object DebugStateChanges {
           id,
           fee,
           feeAssetId,
-          timestamp,
+          timestamp.getOrElse(0),
           sender,
           height,
           minSponsoredAssetFee,
