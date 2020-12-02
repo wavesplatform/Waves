@@ -181,9 +181,8 @@ object Blockchain {
       else if (height > 1) PlainBlockVersion
       else GenesisBlockVersion
 
-    def resolveInvoke(c: ContinuationTransaction): InvokeScriptTransaction =
+    def resolveInvoke(c: ContinuationTransaction): Option[InvokeScriptTransaction] =
       blockchain.transactionInfo(c.invokeScriptTransactionId)
         .collect { case (_, i: InvokeScriptTransaction, _) => i }
-        .getOrElse(throw new IllegalArgumentException(s"Couldn't find Invoke Transaction with id = ${c.invokeScriptTransactionId}"))
   }
 }

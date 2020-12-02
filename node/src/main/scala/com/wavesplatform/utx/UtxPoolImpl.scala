@@ -516,7 +516,9 @@ class UtxPoolImpl(
   }
 
   override def resolveInvoke(c: ContinuationTransaction): InvokeScriptTransaction =
-    transactions.asScala.getOrElse(c.invokeScriptTransactionId, blockchain.resolveInvoke(c))
+    transactions.asScala.get(c.invokeScriptTransactionId)
+      .orElse(blockchain.resolveInvoke(c))
+      .get
       .asInstanceOf[InvokeScriptTransaction]
 
   override def close(): Unit = {

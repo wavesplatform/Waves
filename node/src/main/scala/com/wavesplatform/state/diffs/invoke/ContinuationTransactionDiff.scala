@@ -47,7 +47,7 @@ object ContinuationTransactionDiff {
       expr: Terms.EXPR,
       unusedComplexity: Int
   ): TracedResult[ValidationError, Diff] = {
-    val invoke = blockchain.resolveInvoke(tx)
+    val invoke = blockchain.resolveInvoke(tx).get
     for {
       dAppAddress <- TracedResult(blockchain.resolveAlias(invoke.dAppAddressOrAlias))
       AccountScriptInfo(dAppPublicKey, script, _, callableComplexities) <- TracedResult(

@@ -63,7 +63,7 @@ object Verifier extends ScorexLogging {
   def assets(blockchain: Blockchain, remainingComplexity: Int)(tx: Transaction): TracedResult[(Long, ValidationError), Diff] = {
     val resolvedTx =
       tx match {
-        case c: ContinuationTransaction => blockchain.resolveInvoke(c)
+        case c: ContinuationTransaction => blockchain.resolveInvoke(c).get
         case _                          => tx
       }
 
