@@ -625,7 +625,7 @@ object PBTransactions {
       case tx @ vt.smart.ContinuationTransaction(invokeScriptTransactionId, step, fee, feeAssetId) =>
         val data = Data.Continuation(ContinuationTransactionData(invokeScriptTransactionId.toByteString, step))
         new SignedTransaction(
-          Some(Transaction(tx.chainId, version = tx.version, fee = Some((feeAssetId, fee): Amount), data = data))
+          Some(Transaction(version = tx.version, fee = Some((feeAssetId, fee): Amount), data = data))
         )
 
       case _ =>
