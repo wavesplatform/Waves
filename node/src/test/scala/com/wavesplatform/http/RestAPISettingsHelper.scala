@@ -23,7 +23,7 @@ trait RestAPISettingsHelper {
         s"""waves.rest-api {
            |  api-key-hash = $keyHash
            |  transactions-by-address-limit = $MaxTransactionsPerRequest
-           |  distribution-by-address-limit = $MaxAddressesPerRequest
+           |  distribution-address-limit = $MaxAddressesPerRequest
            |}
          """.stripMargin
       )

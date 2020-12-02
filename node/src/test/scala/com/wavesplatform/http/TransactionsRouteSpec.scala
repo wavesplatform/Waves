@@ -1,7 +1,7 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model._
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.{AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.api.http.ApiError._
@@ -14,13 +14,15 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL}
-import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.{Blockchain, Height, InvokeScriptResult}
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, TxHelpers}
+import com.wavesplatform.transaction.{Asset, Proofs, TxHelpers, TxVersion}
 import com.wavesplatform.{BlockGen, NoShrink, TestTime, TestWallet, TransactionGen}
 import monix.reactive.Observable
 import org.scalacheck.Gen._
@@ -31,6 +33,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
 
+import scala.concurrent.Future
 import scala.util.Random
 
 class TransactionsRouteSpec
@@ -46,9 +49,10 @@ class TransactionsRouteSpec
     with NoShrink {
 
   private val blockchain          = mock[Blockchain]
-  private val utxPoolSynchronizer = mock[UtxPoolSynchronizer]
+  private val utxPoolSynchronizer = mock[TransactionPublisher]
   private val addressTransactions = mock[CommonTransactionsApi]
   private val utxPoolSize         = mockFunction[Int]
+  private val testTime            = new TestTime
 
   private val route =
     seal(
@@ -59,7 +63,7 @@ class TransactionsRouteSpec
         blockchain,
         utxPoolSize,
         utxPoolSynchronizer,
-        new TestTime
+        testTime
       ).route
     )
 
@@ -508,6 +512,57 @@ class TransactionsRouteSpec
       invoke(funcWithoutArgs, 0)
       invoke(funcWithEmptyArgs, 0)
       invoke(funcWithArgs, 2)
+    }
+  }
+
+  routePath("/broadcast") - {
+    def withInvokeScriptTransaction(f: (KeyPair, InvokeScriptTransaction) => Unit): Unit = {
+      val seed = new Array[Byte](32)
+      Random.nextBytes(seed)
+      val sender: KeyPair = KeyPair(seed)
+      val ist = InvokeScriptTransaction(
+        TxVersion.V1,
+        sender.publicKey,
+        sender.toAddress,
+        None,
+        Seq.empty,
+        500000L,
+        Asset.Waves,
+        testTime.getTimestamp(),
+        Proofs.empty,
+        AddressScheme.current.chainId
+      ).signWith(sender.privateKey)
+      f(sender, ist)
+    }
+
+    "shows trace when trace is enabled" in withInvokeScriptTransaction { (sender, ist) =>
+      val accountTrace = AccountVerifierTrace(sender.toAddress, Some(GenericError("Error in account script")))
+      (utxPoolSynchronizer.validateAndBroadcast _)
+        .expects(*, None)
+        .returning(
+          Future.successful(TracedResult(Right(true), List(accountTrace)))
+        )
+        .once()
+      Post(routePath("/broadcast?trace=true"), ist.json()) ~> route ~> check {
+        val result = responseAs[JsObject]
+        (result \ "trace").as[JsValue] shouldBe Json.arr(accountTrace.json)
+      }
+    }
+
+    "does not show trace when trace is disabled" in withInvokeScriptTransaction { (sender, ist) =>
+      val accountTrace = AccountVerifierTrace(sender.toAddress, Some(GenericError("Error in account script")))
+      (utxPoolSynchronizer.validateAndBroadcast _)
+        .expects(*, None)
+        .returning(
+          Future.successful(TracedResult(Right(true), List(accountTrace)))
+        )
+        .twice()
+      Post(routePath("/broadcast"), ist.json()) ~> route ~> check {
+        (responseAs[JsObject] \ "trace") shouldBe empty
+      }
+      Post(routePath("/broadcast?trace=false"), ist.json()) ~> route ~> check {
+        (responseAs[JsObject] \ "trace") shouldBe empty
+      }
     }
   }
 

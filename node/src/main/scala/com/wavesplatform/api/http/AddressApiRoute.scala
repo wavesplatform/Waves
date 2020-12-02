@@ -16,7 +16,7 @@ import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.meta.FunctionSignatures
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.{Global, ValidationError}
-import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.{Blockchain, DataEntry}
@@ -34,7 +34,7 @@ case class AddressApiRoute(
     settings: RestAPISettings,
     wallet: Wallet,
     blockchain: Blockchain,
-    utxPoolSynchronizer: UtxPoolSynchronizer,
+    transactionPublisher: TransactionPublisher,
     time: Time,
     limitedScheduler: Scheduler,
     commonAccountsApi: CommonAccountsApi
