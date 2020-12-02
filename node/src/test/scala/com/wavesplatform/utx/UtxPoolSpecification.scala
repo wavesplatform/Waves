@@ -21,7 +21,6 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
-import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.mining._
 import com.wavesplatform.settings._
@@ -155,9 +154,12 @@ class UtxPoolSpecification
         |@Callable(i)
         |func default() = { WriteSet([DataEntry("0", true)]) }
         |""".stripMargin
-    val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV1).explicitGet()._1
+    val script = compile(scriptText)
     SetScriptTransaction.selfSigned(TxVersion.V1, sender, Some(script), extraFee, time.getTimestamp()).explicitGet()
   }
+
+  private def compile(scriptText: String): Script =
+    ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()._1
 
   private val accountsGen = for {
     sender        <- accountGen.label("sender")
@@ -996,28 +998,25 @@ class UtxPoolSpecification
     }
 
     "continuations" - {
-      "ordering by extraFeePerStep" in forAll {
-        def compile(scriptText: String): Script =
-          ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()._1
-
-        val dApp =
-          compile(
-            s"""
-               | {-# STDLIB_VERSION 5 #-}
-               | {-# CONTENT_TYPE DAPP #-}
-               |
-               | @Callable(i)
-               | func default() = {
-               |   let a = !(${List.fill(60)("sigVerify(base64'', base64'', base64'')").mkString("||")})
-               |   if (a)
-               |     then
-               |       [BooleanEntry("isAllowed", true)]
-               |     else
-               |       throw("unexpected")
-               | }
+      val dApp =
+        compile(
+          s"""
+             | {-# STDLIB_VERSION 5 #-}
+             | {-# CONTENT_TYPE DAPP #-}
+             |
+             | @Callable(i)
+             | func default() = {
+             |   let a = !(${List.fill(60)("sigVerify(base64'', base64'', base64'')").mkString("||")})
+             |   if (a)
+             |     then
+             |       [BooleanEntry("isAllowed", true)]
+             |     else
+             |       throw("unexpected")
+             | }
            """.stripMargin
-          )
+        )
 
+      "are ordered by extraFeePerStep" in forAll {
         for {
           caller   <- accountGen
           dAppAcc1 <- accountGen
@@ -1055,9 +1054,6 @@ class UtxPoolSpecification
         } yield (time, caller.toAddress, dAppAcc1, dAppAcc2, setScript1, setScript2, prioritizedInvoke, tailInvoke)
       } {
         case (time, caller, dAppAcc1, dAppAcc2, setScript1, setScript2, prioritizedInvoke, tailInvoke) =>
-          val prioritizedInvokeId = prioritizedInvoke.id.value()
-          val tailInvokeId        = tailInvoke.id.value()
-
           val bcu = mkBlockchain(Map(caller -> ENOUGH_AMT, dAppAcc1.toAddress -> ENOUGH_AMT, dAppAcc2.toAddress -> ENOUGH_AMT))
           val precondition = TestBlock.create(
             time.getTimestamp(),
@@ -1085,24 +1081,104 @@ class UtxPoolSpecification
             )
 
           def nextStep(step: Int) = {
-            val continuations = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1.get
-            continuations shouldBe
+            val txs = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1.get
+            txs shouldBe
               Seq(
-                ContinuationTransaction(prioritizedInvokeId, step, 0L, Waves),
-                ContinuationTransaction(tailInvokeId, step, 0L, Waves)
+                ContinuationTransaction(prioritizedInvoke.id.value(), step, 0L, Waves),
+                ContinuationTransaction(tailInvoke.id.value(), step, 0L, Waves)
               )
             val block = TestBlock.create(
               time.getTimestamp(),
               bcu.lastBlockId.get,
-              continuations,
+              txs,
               dAppAcc1
             )
             bcu.processBlock(block).explicitGet()
           }
 
           (0 to 2).foreach(nextStep)
-          bcu.continuationStates(prioritizedInvokeId) shouldBe ((3, ContinuationState.Finished))
-          bcu.continuationStates(tailInvokeId) shouldBe ((3, ContinuationState.Finished))
+          bcu.continuationStates(prioritizedInvoke.id.value()) shouldBe ((3, ContinuationState.Finished))
+          bcu.continuationStates(tailInvoke.id.value()) shouldBe ((3, ContinuationState.Finished))
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe None
+      }
+
+      "blocks affecting txs until completion" in forAll {
+        for {
+          caller  <- accountGen
+          dAppAcc <- accountGen
+          fee     <- smallFeeGen
+          time      = new TestTime()
+          setScript = SetScriptTransaction.selfSigned(TxVersion.V2, dAppAcc, Some(dApp), fee, time.getTimestamp()).explicitGet()
+          invoke = InvokeScriptTransaction
+            .selfSigned(
+              TxVersion.V3,
+              caller,
+              dAppAcc.toAddress,
+              None,
+              Nil,
+              fee * 10,
+              Waves,
+              ScriptExtraFee / 10,
+              time.getTimestamp()
+            )
+            .explicitGet()
+          transfer = TransferTransaction
+            .selfSigned(TxVersion.V2, dAppAcc, caller.toAddress, Waves, 1L, Waves, fee, ByteStr.empty, time.getTimestamp())
+            .explicitGet()
+        } yield (time, caller.toAddress, dAppAcc, setScript, invoke, transfer)
+      } {
+        case (time, caller, dAppAcc, setScript, invoke, transfer) =>
+          val bcu = mkBlockchain(Map(caller -> ENOUGH_AMT, dAppAcc.toAddress -> ENOUGH_AMT))
+          val precondition = TestBlock.create(
+            time.getTimestamp(),
+            bcu.lastBlockId.get,
+            Seq(setScript, invoke),
+            dAppAcc
+          )
+          bcu.processBlock(precondition).explicitGet()
+
+          val utx =
+            new UtxPoolImpl(
+              time,
+              bcu,
+              ignoreSpendableBalanceChanged,
+              UtxSettings(
+                10,
+                PoolDefaultMaxBytes,
+                1000,
+                Set.empty,
+                Set.empty,
+                Set.empty,
+                allowTransactionsFromSmartAccounts = true,
+                allowSkipChecks = false
+              )
+            )
+
+          def transferBlock = TestBlock.create(
+            time.getTimestamp(),
+            bcu.lastBlockId.get,
+            Seq(transfer),
+            dAppAcc
+          )
+          bcu.processBlock(transferBlock) should produce("BlockedByContinuation")
+          utx.putIfNew(transfer).resultE.explicitGet()
+
+          def nextStep(step: Int) = {
+            val txs = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1.get
+            txs shouldBe Seq(ContinuationTransaction(invoke.id.value(), step, 0L, Waves))
+            val block = TestBlock.create(
+              time.getTimestamp(),
+              bcu.lastBlockId.get,
+              txs,
+              dAppAcc
+            )
+            bcu.processBlock(block).explicitGet()
+          }
+          (0 to 2).foreach(nextStep)
+          bcu.continuationStates(invoke.id.value()) shouldBe ((3, ContinuationState.Finished))
+
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1.get shouldBe Seq(transfer)
+          bcu.processBlock(transferBlock).explicitGet()
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe None
       }
     }

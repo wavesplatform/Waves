@@ -392,7 +392,10 @@ class UtxPoolImpl(
 
                     case Left(TransactionValidationError(BlockedByContinuation, _)) =>
                       log.trace(s"Transaction ${tx.id()} is blocked due to evaluation of continuation")
-                      r.copy(iterations = r.iterations + 1)
+                      r.copy(
+                        iterations = r.iterations + 1,
+                        validatedTransactions = r.validatedTransactions + tx.id()
+                      )
 
                     case Left(error) =>
                       log.debug(s"Transaction ${tx.id()} removed due to ${extractErrorMessage(error)}")
