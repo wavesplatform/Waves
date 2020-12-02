@@ -10,7 +10,7 @@ import com.wavesplatform.transaction.validation.TxValidator
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 case class ContinuationTransaction(
     invokeScriptTransactionId: ByteStr,
@@ -29,7 +29,7 @@ case class ContinuationTransaction(
     Coeval.evalOnce(
       Json.obj(
         "version"                   -> version,
-        "type"                      -> builder.typeId,
+        "type"                      -> typeId,
         "id"                        -> id().toString,
         "fee"                       -> fee,
         "step"                      -> step,
@@ -57,7 +57,13 @@ object ContinuationTransaction extends TransactionParser {
 
   override def supportedVersions: Set[TxVersion] = Set(TxVersion.V1)
 
-  override def parseBytes(bytes: Array[Byte]): Try[ContinuationTransaction] = ???
+  override def parseBytes(bytes: Array[Byte]): Try[ContinuationTransaction] =
+    PBTransactionSerializer
+      .parseBytes(bytes)
+      .flatMap {
+        case tx: ContinuationTransaction => Success(tx)
+        case tx: Transaction             => Failure(UnexpectedTransaction(typeId, tx.typeId))
+      }
 
   override implicit def validator: TxValidator[ContinuationTransaction] = _.validNel
 }
