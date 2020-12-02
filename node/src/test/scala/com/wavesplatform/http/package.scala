@@ -5,6 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Proofs}
+import org.scalatest.enablers.Emptiness
 import org.scalatest.matchers.{HavePropertyMatchResult, HavePropertyMatcher}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
@@ -100,4 +101,6 @@ package object http {
       )
       .explicitGet()
   }
+
+  implicit val emptyJsLookupResult: Emptiness[JsLookupResult] = r => r.isEmpty
 }

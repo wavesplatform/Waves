@@ -34,11 +34,12 @@ class AssetsBroadcastRouteSpec
   private[this] val route = AssetsApiRoute(
     restAPISettings,
     stub[Wallet],
-    DummyUtxPoolSynchronizer.rejecting(tx => TransactionValidationError(GenericError("foo"), tx)),
+    DummyTransactionPublisher.rejecting(tx => TransactionValidationError(GenericError("foo"), tx)),
     stub[Blockchain],
     stub[Time],
     stub[CommonAccountsApi],
-    stub[CommonAssetsApi]
+    stub[CommonAssetsApi],
+    1000
   ).route
 
   private[this] val fixedIssueGen = for {
@@ -174,11 +175,12 @@ class AssetsBroadcastRouteSpec
     val route = AssetsApiRoute(
       restAPISettings,
       stub[Wallet],
-      DummyUtxPoolSynchronizer.accepting,
+      DummyTransactionPublisher.accepting,
       stub[Blockchain],
       stub[Time],
       stub[CommonAccountsApi],
-      stub[CommonAssetsApi]
+      stub[CommonAssetsApi],
+      1000
     ).route
 
     val seed               = "seed".getBytes("UTF-8")
