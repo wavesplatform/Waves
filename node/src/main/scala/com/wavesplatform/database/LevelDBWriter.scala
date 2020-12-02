@@ -619,7 +619,7 @@ abstract class LevelDBWriter private[database] (
           case (invokeId, states) =>
             val id          = TransactionId(invokeId)
             val lastStepKey = Keys.continuationLastStep(id)
-            val currentStep = if (rw.has(lastStepKey)) rw.get(lastStepKey) else -1
+            val currentStep = Try(rw.get(lastStepKey)).getOrElse(-1)
             val lastStep =
               states.foldLeft(currentStep) {
                 case (currentStep, ((_, step), state)) =>
