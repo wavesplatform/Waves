@@ -7,8 +7,6 @@ import com.wavesplatform.api.http.ApiError.{ScriptCompilerError, TooBigArrayAllo
 import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
