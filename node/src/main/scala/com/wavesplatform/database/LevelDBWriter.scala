@@ -282,11 +282,12 @@ abstract class LevelDBWriter private[database] (
     stateFeatures ++ settings.functionalitySettings.preActivatedFeatures
   }
 
-  override protected def loadContinuationStates(invokeTxId: TransactionId): (Int, ContinuationState) = {
-    val lastStep = readOnly(_.get(Keys.continuationLastStep(invokeTxId)))
-    val state    = readOnly(_.get(Keys.continuationState(invokeTxId, lastStep)))
-    (lastStep, state)
-  }
+  override protected def loadContinuationStates(invokeTxId: TransactionId): (Int, ContinuationState) =
+    readOnly { db =>
+      val lastStep = db.get(Keys.continuationLastStep(invokeTxId))
+      val state    = db.get(Keys.continuationState(invokeTxId, lastStep))
+      (lastStep, state)
+    }
 
   override def wavesAmount(height: Int): BigInt = readOnly { db =>
     val factHeight = height.min(this.height)
