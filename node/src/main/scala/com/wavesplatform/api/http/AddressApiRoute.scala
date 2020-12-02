@@ -206,7 +206,7 @@ case class AddressApiRoute(
     (path("seq" / IntNumber / IntNumber) & get) {
       case (start, end) =>
         if (start < 0 || end < 0 || start > end) complete(GenericError("Invalid sequence"))
-        else if (end - start > MaxAddressesPerRequest) complete(TooBigArrayAllocation(MaxAddressesPerRequest))
+        else if (end - start >= MaxAddressesPerRequest) complete(TooBigArrayAllocation(MaxAddressesPerRequest))
         else complete(wallet.privateKeyAccounts.map(_.toAddress).slice(start, end))
     }
   }
