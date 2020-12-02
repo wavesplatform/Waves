@@ -32,7 +32,6 @@ case class ContinuationTransaction(
         "type"                      -> builder.typeId,
         "id"                        -> id().toString,
         "fee"                       -> fee,
-        "timestamp"                 -> timestamp,
         "step"                      -> step,
         "invokeScriptTransactionId" -> invokeScriptTransactionId.toString
       )
