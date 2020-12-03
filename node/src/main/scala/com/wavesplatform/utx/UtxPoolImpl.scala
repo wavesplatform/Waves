@@ -251,13 +251,20 @@ class UtxPoolImpl(
     Monoid.combineAll(priority :+ pessimistic)
   }
 
-  private[utx] def nonPriorityTransactions(continuations: Iterable[ContinuationTransaction] = Nil): Seq[Transaction] = {
-    (transactions.values.asScala.toVector ++ continuations)
+  private def continuations: Iterable[ContinuationTransaction] =
+    blockchain.continuationStates
+      .collect {
+        case (invokeId, (step, _: ContinuationState.InProgress)) =>
+          ContinuationTransaction(invokeId, step, 0L, Waves)
+      }
+
+  private[utx] def nonPriorityTransactions(withContinuations: Boolean = true): Seq[Transaction] = {
+    (transactions.values.asScala.toVector ++ (if (withContinuations) continuations else Vector()))
       .sorted(inUTXPoolOrdering)
   }
 
   override def all: Seq[Transaction] =
-    (priorityPool.priorityTransactions ++ nonPriorityTransactions()).distinct
+    (priorityPool.priorityTransactions ++ nonPriorityTransactions(false)).distinct
 
   override def size: Int = transactions.size
 
@@ -286,9 +293,9 @@ class UtxPoolImpl(
 
   private[this] case class TxEntry(tx: Transaction, priority: Boolean)
 
-  private[this] def createTxEntrySeq(continuations: Iterable[ContinuationTransaction]): Seq[TxEntry] =
+  private[this] def createTxEntrySeq(): Seq[TxEntry] =
     priorityPool.priorityTransactions.map(TxEntry(_, priority = true)) ++
-      nonPriorityTransactions(continuations).map(TxEntry(_, priority = false))
+      nonPriorityTransactions().map(TxEntry(_, priority = false))
 
   override def packUnconfirmed(
       initialConstraint: MultiDimensionalMiningConstraint,
@@ -415,20 +422,13 @@ class UtxPoolImpl(
 
       @tailrec
       def loop(seed: PackResult): PackResult = {
-        val continuations: Iterable[ContinuationTransaction] =
-          blockchain.continuationStates
-            .collect {
-              case (invokeId, (step, _: ContinuationState.InProgress)) =>
-                ContinuationTransaction(invokeId, step, 0L, Waves)
-            }
-
         def allValidated(seed: PackResult) : Boolean =
           (transactions.keys().asScala ++ priorityPool.priorityTransactionIds ++ continuations.map(_.id.value()))
             .forall(seed.validatedTransactions)
 
         val newSeed = packIteration(
           seed.copy(checkedAddresses = Set.empty),
-          this.createTxEntrySeq(continuations).iterator
+          this.createTxEntrySeq().iterator
         )
         if (newSeed.constraint.isFull) {
           log.trace(s"Block is full: ${newSeed.constraint}")
