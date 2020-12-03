@@ -393,8 +393,7 @@ class UtxPoolImpl(
                     case Left(TransactionValidationError(BlockedByContinuation, _)) =>
                       log.trace(s"Transaction ${tx.id()} is blocked due to evaluation of continuation")
                       r.copy(
-                        iterations = r.iterations + 1,
-                        validatedTransactions = r.validatedTransactions + tx.id()
+                        iterations = r.iterations + 1
                       )
 
                     case Left(error) =>
@@ -413,22 +412,22 @@ class UtxPoolImpl(
               }
           }
 
+      def continuations(seed: PackResult): Iterable[ContinuationTransaction] =
+        (blockchain.continuationStates ++ seed.totalDiff.continuationCurrentStates)
+          .collect {
+            case (invokeId, (step, _: ContinuationState.InProgress)) =>
+              ContinuationTransaction(invokeId, step, 0L, Waves)
+          }
+
+      def allValidated(seed: PackResult) : Boolean =
+        (transactions.keys().asScala ++ priorityPool.priorityTransactionIds ++ continuations(seed).map(_.id.value()))
+          .forall(seed.validatedTransactions)
+
       @tailrec
       def loop(seed: PackResult): PackResult = {
-        val continuations: Iterable[ContinuationTransaction] =
-          (blockchain.continuationStates ++ seed.totalDiff.continuationCurrentStates)
-            .collect {
-              case (invokeId, (step, _: ContinuationState.InProgress)) =>
-                ContinuationTransaction(invokeId, step, 0L, Waves)
-            }
-
-        def allValidated(seed: PackResult) : Boolean =
-          (transactions.keys().asScala ++ priorityPool.priorityTransactionIds ++ continuations.map(_.id.value()))
-            .forall(seed.validatedTransactions)
-
         val newSeed = packIteration(
           seed.copy(checkedAddresses = Set.empty),
-          this.createTxEntrySeq(continuations).iterator
+          this.createTxEntrySeq(continuations(seed)).iterator
         )
         if (newSeed.constraint.isFull) {
           log.trace(s"Block is full: ${newSeed.constraint}")
