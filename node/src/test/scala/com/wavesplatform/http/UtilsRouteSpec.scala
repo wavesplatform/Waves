@@ -704,28 +704,31 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       AccountScriptInfo(PublicKey(new Array[Byte](32)), script, 0, Map.empty)
     }
 
+    val dAppAddress = TxHelpers.defaultSigner.toAddress
+
     def evalScript(text: String) =
-      Post(routePath(s"/script/evaluate/${TxHelpers.defaultSigner.toAddress.stringRepr}"), Json.obj("expr" -> text))
+      Post(routePath(s"/script/evaluate/$dAppAddress"), Json.obj("expr" -> text))
 
     def evalBin(expr: EXPR) = {
       val serialized = ByteStr(Serde.serialize(expr))
-      Post(routePath(s"/script/evaluate/${TxHelpers.defaultSigner.toAddress.stringRepr}"), Json.obj("expr" -> serialized.toString))
+      Post(routePath(s"/script/evaluate/$dAppAddress"), Json.obj("expr" -> serialized.toString))
     }
 
     def responseJson: JsObject = {
       val fullJson = responseAs[JsObject]
-      (fullJson \ "address").as[String] shouldBe TxHelpers.defaultSigner.toAddress.stringRepr
+      (fullJson \ "address").as[String] shouldBe dAppAddress.stringRepr
       (fullJson \ "expr").as[String] should not be empty
       (fullJson \ "result").asOpt[JsObject].getOrElse(fullJson - "address" - "expr")
     }
 
-    (utilsApi.blockchain.accountScript _).when(TxHelpers.defaultSigner.toAddress).returning(None).once()
+    (utilsApi.blockchain.hasAccountScript _).when(dAppAddress).returning(false).once()
 
     evalScript("testNone()") ~> route ~> check {
-      responseJson shouldBe Json.obj("error" -> 199, "message" -> "Address 3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9 is not dApp")
+      responseAs[JsObject] shouldBe Json.obj("error" -> 199, "message" -> s"Address $dAppAddress is not dApp")
     }
 
-    (utilsApi.blockchain.accountScript _).when(TxHelpers.defaultSigner.toAddress).returning(Some(testScript))
+    (utilsApi.blockchain.hasAccountScript _).when(dAppAddress).returning(true).anyNumberOfTimes()
+    (utilsApi.blockchain.accountScript _).when(dAppAddress).returning(Some(testScript)).anyNumberOfTimes()
 
     evalScript("testCallable()") ~> route ~> check {
       responseAs[String] shouldBe "{\"result\":{\"type\":\"WriteSet\",\"value\":{\"data\":{\"type\":\"Array\",\"value\":[{\"type\":\"DataEntry\",\"value\":{\"key\":{\"type\":\"String\",\"value\":\"test\"},\"value\":{\"type\":\"ByteVector\",\"value\":\"11111111111111111111111111\"}}}]}}},\"expr\":\"testCallable()\",\"address\":\"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9\"}"

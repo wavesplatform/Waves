@@ -145,16 +145,10 @@ package object http extends ApiMarshallers with ScorexLogging {
   }
 
   def jsonPost[A: Reads](f: A => ToResponseMarshallable): Route =
-    jsonPostD[A](a => provide(f(a)))
+    jsonPostD[A].apply(obj => complete(f(obj))) ~ get(complete(StatusCodes.MethodNotAllowed))
 
-  def jsonPostD[A: Reads](f: A => Directive1[ToResponseMarshallable]): Route =
-    post((handleExceptions(jsonExceptionHandler) & handleRejections(jsonRejectionHandler)) {
-      entity(as[A]) { a =>
-        f(a) { result =>
-          complete(result)
-        }
-      }
-    }) ~ get(complete(StatusCodes.MethodNotAllowed))
+  def jsonPostD[A: Reads]: Directive1[A] =
+    (post & handleExceptions(jsonExceptionHandler) & handleRejections(jsonRejectionHandler) & entity(as[A]))
 
   def extractScheduler: Directive1[Scheduler] = extractExecutionContext.map(ec => Scheduler(ec))
 
