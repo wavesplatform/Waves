@@ -19,7 +19,7 @@ import com.wavesplatform.database.protobuf.TransactionMeta
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBTransactions
-import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings, WavesSettings}
+import com.wavesplatform.settings.{BlockchainSettings, DBSettings, WavesSettings}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -282,7 +282,7 @@ abstract class LevelDBWriter private[database] (
   override def wavesAmount(height: Int): BigInt = readOnly { db =>
     val factHeight = height.min(this.height)
     if (db.has(Keys.wavesAmount(factHeight))) db.get(Keys.wavesAmount(factHeight))
-    else BigInt(Constants.UnitsInWave * Constants.TotalWaves)
+    else settings.genesisSettings.initialBalance
   }
 
   override def blockReward(height: Int): Option[Long] =
