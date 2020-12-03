@@ -849,6 +849,20 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
     }
   }
 
+  property("strict with throw expression") {
+    val strictScript =
+      """
+        |func testFunc() = {
+        |  strict a = throw("Strict executed error")
+        |  true
+        |}
+        |testFunc()
+        |
+      """.stripMargin.trim
+
+    (the[RuntimeException] thrownBy eval(strictScript, limit = 100)).getMessage shouldBe "Strict executed error"
+  }
+
   property("strict var add cost without usage") {
     val defaultScript =
       """
