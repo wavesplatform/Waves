@@ -24,6 +24,9 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       .get
   }
 
+  def liquidDiff: Diff =
+    blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty)
+
   def effBalance(a: Address): Long = blockchainUpdater.effectiveBalance(a, 1000)
 
   def appendBlock(b: Block): Seq[Diff] = blockchainUpdater.processBlock(b).explicitGet()
