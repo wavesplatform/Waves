@@ -98,7 +98,13 @@ object ApiError {
 
   case object TooBigArrayAllocation extends ApiError {
     override val id: Int          = 10
-    override val message: String  = "Too big sequences requested"
+    override val message: String  = "Too big sequence requested"
+    override val code: StatusCode = StatusCodes.BadRequest
+  }
+
+  case class TooBigArrayAllocation(limit: Int) extends ApiError {
+    override val id: Int          = 10
+    override val message: String  = s"Too big sequence requested: max limit is $limit entries"
     override val code: StatusCode = StatusCodes.BadRequest
   }
 
