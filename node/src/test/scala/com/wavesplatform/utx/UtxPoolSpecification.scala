@@ -1081,7 +1081,7 @@ class UtxPoolSpecification
             )
 
           def nextStep(step: Int) = {
-            val txs = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1.get
+            val txs = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1.get
             txs shouldBe
               Seq(
                 ContinuationTransaction(prioritizedInvoke.id.value(), step, 0L, Waves),
@@ -1099,7 +1099,7 @@ class UtxPoolSpecification
           (0 to 2).foreach(nextStep)
           bcu.continuationStates(prioritizedInvoke.id.value()) shouldBe ((3, ContinuationState.Finished))
           bcu.continuationStates(tailInvoke.id.value()) shouldBe ((3, ContinuationState.Finished))
-          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe None
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe None
       }
 
       "blocks affecting txs until completion" in forAll {
@@ -1164,7 +1164,7 @@ class UtxPoolSpecification
           utx.putIfNew(transfer).resultE.explicitGet()
 
           def nextStep(step: Int) = {
-            val txs = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1.get
+            val txs = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1.get
             txs shouldBe Seq(ContinuationTransaction(invoke.id.value(), step, 0L, Waves))
             val block = TestBlock.create(
               time.getTimestamp(),
@@ -1177,9 +1177,9 @@ class UtxPoolSpecification
           (0 to 2).foreach(nextStep)
           bcu.continuationStates(invoke.id.value()) shouldBe ((3, ContinuationState.Finished))
 
-          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1.get shouldBe Seq(transfer)
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1.get shouldBe Seq(transfer)
           bcu.processBlock(transferBlock).explicitGet()
-          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe None
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe None
       }
     }
   }
