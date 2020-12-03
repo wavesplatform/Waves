@@ -1080,23 +1080,23 @@ class UtxPoolSpecification
               )
             )
 
-          def nextStep(step: Int) = {
-            val txs = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1.get
-            txs shouldBe
-              Seq(
-                ContinuationTransaction(prioritizedInvoke.id.value(), step, 0L, Waves),
-                ContinuationTransaction(tailInvoke.id.value(), step, 0L, Waves)
-              )
-            val block = TestBlock.create(
-              time.getTimestamp(),
-              bcu.lastBlockId.get,
-              txs,
-              dAppAcc1
+          val expectingContinuations =
+            (0 to 2).flatMap(
+              step =>
+                Seq(
+                  ContinuationTransaction(prioritizedInvoke.id.value(), step, 0L, Waves),
+                  ContinuationTransaction(tailInvoke.id.value(), step, 0L, Waves)
+                )
             )
-            bcu.processBlock(block).explicitGet()
-          }
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1.get shouldBe expectingContinuations
 
-          (0 to 2).foreach(nextStep)
+          val block = TestBlock.create(
+            time.getTimestamp(),
+            bcu.lastBlockId.get,
+            expectingContinuations,
+            dAppAcc1
+          )
+          bcu.processBlock(block).explicitGet()
           bcu.continuationStates(prioritizedInvoke.id.value()) shouldBe ((3, ContinuationState.Finished))
           bcu.continuationStates(tailInvoke.id.value()) shouldBe ((3, ContinuationState.Finished))
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe None
@@ -1163,22 +1163,19 @@ class UtxPoolSpecification
           bcu.processBlock(transferBlock) should produce("BlockedByContinuation")
           utx.putIfNew(transfer).resultE.explicitGet()
 
-          def nextStep(step: Int) = {
-            val txs = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1.get
-            txs shouldBe Seq(ContinuationTransaction(invoke.id.value(), step, 0L, Waves))
-            val block = TestBlock.create(
-              time.getTimestamp(),
-              bcu.lastBlockId.get,
-              txs,
-              dAppAcc
-            )
-            bcu.processBlock(block).explicitGet()
-          }
-          (0 to 2).foreach(nextStep)
-          bcu.continuationStates(invoke.id.value()) shouldBe ((3, ContinuationState.Finished))
+          val continuations = (0 to 2).flatMap(step => Seq(ContinuationTransaction(invoke.id.value(), step, 0L, Waves)))
+          val expectingTxs  = continuations :+ transfer
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1.get shouldBe expectingTxs
 
-          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1.get shouldBe Seq(transfer)
-          bcu.processBlock(transferBlock).explicitGet()
+          val block = TestBlock.create(
+            time.getTimestamp(),
+            bcu.lastBlockId.get,
+            expectingTxs,
+            dAppAcc
+          )
+          bcu.processBlock(block).explicitGet()
+
+          bcu.continuationStates(invoke.id.value()) shouldBe ((3, ContinuationState.Finished))
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe None
       }
     }
