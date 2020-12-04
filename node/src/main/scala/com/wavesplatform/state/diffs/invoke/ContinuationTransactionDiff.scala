@@ -75,10 +75,6 @@ object ContinuationTransactionDiff {
         tx.invokeScriptTransactionId
       )
 
-      invocationComplexity <- TracedResult(
-        InvokeDiffsCommon.getInvocationComplexity(blockchain, invoke, callableComplexities, dAppAddress)
-      )
-
       (scriptResult, limit) <- {
         val ctx =
           PureContext.build(script.stdLibVersion).withEnvironment[Environment] |+|
@@ -96,21 +92,22 @@ object ContinuationTransactionDiff {
             limit,
             continuationFirstStepMode = false
           )
-          .leftMap { case (error, log) => FailedTransactionError.dAppExecution(error, invocationComplexity, log) }
+          .leftMap { case (error, log) => FailedTransactionError.dAppExecution(error, limit, log) }
         TracedResult(
           r.map((_, limit)),
           List(InvokeScriptTrace(invoke.dAppAddressOrAlias, invoke.funcCall, r.map(_._1), r.fold(_.log, _._2)))
         )
       }
 
-      doProcessActions = (actions: List[CallableAction], unusedComplexity: Int) =>
+      doProcessActions = (actions: List[CallableAction], unusedComplexity: Int) =>{
+        val spentComplexity = limit - unusedComplexity
         InvokeDiffsCommon
           .processActions(
             actions,
             script.stdLibVersion,
             dAppAddress,
             dAppPublicKey,
-            invocationComplexity,
+            spentComplexity,
             invoke,
             blockchain,
             blockTime,
@@ -118,9 +115,11 @@ object ContinuationTransactionDiff {
             limitedExecution
           )
           .map(
-            InvokeDiffsCommon.finishContinuation(_, tx, blockchain, invoke, limit - unusedComplexity, failed = false)
+            InvokeDiffsCommon
+              .finishContinuation(_, tx, blockchain, invoke, spentComplexity, failed = false)
               .copy(transactions = Map())
           )
+      }
 
       resultDiff <- scriptResult._1 match {
         case ScriptResultV3(dataItems, transfers, unusedComplexity) =>

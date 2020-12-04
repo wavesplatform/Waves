@@ -282,7 +282,7 @@ object TransactionDiffer {
       tx match {
         case c: ContinuationTransaction =>
           val invoke = blockchain.resolveInvoke(c).get
-          InvokeDiffsCommon.finishContinuation(commonDiff, c, blockchain, invoke, spentComplexity, failed = true)
+          InvokeDiffsCommon.finishContinuation(commonDiff, c, blockchain, invoke, spentComplexity = 0, failed = true)
         case _ =>
           commonDiff |+| Diff.empty.copy(
             transactions =
