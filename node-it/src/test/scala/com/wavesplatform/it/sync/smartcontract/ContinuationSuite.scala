@@ -58,11 +58,19 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
          |{-# STDLIB_VERSION 5 #-}
          |{-# CONTENT_TYPE DAPP #-}
          |
+         | func g() =
+         |   groth16Verify(
+         |     base64'lp7+dPDIOfm77haSFnvr33VwYH/KbIalfOJPRvBLzqlHD8BxunNebMr6Gr6S+u+nh7yLzdqr7HHQNOpZI8mdj/7lR0IBqB9zvRfyTr+guUG22kZo4y2KINDp272xGglKEeTglTxyDUriZJNF/+T6F8w70MR/rV+flvuo6EJ0+HA+A2ZnBbTjOIl9wjisBV+0iISo2JdNY1vPXlpwhlL2fVpW/WlREkF0bKlBadDIbNJBgM4niJGuEZDru3wqrGueETKHPv7hQ8em+p6vQolp7c0iknjXrGnvlpf4QtUtpg3z/D+snWjRPbVqRgKXWtihuIvPFaM6dt7HZEbkeMnXWwSINeYC/j3lqYnce8Jq+XkuF42stVNiooI+TuXECnFdFi9Ib25b9wtyz3H/oKg48He1ftntj5uIRCOBvzkFHGUF6Ty214v3JYvXJjdS4uS2jekplZYoV0aXEnYEOIvfF7d4xay3qkx2NspooM4HeZpiHknIWkUVhGVJBzBDLjLB',
+         |     base64'jiGBK+TGHfH8Oadexhdet7ExyIWibSmamWQvffZkyl3WnMoVbTQ3lOks4Mca3sU5qgcaLyQQ1FjFW4g6vtoMapZ43hTGKaWO7bQHsOCvdwHCdwJDulVH16cMTyS9F0BfBJxa88F+JKZc4qMTJjQhspmq755SrKhN9Jf+7uPUhgB4hJTSrmlOkTatgW+/HAf5kZKhv2oRK5p5kS4sU48oqlG1azhMtcHEXDQdcwf9ANel4Z9cb+MQyp2RzI/3hlIx',
+         |     base64''
+         |   )
+         |
+         | # complexity = 5.4kk, expecting 1351 steps in at least 6 blocks
          | @Callable(i)
          | func foo(fail: Boolean) = {
          |  let a =
          |    getInteger(Address(base58''), "key") == unit &&
-         |    !(${List.fill(150)("sigVerify(base64'',base64'',base64'')").mkString("||")})
+         |    !(${List.fill(2000)("g()").mkString("||")})
          |  if (fail && a)
          |    then
          |      throw("fail")
@@ -78,7 +86,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
          |
          | @Callable(i)
          | func setIsAllowedTrue() = {
-         |    let a = !(${List.fill(150)("sigVerify(base64'',base64'',base64'')").mkString("||")})
+         |    let a = !(${List.fill(10)("g()").mkString("||")})
          |    if (a)
          |      then
          |        [BooleanEntry("isAllowed", true)]
@@ -88,7 +96,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
          |
          | @Callable(i)
          | func performActionWithAsset(assetId: ByteVector) = {
-         |    let a = !(${List.fill(150)("sigVerify(base64'',base64'',base64'')").mkString("||")})
+         |    let a = !(${List.fill(10)("g()").mkString("||")})
          |    if (a)
          |      then
          |        [Burn(assetId, 1)]
@@ -118,7 +126,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
 
   private val pureInvokeFee = invokeFee - smartFee
   private val actionsFee    = smartFee * 3 + issueFee
-  private val enoughFee     = pureInvokeFee * 8 + actionsFee
+  private val enoughFee     = pureInvokeFee * 1351 + actionsFee
   private val redundantFee  = pureInvokeFee * 10
 
   private val minSponsoredAssetFee      = 10000L
@@ -234,7 +242,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         dAppAddress,
         func = Some("foo"),
         args = List(CONST_BOOLEAN(true)),
-        fee = 1.waves,
+        fee = enoughFee + redundantFee,
         version = TxVersion.V3,
         waitForTx = true
       )
@@ -348,8 +356,8 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     assertBadRequestAndMessage(
       invokeScriptTx,
       "Fee in WAVES for InvokeScriptTransaction (900000 in WAVES) " +
-        "with 8 invocation steps " +
-        "does not exceed minimal value of 4000000 WAVES."
+        "with 1353 invocation steps " +
+        "does not exceed minimal value of 676500000 WAVES."
     )
   }
 
@@ -379,7 +387,6 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
           .blockSeq(invoke.height, completionHeight)
           .flatMap(_.transactions)
           .filter(tx => tx._type == ContinuationTransaction.typeId && tx.invokeScriptTransactionId.contains(invokeId))
-      val continuationIds = continuations.map(_.id)
 
       continuations.zipWithIndex
         .foreach {
@@ -388,8 +395,6 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
             c.step.value shouldBe i
             c.extraFeePerStep.value shouldBe extraFeePerStep
             c.feeAssetId shouldBe feeAssetInfo.map(_._1)
-            c.call shouldBe invoke.call
-            c.dApp shouldBe invoke.dApp
 
             val expectedFeeInWaves = if (i == continuations.size - 1) pureInvokeFee + actionsFee else pureInvokeFee
             val expectedFeeInAttachedAsset =
@@ -402,12 +407,11 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
 
             val txInfo = node.transactionInfo[DebugStateChanges](c.id)
             txInfo.height should (be >= invoke.height and be <= completionHeight)
-            txInfo.continuationTransactionIds.value shouldBe continuationIds
         }
 
       invoke.extraFeePerStep.value shouldBe extraFeePerStep
       invoke.applicationStatus.value shouldBe endStatus
-      invoke.continuationTransactionIds.value shouldBe continuationIds
+      invoke.continuationsAmount.value shouldBe continuations.size
     }
   }
 

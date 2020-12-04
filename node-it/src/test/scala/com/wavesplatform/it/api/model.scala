@@ -472,7 +472,7 @@ case class DebugStateChanges(
     script: Option[String],
     stateChanges: Option[StateChangesDetails],
     applicationStatus: Option[String],
-    continuationTransactionIds: Option[Seq[String]],
+    continuationsAmount: Option[Int],
     call: Option[JsObject],
     dApp: Option[String],
     extraFeePerStep: Option[Long]
@@ -482,22 +482,22 @@ object DebugStateChanges {
     Reads(
       jsv =>
         for {
-          _type                      <- (jsv \ "type").validate[Int]
-          id                         <- (jsv \ "id").validate[String]
-          fee                        <- (jsv \ "fee").validate[Long]
-          feeAssetId                 <- (jsv \ "feeAssetId").validateOpt[String]
-          timestamp                  <- (jsv \ "timestamp").validateOpt[Long]
-          sender                     <- (jsv \ "sender").validateOpt[String]
-          height                     <- (jsv \ "height").validate[Int]
-          minSponsoredAssetFee       <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
-          recipient                  <- (jsv \ "recipient").validateOpt[String]
-          script                     <- (jsv \ "script").validateOpt[String]
-          stateChanges               <- (jsv \ "stateChanges").validateOpt[StateChangesDetails]
-          applicationStatus          <- (jsv \ "applicationStatus").validateOpt[String]
-          continuationTransactionIds <- (jsv \ "continuationTransactionIds").validateOpt[Seq[String]]
-          call                       <- (jsv \ "call").validateOpt[JsObject]
-          dApp                       <- (jsv \ "dApp").validateOpt[String]
-          extraFeePerStep            <- (jsv \ "extraFeePerStep").validateOpt[Long]
+          _type                <- (jsv \ "type").validate[Int]
+          id                   <- (jsv \ "id").validate[String]
+          fee                  <- (jsv \ "fee").validate[Long]
+          feeAssetId           <- (jsv \ "feeAssetId").validateOpt[String]
+          timestamp            <- (jsv \ "timestamp").validateOpt[Long]
+          sender               <- (jsv \ "sender").validateOpt[String]
+          height               <- (jsv \ "height").validate[Int]
+          minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
+          recipient            <- (jsv \ "recipient").validateOpt[String]
+          script               <- (jsv \ "script").validateOpt[String]
+          stateChanges         <- (jsv \ "stateChanges").validateOpt[StateChangesDetails]
+          applicationStatus    <- (jsv \ "applicationStatus").validateOpt[String]
+          continuationsAmount  <- (jsv \ "continuationsAmount").validateOpt[Int]
+          call                 <- (jsv \ "call").validateOpt[JsObject]
+          dApp                 <- (jsv \ "dApp").validateOpt[String]
+          extraFeePerStep      <- (jsv \ "extraFeePerStep").validateOpt[Long]
         } yield DebugStateChanges(
           _type,
           id,
@@ -511,7 +511,7 @@ object DebugStateChanges {
           script,
           stateChanges,
           applicationStatus,
-          continuationTransactionIds,
+          continuationsAmount,
           call,
           dApp,
           extraFeePerStep
