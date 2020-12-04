@@ -23,7 +23,7 @@ class AliasBroadcastRouteSpec
     with PropertyChecks
     with RestAPISettingsHelper
     with NoShrink {
-  private[this] val utxPoolSynchronizer = DummyUtxPoolSynchronizer.rejecting(tx => TransactionValidationError(GenericError("foo"), tx))
+  private[this] val utxPoolSynchronizer = DummyTransactionPublisher.rejecting(tx => TransactionValidationError(GenericError("foo"), tx))
 
   val route = AliasApiRoute(restAPISettings, stub[CommonTransactionsApi], stub[Wallet], utxPoolSynchronizer, stub[Time], stub[Blockchain]).route
 

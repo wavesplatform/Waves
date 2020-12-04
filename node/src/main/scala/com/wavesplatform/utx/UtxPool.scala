@@ -24,7 +24,6 @@ trait UtxPool extends AutoCloseable {
       strategy: PackStrategy = PackStrategy.Unlimited,
       cancelled: () => Boolean = () => false
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint)
-  def nextMicroBlockSize(): Option[Int]
 }
 
 object UtxPool {

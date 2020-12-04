@@ -135,7 +135,7 @@ class MassTransferTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     val tooBigAttachment = ByteString.copyFrom(("a" * (MaxAttachmentSize + 1)).getBytes("UTF-8"))
     assertGrpcError(
       sender.broadcastMassTransfer(firstAcc, transfers = defaultTransfer, attachment = tooBigAttachment, fee = calcMassTransferFee(1)),
-      "Too big sequences requested",
+      "Too big sequence requested",
       Code.INVALID_ARGUMENT
     )
 
