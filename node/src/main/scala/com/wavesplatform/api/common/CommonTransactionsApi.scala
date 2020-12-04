@@ -11,9 +11,8 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
 import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult, TransactionId}
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction}
 import com.wavesplatform.transaction.{ApplicationStatus, Asset, CreateAliasTransaction, Transaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet

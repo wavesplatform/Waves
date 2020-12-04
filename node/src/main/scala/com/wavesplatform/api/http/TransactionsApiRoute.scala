@@ -23,7 +23,6 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.ApplicationStatus.{ScriptExecutionFailed, ScriptExecutionInProgress, Succeeded}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer.functionCallToJson
 import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
