@@ -21,6 +21,7 @@ import monix.reactive.Observable
 import org.iq80.leveldb.DB
 
 import scala.concurrent.Future
+import scala.util.Try
 
 trait CommonTransactionsApi {
   import CommonTransactionsApi._
@@ -53,7 +54,7 @@ trait CommonTransactionsApi {
 
   def transactionProofs(transactionIds: List[ByteStr]): List[TransactionProof]
 
-  def continuations(invokeTransactionId: ByteStr): Seq[ByteStr]
+  def continuationsAmount(invokeTransactionId: ByteStr): Int
 }
 
 object CommonTransactionsApi {
@@ -129,13 +130,8 @@ object CommonTransactionsApi {
         transactionProof         <- block.transactionProof(transaction, allTransactions)
       } yield transactionProof
 
-    override def continuations(invokeTransactionId: ByteStr): Seq[ByteStr] = {
-      val key = Keys.continuationLastStep(TransactionId(invokeTransactionId))
-      if (db.has(key)) {
-        val lastStep = db.get(key)
-        (0 until lastStep).map(ContinuationTransaction(invokeTransactionId, _, 0L, Waves).id.value())
-      } else
-        Nil
-    }
+    override def continuationsAmount(invokeTransactionId: ByteStr): Int =
+      Try(db.get(Keys.continuationLastStep(TransactionId(invokeTransactionId))))
+        .getOrElse(0)
   }
 }
