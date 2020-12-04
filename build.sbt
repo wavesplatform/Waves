@@ -81,7 +81,7 @@ lazy val `node-it`        = project.dependsOn(node, `grpc-server`)
 lazy val `node-generator` = project.dependsOn(node, `node` % "compile")
 lazy val benchmark        = project.dependsOn(node % "compile;test->test")
 
-lazy val `curve25519-test` = project
+lazy val `curve25519-test` = project.dependsOn(node)
 
 lazy val root = (project in file("."))
   .aggregate(
