@@ -385,10 +385,11 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
     val actualComplexity    = 2018
     val estimatedComplexity = actualComplexity + Random.nextInt(1000)
     val blockchain          = blockchainMock(invoke, ("failingExpr", estimatedComplexity), Some((step, expr, 0)))
+    val stepLimit           = 4000
 
     inside(ContinuationTransactionDiff(blockchain, continuation.timestamp, false)(continuation).resultE) {
       case Left(
-          FailedTransactionError(Cause.DAppExecution, `estimatedComplexity`, _, Some("failed"), None)
+          FailedTransactionError(Cause.DAppExecution, `stepLimit`, _, Some("failed"), None)
           ) =>
     }
   }
@@ -410,7 +411,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
     val estimatedComplexity = actualComplexity + Random.nextInt(1000)
     val blockchain          = blockchainMock(invoke, ("failingAssetVerifier", estimatedComplexity), Some((step, expr, 0)))
 
-    val expectingComplexity = estimatedComplexity + assetScriptComplexity * 3
+    val expectingComplexity = actualComplexity + assetScriptComplexity * 3
     inside(ContinuationTransactionDiff(blockchain, continuation.timestamp, false)(continuation).resultE) {
       case Left(
           FailedTransactionError(Cause.AssetScriptInAction, `expectingComplexity`, _, Some("failed by asset verifier"), Some(`failingAssetId`))
