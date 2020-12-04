@@ -32,7 +32,7 @@ object ContinuationTransactionDiff {
       tx: ContinuationTransaction
   ): TracedResult[ValidationError, Diff] = {
     blockchain.continuationStates(tx.invokeScriptTransactionId) match {
-      case (_, ContinuationState.InProgress(expr, unusedComplexity)) =>
+      case (_, ContinuationState.InProgress(expr, unusedComplexity, _)) =>
         applyDiff(blockchain, blockTime, limitedExecution, tx, expr, unusedComplexity)
       case _ =>
         TracedResult.wrapValue(Diff.empty)
@@ -127,7 +127,7 @@ object ContinuationTransactionDiff {
         case ScriptResultV4(actions, unusedComplexity) =>
           doProcessActions(actions, unusedComplexity)
         case ir: IncompleteResult =>
-          val newState                         = ContinuationState.InProgress(ir.expr, ir.unusedComplexity)
+          val newState                         = ContinuationState.InProgress(ir.expr, ir.unusedComplexity, tx.invokeScriptTransactionId)
           val StepInfo(_, stepFee, scriptsRun) = InvokeDiffsCommon.stepInfo(Diff.empty, blockchain, invoke)
           TracedResult.wrapValue[Diff, ValidationError](
             Diff.empty.copy(
