@@ -12,14 +12,14 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.StateHash.SectionId
-import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, Height, LeaseBalance, NG, StateHash, VolumeAndFee}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, LeaseBalance, NG, StateHash, VolumeAndFee}
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.{NTPTime, TestValues, TestWallet}
 import monix.eval.Task
 import org.scalamock.scalatest.PathMockFactory
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.{JsObject, JsValue, Json}
 
 import scala.util.Random
 
@@ -29,8 +29,8 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
   val wavesSettings = WavesSettings.default()
   val configObject  = wavesSettings.config.root()
   trait Blockchain1 extends Blockchain with NG
-  val blockchain    = stub[Blockchain1]
-  val block         = TestBlock.create(Nil)
+  val blockchain = stub[Blockchain1]
+  val block      = TestBlock.create(Nil)
   val testStateHash = {
     def randomHash: ByteStr = ByteStr(Array.fill(32)(Random.nextInt(256).toByte))
     val hashes              = SectionId.values.map((_, randomHash)).toMap
@@ -56,11 +56,11 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
       null,
       null,
       configObject,
-      _ => Seq.empty
-    , {
-      case 2 => Some(testStateHash)
-      case _ => None
-    })
+      _ => Seq.empty, {
+        case 2 => Some(testStateHash)
+        case _ => None
+      }
+    )
   import debugApiRoute._
 
   routePath("/configInfo") - {
@@ -85,9 +85,10 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
   }
 
   routePath("/validate") - {
-    def createBlockchainStub(): Blockchain with NG = {
+    def createBlockchainStub(f: Blockchain => Unit = _ => ()): Blockchain with NG = {
       trait Blockchain1 extends Blockchain with NG
       val blockchain = stub[Blockchain1]
+      f(blockchain) // Overrides
       (() => blockchain.settings).when().returns(WavesSettings.default().blockchainSettings)
       (() => blockchain.activatedFeatures)
         .when()
@@ -97,7 +98,8 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
             BlockchainFeatures.SmartAccounts.id       -> 0,
             BlockchainFeatures.SmartAssets.id         -> 0,
             BlockchainFeatures.SmartAccountTrading.id -> 0,
-            BlockchainFeatures.OrderV3.id             -> 0
+            BlockchainFeatures.OrderV3.id             -> 0,
+            BlockchainFeatures.Ride4DApps.id          -> 0
           )
         )
       (blockchain.accountScript _).when(*).returns(None)
@@ -157,13 +159,75 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
       val route = debugApiRoute.copy(blockchain = blockchain).route
 
       val tx = TxHelpers.exchange(TxHelpers.order(OrderType.BUY, TestValues.asset), TxHelpers.order(OrderType.SELL, TestValues.asset))
-      Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString())) ~> ApiKeyHeader ~> route ~> check {
+      jsonPost(routePath("/validate"), tx.json()) ~> ApiKeyHeader ~> route ~> check {
         val json = Json.parse(responseAs[String])
-        println(json)
         (json \ "valid").as[Boolean] shouldBe false
         (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
         (json \ "error").as[String] should include("not allowed by script of the asset")
       }
     }
+
+    "invoke tx with asset failing" in {
+      val blockchain = createBlockchainStub { blockchain =>
+        (blockchain.balance _).when(TxHelpers.defaultSigner.publicKey.toAddress, *).returns(Long.MaxValue)
+
+        val (assetScript, assetScriptComplexity) = ScriptCompiler.compile("if true then throw(\"error\") else false", ScriptEstimatorV3).explicitGet()
+        (blockchain.assetScript _).when(TestValues.asset).returns(Some(AssetScriptInfo(assetScript, assetScriptComplexity)))
+        (blockchain.assetDescription _)
+          .when(TestValues.asset)
+          .returns(
+            Some(
+              AssetDescription(
+                null,
+                null,
+                null,
+                null,
+                0,
+                reissuable = false,
+                null,
+                Height(1),
+                Some(AssetScriptInfo(assetScript, assetScriptComplexity)),
+                0,
+                nft = false
+              )
+            )
+          )
+
+        val (dAppScript, dAppScriptComplexity) = ScriptCompiler
+          .compile(
+            s"""
+               |{-# STDLIB_VERSION 3 #-}
+               |{-# SCRIPT_TYPE ACCOUNT #-}
+               |{-# CONTENT_TYPE DAPP #-}
+               |
+               |@Callable(i)
+               |func test() = TransferSet([ScriptTransfer(i.caller, 1, base58'${TestValues.asset}')])
+               |""".stripMargin,
+            ScriptEstimatorV3
+          )
+          .explicitGet()
+        (blockchain.accountScript _)
+          .when(TxHelpers.defaultAddress)
+          .returns(Some(AccountScriptInfo(TxHelpers.defaultSigner.publicKey, dAppScript, 0L, Map(3 -> Map("test" -> dAppScriptComplexity)))))
+        (blockchain.hasAccountScript _).when(TxHelpers.defaultAddress).returns(true)
+      }
+
+      val route = debugApiRoute.copy(blockchain = blockchain).route
+
+      val tx = TxHelpers.invoke(TxHelpers.defaultAddress, "test", fee = 1300000)
+      jsonPost(routePath("/validate"), tx.json()) ~> ApiKeyHeader ~> route ~> check {
+        val json = Json.parse(responseAs[String])
+        println(json)
+        (json \ "valid").as[Boolean] shouldBe false
+        (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
+        (json \ "error").as[String] should include("not allowed by script of the asset")
+
+        // TODO: Check trace
+      }
+    }
+  }
+
+  private[this] def jsonPost(path: String, json: JsValue) = {
+    Post(path, HttpEntity(ContentTypes.`application/json`, json.toString()))
   }
 }
