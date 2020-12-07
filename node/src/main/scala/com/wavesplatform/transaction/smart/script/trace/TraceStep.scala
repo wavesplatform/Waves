@@ -30,14 +30,23 @@ case class AccountVerifierTrace(
   })
 }
 
+object AssetVerifierTrace {
+  type AssetType = AssetType.Value
+  object AssetType extends Enumeration {
+    val Unknown, OrderAmount, OrderPrice, MatcherFee, Payment, Reissue, Burn, Sponsor, Transfer = Value
+  }
+}
+
 case class AssetVerifierTrace(
     id: ByteStr,
-    errorO: Option[ValidationError]
+    errorOpt: Option[ValidationError],
+    assetType: AssetVerifierTrace.AssetType.Value = AssetVerifierTrace.AssetType.Unknown
 ) extends TraceStep {
   override lazy val json: JsObject = Json.obj(
-    "type" -> "asset",
-    "id"   -> id.toString
-  ) ++ (errorO match {
+    "type"      -> "asset",
+    "assetType" -> assetType.toString.updated(0, assetType.toString.charAt(0).toLower),
+    "id"        -> id.toString
+  ) ++ (errorOpt match {
     case Some(e) => Json.obj("error"  -> TraceStep.errorJson(e))
     case None    => Json.obj("result" -> "ok")
   })
