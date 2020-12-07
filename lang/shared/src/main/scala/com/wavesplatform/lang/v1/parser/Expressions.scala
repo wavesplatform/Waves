@@ -87,11 +87,13 @@ object Expressions {
     def isEmpty: Boolean =
       this match {
         case _: Single    => false
+        case AnyType(_)   => false
         case Union(types) => types.isEmpty
         case Tuple(types) => types.exists(_.isEmpty)
       }
   }
   case class Single(name: PART[String], parameter: Option[PART[Type]] = None)   extends Type
+  case class AnyType(position: Pos)                                             extends Type
   case class Union(types: Seq[Type])                                            extends Type
   object Union {
     def apply(types: Seq[Type]): Type = types match {

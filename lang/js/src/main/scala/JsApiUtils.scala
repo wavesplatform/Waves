@@ -208,6 +208,10 @@ package object JsApiUtils {
 
   def serType(t: Type): js.Object =
     t match {
+      case Expressions.AnyType(_) =>
+        jObj.applyDynamic("apply")(
+          "typeName"  -> "Any"
+        )
       case Expressions.Single(name, parameter) =>
         jObj.applyDynamic("apply")(
           "typeName"  -> serPartStr(name),
