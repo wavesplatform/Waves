@@ -99,6 +99,8 @@ object FunctionIds {
   val ACCOUNTWAVESBALANCE: Short     = 1007
   val ACCOUNTASSETONLYBALANCE: Short = 1008
 
+  val CALLDAPP: Short                = 1020
+
   val DATA_LONG_FROM_ARRAY: Short    = 1040
   val DATA_BOOLEAN_FROM_ARRAY: Short = 1041
   val DATA_BYTES_FROM_ARRAY: Short   = 1042

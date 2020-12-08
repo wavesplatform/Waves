@@ -13,9 +13,13 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain._
 
-sealed trait ScriptResult
+sealed trait ScriptResult {
+  def returnedValue: EVALUATED = unit
+}
+
 case class ScriptResultV3(ds: List[DataItem[_]], ts: List[AssetTransfer]) extends ScriptResult
-case class ScriptResultV4(actions: List[CallableAction])                  extends ScriptResult
+case class ScriptResultV4(actions: List[CallableAction],
+                          override val returnedValue: EVALUATED = unit)   extends ScriptResult
 case class IncompleteResult(expr: EXPR, unusedComplexity: Int)            extends ScriptResult
 
 object ScriptResult {
@@ -218,7 +222,7 @@ object ScriptResult {
         err(other, V4, FieldNames.SponsorFee)
     }
 
-  private def processScriptResultV4(ctx: EvaluationContext[Environment, Id], txId: ByteStr, actions: Seq[EVALUATED]): Either[String, ScriptResultV4] =
+  private def processScriptResultV4(ctx: EvaluationContext[Environment, Id], txId: ByteStr, actions: Seq[EVALUATED], ret: EVALUATED = unit): Either[String, ScriptResultV4] =
     actions.toList
       .traverse {
         case obj @ CaseObj(actionType, fields) =>
@@ -229,7 +233,7 @@ object ScriptResult {
 
         case other => err(other, V4)
       }
-      .map(ScriptResultV4)
+      .map(v => ScriptResultV4(v, ret))
 
   private val v4ActionHandlers
       : Map[String, (EvaluationContext[Environment, Id], ByteStr, Map[String, EVALUATED]) => Either[ExecutionError, CallableAction]] =
@@ -256,6 +260,13 @@ object ScriptResult {
           case f                       => err(f, version)
         }
       case (ARR(actions), V4) => processScriptResultV4(ctx, txId, actions)
+      case (CaseObj(tpe, fields), V4) if fields.size == 2 =>
+                          // XXX V5 need
+                          // XXX check tpe
+                              (fields("_1"), fields("_2")) match {
+                                case (ARR(actions), ret) => processScriptResultV4(ctx, txId, actions, ret)
+                                case _ => err(tpe.name, version)
+                              }
 
       case c => err(c.toString, version)
     }

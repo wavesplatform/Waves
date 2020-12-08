@@ -18,6 +18,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
 import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.DiffsCommon
@@ -62,7 +63,7 @@ object InvokeDiffsCommon {
 
   def getInvocationComplexity(
       blockchain: Blockchain,
-      tx: InvokeScriptTransaction,
+      call : FUNCTION_CALL,
       callableComplexities: Map[Int, Map[String, Long]],
       dAppAddress: Address
   ): Either[ValidationError, Long] = {
@@ -70,8 +71,8 @@ object InvokeDiffsCommon {
       complexitiesByCallable <- callableComplexities.get(blockchain.estimator.version).toRight {
         GenericError(s"Cannot find complexity storage, address = $dAppAddress, estimator version = ${blockchain.estimator.version}")
       }
-      complexity <- complexitiesByCallable.get(tx.funcCall.function.funcName).toRight {
-        GenericError(s"Cannot find callable function `${tx.funcCall.function.funcName}`, address = $dAppAddress`")
+      complexity <- complexitiesByCallable.get(call.function.funcName).toRight {
+        GenericError(s"Cannot find callable function `${call.function.funcName}`, address = $dAppAddress`")
       }
     } yield complexity
   }
@@ -81,9 +82,9 @@ object InvokeDiffsCommon {
       version: StdLibVersion,
       dAppAddress: Address,
       dAppPublicKey: PublicKey,
-      feeInfo: (Long, Map[Address, Portfolio]),
+      feeInfo: Option[(Long, Map[Address, Portfolio])],
       invocationComplexity: Long,
-      tx: InvokeScriptTransaction,
+      tx: InvokeScriptLike,
       blockchain: Blockchain,
       blockTime: Long,
       limitedExecution: Boolean = false
@@ -135,34 +136,35 @@ object InvokeDiffsCommon {
             reissueList.map(r => IssuedAsset(r.assetId)) ++
             burnList.map(b => IssuedAsset(b.assetId)) ++
             sponsorFeeList.map(sf => IssuedAsset(sf.assetId))
-        val totalScriptsInvoked = smartAssetInvocations.count(blockchain.hasAssetScript) + (if (blockchain.hasAccountScript(tx.sender.toAddress)) 1
-                                                                                            else 0)
+        val totalScriptsInvoked = smartAssetInvocations.count(blockchain.hasAssetScript) +
+                                  (if (blockchain.hasAccountScript(tx.root.sender.toAddress)) 1 else 0)  // XXX should be 0 for crosscontract calls
         val minIssueFee       = issueList.count(i => !blockchain.isNFT(i)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
         val dAppInvocationFee = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber
         val minWaves          = totalScriptsInvoked * ScriptExtraFee + dAppInvocationFee + minIssueFee
         val txName            = Constants.TransactionNames(InvokeScriptTransaction.typeId)
-        val assetName         = tx.assetFee._1.fold("WAVES")(_.id.toString)
+        val assetName         = tx.root.assetFee._1.fold("WAVES")(_.id.toString)
         Either.cond(
-          minWaves <= feeInfo._1,
+          feeInfo.forall(minWaves <= _._1),
           totalScriptsInvoked,
           FailedTransactionError.feeForActions(
-            s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
+            s"Fee in $assetName for $txName (${tx.root.assetFee._2} in $assetName)" +
               s" with $totalScriptsInvoked total scripts invoked$stepsInfo does not exceed minimal value of $minWaves WAVES.",
             invocationComplexity
           )
         )
       }
 
-      paymentsAndFeeDiff = paymentsPart(tx, dAppAddress, feeInfo._2)
+      feePortfolios = feeInfo.fold(Map.empty[Address, Portfolio])(_._2)
+      paymentsAndFeeDiff = paymentsPart(tx, dAppAddress, feePortfolios)
 
       compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey)(actions, paymentsAndFeeDiff, complexityLimit)
         .leftMap(_.addComplexity(invocationComplexity))
 
-      transfers = compositeDiff.portfolios |+| feeInfo._2.view.mapValues(_.negate).toMap
+      transfers = compositeDiff.portfolios |+| feePortfolios.view.mapValues(_.negate).toMap
 
-      currentTxDiff         = compositeDiff.transactions(tx.id())
+      currentTxDiff         = compositeDiff.transactions(tx.root.id())
       currentTxDiffWithKeys = currentTxDiff.copy(affected = currentTxDiff.affected ++ transfers.keys ++ compositeDiff.accountData.keys)
-      updatedTxDiff         = compositeDiff.transactions.concat(Map(tx.id() -> currentTxDiffWithKeys))
+      updatedTxDiff         = compositeDiff.transactions.concat(Map(tx.root.id() -> currentTxDiffWithKeys))
 
       isr = InvokeScriptResult(
         dataEntries,
@@ -182,14 +184,14 @@ object InvokeDiffsCommon {
       resultDiff = compositeDiff.copy(
         transactions = updatedTxDiff,
         scriptsRun = scriptsInvoked + 1,
-        scriptResults = Map(tx.id() -> isr),
+        scriptResults = Map(tx.root.id() -> isr),
         scriptsComplexity = invocationComplexity + compositeDiff.scriptsComplexity
       )
     } yield resultDiff
   }
 
   def paymentsPart(
-      tx: InvokeScriptTransaction,
+      tx: InvokeScriptLike,
       dAppAddress: Address,
       feePart: Map[Address, Portfolio]
   ): Diff = {
@@ -198,16 +200,16 @@ object InvokeDiffsCommon {
         case InvokeScriptTransaction.Payment(amt, assetId) =>
           assetId match {
             case asset @ IssuedAsset(_) =>
-              Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))) |+|
+              Map(tx.senderAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))) |+|
                 Map(dAppAddress       -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
             case Waves =>
-              Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty)) |+|
+              Map(tx.senderAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty)) |+|
                 Map(dAppAddress       -> Portfolio(amt, LeaseBalance.empty, Map.empty))
           }
       }
       .foldLeft(Map[Address, Portfolio]())(_ |+| _)
 
-    Diff(tx = tx, portfolios = feePart |+| payablePart)
+    Diff(tx = tx.root, portfolios = feePart |+| payablePart)
   }
 
   private def dataItemToEntry(item: DataOp): DataEntry[_] =
@@ -222,12 +224,12 @@ object InvokeDiffsCommon {
   private def checkSelfPayments(
       dAppAddress: Address,
       blockchain: Blockchain,
-      tx: InvokeScriptTransaction,
+      tx: InvokeScriptLike,
       version: StdLibVersion,
       transfers: List[AssetTransfer]
   ): Either[String, Unit] =
     if (blockchain.disallowSelfPayment && version >= V4)
-      if (tx.payments.nonEmpty && tx.sender.toAddress == dAppAddress)
+      if (tx.payments.nonEmpty && tx.senderAddress == dAppAddress)
         "DApp self-payment is forbidden since V4".asLeft[Unit]
       else if (transfers.exists(_.recipient.bytes == ByteStr(dAppAddress.bytes)))
         "DApp self-transfer is forbidden since V4".asLeft[Unit]
@@ -245,7 +247,7 @@ object InvokeDiffsCommon {
   }
 
   private[this] def checkDataEntries(
-      tx: InvokeScriptTransaction,
+      tx: InvokeScriptLike,
       dataEntries: Seq[DataEntry[_]],
       stdLibVersion: StdLibVersion
   ): Either[String, Unit] =
@@ -256,9 +258,9 @@ object InvokeDiffsCommon {
         s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize} entries"
       )
       _ <- Either.cond(
-        !tx.isProtobufVersion || dataEntries.forall(_.key.nonEmpty),
+        !tx.enableEmptyKeys || dataEntries.forall(_.key.nonEmpty),
         (),
-        s"Empty keys aren't allowed in tx version >= ${tx.protobufVersion}"
+        s"Empty keys aren't allowed in tx version >= ${tx.root.protobufVersion}"
       )
 
       maxKeySize = ContractLimits.MaxKeySizeInBytesByVersion(stdLibVersion)
@@ -288,7 +290,7 @@ object InvokeDiffsCommon {
   private def foldActions(
       sblockchain: Blockchain,
       blockTime: Long,
-      tx: InvokeScriptTransaction,
+      tx: InvokeScriptLike,
       dAppAddress: Address,
       pk: PublicKey
   )(
@@ -304,7 +306,7 @@ object InvokeDiffsCommon {
             else remainingLimit
 
           val blockchain   = CompositeBlockchain(sblockchain, Some(curDiff))
-          val actionSender = Recipient.Address(ByteStr(tx.dAppAddressOrAlias.bytes))
+          val actionSender = Recipient.Address(ByteStr(tx.dAppAddressOrAlias.bytes))  // XXX Is it correct for aliases&
 
           def applyTransfer(transfer: AssetTransfer, pk: PublicKey): TracedResult[FailedTransactionError, Diff] = {
             val AssetTransfer(addressRepr, amount, asset) = transfer
@@ -340,11 +342,11 @@ object InvokeDiffsCommon {
                       pk,
                       Recipient.Address(addressRepr.bytes),
                       amount,
-                      tx.timestamp,
-                      tx.id()
+                      tx.root.timestamp,
+                      tx.root.id()
                     )
                     val assetValidationDiff =
-                      validatePseudoTxWithSmartAssetScript(blockchain, tx)(pseudoTx, a.id, assetVerifierDiff, script, complexity, complexityLimit)
+                      validatePseudoTxWithSmartAssetScript(blockchain, tx.root)(pseudoTx, a.id, assetVerifierDiff, script, complexity, complexityLimit)
                     val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
                     TracedResult(
                       assetValidationDiff.map(d => nextDiff.copy(scriptsComplexity = d.scriptsComplexity)),
@@ -359,7 +361,7 @@ object InvokeDiffsCommon {
               Diff.stateOps(accountData = Map(dAppAddress -> AccountDataInfo(Map(item.key -> dataItemToEntry(item)))))
             )
 
-          def applyIssue(itx: InvokeScriptTransaction, pk: PublicKey, issue: Issue): TracedResult[FailedTransactionError, Diff] = {
+          def applyIssue(itx: InvokeScriptLike, pk: PublicKey, issue: Issue): TracedResult[FailedTransactionError, Diff] = {
             if (issue.name
                   .getBytes("UTF-8")
                   .length < IssueTransaction.MinAssetNameLength || issue.name.getBytes("UTF-8").length > IssueTransaction.MaxAssetNameLength) {
@@ -369,7 +371,7 @@ object InvokeDiffsCommon {
             } else if (blockchain.assetDescription(IssuedAsset(issue.id)).isDefined) {
               TracedResult(Left(FailedTransactionError.dAppExecution(s"Asset ${issue.id} is already issued", 0L)), List())
             } else {
-              val staticInfo = AssetStaticInfo(TransactionId @@ itx.id(), pk, issue.decimals, blockchain.isNFT(issue))
+              val staticInfo = AssetStaticInfo(TransactionId @@ itx.root.id(), pk, issue.decimals, blockchain.isNFT(issue))
               val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
               val info       = AssetInfo(ByteString.copyFromUtf8(issue.name), ByteString.copyFromUtf8(issue.description), Height @@ blockchain.height)
 
@@ -380,7 +382,7 @@ object InvokeDiffsCommon {
                 .map(
                   script =>
                     Diff(
-                      tx = itx,
+                      tx = itx.root,
                       portfolios = Map(pk.toAddress -> Portfolio(assets = Map(asset -> issue.quantity))),
                       issuedAssets = Map(asset      -> NewAssetInfo(staticInfo, info, volumeInfo)),
                       assetScripts = Map(asset      -> script.map(script => AssetScriptInfo(script._1, script._2)))
@@ -392,13 +394,13 @@ object InvokeDiffsCommon {
 
           def applyReissue(reissue: Reissue, pk: PublicKey): TracedResult[FailedTransactionError, Diff] = {
             val reissueDiff = DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue).leftMap(asFailedScriptError)
-            val pseudoTx    = ReissuePseudoTx(reissue, actionSender, pk, tx.id(), tx.timestamp)
+            val pseudoTx    = ReissuePseudoTx(reissue, actionSender, pk, tx.root.id(), tx.root.timestamp)
             validateActionAsPseudoTx(reissueDiff, reissue.assetId, pseudoTx)
           }
 
           def applyBurn(burn: Burn, pk: PublicKey): TracedResult[FailedTransactionError, Diff] = {
             val burnDiff = DiffsCommon.processBurn(blockchain, dAppAddress, fee = 0, burn).leftMap(asFailedScriptError)
-            val pseudoTx = BurnPseudoTx(burn, actionSender, pk, tx.id(), tx.timestamp)
+            val pseudoTx = BurnPseudoTx(burn, actionSender, pk, tx.root.id(), tx.root.timestamp)
             validateActionAsPseudoTx(burnDiff, burn.assetId, pseudoTx)
           }
 
@@ -413,7 +415,7 @@ object InvokeDiffsCommon {
               )
               _ <- TracedResult(SponsorFeeTxValidator.checkMinSponsoredAssetFee(sponsorFee.minSponsoredAssetFee).leftMap(asFailedScriptError))
               sponsorDiff = DiffsCommon.processSponsor(blockchain, dAppAddress, fee = 0, sponsorFee).leftMap(asFailedScriptError)
-              pseudoTx    = SponsorFeePseudoTx(sponsorFee, actionSender, pk, tx.id(), tx.timestamp)
+              pseudoTx    = SponsorFeePseudoTx(sponsorFee, actionSender, pk, tx.root.id(), tx.root.timestamp)
               r <- validateActionAsPseudoTx(sponsorDiff, sponsorFee.assetId, pseudoTx)
             } yield r
 
@@ -427,7 +429,7 @@ object InvokeDiffsCommon {
                 val assetValidationDiff =
                   for {
                     result <- actionDiff
-                    validatedResult <- validatePseudoTxWithSmartAssetScript(blockchain, tx)(
+                    validatedResult <- validatePseudoTxWithSmartAssetScript(blockchain, tx.root)(
                       pseudoTx,
                       assetId,
                       result,
@@ -478,7 +480,7 @@ object InvokeDiffsCommon {
         isAssetScript = true,
         scriptContainerAddress =
           if (blockchain.passCorrectAssetId) Coproduct[Environment.Tthis](Environment.AssetId(assetId.arr))
-          else Coproduct[Environment.Tthis](Environment.AssetId(tx.dAppAddressOrAlias.bytes)),
+          else Coproduct[Environment.Tthis](Environment.AssetId(tx.root.dAppAddressOrAlias.bytes)),
         complexityLimit
       ) match {
         case (log, Left(error))  => Left(FailedTransactionError.assetExecutionInAction(error, complexity, log, assetId))

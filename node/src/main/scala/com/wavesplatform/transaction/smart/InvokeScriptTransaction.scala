@@ -12,6 +12,7 @@ import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
+import com.wavesplatform.state.diffs.invoke.InvokeScriptLike
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -32,7 +33,8 @@ case class InvokeScriptTransaction(
     with VersionedTransaction
     with TxWithFee.InCustomAsset
     with FastHashId
-    with LegacyPBSwitch.V2 {
+    with LegacyPBSwitch.V2
+    with InvokeScriptLike {
 
   val funcCall = funcCallOpt.getOrElse(FUNCTION_CALL(FunctionHeader.User(ContractEvaluator.DEFAULT_FUNC_NAME), List.empty))
 
@@ -42,7 +44,9 @@ case class InvokeScriptTransaction(
   val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
   val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
 
-  override def checkedAssets: Seq[IssuedAsset] = payments collect { case Payment(_, assetId: IssuedAsset) => assetId }
+  override def root : InvokeScriptTransaction = this
+  def senderAddress: Address = sender.toAddress
+  override def checkedAssets: Seq[IssuedAsset] = super[InvokeScriptLike].checkedAssets
 }
 
 object InvokeScriptTransaction extends TransactionParser {

@@ -15,6 +15,8 @@ import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, _}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
+import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
+import com.wavesplatform.lang.ValidationError
 import monix.eval.Coeval
 import org.scalacheck.ShrinkLowPriority
 
@@ -93,6 +95,7 @@ object Common {
     override def txId: ByteStr                                                                                   = ???
     override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
     override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???
+    override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)]): Either[ValidationError, EVALUATED] = ???
     }
 
   def addressFromPublicKey(chainId: Byte, pk: Array[Byte], addressVersion: Byte = EnvironmentFunctions.AddressVersion): Array[Byte] = {

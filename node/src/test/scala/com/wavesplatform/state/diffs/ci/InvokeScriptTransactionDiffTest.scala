@@ -1655,7 +1655,7 @@ class InvokeScriptTransactionDiffTest
     forAll(uniqueAssetIdScenario) {
       case (asset, invoke, master, script, funcBinding) =>
         (() => blockchain.settings).expects().returning(TestSettings.Default.blockchainSettings)
-        (blockchain.assetScript _).expects(*).returning(None)
+        (blockchain.assetScript _).expects(*).returning(None).anyNumberOfTimes()
         (blockchain.accountScript _)
           .expects(master.toAddress)
           .returning(Some(AccountScriptInfo(master.publicKey, script.explicitGet(), 10L, Map(1 -> Map(funcBinding -> 10L)))))
@@ -2077,7 +2077,7 @@ class InvokeScriptTransactionDiffTest
           assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
             case (diff, bc) =>
               val invocationComplexity =
-                InvokeDiffsCommon.getInvocationComplexity(bc, invokeTx, bc.accountScript(dApp).get.complexitiesByEstimator, dApp).explicitGet()
+                InvokeDiffsCommon.getInvocationComplexity(bc, invokeTx.funcCall, bc.accountScript(dApp).get.complexitiesByEstimator, dApp).explicitGet()
               diff.scriptsComplexity shouldBe invocationComplexity
           }
         }
@@ -2167,8 +2167,169 @@ class InvokeScriptTransactionDiffTest
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
             val invocationComplexity =
-              InvokeDiffsCommon.getInvocationComplexity(bc, invokeTx, bc.accountScript(dApp).get.complexitiesByEstimator, dApp).explicitGet()
+              InvokeDiffsCommon.getInvocationComplexity(bc, invokeTx.funcCall, bc.accountScript(dApp).get.complexitiesByEstimator, dApp).explicitGet()
             invocationComplexity + assetsComplexity shouldBe diff.scriptsComplexity
+        }
+    }
+  }
+
+  property("Crosscontract call (same accaunt)") {
+     def contract(): DApp = {
+      val expr = {
+        val script =
+          s"""
+             |{-# STDLIB_VERSION 4 #-}
+             |{-# CONTENT_TYPE DAPP #-}
+             |{-#SCRIPT_TYPE ACCOUNT#-}
+             |
+             | @Callable(i)
+             | func bar() = {
+             |   ([IntegerEntry("bar", 1)], "return")
+             | }
+             |
+             | @Callable(i)
+             | func foo() = {
+             |  let r = Invoke(this, "bar", [], [])
+             |  if r == "return"
+             |  then
+             |   let data = getIntegerValue(this, "bar")
+             |   if data == 1
+             |   then
+             |    [
+             |     IntegerEntry("key", 1)
+             |    ]
+             |   else
+             |    throw("Bad state")
+             |  else
+             |   throw("Bad returned value")
+             | }
+             |""".stripMargin
+        Parser.parseContract(script).get.value
+      }
+
+      compileContractFromExpr(expr, V4)
+    }
+    val scenario =
+      for {
+        master  <- accountGen
+        invoker <- accountGen
+        ts      <- timestampGen
+        fee     = 100500000
+//        fee     <- ciFee(240)
+//        _ = println(fee)
+        gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+        gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+
+        script     = ContractScript(V4, contract())
+        ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 5).explicitGet()
+        fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
+        payments   = List(Payment(10, Waves))  // Payment to itself shoulb be disabled
+        invokeTx = InvokeScriptTransaction
+          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .explicitGet()
+      } yield (Seq(gTx1, gTx2, ssTx), invokeTx, master.toAddress)
+
+    forAll(scenario) {
+      case (genesisTxs, invokeTx, dApp) =>
+        assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
+          case (diff, bc) =>
+            bc.accountData(dApp, "key") shouldBe Some(IntegerDataEntry("key",1))
+            bc.accountData(dApp, "bar") shouldBe Some(IntegerDataEntry("bar",1))
+        }
+    }
+  }
+
+  property("Crosscontract call (two accaunts)") {
+     def contract(): DApp = {
+      val expr = {
+        val script =
+          s"""
+             |{-# STDLIB_VERSION 4 #-}
+             |{-# CONTENT_TYPE DAPP #-}
+             |{-#SCRIPT_TYPE ACCOUNT#-}
+             |
+             | @Callable(i)
+             | func bar(a: ByteVector) = {
+             |   ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit)], 17)
+             | }
+             |""".stripMargin
+        Parser.parseContract(script).get.value
+      }
+
+      compileContractFromExpr(expr, V4)
+    }
+ 
+     def contract1(otherAcc: Address): DApp = {
+      val expr = {
+        val script =
+          s"""
+             |{-# STDLIB_VERSION 4 #-}
+             |{-# CONTENT_TYPE DAPP #-}
+             |{-#SCRIPT_TYPE ACCOUNT#-}
+             |
+             | @Callable(i)
+             | func foo() = {
+             |  let b1 = wavesBalance(this)
+             |  let ob1 = wavesBalance(Address(base58'$otherAcc'))
+             |  if b1 == b1 && ob1 == ob1
+             |  then
+             |    let r = Invoke(Address(base58'$otherAcc'), "bar", [this.bytes], [AttachedPayment(unit, 17)])
+             |    if r == 17
+             |    then
+             |     let data = getIntegerValue(Address(base58'$otherAcc'), "bar")
+             |     let b2 = wavesBalance(this)
+             |     let ob2 = wavesBalance(Address(base58'$otherAcc'))
+             |     if data == 1
+             |     then
+             |      if b2 == b2 && ob1.regular+14 == ob2.regular && b1.regular == b2.regular+14
+             |      then
+             |       [
+             |        IntegerEntry("key", 1)
+             |       ]
+             |      else
+             |       throw("Balance check failed")
+             |     else
+             |      throw("Bad state")
+             |    else
+             |     throw("Bad returned value")
+             |   else
+             |    throw("Imposible")
+             | }
+             |""".stripMargin
+        Parser.parseContract(script).get.value
+      }
+
+      compileContractFromExpr(expr, V4)
+    }
+    val scenario =
+      for {
+        master  <- accountGen
+        invoker <- accountGen
+        service <- accountGen
+        ts      <- timestampGen
+        fee     = 100500000
+        //fee     <- ciFee(240)
+        gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+        gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+        gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
+
+        script1    = ContractScript(V4, contract1(service.toAddress))
+        script      = ContractScript(V4, contract())
+        ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
+        ssTx1      = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
+        fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
+        payments   = List(Payment(10, Waves))
+        invokeTx = InvokeScriptTransaction
+          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .explicitGet()
+      } yield (Seq(gTx1, gTx2, gTx3, ssTx1, ssTx), invokeTx, master.toAddress, service.toAddress)
+
+    forAll(scenario) {
+      case (genesisTxs, invokeTx, dApp, service) =>
+        assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
+          case (diff, bc) =>
+            bc.accountData(dApp, "key") shouldBe Some(IntegerDataEntry("key",1))
+            bc.accountData(service, "bar") shouldBe Some(IntegerDataEntry("bar",1))
         }
     }
   }

@@ -80,7 +80,8 @@ object WavesContext {
       calculateAssetIdF,
       transactionFromProtoBytesF(proofsEnabled, version),
       simplifiedIssueActionConstructor,
-      detailedIssueActionConstructor
+      detailedIssueActionConstructor,
+      callDAppF(version)  // Need to move to the V5
     )
 
   private def variableFuncs(version: StdLibVersion, c: ContentType, proofsEnabled: Boolean) = {
