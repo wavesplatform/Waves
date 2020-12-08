@@ -222,10 +222,10 @@ case class UtilsApiRoute(
       val script = blockchain.accountScript(address).get.script
 
       def serializeResult(e: EVALUATED): JsValue = e match { // TODO: Tuple?
-        case Terms.CONST_LONG(t)               => Json.obj("type" -> "Int", "value"        -> t)
-        case constbytestr: Terms.CONST_BYTESTR => Json.obj("type" -> "ByteVector", "value" -> constbytestr.bs.toString)
-        case conststring: Terms.CONST_STRING   => Json.obj("type" -> "String", "value"     -> conststring.s)
-        case Terms.CONST_BOOLEAN(b)            => Json.obj("type" -> "Boolean", "value"    -> b)
+        case Terms.CONST_LONG(num)   => Json.obj("type" -> "Int", "value"        -> num)
+        case Terms.CONST_BYTESTR(bs) => Json.obj("type" -> "ByteVector", "value" -> bs.toString)
+        case Terms.CONST_STRING(str) => Json.obj("type" -> "String", "value"     -> str)
+        case Terms.CONST_BOOLEAN(b)  => Json.obj("type" -> "Boolean", "value"    -> b)
         case Terms.CaseObj(caseType, fields) =>
           Json.obj("type" -> caseType.name, "value" -> JsObject(fields.view.mapValues(serializeResult).toSeq))
         case Terms.ARR(xs)      => Json.obj("type"  -> "Array", "value"                          -> xs.map(serializeResult))
