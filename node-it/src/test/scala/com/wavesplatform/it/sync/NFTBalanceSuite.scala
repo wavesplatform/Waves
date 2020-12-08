@@ -131,7 +131,7 @@ class NFTBalanceSuite extends FreeSpec with BaseTransactionSuiteLike {
         .recoverWith {
           case ex: Throwable =>
             Future.successful {
-              assert(ex.getMessage contains "Too big sequences requested")
+              assert(ex.getMessage contains "Too big sequence requested")
             }
         }
 

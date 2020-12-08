@@ -9,11 +9,12 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.TransactionMeta
 import com.wavesplatform.db.DBCacheSettings
+import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
+import com.wavesplatform.settings.{GenesisSettings, TestFunctionalitySettings, TestSettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.utils._
 import com.wavesplatform.state.{BlockchainUpdaterImpl, Height, TransactionId, TxNum}
@@ -21,11 +22,13 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import com.wavesplatform.utils.Time
+import com.wavesplatform.utils.{SystemTime, Time}
 import com.wavesplatform.{EitherMatchers, RequestGen, TransactionGen, WithDB, database}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
+
+import scala.concurrent.duration.Duration
 
 //noinspection NameBooleanParameters
 class LevelDBWriterSpec
@@ -119,11 +122,29 @@ class LevelDBWriterSpec
 
   }
 
+  "wavesAmount" - {
+    "counts genesis" in {
+      val (_, leveldb) = TestStorageFactory(
+        TestSettings.Default.copy(
+          blockchainSettings =
+            TestSettings.Default.blockchainSettings.copy(genesisSettings = GenesisSettings(0L, 0L, 1234L, None, Nil, 1, Duration.Zero))
+        ),
+        this.db,
+        SystemTime,
+        ignoreSpendableBalanceChanged,
+        BlockchainUpdateTriggers.noop
+      )
+
+      leveldb.wavesAmount(1) shouldBe BigInt(1234)
+    }
+  }
+
   def baseTest(gen: Time => Gen[(KeyPair, Seq[Block])])(f: (LevelDBWriter, KeyPair) => Unit): Unit = {
     val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
-    val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
+    val bcu =
+      new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
     try {
       val (account, blocks) = gen(ntpTime).sample.get
 
@@ -143,7 +164,8 @@ class LevelDBWriterSpec
     val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
-    val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
+    val bcu =
+      new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
     try {
       val (account, blocks) = gen(ntpTime).sample.get
 
