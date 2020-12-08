@@ -167,23 +167,23 @@ case class Diff(
     scriptsRun: Int,
     scriptsComplexity: Long,
     scriptResults: Map[ByteStr, InvokeScriptResult],
-    continuationStates: SortedMap[(ByteStr, Int), ContinuationState],
+    continuationStates: SortedMap[(Address, Int), ContinuationState],
     replacingTransactions: Seq[NewTransactionInfo]
 ) {
-  lazy val continuationCurrentStates: Map[ByteStr, (Int, ContinuationState)] =
+  lazy val continuationCurrentStates: Map[Address, (Int, ContinuationState)] =
     continuationStates
-      .groupBy { case ((invokeId, _), _) => invokeId }
+      .groupBy { case ((address, _), _) => address }
       .map {
-        case (invokeId, states) =>
+        case (address, states) =>
           val ((_, step), currentState) = states.last
-          (invokeId, (step, currentState))
+          (address, (step, currentState))
       }
 
   def bindTransaction(tx: Transaction): Diff =
     copy(transactions = transactions.concat(Map(Diff.toDiffTxData(tx, portfolios, accountData))))
 
-  def addContinuationState(invokeId: ByteStr, step: Int, state: ContinuationState): Diff =
-    copy(continuationStates = continuationStates + ((invokeId, step) -> state))
+  def addContinuationState(address: Address, step: Int, state: ContinuationState): Diff =
+    copy(continuationStates = continuationStates + ((address, step) -> state))
 }
 
 object Diff {
@@ -200,7 +200,7 @@ object Diff {
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
       scriptsRun: Int = 0,
-      continuationStates: Map[(ByteStr, Int), ContinuationState] = Map.empty,
+      continuationStates: Map[(Address, Int), ContinuationState] = Map.empty,
       replacingTransactions: Seq[NewTransactionInfo] = Seq()
   ): Diff =
     Diff(
@@ -237,7 +237,7 @@ object Diff {
       scriptsRun: Int = 0,
       scriptsComplexity: Long = 0,
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
-      continuationStates: Map[(ByteStr, Int), ContinuationState] = Map.empty
+      continuationStates: Map[(Address, Int), ContinuationState] = Map.empty
   ): Diff =
     Diff(
       // should be changed to VectorMap after 2.13 https://github.com/scala/scala/pull/6854
@@ -317,4 +317,7 @@ object Diff {
     def hashString: String =
       Integer.toHexString(d.hashCode())
   }
+
+  implicit lazy val addressOrdering: Ordering[Address] =
+    Ordering[String].on(_.stringRepr)
 }

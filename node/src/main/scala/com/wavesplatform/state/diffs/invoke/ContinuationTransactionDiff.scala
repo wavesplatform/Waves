@@ -4,6 +4,7 @@ import cats.Id
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, DApp}
 import com.wavesplatform.lang.v1.ContractLimits
@@ -31,7 +32,9 @@ object ContinuationTransactionDiff {
   def apply(blockchain: Blockchain, blockTime: Long, limitedExecution: Boolean = true)(
       tx: ContinuationTransaction
   ): TracedResult[ValidationError, Diff] = {
-    blockchain.continuationStates(tx.invokeScriptTransactionId) match {
+    val dAppAddressOrAlias = blockchain.resolveInvoke(tx).get.dAppAddressOrAlias
+    val dAppAddress = blockchain.resolveAlias(dAppAddressOrAlias).explicitGet()
+    blockchain.continuationStates(dAppAddress) match {
       case (_, ContinuationState.InProgress(expr, unusedComplexity, _)) =>
         applyDiff(blockchain, blockTime, limitedExecution, tx, expr, unusedComplexity)
       case _ =>
@@ -50,7 +53,7 @@ object ContinuationTransactionDiff {
     val invoke = blockchain.resolveInvoke(tx).get
     for {
       dAppAddress <- TracedResult(blockchain.resolveAlias(invoke.dAppAddressOrAlias))
-      AccountScriptInfo(dAppPublicKey, script, _, callableComplexities) <- TracedResult(
+      AccountScriptInfo(dAppPublicKey, script, _, _) <- TracedResult(
         blockchain
           .accountScript(dAppAddress)
           .toRight(GenericError(s"Cannot find dApp with address=$dAppAddress"))
@@ -135,7 +138,7 @@ object ContinuationTransactionDiff {
               portfolios = InvokeDiffsCommon.stepFeePortfolios(stepFee, invoke, blockchain),
               scriptsRun = scriptsRun,
               scriptsComplexity = limit - ir.unusedComplexity
-            ).addContinuationState(tx.invokeScriptTransactionId, tx.step + 1, newState)
+            ).addContinuationState(dAppAddress, tx.step + 1, newState)
           )
       }
     } yield resultDiff

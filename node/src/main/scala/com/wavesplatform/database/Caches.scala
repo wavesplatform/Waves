@@ -151,10 +151,10 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def loadActivatedFeatures(): Map[Short, Int]
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
-  protected val continuationStatesCache: LoadingCache[ByteStr,  (Int, ContinuationState)] =
-    cache(dbSettings.maxCacheSize, invokeTxId => loadContinuationStates(TransactionId(invokeTxId)))
-  protected def loadContinuationStates(invokeTxId: TransactionId): (Int, ContinuationState)
-  override def continuationStates: Map[ByteStr, (Int, ContinuationState)] =
+  protected val continuationStatesCache: LoadingCache[Address,  (Int, ContinuationState)] =
+    cache(dbSettings.maxCacheSize, address => loadContinuationStates(address))
+  protected def loadContinuationStates(address: Address): (Int, ContinuationState)
+  override def continuationStates: Map[Address, (Int, ContinuationState)] =
     continuationStatesCache.asMap.asScala.toMap
 
   //noinspection ScalaStyle
@@ -180,7 +180,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       scriptResults: Map[ByteStr, InvokeScriptResult],
       failedTransactionIds: Set[ByteStr],
       stateHash: StateHashBuilder.Result,
-      continuationStates: SortedMap[(ByteStr, Int), ContinuationState],
+      continuationStates: SortedMap[(AddressId, Int), ContinuationState],
       replacingTransactions: Seq[NewTransactionInfo]
   ): Unit
 
@@ -316,7 +316,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       diff.scriptResults,
       failedTransactionIds,
       stateHash.result(),
-      diff.continuationStates,
+      diff.continuationStates.map { case ((address, step), state) => ((addressIdWithFallback(address, newAddressIds), step), state) },
       diff.replacingTransactions
     )
 
@@ -389,4 +389,6 @@ object Caches {
     new ObservedLoadingCache(cache(maximumSize, loader), changed)
 
   implicit def seqSemigroup[A]: Semigroup[Seq[A]] = _ ++ _
+
+  implicit lazy val orderingAddressId: Ordering[AddressId] = Ordering[Long].on(_.toLong)
 }

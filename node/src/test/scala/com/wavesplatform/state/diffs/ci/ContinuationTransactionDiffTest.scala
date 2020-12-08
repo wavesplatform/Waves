@@ -1,4 +1,5 @@
 package com.wavesplatform.state.diffs.ci
+
 import cats.data.Ior
 import cats.implicits._
 import com.google.protobuf.ByteString
@@ -23,6 +24,7 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.{Burn, Recipient, Reissue}
 import com.wavesplatform.lang.{Common, Global}
 import com.wavesplatform.settings.TestSettings
+import com.wavesplatform.state.Diff.addressOrdering
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.diffs.invoke.{ContinuationTransactionDiff, InvokeScriptTransactionDiff}
@@ -126,7 +128,14 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
       case (step, expr, unusedComplexity) =>
         (() => blockchain.continuationStates)
           .expects()
-          .returning(Map((invoke.id.value(), (step, ContinuationState.InProgress(expr, unusedComplexity)))))
+          .returning(
+            Map(
+              (
+                invoke.dAppAddressOrAlias.asInstanceOf[Address],
+                (step, ContinuationState.InProgress(expr, unusedComplexity, invoke.id.value()))
+              )
+            )
+          )
     }
     (blockchain.transactionInfo _)
       .expects(invoke.id.value())
@@ -290,9 +299,11 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
 
     InvokeScriptTransactionDiff(blockchain, invoke.timestamp, false)(invoke).resultE shouldBe Right(
       Diff.empty.copy(
-        transactions = Map(invoke.id.value()            -> NewTransactionInfo(invoke, Set(), ScriptExecutionInProgress)),
-        portfolios = Map(invoke.sender.toAddress        -> Portfolio.waves(-stepFee)),
-        continuationStates = SortedMap((invoke.id.value(), 0) -> ContinuationState.InProgress(resultExpr, unusedComplexity)),
+        transactions = Map(invoke.id.value()     -> NewTransactionInfo(invoke, Set(), ScriptExecutionInProgress)),
+        portfolios = Map(invoke.sender.toAddress -> Portfolio.waves(-stepFee)),
+        continuationStates = SortedMap(
+          (invoke.dAppAddressOrAlias.asInstanceOf[Address], 0) -> ContinuationState.InProgress(resultExpr, unusedComplexity, invoke.id.value())
+        ),
         scriptsRun = 2,
         scriptsComplexity = spentComplexity
       )
@@ -317,7 +328,10 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
       Diff.empty.copy(
         portfolios = Map(invoke.sender.toAddress -> Portfolio.waves(-stepFee)),
         replacingTransactions = Seq(NewTransactionInfo(continuation.copy(fee = stepFee), Set(), Succeeded)),
-        continuationStates = SortedMap((invoke.id.value(), continuation.step + 1) -> ContinuationState.InProgress(result, resultUnusedComplexity)),
+        continuationStates = SortedMap(
+          (invoke.dAppAddressOrAlias.asInstanceOf[Address], continuation.step + 1) -> ContinuationState
+            .InProgress(result, resultUnusedComplexity, invoke.id.value())
+        ),
         scriptsRun = 1,
         scriptsComplexity = spentComplexity
       )
@@ -359,8 +373,8 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
           )
         ),
         scriptsComplexity = actualComplexity + actionScriptInvocations * assetScriptComplexity,
-        continuationStates = SortedMap((invoke.id.value(), continuation.step + 1) -> ContinuationState.Finished),
-        updatedAssets = Map(scriptedAsset                                   -> Ior.Right(AssetVolumeInfo(true, reissueAmount - burnAmount))),
+        continuationStates = SortedMap((invoke.dAppAddressOrAlias.asInstanceOf[Address], continuation.step + 1) -> ContinuationState.Finished),
+        updatedAssets = Map(scriptedAsset                                                                       -> Ior.Right(AssetVolumeInfo(true, reissueAmount - burnAmount))),
         replacingTransactions = Seq(
           NewTransactionInfo(continuation.copy(fee = stepFee), Set(), Succeeded),
           NewTransactionInfo(invoke, Set(invoke.sender.toAddress, dAppAddress, transferAddress), Succeeded)

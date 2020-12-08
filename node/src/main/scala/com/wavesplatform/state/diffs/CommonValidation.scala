@@ -271,12 +271,10 @@ object CommonValidation {
       case authorized: AuthorizedTransaction =>
         blockchain.continuationStates
           .exists {
-            case (invokeId, (_, _: ContinuationState.InProgress)) =>
-              val txSender    = authorized.sender.toAddress
-              val invoke      = blockchain.transactionInfo(invokeId).get._2.asInstanceOf[InvokeScriptTransaction]
-              val dAppAddress = blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
-              def specificCases =
+            case (dAppAddress, (_, _: ContinuationState.InProgress)) =>
                 authorized match {
+                  case a if a.sender.toAddress == dAppAddress =>
+                    true
                   case e: ExchangeTransaction =>
                     dAppAddress == e.order1.sender.toAddress || dAppAddress == e.order2.sender.toAddress
                   case i: InvokeScriptTransaction =>
@@ -289,7 +287,6 @@ object CommonValidation {
                   case _ =>
                     false
                 }
-              dAppAddress == txSender || specificCases
             case _ =>
               false
           }

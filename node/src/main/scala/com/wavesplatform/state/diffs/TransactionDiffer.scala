@@ -11,7 +11,7 @@ import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.invoke.{ContinuationTransactionDiff, InvokeDiffsCommon, InvokeScriptTransactionDiff}
-import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
+import com.wavesplatform.state.{Blockchain, ContinuationState, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
 import com.wavesplatform.transaction.ApplicationStatus.ScriptExecutionFailed
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
@@ -140,7 +140,10 @@ object TransactionDiffer {
       initDiff: Diff,
       remainingComplexity: Int
   ): TracedResult[ValidationError, Diff] = {
-    val isContinuationFirstStep = initDiff.continuationStates.contains((tx.id.value(), 0))
+    val txId = tx.id.value()
+    val isContinuationFirstStep = initDiff.continuationStates
+      .collectFirst { case ((_, 0), ContinuationState.InProgress(_, _, `txId`)) => true }
+      .getOrElse(false)
     val diff = if (verify && !isContinuationFirstStep) {
       Verifier.assets(blockchain, remainingComplexity)(tx).leftMap {
         case (spentComplexity, ScriptExecutionError(error, log, Some(assetId))) if mayFail(tx) && acceptFailed(blockchain) =>

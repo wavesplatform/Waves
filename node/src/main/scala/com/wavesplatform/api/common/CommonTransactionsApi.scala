@@ -1,16 +1,18 @@
 package com.wavesplatform.api.common
 
+import cats.implicits._
 import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.{BlockMeta, common}
 import com.wavesplatform.block
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.{DBExt, Keys}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
-import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult, TransactionId}
+import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{ApplicationStatus, Asset, CreateAliasTransaction, Transaction}
@@ -129,8 +131,14 @@ object CommonTransactionsApi {
         transactionProof         <- block.transactionProof(transaction, allTransactions)
       } yield transactionProof
 
-    override def continuationsAmount(invokeTransactionId: ByteStr): Int =
-      Try(db.get(Keys.continuationLastStep(TransactionId(invokeTransactionId))))
-        .getOrElse(0)
+    override def continuationsAmount(invokeTransactionId: ByteStr): Int = {
+      val amount = for {
+        invoke      <- Try(blockchain.transactionInfo(invokeTransactionId).collectFirst { case (_, i: InvokeScriptTransaction, _) => i }.get)
+        dAppAddress <- Try(blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet())
+        id          <- Try(db.get(Keys.addressId(dAppAddress)).get)
+        stepsAmount <- Try(db.get(Keys.continuationLastStep(id)))
+      } yield stepsAmount
+      amount.getOrElse(0)
+    }
   }
 }

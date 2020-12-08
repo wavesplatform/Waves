@@ -871,7 +871,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             BlockchainFeatures.ContinuationTransaction -> 0
           )
         ) { d =>
-          val invokeId = invoke.id.value()
+          val address = d.levelDBWriter.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
 
           d.appendBlock(genesisBlock(timestamp, Map(caller -> ENOUGH_AMT, dAppAcc -> ENOUGH_AMT)))
           d.appendBlock(setScript)
@@ -884,7 +884,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.balance(caller) shouldBe startCallerBalance - FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
           d.balance(dAppAcc) shouldBe startDAppBalance
           inside(d.blockchainUpdater.continuationStates.toList) {
-            case List((`invokeId`, (0, ContinuationState.InProgress(_, _)))) =>
+            case List((`address`, (0, ContinuationState.InProgress(_, _, _)))) =>
           }
 
           d.appendBlock(continuation)
@@ -892,13 +892,13 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.balance(caller) shouldBe startCallerBalance - 2 * FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
           d.balance(dAppAcc) shouldBe startDAppBalance
           inside(d.blockchainUpdater.continuationStates.toList) {
-            case List((`invokeId`, (1, ContinuationState.InProgress(_, _)))) =>
+            case List((`address`, (1, ContinuationState.InProgress(_, _, _)))) =>
           }
 
           d.appendBlock(continuation.copy(step = 1))
           d.balance(caller) shouldBe startCallerBalance - 3 * FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit - paymentAmount
           d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
-          d.blockchainUpdater.continuationStates shouldBe Map((invokeId, (2, ContinuationState.Finished)))
+          d.blockchainUpdater.continuationStates shouldBe Map((address, (2, ContinuationState.Finished)))
           d.blockchainUpdater.accountData(dAppAcc, "isAllowed") shouldBe Some(BooleanDataEntry("isAllowed", true))
 
           d.removeAfter(afterFirstStep)
@@ -906,14 +906,14 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.balance(caller) shouldBe startCallerBalance - 2 * FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
           d.balance(dAppAcc) shouldBe startDAppBalance
           inside(d.blockchainUpdater.continuationStates.toList) {
-            case List((`invokeId`, (1, ContinuationState.InProgress(_, _)))) =>
+            case List((`address`, (1, ContinuationState.InProgress(_, _, _)))) =>
           }
 
           d.removeAfter(afterInvoke)
           d.balance(caller) shouldBe startCallerBalance - FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
           d.balance(dAppAcc) shouldBe startDAppBalance
           inside(d.blockchainUpdater.continuationStates.toList) {
-            case List((`invokeId`, (0, ContinuationState.InProgress(_, _)))) =>
+            case List((`address`, (0, ContinuationState.InProgress(_, _, _)))) =>
           }
 
           d.removeAfter(beforeInvoke)

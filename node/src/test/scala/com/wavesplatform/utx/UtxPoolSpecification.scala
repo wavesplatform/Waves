@@ -1097,8 +1097,8 @@ class UtxPoolSpecification
             dAppAcc1
           )
           bcu.processBlock(block).explicitGet()
-          bcu.continuationStates(prioritizedInvoke.id.value()) shouldBe ((3, ContinuationState.Finished))
-          bcu.continuationStates(tailInvoke.id.value()) shouldBe ((3, ContinuationState.Finished))
+          bcu.continuationStates(prioritizedInvoke.dAppAddressOrAlias.asInstanceOf[Address]) shouldBe ((3, ContinuationState.Finished))
+          bcu.continuationStates(tailInvoke.dAppAddressOrAlias.asInstanceOf[Address]) shouldBe ((3, ContinuationState.Finished))
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe None
       }
 
@@ -1175,7 +1175,7 @@ class UtxPoolSpecification
           )
           bcu.processBlock(block).explicitGet()
 
-          bcu.continuationStates(invoke.id.value()) shouldBe ((3, ContinuationState.Finished))
+          bcu.continuationStates(invoke.dAppAddressOrAlias.asInstanceOf[Address]) shouldBe ((3, ContinuationState.Finished))
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe None
       }
     }

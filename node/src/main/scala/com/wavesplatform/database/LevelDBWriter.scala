@@ -282,10 +282,11 @@ abstract class LevelDBWriter private[database] (
     stateFeatures ++ settings.functionalitySettings.preActivatedFeatures
   }
 
-  override protected def loadContinuationStates(invokeTxId: TransactionId): (Int, ContinuationState) =
+  override protected def loadContinuationStates(address: Address): (Int, ContinuationState) =
     readOnly { db =>
-      val lastStep = db.get(Keys.continuationLastStep(invokeTxId))
-      val state    = db.get(Keys.continuationState(invokeTxId, lastStep))
+      val id       = addressId(address).get
+      val lastStep = db.get(Keys.continuationLastStep(id))
+      val state    = db.get(Keys.continuationState(id, lastStep))
       (lastStep, state)
     }
 
@@ -387,7 +388,7 @@ abstract class LevelDBWriter private[database] (
       scriptResults: Map[ByteStr, InvokeScriptResult],
       failedTransactionIds: Set[ByteStr],
       stateHash: StateHashBuilder.Result,
-      continuationStates: SortedMap[(ByteStr, Int), ContinuationState],
+      continuationStates: SortedMap[(AddressId, Int), ContinuationState],
       replacingTransactions: Seq[NewTransactionInfo]
   ): Unit = {
     log.trace(s"Persisting block ${block.id()} at height $height")
@@ -402,14 +403,21 @@ abstract class LevelDBWriter private[database] (
         rw.put(Keys.safeRollbackHeight, height - dbSettings.maxRollbackDepth)
       }
 
+      def inProgress(i: InvokeScriptTransaction) = {
+        val id = i.id.value()
+        continuationStates
+          .collectFirst { case ((_, 0), ContinuationState.InProgress(_, _, `id`)) => true }
+          .getOrElse(false)
+      }
+
       val newTransactions: Map[TransactionId, (Transaction, TxNum, Int, ApplicationStatus)] =
         block.transactionData.zipWithIndex.map {
           case (tx, idx) =>
             val status =
               tx match {
-                case _ if failedTransactionIds.contains(tx.id())                                  => ScriptExecutionFailed
-                case i: InvokeScriptTransaction if continuationStates.contains((i.id.value(), 0)) => ScriptExecutionInProgress
-                case _                                                                            => Succeeded
+                case _ if failedTransactionIds.contains(tx.id()) => ScriptExecutionFailed
+                case i: InvokeScriptTransaction if inProgress(i) => ScriptExecutionInProgress
+                case _                                           => Succeeded
               }
             val k = TransactionId(tx.id())
             val v = (tx, TxNum(idx.toShort), this.height, status)
@@ -615,17 +623,16 @@ abstract class LevelDBWriter private[database] (
       }
 
       continuationStates
-        .groupBy { case ((invokeId, _), _) => invokeId }
+        .groupBy { case ((addressId, _), _) => addressId }
         .foreach {
-          case (invokeId, states) =>
-            val id          = TransactionId(invokeId)
-            val lastStepKey = Keys.continuationLastStep(id)
+          case (addressId, states) =>
+            val lastStepKey = Keys.continuationLastStep(addressId)
             val currentStep = Try(rw.get(lastStepKey)).getOrElse(-1)
             val lastStep =
               states.foldLeft(currentStep) {
                 case (currentStep, ((_, step), state)) =>
                   if (step == currentStep + 1) {
-                    rw.put(Keys.continuationState(id, step), state)
+                    rw.put(Keys.continuationState(addressId, step), state)
                     step
                   } else {
                     currentStep
@@ -665,7 +672,7 @@ abstract class LevelDBWriter private[database] (
     readOnly(_.get(Keys.heightOf(targetBlockId))).fold(Seq.empty[(Block, ByteStr)]) { targetHeight =>
       log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
-      val continuationLastSteps = mutable.Map[TransactionId, Int]()
+      val continuationLastSteps = mutable.Map[AddressId, (Int, TransactionId, Address)]()
 
       val discardedBlocks: Seq[(Block, ByteStr)] = for (currentHeight <- height until targetHeight by -1) yield {
         val balancesToInvalidate    = Seq.newBuilder[(Address, Asset)]
@@ -775,18 +782,24 @@ abstract class LevelDBWriter private[database] (
                 case _: DataTransaction => // see changed data keys removal
 
                 case tx: InvokeScriptTransaction =>
-                  val id = TransactionId(tx.id.value())
+                  val address = resolveAlias(tx.dAppAddressOrAlias).explicitGet()
+                  val id      = addressId(address).get
                   rw.delete(Keys.invokeScriptResult(h, num))
                   rw.delete(Keys.continuationState(id, step = 0))
                   rw.delete(Keys.continuationLastStep(id))
-                  continuationStatesCache.invalidate(id)
+                  continuationLastSteps.remove(id)
+                  continuationStatesCache.invalidate(address)
 
                 case tx: ContinuationTransaction =>
-                  val id = TransactionId(tx.invokeScriptTransactionId)
+                  val invoke  = this.resolveInvoke(tx).get
+                  val address = resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
+                  val id      = addressId(address).get
                   continuationLastSteps.updateWith(id) { currentStepOpt =>
-                    val currentStep = currentStepOpt.getOrElse(rw.get(Keys.continuationLastStep(id)))
-                    val newStep     = if (tx.step < currentStep) tx.step else currentStep
-                    Some(newStep)
+                    val lastStep                   = rw.get(Keys.continuationLastStep(id))
+                    val value                      = (lastStep, TransactionId(invoke.id.value()), address)
+                    val (currentStep, invokeId, _) = currentStepOpt.getOrElse(value)
+                    val newStep                    = if (tx.step < currentStep) tx.step else currentStep
+                    Some((newStep, invokeId, address))
                   }
                   rw.delete(Keys.continuationState(id, tx.step + 1))
                   rw.delete(Keys.invokeScriptResult(h, num))
@@ -830,21 +843,17 @@ abstract class LevelDBWriter private[database] (
       }
 
       continuationLastSteps.foreach {
-        case (id, step) =>
-          if (readOnly(_.has(Keys.continuationLastStep(id)))) {
-            readWrite { rw =>
-              val TransactionMeta(height, num, _, _, _) = rw.get(Keys.transactionMetaById(id)).get
-              val txNum                                 = TxNum(num.toShort)
-              val (tx, _)                               = rw.get(Keys.transactionAt(Height(height), txNum)).get
-              rw.put(Keys.transactionAt(Height(height), txNum), Some((tx, ScriptExecutionInProgress)))
-              val meta = TransactionMeta(height, num, tx.typeId, applicationStatus = toDb(ScriptExecutionInProgress))
-              rw.put(Keys.transactionMetaById(id), Some(meta))
-              rw.put(Keys.continuationLastStep(id), step)
-            }
-            continuationStatesCache.refresh(id)
-          } else {
-            continuationStatesCache.invalidate(id)
+        case (id, (step, invokeId, address)) =>
+          readWrite { rw =>
+            val TransactionMeta(height, num, _, _, _) = rw.get(Keys.transactionMetaById(invokeId)).get
+            val txNum                                 = TxNum(num.toShort)
+            val (tx, _)                               = rw.get(Keys.transactionAt(Height(height), txNum)).get
+            rw.put(Keys.transactionAt(Height(height), txNum), Some((tx, ScriptExecutionInProgress)))
+            val meta = TransactionMeta(height, num, tx.typeId, applicationStatus = toDb(ScriptExecutionInProgress))
+            rw.put(Keys.transactionMetaById(invokeId), Some(meta))
+            rw.put(Keys.continuationLastStep(id), step)
           }
+          continuationStatesCache.refresh(address)
       }
 
       log.debug(s"Rollback to block $targetBlockId at $targetHeight completed")
