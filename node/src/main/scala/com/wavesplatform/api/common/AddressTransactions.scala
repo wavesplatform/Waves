@@ -21,30 +21,15 @@ trait AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Observable[(Height, Transaction, Boolean)] =
-    Observable.fromIterator(Task(allAddressTransactions(db, maybeDiff, subject, sender, types, fromId)))
-
-  def invokeScriptResults(
-      db: DB,
-      maybeDiff: Option[(Height, Diff)],
-      subject: Address,
-      sender: Option[Address],
-      types: Set[Transaction.Type],
-      fromId: Option[ByteStr]
   ): Observable[TransactionMeta] =
     Observable
       .fromIterator(Task(allAddressTransactions(db, maybeDiff, subject, sender, types, fromId).map {
         case (height, transaction, succeeded) =>
-          val maybeScriptResult = transaction match {
-            case ist: InvokeScriptTransaction =>
-              maybeDiff
-                .flatMap { case (_, diff) => diff.scriptResults.get(ist.id()) }
-                .orElse(loadInvokeScriptResult(db, ist.id()))
-
-            case _ => None
+          TransactionMeta.create(height, transaction, succeeded) { ist =>
+            maybeDiff
+              .flatMap { case (_, diff) => diff.scriptResults.get(ist.id()) }
+              .orElse(loadInvokeScriptResult(db, ist.id()))
           }
-
-          TransactionMeta(height, transaction, maybeScriptResult, succeeded)
       }))
 }
 

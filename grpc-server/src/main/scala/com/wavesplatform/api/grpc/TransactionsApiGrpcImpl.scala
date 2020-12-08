@@ -2,6 +2,7 @@ package com.wavesplatform.api.grpc
 
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.common.CommonTransactionsApi
+import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBRecipientImplicitConversionOps
@@ -48,10 +49,11 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
 
       responseObserver.completeWith(
         stream
-          .filter { case (_, t, _) => transactionIdSet.isEmpty || transactionIdSet(t.id()) }
+          .filter { case TransactionMeta(_, tx, _) => transactionIdSet.isEmpty || transactionIdSet(tx.id()) }
           .map {
-            case (h, tx, false) => TransactionResponse(tx.id().toByteString, h, Some(tx.toPB), ApplicationStatus.SCRIPT_EXECUTION_FAILED)
-            case (h, tx, _)     => TransactionResponse(tx.id().toByteString, h, Some(tx.toPB), ApplicationStatus.SUCCEEDED)
+            case TransactionMeta(h, tx, false) =>
+              TransactionResponse(tx.id().toByteString, h, Some(tx.toPB), ApplicationStatus.SCRIPT_EXECUTION_FAILED)
+            case TransactionMeta(h, tx, _) => TransactionResponse(tx.id().toByteString, h, Some(tx.toPB), ApplicationStatus.SUCCEEDED)
           }
       )
     }
@@ -79,8 +81,8 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
       val result = Observable(request.transactionIds: _*)
         .flatMap(txId => Observable.fromIterable(commonApi.transactionById(txId.toByteStr)))
         .collect {
-          case CommonTransactionsApi.TransactionMeta(_, transaction, Some(invokeScriptResult), _) =>
-            InvokeScriptResultResponse.of(Some(PBTransactions.protobuf(transaction)), Some(VISR.toPB(invokeScriptResult)))
+          case CommonTransactionsApi.TransactionMeta.Invoke(_, transaction, _, invokeScriptResult) =>
+            InvokeScriptResultResponse.of(Some(PBTransactions.protobuf(transaction)), invokeScriptResult.map(VISR.toPB))
         }
 
       responseObserver.completeWith(result)

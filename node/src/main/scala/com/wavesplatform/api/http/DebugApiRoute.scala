@@ -72,7 +72,7 @@ case class DebugApiRoute(
   override val settings: RestAPISettings = ws.restAPISettings
 
   private[this] val serializer                     = TransactionJsonSerializer(blockchain, transactionsApi)
-  private[this] implicit val transactionMetaWrites = OWrites[TransactionMeta](serializer.txMetaToJson)
+  private[this] implicit val transactionMetaWrites = OWrites[TransactionMeta](serializer.transactionWithMetaJson)
 
   override lazy val route: Route = pathPrefix("debug") {
     stateChanges ~ balanceHistory ~ stateHash ~ validate ~ withAuth {
@@ -249,9 +249,9 @@ case class DebugApiRoute(
 
   def stateChangesById: Route = (get & path("stateChanges" / "info" / TransactionId)) { id =>
     transactionsApi.transactionById(id) match {
-      case Some(meta) if meta.invokeScriptResult.isDefined => complete(meta)
-      case Some(_)                                         => complete(ApiError.UnsupportedTransactionType)
-      case None                                            => complete(ApiError.TransactionDoesNotExist)
+      case Some(meta: TransactionMeta.Invoke) => complete(meta: TransactionMeta)
+      case Some(_)                            => complete(ApiError.UnsupportedTransactionType)
+      case None                               => complete(ApiError.TransactionDoesNotExist)
     }
   }
 
@@ -265,7 +265,7 @@ case class DebugApiRoute(
             Source
               .fromPublisher(
                 transactionsApi
-                  .invokeScriptResults(address, None, Set.empty, afterOpt)
+                  .transactionsByAddress(address, None, Set.empty, afterOpt)
                   .map(Json.toJsObject(_))
                   .toReactivePublisher
               )

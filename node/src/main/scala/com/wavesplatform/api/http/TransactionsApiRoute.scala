@@ -8,7 +8,7 @@ import cats.instances.try_._
 import cats.syntax.alternative._
 import cats.syntax.either._
 import cats.syntax.traverse._
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.api.http.ApiError._
@@ -22,7 +22,6 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
@@ -46,7 +45,7 @@ case class TransactionsApiRoute(
   import TransactionsApiRoute._
 
   private[this] val serializer                     = TransactionJsonSerializer(blockchain, commonApi)
-  private[this] implicit val transactionMetaWrites = OWrites[TransactionMeta](serializer.txMetaToJson)
+  private[this] implicit val transactionMetaWrites = OWrites[TransactionMeta](serializer.transactionWithMetaJson)
 
   override lazy val route: Route =
     pathPrefix("transactions") {
@@ -124,7 +123,7 @@ case class TransactionsApiRoute(
 
   def unconfirmed: Route = (pathPrefix("unconfirmed") & get) {
     pathEndOrSingleSlash {
-      complete(JsArray(commonApi.unconfirmedTransactions.map(serializer.unconfirmedTxToExtendedJson)))
+      complete(JsArray(commonApi.unconfirmedTransactions.map(serializer.unconfirmedTxExtendedJson)))
     } ~ utxSize ~ utxTransactionInfo
   }
 
@@ -139,7 +138,7 @@ case class TransactionsApiRoute(
       path(TransactionId) { id =>
         commonApi.unconfirmedTransactionById(id) match {
           case Some(tx) =>
-            complete(serializer.unconfirmedTxToExtendedJson(tx))
+            complete(serializer.unconfirmedTxExtendedJson(tx))
           case None =>
             complete(ApiError.TransactionDoesNotExist)
         }
@@ -196,7 +195,7 @@ case class TransactionsApiRoute(
     }
 
   def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr])(implicit sc: Scheduler): Future[List[JsObject]] = {
-    val aliasesOfAddress =
+    val aliasesOfAddress: Task[Set[AddressOrAlias]] =
       commonApi
         .aliasesOfAddress(address)
         .collect { case (_, cat) => cat.alias }
@@ -208,21 +207,19 @@ case class TransactionsApiRoute(
       * Produces compact representation for large transactions by stripping unnecessary data.
       * Currently implemented for MassTransfer transaction only.
       */
-    def txToCompactJson(address: Address, tx: Transaction): Task[JsObject] = {
+    def compactJson(address: Address, meta: TransactionMeta): Task[JsObject] = {
       import com.wavesplatform.transaction.transfer._
-      tx match {
-        case mtt: MassTransferTransaction if mtt.sender.toAddress != address => aliasesOfAddress.map(mtt.compactJson)
-        case _                                                               => Task.now(serializer.txToExtendedJson(tx))
+      meta.transaction match {
+        case mtt: MassTransferTransaction if mtt.sender.toAddress != address =>
+          aliasesOfAddress.map(mtt.compactJson(_) ++ serializer.transactionMetaJson(meta))
+        case _ => Task.now(serializer.transactionWithMetaJson(meta))
       }
     }
 
     commonApi
       .transactionsByAddress(address, None, Set.empty, maybeAfter)
       .take(limitParam)
-      .mapEval {
-        case (height, tx, succeeded) =>
-          txToCompactJson(address, tx).map(_ ++ serializer.applicationStatus(height, succeeded) + ("height" -> JsNumber(height)))
-      }
+      .mapEval(compactJson(address, _))
       .toListL
       .runToFuture
   }
@@ -274,7 +271,7 @@ object TransactionsApiRoute {
   }
 
   private[http] final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: CommonTransactionsApi) {
-    def txMetaToJson(meta: TransactionMeta): JsObject = {
+    def transactionMetaJson(meta: TransactionMeta): JsObject = {
       val specificInfo = meta.transaction match {
         case lease: LeaseTransaction =>
           import com.wavesplatform.api.http.TransactionsApiRoute.LeaseStatus._
@@ -283,22 +280,27 @@ object TransactionsApiRoute {
         case leaseCancel: LeaseCancelTransaction =>
           Json.obj("lease" -> blockchain.transactionInfo(leaseCancel.leaseId).map(_._2.json()).getOrElse[JsValue](JsNull))
 
-        case _: InvokeScriptTransaction =>
-          Json.obj("stateChanges" -> meta.invokeScriptResult)
-
         case _ => JsObject.empty
       }
 
-      Seq(meta.transaction.json(), TransactionJsonSerializer.height(meta.height), applicationStatus(meta.height, meta.succeeded), specificInfo)
-        .reduce(_ ++ _)
+      val stateChanges = meta match {
+        case i: TransactionMeta.Invoke => Json.obj("stateChanges" -> i.invokeScriptResult)
+        case _                         => JsObject.empty
+      }
+
+      Seq(
+        TransactionJsonSerializer.height(meta.height),
+        applicationStatus(meta.height, meta.succeeded),
+        stateChanges,
+        specificInfo
+      ).reduce(_ ++ _)
     }
 
-    def txToExtendedJson(tx: Transaction): JsObject = {
-      val meta = commonApi.transactionById(tx.id())
-      meta.fold(tx.json())(txMetaToJson)
+    def transactionWithMetaJson(meta: TransactionMeta): JsObject = {
+      meta.transaction.json() ++ transactionMetaJson(meta)
     }
 
-    def unconfirmedTxToExtendedJson(tx: Transaction): JsObject = tx match {
+    def unconfirmedTxExtendedJson(tx: Transaction): JsObject = tx match {
       case leaseCancel: LeaseCancelTransaction =>
         leaseCancel.json() ++ Json.obj("lease" -> blockchain.transactionInfo(leaseCancel.leaseId).map(_._2.json()).getOrElse[JsValue](JsNull))
 

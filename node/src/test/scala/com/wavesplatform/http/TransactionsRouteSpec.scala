@@ -262,11 +262,7 @@ class TransactionsRouteSpec
       (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
       (addressTransactions.transactionsByAddress _)
         .expects(account.toAddress, *, *, None)
-        .returning(Observable((1.asInstanceOf[Height], transaction, true)))
-        .once()
-      (addressTransactions.transactionById _)
-        .expects(transaction.id())
-        .returning(Some(TransactionMeta(Height(1), transaction, Some(InvokeScriptResult()), succeeded = true)))
+        .returning(Observable(TransactionMeta.Invoke(Height(1), transaction, succeeded = true, Some(InvokeScriptResult()))))
         .once()
 
       Get(routePath(s"/address/${account.toAddress}/limit/1")) ~> route ~> check {
@@ -296,7 +292,7 @@ class TransactionsRouteSpec
 
       forAll(txAvailability) {
         case (tx, succeed, height, acceptFailedActivationHeight) =>
-          (addressTransactions.transactionById _).expects(tx.id()).returning(Some(TransactionMeta(Height(height), tx, None, succeed))).once()
+          (addressTransactions.transactionById _).expects(tx.id()).returning(Some(TransactionMeta.Default(Height(height), tx, succeed))).once()
           (() => blockchain.activatedFeatures)
             .expects()
             .returning(Map(BlockchainFeatures.BlockV5.id -> acceptFailedActivationHeight))
@@ -322,7 +318,7 @@ class TransactionsRouteSpec
       (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
       (addressTransactions.transactionById _)
         .expects(transaction.id())
-        .returning(Some(TransactionMeta(Height(1), transaction, Some(InvokeScriptResult()), succeeded = true)))
+        .returning(Some(TransactionMeta.Invoke(Height(1), transaction, succeeded = true, Some(InvokeScriptResult()))))
         .once()
 
       Get(routePath(s"/info/${transaction.id()}")) ~> route ~> check {
@@ -338,7 +334,7 @@ class TransactionsRouteSpec
         tx =>
           (addressTransactions.transactionById _)
             .expects(tx.id())
-            .returns(Some(TransactionMeta(Height(1), tx, Some(InvokeScriptResult()), succeeded = true)))
+            .returns(Some(TransactionMeta.Invoke(Height(1), tx, succeeded = true, Some(InvokeScriptResult()))))
             .repeat(3)
       )
 
@@ -456,7 +452,7 @@ class TransactionsRouteSpec
   routePath("/unconfirmed/info/{id}") - {
     "handles invalid signature" in {
       forAll(invalidBase58Gen) { invalidBase58 =>
-        Get(routePath(s"/unconfirmed/info/$invalidBase58")) ~> route should produce(InvalidTransactionId("Wrong char"), true)
+        Get(routePath(s"/unconfirmed/info/$invalidBase58")) ~> route should produce(InvalidTransactionId("Wrong char"), matchMsg = true)
       }
 
       Get(routePath(s"/unconfirmed/info/")) ~> route should produce(InvalidSignature)
