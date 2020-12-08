@@ -265,15 +265,14 @@ object InvokeDiffsCommon {
       maxKeySize = ContractLimits.MaxKeySizeInBytesByVersion(stdLibVersion)
       _ <- dataEntries
         .collectFirst {
-          Function.unlift {
-            entry =>
-              val length = entry.key.utf8Bytes.length
-              if (length > maxKeySize)
-                Some(s"Data entry key size = $length bytes must be less than $maxKeySize")
-              else if (entry.key.isEmpty && stdLibVersion >= V4)
-                Some(s"Data entry key should not be empty")
-              else
-                None
+          Function.unlift { entry =>
+            val length = entry.key.utf8Bytes.length
+            if (length > maxKeySize)
+              Some(s"Data entry key size = $length bytes must be less than $maxKeySize")
+            else if (entry.key.isEmpty && stdLibVersion >= V4)
+              Some(s"Data entry key should not be empty")
+            else
+              None
           }
         }
         .toLeft(())
@@ -394,13 +393,13 @@ object InvokeDiffsCommon {
           def applyReissue(reissue: Reissue, pk: PublicKey): TracedResult[FailedTransactionError, Diff] = {
             val reissueDiff = DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue).leftMap(asFailedScriptError)
             val pseudoTx    = ReissuePseudoTx(reissue, actionSender, pk, tx.id(), tx.timestamp)
-            validateActionAsPseudoTx(reissueDiff, reissue.assetId, pseudoTx, AssetType.Reissue)
+            callAssetVerifierWithPseudoTx(reissueDiff, reissue.assetId, pseudoTx, AssetType.Reissue)
           }
 
           def applyBurn(burn: Burn, pk: PublicKey): TracedResult[FailedTransactionError, Diff] = {
             val burnDiff = DiffsCommon.processBurn(blockchain, dAppAddress, fee = 0, burn).leftMap(asFailedScriptError)
             val pseudoTx = BurnPseudoTx(burn, actionSender, pk, tx.id(), tx.timestamp)
-            validateActionAsPseudoTx(burnDiff, burn.assetId, pseudoTx, AssetType.Burn)
+            callAssetVerifierWithPseudoTx(burnDiff, burn.assetId, pseudoTx, AssetType.Burn)
           }
 
           def applySponsorFee(sponsorFee: SponsorFee, pk: PublicKey): TracedResult[FailedTransactionError, Diff] =
@@ -415,10 +414,10 @@ object InvokeDiffsCommon {
               _ <- TracedResult(SponsorFeeTxValidator.checkMinSponsoredAssetFee(sponsorFee.minSponsoredAssetFee).leftMap(asFailedScriptError))
               sponsorDiff = DiffsCommon.processSponsor(blockchain, dAppAddress, fee = 0, sponsorFee).leftMap(asFailedScriptError)
               pseudoTx    = SponsorFeePseudoTx(sponsorFee, actionSender, pk, tx.id(), tx.timestamp)
-              r <- validateActionAsPseudoTx(sponsorDiff, sponsorFee.assetId, pseudoTx, AssetType.Sponsor)
+              r <- callAssetVerifierWithPseudoTx(sponsorDiff, sponsorFee.assetId, pseudoTx, AssetType.Sponsor)
             } yield r
 
-          def validateActionAsPseudoTx(
+          def callAssetVerifierWithPseudoTx(
               actionDiff: Either[FailedTransactionError, Diff],
               assetId: ByteStr,
               pseudoTx: PseudoTx,

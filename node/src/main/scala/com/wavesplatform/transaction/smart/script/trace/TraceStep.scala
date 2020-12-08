@@ -33,7 +33,7 @@ case class AccountVerifierTrace(
 object AssetVerifierTrace {
   type AssetType = AssetType.Value
   object AssetType extends Enumeration {
-    val Unknown, OrderAmount, OrderPrice, MatcherFee, Payment, Reissue, Burn, Sponsor, Transfer = Value
+    val Unknown, OrderAmount, OrderPrice, MatcherFee, Payment, Reissue, Burn, Sponsor, Transfer, Update = Value
   }
 }
 

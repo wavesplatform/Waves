@@ -18,6 +18,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError, TransactionNotAllowedByScript}
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
@@ -93,6 +94,7 @@ object Verifier extends ScorexLogging {
       case i: InvokeScriptTransaction if i.payments.exists(_.assetId == asset) => AssetType.Payment
       case e: ExchangeTransaction if e.order1.assetPair.amountAsset == asset   => AssetType.OrderAmount
       case e: ExchangeTransaction if e.order1.assetPair.priceAsset == asset    => AssetType.OrderPrice
+      case u: UpdateAssetInfoTransaction if u.assetId == asset                 => AssetType.Update
       case _                                                                   => AssetType.Unknown
     }
 
@@ -105,8 +107,8 @@ object Verifier extends ScorexLogging {
     val additionalAssets = tx match {
       case e: ExchangeTransaction =>
         for {
-          asset: IssuedAsset <- List(e.buyOrder.matcherFeeAssetId, e.sellOrder.matcherFeeAssetId).distinct
-          script             <- assetScript(asset)
+          asset  <- List(e.buyOrder.matcherFeeAssetId, e.sellOrder.matcherFeeAssetId).distinct.collect { case ia: IssuedAsset => ia }
+          script <- assetScript(asset)
         } yield AssetForCheck(asset, script, AssetType.MatcherFee)
 
       case _ => Nil
