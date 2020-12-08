@@ -7,7 +7,13 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult}
 import com.wavesplatform.state.InvokeScriptResult
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.{ScriptExecutionError, TransactionNotAllowedByScript}
+import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
 
@@ -34,13 +40,27 @@ object AssetVerifierTrace {
   type AssetType = AssetType.Value
   object AssetType extends Enumeration {
     val Unknown, OrderAmount, OrderPrice, MatcherFee, Payment, Reissue, Burn, Sponsor, Transfer, Update = Value
+
+    def fromTxAndAsset(tx: Transaction, asset: IssuedAsset): AssetType = tx match {
+      case i: InvokeScriptTransaction if i.payments.exists(_.assetId == asset) => AssetType.Payment
+
+      case e: ExchangeTransaction if e.order1.assetPair.amountAsset == asset                            => AssetType.OrderAmount
+      case e: ExchangeTransaction if e.order1.assetPair.priceAsset == asset                             => AssetType.OrderPrice
+      case e: ExchangeTransaction if Set(e.order1.matcherFeeAssetId, e.order2.matcherFeeAssetId)(asset) => AssetType.OrderPrice
+
+      case u: UpdateAssetInfoTransaction if u.assetId == asset => AssetType.Update
+      case t: TransferTransaction if t.assetId == asset        => AssetType.Transfer
+      case mt: MassTransferTransaction if mt.assetId == asset  => AssetType.Transfer
+
+      case _ => AssetType.Unknown
+    }
   }
 }
 
 case class AssetVerifierTrace(
     id: ByteStr,
     errorOpt: Option[ValidationError],
-    assetType: AssetVerifierTrace.AssetType.Value = AssetVerifierTrace.AssetType.Unknown
+    assetType: AssetVerifierTrace.AssetType = AssetVerifierTrace.AssetType.Unknown
 ) extends TraceStep {
   override lazy val json: JsObject = Json.obj(
     "type"      -> "asset",

@@ -18,7 +18,6 @@ import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError, TransactionNotAllowedByScript}
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
@@ -90,18 +89,10 @@ object Verifier extends ScorexLogging {
     def assetScript(asset: IssuedAsset): Option[AssetScriptInfo] =
       blockchain.assetDescription(asset).flatMap(_.script)
 
-    def determineAssetType(tx: Transaction, asset: IssuedAsset): AssetType = tx match {
-      case i: InvokeScriptTransaction if i.payments.exists(_.assetId == asset) => AssetType.Payment
-      case e: ExchangeTransaction if e.order1.assetPair.amountAsset == asset   => AssetType.OrderAmount
-      case e: ExchangeTransaction if e.order1.assetPair.priceAsset == asset    => AssetType.OrderPrice
-      case u: UpdateAssetInfoTransaction if u.assetId == asset                 => AssetType.Update
-      case _                                                                   => AssetType.Unknown
-    }
-
     val assets = for {
       asset  <- tx.checkedAssets.toList
       script <- assetScript(asset)
-      assetType = determineAssetType(tx, asset)
+      assetType = AssetType.fromTxAndAsset(tx, asset)
     } yield AssetForCheck(asset, script, assetType)
 
     val additionalAssets = tx match {
