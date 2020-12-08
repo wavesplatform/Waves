@@ -36,9 +36,11 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       .buildNonConflicting()
 
   private lazy val dApp: KeyPair         = firstKeyPair
-  private lazy val caller: KeyPair       = secondKeyPair
   private lazy val dAppAddress: String   = firstAddress
+  private lazy val caller: KeyPair       = secondKeyPair
   private lazy val callerAddress: String = secondAddress
+  private lazy val dApp2: KeyPair        = thirdKeyPair
+  private lazy val dAppAddress2: String  = thirdAddress
 
   private val dummyEstimator = new ScriptEstimator {
     override val version: Int = 0
@@ -52,7 +54,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   private def compile(scriptText: String): String =
     ScriptCompiler.compile(scriptText, dummyEstimator).explicitGet()._1.bytes().base64
 
-  private lazy val script =
+  private lazy val dAppScript1 =
     compile(
       s"""
          |{-# STDLIB_VERSION 5 #-}
@@ -85,21 +87,36 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
          | }
          |
          | @Callable(i)
-         | func setIsAllowedTrue() = {
-         |    let a = !(${List.fill(10)("g()").mkString("||")})
-         |    if (a)
-         |      then
-         |        [BooleanEntry("isAllowed", true)]
-         |      else
-         |        throw("unexpected")
-         | }
-         |
-         | @Callable(i)
          | func performActionWithAsset(assetId: ByteVector) = {
-         |    let a = !(${List.fill(10)("g()").mkString("||")})
+         |    let a = !(${List.fill(380)("g()").mkString("||")})
          |    if (a)
          |      then
          |        [Burn(assetId, 1)]
+         |      else
+         |        throw("unexpected")
+         | }
+       """.stripMargin
+    )
+
+  private lazy val dAppScript2 =
+    compile(
+      s"""
+         |{-# STDLIB_VERSION 5 #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |
+         | func g() =
+         |   groth16Verify(
+         |     base64'lp7+dPDIOfm77haSFnvr33VwYH/KbIalfOJPRvBLzqlHD8BxunNebMr6Gr6S+u+nh7yLzdqr7HHQNOpZI8mdj/7lR0IBqB9zvRfyTr+guUG22kZo4y2KINDp272xGglKEeTglTxyDUriZJNF/+T6F8w70MR/rV+flvuo6EJ0+HA+A2ZnBbTjOIl9wjisBV+0iISo2JdNY1vPXlpwhlL2fVpW/WlREkF0bKlBadDIbNJBgM4niJGuEZDru3wqrGueETKHPv7hQ8em+p6vQolp7c0iknjXrGnvlpf4QtUtpg3z/D+snWjRPbVqRgKXWtihuIvPFaM6dt7HZEbkeMnXWwSINeYC/j3lqYnce8Jq+XkuF42stVNiooI+TuXECnFdFi9Ib25b9wtyz3H/oKg48He1ftntj5uIRCOBvzkFHGUF6Ty214v3JYvXJjdS4uS2jekplZYoV0aXEnYEOIvfF7d4xay3qkx2NspooM4HeZpiHknIWkUVhGVJBzBDLjLB',
+         |     base64'jiGBK+TGHfH8Oadexhdet7ExyIWibSmamWQvffZkyl3WnMoVbTQ3lOks4Mca3sU5qgcaLyQQ1FjFW4g6vtoMapZ43hTGKaWO7bQHsOCvdwHCdwJDulVH16cMTyS9F0BfBJxa88F+JKZc4qMTJjQhspmq755SrKhN9Jf+7uPUhgB4hJTSrmlOkTatgW+/HAf5kZKhv2oRK5p5kS4sU48oqlG1azhMtcHEXDQdcwf9ANel4Z9cb+MQyp2RzI/3hlIx',
+         |     base64''
+         |   )
+         |
+         | @Callable(i)
+         | func setIsAllowedTrue() = {
+         |    let a = !(${List.fill(380)("g()").mkString("||")})
+         |    if (a)
+         |      then
+         |        [BooleanEntry("isAllowed", true)]
          |      else
          |        throw("unexpected")
          | }
@@ -145,19 +162,25 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
 
   test("can't set continuation before activation") {
     assertBadRequestAndMessage(
-      sender.setScript(dApp, Some(script), setScriptFee),
+      sender.setScript(dApp, Some(dAppScript1), setScriptFee),
       "State check failed. Reason: ActivationError(Continuation Transaction feature has not been activated yet)"
     )
   }
 
   test("can set continuation after activation") {
     nodes.waitForHeight(activationHeight)
-    sender.setScript(dApp, Some(script), setScriptFee, waitForTx = true).id
 
+    sender.setScript(dApp, Some(dAppScript1), setScriptFee, waitForTx = true).id
     val scriptInfo = sender.addressScriptInfo(dAppAddress)
     scriptInfo.script.isEmpty shouldBe false
     scriptInfo.scriptText.isEmpty shouldBe false
     scriptInfo.script.get.startsWith("base64:") shouldBe true
+
+    sender.setScript(dApp2, Some(dAppScript2), setScriptFee, waitForTx = true).id
+    val scriptInfo2 = sender.addressScriptInfo(dAppAddress2)
+    scriptInfo2.script.isEmpty shouldBe false
+    scriptInfo2.scriptText.isEmpty shouldBe false
+    scriptInfo2.script.get.startsWith("base64:") shouldBe true
   }
 
   test("can't set continuation with state calls complexity exceeding limit") {
@@ -293,16 +316,16 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     val invoke2 = sender
       .invokeScript(
         caller,
-        dAppAddress,
+        dAppAddress2,
         Some("setIsAllowedTrue"),
         fee = enoughFee,
-        extraFeePerStep = invokeFee / 10,
+        extraFeePerStep = invokeFee / 1000,
         version = TxVersion.V3
       )
       ._1
 
-    waitForContinuation(invoke2.id, shouldBeFailed = false)
     waitForContinuation(invoke1.id, shouldBeFailed = false)
+    waitForContinuation(invoke2.id, shouldBeFailed = false)
 
     assertContinuationChain(invoke1.id, sender.height, actionsFee = smartFee)
     assertContinuationChain(invoke2.id, sender.height, extraFeePerStep = invokeFee / 10)
