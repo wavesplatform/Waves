@@ -82,6 +82,7 @@ object InvokeScriptDiff {
                   tthis,
                   directives,
                   tx.root,
+                  tx.dAppAddress,
                   tx.senderDApp
                 )
 

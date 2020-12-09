@@ -110,6 +110,7 @@ object InvokeScriptTransactionDiff {
                   tthis,
                   directives,
                   tx,
+                  dAppAddress,
                   dAppAddress
                 )
 
