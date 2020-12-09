@@ -140,11 +140,7 @@ object TransactionDiffer {
       initDiff: Diff,
       remainingComplexity: Int
   ): TracedResult[ValidationError, Diff] = {
-    val txId = tx.id.value()
-    val isContinuationFirstStep = initDiff.continuationStates
-      .collectFirst { case ((_, 0), ContinuationState.InProgress(_, _, `txId`)) => true }
-      .getOrElse(false)
-    val diff = if (verify && !isContinuationFirstStep) {
+    val diff = if (verify) {
       Verifier.assets(blockchain, remainingComplexity)(tx).leftMap {
         case (spentComplexity, ScriptExecutionError(error, log, Some(assetId))) if mayFail(tx) && acceptFailed(blockchain) =>
           FailedTransactionError.assetExecution(error, spentComplexity, log, assetId)

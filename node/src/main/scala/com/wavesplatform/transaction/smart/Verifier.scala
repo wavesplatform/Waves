@@ -61,12 +61,6 @@ object Verifier extends ScorexLogging {
 
   /** Verifies asset scripts and returns diff with complexity. In case of error returns spent complexity */
   def assets(blockchain: Blockchain, remainingComplexity: Int)(tx: Transaction): TracedResult[(Long, ValidationError), Diff] = {
-    val resolvedTx =
-      tx match {
-        case c: ContinuationTransaction => blockchain.resolveInvoke(c).get
-        case _                          => tx
-      }
-
     @tailrec
     def loop(
         assets: List[(AssetScriptInfo, IssuedAsset)],
@@ -81,7 +75,7 @@ object Verifier extends ScorexLogging {
 
           val spentComplexity = fullComplexity + complexity
           stats.assetScriptExecution
-            .measureForType(resolvedTx.typeId)(verifyTx(blockchain, script, resolvedTx, Some(asset.id), complexityLimit)) match {
+            .measureForType(tx.typeId)(verifyTx(blockchain, script, tx, Some(asset.id), complexityLimit)) match {
             case TracedResult(e @ Left(_), trace) => (spentComplexity, TracedResult(e, fullTrace ::: trace))
             case TracedResult(Right(_), trace)    => loop(remaining, spentComplexity, fullTrace ::: trace)
           }
@@ -89,11 +83,11 @@ object Verifier extends ScorexLogging {
       }
     }
 
-    val assets = resolvedTx.checkedAssets.flatMap { asset =>
+    val assets = tx.checkedAssets.flatMap { asset =>
       blockchain.assetDescription(asset).flatMap(_.script).map(script => (script, asset))
     }.toList
 
-    val additionalAssets = (resolvedTx match {
+    val additionalAssets = (tx match {
       case etx: ExchangeTransaction => List(etx.buyOrder.matcherFeeAssetId, etx.sellOrder.matcherFeeAssetId)
       case _                        => List.empty
     }).distinct.collect {

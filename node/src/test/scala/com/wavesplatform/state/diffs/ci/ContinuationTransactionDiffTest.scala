@@ -288,23 +288,27 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
   }
 
   property("continuation in progress result after invoke") {
-    val invoke                         = invokeGen.sample.get.copy(funcCallOpt = Some(FUNCTION_CALL(User("multiStepExpr"), Nil)))
-    val stepFee                        = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee
-    val blockchain                     = blockchainMock(invoke, ("multiStepExpr", 1234L), None)
-    val (resultExpr, unusedComplexity) = evaluateInvokeFirstStep(invoke, blockchain)
+    val invoke      = invokeGen.sample.get.copy(funcCallOpt = Some(FUNCTION_CALL(User("multiStepExpr"), Nil)))
+    val dAppAddress = invoke.dAppAddressOrAlias.asInstanceOf[Address]
+    val stepFee     = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee * 2 // payment and account script
+    val blockchain  = blockchainMock(invoke, ("multiStepExpr", 1234L), None)
 
-    val sigVerifyComplexity = 200
+    val (resultExpr, unusedComplexity) = evaluateInvokeFirstStep(invoke, blockchain)
+    val sigVerifyComplexity            = 200
     unusedComplexity should be < sigVerifyComplexity
     val spentComplexity = ContractLimits.MaxComplexityByVersion(V5) - unusedComplexity
 
     InvokeScriptTransactionDiff(blockchain, invoke.timestamp, false)(invoke).resultE shouldBe Right(
       Diff.empty.copy(
-        transactions = Map(invoke.id.value()     -> NewTransactionInfo(invoke, Set(), ScriptExecutionInProgress)),
-        portfolios = Map(invoke.sender.toAddress -> Portfolio.waves(-stepFee)),
-        continuationStates = SortedMap(
-          (invoke.dAppAddressOrAlias.asInstanceOf[Address], 0) -> ContinuationState.InProgress(resultExpr, unusedComplexity, invoke.id.value())
+        transactions = Map(invoke.id.value() -> NewTransactionInfo(invoke, Set(), ScriptExecutionInProgress)),
+        portfolios = Map(
+          invoke.sender.toAddress -> Portfolio(-stepFee, assets = Map(scriptedAsset -> -paymentAmount)),
+          dAppAddress             -> Portfolio.build(scriptedAsset, paymentAmount)
         ),
-        scriptsRun = 2,
+        continuationStates = SortedMap(
+          (dAppAddress, 0) -> ContinuationState.InProgress(resultExpr, unusedComplexity, invoke.id.value())
+        ),
+        scriptsRun = 3, // step, payment and account script
         scriptsComplexity = spentComplexity
       )
     )
@@ -341,15 +345,12 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
   property("continuation finish result with scripted actions and payment") {
     val dAppAddress             = dAppPk.toAddress
     val actionScriptInvocations = 3
-    val stepFee                 = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee * (actionScriptInvocations + 1)
-    val invoke = invokeGen.sample.get.copy(
-      funcCallOpt = Some(FUNCTION_CALL(User("oneStepExpr"), Nil)),
-      fee = stepFee + ScriptExtraFee, // for account script
-      dAppAddressOrAlias = dAppAddress
-    )
-    val step         = Random.nextInt(Int.MaxValue)
-    val continuation = ContinuationTransaction(invoke.id.value(), step, fee = 0L, invoke.feeAssetId)
-    val expr         = dApp.expr.callableFuncs.find(_.u.name == "oneStepExpr").get.u.body
+    val stepFee                 = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee * actionScriptInvocations
+    val func                    = Some(FUNCTION_CALL(User("oneStepExpr"), Nil))
+    val invoke                  = invokeGen.sample.get.copy(funcCallOpt = func, fee = stepFee, dAppAddressOrAlias = dAppAddress)
+    val step                    = Random.nextInt(Int.MaxValue)
+    val continuation            = ContinuationTransaction(invoke.id.value(), step, fee = 0L, invoke.feeAssetId)
+    val expr                    = dApp.expr.callableFuncs.find(_.u.name == "oneStepExpr").get.u.body
 
     val actualComplexity    = 2018
     val estimatedComplexity = actualComplexity + Random.nextInt(1000)
@@ -358,12 +359,12 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
     ContinuationTransactionDiff(blockchain, continuation.timestamp, false)(continuation).resultE shouldBe Right(
       Diff.empty.copy(
         portfolios = Map(
-          invoke.sender.toAddress -> Portfolio(-stepFee, assets = Map(scriptedAsset -> -paymentAmount)),
-          dAppAddress             -> Portfolio.build(scriptedAsset, reissueAmount - burnAmount - transferAmount + paymentAmount),
+          invoke.sender.toAddress -> Portfolio(-stepFee),
+          dAppAddress             -> Portfolio.build(scriptedAsset, reissueAmount - burnAmount - transferAmount),
           transferAddress         -> Portfolio.build(scriptedAsset, transferAmount)
         ),
         accountData = Map(dAppAddress -> AccountDataInfo(Map("isAllowed" -> BooleanDataEntry("isAllowed", true)))),
-        scriptsRun = actionScriptInvocations + 2, // with payment script
+        scriptsRun = actionScriptInvocations + 1, // with step
         scriptResults = Map(
           invoke.id.value() -> InvokeScriptResult(
             data = Seq(BooleanDataEntry("isAllowed", true)),
@@ -377,7 +378,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
         updatedAssets = Map(scriptedAsset                                                                       -> Ior.Right(AssetVolumeInfo(true, reissueAmount - burnAmount))),
         replacingTransactions = Seq(
           NewTransactionInfo(continuation.copy(fee = stepFee), Set(), Succeeded),
-          NewTransactionInfo(invoke, Set(invoke.sender.toAddress, dAppAddress, transferAddress), Succeeded)
+          NewTransactionInfo(invoke, Set(dAppAddress, transferAddress), Succeeded)
         )
       )
     )
@@ -433,24 +434,15 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
     }
   }
 
-  property("failed by payment asset verifier continuation") {
-    val dAppAddress             = dAppPk.toAddress
-    val actionScriptInvocations = 3
-    val stepFee                 = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee * (actionScriptInvocations + 1)
-    val invoke = invokeScriptGen(Gen.const(Seq(Payment(paymentAmount, failingAsset)))).sample.get.copy(
-      funcCallOpt = Some(FUNCTION_CALL(User("oneStepExpr"), List(CONST_BOOLEAN(true)))),
-      fee = stepFee + ScriptExtraFee, // for account script
-      dAppAddressOrAlias = dAppAddress
-    )
+  property("failed by payment asset verifier") {
+    val invoke       = invokeScriptGen(Gen.const(Seq(Payment(paymentAmount, failingAsset)))).sample.get
     val step         = Random.nextInt(Int.MaxValue)
     val continuation = ContinuationTransaction(invoke.id.value(), step, fee = 0L, invoke.feeAssetId)
     val expr         = dApp.expr.callableFuncs.find(_.u.name == "oneStepExpr").get.u.body
+    val blockchain   = blockchainMock(invoke, ("oneStepExpr", 123), Some((step, expr, 0)))
 
-    val actualComplexity    = 2018
-    val estimatedComplexity = actualComplexity + Random.nextInt(1000)
-    val blockchain          = blockchainMock(invoke, ("oneStepExpr", estimatedComplexity), Some((step, expr, 0)))
-
-    Verifier.assets(blockchain, Int.MaxValue)(continuation).resultE shouldBe
+    Verifier.assets(blockchain, Int.MaxValue)(continuation).resultE shouldBe Right(Diff.empty)
+    Verifier.assets(blockchain, Int.MaxValue)(invoke).resultE shouldBe
       Left((assetScriptComplexity, ScriptExecutionError("failed by asset verifier", Nil, Some(`failingAssetId`))))
   }
 }

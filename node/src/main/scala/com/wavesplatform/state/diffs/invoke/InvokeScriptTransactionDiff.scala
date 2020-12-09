@@ -192,7 +192,7 @@ object InvokeScriptTransactionDiff {
                   portfolios = InvokeDiffsCommon.stepFeePortfolios(stepFee, tx, blockchain),
                   scriptsRun = scriptsRun
                 )
-                TracedResult.wrapValue(stateDiff |+| portfolios)
+                TracedResult.wrapValue(InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()) |+| stateDiff |+| portfolios)
             }
           } yield resultDiff
         } yield result

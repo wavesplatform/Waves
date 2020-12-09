@@ -226,17 +226,20 @@ object InvokeDiffsCommon {
         (if (blockchain.hasAccountScript(tx.sender.toAddress)) 1 else 0)
 
       stepLimit = ContractLimits.MaxComplexityByVersion(version)
-      feeDiff <- calcAndCheckFee(
-        FailedTransactionError.feeForActions,
-        tx,
-        blockchain,
-        stepLimit,
-        invocationComplexity,
-        issueList,
-        actionScriptsInvoked
-      )
+      feeDiff <- if (isContinuation)
+        TracedResult.wrapValue(Map[Address, Portfolio]())
+      else
+        calcAndCheckFee(
+          FailedTransactionError.feeForActions,
+          tx,
+          blockchain,
+          stepLimit,
+          invocationComplexity,
+          issueList,
+          actionScriptsInvoked
+        )
 
-      paymentsAndFeeDiff = paymentsPart(tx, dAppAddress, if (isContinuation) Map() else feeDiff)
+      paymentsAndFeeDiff = if (isContinuation) Diff(tx = tx) else paymentsPart(tx, dAppAddress, feeDiff)
 
       compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey)(actions, paymentsAndFeeDiff, complexityLimit)
         .leftMap(_.addComplexity(invocationComplexity))
@@ -306,15 +309,15 @@ object InvokeDiffsCommon {
     val scriptResult = diff.scriptResults.getOrElse(invoke.id.value(), InvokeScriptResult())
     val assetActions =
       if (isLastStep)
-        invoke.checkedAssets ++
-          scriptResult.transfers.flatMap(_.asset.fold(Option.empty[IssuedAsset])(Some(_))) ++
+        scriptResult.transfers.flatMap(_.asset.fold(Option.empty[IssuedAsset])(Some(_))) ++
           scriptResult.burns.map(b => IssuedAsset(b.assetId)) ++
           scriptResult.reissues.map(r => IssuedAsset(r.assetId)) ++
           scriptResult.sponsorFees.map(sf => IssuedAsset(sf.assetId))
       else
         Seq()
     val smartAccountCount    = if (isFirstStep && blockchain.hasAccountScript(invoke.sender.toAddress)) 1 else 0
-    val additionalScriptsRun = assetActions.count(blockchain.hasAssetScript) + smartAccountCount
+    val paymentsCount        = if (isFirstStep) invoke.checkedAssets.count(blockchain.hasAssetScript) else 0
+    val additionalScriptsRun = smartAccountCount + paymentsCount + assetActions.count(blockchain.hasAssetScript)
     val additionalScriptsFee = additionalScriptsRun * ScriptExtraFee
     val issuesFee            = scriptResult.issues.count(!blockchain.isNFT(_)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
     val baseStepFee          = expectedStepFeeInWaves(invoke, blockchain)
@@ -334,7 +337,7 @@ object InvokeDiffsCommon {
           Map(assetInfo.issuer.toAddress -> Portfolio(-feeInWaves, assets = Map(asset -> stepFee)))
     }
 
-  private def paymentsPart(
+  def paymentsPart(
       tx: InvokeScriptTransaction,
       dAppAddress: Address,
       feePart: Map[Address, Portfolio]
