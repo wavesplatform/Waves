@@ -26,7 +26,7 @@ import monix.eval.Coeval
 import org.scalatest.OptionValues
 
 class ContinuationSuite extends BaseTransactionSuite with OptionValues {
-  private val activationHeight = 8
+  private val activationHeight = 1
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
@@ -299,11 +299,12 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   }
 
   test("continuation prioritization") {
-    val assetScript = compile(s"""getBooleanValue(Address(base58'$dAppAddress'), "isAllowed")""")
+    val extraFee = invokeFee / 1000
+    val assetScript = compile(s"""getBooleanValue(Address(base58'$dAppAddress2'), "isAllowed")""")
     val assetId     = sender.issue(dApp, quantity = 100, script = Some(assetScript), fee = issueFee + smartFee, waitForTx = true).id
 
     val entry = List(BooleanDataEntry("isAllowed", value = false))
-    sender.putData(dApp, entry, calcDataFee(entry, TxVersion.V1) + smartFee, waitForTx = true)
+    sender.putData(dApp2, entry, calcDataFee(entry, TxVersion.V1) + smartFee, waitForTx = true)
 
     val invoke1 = sender
       .invokeScript(
@@ -322,16 +323,16 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         dAppAddress2,
         Some("setIsAllowedTrue"),
         fee = enoughFee,
-        extraFeePerStep = invokeFee / 1000,
+        extraFeePerStep = extraFee,
         version = TxVersion.V3
       )
       ._1
 
-    waitForContinuation(invoke1.id, shouldBeFailed = false)
     waitForContinuation(invoke2.id, shouldBeFailed = false)
+    waitForContinuation(invoke1.id, shouldBeFailed = false)
 
     assertContinuationChain(invoke1.id, sender.height, actionsFee = smartFee)
-    assertContinuationChain(invoke2.id, sender.height, extraFeePerStep = invokeFee / 10)
+    assertContinuationChain(invoke2.id, sender.height, extraFeePerStep = extraFee)
   }
 
   test("hold transactions from DApp address until continuation is completed") {
