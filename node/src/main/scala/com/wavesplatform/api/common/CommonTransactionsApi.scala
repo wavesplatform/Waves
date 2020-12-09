@@ -1,6 +1,5 @@
 package com.wavesplatform.api.common
 
-import cats.implicits._
 import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.{BlockMeta, common}
 import com.wavesplatform.block
@@ -13,8 +12,9 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
 import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult}
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction}
 import com.wavesplatform.transaction.{ApplicationStatus, Asset, CreateAliasTransaction, Transaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -55,7 +55,7 @@ trait CommonTransactionsApi {
 
   def transactionProofs(transactionIds: List[ByteStr]): List[TransactionProof]
 
-  def continuationsAmount(invokeTransactionId: ByteStr): Int
+  def continuationTransactionIds(invoke: InvokeScriptTransaction): Seq[ByteStr]
 }
 
 object CommonTransactionsApi {
@@ -131,14 +131,13 @@ object CommonTransactionsApi {
         transactionProof         <- block.transactionProof(transaction, allTransactions)
       } yield transactionProof
 
-    override def continuationsAmount(invokeTransactionId: ByteStr): Int = {
-      val amount = for {
-        invoke      <- Try(blockchain.transactionInfo(invokeTransactionId).collectFirst { case (_, i: InvokeScriptTransaction, _) => i }.get)
+    override def continuationTransactionIds(invoke: InvokeScriptTransaction): Seq[ByteStr] = {
+      val ids = for {
         dAppAddress <- Try(blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet())
         id          <- Try(db.get(Keys.addressId(dAppAddress)).get)
         stepsAmount <- Try(db.get(Keys.continuationLastStep(id)))
-      } yield stepsAmount
-      amount.getOrElse(0)
+      } yield (0 until stepsAmount).map(ContinuationTransaction(invoke.id.value(), _, 0L, Waves).id.value())
+      ids.getOrElse(Nil)
     }
   }
 }

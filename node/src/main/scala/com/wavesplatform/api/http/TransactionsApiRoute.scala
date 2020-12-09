@@ -266,19 +266,8 @@ object TransactionsApiRoute {
 
   def continuationJsFields(tx: Transaction, transactionsApi: CommonTransactionsApi): JsObject =
     tx match {
-      case c: ContinuationTransaction =>
-        val invokeId = c.invokeScriptTransactionId
-        transactionsApi.transactionById(invokeId) match {
-          case Some((_, Right((invoke, _)), _)) =>
-            Json.obj(
-              "extraFeePerStep" -> invoke.extraFeePerStep,
-              "feeAssetId"      -> invoke.feeAssetId
-            )
-          case _ =>
-            Json.obj()
-        }
-      case t: InvokeScriptTransaction if t.version == TxVersion.V3 =>
-        Json.obj("continuationsAmount" -> transactionsApi.continuationsAmount(t.id()))
+      case i: InvokeScriptTransaction if i.version == TxVersion.V3 =>
+        Json.obj("continuationTransactionIds" -> transactionsApi.continuationTransactionIds(i).map(_.toString))
       case _ =>
         Json.obj()
     }

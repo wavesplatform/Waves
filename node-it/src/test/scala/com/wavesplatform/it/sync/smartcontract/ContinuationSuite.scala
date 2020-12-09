@@ -420,8 +420,6 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
           case (c, i) =>
             c.version.value shouldBe TxVersion.V1
             c.step.value shouldBe i
-            c.extraFeePerStep.value shouldBe extraFeePerStep
-            c.feeAssetId shouldBe feeAssetInfo.map(_._1)
 
             val expectedFeeInWaves = if (i == continuations.size - 1) pureInvokeFee + actionsFee else pureInvokeFee
             val expectedFeeInAttachedAsset =
@@ -438,7 +436,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
 
       invoke.extraFeePerStep.value shouldBe extraFeePerStep
       invoke.applicationStatus.value shouldBe endStatus
-      invoke.continuationsAmount.value shouldBe continuations.size
+      invoke.continuationTransactionIds.value shouldBe continuations.map(_.id)
     }
   }
 
