@@ -150,15 +150,18 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   private val sponsoredAssetAmount      = 10.waves
   private lazy val sponsoredAssetIssuer = thirdKeyPair
   private lazy val sponsoredAssetId = {
-    val id = sender.issue(sponsoredAssetIssuer, quantity = sponsoredAssetAmount, waitForTx = true).id
-    sender.sponsorAsset(sponsoredAssetIssuer, id, baseFee = minSponsoredAssetFee, waitForTx = true)
-    sender.transfer(sponsoredAssetIssuer, caller.toAddress.stringRepr, sponsoredAssetAmount, assetId = Some(id), waitForTx = true)
+    val id = sender.issue(sponsoredAssetIssuer, quantity = sponsoredAssetAmount, fee = issueFee + smartFee, waitForTx = true).id
+    sender.sponsorAsset(sponsoredAssetIssuer, id, baseFee = minSponsoredAssetFee, fee = issueFee + smartFee, waitForTx = true)
+    sender.transfer(sponsoredAssetIssuer, caller.toAddress.stringRepr, sponsoredAssetAmount, assetId = Some(id), fee = smartMinFee, waitForTx = true)
     id
   }
   private lazy val sponsorFee = Some((sponsoredAssetId, minSponsoredAssetFee))
 
-  private lazy val scriptedAssetId =
-    sender.issue(dApp, script = Some(compile("true")), waitForTx = true).id
+  private lazy val scriptedAssetId = {
+    val id = sender.issue(dApp, script = Some(compile("true")), waitForTx = true).id
+    sender.transfer(dApp, dAppAddress2, 100, assetId = Some(id), fee = smartMinFee, waitForTx = true)
+    id
+  }
 
   test("can't set continuation before activation") {
     assertBadRequestAndMessage(

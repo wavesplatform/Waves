@@ -6,7 +6,7 @@ import cats.data.Ior
 import cats.implicits._
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
-import com.google.common.primitives.{Ints, Shorts}
+import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
@@ -282,13 +282,21 @@ abstract class LevelDBWriter private[database] (
     stateFeatures ++ settings.functionalitySettings.preActivatedFeatures
   }
 
-  override protected def loadContinuationStates(address: Address): (Int, ContinuationState) =
+  override protected def loadContinuationStates(): mutable.Map[Address, (Int, ContinuationState)] = {
+    val states = mutable.Map[Address, (Int, ContinuationState)]()
     readOnly { db =>
-      val id       = addressId(address).get
-      val lastStep = db.get(Keys.continuationLastStep(id))
-      val state    = db.get(Keys.continuationState(id, lastStep))
-      (lastStep, state)
+      db.iterateOver(KeyTags.ContinuationLastStep) { entry =>
+        val id       = AddressId(Longs.fromByteArray(entry.getKey.takeRight(8)))
+        val lastStep = db.get(Keys.continuationLastStep(id))
+        val state    = db.get(Keys.continuationState(id, lastStep))
+        if (state.isInstanceOf[ContinuationState.InProgress]) {
+          val address = db.get(Keys.idToAddress(id))
+          states.put(address, (lastStep, state))
+        }
+      }
     }
+    states
+  }
 
   override def wavesAmount(height: Int): BigInt = readOnly { db =>
     val factHeight = height.min(this.height)
@@ -788,21 +796,23 @@ abstract class LevelDBWriter private[database] (
                   rw.delete(Keys.continuationState(id, step = 0))
                   rw.delete(Keys.continuationLastStep(id))
                   continuationLastSteps.remove(id)
-                  continuationStatesCache.invalidate(address)
+                  continuationStatesCache.remove(address)
 
                 case tx: ContinuationTransaction =>
                   val invoke  = this.resolveInvoke(tx).get
                   val address = resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
                   val id      = addressId(address).get
-                  continuationLastSteps.updateWith(id) { currentStepOpt =>
-                    val lastStep                   = rw.get(Keys.continuationLastStep(id))
-                    val value                      = (lastStep, TransactionId(invoke.id.value()), address)
-                    val (currentStep, invokeId, _) = currentStepOpt.getOrElse(value)
-                    val newStep                    = if (tx.step < currentStep) tx.step else currentStep
-                    Some((newStep, invokeId, address))
-                  }
                   rw.delete(Keys.continuationState(id, tx.step + 1))
                   rw.delete(Keys.invokeScriptResult(h, num))
+                  if (continuationStatesCache.contains(address)) {
+                    continuationLastSteps.updateWith(id) { currentStepOpt =>
+                      val lastStep                   = rw.get(Keys.continuationLastStep(id))
+                      val value                      = (lastStep, TransactionId(invoke.id.value()), address)
+                      val (currentStep, invokeId, _) = currentStepOpt.getOrElse(value)
+                      val newStep                    = if (tx.step < currentStep) tx.step else currentStep
+                      Some((newStep, invokeId, address))
+                    }
+                  }
 
                 case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))
                 case tx: ExchangeTransaction =>
@@ -852,8 +862,10 @@ abstract class LevelDBWriter private[database] (
             val meta = TransactionMeta(height, num, tx.typeId, applicationStatus = toDb(ScriptExecutionInProgress))
             rw.put(Keys.transactionMetaById(invokeId), Some(meta))
             rw.put(Keys.continuationLastStep(id), step)
+
+            val state = rw.get(Keys.continuationState(id, step))
+            continuationStatesCache.put(address, (step, state))
           }
-          continuationStatesCache.refresh(address)
       }
 
       log.debug(s"Rollback to block $targetBlockId at $targetHeight completed")
