@@ -634,19 +634,12 @@ abstract class LevelDBWriter private[database] (
         .groupBy { case ((addressId, _), _) => addressId }
         .foreach {
           case (addressId, states) =>
-            val lastStepKey = Keys.continuationLastStep(addressId)
-            val currentStep = Try(rw.get(lastStepKey)).getOrElse(-1)
-            val lastStep =
-              states.foldLeft(currentStep) {
-                case (currentStep, ((_, step), state)) =>
-                  if (step == currentStep + 1) {
-                    rw.put(Keys.continuationState(addressId, step), state)
-                    step
-                  } else {
-                    currentStep
-                  }
-              }
-            rw.put(lastStepKey, lastStep)
+            states.foreach {
+              case ((_, step), state) =>
+                rw.put(Keys.continuationState(addressId, step), state)
+            }
+            val ((_, step), _) = states.last
+            rw.put(Keys.continuationLastStep(addressId), step)
         }
 
       expiredKeys.foreach(rw.delete(_, "expired-keys"))
