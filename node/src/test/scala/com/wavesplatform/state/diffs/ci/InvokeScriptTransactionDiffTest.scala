@@ -1655,7 +1655,8 @@ class InvokeScriptTransactionDiffTest
     forAll(uniqueAssetIdScenario) {
       case (asset, invoke, master, script, funcBinding) =>
         (() => blockchain.settings).expects().returning(TestSettings.Default.blockchainSettings)
-        (blockchain.assetScript _).expects(*).returning(None).anyNumberOfTimes()
+        (blockchain.assetScript _).expects(*).returning(None)
+          .anyNumberOfTimes()   // XXX Why?
         (blockchain.accountScript _)
           .expects(master.toAddress)
           .returning(Some(AccountScriptInfo(master.publicKey, script.explicitGet(), 10L, Map(1 -> Map(funcBinding -> 10L)))))

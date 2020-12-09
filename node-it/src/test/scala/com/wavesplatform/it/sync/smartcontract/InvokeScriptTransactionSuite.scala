@@ -100,7 +100,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     sender.transactionInfo[TransactionInfo](setScriptId2).script.get.startsWith("base64:") shouldBe true
   }
 
-  test("disable use this with alias") {
+  ignore("disable use this with alias") {
     assertApiErrorRaised(
       sender.invokeScript(
         caller,
