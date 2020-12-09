@@ -26,7 +26,7 @@ import monix.eval.Coeval
 import org.scalatest.OptionValues
 
 class ContinuationSuite extends BaseTransactionSuite with OptionValues {
-  private val activationHeight = 1
+  private val activationHeight = 8
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
