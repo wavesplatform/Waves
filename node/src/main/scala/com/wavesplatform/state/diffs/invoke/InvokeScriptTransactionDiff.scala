@@ -73,7 +73,7 @@ object InvokeScriptTransactionDiff {
             )
           )
 
-          _ <- InvokeDiffsCommon.calcAndCheckFee(
+          totalFeePortfolio <- InvokeDiffsCommon.calcAndCheckFee(
             (message, _) => GenericError(message),
             tx,
             blockchain,
@@ -187,11 +187,8 @@ object InvokeScriptTransactionDiff {
                     scriptsComplexity = fullLimit - ir.unusedComplexity
                   )
                   .addContinuationState(dAppAddress, step = 0, state = state)
-                val StepInfo(_, stepFee, scriptsRun) = InvokeDiffsCommon.stepInfo(stateDiff, blockchain, tx)
-                val portfolios = Diff.stateOps(
-                  portfolios = InvokeDiffsCommon.stepFeePortfolios(stepFee, tx, blockchain),
-                  scriptsRun = scriptsRun
-                )
+                val StepInfo(_, _, scriptsRun) = InvokeDiffsCommon.stepInfo(stateDiff, blockchain, tx)
+                val portfolios = Diff.stateOps(portfolios = totalFeePortfolio, scriptsRun = scriptsRun)
                 TracedResult.wrapValue(InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()) |+| stateDiff |+| portfolios)
             }
           } yield resultDiff

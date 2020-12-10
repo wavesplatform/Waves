@@ -128,6 +128,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
       case (step, expr, unusedComplexity) =>
         (() => blockchain.continuationStates)
           .expects()
+          .anyNumberOfTimes()
           .returning(
             Map(
               (
@@ -290,7 +291,6 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
   property("continuation in progress result after invoke") {
     val invoke      = invokeGen.sample.get.copy(funcCallOpt = Some(FUNCTION_CALL(User("multiStepExpr"), Nil)))
     val dAppAddress = invoke.dAppAddressOrAlias.asInstanceOf[Address]
-    val stepFee     = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee * 2 // payment and account script
     val blockchain  = blockchainMock(invoke, ("multiStepExpr", 1234L), None)
 
     val (resultExpr, unusedComplexity) = evaluateInvokeFirstStep(invoke, blockchain)
@@ -302,7 +302,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
       Diff.empty.copy(
         transactions = Map(invoke.id.value() -> NewTransactionInfo(invoke, Set(), ScriptExecutionInProgress)),
         portfolios = Map(
-          invoke.sender.toAddress -> Portfolio(-stepFee, assets = Map(scriptedAsset -> -paymentAmount)),
+          invoke.sender.toAddress -> Portfolio(-invoke.fee, assets = Map(scriptedAsset -> -paymentAmount)),
           dAppAddress             -> Portfolio.build(scriptedAsset, paymentAmount)
         ),
         continuationStates = SortedMap(
@@ -312,6 +312,8 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
         scriptsComplexity = spentComplexity
       )
     )
+    Verifier.assets(blockchain, Int.MaxValue)(invoke).resultE shouldBe
+      Right(Diff.empty.copy(scriptsComplexity = assetScriptComplexity))
   }
 
   property("continuation in progress result after continuation") {
@@ -330,7 +332,6 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
 
     ContinuationTransactionDiff(blockchain, continuation.timestamp, false)(continuation).resultE shouldBe Right(
       Diff.empty.copy(
-        portfolios = Map(invoke.sender.toAddress -> Portfolio.waves(-stepFee)),
         replacingTransactions = Seq(NewTransactionInfo(continuation.copy(fee = stepFee), Set(), Succeeded)),
         continuationStates = SortedMap(
           (invoke.dAppAddressOrAlias.asInstanceOf[Address], continuation.step + 1) -> ContinuationState
@@ -345,10 +346,10 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
   property("continuation finish result with scripted actions and payment") {
     val dAppAddress             = dAppPk.toAddress
     val actionScriptInvocations = 3
-    val stepFee                 = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee * actionScriptInvocations
+    val step                    = 2 // 4 steps: invoke and 3 continuations (0, 1, 2) were completed
+    val stepFee                 = (step + 2) * FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee * actionScriptInvocations
     val func                    = Some(FUNCTION_CALL(User("oneStepExpr"), Nil))
-    val invoke                  = invokeGen.sample.get.copy(funcCallOpt = func, fee = stepFee, dAppAddressOrAlias = dAppAddress)
-    val step                    = Random.nextInt(Int.MaxValue)
+    val invoke                  = invokeGen.sample.get.copy(funcCallOpt = func, dAppAddressOrAlias = dAppAddress)
     val continuation            = ContinuationTransaction(invoke.id.value(), step, fee = 0L, invoke.feeAssetId)
     val expr                    = dApp.expr.callableFuncs.find(_.u.name == "oneStepExpr").get.u.body
 
@@ -359,7 +360,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
     ContinuationTransactionDiff(blockchain, continuation.timestamp, false)(continuation).resultE shouldBe Right(
       Diff.empty.copy(
         portfolios = Map(
-          invoke.sender.toAddress -> Portfolio(-stepFee),
+          invoke.sender.toAddress -> Portfolio(invoke.fee - stepFee),
           dAppAddress             -> Portfolio.build(scriptedAsset, reissueAmount - burnAmount - transferAmount),
           transferAddress         -> Portfolio.build(scriptedAsset, transferAmount)
         ),

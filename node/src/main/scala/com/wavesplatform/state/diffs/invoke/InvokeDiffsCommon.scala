@@ -55,7 +55,7 @@ object InvokeDiffsCommon {
         else
           invocationComplexity / stepLimit + 1
 
-      val attachedFee = tx.fee + tx.extraFeePerStep * stepsNumber
+      val attachedFee = tx.fee
 
       for {
         (attachedFeeInWaves, portfolioDiff) <- tx.assetFee._1 match {
@@ -124,6 +124,9 @@ object InvokeDiffsCommon {
         }
       } yield portfolioDiff
     }
+
+  private def expectedStepFeeInAttachedAsset(tx: InvokeScriptTransaction, blockchain: Blockchain): Long =
+    wavesToAttachedAsset(tx, blockchain, FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit) + tx.extraFeePerStep
 
   private def expectedStepFeeInWaves(tx: InvokeScriptTransaction, blockchain: Blockchain): Long =
     FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + attachedAssetToWaves(tx, blockchain, tx.extraFeePerStep)
@@ -282,16 +285,16 @@ object InvokeDiffsCommon {
       spentComplexity: Long,
       failed: Boolean
   ): Diff = {
-    val address                           = blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
-    val diffWithState                     = diff.addContinuationState(address, tx.step + 1, ContinuationState.Finished)
-    val StepInfo(_, totalFee, scriptsRun) = stepInfo(diffWithState, blockchain, invoke)
-    val status                            = if (failed) ScriptExecutionFailed else Succeeded
+    val dAppAddress                      = blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
+    val diffWithState                    = diff.addContinuationState(dAppAddress, tx.step + 1, ContinuationState.Finished)
+    val StepInfo(_, stepFee, scriptsRun) = stepInfo(diffWithState, blockchain, invoke)
+    val status                           = if (failed) ScriptExecutionFailed else Succeeded
     diffWithState |+| Diff.empty.copy(
-      portfolios = stepFeePortfolios(totalFee, invoke, blockchain),
+      portfolios = unusedFeePortfolios(tx, invoke, blockchain, stepFee),
       scriptsRun = scriptsRun,
       scriptsComplexity = spentComplexity,
       replacingTransactions = Seq(
-        NewTransactionInfo(tx.copy(fee = totalFee), Set(), status),
+        NewTransactionInfo(tx.copy(fee = stepFee), Set(), status),
         NewTransactionInfo(invoke, (diffWithState.portfolios.keys ++ diffWithState.accountData.keys).toSet, status)
       )
     )
@@ -326,16 +329,24 @@ object InvokeDiffsCommon {
     StepInfo(feeInWaves, feeInAttachedAsset, scriptsRun = 1 + additionalScriptsRun)
   }
 
-  def stepFeePortfolios(stepFee: Long, invoke: InvokeScriptTransaction, blockchain: Blockchain): Map[Address, Portfolio] =
+  def unusedFeePortfolios(
+      tx: ContinuationTransaction,
+      invoke: InvokeScriptTransaction,
+      blockchain: Blockchain,
+      lastStepFee: Long
+  ): Map[Address, Portfolio] = {
+    val consumedFee = (tx.step + 1) * expectedStepFeeInAttachedAsset(invoke, blockchain) + lastStepFee
+    val unusedFee   = invoke.fee - consumedFee
     invoke.assetFee._1 match {
       case Waves =>
-        Map(invoke.sender.toAddress -> Portfolio(-stepFee))
+        Map(invoke.sender.toAddress -> Portfolio(unusedFee))
       case asset @ IssuedAsset(_) =>
         val assetInfo  = blockchain.assetDescription(asset).get
-        val feeInWaves = Sponsorship.toWaves(stepFee, assetInfo.sponsorship)
-        Map(invoke.sender.toAddress      -> Portfolio(assets = Map(asset              -> -stepFee))) |+|
-          Map(assetInfo.issuer.toAddress -> Portfolio(-feeInWaves, assets = Map(asset -> stepFee)))
+        val feeInWaves = Sponsorship.toWaves(unusedFee, assetInfo.sponsorship)
+        Map(invoke.sender.toAddress      -> Portfolio.build(asset, unusedFee)) |+|
+          Map(assetInfo.issuer.toAddress -> Portfolio(feeInWaves, assets = Map(asset -> -unusedFee)))
     }
+  }
 
   def paymentsPart(
       tx: InvokeScriptTransaction,

@@ -135,7 +135,6 @@ object ContinuationTransactionDiff {
           TracedResult.wrapValue[Diff, ValidationError](
             Diff.empty.copy(
               replacingTransactions = Seq(NewTransactionInfo(tx.copy(fee = stepFee), Set(), Succeeded)),
-              portfolios = InvokeDiffsCommon.stepFeePortfolios(stepFee, invoke, blockchain),
               scriptsRun = scriptsRun,
               scriptsComplexity = limit - ir.unusedComplexity
             ).addContinuationState(dAppAddress, tx.step + 1, newState)
