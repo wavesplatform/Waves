@@ -10,8 +10,8 @@ import com.wavesplatform.state.InvokeScriptResult
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.{ScriptExecutionError, TransactionNotAllowedByScript}
-import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
+import com.wavesplatform.transaction.assets.{BurnTransaction, ReissueTransaction, SetAssetScriptTransaction, UpdateAssetInfoTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import play.api.libs.json.Json.JsValueWrapper
@@ -37,22 +37,26 @@ case class AccountVerifierTrace(
 }
 
 object AssetVerifierTrace {
-  type AssetType = AssetType.Value
-  object AssetType extends Enumeration {
+  type AssetContext = AssetContext.Value
+  object AssetContext extends Enumeration {
     val Unknown, OrderAmount, OrderPrice, MatcherFee, Payment, Reissue, Burn, Sponsor, Transfer, Update = Value
 
-    def fromTxAndAsset(tx: Transaction, asset: IssuedAsset): AssetType = tx match {
-      case i: InvokeScriptTransaction if i.payments.exists(_.assetId == asset) => AssetType.Payment
+    def fromTxAndAsset(tx: Transaction, asset: IssuedAsset): AssetContext = tx match {
+      case i: InvokeScriptTransaction if i.payments.exists(_.assetId == asset) => AssetContext.Payment
 
-      case e: ExchangeTransaction if e.order1.assetPair.amountAsset == asset                            => AssetType.OrderAmount
-      case e: ExchangeTransaction if e.order1.assetPair.priceAsset == asset                             => AssetType.OrderPrice
-      case e: ExchangeTransaction if Set(e.order1.matcherFeeAssetId, e.order2.matcherFeeAssetId)(asset) => AssetType.OrderPrice
+      case e: ExchangeTransaction if e.order1.assetPair.amountAsset == asset                            => AssetContext.OrderAmount
+      case e: ExchangeTransaction if e.order1.assetPair.priceAsset == asset                             => AssetContext.OrderPrice
+      case e: ExchangeTransaction if Set(e.order1.matcherFeeAssetId, e.order2.matcherFeeAssetId)(asset) => AssetContext.OrderPrice
 
-      case u: UpdateAssetInfoTransaction if u.assetId == asset => AssetType.Update
-      case t: TransferTransaction if t.assetId == asset        => AssetType.Transfer
-      case mt: MassTransferTransaction if mt.assetId == asset  => AssetType.Transfer
+      case r: ReissueTransaction if r.asset == asset           => AssetContext.Reissue
+      case r: BurnTransaction if r.asset == asset              => AssetContext.Burn
+      case u: UpdateAssetInfoTransaction if u.assetId == asset => AssetContext.Update
+      case u: SetAssetScriptTransaction if u.asset == asset    => AssetContext.Update
 
-      case _ => AssetType.Unknown
+      case t: TransferTransaction if t.assetId == asset       => AssetContext.Transfer
+      case mt: MassTransferTransaction if mt.assetId == asset => AssetContext.Transfer
+
+      case _ => AssetContext.Unknown
     }
   }
 }
@@ -60,12 +64,12 @@ object AssetVerifierTrace {
 case class AssetVerifierTrace(
     id: ByteStr,
     errorOpt: Option[ValidationError],
-    assetType: AssetVerifierTrace.AssetType = AssetVerifierTrace.AssetType.Unknown
+    context: AssetVerifierTrace.AssetContext = AssetVerifierTrace.AssetContext.Unknown
 ) extends TraceStep {
   override lazy val json: JsObject = Json.obj(
-    "type"      -> "asset",
-    "assetType" -> assetType.toString.updated(0, assetType.toString.charAt(0).toLower),
-    "id"        -> id.toString
+    "type"    -> "asset",
+    "context" -> context.toString.updated(0, context.toString.charAt(0).toLower),
+    "id"      -> id.toString
   ) ++ (errorOpt match {
     case Some(e) => Json.obj("error"  -> TraceStep.errorJson(e))
     case None    => Json.obj("result" -> "ok")

@@ -181,7 +181,7 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
         (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
         (json \ "error").as[String] should include("not allowed by script of the asset")
         (json \ "trace").as[JsArray] shouldBe Json.parse(
-          "[{\"type\":\"asset\",\"assetType\":\"orderAmount\",\"id\":\"5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx\",\"error\":{\"type\":\"asset\",\"vars\":[],\"reason\":\"error\"}}]"
+          "[{\"type\":\"asset\",\"context\":\"orderAmount\",\"id\":\"5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx\",\"error\":{\"type\":\"asset\",\"vars\":[],\"reason\":\"error\"}}]"
         )
       }
     }
@@ -303,7 +303,7 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
                     |  }
                     |}, {
                     |  "type" : "asset",
-                    |  "assetType" : "payment",
+                    |  "context" : "payment",
                     |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
                     |  "error" : {
                     |    "type" : "asset",
@@ -357,7 +357,7 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
           |  }
           |}, {
           |  "type" : "asset",
-          |  "assetType" : "transfer",
+          |  "context" : "transfer",
           |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
           |  "error" : "FailedTransactionError(code = 3, error = Transaction is not allowed by script of the asset 5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx: error, log =)"
           |} ]""".stripMargin
@@ -421,7 +421,7 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
                |  }
                |}, {
                |  "type" : "asset",
-               |  "assetType" : "reissue",
+               |  "context" : "reissue",
                |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
                |  "error" : "FailedTransactionError(code = 3, error = Transaction is not allowed by script of the asset 5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx: error, log =)"
                |} ]""".stripMargin
@@ -452,7 +452,7 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
           |  }
           |}, {
           |  "type" : "asset",
-          |  "assetType" : "burn",
+          |  "context" : "burn",
           |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
           |  "error" : "FailedTransactionError(code = 3, error = Transaction is not allowed by script of the asset 5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx: error, log =)"
           |} ]""".stripMargin

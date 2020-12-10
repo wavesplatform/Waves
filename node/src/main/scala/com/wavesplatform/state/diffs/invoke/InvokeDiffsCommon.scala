@@ -30,7 +30,7 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
-import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetType
+import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.validation.impl.SponsorFeeTxValidator
 import com.wavesplatform.utils._
@@ -421,7 +421,7 @@ object InvokeDiffsCommon {
               actionDiff: Either[FailedTransactionError, Diff],
               assetId: ByteStr,
               pseudoTx: PseudoTx,
-              assetType: AssetType
+              assetType: AssetContext
           ): TracedResult[FailedTransactionError, Diff] =
             blockchain.assetScript(IssuedAsset(assetId)).fold(TracedResult(actionDiff)) {
               case AssetScriptInfo(script, complexity) =>

@@ -21,7 +21,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
-import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetType
+import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, AssetVerifierTrace, TraceStep, TracedResult}
 import com.wavesplatform.utils.ScorexLogging
 import org.msgpack.core.annotations.VisibleForTesting
@@ -62,7 +62,7 @@ object Verifier extends ScorexLogging {
 
   /** Verifies asset scripts and returns diff with complexity. In case of error returns spent complexity */
   def assets(blockchain: Blockchain, remainingComplexity: Int)(tx: Transaction): TracedResult[(Long, ValidationError), Diff] = {
-    case class AssetForCheck(asset: IssuedAsset, script: AssetScriptInfo, assetType: AssetType)
+    case class AssetForCheck(asset: IssuedAsset, script: AssetScriptInfo, assetType: AssetContext)
 
     @tailrec
     def loop(
