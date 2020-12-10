@@ -103,15 +103,15 @@ class ContinuationStateSpec extends FreeSpec with Matchers with WithDomain with 
             val startDAppBalance   = d.balance(dAppAcc)
 
             d.appendBlock(invoke)
-            d.balance(caller) shouldBe startCallerBalance - FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
-            d.balance(dAppAcc) shouldBe startDAppBalance
+            d.balance(caller) shouldBe startCallerBalance - invoke.fee - paymentAmount
+            d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
             inside(d.blockchainUpdater.continuationStates.toList) {
               case List((`address`, (0, ContinuationState.InProgress(_, _, _)))) =>
             }
 
             d.appendBlock(continuation(invoke, 0))
-            d.balance(caller) shouldBe startCallerBalance - 2 * FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
-            d.balance(dAppAcc) shouldBe startDAppBalance
+            d.balance(caller) shouldBe startCallerBalance - invoke.fee - paymentAmount
+            d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
             inside(d.blockchainUpdater.continuationStates.toList) {
               case List((`address`, (1, ContinuationState.InProgress(_, _, _)))) =>
             }

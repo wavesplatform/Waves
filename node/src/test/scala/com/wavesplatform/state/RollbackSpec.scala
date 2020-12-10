@@ -881,16 +881,16 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
           d.appendBlock(invoke)
           val afterInvoke = d.lastBlockId
-          d.balance(caller) shouldBe startCallerBalance - FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
-          d.balance(dAppAcc) shouldBe startDAppBalance
+          d.balance(caller) shouldBe startCallerBalance - invoke.fee - paymentAmount
+          d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
           inside(d.blockchainUpdater.continuationStates.toList) {
             case List((`address`, (0, ContinuationState.InProgress(_, _, _)))) =>
           }
 
           d.appendBlock(continuation)
           val afterFirstStep = d.lastBlockId
-          d.balance(caller) shouldBe startCallerBalance - 2 * FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
-          d.balance(dAppAcc) shouldBe startDAppBalance
+          d.balance(caller) shouldBe startCallerBalance - invoke.fee - paymentAmount
+          d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
           inside(d.blockchainUpdater.continuationStates.toList) {
             case List((`address`, (1, ContinuationState.InProgress(_, _, _)))) =>
           }
@@ -903,15 +903,15 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
           d.removeAfter(afterFirstStep)
           d.blockchainUpdater.accountData(dAppAcc, "isAllowed") shouldBe None
-          d.balance(caller) shouldBe startCallerBalance - 2 * FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
-          d.balance(dAppAcc) shouldBe startDAppBalance
+          d.balance(caller) shouldBe startCallerBalance - invoke.fee - paymentAmount
+          d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
           inside(d.blockchainUpdater.continuationStates.toList) {
             case List((`address`, (1, ContinuationState.InProgress(_, _, _)))) =>
           }
 
           d.removeAfter(afterInvoke)
-          d.balance(caller) shouldBe startCallerBalance - FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
-          d.balance(dAppAcc) shouldBe startDAppBalance
+          d.balance(caller) shouldBe startCallerBalance - invoke.fee - paymentAmount
+          d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
           inside(d.blockchainUpdater.continuationStates.toList) {
             case List((`address`, (0, ContinuationState.InProgress(_, _, _)))) =>
           }
