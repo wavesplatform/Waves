@@ -40,6 +40,86 @@ class EvaluatorV2(
         _update
       else
         (_: EXPR) => Coeval.now(())
+
+    def evaluateFunctionArgs(fc: FUNCTION_CALL): Coeval[Int] =
+      Coeval.defer {
+        fc.args.indices
+          .to(LazyList)
+          .foldM(limit) {
+            case (unused, argIndex) =>
+              if (unused <= 0)
+                Coeval.now(unused)
+              else
+                root(
+                  expr = fc.args(argIndex),
+                  _update = argValue => Coeval.delay(fc.args = fc.args.updated(argIndex, argValue)),
+                  limit = unused,
+                  parentBlocks,
+                  continuationFirstStepMode && !fc.function.isExternal,
+                  omitErrors
+                )
+          }
+      }
+
+    def evaluateNativeFunction(fc: FUNCTION_CALL, limit: Int): Coeval[Int] = {
+      val function =
+        ctx.ec.functions
+          .getOrElse(fc.function, throw new RuntimeException(s"function '${fc.function}' not found"))
+          .asInstanceOf[NativeFunction[Environment]]
+      val cost = function.costByLibVersion(stdLibVersion).toInt
+      if (limit < cost)
+        Coeval.now(limit)
+      else {
+        val (functionResult, resultCost) =
+          function
+            .ev[Id]((ctx.ec.environment, fc.args.asInstanceOf[List[EVALUATED]]))
+            .fold(
+              error =>
+                if (omitErrors)
+                  (FUNCTION_CALL(FunctionHeader.Native(FunctionIds.THROW), List(CONST_STRING(error).explicitGet())), 1)
+                else
+                  throw new RuntimeException(error),
+              result => (result, cost)
+            )
+        update(functionResult).map(_ => limit - resultCost)
+      }
+    }
+
+    def evaluateUserFunction(fc: FUNCTION_CALL, limit: Int, name: String): Option[Coeval[Int]] = {
+      ctx.ec.functions
+        .get(fc.function)
+        .map(_.asInstanceOf[UserFunction[Environment]])
+        .map(f => FUNC(f.name, f.args.toList, f.ev[Id](ctx.ec.environment)))
+        .orElse(findUserFunction(name, parentBlocks))
+        .map { signature =>
+          val argsWithExpr =
+            (signature.args zip fc.args)
+              .foldRight(signature.body.deepCopy.value) {
+                case ((argName, argValue), argsWithExpr) =>
+                  BLOCK(LET(argName, argValue), argsWithExpr)
+              }
+          _update(argsWithExpr).flatMap(
+            _ =>
+              if (limit > 0)
+                root(argsWithExpr, _update, limit, parentBlocks, continuationFirstStepMode, omitErrors)
+              else
+                Coeval.now(limit)
+          )
+        }
+    }
+
+    def evaluateConstructor(fc: FUNCTION_CALL, limit: Int, name: String): Coeval[Int] = {
+      val caseType =
+        ctx.ec.typeDefs.get(name) match {
+          case Some(caseType: CASETYPEREF) => Coeval.now(caseType)
+          case _                           => Coeval.raiseError(new NoSuchElementException(s"Function or type '$name' not found"))
+        }
+      caseType.flatMap { objectType =>
+        val fields = objectType.fields.map(_._1) zip fc.args.asInstanceOf[List[EVALUATED]]
+        root(CaseObj(objectType, fields.toMap), update, limit, parentBlocks, continuationFirstStepMode, omitErrors)
+      }
+    }
+
     expr match {
       case b: BLOCK_DEF =>
         Coeval.defer(
@@ -67,14 +147,10 @@ class EvaluatorV2(
             omitErrors
           ).flatMap { unused =>
             g.expr match {
-              case co: CaseObj if unused > 0 =>
-                update(co.fields(g.field)).map(_ => unused - 1)
-              case _: CaseObj =>
-                Coeval.now(unused)
-              case ev: EVALUATED =>
-                throw new IllegalArgumentException(s"GETTER of non-case-object $ev")
-              case _ =>
-                Coeval.now(unused)
+              case co: CaseObj if unused > 0 => update(co.fields(g.field)).map(_ => unused - 1)
+              case _: CaseObj                => Coeval.now(unused)
+              case ev: EVALUATED             => throw new IllegalArgumentException(s"GETTER of non-case-object $ev")
+              case _                         => Coeval.now(unused)
             }
           }
         )
@@ -151,128 +227,30 @@ class EvaluatorV2(
         }
 
       case fc: FUNCTION_CALL =>
-        val forceEvaluateArgs = !continuationFirstStepMode || fc.function.isExternal
-        val evaluatedArgs =
-          Coeval.defer {
-            fc.args.indices
-              .to(LazyList)
-              .foldM(limit) {
-                case (unused, argIndex) =>
-                  if (unused <= 0)
-                    Coeval.now(unused)
-                  else
-                    root(
-                      expr = fc.args(argIndex),
-                      _update = argValue => Coeval.delay(fc.args = fc.args.updated(argIndex, argValue)),
-                      limit = unused,
-                      parentBlocks,
-                      !forceEvaluateArgs,
-                      omitErrors
-                    )
-              }
-          }
-        evaluatedArgs
+        evaluateFunctionArgs(fc)
           .flatMap { unusedArgsComplexity =>
-            if (fc.args.forall(_.isInstanceOf[EVALUATED])) {
-              fc.function match {
-                case FunctionHeader.Native(_) if !continuationFirstStepMode || fc.function.isExternal =>
-                  val function =
-                    ctx.ec.functions
-                      .getOrElse(fc.function, throw new RuntimeException(s"function '${fc.function}' not found"))
-                      .asInstanceOf[NativeFunction[Environment]]
-                  val cost = function.costByLibVersion(stdLibVersion).toInt
-                  if (unusedArgsComplexity < cost)
-                    Coeval.now(unusedArgsComplexity)
-                  else {
-                    val (functionResult, resultCost) =
-                      function
-                        .ev[Id]((ctx.ec.environment, fc.args.asInstanceOf[List[EVALUATED]]))
-                        .fold(
-                          error =>
-                            if (omitErrors)
-                              (FUNCTION_CALL(FunctionHeader.Native(FunctionIds.THROW), List(CONST_STRING(error).explicitGet())), 1)
-                            else
-                              throw new RuntimeException(error),
-                          result => (result, cost)
-                        )
-                    update(functionResult)
-                      .map(_ => unusedArgsComplexity - resultCost)
-                  }
-
-                case FunctionHeader.User(_, name) =>
-                  ctx.ec.functions
-                    .get(fc.function)
-                    .map(_.asInstanceOf[UserFunction[Environment]])
-                    .map(f => FUNC(f.name, f.args.toList, f.ev[Id](ctx.ec.environment)))
-                    .orElse(findUserFunction(name, parentBlocks))
-                    .map { signature =>
-                      val argsWithExpr =
-                        (signature.args zip fc.args)
-                          .foldRight(signature.body.deepCopy.value) {
-                            case ((argName, argValue), argsWithExpr) =>
-                              BLOCK(LET(argName, argValue), argsWithExpr)
-                          }
-                      _update(argsWithExpr).flatMap(
-                        _ =>
-                          if (unusedArgsComplexity > 0)
-                            root(argsWithExpr, _update, unusedArgsComplexity, parentBlocks, continuationFirstStepMode, omitErrors)
-                          else
-                            Coeval.now(unusedArgsComplexity)
-                      )
-                    }
-                    .getOrElse {
-                      if (unusedArgsComplexity > 0) {
-                        val caseType =
-                          ctx.ec.typeDefs.get(name) match {
-                            case Some(caseType: CASETYPEREF) => Coeval.now(caseType)
-                            case _                           => Coeval.raiseError(new NoSuchElementException(s"Function or type '$name' not found"))
-                          }
-                        caseType.flatMap { objectType =>
-                          val fields = objectType.fields.map(_._1) zip fc.args.asInstanceOf[List[EVALUATED]]
-                          root(CaseObj(objectType, fields.toMap), update, unusedArgsComplexity, parentBlocks, continuationFirstStepMode, omitErrors)
-                        }
-                      } else
-                        Coeval.now(unusedArgsComplexity)
-                    }
-                case _ =>
-                  Coeval.now(limit)
-
-              }
-            } else {
-              fc.function match {
-                case FunctionHeader.Native(name) =>
-                  Coeval.now(unusedArgsComplexity)
-                case FunctionHeader.User(_, name) =>
-                  ctx.ec.functions
-                    .get(fc.function)
-                    .map(_.asInstanceOf[UserFunction[Environment]])
-                    .map(f => FUNC(f.name, f.args.toList, f.ev[Id](ctx.ec.environment)))
-                    .orElse(findUserFunction(name, parentBlocks))
-                    .map { signature =>
-                      val argsWithExpr =
-                        (signature.args zip fc.args)
-                          .foldRight(signature.body.deepCopy.value) {
-                            case ((argName, argValue), argsWithExpr) =>
-                              BLOCK(LET(argName, argValue), argsWithExpr)
-                          }
-                      _update(argsWithExpr).flatMap(
-                        _ =>
-                          if (unusedArgsComplexity > 0)
-                            root(argsWithExpr, _update, unusedArgsComplexity, parentBlocks, continuationFirstStepMode, omitErrors)
-                          else
-                            Coeval.now(unusedArgsComplexity)
-                      )
-                    }
-                    .getOrElse {
+            val argsEvaluated = fc.args.forall(_.isInstanceOf[EVALUATED])
+            fc.function match {
+              case FunctionHeader.Native(_) if argsEvaluated && (!continuationFirstStepMode || fc.function.isExternal) =>
+                evaluateNativeFunction(fc, unusedArgsComplexity)
+              case FunctionHeader.Native(_) =>
+                Coeval.now(unusedArgsComplexity)
+              case FunctionHeader.User(_, name) =>
+                evaluateUserFunction(fc, unusedArgsComplexity, name)
+                  .getOrElse {
+                    if (argsEvaluated && unusedArgsComplexity > 0) {
+                      evaluateConstructor(fc, unusedArgsComplexity, name)
+                    } else
                       Coeval.now(unusedArgsComplexity)
-                    }
-              }
+                  }
             }
           }
+
       case evaluated: EVALUATED =>
         update(evaluated).map(_ => limit)
 
-      case f: FAILED_EXPR => throw new Error(s"Unexpected $f")
+      case f: FAILED_EXPR =>
+        throw new Error(s"Unexpected $f")
     }
   }
 
@@ -284,15 +262,17 @@ class EvaluatorV2(
       parentBlocks: List[BLOCK_DEF],
       continuationFirstStepMode: Boolean,
       omitErrors: Boolean
-  ): Option[Coeval[Int]] =
+  ): Option[Coeval[Int]] = {
+    def evaluate(l: LET, nextParentBlocks: List[BLOCK_DEF]) =
+      Some(evaluateRef(update, limit, l, nextParentBlocks, continuationFirstStepMode, omitErrors))
+
     parentBlocks match {
-      case LET_BLOCK(l @ LET(`key`, _, _), _) :: nextParentBlocks =>
-        Some(evaluateRef(update, limit, l, nextParentBlocks, continuationFirstStepMode, omitErrors))
-      case BLOCK(l @ LET(`key`, _, _), _) :: nextParentBlocks =>
-        Some(evaluateRef(update, limit, l, nextParentBlocks, continuationFirstStepMode, omitErrors))
-      case _ :: nextParentBlocks => visitRef(key, update, limit, nextParentBlocks, continuationFirstStepMode, omitErrors)
-      case Nil                   => None
+      case LET_BLOCK(l @ LET(`key`, _, _), _) :: nextParentBlocks => evaluate(l, nextParentBlocks)
+      case BLOCK(l @ LET(`key`, _, _), _) :: nextParentBlocks     => evaluate(l, nextParentBlocks)
+      case _ :: nextParentBlocks                                  => visitRef(key, update, limit, nextParentBlocks, continuationFirstStepMode, omitErrors)
+      case Nil                                                    => None
     }
+  }
 
   private def evaluateRef(
       update: EVALUATED => Coeval[Unit],
