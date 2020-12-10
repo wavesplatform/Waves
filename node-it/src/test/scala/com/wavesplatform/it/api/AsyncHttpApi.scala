@@ -572,10 +572,10 @@ object AsyncHttpApi extends Assertions {
       )
 
     def debugStateChanges(invokeScriptTransactionId: String, amountsAsStrings: Boolean): Future[DebugStateChanges] =
-      get(s"/debug/stateChanges/info/$invokeScriptTransactionId", amountsAsStrings).as[DebugStateChanges](amountsAsStrings)
+      get(s"/transactions/info/$invokeScriptTransactionId", amountsAsStrings).as[DebugStateChanges](amountsAsStrings)
 
     def debugStateChangesByAddress(address: String, limit: Int = 10000, after: Option[String] = None): Future[Seq[DebugStateChanges]] =
-      get(s"/debug/stateChanges/address/$address/limit/$limit${after.fold("")(a => s"?after=$a")}").as[Seq[DebugStateChanges]]
+      get(s"/transactions/address/$address/limit/$limit${after.fold("")(a => s"?after=$a")}").as[Seq[DebugStateChanges]]
 
     def assetBalance(address: String, asset: String, amountsAsStrings: Boolean = false): Future[AssetBalance] =
       get(s"/assets/balance/$address/$asset", amountsAsStrings).as[AssetBalance](amountsAsStrings)
