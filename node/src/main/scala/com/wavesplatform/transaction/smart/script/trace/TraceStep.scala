@@ -39,7 +39,7 @@ case class AccountVerifierTrace(
 object AssetVerifierTrace {
   type AssetContext = AssetContext.Value
   object AssetContext extends Enumeration {
-    val Unknown, OrderAmount, OrderPrice, MatcherFee, Payment, Reissue, Burn, Sponsor, Transfer, Update = Value
+    val Unknown, OrderAmount, OrderPrice, MatcherFee, Payment, Reissue, Burn, Sponsor, Transfer, UpdateInfo = Value
 
     def fromTxAndAsset(tx: Transaction, asset: IssuedAsset): AssetContext = tx match {
       case i: InvokeScriptTransaction if i.payments.exists(_.assetId == asset) => AssetContext.Payment
@@ -50,8 +50,8 @@ object AssetVerifierTrace {
 
       case r: ReissueTransaction if r.asset == asset           => AssetContext.Reissue
       case r: BurnTransaction if r.asset == asset              => AssetContext.Burn
-      case u: UpdateAssetInfoTransaction if u.assetId == asset => AssetContext.Update
-      case u: SetAssetScriptTransaction if u.asset == asset    => AssetContext.Update
+      case u: UpdateAssetInfoTransaction if u.assetId == asset => AssetContext.UpdateInfo
+      case u: SetAssetScriptTransaction if u.asset == asset    => AssetContext.UpdateInfo
 
       case t: TransferTransaction if t.assetId == asset       => AssetContext.Transfer
       case mt: MassTransferTransaction if mt.assetId == asset => AssetContext.Transfer
