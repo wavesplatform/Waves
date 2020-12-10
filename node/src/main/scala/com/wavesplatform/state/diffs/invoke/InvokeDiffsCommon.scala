@@ -87,6 +87,7 @@ object InvokeDiffsCommon {
       tx: InvokeScriptLike,
       blockchain: Blockchain,
       blockTime: Long,
+      runsLimit: Int,
       limitedExecution: Boolean = false
   ): TracedResult[ValidationError, Diff] = {
     val complexityLimit =
@@ -137,20 +138,24 @@ object InvokeDiffsCommon {
             burnList.map(b => IssuedAsset(b.assetId)) ++
             sponsorFeeList.map(sf => IssuedAsset(sf.assetId))
         val totalScriptsInvoked = smartAssetInvocations.count(blockchain.hasAssetScript) +
-                                  (if (blockchain.hasAccountScript(tx.root.sender.toAddress)) 1 else 0)  // XXX should be 0 for crosscontract calls
+                                  (if (tx.isInstanceOf[InvokeScriptTransaction] && blockchain.hasAccountScript(tx.root.sender.toAddress)) 1 else 0)
         val minIssueFee       = issueList.count(i => !blockchain.isNFT(i)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
         val dAppInvocationFee = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber
         val minWaves          = totalScriptsInvoked * ScriptExtraFee + dAppInvocationFee + minIssueFee
         val txName            = Constants.TransactionNames(InvokeScriptTransaction.typeId)
         val assetName         = tx.root.assetFee._1.fold("WAVES")(_.id.toString)
         Either.cond(
-          feeInfo.forall(minWaves <= _._1),
+          totalScriptsInvoked <= runsLimit && feeInfo.forall(minWaves <= _._1),
           totalScriptsInvoked,
-          FailedTransactionError.feeForActions(
-            s"Fee in $assetName for $txName (${tx.root.assetFee._2} in $assetName)" +
-              s" with $totalScriptsInvoked total scripts invoked$stepsInfo does not exceed minimal value of $minWaves WAVES.",
-            invocationComplexity
-          )
+          if(totalScriptsInvoked <= runsLimit) {
+            FailedTransactionError.feeForActions(
+              s"Fee in $assetName for $txName (${tx.root.assetFee._2} in $assetName)" +
+                s" with $totalScriptsInvoked total scripts invoked$stepsInfo does not exceed minimal value of $minWaves WAVES.",
+              invocationComplexity
+            )
+          } else {
+            ValidationError.ScriptRunsLimitError(s"Too many scripts run while processing actions for $tx")
+          }
         )
       }
 

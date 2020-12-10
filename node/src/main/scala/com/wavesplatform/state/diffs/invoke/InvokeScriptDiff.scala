@@ -40,8 +40,8 @@ object InvokeScriptDiff {
   private val stats = TxProcessingStats
   import stats.TxTimerExt
 
-  def apply(blockchain: Blockchain, blockTime: Long, limitedExecution: Boolean)(tx: InvokeScript): TracedResult[ValidationError, (Diff, EVALUATED)] = {
-
+  def apply(blockchain: Blockchain, blockTime: Long, limitedExecution: Boolean, runsLimit: Int)(tx: InvokeScript): TracedResult[ValidationError, (Diff, EVALUATED)] = {
+    if(runsLimit <= 0) return TracedResult(Left(ValidationError.ScriptRunsLimitError(s"Too many scripts run while invoke $tx")))
     val dAppAddress = tx.dAppAddress
     val accScript = blockchain.accountScript(dAppAddress)
     val functionCall  = tx.funcCall
@@ -83,7 +83,8 @@ object InvokeScriptDiff {
                   directives,
                   tx.root,
                   tx.dAppAddress,
-                  tx.senderDApp
+                  tx.senderDApp,
+                  runsLimit-1
                 )
 
                 //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
@@ -125,6 +126,7 @@ object InvokeScriptDiff {
               tx,
               CompositeBlockchain(blockchain, Some(scriptResult._1)),
               blockTime,
+              runsLimit - scriptResult._1.scriptsRun,
               limitedExecution
             )
 

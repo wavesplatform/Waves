@@ -48,6 +48,7 @@ object InvokeScriptTransactionDiff {
     val dAppAddressEi = blockchain.resolveAlias(tx.dAppAddressOrAlias)
     val accScriptEi   = dAppAddressEi.map(blockchain.accountScript)
     val functionCall  = tx.funcCall
+    val runsLimit     = 10    // XXX runsLimit should be calculated depends fee
 
     accScriptEi match {
       case Right(Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, callableComplexities))) =>
@@ -111,7 +112,8 @@ object InvokeScriptTransactionDiff {
                   directives,
                   tx,
                   dAppAddress,
-                  dAppAddress
+                  dAppAddress,
+                  runsLimit
                 )
 
                 //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
@@ -153,6 +155,7 @@ object InvokeScriptTransactionDiff {
               tx,
               CompositeBlockchain(blockchain, Some(scriptResult._1)),
               blockTime,
+              runsLimit - scriptResult._1.scriptsRun,
               limitedExecution
             )
 
