@@ -71,14 +71,14 @@ object Verifier extends ScorexLogging {
         fullTrace: List[TraceStep]
     ): (Long, TracedResult[ValidationError, Transaction]) = {
       assets match {
-        case AssetForCheck(asset, AssetScriptInfo(script, complexity), assetType) :: remaining =>
+        case AssetForCheck(asset, AssetScriptInfo(script, complexity), context) :: remaining =>
           val complexityLimit =
             if (remainingComplexity == Int.MaxValue) remainingComplexity
             else remainingComplexity - fullComplexity.toInt
 
           val spentComplexity = fullComplexity + complexity
           stats.assetScriptExecution
-            .measureForType(tx.typeId)(verifyTx(blockchain, script, tx, Some(asset.id), complexityLimit, assetType)) match {
+            .measureForType(tx.typeId)(verifyTx(blockchain, script, tx, Some(asset.id), complexityLimit, context)) match {
             case TracedResult(e @ Left(_), trace) => (spentComplexity, TracedResult(e, fullTrace ::: trace))
             case TracedResult(Right(_), trace)    => loop(remaining, spentComplexity, fullTrace ::: trace)
           }
@@ -92,15 +92,15 @@ object Verifier extends ScorexLogging {
     val assets = for {
       asset  <- tx.checkedAssets.toList
       script <- assetScript(asset)
-      assetType = AssetType.fromTxAndAsset(tx, asset)
-    } yield AssetForCheck(asset, script, assetType)
+      context = AssetContext.fromTxAndAsset(tx, asset)
+    } yield AssetForCheck(asset, script, context)
 
     val additionalAssets = tx match {
       case e: ExchangeTransaction =>
         for {
           asset  <- List(e.buyOrder.matcherFeeAssetId, e.sellOrder.matcherFeeAssetId).distinct.collect { case ia: IssuedAsset => ia }
           script <- assetScript(asset)
-        } yield AssetForCheck(asset, script, AssetType.MatcherFee)
+        } yield AssetForCheck(asset, script, AssetContext.MatcherFee)
 
       case _ => Nil
     }
@@ -131,7 +131,7 @@ object Verifier extends ScorexLogging {
       transaction: Transaction,
       assetIdOpt: Option[ByteStr],
       complexityLimit: Int = Int.MaxValue,
-      assetType: AssetType.Value = AssetType.Unknown
+      assetContext: AssetContext.Value = AssetContext.Unknown
   ): TracedResult[ValidationError, Transaction] = {
 
     val isAsset       = assetIdOpt.nonEmpty
@@ -159,7 +159,7 @@ object Verifier extends ScorexLogging {
 
     val createTrace = { maybeError: Option[ValidationError] =>
       val trace = assetIdOpt match {
-        case Some(assetId) => AssetVerifierTrace(assetId, maybeError, assetType)
+        case Some(assetId) => AssetVerifierTrace(assetId, maybeError, assetContext)
         case None          => AccountVerifierTrace(senderAddress, maybeError)
       }
       List(trace)
