@@ -47,51 +47,51 @@ class ContinuationStateSpec extends FreeSpec with Matchers with WithDomain with 
   private def continuation(i: InvokeScriptTransaction, step: Int): ContinuationTransaction =
     ContinuationTransaction(i.id.value(), step, fee = 0L, Waves)
 
-  "Continuations" - {
-    "one after another for one dApp" in forAll {
-      def compile(scriptText: String): Script =
-        ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()._1
+  private def compile(scriptText: String): Script =
+    ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()._1
 
-      val dApp =
-        compile(
-          s"""
-             | {-# STDLIB_VERSION 5 #-}
-             | {-# CONTENT_TYPE DAPP #-}
-             |
-             | @Callable(i)
-             | func default() = {
-             |   let a = !(${List.fill(40)("sigVerify(base64'', base64'', base64'')").mkString("||")})
-             |   if (a)
-             |     then
-             |       [BooleanEntry("isAllowed", true)]
-             |     else
-             |       throw("unexpected")
-             | }
+  private val dApp: Script =
+    compile(
+      s"""
+         | {-# STDLIB_VERSION 5 #-}
+         | {-# CONTENT_TYPE DAPP #-}
+         |
+         | @Callable(i)
+         | func default() = {
+         |   let a = !(${List.fill(40)("sigVerify(base64'', base64'', base64'')").mkString("||")})
+         |   if (a)
+         |     then
+         |       [BooleanEntry("isAllowed", true)]
+         |     else
+         |       throw("unexpected")
+         | }
            """.stripMargin
-        )
+    )
 
-      for {
-        caller  <- accountGen
-        dAppAcc <- accountGen
-        fee     <- smallFeeGen
-        timestamp     = nextTs
-        setScript     = SetScriptTransaction.selfSigned(TxVersion.V2, dAppAcc, Some(dApp), fee, timestamp + 1).explicitGet()
-        paymentAmount = 1234567L
-        makeInvoke = () => InvokeScriptTransaction
-          .selfSigned(
-            TxVersion.V3,
-            caller,
-            dAppAcc.toAddress,
-            None,
-            Seq(Payment(paymentAmount, Waves)),
-            fee * 10,
-            Waves,
-            InvokeScriptTransaction.DefaultExtraFeePerStep,
-            nextTs
-          )
-          .explicitGet()
-      } yield (timestamp, caller.toAddress, dAppAcc.toAddress, setScript, makeInvoke, paymentAmount)
-    } {
+  private val preconditions = for {
+    caller  <- accountGen
+    dAppAcc <- accountGen
+    fee     <- smallFeeGen
+    timestamp     = nextTs
+    setScript     = SetScriptTransaction.selfSigned(TxVersion.V2, dAppAcc, Some(dApp), fee, timestamp + 1).explicitGet()
+    paymentAmount = 1234567L
+    makeInvoke = () => InvokeScriptTransaction
+      .selfSigned(
+        TxVersion.V3,
+        caller,
+        dAppAcc.toAddress,
+        None,
+        Seq(Payment(paymentAmount, Waves)),
+        fee * 10,
+        Waves,
+        InvokeScriptTransaction.DefaultExtraFeePerStep,
+        nextTs
+      )
+      .explicitGet()
+  } yield (timestamp, caller.toAddress, dAppAcc.toAddress, setScript, makeInvoke, paymentAmount)
+
+  "Continuations" - {
+    "one after another for one dApp" in forAll(preconditions) {
       case (timestamp, caller, dAppAcc, setScript, makeInvoke, paymentAmount) =>
         withDomain(settings) { d =>
           d.appendBlock(genesisBlock(timestamp, Map(caller -> ENOUGH_AMT, dAppAcc -> ENOUGH_AMT)))
@@ -126,6 +126,30 @@ class ContinuationStateSpec extends FreeSpec with Matchers with WithDomain with 
           performAndAssertChain(makeInvoke())
           performAndAssertChain(makeInvoke())
           performAndAssertChain(makeInvoke())
+        }
+    }
+
+    "disallow unordered continuations" in forAll(preconditions) {
+      case (timestamp, caller, dAppAcc, setScript, makeInvoke, _) =>
+        withDomain(settings) { d =>
+          d.appendBlock(genesisBlock(timestamp, Map(caller -> ENOUGH_AMT, dAppAcc -> ENOUGH_AMT)))
+          d.appendBlock(setScript)
+
+          val invoke = makeInvoke()
+
+          d.appendBlock(invoke)
+          d.appendBlock(continuation(invoke, 0))
+          an[RuntimeException] should be thrownBy d.appendBlock(continuation(invoke, 0))
+          an[RuntimeException] should be thrownBy d.appendBlock(continuation(invoke, 2))
+          an[RuntimeException] should be thrownBy d.appendBlock(continuation(invoke, Int.MaxValue))
+          an[RuntimeException] should be thrownBy d.appendBlock(continuation(invoke, -3))
+          d.appendBlock(continuation(invoke, 1))
+
+          val address = d.levelDBWriter.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
+          d.blockchainUpdater.continuationStates shouldBe Map((address, (2, ContinuationState.Finished)))
+          d.blockchainUpdater.accountData(dAppAcc, "isAllowed") shouldBe Some(BooleanDataEntry("isAllowed", true))
+
+          an[RuntimeException] should be thrownBy d.appendBlock(continuation(invoke, 2))
         }
     }
   }

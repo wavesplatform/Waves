@@ -35,10 +35,14 @@ object ContinuationTransactionDiff {
     val dAppAddressOrAlias = blockchain.resolveInvoke(tx).get.dAppAddressOrAlias
     val dAppAddress = blockchain.resolveAlias(dAppAddressOrAlias).explicitGet()
     blockchain.continuationStates(dAppAddress) match {
-      case (_, ContinuationState.InProgress(expr, unusedComplexity, _)) =>
+      case (step, ContinuationState.InProgress(expr, unusedComplexity, _)) if step == tx.step =>
         applyDiff(blockchain, blockTime, limitedExecution, tx, expr, unusedComplexity)
       case _ =>
-        TracedResult.wrapValue(Diff.empty)
+        TracedResult(Left(GenericError(
+          s"Unexpected ContinuationTransaction for " +
+            s"InvokeScriptTransaction id = ${tx.invokeScriptTransactionId} " +
+            s"step = ${tx.step}"
+        )))
     }
   }
 
