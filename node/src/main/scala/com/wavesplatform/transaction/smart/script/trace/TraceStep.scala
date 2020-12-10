@@ -10,8 +10,8 @@ import com.wavesplatform.state.InvokeScriptResult
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.{ScriptExecutionError, TransactionNotAllowedByScript}
+import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
-import com.wavesplatform.transaction.assets.{BurnTransaction, ReissueTransaction, SetAssetScriptTransaction, UpdateAssetInfoTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import play.api.libs.json.Json.JsValueWrapper
@@ -50,6 +50,7 @@ object AssetVerifierTrace {
 
       case r: ReissueTransaction if r.asset == asset           => AssetContext.Reissue
       case r: BurnTransaction if r.asset == asset              => AssetContext.Burn
+      case s: SponsorFeeTransaction if s.asset == asset        => AssetContext.Sponsor
       case u: UpdateAssetInfoTransaction if u.assetId == asset => AssetContext.UpdateInfo
       case u: SetAssetScriptTransaction if u.asset == asset    => AssetContext.UpdateInfo
 
