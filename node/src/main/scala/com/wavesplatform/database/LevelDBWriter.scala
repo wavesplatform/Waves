@@ -287,7 +287,7 @@ abstract class LevelDBWriter private[database] (
     readOnly { db =>
       db.iterateOver(KeyTags.ContinuationLastStep) { entry =>
         val id       = AddressId(Longs.fromByteArray(entry.getKey.takeRight(8)))
-        val lastStep = db.get(Keys.continuationLastStep(id))
+        val lastStep = Ints.fromByteArray(entry.getValue)
         val state    = db.get(Keys.continuationState(id, lastStep))
         if (state.isInstanceOf[ContinuationState.InProgress]) {
           val address = db.get(Keys.idToAddress(id))
