@@ -19,7 +19,6 @@ import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
 
-import scala.collection.immutable.SortedMap
 import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
@@ -179,7 +178,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       scriptResults: Map[ByteStr, InvokeScriptResult],
       failedTransactionIds: Set[ByteStr],
       stateHash: StateHashBuilder.Result,
-      continuationStates: SortedMap[(AddressId, Int), ContinuationState],
+      continuationStates: Map[AddressId, (Int, ContinuationState)],
       replacingTransactions: Seq[NewTransactionInfo]
   ): Unit
 
@@ -315,7 +314,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       diff.scriptResults,
       failedTransactionIds,
       stateHash.result(),
-      diff.continuationStates.map { case ((address, step), state) => ((addressIdWithFallback(address, newAddressIds), step), state) },
+      diff.continuationStates.map { case (address, (step, state)) => (addressIdWithFallback(address, newAddressIds), (step, state)) },
       diff.replacingTransactions
     )
 
@@ -347,7 +346,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     blocksTs.put(newHeight, block.header.timestamp)
 
     accountDataCache.putAll(newData.asJava)
-    continuationStatesCache ++= diff.continuationCurrentStates
+    continuationStatesCache ++= diff.continuationStates
 
     forgetBlocks()
   }

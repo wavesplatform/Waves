@@ -413,7 +413,7 @@ class UtxPoolImpl(
           }
 
       def continuations(seed: PackResult): Iterable[ContinuationTransaction] =
-        (blockchain.continuationStates ++ seed.totalDiff.continuationCurrentStates)
+        (blockchain.continuationStates ++ seed.totalDiff.continuationStates)
           .collect {
             case (_, (step, ContinuationState.InProgress(_, _, invokeId))) =>
               ContinuationTransaction(invokeId, step, 0L, Waves)

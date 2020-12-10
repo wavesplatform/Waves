@@ -158,7 +158,7 @@ final case class CompositeBlockchain(
   override def hitSource(height: Int): Option[ByteStr] = hitSource.filter(_ => this.height == height) orElse inner.hitSource(height)
 
   override def continuationStates: collection.Map[Address, (Int, ContinuationState)] =
-    inner.continuationStates ++ diff.continuationCurrentStates
+    inner.continuationStates ++ diff.continuationStates
 }
 
 object CompositeBlockchain {

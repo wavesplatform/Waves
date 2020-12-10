@@ -37,7 +37,6 @@ import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
-import scala.collection.immutable.SortedMap
 import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import scala.jdk.CollectionConverters._
@@ -396,7 +395,7 @@ abstract class LevelDBWriter private[database] (
       scriptResults: Map[ByteStr, InvokeScriptResult],
       failedTransactionIds: Set[ByteStr],
       stateHash: StateHashBuilder.Result,
-      continuationStates: SortedMap[(AddressId, Int), ContinuationState],
+      continuationStates: Map[AddressId, (Int, ContinuationState)],
       replacingTransactions: Seq[NewTransactionInfo]
   ): Unit = {
     log.trace(s"Persisting block ${block.id()} at height $height")
@@ -414,7 +413,7 @@ abstract class LevelDBWriter private[database] (
       def inProgress(i: InvokeScriptTransaction) = {
         val id = i.id.value()
         continuationStates
-          .collectFirst { case ((_, 0), ContinuationState.InProgress(_, _, `id`)) => true }
+          .collectFirst { case (_, (0, ContinuationState.InProgress(_, _, `id`))) => true }
           .getOrElse(false)
       }
 
@@ -631,14 +630,9 @@ abstract class LevelDBWriter private[database] (
       }
 
       continuationStates
-        .groupBy { case ((addressId, _), _) => addressId }
         .foreach {
-          case (addressId, states) =>
-            states.foreach {
-              case ((_, step), state) =>
-                rw.put(Keys.continuationState(addressId, step), state)
-            }
-            val ((_, step), _) = states.last
+          case (addressId, (step, state)) =>
+            rw.put(Keys.continuationState(addressId, step), state)
             rw.put(Keys.continuationLastStep(addressId), step)
         }
 

@@ -306,8 +306,8 @@ object InvokeDiffsCommon {
       invoke: InvokeScriptTransaction
   ): StepInfo = {
     val dAppAddress = blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
-    val isFirstStep = diff.continuationStates.collectFirst { case ((`dAppAddress`, 0), _) => true }.getOrElse(false)
-    val isLastStep  = diff.continuationStates.collectFirst { case ((`dAppAddress`, _), ContinuationState.Finished) => true }.getOrElse(false)
+    val isFirstStep = diff.continuationStates.get(dAppAddress).exists(_._1 == 0)
+    val isLastStep  = diff.continuationStates.get(dAppAddress).exists(_._2 == ContinuationState.Finished)
 
     val scriptResult = diff.scriptResults.getOrElse(invoke.id.value(), InvokeScriptResult())
     val assetActions =

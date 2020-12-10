@@ -24,7 +24,6 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.{Burn, Recipient, Reissue}
 import com.wavesplatform.lang.{Common, Global}
 import com.wavesplatform.settings.TestSettings
-import com.wavesplatform.state.Diff.addressOrdering
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.diffs.invoke.{ContinuationTransactionDiff, InvokeScriptTransactionDiff}
@@ -41,7 +40,6 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{Inside, Matchers, PropSpec}
 import shapeless.Coproduct
 
-import scala.collection.immutable.SortedMap
 import scala.util.Random
 
 class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with TransactionGen with Matchers with Inside {
@@ -305,8 +303,8 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
           invoke.sender.toAddress -> Portfolio(-invoke.fee, assets = Map(scriptedAsset -> -paymentAmount)),
           dAppAddress             -> Portfolio.build(scriptedAsset, paymentAmount)
         ),
-        continuationStates = SortedMap(
-          (dAppAddress, 0) -> ContinuationState.InProgress(resultExpr, unusedComplexity, invoke.id.value())
+        continuationStates = Map(
+          (dAppAddress, (0, ContinuationState.InProgress(resultExpr, unusedComplexity, invoke.id.value())))
         ),
         scriptsRun = 3, // step, payment and account script
         scriptsComplexity = spentComplexity
@@ -333,9 +331,11 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
     ContinuationTransactionDiff(blockchain, continuation.timestamp, false)(continuation).resultE shouldBe Right(
       Diff.empty.copy(
         replacingTransactions = Seq(NewTransactionInfo(continuation.copy(fee = stepFee), Set(), Succeeded)),
-        continuationStates = SortedMap(
-          (invoke.dAppAddressOrAlias.asInstanceOf[Address], continuation.step + 1) -> ContinuationState
-            .InProgress(result, resultUnusedComplexity, invoke.id.value())
+        continuationStates = Map(
+          (invoke.dAppAddressOrAlias.asInstanceOf[Address], (
+            continuation.step + 1,
+            ContinuationState.InProgress(result, resultUnusedComplexity, invoke.id.value())
+          ))
         ),
         scriptsRun = 1,
         scriptsComplexity = spentComplexity
@@ -375,7 +375,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
           )
         ),
         scriptsComplexity = actualComplexity + actionScriptInvocations * assetScriptComplexity,
-        continuationStates = SortedMap((invoke.dAppAddressOrAlias.asInstanceOf[Address], continuation.step + 1) -> ContinuationState.Finished),
+        continuationStates = Map((invoke.dAppAddressOrAlias.asInstanceOf[Address], (continuation.step + 1, ContinuationState.Finished))),
         updatedAssets = Map(scriptedAsset                                                                       -> Ior.Right(AssetVolumeInfo(true, reissueAmount - burnAmount))),
         replacingTransactions = Seq(
           NewTransactionInfo(continuation.copy(fee = stepFee), Set(), Succeeded),
