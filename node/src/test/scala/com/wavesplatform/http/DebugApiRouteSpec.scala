@@ -261,7 +261,7 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
 
       val route = debugApiRoute.copy(blockchain = blockchain).route
 
-      def testFunction(name: String, result: InvokeScriptTransaction => String = _ => "") = {
+      def testFunction(name: String, result: InvokeScriptTransaction => String) = {
         val tx = TxHelpers.invoke(TxHelpers.defaultAddress, name, fee = 102500000)
 
         jsonPost(routePath("/validate"), tx.json()) ~> ApiKeyHeader ~> route ~> check {
