@@ -3,14 +3,18 @@ package com.wavesplatform.api.http
 import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
 
+import akka.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSupport}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
+import akka.stream.scaladsl.Source
 import cats.implicits._
 import cats.kernel.Monoid
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi}
+import com.wavesplatform.api.http.TransactionsApiRoute.TransactionJsonSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
@@ -66,6 +70,9 @@ case class DebugApiRoute(
   private lazy val wavesConfig: JsObject = Json.obj("waves" -> (fullConfig \ "waves").get)
 
   override val settings: RestAPISettings = ws.restAPISettings
+
+  private[this] val serializer                     = TransactionJsonSerializer(blockchain, transactionsApi)
+  private[this] implicit val transactionMetaWrites = OWrites[TransactionMeta](serializer.transactionWithMetaJson)
 
   override lazy val route: Route = pathPrefix("debug") {
     stateChanges ~ balanceHistory ~ stateHash ~ validate ~ withAuth {
@@ -240,13 +247,32 @@ case class DebugApiRoute(
 
   def stateChanges: Route = stateChangesById ~ stateChangesByAddress
 
-  def stateChangesById: Route = (get & path("stateChanges" / "info" / TransactionId)) { transactionId =>
-    redirect(s"/transactions/info/$transactionId", StatusCodes.PermanentRedirect)
+  def stateChangesById: Route = (get & path("stateChanges" / "info" / TransactionId)) { id =>
+    transactionsApi.transactionById(id) match {
+      case Some(meta: TransactionMeta.Invoke) => complete(meta: TransactionMeta)
+      case Some(_)                            => complete(ApiError.UnsupportedTransactionType)
+      case None                               => complete(ApiError.TransactionDoesNotExist)
+    }
   }
 
   def stateChangesByAddress: Route =
     (get & path("stateChanges" / "address" / AddrSegment / "limit" / IntNumber) & parameter("after".as[ByteStr].?)) { (address, limit, afterOpt) =>
-      redirect(s"/transactions/address/$address/limit/$limit${afterOpt.fold("")("?after=" + _)}", StatusCodes.PermanentRedirect)
+      validate(limit <= settings.transactionsByAddressLimit, s"Max limit is ${settings.transactionsByAddressLimit}") {
+        extractScheduler { implicit s =>
+          complete {
+            implicit val ss: JsonEntityStreamingSupport = EntityStreamingSupport.json()
+
+            Source
+              .fromPublisher(
+                transactionsApi
+                  .transactionsByAddress(address, None, Set.empty, afterOpt)
+                  .map(Json.toJsObject(_))
+                  .toReactivePublisher
+              )
+              .take(limit)
+          }
+        }
+      }
     }
 
   def stateHash: Route =
