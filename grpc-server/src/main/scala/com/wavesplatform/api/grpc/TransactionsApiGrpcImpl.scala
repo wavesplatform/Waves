@@ -19,7 +19,7 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
   override def getTransactions(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit =
     responseObserver.interceptErrors {
       val transactionIds = request.transactionIds.map(_.toByteStr)
-      val stream = request.recipient match {
+      val stream: Observable[TransactionMeta] = request.recipient match {
         case Some(subject) =>
           commonApi.transactionsByAddress(
             subject
@@ -32,7 +32,7 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
         case None =>
           if (request.sender.isEmpty) {
             Observable.fromIterable(transactionIds.flatMap(commonApi.transactionById)).map { meta =>
-              (meta.height, meta.transaction, meta.succeeded)
+              TransactionMeta.Default(meta.height, meta.transaction, meta.succeeded)
             }
           } else {
             val senderAddress = request.sender.toAddress
