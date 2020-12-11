@@ -6,6 +6,7 @@ import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBRecipientImplicitConversionOps
+import com.wavesplatform.state.{InvokeScriptResult => VISR}
 import com.wavesplatform.transaction.Authorized
 import io.grpc.stub.StreamObserver
 import io.grpc.{Status, StatusRuntimeException}
@@ -53,7 +54,10 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
           .map {
             case TransactionMeta(h, tx, false) =>
               TransactionResponse(tx.id().toByteString, h, Some(tx.toPB), ApplicationStatus.SCRIPT_EXECUTION_FAILED)
-            case TransactionMeta(h, tx, _) => TransactionResponse(tx.id().toByteString, h, Some(tx.toPB), ApplicationStatus.SUCCEEDED)
+            case TransactionMeta.Invoke(h, tx, _, result) =>
+              TransactionResponse(tx.id().toByteString, h, Some(tx.toPB), ApplicationStatus.SUCCEEDED, result.map(VISR.toPB))
+            case TransactionMeta(h, tx, _) =>
+              TransactionResponse(tx.id().toByteString, h, Some(tx.toPB), ApplicationStatus.SUCCEEDED)
           }
       )
     }
@@ -76,8 +80,6 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
 
   override def getStateChanges(request: TransactionsRequest, responseObserver: StreamObserver[InvokeScriptResultResponse]): Unit =
     responseObserver.interceptErrors {
-      import com.wavesplatform.state.{InvokeScriptResult => VISR}
-
       val result = Observable(request.transactionIds: _*)
         .flatMap(txId => Observable.fromIterable(commonApi.transactionById(txId.toByteStr)))
         .collect {
