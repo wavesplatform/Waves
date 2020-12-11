@@ -25,50 +25,6 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
   private var asset1: IssuedAsset = _
   private var asset2: IssuedAsset = _
 
-  test("prerequisite: set contract and issue asset") {
-    val source =
-      s"""
-      |{-# STDLIB_VERSION 4 #-}
-      |{-# CONTENT_TYPE DAPP #-}
-      |{-# SCRIPT_TYPE ACCOUNT #-}
-      |
-      |func parse(asset: ByteVector|Unit) = if asset.isDefined() then asset.value() else base58''
-      |
-      |@Callable(inv)
-      |func default() = {
-      |  let pmt = inv.payments
-      |  nil
-      |  ++ (if pmt.size() > 0 then [
-      |    IntegerEntry("amount_0", pmt[0].amount),
-      |    BinaryEntry("asset_0", pmt[0].assetId.parse())
-      |  ] else nil)
-      |  ++ (if pmt.size() > 1 then [
-      |    IntegerEntry("amount_1", pmt[1].amount),
-      |    BinaryEntry("asset_1", pmt[1].assetId.parse())
-      |  ] else nil)
-      |}
-      |
-      |@Callable(inv)
-      |func f(toAlias: String) = {
-      | if (${"sigVerify(base58'', base58'', base58'') ||" * 8} true)
-      |  then {
-      |    let pmt = inv.payments[0]
-      |    #avoidbugcomment
-      |    [ScriptTransfer(Alias(toAlias), pmt.amount, pmt.assetId)]
-      |  }
-      |  else {
-      |    throw("unexpected")
-      |  }
-      |}
-      """.stripMargin
-    val script = ScriptCompiler.compile(source, ScriptEstimatorV2).explicitGet()._1.bytes().base64
-    sender.setScript(dApp, Some(script), setScriptFee, waitForTx = true)
-
-    asset1 = IssuedAsset(ByteStr.decodeBase58(sender.issue(caller, waitForTx = true).id).get)
-    asset2 = IssuedAsset(ByteStr.decodeBase58(sender.issue(caller, waitForTx = true).id).get)
-    sender.createAlias(caller, "recipientalias", smartMinFee, waitForTx = true)
-  }
-
   test("can transfer to alias") {
     val dAppBalance   = sender.balance(dAppAddress).balance
     val callerBalance = sender.balance(callerAddress).balance
@@ -228,8 +184,53 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
   test("can't attach with zero asset amount") {
     assertApiError(
       sender.invokeScript(caller, dAppAddress, payment = Seq(Payment(0, asset1), Payment(1, Waves))),
-      NonPositiveAmount(s"0 of IssuedAsset(${asset1.id.toString})")
+      NonPositiveAmount(s"0 of $asset1")
     )
   }
 
+  protected override def beforeAll(): Unit = {
+    super.beforeAll()
+
+    val source =
+      s"""
+         |{-# STDLIB_VERSION 4 #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |{-# SCRIPT_TYPE ACCOUNT #-}
+         |
+         |func parse(asset: ByteVector|Unit) = if asset.isDefined() then asset.value() else base58''
+         |
+         |@Callable(inv)
+         |func default() = {
+         |  let pmt = inv.payments
+         |  nil
+         |  ++ (if pmt.size() > 0 then [
+         |    IntegerEntry("amount_0", pmt[0].amount),
+         |    BinaryEntry("asset_0", pmt[0].assetId.parse())
+         |  ] else nil)
+         |  ++ (if pmt.size() > 1 then [
+         |    IntegerEntry("amount_1", pmt[1].amount),
+         |    BinaryEntry("asset_1", pmt[1].assetId.parse())
+         |  ] else nil)
+         |}
+         |
+         |@Callable(inv)
+         |func f(toAlias: String) = {
+         | if (${"sigVerify(base58'', base58'', base58'') ||" * 8} true)
+         |  then {
+         |    let pmt = inv.payments[0]
+         |    #avoidbugcomment
+         |    [ScriptTransfer(Alias(toAlias), pmt.amount, pmt.assetId)]
+         |  }
+         |  else {
+         |    throw("unexpected")
+         |  }
+         |}
+      """.stripMargin
+    val script = ScriptCompiler.compile(source, ScriptEstimatorV2).explicitGet()._1.bytes().base64
+    sender.setScript(dApp, Some(script), setScriptFee, waitForTx = true)
+
+    asset1 = IssuedAsset(ByteStr.decodeBase58(sender.issue(caller, waitForTx = true).id).get)
+    asset2 = IssuedAsset(ByteStr.decodeBase58(sender.issue(caller, waitForTx = true).id).get)
+    sender.createAlias(caller, "recipientalias", smartMinFee, waitForTx = true)
+  }
 }
