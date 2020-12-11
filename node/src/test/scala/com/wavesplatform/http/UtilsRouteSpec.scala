@@ -683,7 +683,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   routePath("/script/evaluate/{address}") in {
     val testScript = {
       val str = s"""
-                   |{-# STDLIB_VERSION 3 #-}
+                   |{-# STDLIB_VERSION 4 #-}
                    |{-# CONTENT_TYPE DAPP #-}
                    |{-# SCRIPT_TYPE ACCOUNT #-}
                    |
@@ -693,11 +693,11 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
                    |func testS() = "Test"
                    |func testF() = throw("Test")
                    |func testCompl() = ${"sigVerify(base58'', base58'', base58'') ||" * 100} true
-                   |
                    |func testThis() = this
+                   |func testListArg(list: List[String|ByteVector|Int], str: String, bytes: ByteVector) = list.containsElement(str)
                    |
                    |@Callable(i)
-                   |func testCallable() = WriteSet([DataEntry("test", i.caller.bytes)])
+                   |func testCallable() = [BinaryEntry("test", i.caller.bytes)]
                    |""".stripMargin
 
       val (script, _) = ScriptCompiler.compile(str, ScriptEstimatorV2).explicitGet()
@@ -730,8 +730,12 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     (utilsApi.blockchain.hasAccountScript _).when(dAppAddress).returning(true).anyNumberOfTimes()
     (utilsApi.blockchain.accountScript _).when(dAppAddress).returning(Some(testScript)).anyNumberOfTimes()
 
+    evalScript("testListArg([\"test\",111], \"test\", base58'aaa')") ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Boolean", "value" -> true)
+    }
+
     evalScript("testCallable()") ~> route ~> check {
-      responseAs[String] shouldBe "{\"result\":{\"type\":\"WriteSet\",\"value\":{\"data\":{\"type\":\"Array\",\"value\":[{\"type\":\"DataEntry\",\"value\":{\"key\":{\"type\":\"String\",\"value\":\"test\"},\"value\":{\"type\":\"ByteVector\",\"value\":\"11111111111111111111111111\"}}}]}}},\"expr\":\"testCallable()\",\"address\":\"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9\"}"
+      responseAs[String] shouldBe "{\"result\":{\"type\":\"Array\",\"value\":[{\"type\":\"BinaryEntry\",\"value\":{\"key\":{\"type\":\"String\",\"value\":\"test\"},\"value\":{\"type\":\"ByteVector\",\"value\":\"11111111111111111111111111\"}}}]},\"expr\":\"testCallable()\",\"address\":\"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9\"}"
     }
 
     evalScript("testThis()") ~> route ~> check {
