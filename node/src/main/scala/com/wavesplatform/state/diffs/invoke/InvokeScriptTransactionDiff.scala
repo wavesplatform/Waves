@@ -48,7 +48,6 @@ object InvokeScriptTransactionDiff {
     val dAppAddressEi = blockchain.resolveAlias(tx.dAppAddressOrAlias)
     val accScriptEi   = dAppAddressEi.map(blockchain.accountScript)
     val functionCall  = tx.funcCall
-    val runsLimit     = 10    // XXX runsLimit should be calculated depends fee
 
     accScriptEi match {
       case Right(Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, callableComplexities))) =>
@@ -57,6 +56,7 @@ object InvokeScriptTransactionDiff {
           dAppAddress <- TracedResult(dAppAddressEi)
 
           feeInfo <- TracedResult(InvokeDiffsCommon.calcFee(blockchain, tx))
+          runsLimit = math.min(BigDecimal((feeInfo._1 - FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + ScriptExtraFee/2) / ScriptExtraFee).toIntExact, 10) + 1
 
           invocationComplexity <- TracedResult {
             InvokeDiffsCommon.getInvocationComplexity(blockchain, tx.funcCall, callableComplexities, dAppAddress)
