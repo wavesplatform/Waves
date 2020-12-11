@@ -7,7 +7,7 @@
  */
 
 import sbt.Keys._
-import sbt._
+import sbt.{Project, _}
 import sbtcrossproject.CrossPlugin.autoImport.{CrossType, crossProject}
 
 val langPublishSettings = Seq(
@@ -35,7 +35,7 @@ lazy val lang =
           PB.protoSources := Seq(PB.externalIncludePath.value, baseDirectory.value.getParentFile / "shared" / "src" / "main" / "protobuf"),
           includeFilter in PB.generate := { (f: File) =>
             (** / "DAppMeta.proto").matches(f.toPath) ||
-              (** / "waves" / "*.proto").matches(f.toPath)
+            (** / "waves" / "*.proto").matches(f.toPath)
           },
           PB.deleteTargetDirectory := false
         )
@@ -110,9 +110,9 @@ inScope(Global)(
       "-language:implicitConversions",
       "-language:postfixOps",
       "-Ywarn-unused:-implicits",
-      "-Xlint",
-      "-opt:l:inline",
-      "-opt-inline-from:**"
+      "-Xlint"
+      //"-opt:l:inline",
+      //"-opt-inline-from:**"
     ),
     crossPaths := false,
     scalafmtOnCompile := false,
@@ -164,17 +164,25 @@ checkPRRaw := Def
       (Test / compile).value
       (`lang-tests` / Test / test).value
       (`lang-js` / Compile / fastOptJS).value
-      (`grpc-server` / Test / test).value
       (node / Test / test).value
     }
   )
   .value
 
 def checkPR: Command = Command.command("checkPR") { state =>
-  val updatedState = Project
+  val stateForNodeTest = Project
     .extract(state)
-    .appendWithoutSession(Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings")), state)
-  Project.extract(updatedState).runTask(checkPRRaw, updatedState)
+    .appendWithoutSession(Seq(Global / scalacOptions += "-Xfatal-warnings"), state)
+  Project.extract(stateForNodeTest).runTask(checkPRRaw, stateForNodeTest)
+
+  val stateForGrpcTests = Project
+    .extract(state)
+    .appendWithoutSession(Seq(Global / scalacOptions := {
+      val options = (Global / scalacOptions).value
+      options.filterNot(_ == "-deprecation") :+ "-Xfatal-warnings"
+    }), state)
+
+  Project.extract(stateForGrpcTests).runTask(`grpc-server` / Test / test, stateForGrpcTests)
   state
 }
 
