@@ -629,7 +629,14 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |  func verify() = {
           |    match tx {
           |      case tx:InvokeScriptTransaction =>
-          |        isDefined(tx.payment) && isDefined(tx.feeAssetId)
+          |        isDefined(tx.payment) && isDefined(tx.feeAssetId) &&
+          |        match tx.args[0] {
+          |          case _: Int => false
+          |          case _: String => false
+          |          case _: Boolean => false
+          |          case _: ByteVector => false
+          |          case ll => ll[0] == 1
+          |        }
           |      case _ => true
           |    }
           |  }

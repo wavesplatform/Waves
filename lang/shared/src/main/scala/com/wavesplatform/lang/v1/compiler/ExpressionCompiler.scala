@@ -8,7 +8,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.compiler.CompilationError._
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types.{FINAL, _}
+import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
@@ -248,6 +248,7 @@ object ExpressionCompiler {
       typedExpr <- compileExprWithCtx(expr, saveExprContext)
       exprTypesWithErr <- (typedExpr.t match {
         case u: UNION => u.pure[CompileM]
+        case ANY => ANY.pure[CompileM]
         case _        => raiseError[Id, CompilerContext, CompilationError, UNION](MatchOnlyUnion(p.start, p.end))
       }).handleError()
       exprTypes = exprTypesWithErr._1.getOrElse(NOTHING)
@@ -259,10 +260,15 @@ object ExpressionCompiler {
         case _      => None
       }
       matchTypes <- cases.traverse(c => handleCompositeType(p, c.caseType, Some(exprTypes), allowShadowVarName))
+      defaultType = exprTypes match {
+        case ANY => ANY
+        case UNION(tl, _) => UNION(tl.filter(t => !matchTypes.contains(t)), None)
+        case _ => NOTHING
+      }
       ifCasesWithErr <- inspectFlat[Id, CompilerContext, CompilationError, Expressions.EXPR](
         updatedCtx => {
           val ref = Expressions.REF(p, PART.VALID(p, refTmpKey), ctxOpt = saveExprContext.toOption(updatedCtx.getSimpleContext()))
-          mkIfCases(cases, matchTypes, ref, allowShadowVarName).toCompileM
+          mkIfCases(cases, matchTypes, ref, defaultType, allowShadowVarName).toCompileM
         }
       ).handleError()
       compiledMatch <- compileLetBlock(
@@ -277,10 +283,21 @@ object ExpressionCompiler {
         ),
         saveExprContext
       )
-      matchedTypesUnion = UNION.create(matchTypes)
+      checktypes = if(matchTypes.contains(LIST(ANY))) {
+        (matchTypes.filter(_ != LIST(ANY)), UNION.create((exprTypes match {
+          case ANY => List(ANY)
+          case t => t.typeList
+        }).filter {
+          case LIST(_) => false
+          case _ => true
+        }))
+      } else {
+        (matchTypes, exprTypes)
+      }
+      matchedTypesUnion = UNION.create(checktypes._1)
       checkWithErr <-
           Either.cond(
-              (cases.last.caseType.isEmpty && (exprTypes >= matchedTypesUnion)) || (exprTypes equivalent matchedTypesUnion),
+              (cases.last.caseType.isEmpty && (checktypes._2 >= matchedTypesUnion)) || (checktypes._2 equivalent matchedTypesUnion),
               (),
               MatchNotExhaustive(p.start, p.end, exprTypes.typeList, matchTypes)
             )
@@ -648,6 +665,7 @@ object ExpressionCompiler {
       cases: List[MATCH_CASE],
       caseTypes: List[FINAL],
       refTmp: Expressions.REF,
+      defaultType: FINAL,
       allowShadowVarName: Option[String]
   ): Either[CompilationError, Expressions.EXPR] = {
 
@@ -657,19 +675,28 @@ object ExpressionCompiler {
           case PART.VALID(_, x) => allowShadowVarName.contains(x)
           case _                => false
         }
-        Expressions.BLOCK(mc.position, Expressions.LET(mc.position, nv, refTmp, Some(caseType), allowShadowing), mc.expr)
+        val t = caseType match {
+          case UNION(Seq(),_) => defaultType match {
+                                   case UNION(Seq(t), _) => t
+                                   case _ => defaultType
+                                 }
+          case _ => caseType
+        }
+        Expressions.BLOCK(mc.position, Expressions.LET(mc.position, nv, refTmp, Some(t), allowShadowing), mc.expr)
       }
-      UNION(caseType).unfold.typeList match {
-        case Nil => Right(blockWithNewVar)
-        case types =>
-          def isInst(matchType: String): Expressions.EXPR =
-            Expressions
-              .FUNCTION_CALL(
-                mc.position,
-                PART.VALID(mc.position, "_isInstanceOf"),
-                List(refTmp, Expressions.CONST_STRING(mc.position, PART.VALID(mc.position, matchType)))
-              )
 
+      def isInst(matchType: String): Expressions.EXPR =
+        Expressions
+          .FUNCTION_CALL(
+            mc.position,
+            PART.VALID(mc.position, "_isInstanceOf"),
+            List(refTmp, Expressions.CONST_STRING(mc.position, PART.VALID(mc.position, matchType)))
+          )
+
+      caseType.unfold match {
+        case ANY => Right(blockWithNewVar)
+        case UNION(Nil, _) => Right(blockWithNewVar)
+        case UNION(types, _) =>
           for {
             cases <- types.map(_.name) match {
               case hType :: tTypes =>
@@ -679,6 +706,8 @@ object ExpressionCompiler {
               case Nil => ???
             }
           } yield cases
+        case t =>
+          Right(Expressions.IF(mc.position, isInst(t.name), blockWithNewVar, further))
       }
     }
 
@@ -756,6 +785,7 @@ object ExpressionCompiler {
         types.toList
           .traverse(handleCompositeType(pos, _, expectedType, varName))
           .map(types => TUPLE(types))
+      case Expressions.AnyType(pos) => (ANY:FINAL).pure[CompileM]
     }
 
   def handlePart[T](part: PART[T]): CompileM[T] = part match {
