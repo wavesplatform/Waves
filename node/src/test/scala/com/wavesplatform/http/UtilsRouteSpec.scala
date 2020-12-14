@@ -730,7 +730,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     (utilsApi.blockchain.hasAccountScript _).when(dAppAddress).returning(true).anyNumberOfTimes()
     (utilsApi.blockchain.accountScript _).when(dAppAddress).returning(Some(testScript)).anyNumberOfTimes()
 
-    evalScript("testListArg([\"test\",111], \"test\", base58'aaa')") ~> route ~> check {
+    evalScript("testListArg([\"test\", 111, base64'dGVzdA==', false], \"test\", base58'aaa')") ~> route ~> check {
       responseJson shouldBe Json.obj("type" -> "Boolean", "value" -> true)
     }
 
