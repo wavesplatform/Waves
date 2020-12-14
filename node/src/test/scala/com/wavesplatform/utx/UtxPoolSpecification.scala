@@ -401,7 +401,7 @@ class UtxPoolSpecification
       """let x = 1
         |let y = 2
         |true""".stripMargin
-    ExpressionCompiler.compile(code, CompilerContext.empty).explicitGet()
+    ExpressionCompiler.compileBoolean(code, CompilerContext.empty).explicitGet()
   }
 
   private val script: Script = ExprScript(expr).explicitGet()
