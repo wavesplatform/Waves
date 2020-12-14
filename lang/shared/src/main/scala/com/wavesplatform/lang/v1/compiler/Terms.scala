@@ -9,7 +9,7 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, CASETYPEREF, LIST, LONG, NOTHING, REAL, STRING, TUPLE}
+import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import monix.eval.Coeval
 
@@ -295,7 +295,7 @@ object Terms {
     lazy val elementsWeightSum: Long =
       weight - EMPTYARR_WEIGHT - ELEM_WEIGHT * xs.size
 
-    override val getType: REAL = LIST(NOTHING) // currently should not be used
+    override val getType: REAL = LIST(ANY)
   }
 
   object ARR {

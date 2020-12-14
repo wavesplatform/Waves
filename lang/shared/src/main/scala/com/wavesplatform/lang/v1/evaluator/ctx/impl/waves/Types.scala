@@ -263,7 +263,8 @@ object Types {
     )
   )
 
-  def buildInvokeScriptTransactionType(proofsEnabled: Boolean, version: StdLibVersion) =
+  def buildInvokeScriptTransactionType(proofsEnabled: Boolean, version: StdLibVersion) = {
+    val argTypes = UNION(LONG, STRING, BOOLEAN, BYTESTR, LIST(UNION(LONG, STRING, BOOLEAN, BYTESTR)))
     CASETYPEREF(
       "InvokeScriptTransaction",
       addProofsIfNeeded(
@@ -271,11 +272,12 @@ object Types {
           "dApp"       -> addressOrAliasType,
           "feeAssetId" -> optionByteVector,
           "function"   -> STRING,
-          "args"       -> LIST(UNION(LONG, STRING, BOOLEAN, BYTESTR))
+          "args"       -> LIST(argTypes)
         ) ++ header ++ proven :+ payments(version.supportsMultiPayment),
         proofsEnabled
       )
     )
+  }
 
   def buildReissueTransactionType(proofsEnabled: Boolean) = CASETYPEREF(
     "ReissueTransaction",

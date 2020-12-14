@@ -881,7 +881,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
     evalWithLogging(
       context.evaluationContext(Common.emptyBlockchainEnvironment()),
       ExpressionCompiler
-        .compile(script, context.compilerContext)
+        .compileBoolean(script, context.compilerContext)
         .explicitGet()
     ).map {
       case (CONST_BOOLEAN(b), log) => (b, log)
@@ -1012,7 +1012,7 @@ class EvaluatorV1V2Test extends PropSpec with PropertyChecks with Matchers with 
     evalWithLogging(
       context.evaluationContext[Id](Common.emptyBlockchainEnvironment()),
       ExpressionCompiler
-        .compile(script, context.compilerContext)
+        .compileBoolean(script, context.compilerContext)
         .explicitGet()
     ).map {
       case (CONST_BOOLEAN(b), log) => (b, log)

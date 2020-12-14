@@ -26,11 +26,13 @@ trait BroadcastRoute { _: ApiRoute =>
         provide(broadcastTransaction(tx, includeTrace))
       }
 
-  def broadcast[A: Reads](f: A => Either[ValidationError, Transaction]): Route =
-    jsonPostD[A] { a =>
+  def broadcast[A: Reads](f: A => Either[ValidationError, Transaction]): Route = {
+    val directive = jsonPostD[A].flatMap { a =>
       f(a).fold(
-        e => provide(ApiError.fromValidationError(e)),
+        e => provide[ToResponseMarshallable](ApiError.fromValidationError(e)),
         extractTraceParameter
       )
     }
+    directive(complete(_))
+  }
 }

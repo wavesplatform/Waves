@@ -217,7 +217,7 @@ object Parser {
   def singleTypeP[_:P]: P[Single] = (anyVarName ~~ ("[" ~~ Index ~ unionTypeP ~ Index ~~ "]").?).map {
     case (t, param) => Single(t, param.map { case (start, param, end) => VALID(Pos(start, end), param) })
   }
-  def unionTypeP[_:P]: P[Type] = P(singleTypeP | tupleTypeP).rep(1, comment ~ "|" ~ comment).map(Union.apply)
+  def unionTypeP[_:P]: P[Type] = (Index ~ P("Any") ~ Index).map { case (start, end) => AnyType(Pos(start, end)) } | P(singleTypeP | tupleTypeP).rep(1, comment ~ "|" ~ comment).map(Union.apply)
   def tupleTypeP[_:P]: P[Tuple] =
     ("(" ~
       P(unionTypeP).rep(
@@ -249,17 +249,19 @@ object Parser {
   def matchCaseP(implicit c: fastparse.P[Any]): P[MATCH_CASE] = {
     def checkForGenericAndGetLastPos(t: Type): Either[INVALID, Option[Pos]] =
       t match {
+        case Single(VALID(position, "List"), Some(VALID(_, AnyType(_)))) => Right(Some(position))
         case Single(name, parameter) =>
           parameter
             .toLeft(Some(name.position))
             .leftMap {
-              case VALID(position, v)              => INVALID(position, s"Unexpected generic match type [$v]")
+              case VALID(position, v)              => INVALID(position, s"Unexpected generic match type $t")
               case PART.INVALID(position, message) => INVALID(position, message)
             }
         case Union(types) =>
           types.lastOption.flatTraverse(checkForGenericAndGetLastPos)
         case Tuple(types) =>
           types.lastOption.flatTraverse(checkForGenericAndGetLastPos)
+        case AnyType(pos) => Right(Some(pos))
       }
 
     def restMatchCaseInvalidP(implicit c: fastparse.P[Any]): P[String] = P((!P("=>") ~~ AnyChar.!).repX.map(_.mkString))

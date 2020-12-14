@@ -163,7 +163,6 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         Recipient.Address(callerAddress),
         callerPublicKey,
         AttachedPayments.Single(None),
-        ByteStr.empty,
         transactionId,
         fee,
         feeAssetId
