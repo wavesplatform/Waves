@@ -110,9 +110,9 @@ inScope(Global)(
       "-language:implicitConversions",
       "-language:postfixOps",
       "-Ywarn-unused:-implicits",
-      "-Xlint"
-      //"-opt:l:inline",
-      //"-opt-inline-from:**"
+      "-Xlint",
+      "-opt:l:inline",
+      "-opt-inline-from:**"
     ),
     crossPaths := false,
     scalafmtOnCompile := false,
