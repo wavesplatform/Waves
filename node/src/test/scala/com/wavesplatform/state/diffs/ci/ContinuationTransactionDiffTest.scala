@@ -256,7 +256,6 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
       Recipient.Address(ByteStr(invoke.sender.toAddress.bytes)),
       invoke.sender,
       AttachedPaymentExtractor.extractPayments(invoke, V5, blockchain, DAppTarget).explicitGet(),
-      ByteStr(invoke.dAppAddressOrAlias.bytes),
       invoke.id.value(),
       invoke.fee,
       invoke.feeAssetId.compatId

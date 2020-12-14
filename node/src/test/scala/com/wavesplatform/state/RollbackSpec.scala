@@ -6,7 +6,6 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.SignatureLength
-import com.wavesplatform.database.Keys
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.features.{BlockchainFeatures, _}
