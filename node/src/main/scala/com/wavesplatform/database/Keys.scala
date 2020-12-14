@@ -174,11 +174,22 @@ object Keys {
   def nftAt(addressId: AddressId, index: Int, assetId: IssuedAsset): Key[Option[Unit]] =
     Key.opt(NftPossession, addressId.toByteArray ++ Longs.toByteArray(index) ++ assetId.id.arr, _ => (), _ => Array.emptyByteArray)
 
+/*
   def continuationState(addressId: AddressId, step: Int): Key[ContinuationState] =
     Key(ContinuationStates, addressId.toByteArray ++ Ints.toByteArray(step), readContinuationState, writeContinuationState)
 
   def continuationLastStep(addressId: AddressId): Key[Int] =
     Key(ContinuationLastStep, addressId.toByteArray, Ints.fromByteArray, Ints.toByteArray)
+*/
+
+  def continuationHistory(addressId: AddressId): Key[Seq[(Height, Option[TransactionId])]] =
+    Key(ContinuationHistory, addressId.toByteArray, readContinuationHistory, writeContinuationHistory)
+
+  def continuationState(invokeId: TransactionId, height: Height): Key[(Int, ContinuationState)] =
+    Key(ContinuationHistory, h(height) ++ invokeId.arr, readContinuationState, writeContinuationState)
+
+  def continuationTransactions(invokeId: TransactionId): Key[Seq[(Height, TxNum)]] =
+    Key(ContinuationTransactions, invokeId.arr, readContinuationTransactions, writeContinuationTransactions)
 
   def bloomFilterChecksum(filterName: String): Key[Array[Byte]] = Key(KeyTags.BloomFilterChecksum, filterName.utf8Bytes, identity, identity)
 

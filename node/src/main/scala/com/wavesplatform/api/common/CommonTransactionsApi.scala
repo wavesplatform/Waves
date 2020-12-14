@@ -6,15 +6,13 @@ import com.wavesplatform.block
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.{DBExt, Keys}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
-import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult}
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult, TransactionId}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction}
 import com.wavesplatform.transaction.{ApplicationStatus, Asset, CreateAliasTransaction, Transaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -22,7 +20,6 @@ import monix.reactive.Observable
 import org.iq80.leveldb.DB
 
 import scala.concurrent.Future
-import scala.util.Try
 
 trait CommonTransactionsApi {
   import CommonTransactionsApi._
@@ -131,13 +128,10 @@ object CommonTransactionsApi {
         transactionProof         <- block.transactionProof(transaction, allTransactions)
       } yield transactionProof
 
-    override def continuationTransactionIds(invoke: InvokeScriptTransaction): Seq[ByteStr] = {
-      val ids = for {
-        dAppAddress <- Try(blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet())
-        id          <- Try(db.get(Keys.addressId(dAppAddress)).get)
-        stepsAmount <- Try(db.get(Keys.continuationLastStep(id)))
-      } yield (0 until stepsAmount).map(ContinuationTransaction(invoke.id.value(), _, 0L, Waves).id.value())
-      ids.getOrElse(Nil)
-    }
+    override def continuationTransactionIds(invoke: InvokeScriptTransaction): Seq[ByteStr] =
+      for {
+        (height, num)     <- db.get(Keys.continuationTransactions(TransactionId(invoke.id.value())))
+        (continuation, _) <- db.get(Keys.transactionAt(height, num))
+      } yield continuation.id.value()
   }
 }

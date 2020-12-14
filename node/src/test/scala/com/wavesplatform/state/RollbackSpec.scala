@@ -6,6 +6,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.SignatureLength
+import com.wavesplatform.database.Keys
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.features.{BlockchainFeatures, _}
@@ -25,9 +26,10 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
-import com.wavesplatform.state.diffs.{ENOUGH_AMT}
+import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.transaction.ApplicationStatus.{ScriptExecutionInProgress, Succeeded}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
@@ -203,7 +205,9 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.appendBlock(TestBlock.create(nextTs, genesisBlockId, Seq(lt)))
           d.blockchainUpdater.height shouldBe 2
           val blockWithLeaseId = d.lastBlockId
-          d.blockchainUpdater.leaseDetails(lt.id()) should contain(LeaseDetails(sender.publicKey, recipient.toAddress, 2, leaseAmount, isActive = true))
+          d.blockchainUpdater.leaseDetails(lt.id()) should contain(
+            LeaseDetails(sender.publicKey, recipient.toAddress, 2, leaseAmount, isActive = true)
+          )
           d.blockchainUpdater.leaseBalance(sender.toAddress).out shouldEqual leaseAmount
           d.blockchainUpdater.leaseBalance(recipient.toAddress).in shouldEqual leaseAmount
 
@@ -214,12 +218,16 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               Seq(LeaseCancelTransaction.signed(1.toByte, sender.publicKey, lt.id(), 1, nextTs, sender.privateKey).explicitGet())
             )
           )
-          d.blockchainUpdater.leaseDetails(lt.id()) should contain(LeaseDetails(sender.publicKey, recipient.toAddress, 2, leaseAmount, isActive = false))
+          d.blockchainUpdater.leaseDetails(lt.id()) should contain(
+            LeaseDetails(sender.publicKey, recipient.toAddress, 2, leaseAmount, isActive = false)
+          )
           d.blockchainUpdater.leaseBalance(sender.toAddress).out shouldEqual 0
           d.blockchainUpdater.leaseBalance(recipient.toAddress).in shouldEqual 0
 
           d.removeAfter(blockWithLeaseId)
-          d.blockchainUpdater.leaseDetails(lt.id()) should contain(LeaseDetails(sender.publicKey, recipient.toAddress, 2, leaseAmount, isActive = true))
+          d.blockchainUpdater.leaseDetails(lt.id()) should contain(
+            LeaseDetails(sender.publicKey, recipient.toAddress, 2, leaseAmount, isActive = true)
+          )
           d.blockchainUpdater.leaseBalance(sender.toAddress).out shouldEqual leaseAmount
           d.blockchainUpdater.leaseBalance(recipient.toAddress).in shouldEqual leaseAmount
 
@@ -236,8 +244,18 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.appendBlock(genesisBlock(nextTs, sender.toAddress, initialBalance))
           val genesisBlockId = d.lastBlockId
           val issueTransaction =
-            IssueTransaction(TxVersion.V1, sender.publicKey, "test".utf8Bytes, Array.emptyByteArray, assetAmount, 8, reissuable = true, script = None, 1, nextTs)
-              .signWith(sender.privateKey)
+            IssueTransaction(
+              TxVersion.V1,
+              sender.publicKey,
+              "test".utf8Bytes,
+              Array.emptyByteArray,
+              assetAmount,
+              8,
+              reissuable = true,
+              script = None,
+              1,
+              nextTs
+            ).signWith(sender.privateKey)
 
           d.appendBlock(
             TestBlock.create(
@@ -258,7 +276,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               d.lastBlockId,
               Seq(
                 TransferTransaction
-                  .selfSigned(1.toByte, sender, recipient.toAddress, IssuedAsset(issueTransaction.id()), assetAmount, Waves, 1, ByteStr.empty,  nextTs)
+                  .selfSigned(1.toByte, sender, recipient.toAddress, IssuedAsset(issueTransaction.id()), assetAmount, Waves, 1, ByteStr.empty, nextTs)
                   .explicitGet()
               )
             )
@@ -281,8 +299,18 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           val genesisBlockId = d.lastBlockId
 
           val issueTransaction =
-            IssueTransaction(TxVersion.V1, sender.publicKey, name.utf8Bytes, description.utf8Bytes, 2000, 8.toByte, reissuable = true, script = None, 1, nextTs)
-              .signWith(sender.privateKey)
+            IssueTransaction(
+              TxVersion.V1,
+              sender.publicKey,
+              name.utf8Bytes,
+              description.utf8Bytes,
+              2000,
+              8.toByte,
+              reissuable = true,
+              script = None,
+              1,
+              nextTs
+            ).signWith(sender.privateKey)
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) shouldBe empty
 
           d.appendBlock(
@@ -295,8 +323,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
           val blockIdWithIssue = d.lastBlockId
 
-          val actualDesc = d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id()))
-          val nameBytes = name.toByteString
+          val actualDesc       = d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id()))
+          val nameBytes        = name.toByteString
           val descriptionBytes = description.toByteString
           val desc1 = AssetDescription(issueTransaction.id(), sender.publicKey, nameBytes, descriptionBytes, 8, reissuable = true, BigInt(2000), Height @@ 2, None, 0, false)
           actualDesc shouldBe Some(desc1)
@@ -312,12 +340,36 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           )
 
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
-            AssetDescription(issueTransaction.id(), sender.publicKey, nameBytes, descriptionBytes, 8, reissuable = false, BigInt(4000), Height @@ 2, None, 0, false)
+            AssetDescription(
+              issueTransaction.id(),
+              sender.publicKey,
+              nameBytes,
+              descriptionBytes,
+              8,
+              reissuable = false,
+              BigInt(4000),
+              Height @@ 2,
+              None,
+              0,
+              false
+            )
           )
 
           d.removeAfter(blockIdWithIssue)
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
-            AssetDescription(issueTransaction.id(), sender.publicKey, nameBytes, descriptionBytes, 8, reissuable = true, BigInt(2000), Height @@ 2, None, 0, false)
+            AssetDescription(
+              issueTransaction.id(),
+              sender.publicKey,
+              nameBytes,
+              descriptionBytes,
+              8,
+              reissuable = true,
+              BigInt(2000),
+              Height @@ 2,
+              None,
+              0,
+              false
+            )
           )
 
           d.removeAfter(genesisBlockId)
@@ -832,7 +884,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
              |   let a = !(${List.fill(40)("sigVerify(base64'', base64'', base64'')").mkString("||")})
              |   if (a)
              |     then
-             |       [BooleanEntry("isAllowed", true)]
+             |       [BooleanEntry("key", true)]
              |     else
              |       throw("unexpected")
              | }
@@ -843,26 +895,26 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
         caller  <- accountGen
         dAppAcc <- accountGen
         fee     <- smallFeeGen
-        timestamp = nextTs
-        setScript = SetScriptTransaction.selfSigned(TxVersion.V2, dAppAcc, Some(dApp), fee, timestamp + 1).explicitGet()
+        timestamp     = nextTs
+        setScript     = SetScriptTransaction.selfSigned(TxVersion.V2, dAppAcc, Some(dApp), fee, timestamp + 1).explicitGet()
         paymentAmount = 1234567L
-        invoke = InvokeScriptTransaction
-          .selfSigned(
-            TxVersion.V3,
-            caller,
-            dAppAcc.toAddress,
-            None,
-            Seq(Payment(paymentAmount, Waves)),
-            fee * 10,
-            Waves,
-            InvokeScriptTransaction.DefaultExtraFeePerStep,
-            timestamp + 2
-          )
-          .explicitGet()
-        continuation = ContinuationTransaction(invoke.id.value(), step = 0, fee = 0L, Waves)
-      } yield (timestamp, caller.toAddress, dAppAcc.toAddress, setScript, invoke, continuation, paymentAmount)
+        createInvoke = () =>
+          InvokeScriptTransaction
+            .selfSigned(
+              TxVersion.V3,
+              caller,
+              dAppAcc.toAddress,
+              None,
+              Seq(Payment(paymentAmount, Waves)),
+              fee * 10,
+              Waves,
+              InvokeScriptTransaction.DefaultExtraFeePerStep,
+              nextTs
+            )
+            .explicitGet()
+      } yield (timestamp, caller.toAddress, dAppAcc.toAddress, setScript, createInvoke, paymentAmount)
     } {
-      case (timestamp, caller, dAppAcc, setScript, invoke, continuation, paymentAmount) =>
+      case (timestamp, caller, dAppAcc, setScript, createInvoke, paymentAmount) =>
         withDomain(
           createSettings(
             BlockchainFeatures.SmartAccounts           -> 0,
@@ -871,55 +923,100 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             BlockchainFeatures.ContinuationTransaction -> 0
           )
         ) { d =>
-          val address = d.levelDBWriter.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
-
           d.appendBlock(genesisBlock(timestamp, Map(caller -> ENOUGH_AMT, dAppAcc -> ENOUGH_AMT)))
           d.appendBlock(setScript)
-          val startCallerBalance = d.balance(caller)
-          val startDAppBalance = d.balance(dAppAcc)
-          val beforeInvoke = d.lastBlockId
 
-          d.appendBlock(invoke)
-          val afterInvoke = d.lastBlockId
-          d.balance(caller) shouldBe startCallerBalance - invoke.fee - paymentAmount
-          d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
-          inside(d.blockchainUpdater.continuationStates.toList) {
-            case List((`address`, (0, ContinuationState.InProgress(_, _, _)))) =>
+          def continuation(i: InvokeScriptTransaction, step: Int): ContinuationTransaction =
+            ContinuationTransaction(i.id.value(), step, fee = 0L, Waves)
+
+          def appendAndAssertChain(invoke: InvokeScriptTransaction): ((ByteStr, ByteStr, ByteStr), (Long, Long)) = {
+            val address            = d.levelDBWriter.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
+            val beforeInvoke       = d.lastBlockId
+            val startCallerBalance = d.balance(caller)
+            val startDAppBalance   = d.balance(dAppAcc)
+
+            d.appendBlock(invoke)
+
+            val afterInvoke = d.lastBlockId
+            d.balance(caller) shouldBe startCallerBalance - invoke.fee - paymentAmount
+            d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
+            d.blockchainUpdater.transactionInfo(invoke.id.value()).get._3 shouldBe ScriptExecutionInProgress
+            d.blockchainUpdater.transactionMeta(invoke.id.value()).get._2 shouldBe ScriptExecutionInProgress
+            inside(d.blockchainUpdater.continuationStates.toList) {
+              case List((`address`, (0, ContinuationState.InProgress(_, _, _)))) =>
+            }
+
+            d.appendBlock(continuation(invoke, 0))
+
+            val afterFirstStep = d.lastBlockId
+            d.balance(caller) shouldBe startCallerBalance - invoke.fee - paymentAmount
+            d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
+            inside(d.blockchainUpdater.continuationStates.toList) {
+              case List((`address`, (1, ContinuationState.InProgress(_, _, _)))) =>
+            }
+
+            d.appendBlock(continuation(invoke, 1))
+
+            d.balance(caller) shouldBe startCallerBalance - 3 * FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit - paymentAmount
+            d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
+            d.blockchainUpdater.continuationStates shouldBe Map((address, (2, ContinuationState.Finished(invoke.id.value()))))
+
+            d.appendBlock()
+
+            ((beforeInvoke, afterInvoke, afterFirstStep), (startCallerBalance, startDAppBalance))
           }
 
-          d.appendBlock(continuation)
-          val afterFirstStep = d.lastBlockId
-          d.balance(caller) shouldBe startCallerBalance - invoke.fee - paymentAmount
-          d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
-          inside(d.blockchainUpdater.continuationStates.toList) {
-            case List((`address`, (1, ContinuationState.InProgress(_, _, _)))) =>
+          def assertRollback(
+              invoke: InvokeScriptTransaction,
+              blockIds: (ByteStr, ByteStr, ByteStr),
+              balances: (Long, Long),
+              end: Boolean
+          ) = {
+            d.blockchainUpdater.transactionInfo(invoke.id.value()).get._3 shouldBe Succeeded
+            d.blockchainUpdater.transactionMeta(invoke.id.value()).get._2 shouldBe Succeeded
+
+            val address                                     = d.levelDBWriter.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
+            val (beforeInvoke, afterInvoke, afterFirstStep) = blockIds
+            val (startCallerBalance, startDAppBalance)      = balances
+
+            d.removeAfter(afterFirstStep)
+
+            d.blockchainUpdater.accountData(dAppAcc, "key") shouldBe (if (end) None else Some(BooleanDataEntry("key", true)))
+            d.balance(caller) shouldBe startCallerBalance - invoke.fee - paymentAmount
+            d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
+            d.blockchainUpdater.transactionInfo(invoke.id.value()).get._3 shouldBe ScriptExecutionInProgress
+            d.blockchainUpdater.transactionMeta(invoke.id.value()).get._2 shouldBe ScriptExecutionInProgress
+            inside(d.blockchainUpdater.continuationStates.toList) {
+              case List((`address`, (1, ContinuationState.InProgress(_, _, _)))) =>
+            }
+
+            d.removeAfter(afterInvoke)
+
+            d.balance(caller) shouldBe startCallerBalance - invoke.fee - paymentAmount
+            d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
+            inside(d.blockchainUpdater.continuationStates.toList) {
+              case List((`address`, (0, ContinuationState.InProgress(_, _, _)))) =>
+            }
+
+            d.removeAfter(beforeInvoke)
+
+            d.balance(caller) shouldBe startCallerBalance
+            d.balance(dAppAcc) shouldBe startDAppBalance
+            d.blockchainUpdater.continuationStates shouldBe Map()
           }
 
-          d.appendBlock(continuation.copy(step = 1))
-          d.balance(caller) shouldBe startCallerBalance - 3 * FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit - paymentAmount
-          d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
-          d.blockchainUpdater.continuationStates shouldBe Map((address, (2, ContinuationState.Finished)))
-          d.blockchainUpdater.accountData(dAppAcc, "isAllowed") shouldBe Some(BooleanDataEntry("isAllowed", true))
+          val invoke1                = createInvoke()
+          val (blockIds1, balances1) = appendAndAssertChain(invoke1)
 
-          d.removeAfter(afterFirstStep)
-          d.blockchainUpdater.accountData(dAppAcc, "isAllowed") shouldBe None
-          d.balance(caller) shouldBe startCallerBalance - invoke.fee - paymentAmount
-          d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
-          inside(d.blockchainUpdater.continuationStates.toList) {
-            case List((`address`, (1, ContinuationState.InProgress(_, _, _)))) =>
-          }
+          val invoke2                = createInvoke()
+          val (blockIds2, balances2) = appendAndAssertChain(invoke2)
 
-          d.removeAfter(afterInvoke)
-          d.balance(caller) shouldBe startCallerBalance - invoke.fee - paymentAmount
-          d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
-          inside(d.blockchainUpdater.continuationStates.toList) {
-            case List((`address`, (0, ContinuationState.InProgress(_, _, _)))) =>
-          }
+          val invoke3                = createInvoke()
+          val (blockIds3, balances3) = appendAndAssertChain(invoke3)
 
-          d.removeAfter(beforeInvoke)
-          d.balance(caller) shouldBe startCallerBalance
-          d.balance(dAppAcc) shouldBe startDAppBalance
-          d.blockchainUpdater.continuationStates shouldBe Map()
+          assertRollback(invoke3, blockIds3, balances3, end = false)
+          assertRollback(invoke2, blockIds2, balances2, end = false)
+          assertRollback(invoke1, blockIds1, balances1, end = true)
         }
     }
   }

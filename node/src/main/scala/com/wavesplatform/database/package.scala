@@ -251,26 +251,86 @@ package object database extends ScorexLogging {
     b.array()
   }
 
-  def readContinuationState(bytes: Array[Byte]): ContinuationState = {
+  def readContinuationState(bytes: Array[Byte]): (Int, ContinuationState) = {
+    val step = Ints.fromByteArray(bytes.take(4))
     val pb.ContinuationState(exprBytes, unusedComplexity, invokeScriptTransactionId) =
-      pb.ContinuationState.parseFrom(bytes)
-    val expr = Serde.deserialize(exprBytes.asReadOnlyByteBuffer(), allowObjects = true).explicitGet()
-    ContinuationState.InProgress(expr, unusedComplexity, invokeScriptTransactionId.toByteStr)
+      pb.ContinuationState.parseFrom(bytes.drop(4))
+    val expr  = Serde.deserialize(exprBytes.asReadOnlyByteBuffer(), allowObjects = true).explicitGet()
+    val state = ContinuationState.InProgress(expr, unusedComplexity, invokeScriptTransactionId.toByteStr)
+    (step, state)
   }
 
-  def writeContinuationState(continuationState: ContinuationState): Array[Byte] = {
+  def writeContinuationState(continuationState: (Int, ContinuationState)): Array[Byte] = {
     continuationState match {
-      case ContinuationState.InProgress(expr, unusedComplexity, invokeScriptTransactionId) =>
-        pb.ContinuationState(
+      case (step, ContinuationState.InProgress(expr, unusedComplexity, invokeScriptTransactionId)) =>
+        val stepBytes = Ints.toByteArray(step)
+        val stateBytes = pb
+          .ContinuationState(
             ByteString.copyFrom(Serde.serialize(expr, allowObjects = true)),
             unusedComplexity,
             ByteString.copyFrom(invokeScriptTransactionId.arr)
           )
           .toByteArray
-
-      case ContinuationState.Finished =>
+        stepBytes ++ stateBytes
+      case _ =>
         Array.empty
     }
+  }
+
+  def readContinuationHistory(bytes: Array[Byte]): Seq[(Height, Option[TransactionId])] = {
+    if (bytes == null)
+      Seq()
+    else {
+      val in = newDataInput(bytes)
+      (1 to in.readInt()).map { _ =>
+        val height = Height(in.readInt())
+        val idSize = in.readShort()
+        val id =
+          if (idSize == 0)
+            None
+          else
+            Some(TransactionId(in.readByteStr(idSize)))
+        (height, id)
+      }
+    }
+  }
+
+  def writeContinuationHistory(states: Seq[(Height, Option[TransactionId])]): Array[Byte] = {
+    val out = newDataOutput()
+    out.writeInt(states.size)
+    states.foreach {
+      case (height, maybeId) =>
+        out.writeInt(height)
+        maybeId.fold(out.writeShort(0)) { id =>
+          out.writeShort(id.size)
+          out.writeByteStr(id)
+        }
+    }
+    out.toByteArray
+  }
+
+  def readContinuationTransactions(bytes: Array[Byte]): Seq[(Height, TxNum)] = {
+    if (bytes == null)
+      Seq()
+    else {
+      val in = newDataInput(bytes)
+      (1 to in.readInt()).map { _ =>
+        val height = Height(in.readInt())
+        val num    = TxNum(in.readShort())
+        (height, num)
+      }
+    }
+  }
+
+  def writeContinuationTransactions(continuations: Seq[(Height, TxNum)]): Array[Byte] = {
+    val out = newDataOutput()
+    out.writeInt(continuations.size)
+    continuations.foreach {
+      case (height, num) =>
+        out.writeInt(height)
+        out.writeShort(num)
+    }
+    out.toByteArray
   }
 
   def readSponsorship(data: Array[Byte]): SponsorshipValue = {

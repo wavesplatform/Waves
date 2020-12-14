@@ -1080,12 +1080,15 @@ class UtxPoolSpecification
               )
             )
 
+          val pId = prioritizedInvoke.id.value()
+          val tId = tailInvoke.id.value()
+
           val expectingContinuations =
             (0 to 2).flatMap(
               step =>
                 Seq(
-                  ContinuationTransaction(prioritizedInvoke.id.value(), step, 0L, Waves),
-                  ContinuationTransaction(tailInvoke.id.value(), step, 0L, Waves)
+                  ContinuationTransaction(pId, step, 0L, Waves),
+                  ContinuationTransaction(tId, step, 0L, Waves)
                 )
             )
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1.get shouldBe expectingContinuations
@@ -1097,8 +1100,8 @@ class UtxPoolSpecification
             dAppAcc1
           )
           bcu.processBlock(block).explicitGet()
-          bcu.continuationStates(prioritizedInvoke.dAppAddressOrAlias.asInstanceOf[Address]) shouldBe ((3, ContinuationState.Finished))
-          bcu.continuationStates(tailInvoke.dAppAddressOrAlias.asInstanceOf[Address]) shouldBe ((3, ContinuationState.Finished))
+          bcu.continuationStates(prioritizedInvoke.dAppAddressOrAlias.asInstanceOf[Address]) shouldBe ((3, ContinuationState.Finished(pId)))
+          bcu.continuationStates(tailInvoke.dAppAddressOrAlias.asInstanceOf[Address]) shouldBe ((3, ContinuationState.Finished(tId)))
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe None
       }
 
@@ -1175,7 +1178,7 @@ class UtxPoolSpecification
           )
           bcu.processBlock(block).explicitGet()
 
-          bcu.continuationStates(invoke.dAppAddressOrAlias.asInstanceOf[Address]) shouldBe ((3, ContinuationState.Finished))
+          bcu.continuationStates(invoke.dAppAddressOrAlias.asInstanceOf[Address]) shouldBe ((3, ContinuationState.Finished(invoke.id.value())))
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe None
       }
     }
