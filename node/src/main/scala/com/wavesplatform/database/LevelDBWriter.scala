@@ -289,11 +289,9 @@ abstract class LevelDBWriter private[database] (
         val dAppAddress   = db.get(Keys.idToAddress(dAppAddressId))
         db.get(Keys.continuationHistory(dAppAddressId))
           .foreach {
-            case (height, ids) =>
-              ids.foreach { id =>
+            case (height, id) =>
                 val state = db.get(Keys.continuationState(id, height))
                 states.put(dAppAddress, state)
-              }
           }
       }
     }
@@ -655,7 +653,7 @@ abstract class LevelDBWriter private[database] (
             val invokeId = TransactionId(state.invokeScriptTransactionId)
             if (step == 0) {
               val heightIds = rw.get(Keys.continuationHistory(dAppAddressId))
-              rw.put(Keys.continuationHistory(dAppAddressId), (h, Some(invokeId)) +: heightIds)
+              rw.put(Keys.continuationHistory(dAppAddressId), (h, invokeId) +: heightIds)
             }
             rw.put(Keys.continuationState(invokeId, h), (step, state))
         }

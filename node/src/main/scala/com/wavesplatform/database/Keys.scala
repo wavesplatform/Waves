@@ -48,7 +48,6 @@ object Keys {
   def sponsorshipAssets(height: Int): Key[Seq[IssuedAsset]] =
     Key(SponsoredAssets, h(height), d => readAssetIds(d).map(IssuedAsset), ias => writeAssetIds(ias.map(_.id)))
 
-
   def leaseBalanceHistory(addressId: AddressId): Key[Seq[Int]] = historyKey(LeaseBalanceHistory, addressId.toByteArray)
   def leaseBalance(addressId: AddressId)(height: Int): Key[LeaseBalance] =
     Key(LeaseBalance, hAddr(height, addressId), readLeaseBalance, writeLeaseBalance)
@@ -174,15 +173,7 @@ object Keys {
   def nftAt(addressId: AddressId, index: Int, assetId: IssuedAsset): Key[Option[Unit]] =
     Key.opt(NftPossession, addressId.toByteArray ++ Longs.toByteArray(index) ++ assetId.id.arr, _ => (), _ => Array.emptyByteArray)
 
-/*
-  def continuationState(addressId: AddressId, step: Int): Key[ContinuationState] =
-    Key(ContinuationStates, addressId.toByteArray ++ Ints.toByteArray(step), readContinuationState, writeContinuationState)
-
-  def continuationLastStep(addressId: AddressId): Key[Int] =
-    Key(ContinuationLastStep, addressId.toByteArray, Ints.fromByteArray, Ints.toByteArray)
-*/
-
-  def continuationHistory(addressId: AddressId): Key[Seq[(Height, Option[TransactionId])]] =
+  def continuationHistory(addressId: AddressId): Key[Seq[(Height, TransactionId)]] =
     Key(ContinuationHistory, addressId.toByteArray, readContinuationHistory, writeContinuationHistory)
 
   def continuationState(invokeId: TransactionId, height: Height): Key[(Int, ContinuationState)] =

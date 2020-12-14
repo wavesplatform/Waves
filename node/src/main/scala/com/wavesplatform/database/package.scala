@@ -29,7 +29,15 @@ import com.wavesplatform.state._
 import com.wavesplatform.transaction.ApplicationStatus._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{ApplicationStatus, GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
+import com.wavesplatform.transaction.{
+  ApplicationStatus,
+  GenesisTransaction,
+  LegacyPBSwitch,
+  PaymentTransaction,
+  Transaction,
+  TransactionParsers,
+  TxValidationError
+}
 import com.wavesplatform.utils.{ScorexLogging, _}
 import monix.eval.Task
 import monix.reactive.Observable
@@ -277,7 +285,7 @@ package object database extends ScorexLogging {
     }
   }
 
-  def readContinuationHistory(bytes: Array[Byte]): Seq[(Height, Option[TransactionId])] = {
+  def readContinuationHistory(bytes: Array[Byte]): Seq[(Height, TransactionId)] = {
     if (bytes == null)
       Seq()
     else {
@@ -285,26 +293,20 @@ package object database extends ScorexLogging {
       (1 to in.readInt()).map { _ =>
         val height = Height(in.readInt())
         val idSize = in.readShort()
-        val id =
-          if (idSize == 0)
-            None
-          else
-            Some(TransactionId(in.readByteStr(idSize)))
+        val id     = TransactionId(in.readByteStr(idSize))
         (height, id)
       }
     }
   }
 
-  def writeContinuationHistory(states: Seq[(Height, Option[TransactionId])]): Array[Byte] = {
+  def writeContinuationHistory(states: Seq[(Height, TransactionId)]): Array[Byte] = {
     val out = newDataOutput()
     out.writeInt(states.size)
     states.foreach {
-      case (height, maybeId) =>
+      case (height, id) =>
         out.writeInt(height)
-        maybeId.fold(out.writeShort(0)) { id =>
-          out.writeShort(id.size)
-          out.writeByteStr(id)
-        }
+        out.writeShort(id.size)
+        out.writeByteStr(id)
     }
     out.toByteArray
   }
