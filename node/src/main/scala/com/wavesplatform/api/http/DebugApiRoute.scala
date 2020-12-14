@@ -266,10 +266,10 @@ case class DebugApiRoute(
               .fromPublisher(
                 transactionsApi
                   .transactionsByAddress(address, None, Set.empty, afterOpt)
+                  .take(limit)
                   .map(Json.toJsObject(_))
                   .toReactivePublisher
               )
-              .take(limit)
           }
         }
       }
