@@ -56,7 +56,7 @@ object InvokeScriptTransactionDiff {
           dAppAddress <- TracedResult(dAppAddressEi)
 
           feeInfo <- TracedResult(InvokeDiffsCommon.calcFee(blockchain, tx))
-          runsLimit = BigDecimal((feeInfo._1 - FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit) / ScriptExtraFee).toIntExact + 1
+          runsLimit = BigDecimal((feeInfo._1 - FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit) / ScriptExtraFee).toIntExact
 
           invocationComplexity <- TracedResult {
             InvokeDiffsCommon.getInvocationComplexity(blockchain, tx.funcCall, callableComplexities, dAppAddress)

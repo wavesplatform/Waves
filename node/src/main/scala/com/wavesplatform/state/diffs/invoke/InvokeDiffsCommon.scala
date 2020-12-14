@@ -147,15 +147,11 @@ object InvokeDiffsCommon {
         Either.cond(
           totalScriptsInvoked <= runsLimit && feeInfo.forall(minWaves <= _._1),
           totalScriptsInvoked,
-          if(totalScriptsInvoked <= runsLimit) {
-            FailedTransactionError.feeForActions(
-              s"Fee in $assetName for $txName (${tx.root.assetFee._2} in $assetName)" +
-                s" with $totalScriptsInvoked total scripts invoked$stepsInfo does not exceed minimal value of $minWaves WAVES.",
-              invocationComplexity
-            )
-          } else {
-            ValidationError.ScriptRunsLimitError(s"Too many scripts run while processing actions for $tx")
-          }
+          FailedTransactionError.feeForActions(
+            s"Fee in $assetName for $txName (${tx.root.assetFee._2} in $assetName)" +
+              s" with $totalScriptsInvoked total scripts invoked$stepsInfo does not exceed minimal value of $minWaves WAVES.",
+            invocationComplexity
+          )
         )
       }
 
