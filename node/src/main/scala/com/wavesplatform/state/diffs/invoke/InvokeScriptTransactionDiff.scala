@@ -96,7 +96,6 @@ object InvokeScriptTransactionDiff {
                   Recipient.Address(ByteStr(invoker.bytes)),
                   tx.sender,
                   payments,
-                  ByteStr(tx.dAppAddressOrAlias.bytes),
                   tx.id(),
                   tx.fee,
                   tx.feeAssetId.compatId
