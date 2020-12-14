@@ -571,23 +571,6 @@ abstract class LevelDBWriter private[database] (
         rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.typeId, applicationStatus = toDb(status))))
       }
 
-      transactions
-        .collect {
-          case (_, (c: ContinuationTransaction, num, height, _)) => (c.invokeScriptTransactionId, num, height)
-        }
-        .toSeq
-        .sortBy { case (_, num, _) => num.toShort }
-        .groupMap {
-          case (id, _, _) => TransactionId(id)
-        } {
-          case (_, num, height) => (Height(height), num)
-        }
-        .foreach {
-          case (id, newContinuations) =>
-            val currentContinuations = rw.get(Keys.continuationTransactions(id))
-            rw.put(Keys.continuationTransactions(id), currentContinuations ++ newContinuations)
-        }
-
       val activationWindowSize = settings.functionalitySettings.activationWindowSize(height)
       if (height % activationWindowSize == 0) {
         val minVotes = settings.functionalitySettings.blocksForFeatureActivation(height)
@@ -656,6 +639,23 @@ abstract class LevelDBWriter private[database] (
             }
             rw.put(Keys.continuationState(invokeId, h), Some((step, state)))
           case _ =>
+        }
+
+      transactions
+        .collect {
+          case (_, (c: ContinuationTransaction, num, height, _)) => (c.invokeScriptTransactionId, num, height)
+        }
+        .toSeq
+        .sortBy { case (_, num, _) => num.toShort }
+        .groupMap {
+          case (id, _, _) => TransactionId(id)
+        } {
+          case (_, num, height) => (Height(height), num)
+        }
+        .foreach {
+          case (id, newContinuations) =>
+            val currentContinuations = rw.get(Keys.continuationTransactions(id))
+            rw.put(Keys.continuationTransactions(id), currentContinuations ++ newContinuations)
         }
 
       expiredKeys.foreach(rw.delete(_, "expired-keys"))
