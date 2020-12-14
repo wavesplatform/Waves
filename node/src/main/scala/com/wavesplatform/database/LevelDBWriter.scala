@@ -829,9 +829,6 @@ abstract class LevelDBWriter private[database] (
                         Some(Some((current.flatten.map(_._1).getOrElse(0) + 1, address)))
                   )
 
-                  rw.delete(Keys.invokeScriptResult(h, num))
-                  rw.delete(Keys.continuationState(invokeId, Height(currentHeight)))
-
                 case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))
                 case tx: ExchangeTransaction =>
                   ordersToInvalidate += rollbackOrderFill(rw, tx.buyOrder.id(), currentHeight)
@@ -881,20 +878,25 @@ abstract class LevelDBWriter private[database] (
     data match {
       case (invokeId, Some((count, address))) =>
         readWrite { rw =>
-          val continuations = rw.get(Keys.continuationTransactions(invokeId))
-          rw.put(Keys.continuationTransactions(invokeId), continuations.dropRight(count))
+          val h                = Height(height)
+          val continuations    = rw.get(Keys.continuationTransactions(invokeId))
+          val newContinuations = continuations.dropRight(count)
+          rw.put(Keys.continuationTransactions(invokeId), newContinuations)
+          rw.delete(Keys.continuationState(invokeId, h))
+          rw.delete(Keys.invokeScriptResult(h, TxNum(continuations.last._2)))
 
-          val previousState = previousContinuationState(rw, invokeId, height)
-          continuationStatesCache.put(address, previousState)
-
+          updateContinuationCache(rw, address, newContinuations, invokeId)
           setStatusInProgress(rw, invokeId)
         }
       case _ =>
     }
 
-  private def previousContinuationState(rw: RW, invokeId: TransactionId, height: Int): (Int, ContinuationState) =
-    rw.get(Keys.continuationState(invokeId, Height(height - 1)))
-      .getOrElse(previousContinuationState(rw, invokeId, height - 1))
+  private def updateContinuationCache(rw: RW, address: Address, continuations: Seq[(Height, TxNum)], invokeId: TransactionId): Unit = {
+    val addressId      = rw.get(Keys.addressId(address)).get
+    val previousHeight = continuations.lastOption.getOrElse(rw.get(Keys.continuationHistory(addressId)).head)._1
+    val previousState  = rw.get(Keys.continuationState(invokeId, previousHeight)).get
+    continuationStatesCache.put(address, previousState)
+  }
 
   private def setStatusInProgress(rw: RW, invokeId: TransactionId): Unit = {
     val TransactionMeta(invokeHeight, num, _, _, _) = rw.get(Keys.transactionMetaById(invokeId)).get
