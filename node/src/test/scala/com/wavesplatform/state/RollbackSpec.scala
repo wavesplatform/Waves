@@ -325,7 +325,19 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           val actualDesc       = d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id()))
           val nameBytes        = name.toByteString
           val descriptionBytes = description.toByteString
-          val desc1 = AssetDescription(issueTransaction.id(), sender.publicKey, nameBytes, descriptionBytes, 8, reissuable = true, BigInt(2000), Height @@ 2, None, 0, false)
+          val desc1 = AssetDescription(
+            issueTransaction.id(),
+            sender.publicKey,
+            nameBytes,
+            descriptionBytes,
+            8,
+            reissuable = true,
+            BigInt(2000),
+            Height @@ 2,
+            None,
+            0,
+            false
+          )
           actualDesc shouldBe Some(desc1)
 
           d.appendBlock(
@@ -641,10 +653,10 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             val (_, issueFc) = issueFunctionCallGen.sample.get
 
             val issueTxId = append(startBlockId, issueFc)
-            val asset = getAsset(d, issueTxId)
+            val asset     = getAsset(d, issueTxId)
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
 
-            val issueBlockId = d.lastBlockId
+            val issueBlockId     = d.lastBlockId
             val issueDescription = d.blockchainUpdater.assetDescription(asset)
 
             val (sponsorship, sponsorFc) = sponsorFunctionCallGen(asset.id).sample.get
@@ -928,39 +940,46 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           def continuation(i: InvokeScriptTransaction, step: Int): ContinuationTransaction =
             ContinuationTransaction(i.id.value(), step, fee = 0L, Waves)
 
+          def assertStateInProgress(states: Iterable[(Address, (Int, ContinuationState))], step: Int): Unit =
+            inside(states.toList) {
+              case List((`dAppAcc`, (`step`, ContinuationState.InProgress(_, _, _)))) =>
+            }
+
           def appendAndAssertChain(invoke: InvokeScriptTransaction): ((ByteStr, ByteStr, ByteStr), (Long, Long)) = {
-            val address            = d.levelDBWriter.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
-            val beforeInvoke       = d.lastBlockId
             val startCallerBalance = d.balance(caller)
             val startDAppBalance   = d.balance(dAppAcc)
+            val beforeInvoke       = d.lastBlockId
 
             d.appendBlock(invoke)
-
-            val afterInvoke = d.lastBlockId
             d.balance(caller) shouldBe startCallerBalance - invoke.fee - paymentAmount
             d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
             d.blockchainUpdater.transactionInfo(invoke.id.value()).get._3 shouldBe ScriptExecutionInProgress
             d.blockchainUpdater.transactionMeta(invoke.id.value()).get._2 shouldBe ScriptExecutionInProgress
-            inside(d.blockchainUpdater.continuationStates.toList) {
-              case List((`address`, (0, ContinuationState.InProgress(_, _, _)))) =>
-            }
-
-            d.appendBlock(continuation(invoke, 0))
-
-            val afterFirstStep = d.lastBlockId
-            d.balance(caller) shouldBe startCallerBalance - invoke.fee - paymentAmount
-            d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
-            inside(d.blockchainUpdater.continuationStates.toList) {
-              case List((`address`, (1, ContinuationState.InProgress(_, _, _)))) =>
-            }
-
-            d.appendBlock(continuation(invoke, 1))
-
-            d.balance(caller) shouldBe startCallerBalance - 3 * FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit - paymentAmount
-            d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
-            d.blockchainUpdater.continuationStates shouldBe Map((address, (2, ContinuationState.Finished(invoke.id.value()))))
+            assertStateInProgress(d.blockchainUpdater.continuationStates, 0)
+            val afterInvoke = d.lastBlockId
 
             d.appendBlock()
+            assertStateInProgress(d.levelDBWriter.continuationStates, 0)
+            assertStateInProgress(d.levelDBWriter.loadContinuationStates(), 0)
+
+            d.appendBlock(continuation(invoke, 0))
+            d.balance(caller) shouldBe startCallerBalance - invoke.fee - paymentAmount
+            d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
+            assertStateInProgress(d.blockchainUpdater.continuationStates, 1)
+            val afterFirstStep = d.lastBlockId
+
+            d.appendBlock()
+            assertStateInProgress(d.levelDBWriter.continuationStates, 1)
+            assertStateInProgress(d.levelDBWriter.loadContinuationStates(), 1)
+
+            d.appendBlock(continuation(invoke, 1))
+            d.balance(caller) shouldBe startCallerBalance - 3 * FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit - paymentAmount
+            d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
+            d.blockchainUpdater.continuationStates shouldBe Map((dAppAcc, (2, ContinuationState.Finished(invoke.id.value()))))
+
+            d.appendBlock()
+            d.levelDBWriter.continuationStates shouldBe Map((dAppAcc, (2, ContinuationState.Finished(invoke.id.value()))))
+            d.levelDBWriter.loadContinuationStates() shouldBe Map()
 
             ((beforeInvoke, afterInvoke, afterFirstStep), (startCallerBalance, startDAppBalance))
           }
@@ -974,7 +993,6 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             d.blockchainUpdater.transactionInfo(invoke.id.value()).get._3 shouldBe Succeeded
             d.blockchainUpdater.transactionMeta(invoke.id.value()).get._2 shouldBe Succeeded
 
-            val address                                     = d.levelDBWriter.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
             val (beforeInvoke, afterInvoke, afterFirstStep) = blockIds
             val (startCallerBalance, startDAppBalance)      = balances
 
@@ -985,23 +1003,25 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
             d.blockchainUpdater.transactionInfo(invoke.id.value()).get._3 shouldBe ScriptExecutionInProgress
             d.blockchainUpdater.transactionMeta(invoke.id.value()).get._2 shouldBe ScriptExecutionInProgress
-            inside(d.blockchainUpdater.continuationStates.toList) {
-              case List((`address`, (1, ContinuationState.InProgress(_, _, _)))) =>
-            }
+            assertStateInProgress(d.blockchainUpdater.continuationStates, 1)
+            assertStateInProgress(d.levelDBWriter.continuationStates, 1)
+            assertStateInProgress(d.levelDBWriter.loadContinuationStates(), 1)
 
             d.removeAfter(afterInvoke)
 
             d.balance(caller) shouldBe startCallerBalance - invoke.fee - paymentAmount
             d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
-            inside(d.blockchainUpdater.continuationStates.toList) {
-              case List((`address`, (0, ContinuationState.InProgress(_, _, _)))) =>
-            }
+            assertStateInProgress(d.blockchainUpdater.continuationStates, 0)
+            assertStateInProgress(d.levelDBWriter.continuationStates, 0)
+            assertStateInProgress(d.levelDBWriter.loadContinuationStates(), 0)
 
             d.removeAfter(beforeInvoke)
 
             d.balance(caller) shouldBe startCallerBalance
             d.balance(dAppAcc) shouldBe startDAppBalance
             d.blockchainUpdater.continuationStates shouldBe Map()
+            d.levelDBWriter.continuationStates shouldBe Map()
+            d.levelDBWriter.loadContinuationStates() shouldBe Map()
           }
 
           val invoke1                = createInvoke()

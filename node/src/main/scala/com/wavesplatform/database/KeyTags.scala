@@ -59,7 +59,7 @@ object KeyTags extends Enumeration {
   SponsoredAssets,
   StateHash,
   ContinuationHistory,
-  ContinuationState,
+  ContinuationStateKey,
   ContinuationTransactions = Value
 
   final implicit class KeyTagExt(val t: KeyTag) extends AnyVal {

@@ -176,8 +176,8 @@ object Keys {
   def continuationHistory(addressId: AddressId): Key[Seq[(Height, TransactionId)]] =
     Key(ContinuationHistory, addressId.toByteArray, readContinuationHistory, writeContinuationHistory)
 
-  def continuationState(invokeId: TransactionId, height: Height): Key[(Int, ContinuationState)] =
-    Key(ContinuationHistory, h(height) ++ invokeId.arr, readContinuationState, writeContinuationState)
+  def continuationState(invokeId: TransactionId, height: Height): Key[Option[(Int, ContinuationState.InProgress)]] =
+    Key.opt(ContinuationStateKey, h(height) ++ invokeId.arr, readContinuationState, writeContinuationState)
 
   def continuationTransactions(invokeId: TransactionId): Key[Seq[(Height, TxNum)]] =
     Key(ContinuationTransactions, invokeId.arr, readContinuationTransactions, writeContinuationTransactions)
