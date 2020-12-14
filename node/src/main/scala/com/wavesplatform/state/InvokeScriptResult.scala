@@ -97,11 +97,11 @@ object InvokeScriptResult {
   def fromLangResult(result: ScriptResult): InvokeScriptResult = {
     import com.wavesplatform.lang.v1.traits.{domain => lang}
 
-    implicit def langAddressToAddress(a: lang.Recipient.Address): Address =
+    def langAddressToAddress(a: lang.Recipient.Address): Address =
       Address.fromBytes(a.bytes.arr).explicitGet()
 
     def langTransferToPayment(t: lang.AssetTransfer): Payment =
-      Payment(t.recipient, Asset.fromCompatId(t.assetId), t.amount)
+      Payment(langAddressToAddress(t.recipient), Asset.fromCompatId(t.assetId), t.amount)
 
     result match {
       case ScriptResultV3(ds, ts) =>
