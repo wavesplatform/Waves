@@ -164,25 +164,20 @@ checkPRRaw := Def
       (Test / compile).value
       (`lang-tests` / Test / test).value
       (`lang-js` / Compile / fastOptJS).value
+      (`grpc-server` / Test / test).value
       (node / Test / test).value
     }
   )
   .value
 
 def checkPR: Command = Command.command("checkPR") { state =>
-  val stateForNodeTest = Project
+  val newState = Project
     .extract(state)
-    .appendWithoutSession(Seq(Global / scalacOptions += "-Xfatal-warnings"), state)
-  Project.extract(stateForNodeTest).runTask(checkPRRaw, stateForNodeTest)
-
-  val stateForGrpcTests = Project
-    .extract(state)
-    .appendWithoutSession(Seq(Global / scalacOptions := {
-      val options = (Global / scalacOptions).value
-      options.filterNot(_ == "-deprecation") :+ "-Xfatal-warnings"
-    }), state)
-
-  Project.extract(stateForGrpcTests).runTask(`grpc-server` / Test / test, stateForGrpcTests)
+    .appendWithoutSession(
+      Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings", "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s")),
+      state
+    )
+  Project.extract(newState).runTask(checkPRRaw, newState)
   state
 }
 
