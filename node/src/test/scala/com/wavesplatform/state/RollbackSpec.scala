@@ -975,10 +975,10 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             d.appendBlock(continuation(invoke, 1))
             d.balance(caller) shouldBe startCallerBalance - 3 * FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit - paymentAmount
             d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
-            d.blockchainUpdater.continuationStates shouldBe Map((dAppAcc, (2, ContinuationState.Finished(invoke.id.value()))))
+            d.blockchainUpdater.continuationStates shouldBe Map((dAppAcc, (2, ContinuationState.Finished)))
 
             d.appendBlock()
-            d.levelDBWriter.continuationStates shouldBe Map((dAppAcc, (2, ContinuationState.Finished(invoke.id.value()))))
+            d.levelDBWriter.continuationStates shouldBe Map((dAppAcc, (2, ContinuationState.Finished)))
             d.levelDBWriter.loadContinuationStates() shouldBe Map()
 
             ((beforeInvoke, afterInvoke, afterFirstStep), (startCallerBalance, startDAppBalance))

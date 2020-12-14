@@ -378,7 +378,7 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
         ),
         scriptsComplexity = actualComplexity + actionScriptInvocations * assetScriptComplexity,
         continuationStates =
-          Map((invoke.dAppAddressOrAlias.asInstanceOf[Address], (continuation.step + 1, ContinuationState.Finished(invoke.id.value())))),
+          Map((invoke.dAppAddressOrAlias.asInstanceOf[Address], (continuation.step + 1, ContinuationState.Finished))),
         updatedAssets = Map(scriptedAsset -> Ior.Right(AssetVolumeInfo(true, reissueAmount - burnAmount))),
         replacingTransactions = Seq(
           NewTransactionInfo(continuation.copy(fee = stepFee), Set(), Succeeded),

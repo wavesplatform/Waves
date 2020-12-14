@@ -145,12 +145,10 @@ case class NewTransactionInfo(transaction: Transaction, affected: Set[Address], 
 
 case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: AssetVolumeInfo)
 
-sealed trait ContinuationState {
-  val invokeScriptTransactionId: ByteStr
-}
+sealed trait ContinuationState
 object ContinuationState {
   case class InProgress(expr: EXPR, unusedComplexity: Int, invokeScriptTransactionId: ByteStr) extends ContinuationState
-  case class Finished(invokeScriptTransactionId: ByteStr)                                      extends ContinuationState
+  case object Finished                                                                         extends ContinuationState
 }
 
 case class Diff(
