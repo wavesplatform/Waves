@@ -21,44 +21,42 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
     responseObserver.interceptErrors {
       val transactionIds = request.transactionIds.map(_.toByteStr)
       val stream: Observable[TransactionMeta] = request.recipient match {
+        // By recipient
         case Some(subject) =>
+          val recipientAddrOrAlias = subject
+            .toAddressOrAlias(AddressScheme.current.chainId)
+            .fold(e => throw new IllegalArgumentException(e.toString), identity)
+
+          val maybeSender = Option(request.sender)
+            .collect { case s if !s.isEmpty => s.toAddress }
+
           commonApi.transactionsByAddress(
-            subject
-              .toAddressOrAlias(AddressScheme.current.chainId)
-              .fold(e => throw new IllegalArgumentException(e.toString), identity),
-            Option(request.sender).collect { case s if !s.isEmpty => s.toAddress },
+            recipientAddrOrAlias,
+            maybeSender,
             Set.empty,
             None
           )
+
+        // By sender
+        case None if !request.sender.isEmpty =>
+          val senderAddress = request.sender.toAddress
+          commonApi.transactionsByAddress(
+            senderAddress,
+            Some(senderAddress),
+            Set.empty,
+            None
+          )
+
+        // By ids
         case None =>
-          if (request.sender.isEmpty) {
-            Observable.fromIterable(transactionIds.flatMap(commonApi.transactionById)).map { meta =>
-              TransactionMeta.Default(meta.height, meta.transaction, meta.succeeded)
-            }
-          } else {
-            val senderAddress = request.sender.toAddress
-            commonApi.transactionsByAddress(
-              senderAddress,
-              Some(senderAddress),
-              Set.empty,
-              None
-            )
-          }
+          Observable.fromIterable(transactionIds.flatMap(commonApi.transactionById))
       }
 
       val transactionIdSet = transactionIds.toSet
-
       responseObserver.completeWith(
         stream
           .filter { case TransactionMeta(_, tx, _) => transactionIdSet.isEmpty || transactionIdSet(tx.id()) }
-          .map {
-            case TransactionMeta(h, tx, false) =>
-              TransactionResponse(tx.id().toByteString, h, Some(tx.toPB), ApplicationStatus.SCRIPT_EXECUTION_FAILED)
-            case TransactionMeta.Invoke(h, tx, _, result) =>
-              TransactionResponse(tx.id().toByteString, h, Some(tx.toPB), ApplicationStatus.SUCCEEDED, result.map(VISR.toPB))
-            case TransactionMeta(h, tx, _) =>
-              TransactionResponse(tx.id().toByteString, h, Some(tx.toPB), ApplicationStatus.SUCCEEDED)
-          }
+          .map(TransactionsApiGrpcImpl.toTransactionResponse)
       )
     }
 
@@ -118,4 +116,18 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
       result  <- commonApi.broadcastTransaction(vtx)
       _       <- result.resultE.toFuture
     } yield tx).wrapErrors
+}
+
+private object TransactionsApiGrpcImpl {
+  def toTransactionResponse(meta: TransactionMeta): TransactionResponse = {
+    val TransactionMeta(height, tx, succeeded) = meta
+    val transactionId                          = tx.id().toByteString
+    val status                                 = if (succeeded) ApplicationStatus.SUCCEEDED else ApplicationStatus.SCRIPT_EXECUTION_FAILED
+    val invokeScriptResult = meta match {
+      case TransactionMeta.Invoke(_, _, _, r) => r.map(VISR.toPB)
+      case _                                  => None
+    }
+
+    TransactionResponse(transactionId, height, Some(tx.toPB), status, invokeScriptResult)
+  }
 }
