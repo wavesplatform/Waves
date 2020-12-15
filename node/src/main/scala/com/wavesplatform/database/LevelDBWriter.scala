@@ -1123,4 +1123,7 @@ abstract class LevelDBWriter private[database] (
 
     txs.toList
   }
+
+  override def continuationsCount(invokeId: ByteStr): Int =
+    readOnly(_.get(Keys.continuationTransactions(TransactionId(invokeId)))).size
 }

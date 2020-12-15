@@ -137,7 +137,7 @@ object ContinuationTransactionDiff {
               replacingTransactions = Seq(NewTransactionInfo(tx.copy(fee = stepFee), Set(), Succeeded)),
               scriptsRun = scriptsRun,
               scriptsComplexity = limit - ir.unusedComplexity
-            ).addContinuationState(dAppAddress, tx.step + 1, newState)
+            ).addContinuationState(dAppAddress, tx.step, newState)
           )
       }
     } yield resultDiff

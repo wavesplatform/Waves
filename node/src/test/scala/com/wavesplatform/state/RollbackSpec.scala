@@ -962,7 +962,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             assertStateInProgress(d.levelDBWriter.continuationStates, 0)
             assertStateInProgress(d.levelDBWriter.loadContinuationStates(), 0)
 
-            d.appendBlock(continuation(invoke, 0))
+            d.appendBlock(continuation(invoke, 1))
             d.balance(caller) shouldBe startCallerBalance - invoke.fee - paymentAmount
             d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
             assertStateInProgress(d.blockchainUpdater.continuationStates, 1)
@@ -972,7 +972,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             assertStateInProgress(d.levelDBWriter.continuationStates, 1)
             assertStateInProgress(d.levelDBWriter.loadContinuationStates(), 1)
 
-            d.appendBlock(continuation(invoke, 1))
+            d.appendBlock(continuation(invoke, 2))
             d.balance(caller) shouldBe startCallerBalance - 3 * FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit - paymentAmount
             d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
             d.blockchainUpdater.continuationStates shouldBe Map((dAppAcc, (2, ContinuationState.Finished)))

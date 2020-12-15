@@ -286,11 +286,11 @@ object InvokeDiffsCommon {
       failed: Boolean
   ): Diff = {
     val dAppAddress                      = blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
-    val diffWithState                    = diff.addContinuationState(dAppAddress, tx.step + 1, ContinuationState.Finished)
+    val diffWithState                    = diff.addContinuationState(dAppAddress, tx.step, ContinuationState.Finished)
     val StepInfo(_, stepFee, scriptsRun) = stepInfo(diffWithState, blockchain, invoke)
     val status                           = if (failed) ScriptExecutionFailed else Succeeded
     diffWithState |+| Diff.empty.copy(
-      portfolios = unusedFeePortfolios(tx, invoke, blockchain, stepFee),
+      portfolios = unusedFeePortfolios(invoke, blockchain, stepFee),
       scriptsRun = scriptsRun,
       scriptsComplexity = spentComplexity,
       replacingTransactions = Seq(
@@ -330,12 +330,11 @@ object InvokeDiffsCommon {
   }
 
   def unusedFeePortfolios(
-      tx: ContinuationTransaction,
       invoke: InvokeScriptTransaction,
       blockchain: Blockchain,
       lastStepFee: Long
   ): Map[Address, Portfolio] = {
-    val consumedFee = (tx.step + 1) * expectedStepFeeInAttachedAsset(invoke, blockchain) + lastStepFee
+    val consumedFee = (blockchain.continuationsCount(invoke.id.value()) + 1) * expectedStepFeeInAttachedAsset(invoke, blockchain) + lastStepFee
     val unusedFee   = invoke.fee - consumedFee
     invoke.assetFee._1 match {
       case Waves =>

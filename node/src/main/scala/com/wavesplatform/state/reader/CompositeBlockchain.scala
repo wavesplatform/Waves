@@ -159,6 +159,9 @@ final case class CompositeBlockchain(
 
   override def continuationStates: collection.Map[Address, (Int, ContinuationState)] =
     inner.continuationStates ++ diff.continuationStates
+
+  override def continuationsCount(invokeId: ByteStr): Int =
+    inner.continuationsCount(invokeId)
 }
 
 object CompositeBlockchain {

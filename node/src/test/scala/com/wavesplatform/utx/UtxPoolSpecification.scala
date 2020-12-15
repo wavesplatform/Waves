@@ -42,7 +42,7 @@ import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
-import org.scalatest.{EitherValues, FreeSpec, Matchers}
+import org.scalatest.{EitherValues, FreeSpec, Inside, Matchers}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.collection.mutable.ListBuffer
@@ -75,7 +75,8 @@ class UtxPoolSpecification
     with BlocksTransactionsHelpers
     with WithDomain
     with EitherValues
-    with Eventually {
+    with Eventually
+    with Inside {
   private val PoolDefaultMaxBytes = 50 * 1024 * 1024 // 50 MB
 
   import FeeValidation.{ScriptExtraFee => extraFee}
@@ -1080,25 +1081,32 @@ class UtxPoolSpecification
               )
             )
 
-          val expectingContinuations =
-            (0 to 2).flatMap(
-              step =>
+          val prioritizedId = prioritizedInvoke.id.value()
+          val tailId        = tailInvoke.id.value()
+
+          val packResult = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1
+          inside(packResult) {
+            case Some(
                 Seq(
-                  ContinuationTransaction(prioritizedInvoke.id.value(), step, 0L, Waves),
-                  ContinuationTransaction(tailInvoke.id.value(), step, 0L, Waves)
+                  ContinuationTransaction(`prioritizedId`, _, 0L, Waves),
+                  ContinuationTransaction(`tailId`, _, 0L, Waves),
+                  ContinuationTransaction(`prioritizedId`, _, 0L, Waves),
+                  ContinuationTransaction(`tailId`, _, 0L, Waves),
+                  ContinuationTransaction(`prioritizedId`, _, 0L, Waves),
+                  ContinuationTransaction(`tailId`, _, 0L, Waves)
                 )
-            )
-          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1.get shouldBe expectingContinuations
+                ) =>
+          }
 
           val block = TestBlock.create(
             time.getTimestamp(),
             bcu.lastBlockId.get,
-            expectingContinuations,
+            packResult.get,
             dAppAcc1
           )
           bcu.processBlock(block).explicitGet()
-          bcu.continuationStates(prioritizedInvoke.dAppAddressOrAlias.asInstanceOf[Address]) shouldBe ((3, ContinuationState.Finished))
-          bcu.continuationStates(tailInvoke.dAppAddressOrAlias.asInstanceOf[Address]) shouldBe ((3, ContinuationState.Finished))
+          bcu.continuationStates(prioritizedInvoke.dAppAddressOrAlias.asInstanceOf[Address])._2 shouldBe ContinuationState.Finished
+          bcu.continuationStates(tailInvoke.dAppAddressOrAlias.asInstanceOf[Address])._2 shouldBe ContinuationState.Finished
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe None
       }
 
@@ -1163,19 +1171,26 @@ class UtxPoolSpecification
           bcu.processBlock(transferBlock) should produce("BlockedByContinuation")
           utx.putIfNew(transfer).resultE.explicitGet()
 
-          val continuations = (0 to 2).flatMap(step => Seq(ContinuationTransaction(invoke.id.value(), step, 0L, Waves)))
-          val expectingTxs  = continuations :+ transfer
-          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1.get shouldBe expectingTxs
+          val invokeId = invoke.id.value()
+          val packResult = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1
+          inside(packResult) {
+            case Some(Seq(
+            ContinuationTransaction(`invokeId`, _, 0L, Waves),
+            ContinuationTransaction(`invokeId`, _, 0L, Waves),
+            ContinuationTransaction(`invokeId`, _, 0L, Waves),
+            `transfer`
+            )) =>
+          }
 
           val block = TestBlock.create(
             time.getTimestamp(),
             bcu.lastBlockId.get,
-            expectingTxs,
+            packResult.get,
             dAppAcc
           )
           bcu.processBlock(block).explicitGet()
 
-          bcu.continuationStates(invoke.dAppAddressOrAlias.asInstanceOf[Address]) shouldBe ((3, ContinuationState.Finished))
+          bcu.continuationStates(invoke.dAppAddressOrAlias.asInstanceOf[Address])._2 shouldBe ContinuationState.Finished
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe None
       }
     }

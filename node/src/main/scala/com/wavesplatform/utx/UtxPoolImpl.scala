@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
 import scala.jdk.CollectionConverters._
-import scala.util.{Left, Right}
+import scala.util.{Left, Random, Right}
 
 //noinspection ScalaStyle
 class UtxPoolImpl(
@@ -415,9 +415,17 @@ class UtxPoolImpl(
       def continuations(seed: PackResult): Iterable[ContinuationTransaction] =
         (blockchain.continuationStates ++ seed.totalDiff.continuationStates)
           .collect {
-            case (_, (step, ContinuationState.InProgress(_, _, invokeId))) =>
-              ContinuationTransaction(invokeId, step, 0L, Waves)
+            case (_, (_, ContinuationState.InProgress(_, _, invokeId))) =>
+              generateContinuation(invokeId)
           }
+
+      @tailrec def generateContinuation(invokeId: ByteStr): ContinuationTransaction = {
+        val c = ContinuationTransaction(invokeId, Random.nextInt(Int.MaxValue), 0L, Waves)
+        if (blockchain.containsTransaction(c) || transactions.contains(c))
+          generateContinuation(invokeId)
+        else
+          c
+      }
 
       def allValidated(seed: PackResult) : Boolean =
         (transactions.keys().asScala ++ priorityPool.priorityTransactionIds ++ continuations(seed).map(_.id.value()))
