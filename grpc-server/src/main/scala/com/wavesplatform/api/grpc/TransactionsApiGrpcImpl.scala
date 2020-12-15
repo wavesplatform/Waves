@@ -2,9 +2,11 @@ package com.wavesplatform.api.grpc
 
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.common.CommonTransactionsApi
+import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBRecipientImplicitConversionOps
+import com.wavesplatform.state.{InvokeScriptResult => VISR}
 import com.wavesplatform.transaction.Authorized
 import io.grpc.stub.StreamObserver
 import io.grpc.{Status, StatusRuntimeException}
@@ -18,41 +20,43 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
   override def getTransactions(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit =
     responseObserver.interceptErrors {
       val transactionIds = request.transactionIds.map(_.toByteStr)
-      val stream = request.recipient match {
+      val stream: Observable[TransactionMeta] = request.recipient match {
+        // By recipient
         case Some(subject) =>
+          val recipientAddrOrAlias = subject
+            .toAddressOrAlias(AddressScheme.current.chainId)
+            .fold(e => throw new IllegalArgumentException(e.toString), identity)
+
+          val maybeSender = Option(request.sender)
+            .collect { case s if !s.isEmpty => s.toAddress }
+
           commonApi.transactionsByAddress(
-            subject
-              .toAddressOrAlias(AddressScheme.current.chainId)
-              .fold(e => throw new IllegalArgumentException(e.toString), identity),
-            Option(request.sender).collect { case s if !s.isEmpty => s.toAddress },
+            recipientAddrOrAlias,
+            maybeSender,
             Set.empty,
             None
           )
+
+        // By sender
+        case None if !request.sender.isEmpty =>
+          val senderAddress = request.sender.toAddress
+          commonApi.transactionsByAddress(
+            senderAddress,
+            Some(senderAddress),
+            Set.empty,
+            None
+          )
+
+        // By ids
         case None =>
-          if (request.sender.isEmpty) {
-            Observable.fromIterable(transactionIds.flatMap(commonApi.transactionById)).map {
-              case (h, e, s) => (h, e.fold(identity, _._1), s)
-            }
-          } else {
-            val senderAddress = request.sender.toAddress
-            commonApi.transactionsByAddress(
-              senderAddress,
-              Some(senderAddress),
-              Set.empty,
-              None
-            )
-          }
+          Observable.fromIterable(transactionIds.flatMap(commonApi.transactionById))
       }
 
       val transactionIdSet = transactionIds.toSet
-
       responseObserver.completeWith(
         stream
-          .filter { case (_, t, _) => transactionIdSet.isEmpty || transactionIdSet(t.id()) }
-          .map {
-            case (h, tx, false) => TransactionResponse(tx.id().toByteString, h, Some(tx.toPB), ApplicationStatus.SCRIPT_EXECUTION_FAILED)
-            case (h, tx, _)     => TransactionResponse(tx.id().toByteString, h, Some(tx.toPB), ApplicationStatus.SUCCEEDED)
-          }
+          .filter { case TransactionMeta(_, tx, _) => transactionIdSet.isEmpty || transactionIdSet(tx.id()) }
+          .map(TransactionsApiGrpcImpl.toTransactionResponse)
       )
     }
 
@@ -74,13 +78,11 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
 
   override def getStateChanges(request: TransactionsRequest, responseObserver: StreamObserver[InvokeScriptResultResponse]): Unit =
     responseObserver.interceptErrors {
-      import com.wavesplatform.state.{InvokeScriptResult => VISR}
-
       val result = Observable(request.transactionIds: _*)
         .flatMap(txId => Observable.fromIterable(commonApi.transactionById(txId.toByteStr)))
         .collect {
-          case (_, Right((tx, Some(isr))), _) =>
-            InvokeScriptResultResponse.of(Some(PBTransactions.protobuf(tx)), Some(VISR.toPB(isr)))
+          case CommonTransactionsApi.TransactionMeta.Invoke(_, transaction, _, invokeScriptResult) =>
+            InvokeScriptResultResponse.of(Some(PBTransactions.protobuf(transaction)), invokeScriptResult.map(VISR.toPB))
         }
 
       responseObserver.completeWith(result)
@@ -93,9 +95,9 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
           .unconfirmedTransactionById(txId.toByteStr)
           .map(_ => TransactionStatus(txId, TransactionStatus.Status.UNCONFIRMED))
           .orElse {
-            commonApi.transactionById(txId.toByteStr).map {
-              case (h, _, false) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h, ApplicationStatus.SCRIPT_EXECUTION_FAILED)
-              case (h, _, _)     => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h, ApplicationStatus.SUCCEEDED)
+            commonApi.transactionById(txId.toByteStr).map { m =>
+              val status = if (m.succeeded) ApplicationStatus.SUCCEEDED else ApplicationStatus.SCRIPT_EXECUTION_FAILED
+              TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, m.height, status)
             }
           }
           .getOrElse(TransactionStatus(txId, TransactionStatus.Status.NOT_EXISTS))
@@ -114,4 +116,18 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
       result  <- commonApi.broadcastTransaction(vtx)
       _       <- result.resultE.toFuture
     } yield tx).wrapErrors
+}
+
+private object TransactionsApiGrpcImpl {
+  def toTransactionResponse(meta: TransactionMeta): TransactionResponse = {
+    val TransactionMeta(height, tx, succeeded) = meta
+    val transactionId                          = tx.id().toByteString
+    val status                                 = if (succeeded) ApplicationStatus.SUCCEEDED else ApplicationStatus.SCRIPT_EXECUTION_FAILED
+    val invokeScriptResult = meta match {
+      case TransactionMeta.Invoke(_, _, _, r) => r.map(VISR.toPB)
+      case _                                  => None
+    }
+
+    TransactionResponse(transactionId, height, Some(tx.toPB), status, invokeScriptResult)
+  }
 }

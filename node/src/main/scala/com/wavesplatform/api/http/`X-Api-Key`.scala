@@ -1,4 +1,4 @@
-package com.wavesplatform.http
+package com.wavesplatform.api.http
 
 import akka.http.scaladsl.model.headers._
 
