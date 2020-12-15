@@ -9,7 +9,7 @@ import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult}
 import com.wavesplatform.state.InvokeScriptResult
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.TxValidationError.{ScriptExecutionError, TransactionNotAllowedByScript}
+import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, ScriptExecutionError, TransactionNotAllowedByScript}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -24,16 +24,14 @@ sealed abstract class TraceStep {
 
 case class AccountVerifierTrace(
     address: Address,
-    errorO: Option[ValidationError]
+    errorOpt: Option[ValidationError]
 ) extends TraceStep {
 
-  override lazy val json: JsObject = Json.obj(
-    "type" -> "verifier",
-    "id"   -> address.stringRepr
-  ) ++ (errorO match {
-    case Some(e) => Json.obj("error"  -> TraceStep.errorJson(e))
-    case None    => Json.obj("result" -> "ok")
-  })
+  override lazy val json: JsObject = Json
+    .obj(
+      "type" -> "verifier",
+      "id"   -> address.stringRepr
+    ) ++ TraceStep.maybeErrorJson(errorOpt)
 }
 
 object AssetVerifierTrace {
@@ -71,10 +69,7 @@ case class AssetVerifierTrace(
     "type"    -> "asset",
     "context" -> context.toString.updated(0, context.toString.charAt(0).toLower),
     "id"      -> id.toString
-  ) ++ (errorOpt match {
-    case Some(e) => Json.obj("error"  -> TraceStep.errorJson(e))
-    case None    => Json.obj("result" -> "ok")
-  })
+  ) ++ TraceStep.maybeErrorJson(errorOpt)
 }
 
 case class InvokeScriptTrace(
@@ -91,31 +86,32 @@ case class InvokeScriptTrace(
       "type"     -> "dApp",
       "id"       -> dAppAddressOrAlias.stringRepr,
       "function" -> functionCall.function.funcName,
-      "args"     -> functionCall.args.map(_.toString),
-      resultE match {
-        case Right(value) =>
-          "result" -> (TraceStep.scriptResultJson(value) ++ (if (logged) Json.obj(TraceStep.logJson(log)) else JsObject.empty))
-        case Left(e) => "error" -> TraceStep.errorJson(e)
-      }
-    )
+      "args"     -> functionCall.args.map(_.toString)
+    ) ++ (resultE match {
+      case Right(value) => TraceStep.maybeErrorJson(None) ++ Json.obj("result" -> TraceStep.scriptResultJson(value))
+      case Left(e)      => TraceStep.maybeErrorJson(Some(e))
+    }) ++ (if (logged) Json.obj(TraceStep.logJson(log)) else JsObject.empty)
   }
-
 }
 
 object TraceStep {
-  def scriptResultJson(v: ScriptResult): JsObject =
+  private[trace] def scriptResultJson(v: ScriptResult): JsObject =
     Json.toJsObject(InvokeScriptResult.fromLangResult(v))
 
-  def errorJson(e: ValidationError): JsValue = e match {
-    case see: ScriptExecutionError          => Json.obj(logType(see.isAssetScript), logJson(see.log), "reason" -> see.error)
-    case tne: TransactionNotAllowedByScript => Json.obj(logType(tne.isAssetScript), logJson(tne.log))
-    case a                                  => JsString(a.toString)
+  private[trace] def maybeErrorJson(errorOpt: Option[ValidationError]): JsObject =
+    errorOpt match {
+      case Some(e) => Json.obj("result" -> "failure") ++ TraceStep.errorJson(e)
+      case None    => Json.obj("result" -> "success", "error" -> JsNull)
+    }
+
+  private def errorJson(e: ValidationError): JsObject = e match {
+    case see: ScriptExecutionError          => Json.obj(logJson(see.log), "error" -> see.error)
+    case tne: TransactionNotAllowedByScript => Json.obj(logJson(tne.log), "error" -> JsNull)
+    case fte: FailedTransactionError        => Json.obj(logJson(fte.log), "error" -> fte.error.map(JsString))
+    case a                                  => Json.obj("error"                   -> a.toString)
   }
 
-  private def logType(isAssetScript: Boolean): (String, JsValueWrapper) =
-    "type" -> (if (isAssetScript) "asset" else "account")
-
-  def logJson(l: Log[Id]): (String, JsValueWrapper) =
+  private[trace] def logJson(l: Log[Id]): (String, JsValueWrapper) =
     "vars" -> l.map {
       case (k, Right(v))  => Json.obj("name" -> k) ++ serializeVarValue(v)
       case (k, Left(err)) => Json.obj("name" -> k, "error" -> err)

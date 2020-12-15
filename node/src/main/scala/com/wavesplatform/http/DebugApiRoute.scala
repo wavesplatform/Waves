@@ -223,8 +223,10 @@ case class DebugApiRoute(
     path("validate")(jsonPost[JsObject] { jsv =>
       val startTime = System.nanoTime()
 
+      val parsedTransaction = TransactionFactory.fromSignedRequest(jsv)
+
       val tracedDiff = for {
-        tx   <- TracedResult(TransactionFactory.fromSignedRequest(jsv))
+        tx   <- TracedResult(parsedTransaction)
         diff <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, tx)
       } yield (tx, diff)
 
@@ -233,12 +235,20 @@ case class DebugApiRoute(
         case Left(err)         => Some(err)
       }
 
+      val transactionJson = parsedTransaction match {
+        case Right(tx) => tx.json()
+        case Left(_)   => jsv
+      }
+
       val response = Json.obj(
         "valid"          -> error.isEmpty,
         "validationTime" -> (System.nanoTime() - startTime).nanos.toMillis,
         "trace"          -> tracedDiff.trace.map(_.loggedJson)
       )
-      error.fold(response)(err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)))
+
+      error.fold(response ++ transactionJson)(
+        err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)) + ("transaction" -> transactionJson)
+      )
     })
 
   def stateChanges: Route = stateChangesById ~ stateChangesByAddress

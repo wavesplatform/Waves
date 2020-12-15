@@ -175,13 +175,13 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
 
       val route = debugApiRoute.copy(blockchain = blockchain).route
       val tx    = TxHelpers.exchange(TxHelpers.order(OrderType.BUY, TestValues.asset), TxHelpers.order(OrderType.SELL, TestValues.asset))
-      jsonPost(routePath("/validate"), tx.json()) ~> ApiKeyHeader ~> route ~> check {
+      jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
         val json = Json.parse(responseAs[String])
         (json \ "valid").as[Boolean] shouldBe false
         (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
         (json \ "error").as[String] should include("not allowed by script of the asset")
         (json \ "trace").as[JsArray] shouldBe Json.parse(
-          "[{\"type\":\"asset\",\"context\":\"orderAmount\",\"id\":\"5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx\",\"error\":{\"type\":\"asset\",\"vars\":[],\"reason\":\"error\"}}]"
+          "[{\"type\":\"asset\",\"context\":\"orderAmount\",\"id\":\"5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx\",\"result\":\"failure\",\"vars\":[],\"error\":\"error\"}]"
         )
       }
     }
@@ -233,7 +233,10 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
                |]
                |
                |@Callable(i)
-               |func issue() = [Issue("name", "description", 1000, 4, true, unit, 0)]
+               |func issue() = {
+               |  let docimals = 4
+               |  [Issue("name", "description", 1000, docimals, true, unit, 0)]
+               |}
                |
                |@Callable(i)
                |func reissue() = [Reissue(base58'${TestValues.asset}', 1, false)]
@@ -264,8 +267,14 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
       def testFunction(name: String, result: InvokeScriptTransaction => String) = {
         val tx = TxHelpers.invoke(TxHelpers.defaultAddress, name, fee = 102500000)
 
-        jsonPost(routePath("/validate"), tx.json()) ~> ApiKeyHeader ~> route ~> check {
+        jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
           val json  = Json.parse(responseAs[String])
+
+          if ((json \ "valid").as[Boolean])
+            assert(tx.json().fieldSet subsetOf json.as[JsObject].fieldSet)
+          else
+            (json \ "transaction").as[JsObject] shouldBe tx.json()
+
           val trace = Json.prettyPrint((json \ "trace").as[JsArray])
           if (trace != result(tx)) println(trace)
           trace shouldBe result(tx)
@@ -275,8 +284,14 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
       def testPayment(result: String) = {
         val tx = TxHelpers.invoke(TxHelpers.signer(1).toAddress, "test", fee = 800000, payments = Seq(Payment(1L, TestValues.asset)))
 
-        jsonPost(routePath("/validate"), tx.json()) ~> ApiKeyHeader ~> route ~> check {
+        jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
           val json  = Json.parse(responseAs[String])
+
+          if ((json \ "valid").as[Boolean])
+            assert(tx.json().fieldSet subsetOf json.as[JsObject].fieldSet)
+          else
+            (json \ "transaction").as[JsObject] shouldBe tx.json()
+
           val trace = Json.prettyPrint((json \ "trace").as[JsArray])
           if (trace != result) println(trace)
           trace shouldBe result
@@ -286,7 +301,8 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
       testPayment("""[ {
                     |  "type" : "verifier",
                     |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                    |  "result" : "ok"
+                    |  "result" : "success",
+                    |  "error" : null
                     |}, {
                     |  "type" : "dApp",
                     |  "id" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
@@ -298,69 +314,72 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
                     |    "issues" : [ ],
                     |    "reissues" : [ ],
                     |    "burns" : [ ],
-                    |    "sponsorFees" : [ ],
-                    |    "vars" : [ ]
-                    |  }
+                    |    "sponsorFees" : [ ]
+                    |  },
+                    |  "error" : null,
+                    |  "vars" : [ ]
                     |}, {
                     |  "type" : "asset",
                     |  "context" : "payment",
                     |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-                    |  "error" : {
-                    |    "type" : "asset",
-                    |    "vars" : [ ],
-                    |    "reason" : "error"
-                    |  }
+                    |  "result" : "failure",
+                    |  "vars" : [ ],
+                    |  "error" : "error"
                     |} ]""".stripMargin)
 
       testFunction(
         "dataAndTransfer",
         _ => """[ {
-          |  "type" : "verifier",
-          |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-          |  "result" : "ok"
-          |}, {
-          |  "type" : "dApp",
-          |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-          |  "function" : "dataAndTransfer",
-          |  "args" : [ ],
-          |  "result" : {
-          |    "data" : [ {
-          |      "key" : "key",
-          |      "type" : "integer",
-          |      "value" : 1
-          |    }, {
-          |      "key" : "key",
-          |      "type" : "boolean",
-          |      "value" : true
-          |    }, {
-          |      "key" : "key",
-          |      "type" : "string",
-          |      "value" : "str"
-          |    }, {
-          |      "key" : "key",
-          |      "type" : "binary",
-          |      "value" : "base64:"
-          |    }, {
-          |      "key" : "key",
-          |      "value" : null
-          |    } ],
-          |    "transfers" : [ {
-          |      "address" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
-          |      "asset" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-          |      "amount" : 1
-          |    } ],
-          |    "issues" : [ ],
-          |    "reissues" : [ ],
-          |    "burns" : [ ],
-          |    "sponsorFees" : [ ],
-          |    "vars" : [ ]
-          |  }
-          |}, {
-          |  "type" : "asset",
-          |  "context" : "transfer",
-          |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-          |  "error" : "FailedTransactionError(code = 3, error = Transaction is not allowed by script of the asset 5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx: error, log =)"
-          |} ]""".stripMargin
+               |  "type" : "verifier",
+               |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+               |  "result" : "success",
+               |  "error" : null
+               |}, {
+               |  "type" : "dApp",
+               |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+               |  "function" : "dataAndTransfer",
+               |  "args" : [ ],
+               |  "result" : {
+               |    "data" : [ {
+               |      "key" : "key",
+               |      "type" : "integer",
+               |      "value" : 1
+               |    }, {
+               |      "key" : "key",
+               |      "type" : "boolean",
+               |      "value" : true
+               |    }, {
+               |      "key" : "key",
+               |      "type" : "string",
+               |      "value" : "str"
+               |    }, {
+               |      "key" : "key",
+               |      "type" : "binary",
+               |      "value" : "base64:"
+               |    }, {
+               |      "key" : "key",
+               |      "value" : null
+               |    } ],
+               |    "transfers" : [ {
+               |      "address" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+               |      "asset" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+               |      "amount" : 1
+               |    } ],
+               |    "issues" : [ ],
+               |    "reissues" : [ ],
+               |    "burns" : [ ],
+               |    "sponsorFees" : [ ]
+               |  },
+               |  "error" : null,
+               |  "vars" : [ ]
+               |}, {
+               |  "type" : "asset",
+               |  "context" : "transfer",
+               |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+               |  "result" : "failure",
+               |  "vars" : [ ],
+               |  "error" : "error"
+               |} ]""".stripMargin
       )
 
       testFunction(
@@ -368,7 +387,8 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
         tx => s"""[ {
           |  "type" : "verifier",
           |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-          |  "result" : "ok"
+          |  "result" : "success",
+          |  "error" : null
           |}, {
           |  "type" : "dApp",
           |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
@@ -389,9 +409,14 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
           |    } ],
           |    "reissues" : [ ],
           |    "burns" : [ ],
-          |    "sponsorFees" : [ ],
-          |    "vars" : [ ]
-          |  }
+          |    "sponsorFees" : [ ]
+          |  },
+          |  "error" : null,
+          |  "vars" : [ {
+          |    "name" : "docimals",
+          |    "type" : "Int",
+          |    "value" : 4
+          |  } ]
           |} ]""".stripMargin
       )
 
@@ -400,7 +425,8 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
         _ => """[ {
                |  "type" : "verifier",
                |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-               |  "result" : "ok"
+               |  "result" : "success",
+               |  "error" : null
                |}, {
                |  "type" : "dApp",
                |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
@@ -416,52 +442,106 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
                |      "quantity" : 1
                |    } ],
                |    "burns" : [ ],
-               |    "sponsorFees" : [ ],
-               |    "vars" : [ ]
-               |  }
+               |    "sponsorFees" : [ ]
+               |  },
+               |  "error" : null,
+               |  "vars" : [ ]
                |}, {
                |  "type" : "asset",
                |  "context" : "reissue",
                |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-               |  "error" : "FailedTransactionError(code = 3, error = Transaction is not allowed by script of the asset 5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx: error, log =)"
+               |  "result" : "failure",
+               |  "vars" : [ ],
+               |  "error" : "error"
                |} ]""".stripMargin
       )
 
       testFunction(
         "burn",
         _ => """[ {
-          |  "type" : "verifier",
-          |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-          |  "result" : "ok"
-          |}, {
-          |  "type" : "dApp",
-          |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-          |  "function" : "burn",
-          |  "args" : [ ],
-          |  "result" : {
-          |    "data" : [ ],
-          |    "transfers" : [ ],
-          |    "issues" : [ ],
-          |    "reissues" : [ ],
-          |    "burns" : [ {
-          |      "assetId" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-          |      "quantity" : 1
-          |    } ],
-          |    "sponsorFees" : [ ],
-          |    "vars" : [ ]
-          |  }
-          |}, {
-          |  "type" : "asset",
-          |  "context" : "burn",
-          |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-          |  "error" : "FailedTransactionError(code = 3, error = Transaction is not allowed by script of the asset 5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx: error, log =)"
-          |} ]""".stripMargin
+               |  "type" : "verifier",
+               |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+               |  "result" : "success",
+               |  "error" : null
+               |}, {
+               |  "type" : "dApp",
+               |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+               |  "function" : "burn",
+               |  "args" : [ ],
+               |  "result" : {
+               |    "data" : [ ],
+               |    "transfers" : [ ],
+               |    "issues" : [ ],
+               |    "reissues" : [ ],
+               |    "burns" : [ {
+               |      "assetId" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+               |      "quantity" : 1
+               |    } ],
+               |    "sponsorFees" : [ ]
+               |  },
+               |  "error" : null,
+               |  "vars" : [ ]
+               |}, {
+               |  "type" : "asset",
+               |  "context" : "burn",
+               |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+               |  "result" : "failure",
+               |  "vars" : [ ],
+               |  "error" : "error"
+               |} ]""".stripMargin
       )
 
+    }
+
+    "transfer transaction with asset fail" in {
+      val blockchain = createBlockchainStub { blockchain =>
+        (blockchain.balance _).when(*, *).returns(Long.MaxValue / 2)
+
+        val (assetScript, assetScriptComplexity) = ScriptCompiler.compile("false", ScriptEstimatorV3).explicitGet()
+        (blockchain.assetScript _).when(TestValues.asset).returns(Some(AssetScriptInfo(assetScript, assetScriptComplexity)))
+        (blockchain.assetDescription _)
+          .when(TestValues.asset)
+          .returns(
+            Some(
+              AssetDescription(
+                TestValues.asset.id,
+                TxHelpers.defaultSigner.publicKey,
+                null,
+                null,
+                0,
+                reissuable = true,
+                BigInt(1),
+                Height(1),
+                Some(AssetScriptInfo(assetScript, assetScriptComplexity)),
+                0,
+                nft = false
+              )
+            )
+          )
+      }
+      val route = debugApiRoute.copy(blockchain = blockchain).route
+      val tx    = TxHelpers.transfer(TxHelpers.defaultSigner, TxHelpers.defaultAddress, 1, TestValues.asset)
+
+      jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
+        val json = responseAs[JsObject]
+        (json \ "trace").as[JsArray] shouldBe Json.parse("""[ {
+                                                           |    "type" : "asset",
+                                                           |    "context" : "transfer",
+                                                           |    "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+                                                           |    "result" : "failure",
+                                                           |    "vars" : [ ],
+                                                           |    "error" : null
+                                                           |  } ]""".stripMargin)
+
+        (json \ "valid").as[Boolean] shouldBe false
+        (json \ "transaction").as[JsObject] shouldBe tx.json()
+      }
     }
   }
 
   private[this] def jsonPost(path: String, json: JsValue) = {
     Post(path, HttpEntity(ContentTypes.`application/json`, json.toString()))
   }
+
+  private[this] def responseAsPrettyJson: String = Json.prettyPrint(Json.parse(responseAs[String]))
 }
