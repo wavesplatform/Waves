@@ -112,7 +112,8 @@ inScope(Global)(
       "-Ywarn-unused:-implicits",
       "-Xlint",
       "-opt:l:inline",
-      "-opt-inline-from:**"
+      "-opt-inline-from:**",
+      "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s" // Ignore gRPC warnings
     ),
     crossPaths := false,
     scalafmtOnCompile := false,
@@ -174,7 +175,7 @@ def checkPR: Command = Command.command("checkPR") { state =>
   val newState = Project
     .extract(state)
     .appendWithoutSession(
-      Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings", "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s")),
+      Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings")),
       state
     )
   Project.extract(newState).runTask(checkPRRaw, newState)
