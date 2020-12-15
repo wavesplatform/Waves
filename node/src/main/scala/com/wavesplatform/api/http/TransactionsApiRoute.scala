@@ -196,10 +196,10 @@ case class TransactionsApiRoute(
       leaseCancel.json() ++ Json.obj("lease" -> blockchain.transactionInfo(leaseCancel.leaseId).map(_._2.json()).getOrElse[JsValue](JsNull))
 
     case continuation: ContinuationTransaction =>
-      continuation.json() ++ continuationJsFields(continuation, transactionsApi)
+      continuation.json() ++ continuationJsFields(continuation, blockchain)
 
     case invoke: InvokeScriptTransaction =>
-      invoke.json() ++ continuationJsFields(invoke, transactionsApi)
+      invoke.json() ++ continuationJsFields(invoke, blockchain)
 
     case t =>
       t.json()
@@ -264,10 +264,10 @@ object TransactionsApiRoute {
     } else
       JsObject.empty
 
-  def continuationJsFields(tx: Transaction, transactionsApi: CommonTransactionsApi): JsObject =
+  def continuationJsFields(tx: Transaction, blockchain: Blockchain): JsObject =
     tx match {
       case i: InvokeScriptTransaction if i.version == TxVersion.V3 =>
-        Json.obj("continuationTransactionIds" -> transactionsApi.continuationTransactionIds(i).map(_.toString))
+        Json.obj("continuationTransactionIds" -> blockchain.continuationTransactionIds(i.id.value()).map(_.toString))
       case _ =>
         Json.obj()
     }

@@ -135,9 +135,9 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
               )
             )
           )
-        (blockchain.continuationsCount _)
+        (blockchain.continuationTransactionIds _)
           .expects(invoke.id.value())
-          .returning(2)
+          .returning(Seq(ByteStr.empty, ByteStr.empty))
     }
     (blockchain.transactionInfo _)
       .expects(invoke.id.value())

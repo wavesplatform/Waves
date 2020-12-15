@@ -6,11 +6,10 @@ import com.wavesplatform.block
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.{DBExt, Keys}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
-import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult, TransactionId}
+import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{ApplicationStatus, Asset, CreateAliasTransaction, Transaction}
@@ -51,8 +50,6 @@ trait CommonTransactionsApi {
   ): Observable[TransactionMeta]
 
   def transactionProofs(transactionIds: List[ByteStr]): List[TransactionProof]
-
-  def continuationTransactionIds(invoke: InvokeScriptTransaction): Seq[ByteStr]
 }
 
 object CommonTransactionsApi {
@@ -127,11 +124,5 @@ object CommonTransactionsApi {
         (meta, allTransactions)  <- blockAt(height) if meta.header.version >= Block.ProtoBlockVersion
         transactionProof         <- block.transactionProof(transaction, allTransactions)
       } yield transactionProof
-
-    override def continuationTransactionIds(invoke: InvokeScriptTransaction): Seq[ByteStr] =
-      for {
-        (height, num)     <- db.get(Keys.continuationTransactions(TransactionId(invoke.id.value())))
-        (continuation, _) <- db.get(Keys.transactionAt(height, num))
-      } yield continuation.id.value()
   }
 }

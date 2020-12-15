@@ -73,7 +73,7 @@ trait Blockchain {
 
   def continuationStates: collection.Map[Address, (Int, ContinuationState)]
 
-  def continuationsCount(invokeId: ByteStr): Int
+  def continuationTransactionIds(invokeId: ByteStr): Seq[ByteStr]
 }
 
 object Blockchain {

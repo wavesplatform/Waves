@@ -642,9 +642,11 @@ abstract class LevelDBWriter private[database] (
             if (step == 0) {
               val hKey = Keys.continuationHistory(dAppAddressId)
               expiredKeys ++= updateHistory[(Height, TransactionId)](
-                rw, hKey, threshold,
+                rw,
+                hKey,
+                threshold,
                 { case (height, id) => Keys.continuationState(id, height).keyBytes },
-                { case (height, _)  => height},
+                { case (height, _)  => height },
                 h => (Height(h), invokeId)
               )
             }
@@ -1124,6 +1126,12 @@ abstract class LevelDBWriter private[database] (
     txs.toList
   }
 
-  override def continuationsCount(invokeId: ByteStr): Int =
-    readOnly(_.get(Keys.continuationTransactions(TransactionId(invokeId)))).size
+  override def continuationTransactionIds(invokeId: ByteStr): Seq[ByteStr] =
+    readOnly(
+      db =>
+        for {
+          (height, num)     <- db.get(Keys.continuationTransactions(TransactionId(invokeId)))
+          (continuation, _) <- db.get(Keys.transactionAt(height, num))
+        } yield continuation.id.value()
+    )
 }

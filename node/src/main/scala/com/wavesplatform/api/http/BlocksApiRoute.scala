@@ -2,10 +2,11 @@ package com.wavesplatform.api.http
 
 import akka.http.scaladsl.server.{Route, StandardRoute}
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.api.common.{CommonBlocksApi, CommonTransactionsApi}
+import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.http.ApiError.{BlockDoesNotExist, TooBigArrayAllocation}
 import com.wavesplatform.block.Block
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.{ApplicationStatus, Transaction}
 import play.api.libs.json._
@@ -13,7 +14,7 @@ import play.api.libs.json._
 case class BlocksApiRoute(
     settings: RestAPISettings,
     commonApi: CommonBlocksApi,
-    transactionsApi: CommonTransactionsApi
+    blockchain: Blockchain
 ) extends ApiRoute {
   import BlocksApiRoute._
   private[this] val MaxBlocksPerRequest = 100 // todo: make this configurable and fix integration tests
@@ -41,13 +42,13 @@ case class BlocksApiRoute(
         meta <- commonApi.meta(signature).toRight(BlockDoesNotExist)
       } yield Json.obj("height" -> meta.height))
     } ~ path("signature" / BlockId) { signature => // TODO: Delete
-      complete(commonApi.block(signature).map(toJson(_, transactionsApi)).toRight(BlockDoesNotExist))
+      complete(commonApi.block(signature).map(toJson(_, blockchain)).toRight(BlockDoesNotExist))
     } ~ path("address" / AddrSegment / IntNumber / IntNumber) { (address, start, end) =>
       if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) extractScheduler { implicit ec =>
         complete(
           commonApi
             .blocksRange(start, end, address)
-            .map(toJson(_, transactionsApi))
+            .map(toJson(_, blockchain))
             .toListL
             .runToFuture
         )
@@ -65,13 +66,13 @@ case class BlocksApiRoute(
         complete(commonApi.meta(id).map(_.json()).toRight(BlockDoesNotExist))
       }
     } ~ path(BlockId) { id =>
-      complete(commonApi.block(id).map(toJson(_, transactionsApi)).toRight(BlockDoesNotExist))
+      complete(commonApi.block(id).map(toJson(_, blockchain)).toRight(BlockDoesNotExist))
     }
   }
 
   private def at(height: Int, includeTransactions: Boolean): StandardRoute = complete {
     if (includeTransactions)
-      commonApi.blockAtHeight(height).map(toJson(_, transactionsApi))
+      commonApi.blockAtHeight(height).map(toJson(_, blockchain))
     else
       commonApi.metaAtHeight(height).map(_.json())
   }
@@ -81,7 +82,7 @@ case class BlocksApiRoute(
       val blocks = if (includeTransactions) {
         commonApi
           .blocksRange(start, end)
-          .map(toJson(_, transactionsApi))
+          .map(toJson(_, blockchain))
       } else {
         commonApi
           .metaRange(start, end)
@@ -100,20 +101,20 @@ object BlocksApiRoute {
 
   private def toJson(
       v: (BlockMeta, Seq[(Transaction, ApplicationStatus)]),
-      transactionsApi: CommonTransactionsApi
+      blockchain: Blockchain
   ): JsObject =
-    v._1.json() ++ transactionField(v._1.header.version, v._2, transactionsApi)
+    v._1.json() ++ transactionField(v._1.header.version, v._2, blockchain)
 
   private def transactionField(
       blockVersion: Byte,
       transactions: Seq[(Transaction, ApplicationStatus)],
-      transactionsApi: CommonTransactionsApi
+      blockchain: Blockchain
   ): JsObject = Json.obj(
     "fee" -> transactions.map(_._1.assetFee).collect { case (Waves, feeAmt) => feeAmt }.sum,
     "transactions" -> JsArray(transactions.map {
       case (transaction, succeeded) =>
         transaction.json() ++
-          TransactionsApiRoute.continuationJsFields(transaction, transactionsApi) ++
+          TransactionsApiRoute.continuationJsFields(transaction, blockchain) ++
           applicationStatusJsField(blockVersion >= Block.ProtoBlockVersion, succeeded)
     })
   )

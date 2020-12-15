@@ -76,7 +76,7 @@ trait EmptyBlockchain extends Blockchain {
 
   override def continuationStates: collection.Map[Address, (Int, ContinuationState)] = Map()
 
-  override def continuationsCount(invokeId: ByteStr): Int = 0
+  override def continuationTransactionIds(invokeId: ByteStr): Seq[ByteStr] = Seq()
 }
 
 object EmptyBlockchain extends EmptyBlockchain

@@ -694,8 +694,8 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.continuationStates
   }
 
-  override def continuationsCount(invokeId: ByteStr): Int =
-    compositeBlockchain.continuationsCount(invokeId)
+  override def continuationTransactionIds(invokeId: ByteStr): Seq[ByteStr] =
+    compositeBlockchain.continuationTransactionIds(invokeId)
 
   private[this] def compositeBlockchain =
     ngState.fold(leveldb: Blockchain)(CompositeBlockchain(leveldb, _))

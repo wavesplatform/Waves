@@ -334,7 +334,8 @@ object InvokeDiffsCommon {
       blockchain: Blockchain,
       lastStepFee: Long
   ): Map[Address, Portfolio] = {
-    val consumedFee = (blockchain.continuationsCount(invoke.id.value()) + 1) * expectedStepFeeInAttachedAsset(invoke, blockchain) + lastStepFee
+    val stepCount   = blockchain.continuationTransactionIds(invoke.id.value()).length
+    val consumedFee = (stepCount + 1) * expectedStepFeeInAttachedAsset(invoke, blockchain) + lastStepFee
     val unusedFee   = invoke.fee - consumedFee
     invoke.assetFee._1 match {
       case Waves =>
