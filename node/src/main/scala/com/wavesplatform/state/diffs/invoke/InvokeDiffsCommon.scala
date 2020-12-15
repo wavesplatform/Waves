@@ -286,7 +286,7 @@ object InvokeDiffsCommon {
       failed: Boolean
   ): Diff = {
     val dAppAddress                      = blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
-    val diffWithState                    = diff.addContinuationState(dAppAddress, tx.step, ContinuationState.Finished)
+    val diffWithState                    = diff.addContinuationState(dAppAddress, tx.nonce, ContinuationState.Finished)
     val StepInfo(_, stepFee, scriptsRun) = stepInfo(diffWithState, blockchain, invoke)
     val status                           = if (failed) ScriptExecutionFailed else Succeeded
     diffWithState |+| Diff.empty.copy(

@@ -637,9 +637,9 @@ abstract class LevelDBWriter private[database] (
 
       continuationStates
         .foreach {
-          case (dAppAddressId, (step, state: ContinuationState.InProgress)) =>
+          case (dAppAddressId, (nonce, state: ContinuationState.InProgress)) =>
             val invokeId = TransactionId(state.invokeScriptTransactionId)
-            if (step == 0) {
+            if (nonce == 0) {
               val hKey = Keys.continuationHistory(dAppAddressId)
               expiredKeys ++= updateHistory[(Height, TransactionId)](
                 rw,
@@ -650,7 +650,7 @@ abstract class LevelDBWriter private[database] (
                 h => (Height(h), invokeId)
               )
             }
-            rw.put(Keys.continuationState(invokeId, Height(height)), Some((step, state)))
+            rw.put(Keys.continuationState(invokeId, Height(height)), Some((nonce, state)))
           case _ =>
         }
 

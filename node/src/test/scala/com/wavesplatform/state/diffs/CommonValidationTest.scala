@@ -350,7 +350,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
           timestamp
         )
         .explicitGet()
-      continuation = ContinuationTransaction(invoke.id.value(), step = 0, fee = 0L, Waves)
+      continuation = ContinuationTransaction(invoke.id.value(), nonce = 0, fee = 0L, Waves)
       transfer = TransferTransaction
         .selfSigned(TxVersion.V2, dAppAcc, master.toAddress, Waves, 1L, Waves, fee, ByteStr.empty, timestamp)
         .explicitGet()
@@ -376,7 +376,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
     forAll(preconditionsAndPayment) {
       case (genesis, setScript, invoke, continuation, transfer) =>
         assertDiffEi(
-          Seq(TestBlock.create(genesis), TestBlock.create(Seq(setScript, invoke, continuation, continuation.copy(step = 1)))),
+          Seq(TestBlock.create(genesis), TestBlock.create(Seq(setScript, invoke, continuation, continuation.copy(nonce = 1)))),
           TestBlock.create(Seq(transfer)),
           rideV5Activated
         )(_ shouldBe Symbol("right"))

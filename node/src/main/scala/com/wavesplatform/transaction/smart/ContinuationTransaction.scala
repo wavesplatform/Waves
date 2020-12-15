@@ -14,7 +14,7 @@ import scala.util.{Failure, Success, Try}
 
 case class ContinuationTransaction(
     invokeScriptTransactionId: ByteStr,
-    step: Int,
+    nonce: Int,
     fee: TxAmount,
     feeAssetId: Asset
 ) extends Transaction
@@ -32,7 +32,7 @@ case class ContinuationTransaction(
         "type"                      -> typeId,
         "id"                        -> id().toString,
         "fee"                       -> fee,
-        "step"                      -> step,
+        "nonce"                     -> nonce,
         "invokeScriptTransactionId" -> invokeScriptTransactionId.toString
       )
     )
@@ -44,7 +44,7 @@ case class ContinuationTransaction(
     TxVersion.V1
 
   override val id: Coeval[ByteStr] =
-    Coeval.now(FastHashId.create(invokeScriptTransactionId.arr ++ Ints.toByteArray(step)))
+    Coeval.now(FastHashId.create(invokeScriptTransactionId.arr ++ Ints.toByteArray(nonce)))
 
   override def timestamp: TxTimestamp =
     0L

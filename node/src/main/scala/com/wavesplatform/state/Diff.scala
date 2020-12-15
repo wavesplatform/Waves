@@ -172,8 +172,8 @@ case class Diff(
   def bindTransaction(tx: Transaction): Diff =
     copy(transactions = transactions.concat(Map(Diff.toDiffTxData(tx, portfolios, accountData))))
 
-  def addContinuationState(address: Address, step: Int, state: ContinuationState): Diff =
-    copy(continuationStates = continuationStates + ((address, (step, state))))
+  def addContinuationState(address: Address, nonce: Int, state: ContinuationState): Diff =
+    copy(continuationStates = continuationStates + ((address, (nonce, state))))
 }
 
 object Diff {

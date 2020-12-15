@@ -318,13 +318,13 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
 
   property("continuation in progress result after continuation") {
     val expr                             = dApp.expr.callableFuncs.find(_.u.name == "multiStepExpr").get.u.body
-    val step                             = Random.nextInt(Int.MaxValue)
+    val nonce                            = Random.nextInt(Int.MaxValue)
     val invoke                           = invokeGen.sample.get.copy(funcCallOpt = Some(FUNCTION_CALL(User("multiStepExpr"), Nil)))
-    val continuation                     = ContinuationTransaction(invoke.id.value(), step, fee = 0L, invoke.feeAssetId)
+    val continuation                     = ContinuationTransaction(invoke.id.value(), nonce, fee = 0L, invoke.feeAssetId)
     val stepFee                          = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
     val startUnusedComplexity            = Random.nextInt(2000)
     val (result, resultUnusedComplexity) = evaluateContinuationStep(expr, startUnusedComplexity)
-    val blockchain                       = blockchainMock(invoke, ("multiStepExpr", 1234L), Some((step, expr, startUnusedComplexity)))
+    val blockchain                       = blockchainMock(invoke, ("multiStepExpr", 1234L), Some((nonce, expr, startUnusedComplexity)))
 
     val sigVerifyComplexity = 200
     resultUnusedComplexity should be < sigVerifyComplexity
@@ -335,8 +335,8 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
     r.scriptsRun shouldBe 1
     r.scriptsComplexity shouldBe spentComplexity
     r.continuationStates.size shouldBe 1
-    val (nonce, state) = r.continuationStates(invoke.dAppAddressOrAlias.asInstanceOf[Address])
-    nonce should be >= 0
+    val (resultNonce, state) = r.continuationStates(invoke.dAppAddressOrAlias.asInstanceOf[Address])
+    resultNonce should be >= 0
     state shouldBe ContinuationState.InProgress(result, resultUnusedComplexity, invoke.id.value())
   }
 
@@ -395,13 +395,13 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
       fee = stepFee + ScriptExtraFee, // for account script
       dAppAddressOrAlias = dAppAddress
     )
-    val step         = Random.nextInt(Int.MaxValue)
-    val continuation = ContinuationTransaction(invoke.id.value(), step, fee = 0L, invoke.feeAssetId)
+    val nonce        = Random.nextInt(Int.MaxValue)
+    val continuation = ContinuationTransaction(invoke.id.value(), nonce, fee = 0L, invoke.feeAssetId)
     val expr         = dApp.expr.callableFuncs.find(_.u.name == "failingExpr").get.u.body
 
     val actualComplexity    = 2018
     val estimatedComplexity = actualComplexity + Random.nextInt(1000)
-    val blockchain          = blockchainMock(invoke, ("failingExpr", estimatedComplexity), Some((step, expr, 0)))
+    val blockchain          = blockchainMock(invoke, ("failingExpr", estimatedComplexity), Some((nonce, expr, 0)))
     val stepLimit           = 4000
 
     inside(ContinuationTransactionDiff(blockchain, continuation.timestamp, false)(continuation).resultE) {
@@ -420,13 +420,13 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
       fee = stepFee + ScriptExtraFee, // for account script
       dAppAddressOrAlias = dAppAddress
     )
-    val step         = Random.nextInt(Int.MaxValue)
-    val continuation = ContinuationTransaction(invoke.id.value(), step, fee = 0L, invoke.feeAssetId)
+    val nonce        = Random.nextInt(Int.MaxValue)
+    val continuation = ContinuationTransaction(invoke.id.value(), nonce, fee = 0L, invoke.feeAssetId)
     val expr         = dApp.expr.callableFuncs.find(_.u.name == "failingAssetVerifier").get.u.body
 
     val actualComplexity    = 2018
     val estimatedComplexity = actualComplexity + Random.nextInt(1000)
-    val blockchain          = blockchainMock(invoke, ("failingAssetVerifier", estimatedComplexity), Some((step, expr, 0)))
+    val blockchain          = blockchainMock(invoke, ("failingAssetVerifier", estimatedComplexity), Some((nonce, expr, 0)))
 
     val expectingComplexity = actualComplexity + assetScriptComplexity * 3
     inside(ContinuationTransactionDiff(blockchain, continuation.timestamp, false)(continuation).resultE) {
@@ -438,10 +438,10 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
 
   property("failed by payment asset verifier") {
     val invoke       = invokeScriptGen(Gen.const(Seq(Payment(paymentAmount, failingAsset)))).sample.get
-    val step         = Random.nextInt(Int.MaxValue)
-    val continuation = ContinuationTransaction(invoke.id.value(), step, fee = 0L, invoke.feeAssetId)
+    val nonce        = Random.nextInt(Int.MaxValue)
+    val continuation = ContinuationTransaction(invoke.id.value(), nonce, fee = 0L, invoke.feeAssetId)
     val expr         = dApp.expr.callableFuncs.find(_.u.name == "oneStepExpr").get.u.body
-    val blockchain   = blockchainMock(invoke, ("oneStepExpr", 123), Some((step, expr, 0)))
+    val blockchain   = blockchainMock(invoke, ("oneStepExpr", 123), Some((nonce, expr, 0)))
 
     Verifier.assets(blockchain, Int.MaxValue)(continuation).resultE shouldBe Right(Diff.empty)
     Verifier.assets(blockchain, Int.MaxValue)(invoke).resultE shouldBe

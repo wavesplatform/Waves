@@ -419,7 +419,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         .foreach {
           case (c, i) =>
             c.version.value shouldBe TxVersion.V1
-            c.step.value should be >= 0
+            c.nonce.value should be >= 0
 
             val expectedFeeInWaves = if (i == continuations.size - 1) pureInvokeFee + actionsFee else pureInvokeFee
             val expectedFeeInAttachedAsset =

@@ -138,7 +138,7 @@ class Transaction(
     val proofs: Option[Seq[String]],
     val applicationStatus: Option[String],
     val invokeScriptTransactionId: Option[String],
-    val step: Option[Int],
+    val nonce: Option[Int],
     val extraFeePerStep: Option[Long],
     val call: Option[JsObject],
     val dApp: Option[String]
@@ -181,7 +181,7 @@ object Transaction {
       proofs: Option[Seq[String]],
       applicationStatus: Option[String],
       invokeScriptTransactionId: Option[String],
-      step: Option[Int],
+      nonce: Option[Int],
       extraFeePerStep: Option[Long],
       call: Option[JsObject],
       dApp: Option[String]
@@ -212,7 +212,7 @@ object Transaction {
     proofs,
     applicationStatus,
     invokeScriptTransactionId,
-    step,
+    nonce,
     extraFeePerStep,
     call,
     dApp
@@ -251,7 +251,7 @@ object Transaction {
           proofs                    <- (jsv \ "proofs").validateOpt[Seq[String]]
           applicationStatus         <- (jsv \ "applicationStatus").validateOpt[String]
           invokeScriptTransactionId <- (jsv \ "invokeScriptTransactionId").validateOpt[String]
-          step                      <- (jsv \ "step").validateOpt[Int]
+          nonce                      <- (jsv \ "nonce").validateOpt[Int]
           extraFeePerStep           <- (jsv \ "extraFeePerStep").validateOpt[Long]
           call                      <- (jsv \ "call").validateOpt[JsObject]
           dApp                      <- (jsv \ "dApp").validateOpt[String]
@@ -282,7 +282,7 @@ object Transaction {
           proofs,
           applicationStatus,
           invokeScriptTransactionId,
-          step,
+          nonce,
           extraFeePerStep,
           call,
           dApp
