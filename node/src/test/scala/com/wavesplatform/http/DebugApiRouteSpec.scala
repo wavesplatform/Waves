@@ -190,8 +190,16 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue / 2)
 
-        val (assetScript, assetScriptComplexity) = ScriptCompiler.compile("if true then throw(\"error\") else false", ScriptEstimatorV3).explicitGet()
+        val (assetScript, assetScriptComplexity) = ScriptCompiler
+          .compile(
+            "let test = true\n" +
+              "if test then throw(\"error\") else !test",
+            ScriptEstimatorV3
+          )
+          .explicitGet()
+
         (blockchain.assetScript _).when(TestValues.asset).returns(Some(AssetScriptInfo(assetScript, assetScriptComplexity)))
+
         (blockchain.assetDescription _)
           .when(TestValues.asset)
           .returns(
@@ -247,6 +255,7 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
             ScriptEstimatorV3
           )
           .explicitGet()
+
         (blockchain.accountScript _)
           .when(*)
           .returns(
@@ -259,42 +268,40 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
               )
             )
           )
-        (blockchain.hasAccountScript _).when(TxHelpers.defaultAddress).returns(true)
+          .anyNumberOfTimes()
+
+        (blockchain.hasAccountScript _).when(*).returns(true).anyNumberOfTimes()
       }
 
       val route = debugApiRoute.copy(blockchain = blockchain).route
 
-      def testFunction(name: String, result: InvokeScriptTransaction => String) = {
+      def testFunction(name: String, result: InvokeScriptTransaction => String) = withClue(s"function $name") {
         val tx = TxHelpers.invoke(TxHelpers.defaultAddress, name, fee = 102500000)
 
         jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
-          val json  = Json.parse(responseAs[String])
+          val json = Json.parse(responseAs[String])
 
           if ((json \ "valid").as[Boolean])
             assert(tx.json().fieldSet subsetOf json.as[JsObject].fieldSet)
           else
             (json \ "transaction").as[JsObject] shouldBe tx.json()
 
-          val trace = Json.prettyPrint((json \ "trace").as[JsArray])
-          if (trace != result(tx)) println(trace)
-          trace shouldBe result(tx)
+          (json \ "trace").as[JsArray] shouldBe Json.parse(result(tx))
         }
       }
 
-      def testPayment(result: String) = {
+      def testPayment(result: String) = withClue("payment") {
         val tx = TxHelpers.invoke(TxHelpers.signer(1).toAddress, "test", fee = 800000, payments = Seq(Payment(1L, TestValues.asset)))
 
         jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
-          val json  = Json.parse(responseAs[String])
+          val json = Json.parse(responseAs[String])
 
           if ((json \ "valid").as[Boolean])
             assert(tx.json().fieldSet subsetOf json.as[JsObject].fieldSet)
           else
             (json \ "transaction").as[JsObject] shouldBe tx.json()
 
-          val trace = Json.prettyPrint((json \ "trace").as[JsArray])
-          if (trace != result) println(trace)
-          trace shouldBe result
+          (json \ "trace").as[JsArray] shouldBe Json.parse(result)
         }
       }
 
@@ -323,7 +330,11 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
                     |  "context" : "payment",
                     |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
                     |  "result" : "failure",
-                    |  "vars" : [ ],
+                    |  "vars" : [ {
+                    |    "name" : "test",
+                    |    "type" : "Boolean",
+                    |    "value" : true
+                    |  } ],
                     |  "error" : "error"
                     |} ]""".stripMargin)
 
@@ -377,7 +388,11 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
                |  "context" : "transfer",
                |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
                |  "result" : "failure",
-               |  "vars" : [ ],
+               |  "vars" : [ {
+               |    "name" : "test",
+               |    "type" : "Boolean",
+               |    "value" : true
+               |  } ],
                |  "error" : "error"
                |} ]""".stripMargin
       )
@@ -451,7 +466,11 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
                |  "context" : "reissue",
                |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
                |  "result" : "failure",
-               |  "vars" : [ ],
+               |  "vars" : [ {
+               |    "name" : "test",
+               |    "type" : "Boolean",
+               |    "value" : true
+               |  } ],
                |  "error" : "error"
                |} ]""".stripMargin
       )
@@ -486,7 +505,11 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
                |  "context" : "burn",
                |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
                |  "result" : "failure",
-               |  "vars" : [ ],
+               |  "vars" : [ {
+               |    "name" : "test",
+               |    "type" : "Boolean",
+               |    "value" : true
+               |  } ],
                |  "error" : "error"
                |} ]""".stripMargin
       )
@@ -542,6 +565,4 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
   private[this] def jsonPost(path: String, json: JsValue) = {
     Post(path, HttpEntity(ContentTypes.`application/json`, json.toString()))
   }
-
-  private[this] def responseAsPrettyJson: String = Json.prettyPrint(Json.parse(responseAs[String]))
 }
