@@ -307,12 +307,19 @@ abstract class LevelDBWriter private[database] (
     readOnly(_.db.get(Keys.blockReward(height)))
 
   private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] =
-    updateHistory(rw, rw.get(key), key, threshold, kf)
+    updateHistory[Int](rw, key, threshold, kf.andThen(_.keyBytes), identity, identity)
 
-  private def updateHistory(rw: RW, history: Seq[Int], key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] = {
-    val (c1, c2) = history.partition(_ > threshold)
-    rw.put(key, (height +: c1) ++ c2.headOption)
-    c2.drop(1).map(kf(_).keyBytes)
+  private def updateHistory[A](
+      rw: RW,
+      key: Key[Seq[A]],
+      threshold: Int,
+      keyBytes: A => Array[Byte],
+      toHeight: A => Int,
+      headElement: Int => A
+  ): Seq[Array[Byte]] = {
+    val (c1, c2) = rw.get(key).partition(v => toHeight(v) > threshold)
+    rw.put(key, (headElement(height) +: c1) ++ c2.headOption)
+    c2.drop(1).map(keyBytes)
   }
 
   private def appendBalances(
@@ -631,13 +638,17 @@ abstract class LevelDBWriter private[database] (
       continuationStates
         .foreach {
           case (dAppAddressId, (step, state: ContinuationState.InProgress)) =>
-            val h        = Height(height)
             val invokeId = TransactionId(state.invokeScriptTransactionId)
             if (step == 0) {
-              val heightIds = rw.get(Keys.continuationHistory(dAppAddressId))
-              rw.put(Keys.continuationHistory(dAppAddressId), (h, invokeId) +: heightIds)
+              val hKey = Keys.continuationHistory(dAppAddressId)
+              expiredKeys ++= updateHistory[(Height, TransactionId)](
+                rw, hKey, threshold,
+                { case (height, id) => Keys.continuationState(id, height).keyBytes },
+                { case (height, _)  => height},
+                h => (Height(h), invokeId)
+              )
             }
-            rw.put(Keys.continuationState(invokeId, h), Some((step, state)))
+            rw.put(Keys.continuationState(invokeId, Height(height)), Some((step, state)))
           case _ =>
         }
 
