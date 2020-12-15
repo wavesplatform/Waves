@@ -5,12 +5,12 @@ import cats.implicits._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
+import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.UtilsApiRoute
 import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
-import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
