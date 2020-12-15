@@ -18,7 +18,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
-import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2}
@@ -30,7 +30,7 @@ import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
 import com.wavesplatform.transaction.smart.BlockchainContext
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.utils.Time
+import com.wavesplatform.utils.{Time, evaluatedWrites}
 import monix.eval.Coeval
 import monix.execution.Scheduler
 import play.api.libs.json._
@@ -221,17 +221,6 @@ case class UtilsApiRoute(
     (path("script" / "evaluate" / ScriptedAddress) & jsonPostD[JsObject]) { (address: Address, obj: JsObject) =>
       val script = blockchain.accountScript(address).get.script
 
-      def serializeResult(e: EVALUATED): JsValue = e match { // TODO: Tuple?
-        case Terms.CONST_LONG(num)   => Json.obj("type" -> "Int", "value"        -> num)
-        case Terms.CONST_BYTESTR(bs) => Json.obj("type" -> "ByteVector", "value" -> bs.toString)
-        case Terms.CONST_STRING(str) => Json.obj("type" -> "String", "value"     -> str)
-        case Terms.CONST_BOOLEAN(b)  => Json.obj("type" -> "Boolean", "value"    -> b)
-        case Terms.CaseObj(caseType, fields) =>
-          Json.obj("type" -> caseType.name, "value" -> JsObject(fields.view.mapValues(serializeResult).toSeq))
-        case Terms.ARR(xs)      => Json.obj("type"  -> "Array", "value"                          -> xs.map(serializeResult))
-        case Terms.FAIL(reason) => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "error" -> reason)
-      }
-
       def parseCall(js: JsReadable) = {
         val binaryCall = js
           .asOpt[ByteStr]
@@ -254,7 +243,7 @@ case class UtilsApiRoute(
 
       val requestData = obj ++ Json.obj("address" -> address.stringRepr)
       val responseJson = result
-        .map(r => Json.obj("result" -> serializeResult(r)))
+        .map(r => Json.obj("result" -> r))
         .recover {
           case e: ScriptExecutionError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.error)
           case other                   => ApiError.fromValidationError(other).json

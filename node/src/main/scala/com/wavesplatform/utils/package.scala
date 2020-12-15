@@ -7,6 +7,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.ByteStr._
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.lang.v1.compiler.Terms._
 import org.apache.commons.lang3.time.DurationFormatUtils
 import play.api.libs.json._
 
@@ -78,5 +79,19 @@ package object utils extends ScorexLogging {
   implicit class StringBytes(val s: String) extends AnyVal {
     def utf8Bytes: Array[Byte]   = s.getBytes(Charsets.UTF_8)
     def toByteString: ByteString = ByteString.copyFromUtf8(s)
+  }
+
+  implicit val evaluatedWrites: Writes[EVALUATED] = new Writes[EVALUATED] {
+    import com.wavesplatform.api.http.ApiError
+    override def writes(o: EVALUATED): JsValue = o match {
+        case CONST_LONG(num)   => Json.obj("type" -> "Int", "value"        -> num)
+        case CONST_BYTESTR(bs) => Json.obj("type" -> "ByteVector", "value" -> bs.toString)
+        case CONST_STRING(str) => Json.obj("type" -> "String", "value"     -> str)
+        case CONST_BOOLEAN(b)  => Json.obj("type" -> "Boolean", "value"    -> b)
+        case CaseObj(caseType, fields) =>
+          Json.obj("type" -> caseType.name, "value" -> JsObject(fields.view.mapValues(writes).toSeq))
+        case ARR(xs)      => Json.obj("type"  -> "Array", "value" -> xs.map(writes))
+        case FAIL(reason) => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "error" -> reason)
+    }
   }
 }

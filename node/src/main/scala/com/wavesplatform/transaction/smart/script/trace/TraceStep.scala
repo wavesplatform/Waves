@@ -6,8 +6,10 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.evaluator.{IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.transaction.TxValidationError.{ScriptExecutionError, TransactionNotAllowedByScript}
+import com.wavesplatform.utils._
 import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
 
@@ -90,7 +92,11 @@ case class InvokeScriptTrace(
             case sponsorFee: SponsorFee  => sponsorFeeJson(sponsorFee) + ("type" -> JsString("sponsorFee"))
             case item: DataOp            => dataItemJson(item) + ("type"     -> JsString("dataItem"))
           }
-        )
+        ) ++ (if(ret == unit) {
+          Json.obj()
+        } else {
+          Json.obj("return" -> ret)
+        })
       case i: IncompleteResult =>
         throw new RuntimeException(s"Unexpected $i")
     }
