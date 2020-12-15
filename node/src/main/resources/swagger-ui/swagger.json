@@ -2768,6 +2768,73 @@
         "x-codegen-request-body-name": "code"
       }
     },
+    "/utils/script/evaluate/{address}": {
+      "post": {
+        "tags": [
+          "utils"
+        ],
+        "summary": "Evaluate",
+        "description": "Evaluates the provided expression, taking into account the deployed dApp contract",
+        "operationId": "script_evaluate",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address of the deployed dApp contract",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Expression to evaluate",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expr": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "address": {
+                      "type": "string"
+                    },
+                    "expr": {
+                      "type": "string"
+                    },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "value": {
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/utils/seed": {
       "get": {
         "tags": [
