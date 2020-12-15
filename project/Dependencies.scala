@@ -26,7 +26,7 @@ object Dependencies {
   val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
   val janino             = "org.codehaus.janino" % "janino" % "3.0.12"
   val asyncHttpClient    = "org.asynchttpclient" % "async-http-client" % "2.7.0"
-  val curve25519         = "com.wavesplatform" % "curve25519-java" % "0.6.4-N2150-SNAPSHOT"
+  val curve25519         = "com.wavesplatform" % "curve25519-java" % "0.6.4"
 
   val catsEffect = catsModule("effect", "2.1.3")
   val catsCore   = catsModule("core")
