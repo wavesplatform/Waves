@@ -419,7 +419,7 @@ abstract class LevelDBWriter private[database] (
 
       def inProgress(i: InvokeScriptTransaction): Boolean = {
         val address = resolveAlias(i.dAppAddressOrAlias).explicitGet()
-        val id      = addressId(address).get
+        val id      = addressId(address).getOrElse(newAddresses(address))
         continuationStates.get(id).exists(_._2.isInstanceOf[ContinuationState.InProgress])
       }
 
