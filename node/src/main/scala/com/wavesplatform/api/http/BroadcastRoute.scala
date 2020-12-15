@@ -1,8 +1,7 @@
-package com.wavesplatform.http
+package com.wavesplatform.api.http
 
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.server.{Directive1, Route}
-import com.wavesplatform.api.http.{ApiError, ApiRoute, jsonPostD}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.transaction.Transaction

@@ -2024,6 +2024,48 @@
         }
       }
     },
+    "/transactions/info": {
+      "get": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "Transaction info",
+        "description": "Get a transactions by its IDs",
+        "operationId": "info_multiple",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Transaction IDs base58 encoded",
+            "required": true,
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/parameters/txId"
+              },
+              "minItems": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Transaction"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/transactions/sign": {
       "post": {
         "tags": [

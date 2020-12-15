@@ -5,6 +5,7 @@ import akka.http.scaladsl.model.MediaTypes.`application/json`
 import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
+import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi}
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.common.state.ByteStr
@@ -69,7 +70,7 @@ class CustomJsonMarshallerSpec
   property("/transactions/info/{id}") {
     forAll(leaseGen) { lt =>
       val height: Height = Height(1)
-      (transactionsApi.transactionById _).expects(lt.id()).returning(Some((height, Left(lt), true))).twice()
+      (transactionsApi.transactionById _).expects(lt.id()).returning(Some(TransactionMeta.Default(height, lt, succeeded = true))).twice()
       (blockchain.leaseDetails _)
         .expects(lt.id())
         .returning(Some(LeaseDetails(lt.sender, lt.recipient, 1, lt.amount, true)))

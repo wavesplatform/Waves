@@ -1,6 +1,6 @@
 package com.wavesplatform.it
 
-import com.wavesplatform.http.DebugMessage
+import com.wavesplatform.api.http.DebugMessage
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.{Args, Status, Suite, SuiteMixin}
