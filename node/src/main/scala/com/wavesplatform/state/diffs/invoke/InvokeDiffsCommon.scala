@@ -31,7 +31,7 @@ import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
-import com.wavesplatform.transaction.validation.impl.SponsorFeeTxValidator
+import com.wavesplatform.transaction.validation.impl.{LeaseCancelTxValidator, LeaseTxValidator, SponsorFeeTxValidator}
 import com.wavesplatform.utils._
 import shapeless.Coproduct
 
@@ -417,6 +417,18 @@ object InvokeDiffsCommon {
               r <- validateActionAsPseudoTx(sponsorDiff, sponsorFee.assetId, pseudoTx)
             } yield r
 
+          def applyLease(lease: Lease): TracedResult[FailedTransactionError, Diff] =
+            for {
+              _ <- TracedResult(LeaseTxValidator.validateAmount(lease.amount)).leftMap(asFailedScriptError)
+              diff <- DiffsCommon.processLease(blockchain, dAppAddress, fee = 0, tx.id(), lease).leftMap(asFailedScriptError)
+            } yield diff
+
+          def applyLeaseCancel(leaseCancel: LeaseCancel): TracedResult[FailedTransactionError, Diff] =
+            for {
+              _ <- TracedResult(LeaseCancelTxValidator.checkLeaseId(leaseCancel.leaseId)).leftMap(asFailedScriptError)
+              diff <- DiffsCommon.processLeaseCancel(blockchain, dAppAddress, fee = 0, blockTime, leaseCancel).leftMap(asFailedScriptError)
+            } yield diff
+
           def validateActionAsPseudoTx(
               actionDiff: Either[FailedTransactionError, Diff],
               assetId: ByteStr,
@@ -455,6 +467,8 @@ object InvokeDiffsCommon {
             case r: Reissue     => applyReissue(r, pk)
             case b: Burn        => applyBurn(b, pk)
             case sf: SponsorFee => applySponsorFee(sf, pk)
+            case l: Lease       => applyLease(l)
+            case lc: LeaseCancel => applyLeaseCancel(lc)
           }
           diffAcc |+| diff.leftMap(_.addComplexity(curDiff.scriptsComplexity))
 

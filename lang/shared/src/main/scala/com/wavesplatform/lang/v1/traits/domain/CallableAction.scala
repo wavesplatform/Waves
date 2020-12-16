@@ -80,6 +80,15 @@ case class SponsorFee(
     minSponsoredAssetFee: Option[Long]
 ) extends CallableAction
 
+case class Lease(
+    recipient: Address,
+    amount: Long
+) extends CallableAction
+
+case class LeaseCancel(
+    leaseId: ByteStr
+) extends CallableAction
+
 sealed trait DataOp extends CallableAction {
   val key: String
 }

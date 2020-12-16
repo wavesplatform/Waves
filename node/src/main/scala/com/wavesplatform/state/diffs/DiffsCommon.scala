@@ -2,6 +2,8 @@ package com.wavesplatform.state.diffs
 
 import cats.implicits._
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.ComplexityCheckPolicyProvider._
 import com.wavesplatform.features.EstimatorProvider._
@@ -9,12 +11,12 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.lang.v1.traits.domain.{Burn, Reissue, SponsorFee}
+import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, Diff, LeaseBalance, Portfolio, SponsorshipValue}
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{ProvenTransaction, Transaction}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
+import com.wavesplatform.transaction.{ProvenTransaction, Transaction}
 
 object DiffsCommon {
   def countScriptRuns(blockchain: Blockchain, tx: ProvenTransaction): Int =
@@ -129,7 +131,7 @@ object DiffsCommon {
 
   def processSponsor(blockchain: Blockchain, sender: Address, fee: Long, sponsorFee: SponsorFee): Either[ValidationError, Diff] = {
     val asset = IssuedAsset(sponsorFee.assetId)
-    DiffsCommon.validateAsset(blockchain, asset, sender, issuerOnly = true).flatMap { _ =>
+    validateAsset(blockchain, asset, sender, issuerOnly = true).flatMap { _ =>
       Either.cond(
         !blockchain.hasAssetScript(asset),
         Diff.stateOps(
@@ -139,5 +141,60 @@ object DiffsCommon {
         GenericError("Sponsorship smart assets is disabled.")
       )
     }
+  }
+
+  def processLease(blockchain: Blockchain, sender: Address, fee: Long, txId: ByteStr, lease: Lease): Either[ValidationError, Diff] = {
+    if (Address.fromBytes(lease.recipient.bytes.arr).explicitGet() == sender)
+      Left(GenericError("Cannot lease to self"))
+    else {
+      val leaseBalance = blockchain.leaseBalance(sender)
+      val balance      = blockchain.balance(sender, Waves)
+      if (balance - leaseBalance.out < lease.amount) {
+        Left(GenericError(s"Cannot lease more than own: Balance:$balance, already leased: ${leaseBalance.out}"))
+      } else {
+        val portfolioDiff = Map(
+          sender                                                     -> Portfolio(-fee, LeaseBalance(0, lease.amount), Map.empty),
+          Address.fromBytes(lease.recipient.bytes.arr).explicitGet() -> Portfolio(0, LeaseBalance(lease.amount, 0), Map.empty)
+        )
+        Right(
+          Diff.stateOps(
+            portfolios = portfolioDiff,
+            leaseState = Map(txId -> true)
+          )
+        )
+      }
+    }
+  }
+
+  def processLeaseCancel(blockchain: Blockchain, sender: Address, fee: Long, time: Long, leaseCancel: LeaseCancel): Either[ValidationError, Diff] = {
+    val fs = blockchain.settings.functionalitySettings
+    for {
+      lease <- blockchain.leaseDetails(leaseCancel.leaseId) match {
+        case None    => Left(GenericError(s"Related LeaseTransaction not found"))
+        case Some(l) => Right(l)
+      }
+      recipient <- blockchain.resolveAlias(lease.recipient)
+      isLeaseActive = lease.isActive
+      _ <- Either.cond(
+        !isLeaseActive && time > fs.allowMultipleLeaseCancelTransactionUntilTimestamp,
+        (),
+        GenericError(s"Cannot cancel already cancelled lease")
+      )
+      portfolioDiff <- if (sender == lease.sender.toAddress || time < fs.allowMultipleLeaseCancelTransactionUntilTimestamp)
+        Right(
+          Map(sender      -> Portfolio(-fee, LeaseBalance(0, -lease.amount))) |+|
+            Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0)))
+        )
+      else
+        Left(
+          GenericError(
+            s"LeaseTransaction was leased by other sender " +
+              s"and time=$time > allowMultipleLeaseCancelTransactionUntilTimestamp=${fs.allowMultipleLeaseCancelTransactionUntilTimestamp}"
+          )
+        )
+    } yield Diff.stateOps(
+      portfolios = portfolioDiff,
+      leaseState = Map(leaseCancel.leaseId -> false)
+    )
   }
 }

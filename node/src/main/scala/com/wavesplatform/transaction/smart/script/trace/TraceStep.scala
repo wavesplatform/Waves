@@ -82,12 +82,14 @@ case class InvokeScriptTrace(
       case ScriptResultV4(actions) =>
         Json.obj(
           "actions" -> actions.map {
-            case transfer: AssetTransfer => transferJson(transfer) + ("type" -> JsString("transfer"))
-            case issue: Issue            => issueJson(issue) + ("type"       -> JsString("issue"))
-            case reissue: Reissue        => reissueJson(reissue) + ("type"   -> JsString("reissue"))
-            case burn: Burn              => burnJson(burn) + ("type"         -> JsString("burn"))
-            case sponsorFee: SponsorFee  => sponsorFeeJson(sponsorFee) + ("type" -> JsString("sponsorFee"))
-            case item: DataOp            => dataItemJson(item) + ("type"     -> JsString("dataItem"))
+            case transfer: AssetTransfer  => transferJson(transfer) + ("type"       -> JsString("transfer"))
+            case issue: Issue             => issueJson(issue) + ("type"             -> JsString("issue"))
+            case reissue: Reissue         => reissueJson(reissue) + ("type"         -> JsString("reissue"))
+            case burn: Burn               => burnJson(burn) + ("type"               -> JsString("burn"))
+            case sponsorFee: SponsorFee   => sponsorFeeJson(sponsorFee) + ("type"   -> JsString("sponsorFee"))
+            case lease: Lease             => leaseJson(lease) + ("type"             -> JsString("lease"))
+            case leaseCancel: LeaseCancel => leaseCancelJson(leaseCancel) + ("type" -> JsString("leaseCancel"))
+            case item: DataOp             => dataItemJson(item) + ("type"           -> JsString("dataItem"))
           }
         )
       case i: IncompleteResult =>
@@ -106,13 +108,13 @@ case class InvokeScriptTrace(
 
   private def dataItemJson(item: DataOp) =
     Json.obj(
-      "key"   -> item.key,
+      "key" -> item.key,
       "value" -> (item match {
-        case DataItem.Lng(_, v) => Json.toJson(v)
+        case DataItem.Lng(_, v)  => Json.toJson(v)
         case DataItem.Bool(_, v) => Json.toJson(v)
-        case DataItem.Bin(_, v) => Json.toJson(v.toString)
-        case DataItem.Str(_, v) => Json.toJson(v)
-        case DataItem.Delete(_) => JsNull
+        case DataItem.Bin(_, v)  => Json.toJson(v.toString)
+        case DataItem.Str(_, v)  => Json.toJson(v)
+        case DataItem.Delete(_)  => JsNull
       })
     )
 
@@ -146,6 +148,17 @@ case class InvokeScriptTrace(
     Json.obj(
       "assetId"              -> sponsorFee.assetId.toString,
       "minSponsoredAssetFee" -> sponsorFee.minSponsoredAssetFee
+    )
+
+  private def leaseJson(lease: Lease) =
+    Json.obj(
+      "recipient" -> lease.recipient.bytes.toString,
+      "amount"    -> lease.amount
+    )
+
+  private def leaseCancelJson(leaseCancel: LeaseCancel) =
+    Json.obj(
+      "leaseId" -> leaseCancel.leaseId.toString
     )
 }
 
