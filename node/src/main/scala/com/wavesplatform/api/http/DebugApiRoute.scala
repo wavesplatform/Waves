@@ -1,4 +1,4 @@
-package com.wavesplatform.http
+package com.wavesplatform.api.http
 
 import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
@@ -12,11 +12,10 @@ import cats.implicits._
 import cats.kernel.Monoid
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi}
-import com.wavesplatform.api.http.TransactionsApiRoute.applicationStatus
-import com.wavesplatform.api.http._
+import com.wavesplatform.api.http.TransactionsApiRoute.TransactionJsonSerializer
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, _}
@@ -71,6 +70,10 @@ case class DebugApiRoute(
   private lazy val wavesConfig: JsObject = Json.obj("waves" -> (fullConfig \ "waves").get)
 
   override val settings: RestAPISettings = ws.restAPISettings
+
+  private[this] val serializer                     = TransactionJsonSerializer(blockchain, transactionsApi)
+  private[this] implicit val transactionMetaWrites = OWrites[TransactionMeta](serializer.transactionWithMetaJson)
+
   override lazy val route: Route = pathPrefix("debug") {
     stateChanges ~ balanceHistory ~ stateHash ~ validate ~ withAuth {
       state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ configInfo ~ print
@@ -255,10 +258,9 @@ case class DebugApiRoute(
 
   def stateChangesById: Route = (get & path("stateChanges" / "info" / TransactionId)) { id =>
     transactionsApi.transactionById(id) match {
-      case Some((height, Right((ist, isr)), succeeded)) =>
-        complete(ist.json() ++ applicationStatus(isBlockV5(height), succeeded) ++ Json.obj("height" -> height.toInt, "stateChanges" -> isr))
-      case Some(_) => complete(ApiError.UnsupportedTransactionType)
-      case None    => complete(ApiError.TransactionDoesNotExist)
+      case Some(meta: TransactionMeta.Invoke) => complete(meta: TransactionMeta)
+      case Some(_)                            => complete(ApiError.UnsupportedTransactionType)
+      case None                               => complete(ApiError.TransactionDoesNotExist)
     }
   }
 
@@ -272,16 +274,11 @@ case class DebugApiRoute(
             Source
               .fromPublisher(
                 transactionsApi
-                  .invokeScriptResults(address, None, Set.empty, afterOpt)
-                  .map {
-                    case (height, Right((ist, isr)), succeeded) =>
-                      ist.json() ++ applicationStatus(isBlockV5(height), succeeded) ++ Json.obj("height" -> JsNumber(height), "stateChanges" -> isr)
-                    case (height, Left(tx), succeeded) =>
-                      tx.json() ++ applicationStatus(isBlockV5(height), succeeded) ++ Json.obj("height" -> JsNumber(height))
-                  }
+                  .transactionsByAddress(address, None, Set.empty, afterOpt)
+                  .take(limit)
+                  .map(Json.toJsObject(_))
                   .toReactivePublisher
               )
-              .take(limit)
           }
         }
       }
@@ -299,8 +296,6 @@ case class DebugApiRoute(
         case None        => complete(StatusCodes.NotFound)
       }
     }
-
-  private def isBlockV5(height: Int): Boolean = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height)
 }
 
 object DebugApiRoute {
@@ -322,6 +317,7 @@ object DebugApiRoute {
     },
     m => Json.toJson(m.map { case (assetId, count) => assetId.toString -> count })
   )
+
   implicit val leaseInfoFormat: Format[LeaseBalance] = Json.format
 
   case class AccountMiningInfo(address: String, miningBalance: Long, timestamp: Long)

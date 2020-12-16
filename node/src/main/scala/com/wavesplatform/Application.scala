@@ -28,7 +28,6 @@ import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{History, StorageFactory}
-import com.wavesplatform.http.{DebugApiRoute, NodeApiRoute}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerDebugInfo, MinerImpl}
@@ -370,7 +369,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         RewardApiRoute(blockchainUpdater)
       )
 
-      val httpService = CompositeHttpService(apiRoutes, settings.restAPISettings)
+      val httpService   = CompositeHttpService(apiRoutes, settings.restAPISettings)
       val httpFuture  = Http().bindAndHandle(httpService.loggingCompositeRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       serverBinding = Await.result(httpFuture, 20.seconds)
       serverBinding.whenTerminated.foreach(_ => httpService.scheduler.shutdown())
@@ -444,7 +443,7 @@ object Application extends ScorexLogging {
   private[wavesplatform] def loadApplicationConfig(external: Option[File] = None): WavesSettings = {
     import com.wavesplatform.settings._
 
-    val maybeExternalConfig = Try(external.map(ConfigFactory.parseFile(_, ConfigParseOptions.defaults().setAllowMissing(false))))
+    val maybeExternalConfig = Try(external.map(f => ConfigFactory.parseFile(f.getAbsoluteFile, ConfigParseOptions.defaults().setAllowMissing(false))))
     val config              = loadConfig(maybeExternalConfig.getOrElse(None))
 
     // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml

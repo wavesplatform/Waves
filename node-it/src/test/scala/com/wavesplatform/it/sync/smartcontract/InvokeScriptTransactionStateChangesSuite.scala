@@ -358,6 +358,8 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       .bytes()
       .base64
     sender.setScript(contract, Some(script), setScriptFee, waitForTx = true)
+    nodes.waitForEmptyUtx()
+    nodes.waitForHeightArise()
 
     initCallerTxs = sender.transactionsByAddress(callerAddress, 100).length
     initDAppTxs = sender.transactionsByAddress(contractAddress, 100).length
