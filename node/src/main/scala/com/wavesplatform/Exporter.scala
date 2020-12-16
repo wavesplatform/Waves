@@ -55,7 +55,7 @@ object Exporter extends ScorexLogging {
         IO.createOutputStream(outputFilename) match {
           case Success(output) =>
             var exportedBytes = 0L
-            val bos           = new BufferedOutputStream(output)
+            val bos           = new BufferedOutputStream(output, 10 * 1024 * 1024)
             val start         = System.currentTimeMillis()
             exportedBytes += IO.writeHeader(bos, format)
             (2 to height).foreach { h =>
