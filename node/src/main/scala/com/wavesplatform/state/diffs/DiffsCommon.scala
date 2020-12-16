@@ -174,9 +174,8 @@ object DiffsCommon {
         case Some(l) => Right(l)
       }
       recipient <- blockchain.resolveAlias(lease.recipient)
-      isLeaseActive = lease.isActive
       _ <- Either.cond(
-        !isLeaseActive && time > fs.allowMultipleLeaseCancelTransactionUntilTimestamp,
+        lease.isActive || time <= fs.allowMultipleLeaseCancelTransactionUntilTimestamp,
         (),
         GenericError(s"Cannot cancel already cancelled lease")
       )
