@@ -21,12 +21,6 @@ sealed trait BaseFunction[C[_[_]]] {
   @JSExport def args: Seq[String]
   @JSExport def deprecated: Boolean = false
 
-  val expr: Option[ContextfulUserFunction[C]] =
-    this match {
-      case _: NativeFunction[C]            => None
-      case UserFunction(_, _, _, _, ev, _) => Some(ev)
-    }
-
   val costByLibVersionMap: Map[StdLibVersion, Long]
 
   def costByLibVersion(version: StdLibVersion): Long =
