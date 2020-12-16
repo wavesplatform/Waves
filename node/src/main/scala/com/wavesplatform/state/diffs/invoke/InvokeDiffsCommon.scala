@@ -92,13 +92,15 @@ object InvokeDiffsCommon {
       if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - invocationComplexity.toInt
       else Int.MaxValue
 
-    val actionsByType  = actions.groupBy(a => if (classOf[DataOp].isAssignableFrom(a.getClass)) classOf[DataOp] else a.getClass).withDefaultValue(Nil)
-    val transferList   = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
-    val issueList      = actionsByType(classOf[Issue]).asInstanceOf[List[Issue]]
-    val reissueList    = actionsByType(classOf[Reissue]).asInstanceOf[List[Reissue]]
-    val burnList       = actionsByType(classOf[Burn]).asInstanceOf[List[Burn]]
-    val sponsorFeeList = actionsByType(classOf[SponsorFee]).asInstanceOf[List[SponsorFee]]
-    val dataEntries    = actionsByType(classOf[DataOp]).asInstanceOf[List[DataOp]].map(dataItemToEntry)
+    val actionsByType   = actions.groupBy(a => if (classOf[DataOp].isAssignableFrom(a.getClass)) classOf[DataOp] else a.getClass).withDefaultValue(Nil)
+    val transferList    = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
+    val issueList       = actionsByType(classOf[Issue]).asInstanceOf[List[Issue]]
+    val reissueList     = actionsByType(classOf[Reissue]).asInstanceOf[List[Reissue]]
+    val burnList        = actionsByType(classOf[Burn]).asInstanceOf[List[Burn]]
+    val sponsorFeeList  = actionsByType(classOf[SponsorFee]).asInstanceOf[List[SponsorFee]]
+    val leaseList       = actionsByType(classOf[Lease]).asInstanceOf[List[Lease]]
+    val leaseCancelList = actionsByType(classOf[LeaseCancel]).asInstanceOf[List[LeaseCancel]]
+    val dataEntries     = actionsByType(classOf[DataOp]).asInstanceOf[List[DataOp]].map(dataItemToEntry)
 
     for {
       _ <- TracedResult(checkDataEntries(tx, dataEntries, version)).leftMap(FailedTransactionError.dAppExecution(_, invocationComplexity))
@@ -176,7 +178,9 @@ object InvokeDiffsCommon {
         issueList,
         reissueList,
         burnList,
-        sponsorFeeList
+        sponsorFeeList,
+        leaseList,
+        leaseCancelList
       )
 
       resultDiff = compositeDiff.copy(
@@ -420,8 +424,8 @@ object InvokeDiffsCommon {
             for {
               _       <- TracedResult(LeaseTxValidator.validateAmount(l.amount))
               address <- TracedResult(Address.fromBytes(l.recipient.bytes.arr))
-              leaseId =  Lease.calculateId(l, tx.id(), leaseNonce)
-              diff    <- DiffsCommon.processLease(blockchain, l.amount, dAppAddress, address, fee = 0, leaseId)
+              leaseId = Lease.calculateId(l, tx.id(), leaseNonce)
+              diff <- DiffsCommon.processLease(blockchain, l.amount, dAppAddress, address, fee = 0, leaseId)
             } yield diff
 
           def applyLeaseCancel(l: LeaseCancel): TracedResult[ValidationError, Diff] =

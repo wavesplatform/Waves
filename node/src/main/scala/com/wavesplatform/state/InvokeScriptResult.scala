@@ -4,10 +4,10 @@ import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.utils._
-import com.wavesplatform.lang.v1.traits.domain.{Burn, Issue, Reissue, SponsorFee}
-import com.wavesplatform.protobuf.{Amount, _}
+import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
 import com.wavesplatform.protobuf.utils.PBUtils
+import com.wavesplatform.protobuf.{Amount, _}
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
@@ -21,6 +21,8 @@ final case class InvokeScriptResult(
     reissues: Seq[Reissue] = Nil,
     burns: Seq[Burn] = Nil,
     sponsorFees: Seq[SponsorFee] = Nil,
+    leases: Seq[Lease] = Nil,
+    leaseCancels: Seq[LeaseCancel] = Nil,
     error: Option[ErrorMessage] = None
 )
 
@@ -54,6 +56,9 @@ object InvokeScriptResult {
   implicit val reissueFormat      = Json.writes[Reissue]
   implicit val burnFormat         = Json.writes[Burn]
   implicit val sponsorFeeFormat   = Json.writes[SponsorFee]
+  implicit val addressFormat      = Json.writes[Recipient.Address]
+  implicit val leaseFormat        = Json.writes[Lease]
+  implicit val leaseCancelFormat  = Json.writes[LeaseCancel]
   implicit val errorMessageFormat = Json.writes[ErrorMessage]
   implicit val jsonFormat         = Json.writes[InvokeScriptResult]
 
@@ -89,7 +94,9 @@ object InvokeScriptResult {
       isr.reissues.map(toPbReissue),
       isr.burns.map(toPbBurn),
       isr.error.map(toPbErrorMessage),
-      isr.sponsorFees.map(toPbSponsorFee)
+      isr.sponsorFees.map(toPbSponsorFee),
+      isr.leases.map(toPbLease),
+      isr.leaseCancels.map(toPbLeaseCancel)
     )
   }
 
@@ -116,6 +123,12 @@ object InvokeScriptResult {
   private def toPbSponsorFee(sf: SponsorFee) =
     PBInvokeScriptResult.SponsorFee(Some(Amount(sf.assetId.toByteString, sf.minSponsoredAssetFee.getOrElse(0))))
 
+  private def toPbLease(l: Lease) =
+    PBInvokeScriptResult.Lease(ByteString.copyFrom(l.recipient.bytes.arr), l.amount)
+
+  private def toPbLeaseCancel(l: LeaseCancel) =
+    PBInvokeScriptResult.LeaseCancel(ByteString.copyFrom(l.leaseId.arr))
+
   private def toPbErrorMessage(em: ErrorMessage) =
     PBInvokeScriptResult.ErrorMessage(em.code, em.text)
 
@@ -135,6 +148,12 @@ object InvokeScriptResult {
     SponsorFee(amount.assetId.toByteStr, Some(amount.amount).filter(_ > 0))
   }
 
+  private def toVanillaLease(l: PBInvokeScriptResult.Lease) =
+    Lease(Recipient.Address(l.recipient.toByteStr), l.amount)
+
+  private def toVanillaLeaseCancel(sf: PBInvokeScriptResult.LeaseCancel) =
+    LeaseCancel(sf.leaseId.toByteStr)
+
   private def toVanillaErrorMessage(b: PBInvokeScriptResult.ErrorMessage) =
     ErrorMessage(b.code, b.text)
 
@@ -149,6 +168,8 @@ object InvokeScriptResult {
       pbValue.reissues.map(toVanillaReissue),
       pbValue.burns.map(toVanillaBurn),
       pbValue.sponsorFees.map(toVanillaSponsorFee),
+      pbValue.leases.map(toVanillaLease),
+      pbValue.leaseCancels.map(toVanillaLeaseCancel),
       pbValue.errorMessage.map(toVanillaErrorMessage)
     )
   }
