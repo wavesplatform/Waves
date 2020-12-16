@@ -3,7 +3,6 @@ package com.wavesplatform.state.diffs
 import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.ComplexityCheckPolicyProvider._
 import com.wavesplatform.features.EstimatorProvider._
@@ -143,18 +142,25 @@ object DiffsCommon {
     }
   }
 
-  def processLease(blockchain: Blockchain, sender: Address, fee: Long, txId: ByteStr, lease: Lease): Either[ValidationError, Diff] = {
-    if (Address.fromBytes(lease.recipient.bytes.arr).explicitGet() == sender)
+  def processLease(
+      blockchain: Blockchain,
+      amount: Long,
+      sender: Address,
+      recipient: Address,
+      fee: Long,
+      txId: ByteStr
+  ): Either[ValidationError, Diff] =
+    if (recipient == sender)
       Left(GenericError("Cannot lease to self"))
     else {
       val leaseBalance = blockchain.leaseBalance(sender)
       val balance      = blockchain.balance(sender, Waves)
-      if (balance - leaseBalance.out < lease.amount) {
+      if (balance - leaseBalance.out < amount) {
         Left(GenericError(s"Cannot lease more than own: Balance:$balance, already leased: ${leaseBalance.out}"))
       } else {
         val portfolioDiff = Map(
-          sender                                                     -> Portfolio(-fee, LeaseBalance(0, lease.amount), Map.empty),
-          Address.fromBytes(lease.recipient.bytes.arr).explicitGet() -> Portfolio(0, LeaseBalance(lease.amount, 0), Map.empty)
+          sender    -> Portfolio(-fee, LeaseBalance(0, amount)),
+          recipient -> Portfolio(0, LeaseBalance(amount, 0))
         )
         Right(
           Diff.stateOps(
@@ -164,36 +170,30 @@ object DiffsCommon {
         )
       }
     }
-  }
 
-  def processLeaseCancel(blockchain: Blockchain, sender: Address, fee: Long, time: Long, leaseCancel: LeaseCancel): Either[ValidationError, Diff] = {
-    val fs = blockchain.settings.functionalitySettings
+  def processLeaseCancel(blockchain: Blockchain, sender: Address, fee: Long, time: Long, leaseId: ByteStr): Either[ValidationError, Diff] = {
+    val allowedTs = blockchain.settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp
     for {
-      lease <- blockchain.leaseDetails(leaseCancel.leaseId) match {
-        case None    => Left(GenericError(s"Related LeaseTransaction not found"))
-        case Some(l) => Right(l)
-      }
+      lease     <- blockchain.leaseDetails(leaseId).toRight(GenericError(s"Related LeaseTransaction not found"))
       recipient <- blockchain.resolveAlias(lease.recipient)
       _ <- Either.cond(
-        lease.isActive || time <= fs.allowMultipleLeaseCancelTransactionUntilTimestamp,
+        lease.isActive || time <= allowedTs,
         (),
         GenericError(s"Cannot cancel already cancelled lease")
       )
-      portfolioDiff <- if (sender == lease.sender.toAddress || time < fs.allowMultipleLeaseCancelTransactionUntilTimestamp)
-        Right(
-          Map(sender      -> Portfolio(-fee, LeaseBalance(0, -lease.amount))) |+|
-            Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0)))
+      _ <- Either.cond(
+        sender == lease.sender.toAddress || time < allowedTs,
+        (),
+        GenericError(
+          s"LeaseTransaction was leased by other sender and " +
+            s"time=$time > allowMultipleLeaseCancelTransactionUntilTimestamp=$allowedTs"
         )
-      else
-        Left(
-          GenericError(
-            s"LeaseTransaction was leased by other sender " +
-              s"and time=$time > allowMultipleLeaseCancelTransactionUntilTimestamp=${fs.allowMultipleLeaseCancelTransactionUntilTimestamp}"
-          )
-        )
+      )
+      senderPortfolio    = Map(sender    -> Portfolio(-fee, LeaseBalance(0, -lease.amount)))
+      recipientPortfolio = Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0)))
     } yield Diff.stateOps(
-      portfolios = portfolioDiff,
-      leaseState = Map(leaseCancel.leaseId -> false)
+      portfolios = senderPortfolio |+| recipientPortfolio,
+      leaseState = Map(leaseId -> false)
     )
   }
 }

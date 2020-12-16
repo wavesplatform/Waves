@@ -264,15 +264,14 @@ object InvokeDiffsCommon {
       maxKeySize = ContractLimits.MaxKeySizeInBytesByVersion(stdLibVersion)
       _ <- dataEntries
         .collectFirst {
-          Function.unlift {
-            entry =>
-              val length = entry.key.utf8Bytes.length
-              if (length > maxKeySize)
-                Some(s"Data entry key size = $length bytes must be less than $maxKeySize")
-              else if (entry.key.isEmpty && stdLibVersion >= V4)
-                Some(s"Data entry key should not be empty")
-              else
-                None
+          Function.unlift { entry =>
+            val length = entry.key.utf8Bytes.length
+            if (length > maxKeySize)
+              Some(s"Data entry key size = $length bytes must be less than $maxKeySize")
+            else if (entry.key.isEmpty && stdLibVersion >= V4)
+              Some(s"Data entry key should not be empty")
+            else
+              None
           }
         }
         .toLeft(())
@@ -417,16 +416,17 @@ object InvokeDiffsCommon {
               r <- validateActionAsPseudoTx(sponsorDiff, sponsorFee.assetId, pseudoTx)
             } yield r
 
-          def applyLease(lease: Lease): TracedResult[FailedTransactionError, Diff] =
+          def applyLease(l: Lease): TracedResult[ValidationError, Diff] =
             for {
-              _ <- TracedResult(LeaseTxValidator.validateAmount(lease.amount)).leftMap(asFailedScriptError)
-              diff <- DiffsCommon.processLease(blockchain, dAppAddress, fee = 0, tx.id(), lease).leftMap(asFailedScriptError)
+              _       <- TracedResult(LeaseTxValidator.validateAmount(l.amount))
+              address <- TracedResult(Address.fromBytes(l.recipient.bytes.arr))
+              diff    <- DiffsCommon.processLease(blockchain, l.amount, dAppAddress, address, fee = 0, tx.id())
             } yield diff
 
-          def applyLeaseCancel(leaseCancel: LeaseCancel): TracedResult[FailedTransactionError, Diff] =
+          def applyLeaseCancel(l: LeaseCancel): TracedResult[ValidationError, Diff] =
             for {
-              _ <- TracedResult(LeaseCancelTxValidator.checkLeaseId(leaseCancel.leaseId)).leftMap(asFailedScriptError)
-              diff <- DiffsCommon.processLeaseCancel(blockchain, dAppAddress, fee = 0, blockTime, leaseCancel).leftMap(asFailedScriptError)
+              _    <- TracedResult(LeaseCancelTxValidator.checkLeaseId(l.leaseId))
+              diff <- DiffsCommon.processLeaseCancel(blockchain, dAppAddress, fee = 0, blockTime, l.leaseId)
             } yield diff
 
           def validateActionAsPseudoTx(
@@ -462,13 +462,13 @@ object InvokeDiffsCommon {
               } else {
                 PublicKey(new Array[Byte](32))
               })
-            case d: DataOp      => applyDataItem(d)
-            case i: Issue       => applyIssue(tx, pk, i)
-            case r: Reissue     => applyReissue(r, pk)
-            case b: Burn        => applyBurn(b, pk)
-            case sf: SponsorFee => applySponsorFee(sf, pk)
-            case l: Lease       => applyLease(l)
-            case lc: LeaseCancel => applyLeaseCancel(lc)
+            case d: DataOp       => applyDataItem(d)
+            case i: Issue        => applyIssue(tx, pk, i)
+            case r: Reissue      => applyReissue(r, pk)
+            case b: Burn         => applyBurn(b, pk)
+            case sf: SponsorFee  => applySponsorFee(sf, pk)
+            case l: Lease        => applyLease(l).leftMap(asFailedScriptError)
+            case lc: LeaseCancel => applyLeaseCancel(lc).leftMap(asFailedScriptError)
           }
           diffAcc |+| diff.leftMap(_.addComplexity(curDiff.scriptsComplexity))
 
