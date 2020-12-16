@@ -235,12 +235,12 @@ object Bindings {
           )
         )
 
-      case Lease(p, amount, recipient) =>
+      case Tx.Lease(p, amount, recipient) =>
         CaseObj(
           buildLeaseTransactionType(proofsEnabled),
           combine(Map("amount" -> amount), provenTxPart(p, proofsEnabled, version) + mapRecipient(recipient))
         )
-      case LeaseCancel(p, leaseId) =>
+      case Tx.LeaseCancel(p, leaseId) =>
         CaseObj(
           buildLeaseCancelTransactionType(proofsEnabled),
           combine(
