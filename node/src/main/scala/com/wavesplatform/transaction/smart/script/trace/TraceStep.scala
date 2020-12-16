@@ -82,7 +82,6 @@ case class InvokeScriptTrace(
           "transfers" -> ts.map(transferJson)
         )
       case ScriptResultV4(actions, ret) =>
-        // XXX show returned value if it isn't `unit`.
         Json.obj(
           "actions" -> actions.map {
             case transfer: AssetTransfer => transferJson(transfer) + ("type" -> JsString("transfer"))

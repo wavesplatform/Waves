@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluat
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.{Common, Global}
+import com.wavesplatform.lang.Common
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
