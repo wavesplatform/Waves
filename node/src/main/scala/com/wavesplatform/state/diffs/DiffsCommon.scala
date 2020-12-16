@@ -148,7 +148,7 @@ object DiffsCommon {
       sender: Address,
       recipient: Address,
       fee: Long,
-      txId: ByteStr
+      leaseId: ByteStr
   ): Either[ValidationError, Diff] =
     if (recipient == sender)
       Left(GenericError("Cannot lease to self"))
@@ -165,7 +165,7 @@ object DiffsCommon {
         Right(
           Diff.stateOps(
             portfolios = portfolioDiff,
-            leaseState = Map(txId -> true)
+            leaseState = Map(leaseId -> true)
           )
         )
       }
