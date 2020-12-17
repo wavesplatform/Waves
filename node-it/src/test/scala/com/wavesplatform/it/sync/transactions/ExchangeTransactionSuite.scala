@@ -90,7 +90,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
         error.id shouldBe StateCheckFailed.Id
         error.statusCode shouldBe StateCheckFailed.Code.intValue
         error.message should include("Assets should be issued before they can be traded")
-        (error.json \ "tx").asOpt[JsObject] shouldBe defined
+        (error.json \ "transaction").asOpt[JsObject] shouldBe defined
       }
     }
   }
