@@ -635,7 +635,9 @@ class TransactionsRouteSpec
             |      "issues" : [ ],
             |      "reissues" : [ ],
             |      "burns" : [ ],
-            |      "sponsorFees" : [ ]
+            |      "sponsorFees" : [ ],
+            |      "leases" : [ ],
+            |      "leaseCancels" : [ ]
             |    },
             |    "error" : null,
             |    "vars" : [ {
