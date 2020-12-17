@@ -16,7 +16,6 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.{Blockchain, Height, InvokeScriptResult}
-import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.ApplicationStatus.{ScriptExecutionFailed, Succeeded}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -264,7 +263,7 @@ class TransactionsRouteSpec
       (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
       (addressTransactions.transactionsByAddress _)
         .expects(account.toAddress, *, *, None)
-        .returning(Observable(TransactionMeta.Invoke(Height(1), transaction, succeeded = true, Some(InvokeScriptResult()))))
+        .returning(Observable(TransactionMeta.Invoke(Height(1), transaction, succeeded = Succeeded, Some(InvokeScriptResult()))))
         .once()
 
       Get(routePath(s"/address/${account.toAddress}/limit/1")) ~> route ~> check {
@@ -295,7 +294,6 @@ class TransactionsRouteSpec
       forAll(txAvailability) {
         case (tx, succeed, height, acceptFailedActivationHeight) =>
           val h: Height         = Height(height)
-          val info              = if (tx.typeId == InvokeScriptTransaction.typeId) Right((tx.asInstanceOf[InvokeScriptTransaction], None)) else Left(tx)
           val applicationStatus = if (succeed) Succeeded else ScriptExecutionFailed
           (addressTransactions.transactionById _).expects(tx.id()).returning(Some(TransactionMeta.Default(h, tx, applicationStatus))).once()
           (() => blockchain.activatedFeatures)
@@ -323,7 +321,7 @@ class TransactionsRouteSpec
       (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
       (addressTransactions.transactionById _)
         .expects(transaction.id())
-        .returning(Some(TransactionMeta.Invoke(Height(1), transaction, succeeded = true, Some(InvokeScriptResult()))))
+        .returning(Some(TransactionMeta.Invoke(Height(1), transaction, succeeded = Succeeded, Some(InvokeScriptResult()))))
         .once()
 
       Get(routePath(s"/info/${transaction.id()}")) ~> route ~> check {
@@ -339,7 +337,7 @@ class TransactionsRouteSpec
         tx =>
           (addressTransactions.transactionById _)
             .expects(tx.id())
-            .returns(Some(TransactionMeta.Invoke(Height(1), tx, succeeded = true, Some(InvokeScriptResult()))))
+            .returns(Some(TransactionMeta.Invoke(Height(1), tx, succeeded = Succeeded, Some(InvokeScriptResult()))))
             .repeat(3)
       )
 
