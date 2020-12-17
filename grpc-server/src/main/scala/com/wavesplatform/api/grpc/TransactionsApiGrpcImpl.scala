@@ -7,7 +7,6 @@ import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBRecipientImplicitConversionOps
 import com.wavesplatform.state.{InvokeScriptResult => VISR}
-import com.wavesplatform.transaction.ApplicationStatus._
 import com.wavesplatform.transaction.{ApplicationStatus, Authorized}
 import io.grpc.stub.StreamObserver
 import io.grpc.{Status, StatusRuntimeException}
