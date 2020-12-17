@@ -57,7 +57,7 @@ object SponsorFeeTransaction extends TransactionParser {
       version: TxVersion,
       sender: PublicKey,
       asset: IssuedAsset,
-      minSponsoredAssetFee: Option[TxTimestamp],
+      minSponsoredAssetFee: Option[TxAmount],
       fee: TxAmount,
       timestamp: TxTimestamp,
       proofs: Proofs,
@@ -69,7 +69,7 @@ object SponsorFeeTransaction extends TransactionParser {
       version: TxVersion,
       sender: PublicKey,
       asset: IssuedAsset,
-      minSponsoredAssetFee: Option[TxTimestamp],
+      minSponsoredAssetFee: Option[TxAmount],
       fee: TxAmount,
       timestamp: TxTimestamp,
       signer: PrivateKey
@@ -80,7 +80,7 @@ object SponsorFeeTransaction extends TransactionParser {
       version: TxVersion,
       sender: KeyPair,
       asset: IssuedAsset,
-      minSponsoredAssetFee: Option[TxTimestamp],
+      minSponsoredAssetFee: Option[TxAmount],
       fee: TxAmount,
       timestamp: TxTimestamp
   ): Either[ValidationError, SponsorFeeTransaction] =
