@@ -67,7 +67,7 @@
         ],
         "summary": "Wallet addresses",
         "description": "Get a list of account addresses in the [node wallet](https://docs.waves.tech/en/waves-node/how-to-work-with-node-wallet)",
-        "operationId": "root_1",
+        "operationId": "getWalletAddresses",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -90,7 +90,7 @@
         ],
         "summary": "Create wallet address",
         "description": "Generate a new account address in the [node wallet](https://docs.waves.tech/en/waves-node/how-to-work-with-node-wallet)",
-        "operationId": "create_1",
+        "operationId": "createWalletAddress",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -128,7 +128,7 @@
         ],
         "summary": "Verify",
         "description": "Check a signature of a message signed by an account",
-        "operationId": "verify_1",
+        "operationId": "verifyMessageSignature",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -183,7 +183,7 @@
         ],
         "summary": "Wallet addresses by range",
         "description": "Get a list addresses in the [node wallet](https://docs.waves.tech/en/waves-node/how-to-work-with-node-wallet) by a given range of indices. Max range {from}-{to} is 100 addresses",
-        "operationId": "seq_2",
+        "operationId": "getWalletAddressesRange",
         "parameters": [
           {
             "name": "from",
@@ -228,7 +228,7 @@
         ],
         "summary": "Seed",
         "description": "Export seed value for the {address}",
-        "operationId": "seed_2",
+        "operationId": "getAccountSeed",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -275,7 +275,7 @@
         ],
         "summary": "Address from a public key",
         "description": "Generate an address from a given public key",
-        "operationId": "publicKey_1",
+        "operationId": "getAddressByPublicKey",
         "parameters": [
           {
             "name": "publicKey",
@@ -314,9 +314,9 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Regular balance in WAVES",
-        "description": "Get the regular balance at a given address",
-        "operationId": "balance_2",
+        "summary": "Regular balance",
+        "description": "Get the regular balance in WAVES at a given address",
+        "operationId": "getRegularBalance",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -342,8 +342,8 @@
           "addresses"
         ],
         "summary": "Multiple accounts balances",
-        "description": "Get multiple accounts balances. For dozens of addresses, better use the POST method",
-        "operationId": "balance_3",
+        "description": "Get regular balances for multiple addresses. For dozens of addresses, better use the POST method",
+        "operationId": "getMultipleBalances",
         "parameters": [
           {
             "name": "address",
@@ -395,8 +395,8 @@
           "addresses"
         ],
         "summary": "Multiple accounts balances",
-        "description": "Get multiple accounts balances. Max number of addresses is set by `waves.rest-api.transactions-by-address-limit`, 1000 by default",
-        "operationId": "balance_4",
+        "description": "Get regular balances for multiple addresses. Max number of addresses is set by `waves.rest-api.transactions-by-address-limit`, 1000 by default",
+        "operationId": "getMultipleBalancesViaPost",
         "requestBody": {
           "content": {
             "application/json": {
@@ -447,9 +447,9 @@
         "tags": [
           "addresses"
         ],
-        "summary": "Effective balance in WAVES",
-        "description": "Get the effective balance at a given address",
-        "operationId": "effectiveBalance_1",
+        "summary": "Effective balance",
+        "description": "Get the effective balance in WAVES at a given address",
+        "operationId": "getEffectiveBalance",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -476,7 +476,7 @@
         ],
         "summary": "Data by keys or regexp",
         "description": "Read account data entries by given keys or a regular expression",
-        "operationId": "getData_1",
+        "operationId": "getDataByFilter",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -525,7 +525,7 @@
         ],
         "summary": "Data by keys",
         "description": "Read account data entries by given keys",
-        "operationId": "postData_1",
+        "operationId": "getDataByMultipleKeysViaPost",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -593,7 +593,7 @@
         ],
         "summary": "Sign",
         "description": "Sign a message with a private key associated with {address}",
-        "operationId": "sign_3",
+        "operationId": "signMessage",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -640,7 +640,7 @@
         ],
         "summary": "Validate",
         "description": "Check whether address {address} is valid or not",
-        "operationId": "validate_2",
+        "operationId": "validateAddress",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -679,7 +679,7 @@
         ],
         "summary": "Meta by address",
         "description": "Account script meta",
-        "operationId": "scriptMeta_1",
+        "operationId": "getScriptMeta",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -706,7 +706,7 @@
         ],
         "summary": "Account script info",
         "description": "Get an account script or a dApp script with additional info by a given address",
-        "operationId": "scriptInfo_1",
+        "operationId": "getScriptInfo",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -773,7 +773,7 @@
         ],
         "summary": "Delete",
         "description": "Remove the account with address {address} from the wallet",
-        "operationId": "deleteAddress_1",
+        "operationId": "deleteWalletAddress",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -816,7 +816,7 @@
         ],
         "summary": "Sign",
         "description": "Sign a message with a private key associated with {address}",
-        "operationId": "signText_1",
+        "operationId": "signText",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -863,7 +863,7 @@
         ],
         "summary": "Verify text",
         "description": "Check a signature of a message signed by an account",
-        "operationId": "verifyText_1",
+        "operationId": "verifyTextSignature",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -918,7 +918,7 @@
         ],
         "summary": "All types of balances in WAVES",
         "description": "Get the available, regular, generating, and effective balance, see [definitions](https://docs.waves.tech/en/blockchain/account/account-balance#account-balance-in-waves)",
-        "operationId": "balanceDetails_1",
+        "operationId": "getWavesBalances",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -973,7 +973,7 @@
         ],
         "summary": "Confirmed regular balance in WAVES",
         "description": "Get the minimum regular balance at a given address for {confirmations} blocks back from the current height. Max number of confirmations is set by `waves.db.max-rollback-depth`, 2000 by default",
-        "operationId": "balanceWithConfirmations_1",
+        "operationId": "getConfirmedRegularBalance",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -1009,7 +1009,7 @@
         ],
         "summary": "Confirmed effective balance in WAVES",
         "description": "Get the minimum effective balance at a given address for {confirmations} blocks from the current height. Max number of confirmations is set by `waves.db.max-rollback-depth`, 2000 by default",
-        "operationId": "effectiveBalanceWithConfirmations_1",
+        "operationId": "getConfirmedEffectiveBalance",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -1045,7 +1045,7 @@
         ],
         "summary": "Data by key",
         "description": "Read account data entries by a given key",
-        "operationId": "getDataItem_1",
+        "operationId": "getDataByKey",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -1081,7 +1081,7 @@
         ],
         "summary": "Block by signature",
         "description": "Get a block by its signature",
-        "operationId": "signature_1",
+        "operationId": "getBlockBySignature",
         "parameters": [
           {
             "name": "signature",
@@ -1116,7 +1116,7 @@
         ],
         "summary": "Block by ID",
         "description": "Get a block by its ID",
-        "operationId": "block_by_id",
+        "operationId": "getBlockById",
         "parameters": [
           {
             "$ref": "#/components/parameters/blockId"
@@ -1143,7 +1143,7 @@
         ],
         "summary": "Genesis block",
         "description": "Get genesis block",
-        "operationId": "first_1",
+        "operationId": "getFirstBlock",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1165,7 +1165,7 @@
         ],
         "summary": "Blocks forged by address",
         "description": "Get a list of blocks forged by a given address. Max range {from}-{to} is 100 blocks",
-        "operationId": "address_1",
+        "operationId": "getBlocksByAddress",
         "parameters": [
           {
             "name": "from",
@@ -1213,7 +1213,7 @@
         ],
         "summary": "Block range",
         "description": "Get blocks at a given range of heights. Max range {from}-{to} is 100 blocks",
-        "operationId": "seq",
+        "operationId": "getBlocksRange",
         "parameters": [
           {
             "name": "from",
@@ -1258,7 +1258,7 @@
         ],
         "summary": "Average block delay",
         "description": "Average delay in milliseconds between last `blockNum` blocks starting from block with `id`",
-        "operationId": "delay_1",
+        "operationId": "getBlockDelay",
         "parameters": [
           {
             "$ref": "#/components/parameters/blockId"
@@ -1303,7 +1303,7 @@
         ],
         "summary": "Blockchain height",
         "description": "Get the current blockchain height",
-        "operationId": "height_1",
+        "operationId": "getHeight",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1334,7 +1334,7 @@
         ],
         "summary": "Block at height",
         "description": "Get a block at a given height",
-        "operationId": "at_1",
+        "operationId": "getBlockByHeight",
         "parameters": [
           {
             "name": "height",
@@ -1367,7 +1367,7 @@
         ],
         "summary": "Last block",
         "description": "Get the block at the current blockchain height",
-        "operationId": "last_1",
+        "operationId": "getLastBlock",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1389,7 +1389,7 @@
         ],
         "summary": "Block height",
         "description": "Get the height of a block by its ID",
-        "operationId": "heightEncoded_1",
+        "operationId": "getBlockHeightbyId",
         "parameters": [
           {
             "$ref": "#/components/parameters/blockId"
@@ -1425,7 +1425,7 @@
         ],
         "summary": "Block headers at height",
         "description": "Get block headers at a given height",
-        "operationId": "atHeaderOnly_1",
+        "operationId": "getBlockHeadersByHeight",
         "parameters": [
           {
             "name": "height",
@@ -1458,7 +1458,7 @@
         ],
         "summary": "Block headers by ID",
         "description": "Get headers of a given block",
-        "operationId": "block_header_by_id",
+        "operationId": "getBlockHeadersById",
         "parameters": [
           {
             "$ref": "#/components/parameters/blockId"
@@ -1485,7 +1485,7 @@
         ],
         "summary": "Block headers at range",
         "description": "Get block headers at a given range of heights. Max range {from}-{to} is 100 blocks",
-        "operationId": "seqHeaderOnly_1",
+        "operationId": "getBlockHeadersRange",
         "parameters": [
           {
             "name": "from",
@@ -1530,7 +1530,7 @@
         ],
         "summary": "Last block headers",
         "description": "Get headers of the block at the current blockchain height",
-        "operationId": "lastHeaderOnly_1",
+        "operationId": "getLastBlockHeaders",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1552,7 +1552,7 @@
         ],
         "summary": "Connect to peer",
         "description": "Connect to peer",
-        "operationId": "connect_1",
+        "operationId": "connectPeer",
         "requestBody": {
           "description": "JSON with data",
           "content": {
@@ -1619,9 +1619,9 @@
         "tags": [
           "peers"
         ],
-        "summary": "Remove all blacklisted peers",
-        "description": "Clear blacklist",
-        "operationId": "clearBlacklist_1",
+        "summary": "Clear ban list",
+        "description": "Clear the list of banned peers",
+        "operationId": "clearBanList",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1658,8 +1658,8 @@
           "peers"
         ],
         "summary": "Peer list",
-        "description": "Get a list of all ever known not blacklisted peers with a publicly available declared address",
-        "operationId": "allPeers_1",
+        "description": "Get a list of all ever known not banned peers with a publicly available declared address",
+        "operationId": "getPeers",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1697,7 +1697,7 @@
         ],
         "summary": "Connected peers list",
         "description": "Get a list of all peers currently connected to the node",
-        "operationId": "connectedPeers_1",
+        "operationId": "getConnectedPeers",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1757,9 +1757,9 @@
         "tags": [
           "peers"
         ],
-        "summary": "Blacklisted peers list",
-        "description": "Get a list of all currently blacklisted peers of the node",
-        "operationId": "blacklistedPeers_1",
+        "summary": "Ban list",
+        "description": "Get a list of all currently banned peers of the node",
+        "operationId": "getBannedPeers",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1801,7 +1801,7 @@
         ],
         "summary": "Suspended peers list",
         "description": "Suspended peers list",
-        "operationId": "suspendedPeers_1",
+        "operationId": "getSuspendedPeers",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1842,8 +1842,8 @@
           "blockchain"
         ],
         "summary": "Current reward status",
-        "description": "Get current miner’s reward status",
-        "operationId": "rewards_1",
+        "description": "Get current status of block reward",
+        "operationId": "getRewardStatus",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -1864,8 +1864,8 @@
           "blockchain"
         ],
         "summary": "Reward status",
-        "description": "Get miner’s reward status at height",
-        "operationId": "rewardsAtHeight_1",
+        "description": "Get status of block reward at height",
+        "operationId": "getRewardStatusAtHeight",
         "parameters": [
           {
             "name": "height",
@@ -1898,7 +1898,7 @@
         ],
         "summary": "Transaction statuses",
         "description": "Get transaction statuses by their ID. For dozens of transactions, better use the POST method.<br>Transactions in the response are in the same order as in the request.",
-        "operationId": "status_3",
+        "operationId": "getTxStatuses",
         "parameters": [
           {
             "name": "id",
@@ -1937,7 +1937,7 @@
         ],
         "summary": "Transaction statuses",
         "description": "Get transaction statuses by their ID. Max number of transactions is set by `waves.rest-api.transactions-by-address-limit`, 1000 by default.<br>Transactions in the response are in the same order as in the request.",
-        "operationId": "status_4",
+        "operationId": "getTxStatusesViaPost",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2004,7 +2004,7 @@
         ],
         "summary": "Transaction info",
         "description": "Get a transaction by its ID",
-        "operationId": "info_2",
+        "operationId": "getTxById",
         "parameters": [
           {
             "$ref": "#/components/parameters/txId"
@@ -2073,7 +2073,7 @@
         ],
         "summary": "Sign transaction on behalf of wallet account",
         "description": "Sign a transaction with the private key corresponding to the `sender`. Sender must exist in the [node's wallet](https://docs.waves.tech/en/waves-node/how-to-work-with-node-wallet)",
-        "operationId": "sign",
+        "operationId": "signTx",
         "requestBody": {
           "description": "Transaction [data in JSON](https://docs.waves.tech/en/blockchain/transaction/#json-representation) including [`type`](https://docs.waves.tech/en/blockchain/transaction-type/) and `sender`. If `timestamp` is omitted, current node's time is used. `senderPublicKey` is ignored.",
           "content": {
@@ -2115,7 +2115,7 @@
         ],
         "summary": "Unconfirmed transactions",
         "description": "Get a list of transactions in node's UTX pool",
-        "operationId": "unconfirmed_1",
+        "operationId": "getUnconfirmedTxs",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -2140,7 +2140,7 @@
         ],
         "summary": "List of transactions by address",
         "description": "Get a list of the latest transactions involving a given address. Max number of transactions is set by `waves.rest-api.transactions-by-address-limit`, 1000 by default. For pagination, use the field {after}",
-        "operationId": "addressLimit_1",
+        "operationId": "getTxsByAddress",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -2187,7 +2187,7 @@
         ],
         "summary": "Number of unconfirmed transactions",
         "description": "Get the number of transactions in the UTX pool",
-        "operationId": "utxSize_1",
+        "operationId": "getUtxPoolSize",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -2218,7 +2218,7 @@
         ],
         "summary": "Unconfirmed transaction info",
         "description": "Get an unconfirmed transaction by its ID",
-        "operationId": "utxTransactionInfo_1",
+        "operationId": "getUnconfirmedTxById",
         "parameters": [
           {
             "$ref": "#/components/parameters/txId"
@@ -2245,7 +2245,7 @@
         ],
         "summary": "Calculate transaction fee",
         "description": "Get the minimum fee for a given transaction",
-        "operationId": "calculateFee_1",
+        "operationId": "calculateTxFee",
         "requestBody": {
           "description": "Transaction [data in JSON](https://docs.waves.tech/en/blockchain/transaction/#json-representation) including [`type`](https://docs.waves.tech/en/blockchain/transaction-type/) and `senderPublicKey`. To calculate a sponsored fee, specify `feeAssetId`. `fee` and `sender` are ignored.",
           "content": {
@@ -2292,7 +2292,7 @@
         ],
         "summary": "Sign transaction on behalf of wallet account",
         "description": "Sign a transaction with the private key corresponding to a given address. The address must exist in the [node's wallet](https://docs.waves.tech/en/waves-node/how-to-work-with-node-wallet)",
-        "operationId": "signWithSigner_1",
+        "operationId": "signTxWithAddress",
         "parameters": [
           {
             "name": "signerAddress",
@@ -2346,7 +2346,7 @@
         ],
         "summary": "Broadcast transaction",
         "description": "Broadcast a signed transaction",
-        "operationId": "signedBroadcast_1",
+        "operationId": "broadcastSignedTx",
         "requestBody": {
           "description": "Transaction [data in JSON](https://docs.waves.tech/en/blockchain/transaction/#json-representation) including [`type`](https://docs.waves.tech/en/blockchain/transaction-type/) and `signature`/`proofs`",
           "content": {
@@ -2380,7 +2380,7 @@
         ],
         "summary": "Merkle proofs",
         "description": "Get [merkle proofs](https://docs.waves.tech/en/blockchain/block/merkle-root#proof-of-transaction-in-block) for given transactions. For dozens of transactions, better use the POST method",
-        "operationId": "merkle_proof_1",
+        "operationId": "getMerkleProofs",
         "parameters": [
           {
             "name": "id",
@@ -2416,7 +2416,7 @@
         ],
         "summary": "Merkle proofs",
         "description": "Get [merkle proofs](https://docs.waves.tech/en/blockchain/block/merkle-root#proof-of-transaction-in-block) for given transactions",
-        "operationId": "merkle_proof_2",
+        "operationId": "getMerkleProofsViaPost",
         "requestBody": {
           "description": "Transaction IDs",
           "content": {
@@ -2464,7 +2464,7 @@
         ],
         "summary": "Seed of specified length",
         "description": "Generate random seed of a given length in bytes. The returned value is base58 encoded",
-        "operationId": "length_1",
+        "operationId": "generateSeedByLength",
         "parameters": [
           {
             "name": "length",
@@ -2505,7 +2505,7 @@
         ],
         "summary": "Compile",
         "description": "Compiles string code to base64 script representation",
-        "operationId": "compile_1",
+        "operationId": "compileScript",
         "requestBody": {
           "description": "Script code",
           "content": {
@@ -2540,7 +2540,7 @@
         ],
         "summary": "Time",
         "description": "Current Node time (UTC)",
-        "operationId": "time_1",
+        "operationId": "getTime",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -2576,7 +2576,7 @@
         ],
         "summary": "Decompile",
         "description": "Decompiles base64 script representation to string code",
-        "operationId": "decompile_1",
+        "operationId": "decompileScript",
         "requestBody": {
           "description": "Script code",
           "content": {
@@ -2618,7 +2618,7 @@
         ],
         "summary": "Compile script",
         "description": "Compiles string code to base64 script representation",
-        "operationId": "compileCode_1",
+        "operationId": "compileCode",
         "requestBody": {
           "content": {
             "text/plain": {
@@ -2651,7 +2651,7 @@
         ],
         "summary": "Compile script",
         "description": "Compiles string code with imports to base64 script representation",
-        "operationId": "compileWithImports_1",
+        "operationId": "compileWithImports",
         "requestBody": {
           "description": "Script code with imports",
           "content": {
@@ -2700,7 +2700,7 @@
         ],
         "summary": "Estimate",
         "description": "Estimates complexity of a given compiled code",
-        "operationId": "estimate_1",
+        "operationId": "estimate",
         "requestBody": {
           "description": "Compiled code in base64 script representation",
           "content": {
@@ -2842,7 +2842,7 @@
         ],
         "summary": "Seed",
         "description": "Generate random seed. The returned value is base58 encoded",
-        "operationId": "seedRoute_1",
+        "operationId": "generateSeed",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -2872,7 +2872,7 @@
         ],
         "summary": "Secure hash",
         "description": "Calculate the [Keccak-256](https://keccak.team/files/Keccak-submission-3.pdf) hash of the [BLAKE2b-256](https://en.wikipedia.org/wiki/BLAKE_%28hash_function%29) hash of a given message",
-        "operationId": "hashSecure_1",
+        "operationId": "hashSecure",
         "requestBody": {
           "description": "Message to hash",
           "content": {
@@ -2906,7 +2906,7 @@
         ],
         "summary": "Fast hash",
         "description": "Calculate the [BLAKE2b-256](https://en.wikipedia.org/wiki/BLAKE_%28hash_function%29) hash of a given message",
-        "operationId": "hashFast_1",
+        "operationId": "hashFast",
         "requestBody": {
           "description": "Message to hash",
           "content": {
@@ -2940,7 +2940,7 @@
         ],
         "summary": "Serialize transaction",
         "description": "Serialize transaction",
-        "operationId": "transactionSerialize_1",
+        "operationId": "serializeTx",
         "requestBody": {
           "description": "Transaction [data in JSON](https://docs.waves.tech/en/blockchain/transaction/#json-representation) including [`type`](https://docs.waves.tech/en/blockchain/transaction-type/)",
           "content": {
@@ -2985,7 +2985,7 @@
         ],
         "summary": "Seed",
         "description": "Export wallet seed",
-        "operationId": "seed",
+        "operationId": "getSeed",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -3023,7 +3023,7 @@
         ],
         "summary": "Address by alias",
         "description": "Get an address associated with a given alias. Alias should be plain text without an 'alias' prefix and chain ID.",
-        "operationId": "addressOfAlias_1",
+        "operationId": "getAddressByAlias",
         "parameters": [
           {
             "name": "alias",
@@ -3064,7 +3064,7 @@
         ],
         "summary": "Aliases by address",
         "description": "Get a list of aliases associated with a given address",
-        "operationId": "aliasOfAddress_1",
+        "operationId": "getAliasesByAddress",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -3095,7 +3095,7 @@
         ],
         "summary": "Account balances in all assets",
         "description": "Get account balances in all assets (excluding WAVES and NFTs) at a given address",
-        "operationId": "balances_1",
+        "operationId": "getAllAssetBalancesByAddress",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -3181,7 +3181,7 @@
         ],
         "summary": "Information about asset",
         "description": "Get detailed information about a given asset. See [fields descriptions](https://docs.waves.tech/en/blockchain/token/#custom-token-parameters)",
-        "operationId": "asset_details",
+        "operationId": "getAssetDetails",
         "parameters": [
           {
             "$ref": "#/components/parameters/assetId"
@@ -3216,7 +3216,7 @@
         ],
         "summary": "Information about multiple assets",
         "description": "Get detailed information about given assets. See [fields descriptions](https://docs.waves.tech/en/blockchain/token/#custom-token-parameters)",
-        "operationId": "asset_details_array",
+        "operationId": "getMultipleAssetDetails",
         "parameters": [
           {
             "name": "id",
@@ -3264,8 +3264,8 @@
           "assets"
         ],
         "summary": "Account balance in asset",
-        "description": "Get the account balance in a given asset",
-        "operationId": "balance",
+        "description": "Get the account balance in a given asset. 0 for non-existent asset (use [GET /assets/details/{assetId}](#/assets/getAssetDetails) to check if the asset exists)",
+        "operationId": "getAssetBalanceByAddress",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -3312,7 +3312,7 @@
         ],
         "summary": "Asset balance distribution",
         "description": "Get asset balance distribution by addresses",
-        "operationId": "balanceDistribution_1",
+        "operationId": "getAssetDistributionOld",
         "parameters": [
           {
             "$ref": "#/components/parameters/assetId"
@@ -3340,7 +3340,7 @@
         ],
         "summary": "Asset balance distribution at height",
         "description": "Get asset balance distribution by addresses at a given height. Max number of addresses is set by `waves.rest-api.distribution-address-limit`, 1000 by default. For pagination, use the field {after}",
-        "operationId": "balanceDistributionAtHeight_1",
+        "operationId": "getAssetDistribution",
         "parameters": [
           {
             "$ref": "#/components/parameters/assetId"
@@ -3393,7 +3393,7 @@
         ],
         "summary": "Account NFTs",
         "description": "Get a list of [non-fungible tokens](https://docs.waves.tech/en/blockchain/token/non-fungible-token) at a given address. Max for 1000 tokens. For pagination, use the field {after}. See [fields descriptions](https://docs.waves.tech/en/blockchain/token/#custom-token-parameters).<br>Since activation of [feature #15](https://docs.waves.tech/en/waves-node/features/) this method returns only tokens that are issued as NFT (amount: 1, decimal places: 0, reissuable: false) after activation of feature #13. Before activation of feature #15 the method returned all the assets that are issued as NFT.",
-        "operationId": "nft_1",
+        "operationId": "getNfts",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -3440,7 +3440,7 @@
         ],
         "summary": "Active leases by address",
         "description": "Get all active leases involving a given address",
-        "operationId": "active_1",
+        "operationId": "getActiveLeases",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -3470,7 +3470,7 @@
         ],
         "summary": "Generating balance",
         "description": "Account generating balance",
-        "operationId": "generatingBalance_1",
+        "operationId": "getGeneratingBalance",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -3510,7 +3510,7 @@
         ],
         "summary": "Base target",
         "description": "Base target of a block with a given ID",
-        "operationId": "baseTargetId_1",
+        "operationId": "getBaseTarget",
         "parameters": [
           {
             "name": "blockId",
@@ -3553,7 +3553,7 @@
         ],
         "summary": "Base target last",
         "description": "Base target of a last block",
-        "operationId": "basetarget_1",
+        "operationId": "getLastBaseTarget",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -3588,7 +3588,7 @@
         ],
         "summary": "Consensus algo",
         "description": "Shows which consensus algo being using",
-        "operationId": "algo_1",
+        "operationId": "getAlgo",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -3618,7 +3618,7 @@
         ],
         "summary": "Feature activation status",
         "description": "Activation statuses of [blockchain features](https://docs.waves.tech/en/waves-node/features/)",
-        "operationId": "status",
+        "operationId": "getFeatureStatuses",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -3718,7 +3718,7 @@
         ],
         "summary": "Print",
         "description": "Prints a string at DEBUG level, strips to 100 chars",
-        "operationId": "print_1",
+        "operationId": "print",
         "requestBody": {
           "description": "JSON with data",
           "content": {
@@ -3762,7 +3762,7 @@
         ],
         "summary": "Regular address balance",
         "description": "Regular address balance at the current height",
-        "operationId": "state_1",
+        "operationId": "getWavesDistribution",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -3801,7 +3801,7 @@
         ],
         "summary": "State",
         "description": "All info you need to debug",
-        "operationId": "info",
+        "operationId": "getDebugInfo",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -3919,41 +3919,6 @@
         ]
       }
     },
-    "/debug/blocks/{howMany}": {
-      "get": {
-        "tags": [
-          "debug"
-        ],
-        "summary": "Blocks",
-        "description": "Get sizes and full hashes for last blocks",
-        "operationId": "blocks_1",
-        "parameters": [
-          {
-            "name": "howMany",
-            "in": "path",
-            "description": "How many last blocks to take",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Sizes and full hashes",
-            "content": {}
-          },
-          "403": {
-            "$ref": "#/components/responses/ApiKeyNotValid"
-          }
-        },
-        "security": [
-          {
-            "APIKey": []
-          }
-        ]
-      }
-    },
     "/debug/stateHash/{height}": {
       "get": {
         "tags": [
@@ -3961,7 +3926,7 @@
         ],
         "summary": "State hash",
         "description": "Get state hash at height. Available only if node configuration contains `waves.db.store-state-hashes = true` option",
-        "operationId": "state_hash",
+        "operationId": "getStateHash",
         "parameters": [
           {
             "name": "height",
@@ -4027,9 +3992,9 @@
         "tags": [
           "debug"
         ],
-        "summary": "Blacklist peer",
-        "description": "Move a given peer to the blacklist for the time specified in `waves.network.black-list-residence-time`, 15 min by default. The connection to the peer is immediately closed (if it was open)",
-        "operationId": "blacklist_1",
+        "summary": "Ban peer",
+        "description": "Move a given peer to the ban list for the time specified in `waves.network.black-list-residence-time`, 15 min by default. The connection to the peer is immediately closed (if it was open)",
+        "operationId": "banPeer",
         "requestBody": {
           "description": "IP address of node",
           "content": {
@@ -4069,7 +4034,7 @@
         ],
         "summary": "Portfolio",
         "description": "Get current portfolio considering pessimistic transactions in the UTX pool",
-        "operationId": "portfolios_1",
+        "operationId": "getPortfolios",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -4153,7 +4118,7 @@
         ],
         "summary": "Block id",
         "description": "Rollback the state to the block with a given ID",
-        "operationId": "rollbackTo_1",
+        "operationId": "rollbackToId",
         "parameters": [
           {
             "$ref": "#/components/parameters/blockId"
@@ -4196,7 +4161,7 @@
         ],
         "summary": "Validate Transaction",
         "description": "Validates a transaction and measures time spent in milliseconds. You should use the JSON transaction format with proofs",
-        "operationId": "validate",
+        "operationId": "validateTx",
         "requestBody": {
           "description": "Signed transaction",
           "content": {
@@ -4250,7 +4215,7 @@
         ],
         "summary": "History of regular balance",
         "description": "Get history of the regular balance at a given address. Max depth is set by `waves.db.max-rollback-depth`, 2000 by default",
-        "operationId": "balanceHistory_1",
+        "operationId": "getBalanceHistory",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -4294,7 +4259,7 @@
         ],
         "summary": "Regular address balance at the height",
         "description": "Regular address balance at the height. Max number of blocks back from the current height is set by `waves.db.max-rollback-depth`, 2000 by default",
-        "operationId": "stateWaves_1",
+        "operationId": "getWavesDistributionAtHeight",
         "parameters": [
           {
             "name": "height",
@@ -4344,7 +4309,7 @@
         ],
         "summary": "Rollback to height",
         "description": "Removes all blocks after a given height. Max number of blocks back from the current height is set by `waves.db.max-rollback-depth`, 2000 by default",
-        "operationId": "rollback_1",
+        "operationId": "rollbackToHeight",
         "requestBody": {
           "description": "JSON with data",
           "content": {
@@ -4407,7 +4372,7 @@
         ],
         "summary": "State",
         "description": "All miner info you need to debug",
-        "operationId": "minerInfo_1",
+        "operationId": "getGeneratingInfo",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -4455,7 +4420,7 @@
         ],
         "summary": "Config",
         "description": "Currently running node config",
-        "operationId": "configInfo_1",
+        "operationId": "getConfig",
         "parameters": [
           {
             "name": "full",
@@ -4490,7 +4455,7 @@
         ],
         "summary": "Transaction state changes",
         "description": "Get state changes made by the transaction",
-        "operationId": "stateChangesById_1",
+        "operationId": "getStateChangesById",
         "parameters": [
           {
             "$ref": "#/components/parameters/txId"
@@ -4517,7 +4482,7 @@
         ],
         "summary": "List of transactions by address with state changes",
         "description": "Get a list of transactions involving a given address with state changes. Max for 1000 transactions. To get the next 1000 transactions, use the field {after}",
-        "operationId": "stateChangesByAddress_1",
+        "operationId": "getStateChangesByAddress",
         "parameters": [
           {
             "$ref": "#/components/parameters/address"
@@ -4564,7 +4529,7 @@
         ],
         "summary": "Stop",
         "description": "Stop the node",
-        "operationId": "stop_1",
+        "operationId": "stopNode",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -4602,7 +4567,7 @@
         ],
         "summary": "Status",
         "description": "Get status of the running core",
-        "operationId": "status_1",
+        "operationId": "getNodeStatus",
         "responses": {
           "200": {
             "description": "successful operation",
@@ -4647,7 +4612,7 @@
         ],
         "summary": "Version",
         "description": "Get Waves node version",
-        "operationId": "version_1",
+        "operationId": "getNodeVersion",
         "responses": {
           "200": {
             "description": "successful operation",
