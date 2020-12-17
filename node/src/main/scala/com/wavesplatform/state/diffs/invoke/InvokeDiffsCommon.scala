@@ -105,6 +105,7 @@ object InvokeDiffsCommon {
 
     for {
       _ <- TracedResult(checkDataEntries(tx, dataEntries, version)).leftMap(FailedTransactionError.dAppExecution(_, invocationComplexity))
+      _ <- TracedResult(checkLeaseCancels(leaseCancelList)).leftMap(FailedTransactionError.dAppExecution(_, invocationComplexity))
       _ <- TracedResult(
         Either.cond(
           actions.length - dataEntries.length <= ContractLimits.MaxCallableActionsAmount,
@@ -288,6 +289,15 @@ object InvokeDiffsCommon {
         s"WriteSet size can't exceed ${ContractLimits.MaxWriteSetSizeInBytes} bytes, actual: $totalDataBytes bytes"
       )
     } yield ()
+
+  private def checkLeaseCancels(leaseCancels: Seq[LeaseCancel]): Either[String, Unit] = {
+    val duplicates = leaseCancels.diff(leaseCancels.distinct)
+    Either.cond(
+      duplicates.isEmpty,
+      (),
+      s"Duplicated LeaseCancel actions IDs: ${duplicates.distinct.map(_.leaseId).mkString(", ")}"
+    )
+  }
 
   private def foldActions(
       sblockchain: Blockchain,
