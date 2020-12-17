@@ -20,18 +20,20 @@ case class CTX[C[_[_]]](
   @(JSExport @field) vars: Map[String, (FINAL, ContextfulVal[C])],
   @(JSExport @field) functions: Array[BaseFunction[C]]
 ) {
-  lazy val typeDefs = types.map(t => t.name -> t).toMap
+  lazy val typeDefs = types.view.map(t => t.name -> t).toMap
+  lazy val functionMap = functions.view.map(f => f.header -> f).toMap
 
   def evaluationContext[F[_]: Monad](env: C[F]): EvaluationContext[C, F] = {
-    if (functions.map(_.header).distinct.length != functions.length) {
+
+    if (functionMap.size != functions.length) {
       val dups = functions.groupBy(_.header).filter(_._2.length != 1)
       throw new Exception(s"Duplicate runtime functions names: $dups")
     }
     EvaluationContext(
       env,
       typeDefs,
-      vars.view.mapValues(v => LazyVal.fromEval(v._2(env))).toMap,
-      functions.map(f => f.header -> f).toMap
+      vars.map { case (k, v) => k -> LazyVal.fromEval(v._2(env)) },
+      functionMap
     )
   }
 

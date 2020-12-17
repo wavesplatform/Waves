@@ -2,9 +2,9 @@ package com.wavesplatform.http
 
 import com.wavesplatform.TestWallet
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
+import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.WalletApiRoute
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.http.ApiMarshallers._
 import play.api.libs.json.JsObject
 
 class WalletRouteSpec extends RouteSpec("/wallet") with RestAPISettingsHelper with TestWallet {
