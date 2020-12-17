@@ -6,6 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult}
+import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.state.InvokeScriptResult
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
@@ -113,19 +114,7 @@ object TraceStep {
 
   private[trace] def logJson(l: Log[Id]): (String, JsValueWrapper) =
     "vars" -> l.map {
-      case (k, Right(v))  => Json.obj("name" -> k) ++ serializeVarValue(v)
+      case (k, Right(v))  => Json.obj("name" -> k) ++ ScriptValuesJson.serializeValue(v)
       case (k, Left(err)) => Json.obj("name" -> k, "error" -> err)
     }
-
-  import com.wavesplatform.lang.v1.compiler.Terms
-  def serializeVarValue(e: Terms.EVALUATED): JsObject = e match { // TODO: Merge with https://github.com/wavesplatform/Waves/pull/3305/files
-    case Terms.CONST_LONG(t)     => Json.obj("type" -> "Int", "value"        -> t)
-    case bs: Terms.CONST_BYTESTR => Json.obj("type" -> "ByteVector", "value" -> bs.bs.toString)
-    case s: Terms.CONST_STRING   => Json.obj("type" -> "String", "value"     -> s.s)
-    case Terms.CONST_BOOLEAN(b)  => Json.obj("type" -> "Boolean", "value"    -> b)
-    case Terms.CaseObj(caseType, fields) =>
-      Json.obj("type" -> caseType.name, "value" -> JsObject(fields.view.mapValues(serializeVarValue).toSeq))
-    case Terms.ARR(xs)      => Json.obj("type" -> "Array", "value" -> xs.map(serializeVarValue))
-    case Terms.FAIL(reason) => Json.obj("type" -> "Fail", "value"  -> reason)
-  }
 }
