@@ -2251,7 +2251,8 @@ class InvokeScriptTransactionDiffTest
              |
              | @Callable(i)
              | func bar(a: ByteVector) = {
-             |   ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit)], 17)
+             |   let n = Issue("barAsset", "bar asset", 1, 0, false, unit, 0) 
+             |   ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit), BinaryEntry("asset", n.calculateAssetId()), n, ScriptTransfer(Address(a), 1, n.calculateAssetId())], 17)
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value
@@ -2280,9 +2281,10 @@ class InvokeScriptTransactionDiffTest
              |     let data = getIntegerValue(Address(base58'$otherAcc'), "bar")
              |     let b2 = wavesBalance(this)
              |     let ob2 = wavesBalance(Address(base58'$otherAcc'))
+             |     let ab = assetBalance(this, getBinaryValue(Address(base58'$otherAcc'), "asset"))
              |     if data == 1
              |     then
-             |      if ob1.regular+14 == ob2.regular && b1.regular == b2.regular+14
+             |      if ob1.regular+14 == ob2.regular && b1.regular == b2.regular+14 && ab == 1
              |      then
              |       [
              |        IntegerEntry("key", 1)
