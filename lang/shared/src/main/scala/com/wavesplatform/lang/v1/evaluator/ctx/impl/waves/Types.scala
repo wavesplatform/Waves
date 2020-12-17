@@ -169,7 +169,8 @@ object Types {
       FieldNames.Lease,
       List(
         FieldNames.LeaseRecipient -> addressOrAliasType,
-        FieldNames.LeaseAmount    -> LONG
+        FieldNames.LeaseAmount    -> LONG,
+        FieldNames.LeaseNonce     -> LONG,
       )
     )
 

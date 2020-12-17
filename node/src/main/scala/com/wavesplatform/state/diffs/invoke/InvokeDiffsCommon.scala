@@ -3,7 +3,7 @@ package com.wavesplatform.state.diffs.invoke
 import cats.implicits._
 import com.google.common.base.Throwables
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, Alias, PublicKey}
+import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures.BlockV5
@@ -424,12 +424,7 @@ object InvokeDiffsCommon {
           def applyLease(l: Lease): TracedResult[ValidationError, Diff] =
             for {
               _ <- TracedResult(LeaseTxValidator.validateAmount(l.amount))
-              recipient <- TracedResult(
-                l.recipient match {
-                  case Recipient.Address(bytes) => Address.fromBytes(bytes.arr)
-                  case Recipient.Alias(name)    => Alias.create(name)
-                }
-              )
+              recipient <- TracedResult(AddressOrAlias.fromRide(l.recipient))
               leaseId = Lease.calculateId(l, tx.id())
               diff <- DiffsCommon.processLease(blockchain, l.amount, dAppAddress, recipient, fee = 0, leaseId)
             } yield diff

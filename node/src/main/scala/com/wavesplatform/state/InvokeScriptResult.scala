@@ -2,10 +2,10 @@ package com.wavesplatform.state
 
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme}
 import com.wavesplatform.common.utils._
-import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.lang.v1.evaluator.{IncompleteResult, ScriptResult, ScriptResultV3, ScriptResultV4}
+import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.protobuf.{Amount, _}
@@ -58,6 +58,11 @@ object InvokeScriptResult {
   implicit val burnFormat         = Json.writes[Burn]
   implicit val sponsorFeeFormat   = Json.writes[SponsorFee]
   implicit val addressFormat      = Json.writes[Recipient.Address]
+  implicit val aliasFormat        = Json.writes[Recipient.Alias]
+  implicit val recipientFormat    = Writes[Recipient] {
+    case address: Recipient.Address => addressFormat.writes(address)
+    case alias: Recipient.Alias     => aliasFormat.writes(alias)
+  }
   implicit val leaseFormat        = Json.writes[Lease]
   implicit val leaseCancelFormat  = Json.writes[LeaseCancel]
   implicit val errorMessageFormat = Json.writes[ErrorMessage]
@@ -150,8 +155,10 @@ object InvokeScriptResult {
   private def toPbSponsorFee(sf: SponsorFee) =
     PBInvokeScriptResult.SponsorFee(Some(Amount(sf.assetId.toByteString, sf.minSponsoredAssetFee.getOrElse(0))))
 
-  private def toPbLease(l: Lease) =
-    PBInvokeScriptResult.Lease(ByteString.copyFrom(l.recipient.bytes.arr), l.amount, l.nonce)
+  private def toPbLease(l: Lease) = {
+    val recipientBytes = AddressOrAlias.fromRide(l.recipient).explicitGet().bytes
+    PBInvokeScriptResult.Lease(ByteString.copyFrom(recipientBytes), l.amount, l.nonce)
+  }
 
   private def toPbLeaseCancel(l: LeaseCancel) =
     PBInvokeScriptResult.LeaseCancel(ByteString.copyFrom(l.leaseId.arr))
@@ -175,8 +182,10 @@ object InvokeScriptResult {
     SponsorFee(amount.assetId.toByteStr, Some(amount.amount).filter(_ > 0))
   }
 
-  private def toVanillaLease(l: PBInvokeScriptResult.Lease) =
-    Lease(Recipient.Address(l.recipient.toByteStr), l.amount, l.nonce)
+  private def toVanillaLease(l: PBInvokeScriptResult.Lease) = {
+    val recipient = AddressOrAlias.fromBytes(l.recipient.toByteArray, 0).explicitGet()._1.toRide
+    Lease(recipient, l.amount, l.nonce)
+  }
 
   private def toVanillaLeaseCancel(sf: PBInvokeScriptResult.LeaseCancel) =
     LeaseCancel(sf.leaseId.toByteStr)

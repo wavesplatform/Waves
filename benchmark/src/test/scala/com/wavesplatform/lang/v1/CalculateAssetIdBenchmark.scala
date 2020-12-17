@@ -4,8 +4,9 @@ import java.util.concurrent.TimeUnit
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.CalculateAssetIdBenchmark._
-import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
-import com.wavesplatform.lang.v1.traits.domain.Issue
+import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomAddress, randomBytes}
+import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
+import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 import scorex.crypto.hash.{Blake2b256, Keccak256, Sha256}
@@ -79,7 +80,25 @@ class CalculateAssetIdBenchmark {
 
   @Benchmark
   def calculateAssetId(st: CalculateAssetIdSt, bh: Blackhole): Unit =
-    bh.consume(Issue.calculateId(Int.MaxValue, st.MaxAssetDescription, isReissuable = true, st.MaxAssetName, Long.MaxValue, Long.MaxValue, ByteStr(new Array[Byte](64))))
+    bh.consume(
+      Issue.calculateId(
+        Int.MaxValue,
+        st.MaxAssetDescription,
+        isReissuable = true,
+        st.MaxAssetName,
+        Long.MaxValue,
+        Long.MaxValue,
+        ByteStr(new Array[Byte](64))
+      )
+    )
+
+  @Benchmark
+  def calculateLeaseIdWithAddress(st: CalculateLeaseIdSt, bh: Blackhole): Unit =
+    bh.consume(Lease.calculateId(Lease(st.address, Long.MaxValue, Long.MaxValue), st.txId))
+
+  @Benchmark
+  def calculateLeaseIdWithAlias(st: CalculateLeaseIdSt, bh: Blackhole): Unit =
+    bh.consume(Lease.calculateId(Lease(st.maxAlias, Long.MaxValue, Long.MaxValue), st.txId))
 }
 
 object CalculateAssetIdBenchmark {
@@ -110,5 +129,12 @@ object CalculateAssetIdBenchmark {
   class CalculateAssetIdSt {
     val MaxAssetName: String        = "a" * 16
     val MaxAssetDescription: String = "a" * 1000
+  }
+
+  @State(Scope.Benchmark)
+  class CalculateLeaseIdSt {
+    val address: Address = Address(randomAddress)
+    val maxAlias: Alias  = Alias("a" * 30)
+    val txId: ByteStr    = ByteStr(randomBytes(32))
   }
 }
