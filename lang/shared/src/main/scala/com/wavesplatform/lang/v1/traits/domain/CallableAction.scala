@@ -5,7 +5,7 @@ import java.io.ByteArrayOutputStream
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.hacks.Global
 import com.wavesplatform.lang.utils.Serialize._
-import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
+import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 
 sealed trait CallableAction
 
@@ -79,7 +79,7 @@ case class SponsorFee(
 ) extends CallableAction
 
 case class Lease(
-    recipient: Address,
+    recipient: Recipient,
     amount: Long,
     nonce: Long
 ) extends CallableAction
@@ -91,7 +91,10 @@ case class LeaseCancel(
 object Lease {
   def calculateId(l: Lease, invokeId: ByteStr): ByteStr = {
     val out = new ByteArrayOutputStream()
-    out.write(l.recipient.bytes.arr)
+    l.recipient match {
+      case Address(bytes) => out.write(bytes.arr)
+      case Alias(name)    => out.writeString(name)
+    }
     out.write(invokeId.arr)
     out.writeLong(l.nonce)
     out.writeLong(l.amount)

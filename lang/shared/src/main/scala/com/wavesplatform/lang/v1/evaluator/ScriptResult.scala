@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
+import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain._
 
 sealed trait ScriptResult
@@ -100,20 +100,24 @@ object ScriptResult {
             case CaseObj(_, m) if m.isEmpty => Right(None)
             case other                      => err(s"can't reconstruct token from $other", version)
           }
-          address <- processRecipient(recipient, ctx, version)
+          recipient <- processRecipient(recipient, ctx, version)
+          address <- recipient match {
+            case a: Address  => Right(a)
+            case Alias(name) => ctx.environment.resolveAlias(name)
+          }
         } yield AssetTransfer(address, b, token)
       case other =>
         err(other, version, FieldNames.ScriptTransfer)
     }
 
-  private def processRecipient(obj: CaseObj, ctx: EvaluationContext[Environment, Id], version: StdLibVersion) =
+  private def processRecipient(obj: CaseObj, ctx: EvaluationContext[Environment, Id], version: StdLibVersion): Either[String, Recipient] =
     if (obj.caseType.name == Types.addressType.name)
       obj.fields("bytes") match {
         case CONST_BYTESTR(addBytes) => Right(Address(addBytes))
         case other                   => err(s"can't reconstruct address from $other", version)
       } else if (obj.caseType.name == Types.aliasType.name && ctx.environment.multiPaymentAllowed)
       obj.fields("alias") match {
-        case CONST_STRING(alias) => ctx.environment.resolveAlias(alias)
+        case CONST_STRING(alias) => Right(Alias(alias))
         case other               => err(s"can't reconstruct alias from $other", version)
       } else
       err(obj, version, FieldNames.Recipient)
@@ -238,7 +242,8 @@ object ScriptResult {
   private def processLease(ctx: EvaluationContext[Environment, Id], fields: Map[String, EVALUATED], version: StdLibVersion): Either[String, Lease] =
     (fields.get(FieldNames.LeaseRecipient), fields.get(FieldNames.LeaseAmount), fields.get(FieldNames.LeaseNonce)) match {
       case (Some(recipient: CaseObj), Some(CONST_LONG(quantity)), Some(CONST_LONG(nonce))) =>
-        processRecipient(recipient, ctx, version).map(Lease(_, quantity, nonce))
+        processRecipient(recipient, ctx, version)
+          .map(Lease(_, quantity, nonce))
       case other =>
         err(other, version, FieldNames.Lease)
     }
