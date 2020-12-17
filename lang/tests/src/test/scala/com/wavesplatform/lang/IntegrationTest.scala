@@ -2145,7 +2145,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val script =
       s"""
          | calculateLeaseId(Lease(Address(base58'bbbb'), 1234567, 123)) == base58'$id1' &&
-         | calculateLeaseId(Lease(Alias("alias"), 9876, 100))           == base58'$id2'
+         | calculateLeaseId(Lease(Alias("alias"), 9876, 100))           == base58'$id2' &&
+         | base58'$id1' != base58'$id2'
        """.stripMargin
     genericEval[Environment, EVALUATED](script, ctxt = v5Ctx, version = V5, env = utils.buildEnvironment(txId)) shouldBe
       Right(CONST_BOOLEAN(true))
