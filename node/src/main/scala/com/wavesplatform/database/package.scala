@@ -645,18 +645,19 @@ package object database extends ScorexLogging {
   }
 
   def loadTransactions(height: Height, db: ReadOnlyDB): Option[Seq[(Transaction, ApplicationStatus)]] =
-    for {
-      meta <- db.get(Keys.blockMetaAt(height))
-    } yield (0 until meta.transactionCount).toList.flatMap { n =>
-      db.get(Keys.transactionAt(height, TxNum(n.toShort)))
+    if (height < 1 || db.get(Keys.height) < height) None
+    else {
+      val transactions = Seq.newBuilder[(Transaction, ApplicationStatus)]
+      db.iterateOver(KeyTags.NthTransactionInfoAtHeight.prefixBytes ++ Ints.toByteArray(height)) { e =>
+        transactions += readTransaction(e.getValue)
+      }
+      Some(transactions.result())
     }
 
   def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] =
     for {
-      meta <- db.get(Keys.blockMetaAt(height))
-      txs = (0 until meta.transactionCount).toList.flatMap { n =>
-        db.get(Keys.transactionAt(height, TxNum(n.toShort)))
-      }
+      meta  <- db.get(Keys.blockMetaAt(height))
+      txs   <- loadTransactions(height, db)
       block <- createBlock(meta.header, meta.signature, txs.map(_._1)).toOption
     } yield block
 

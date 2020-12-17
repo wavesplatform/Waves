@@ -4,11 +4,11 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
+import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.requests.{TransferV1Request, TransferV2Request}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.it.util.DoubleExt
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
@@ -164,7 +164,10 @@ class AssetsRouteSpec
     }
 
     Get(routePath(s"/${TestValues.asset.id}/distribution/1/limit/1")) ~> route ~> check {
-      responseAs[JsObject] shouldBe Json.obj("error" -> 199, "message" -> s"Unable to get distribution past height ${blockchain.height - MaxDistributionDepth}")
+      responseAs[JsObject] shouldBe Json.obj(
+        "error"   -> 199,
+        "message" -> s"Unable to get distribution past height ${blockchain.height - MaxDistributionDepth}"
+      )
     }
   }
 

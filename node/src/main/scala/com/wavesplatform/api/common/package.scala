@@ -1,5 +1,6 @@
 package com.wavesplatform.api
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{DBExt, Keys}
 import com.wavesplatform.state.{Diff, Height}
@@ -14,7 +15,7 @@ package object common extends BalanceDistribution with AddressTransactions {
     val disabledAliases = db.get(Keys.disabledAliases)
     addressTransactions(db, maybeDiff, address, Some(address), Set(CreateAliasTransaction.typeId), None)
       .collect {
-        case (height, cat: CreateAliasTransaction, Succeeded) if disabledAliases.isEmpty || !disabledAliases(cat.alias) =>
+        case TransactionMeta(height, cat: CreateAliasTransaction, Succeeded) if disabledAliases.isEmpty || !disabledAliases(cat.alias) =>
           height -> cat
       }
   }
@@ -26,5 +27,5 @@ package object common extends BalanceDistribution with AddressTransactions {
       leaseIsActive: ByteStr => Boolean
   ): Observable[(Height, LeaseTransaction)] =
     addressTransactions(db, maybeDiff, address, None, Set(LeaseTransaction.typeId), None)
-      .collect { case (h, lt: LeaseTransaction, Succeeded) if leaseIsActive(lt.id()) => h -> lt }
+      .collect { case TransactionMeta(h, lt: LeaseTransaction, Succeeded) if leaseIsActive(lt.id()) => h -> lt }
 }

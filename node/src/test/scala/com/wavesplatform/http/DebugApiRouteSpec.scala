@@ -2,6 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
+import com.wavesplatform.api.http.DebugApiRoute
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
