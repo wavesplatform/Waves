@@ -152,8 +152,8 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           r.trace.head.asInstanceOf[InvokeScriptTrace].resultE.explicitGet()
 
           val assetTrace = r.trace.tail.asInstanceOf[List[AssetVerifierTrace]]
-          assetTrace.take(2).foreach(_.errorO shouldBe None)
-          assetTrace.last.errorO.get shouldBe r.resultE.left.value.asInstanceOf[TransactionValidationError].cause
+          assetTrace.take(2).foreach(_.errorOpt shouldBe None)
+          assetTrace.last.errorOpt.get shouldBe r.resultE.left.value.asInstanceOf[TransactionValidationError].cause
         }
     }
   }

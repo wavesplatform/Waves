@@ -141,7 +141,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
         "State check failed. Reason: "                     +
         "Attempt to transfer unavailable funds: "          +
         "Transaction application leads to negative asset " +
-       s"'IssuedAsset(${asset.compatId.get})' balance to " +
+       s"'$asset' balance to " +
         "(at least) temporary negative state, "            +
        s"current balance is 0, spends equals -$amount, result is -$amount"
     }

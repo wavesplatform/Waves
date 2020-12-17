@@ -4,10 +4,11 @@ import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.utils._
+import com.wavesplatform.lang.v1.evaluator.{IncompleteResult, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.domain.{Burn, Issue, Reissue, SponsorFee}
-import com.wavesplatform.protobuf.{Amount, _}
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
 import com.wavesplatform.protobuf.utils.PBUtils
+import com.wavesplatform.protobuf.{Amount, _}
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
@@ -91,6 +92,32 @@ object InvokeScriptResult {
       isr.error.map(toPbErrorMessage),
       isr.sponsorFees.map(toPbSponsorFee)
     )
+  }
+
+  def fromLangResult(result: ScriptResult): InvokeScriptResult = {
+    import com.wavesplatform.lang.v1.traits.{domain => lang}
+
+    def langAddressToAddress(a: lang.Recipient.Address): Address =
+      Address.fromBytes(a.bytes.arr).explicitGet()
+
+    def langTransferToPayment(t: lang.AssetTransfer): Payment =
+      Payment(langAddressToAddress(t.recipient), Asset.fromCompatId(t.assetId), t.amount)
+
+    result match {
+      case ScriptResultV3(ds, ts) =>
+        InvokeScriptResult(data = ds.map(DataEntry.fromLangDataOp), transfers = ts.map(langTransferToPayment))
+
+      case ScriptResultV4(actions) =>
+        val issues      = actions.collect { case i: lang.Issue         => i }
+        val reissues    = actions.collect { case ri: lang.Reissue      => ri }
+        val burns       = actions.collect { case b: lang.Burn          => b }
+        val sponsorFees = actions.collect { case sf: lang.SponsorFee   => sf }
+        val dataOps     = actions.collect { case d: lang.DataOp        => DataEntry.fromLangDataOp(d) }
+        val transfers   = actions.collect { case t: lang.AssetTransfer => langTransferToPayment(t) }
+        InvokeScriptResult(dataOps, transfers, issues, reissues, burns, sponsorFees)
+
+      case i: IncompleteResult => throw new IllegalArgumentException(s"Cannot cast incomplete result: $i")
+    }
   }
 
   private def toPbIssue(r: Issue) = {

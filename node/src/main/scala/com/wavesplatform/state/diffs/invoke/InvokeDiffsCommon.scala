@@ -30,6 +30,7 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
+import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.validation.impl.SponsorFeeTxValidator
 import com.wavesplatform.utils._
@@ -264,15 +265,14 @@ object InvokeDiffsCommon {
       maxKeySize = ContractLimits.MaxKeySizeInBytesByVersion(stdLibVersion)
       _ <- dataEntries
         .collectFirst {
-          Function.unlift {
-            entry =>
-              val length = entry.key.utf8Bytes.length
-              if (length > maxKeySize)
-                Some(s"Data entry key size = $length bytes must be less than $maxKeySize")
-              else if (entry.key.isEmpty && stdLibVersion >= V4)
-                Some(s"Data entry key should not be empty")
-              else
-                None
+          Function.unlift { entry =>
+            val length = entry.key.utf8Bytes.length
+            if (length > maxKeySize)
+              Some(s"Data entry key size = $length bytes must be less than $maxKeySize")
+            else if (entry.key.isEmpty && stdLibVersion >= V4)
+              Some(s"Data entry key should not be empty")
+            else
+              None
           }
         }
         .toLeft(())
@@ -348,7 +348,7 @@ object InvokeDiffsCommon {
                     val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
                     TracedResult(
                       assetValidationDiff.map(d => nextDiff.copy(scriptsComplexity = d.scriptsComplexity)),
-                      List(AssetVerifierTrace(id, errorOpt))
+                      List(AssetVerifierTrace(id, errorOpt, AssetContext.Transfer))
                     )
                 }
             }
@@ -393,13 +393,13 @@ object InvokeDiffsCommon {
           def applyReissue(reissue: Reissue, pk: PublicKey): TracedResult[FailedTransactionError, Diff] = {
             val reissueDiff = DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue).leftMap(asFailedScriptError)
             val pseudoTx    = ReissuePseudoTx(reissue, actionSender, pk, tx.id(), tx.timestamp)
-            validateActionAsPseudoTx(reissueDiff, reissue.assetId, pseudoTx)
+            callAssetVerifierWithPseudoTx(reissueDiff, reissue.assetId, pseudoTx, AssetContext.Reissue)
           }
 
           def applyBurn(burn: Burn, pk: PublicKey): TracedResult[FailedTransactionError, Diff] = {
             val burnDiff = DiffsCommon.processBurn(blockchain, dAppAddress, fee = 0, burn).leftMap(asFailedScriptError)
             val pseudoTx = BurnPseudoTx(burn, actionSender, pk, tx.id(), tx.timestamp)
-            validateActionAsPseudoTx(burnDiff, burn.assetId, pseudoTx)
+            callAssetVerifierWithPseudoTx(burnDiff, burn.assetId, pseudoTx, AssetContext.Burn)
           }
 
           def applySponsorFee(sponsorFee: SponsorFee, pk: PublicKey): TracedResult[FailedTransactionError, Diff] =
@@ -414,13 +414,14 @@ object InvokeDiffsCommon {
               _ <- TracedResult(SponsorFeeTxValidator.checkMinSponsoredAssetFee(sponsorFee.minSponsoredAssetFee).leftMap(asFailedScriptError))
               sponsorDiff = DiffsCommon.processSponsor(blockchain, dAppAddress, fee = 0, sponsorFee).leftMap(asFailedScriptError)
               pseudoTx    = SponsorFeePseudoTx(sponsorFee, actionSender, pk, tx.id(), tx.timestamp)
-              r <- validateActionAsPseudoTx(sponsorDiff, sponsorFee.assetId, pseudoTx)
+              r <- callAssetVerifierWithPseudoTx(sponsorDiff, sponsorFee.assetId, pseudoTx, AssetContext.Sponsor)
             } yield r
 
-          def validateActionAsPseudoTx(
+          def callAssetVerifierWithPseudoTx(
               actionDiff: Either[FailedTransactionError, Diff],
               assetId: ByteStr,
-              pseudoTx: PseudoTx
+              pseudoTx: PseudoTx,
+              assetType: AssetContext
           ): TracedResult[FailedTransactionError, Diff] =
             blockchain.assetScript(IssuedAsset(assetId)).fold(TracedResult(actionDiff)) {
               case AssetScriptInfo(script, complexity) =>
@@ -439,7 +440,7 @@ object InvokeDiffsCommon {
                 val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
                 TracedResult(
                   assetValidationDiff,
-                  List(AssetVerifierTrace(assetId, errorOpt))
+                  List(AssetVerifierTrace(assetId, errorOpt, assetType))
                 )
             }
 
