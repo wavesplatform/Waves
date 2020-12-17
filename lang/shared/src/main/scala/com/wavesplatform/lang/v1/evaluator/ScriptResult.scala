@@ -236,9 +236,9 @@ object ScriptResult {
     }
 
   private def processLease(ctx: EvaluationContext[Environment, Id], fields: Map[String, EVALUATED], version: StdLibVersion): Either[String, Lease] =
-    (fields.get(FieldNames.LeaseRecipient), fields.get(FieldNames.LeaseAmount)) match {
-      case (Some(recipient: CaseObj), Some(CONST_LONG(quantity))) =>
-        processRecipient(recipient, ctx, version).map(Lease(_, quantity))
+    (fields.get(FieldNames.LeaseRecipient), fields.get(FieldNames.LeaseAmount), fields.get(FieldNames.LeaseNonce)) match {
+      case (Some(recipient: CaseObj), Some(CONST_LONG(quantity)), Some(CONST_LONG(nonce))) =>
+        processRecipient(recipient, ctx, version).map(Lease(_, quantity, nonce))
       case other =>
         err(other, version, FieldNames.Lease)
     }

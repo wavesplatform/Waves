@@ -124,7 +124,7 @@ object InvokeScriptResult {
     PBInvokeScriptResult.SponsorFee(Some(Amount(sf.assetId.toByteString, sf.minSponsoredAssetFee.getOrElse(0))))
 
   private def toPbLease(l: Lease) =
-    PBInvokeScriptResult.Lease(ByteString.copyFrom(l.recipient.bytes.arr), l.amount)
+    PBInvokeScriptResult.Lease(ByteString.copyFrom(l.recipient.bytes.arr), l.amount, l.nonce)
 
   private def toPbLeaseCancel(l: LeaseCancel) =
     PBInvokeScriptResult.LeaseCancel(ByteString.copyFrom(l.leaseId.arr))
@@ -149,7 +149,7 @@ object InvokeScriptResult {
   }
 
   private def toVanillaLease(l: PBInvokeScriptResult.Lease) =
-    Lease(Recipient.Address(l.recipient.toByteStr), l.amount)
+    Lease(Recipient.Address(l.recipient.toByteStr), l.amount, l.nonce)
 
   private def toVanillaLeaseCancel(sf: PBInvokeScriptResult.LeaseCancel) =
     LeaseCancel(sf.leaseId.toByteStr)

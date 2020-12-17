@@ -80,7 +80,8 @@ case class SponsorFee(
 
 case class Lease(
     recipient: Address,
-    amount: Long
+    amount: Long,
+    nonce: Long
 ) extends CallableAction
 
 case class LeaseCancel(
@@ -88,11 +89,11 @@ case class LeaseCancel(
 ) extends CallableAction
 
 object Lease {
-  def calculateId(l: Lease, invokeId: ByteStr, nonce: Int): ByteStr = {
+  def calculateId(l: Lease, invokeId: ByteStr): ByteStr = {
     val out = new ByteArrayOutputStream()
     out.write(l.recipient.bytes.arr)
     out.write(invokeId.arr)
-    out.writeInt(nonce)
+    out.writeLong(l.nonce)
     out.writeLong(l.amount)
     ByteStr(Global.blake2b256(out.toByteArray))
   }

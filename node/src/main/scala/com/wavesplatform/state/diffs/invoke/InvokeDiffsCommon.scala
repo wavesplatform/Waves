@@ -157,7 +157,7 @@ object InvokeDiffsCommon {
 
       paymentsAndFeeDiff = paymentsPart(tx, dAppAddress, feeInfo._2)
 
-      (compositeDiff, _) <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey)(actions, paymentsAndFeeDiff, complexityLimit)
+      compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey)(actions, paymentsAndFeeDiff, complexityLimit)
         .leftMap(_.addComplexity(invocationComplexity))
 
       transfers = compositeDiff.portfolios |+| feeInfo._2.view.mapValues(_.negate).toMap
@@ -298,10 +298,10 @@ object InvokeDiffsCommon {
       actions: List[CallableAction],
       paymentsDiff: Diff,
       remainingLimit: Int
-  ): TracedResult[FailedTransactionError, (Diff, Int)] =
-    actions.foldLeft(TracedResult((paymentsDiff, 1).asRight[FailedTransactionError])) { (diffAcc, action) =>
+  ): TracedResult[FailedTransactionError, Diff] =
+    actions.foldLeft(TracedResult(paymentsDiff.asRight[FailedTransactionError])) { (diffAcc, action) =>
       diffAcc match {
-        case TracedResult(Right((curDiff, leaseNonce)), _) =>
+        case TracedResult(Right(curDiff), _) =>
           val complexityLimit =
             if (remainingLimit < Int.MaxValue) remainingLimit - curDiff.scriptsComplexity.toInt
             else remainingLimit
@@ -424,7 +424,7 @@ object InvokeDiffsCommon {
             for {
               _       <- TracedResult(LeaseTxValidator.validateAmount(l.amount))
               address <- TracedResult(Address.fromBytes(l.recipient.bytes.arr))
-              leaseId = Lease.calculateId(l, tx.id(), leaseNonce)
+              leaseId = Lease.calculateId(l, tx.id())
               diff <- DiffsCommon.processLease(blockchain, l.amount, dAppAddress, address, fee = 0, leaseId)
             } yield diff
 
@@ -461,23 +461,25 @@ object InvokeDiffsCommon {
             }
 
           val diff = action match {
-            case t: AssetTransfer => applyTransfer(t, if (blockchain.isFeatureActivated(BlockV5)) pk else emptyPk)
-            case d: DataOp        => applyDataItem(d)
-            case i: Issue         => applyIssue(tx, pk, i)
-            case r: Reissue       => applyReissue(r, pk)
-            case b: Burn          => applyBurn(b, pk)
-            case sf: SponsorFee   => applySponsorFee(sf, pk)
-            case l: Lease         => applyLease(l).leftMap(asFailedScriptError)
-            case lc: LeaseCancel  => applyLeaseCancel(lc).leftMap(asFailedScriptError)
+            case t: AssetTransfer =>
+              applyTransfer(t, if (blockchain.isFeatureActivated(BlockV5)) {
+                pk
+              } else {
+                PublicKey(new Array[Byte](32))
+              })
+            case d: DataOp       => applyDataItem(d)
+            case i: Issue        => applyIssue(tx, pk, i)
+            case r: Reissue      => applyReissue(r, pk)
+            case b: Burn         => applyBurn(b, pk)
+            case sf: SponsorFee  => applySponsorFee(sf, pk)
+            case l: Lease        => applyLease(l).leftMap(asFailedScriptError)
+            case lc: LeaseCancel => applyLeaseCancel(lc).leftMap(asFailedScriptError)
           }
-          val leaseCount = if (action.isInstanceOf[Lease]) 1 else 0
-          diffAcc |+| diff.map((_, leaseCount)).leftMap(_.addComplexity(curDiff.scriptsComplexity))
+          diffAcc |+| diff.leftMap(_.addComplexity(curDiff.scriptsComplexity))
 
         case _ => diffAcc
       }
     }
-
-  private val emptyPk = PublicKey(new Array[Byte](32))
 
   private def validatePseudoTxWithSmartAssetScript(blockchain: Blockchain, tx: InvokeScriptTransaction)(
       pseudoTx: PseudoTx,

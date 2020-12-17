@@ -49,6 +49,7 @@ object FieldNames {
   val Lease          = "Lease"
   val LeaseRecipient = "recipient"
   val LeaseAmount    = "amount"
+  val LeaseNonce     = "nonce"
 
   val LeaseCancel = "LeaseCancel"
   val LeaseId     = "leaseId"
