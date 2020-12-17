@@ -45,7 +45,7 @@ trait ApiMarshallers {
         ae =>
           (
             ae.resultE.fold(_.code, _ => StatusCodes.OK),
-            ae.resultE.fold(_.json, writes.writes) ++ (if (includeTrace) Json.obj("trace" -> Json.toJson(ae.trace)) else Json.obj())
+            ae.resultE.fold(_.json, writes.writes) ++ (if (includeTrace) Json.obj("trace" -> ae.trace.map(_.loggedJson)) else Json.obj())
           )
       )
 

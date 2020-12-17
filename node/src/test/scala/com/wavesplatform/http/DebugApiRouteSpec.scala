@@ -6,7 +6,6 @@ import com.wavesplatform.api.http.DebugApiRoute
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.util._
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
@@ -14,13 +13,13 @@ import com.wavesplatform.lang.v1.traits.domain.Issue
 import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.StateHash.SectionId
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, LeaseBalance, NG, StateHash, VolumeAndFee}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, NG, StateHash}
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.{NTPTime, TestValues, TestWallet}
+import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet}
 import monix.eval.Task
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
@@ -28,7 +27,13 @@ import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 import scala.util.Random
 
 //noinspection ScalaStyle
-class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper with TestWallet with NTPTime with PathMockFactory {
+class DebugApiRouteSpec
+    extends RouteSpec("/debug")
+    with RestAPISettingsHelper
+    with TestWallet
+    with NTPTime
+    with PathMockFactory
+    with BlockchainStubHelpers {
 
   val wavesSettings = WavesSettings.default()
   val configObject  = wavesSettings.config.root()
@@ -89,35 +94,6 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
   }
 
   routePath("/validate") - {
-    def createBlockchainStub(f: Blockchain => Unit = _ => ()): Blockchain with NG = {
-      trait Blockchain1 extends Blockchain with NG
-      val blockchain = stub[Blockchain1]
-      f(blockchain) // Overrides
-      (() => blockchain.settings).when().returns(WavesSettings.default().blockchainSettings)
-      (() => blockchain.activatedFeatures)
-        .when()
-        .returns(
-          Map(
-            BlockchainFeatures.BlockV5.id             -> 0,
-            BlockchainFeatures.SmartAccounts.id       -> 0,
-            BlockchainFeatures.SmartAssets.id         -> 0,
-            BlockchainFeatures.SmartAccountTrading.id -> 0,
-            BlockchainFeatures.OrderV3.id             -> 0,
-            BlockchainFeatures.Ride4DApps.id          -> 0
-          )
-        )
-      (blockchain.accountScript _).when(*).returns(None)
-      (blockchain.leaseBalance _).when(*).returns(LeaseBalance.empty)
-      (() => blockchain.height).when().returns(1)
-      (blockchain.blockHeader _).when(*).returns {
-        val block = TestBlock.create(Nil)
-        Some(SignedBlockHeader(block.header, block.signature))
-      }
-      (blockchain.filledVolumeAndFee _).when(*).returns(VolumeAndFee.empty)
-      (blockchain.assetDescription _).when(*).returns(None)
-      blockchain
-    }
-
     "valid tx" in {
       val blockchain = createBlockchainStub()
       (blockchain.balance _).when(TxHelpers.defaultSigner.publicKey.toAddress, *).returns(Long.MaxValue)
@@ -138,7 +114,7 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
 
       val route = debugApiRoute.copy(blockchain = blockchain).route
 
-      val tx = TxHelpers.transfer(TxHelpers.defaultSigner, TestValues.address, 1.waves)
+      val tx = TxHelpers.transfer(TxHelpers.defaultSigner, TestValues.address, Long.MaxValue)
       Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString())) ~> route ~> check {
         val json = Json.parse(responseAs[String])
         (json \ "valid").as[Boolean] shouldBe false
@@ -269,9 +245,8 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
               )
             )
           )
-          .anyNumberOfTimes()
 
-        (blockchain.hasAccountScript _).when(*).returns(true).anyNumberOfTimes()
+        (blockchain.hasAccountScript _).when(*).returns(true)
       }
 
       val route = debugApiRoute.copy(blockchain = blockchain).route
