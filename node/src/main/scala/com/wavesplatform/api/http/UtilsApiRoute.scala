@@ -17,20 +17,21 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.Serde
-import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
+import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
+import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
 import com.wavesplatform.transaction.smart.BlockchainContext
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.utils.{Time, evaluatedWrites}
+import com.wavesplatform.utils.Time
 import monix.eval.Coeval
 import monix.execution.Scheduler
 import play.api.libs.json._
@@ -243,7 +244,7 @@ case class UtilsApiRoute(
 
       val requestData = obj ++ Json.obj("address" -> address.stringRepr)
       val responseJson = result
-        .map(r => Json.obj("result" -> r))
+        .map(r => Json.obj("result" -> ScriptValuesJson.serializeValue(r)))
         .recover {
           case e: ScriptExecutionError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.error)
           case other                   => ApiError.fromValidationError(other).json

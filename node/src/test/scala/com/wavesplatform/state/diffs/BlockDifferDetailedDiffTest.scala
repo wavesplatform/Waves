@@ -85,7 +85,8 @@ class BlockDifferDetailedDiffTest extends FreeSpec with Matchers with PropertyCh
         forAll(genesisTransfersBlockGen) {
           case (addr1, addr2, amt1, amt2, b) =>
             assertDetailedDiff(Seq.empty, b) {
-              case (_, DetailedDiff(_, transactionDiffs)) =>
+              case (_, DetailedDiff(_, td)) =>
+                val transactionDiffs = td.reverse
                 transactionDiffs.head.portfolios(addr1).balance shouldBe ENOUGH_AMT
                 transactionDiffs(1).portfolios(addr1).balance shouldBe -(amt1 + transactionFee)
                 transactionDiffs(1).portfolios(addr2).balance shouldBe amt1

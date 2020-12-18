@@ -17,7 +17,7 @@ import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 
 object BlockDiffer extends ScorexLogging {
-  final case class DetailedDiff(parentDiff: Diff, transactionDiffs: Seq[Diff])
+  final case class DetailedDiff(parentDiff: Diff, transactionDiffs: List[Diff])
   final case class Result(diff: Diff, carry: Long, totalFee: Long, constraint: MiningConstraint, detailedDiff: DetailedDiff)
 
   case class Fraction(dividend: Int, divider: Int) {
@@ -151,7 +151,7 @@ object BlockDiffer extends ScorexLogging {
     val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
     txs
-      .foldLeft(TracedResult(Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Seq.empty)).asRight[ValidationError])) {
+      .foldLeft(TracedResult(Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Nil)).asRight[ValidationError])) {
         case (acc @ TracedResult(Left(_), _), _) => acc
         case (TracedResult(Right(Result(currDiff, carryFee, currTotalFee, currConstraint, DetailedDiff(parentDiff, txDiffs))), _), tx) =>
           val currBlockchain = CompositeBlockchain(blockchain, Some(currDiff))
@@ -181,7 +181,7 @@ object BlockDiffer extends ScorexLogging {
                   carryFee + carry,
                   totalWavesFee,
                   updatedConstraint,
-                  DetailedDiff(parentDiff.combine(minerDiff), txDiffs :+ thisTxDiff)
+                  DetailedDiff(parentDiff.combine(minerDiff), thisTxDiff :: txDiffs)
                 )
               )
             }

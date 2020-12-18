@@ -152,6 +152,7 @@ object StateUpdate {
     }
 
     val (txsStateUpdates, _) = txsDiffs
+      .reverse
       .zip(transactions)
       .foldLeft((ArrayBuffer.empty[StateUpdate], parentDiff)) {
         case ((updates, accDiff), (txDiff, tx)) =>
