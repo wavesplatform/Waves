@@ -241,7 +241,7 @@ class DebugApiRouteSpec
                 TxHelpers.defaultSigner.publicKey,
                 dAppScript,
                 0L,
-                Map(3 -> Seq("test", "dataAndTransfer", "issue", "reissue", "burn", "sponsorFee").map(_ -> 0L).toMap)
+                Map(3 -> Seq("test", "dataAndTransfer", "issue", "reissue", "burn", "sponsorFee").map(_ -> 1L).toMap)
               )
             )
           )
@@ -267,7 +267,7 @@ class DebugApiRouteSpec
       }
 
       def testPayment(result: String) = withClue("payment") {
-        val tx = TxHelpers.invoke(TxHelpers.signer(1).toAddress, "test", fee = 800000, payments = Seq(Payment(1L, TestValues.asset)))
+        val tx = TxHelpers.invoke(TxHelpers.signer(1).toAddress, "test", fee = 1300000, payments = Seq(Payment(1L, TestValues.asset)))
 
         jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
           val json = Json.parse(responseAs[String])
