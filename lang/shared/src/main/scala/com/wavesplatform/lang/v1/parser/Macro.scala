@@ -53,4 +53,18 @@ object Macro {
       block(listL, block(sizeL, block(accL, stepRec(limit, 0, identity))))
     }
   }
+
+  def unwrapStrict(blockPos: Pos, strictLetDec: LET, strictBody: EXPR): EXPR = {
+    val strictPos = strictLetDec.position
+    val strictLetName = strictLetDec.name
+    BLOCK(
+      blockPos,
+      strictLetDec,
+      IF(blockPos,
+        FUNCTION_CALL(strictPos, VALID(strictPos, "=="), List(REF(strictPos, strictLetName), REF(strictPos, strictLetName))),
+        strictBody,
+        FUNCTION_CALL(strictPos, VALID(strictPos, "throw"), List(CONST_STRING(strictPos, VALID(strictPos, "Strict value is not equal to itself."))))
+      )
+    )
+  }
 }
