@@ -1,0 +1,342 @@
+package com.wavesplatform.state.diffs.ci
+
+import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithDomain
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.directives.values.V5
+import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.traits.domain.Recipient
+import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
+import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.{LeaseBalance, Portfolio}
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
+import com.wavesplatform.{NoShrink, TransactionGen}
+import org.scalacheck.Gen
+import org.scalatest.{EitherValues, Matchers, PropSpec}
+import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+
+class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDomain with EitherValues {
+  private def features(activateV5: Boolean): FunctionalitySettings = {
+    val v5ForkO = if (activateV5) Seq(BlockchainFeatures.ContinuationTransaction) else Seq()
+    val parameters =
+      Seq(
+        BlockchainFeatures.SmartAccounts,
+        BlockchainFeatures.SmartAssets,
+        BlockchainFeatures.Ride4DApps,
+        BlockchainFeatures.BlockV5
+      ) ++ v5ForkO
+    TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = parameters.map(_.id -> 0).toMap)
+  }
+
+  private val v4Features = features(activateV5 = false)
+  private val v5Features = features(activateV5 = true)
+
+  private def dApp(body: String): Script = {
+    val script =
+      s"""
+         | {-# STDLIB_VERSION 5       #-}
+         | {-# CONTENT_TYPE   DAPP    #-}
+         | {-# SCRIPT_TYPE    ACCOUNT #-}
+         |
+         | @Callable(i)
+         | func default() = {
+         |   $body
+         | }
+       """.stripMargin
+
+    val expr     = Parser.parseContract(script).get.value
+    val contract = compileContractFromExpr(expr, V5)
+    ContractScript(V5, contract).explicitGet()
+  }
+
+  private def singleLeaseDApp(recipient: Recipient, amount: Long) = {
+    val recipientStr =
+      recipient match {
+        case Recipient.Address(bytes) => s"Address(base58'$bytes')"
+        case Recipient.Alias(name)    => s"""Alias("$name")"""
+      }
+    dApp(s"[Lease($recipientStr, $amount)]")
+  }
+
+  private def leasePreconditions(
+      useAlias: Boolean = false,
+      selfLease: Boolean = false,
+      customRecipient: Option[Recipient] = None,
+      customAmount: Option[Long] = None,
+      customSetScriptFee: Option[Long] = None
+  ): Gen[(List[Transaction], InvokeScriptTransaction, Long, Address, Address, List[LeaseTransaction])] =
+    for {
+      dAppAcc         <- accountGen
+      invoker         <- accountGen
+      generatedAmount <- positiveLongGen
+      ts              <- timestampGen
+      fee             <- ciFee(1)
+      leaseTxAmount1  <- smallFeeGen
+      leaseTxAmount2  <- smallFeeGen
+      invokerAlias = Alias.create("invoker_alias").explicitGet()
+      dAppAlias    = Alias.create("dapp_alias").explicitGet()
+      invokeAliasTx <- createAliasGen(invoker, invokerAlias, fee, ts)
+      dAppAliasTx   <- createAliasGen(dAppAcc, dAppAlias, fee, ts)
+    } yield {
+      val aliasTxs =
+        if (useAlias)
+          if (selfLease)
+            List(invokeAliasTx, dAppAliasTx)
+          else
+            List(invokeAliasTx)
+        else
+          Nil
+      val generatedRecipient =
+        if (selfLease)
+          if (useAlias)
+            dAppAlias
+          else
+            dAppAcc.toAddress
+        else if (useAlias)
+          invokerAlias
+        else
+          invoker.toAddress
+      val recipient    = customRecipient.getOrElse(generatedRecipient.toRide)
+      val leaseAmount  = customAmount.getOrElse(generatedAmount)
+      val dApp         = Some(singleLeaseDApp(recipient, leaseAmount))
+      val setScriptFee = customSetScriptFee.getOrElse(fee)
+      for {
+        genesis       <- GenesisTransaction.create(dAppAcc.toAddress, ENOUGH_AMT, ts)
+        genesis2      <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
+        leaseFromDApp <- LeaseTransaction.selfSigned(2.toByte, dAppAcc, invoker.toAddress, leaseTxAmount1, fee, ts)
+        leaseToDApp   <- LeaseTransaction.selfSigned(2.toByte, invoker, dAppAcc.toAddress, leaseTxAmount2, fee, ts)
+        setDApp       <- SetScriptTransaction.selfSigned(1.toByte, dAppAcc, dApp, setScriptFee, ts + 2)
+        invoke        <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, dAppAcc.toAddress, None, Nil, fee, Waves, ts + 3)
+        preparingTxs = List(genesis, genesis2) ::: aliasTxs ::: List(setDApp)
+        leaseTxs     = List(leaseFromDApp, leaseToDApp)
+      } yield (preparingTxs, invoke, leaseAmount, dAppAcc.toAddress, invoker.toAddress, leaseTxs)
+    }.explicitGet()
+
+  property(s"Lease action is restricted before activation ${BlockchainFeatures.ContinuationTransaction}") {
+    forAll(leasePreconditions()) {
+      case (preparingTxs, invoke, _, _, _, _) =>
+        def r(): Unit =
+          assertDiffEi(
+            Seq(TestBlock.create(preparingTxs)),
+            TestBlock.create(Seq(invoke)),
+            v4Features
+          )(_ => ())
+        (the[RuntimeException] thrownBy r()).getMessage should include("Continuation Transaction feature has not been activated yet")
+    }
+  }
+
+  property(s"Lease action by address") {
+    forAll(leasePreconditions()) {
+      case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, _) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(preparingTxs)),
+          TestBlock.create(Seq(invoke)),
+          v5Features
+        ) {
+          case (diff, _) =>
+            diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee, LeaseBalance(leaseAmount, out = 0))
+            diff.portfolios(dAppAcc) shouldBe Portfolio(0, LeaseBalance(in = 0, leaseAmount))
+        }
+    }
+  }
+
+  property(s"Lease action by alias") {
+    forAll(leasePreconditions(useAlias = true)) {
+      case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, _) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(preparingTxs)),
+          TestBlock.create(Seq(invoke)),
+          v5Features
+        ) {
+          case (diff, _) =>
+            diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee, LeaseBalance(leaseAmount, out = 0))
+            diff.portfolios(dAppAcc) shouldBe Portfolio(0, LeaseBalance(in = 0, leaseAmount))
+        }
+    }
+  }
+
+  property(s"Lease action with empty address") {
+    forAll(leasePreconditions(customRecipient = Some(Recipient.Address(ByteStr.empty)))) {
+      case (preparingTxs, invoke, _, _, _, _) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(preparingTxs)),
+          TestBlock.create(Seq(invoke)),
+          v5Features
+        ) {
+          case (diff, _) =>
+            diff.errorMessage(invoke.id.value()).get.text shouldBe "InvalidAddress(Wrong addressBytes length: expected: 26, actual: 0)"
+        }
+    }
+  }
+
+  property(s"Lease action with wrong address bytes length") {
+    forAll(leasePreconditions(customRecipient = Some(Recipient.Address(ByteStr.fill(10)(127))))) {
+      case (preparingTxs, invoke, _, _, _, _) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(preparingTxs)),
+          TestBlock.create(Seq(invoke)),
+          v5Features
+        ) {
+          case (diff, _) =>
+            diff.errorMessage(invoke.id.value()).get.text shouldBe "InvalidAddress(Wrong addressBytes length: expected: 26, actual: 10)"
+        }
+    }
+  }
+
+  property(s"Lease action with wrong address checksum") {
+    val address       = accountGen.sample.get.toAddress
+    val wrongChecksum = Array.fill[Byte](Address.ChecksumLength)(0)
+    val wrongAddress  = address.bytes.dropRight(Address.ChecksumLength) ++ wrongChecksum
+    forAll(leasePreconditions(customRecipient = Some(Recipient.Address(ByteStr(wrongAddress))))) {
+      case (preparingTxs, invoke, _, _, _, _) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(preparingTxs)),
+          TestBlock.create(Seq(invoke)),
+          v5Features
+        ) {
+          case (diff, _) =>
+            diff.errorMessage(invoke.id.value()).get.text shouldBe "InvalidAddress(Bad address checksum)"
+        }
+    }
+  }
+
+  property(s"Lease action with unexisting alias") {
+    forAll(leasePreconditions(customRecipient = Some(Recipient.Alias("alias2")))) {
+      case (preparingTxs, invoke, _, _, _, _) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(preparingTxs)),
+          TestBlock.create(Seq(invoke)),
+          v5Features
+        ) {
+          case (diff, _) =>
+            diff.errorMessage(invoke.id.value()).get.text shouldBe "Alias 'alias:T:alias2' does not exists."
+        }
+    }
+  }
+
+  property(s"Lease action with illegal alias") {
+    forAll(leasePreconditions(customRecipient = Some(Recipient.Alias("#$%!?")))) {
+      case (preparingTxs, invoke, _, _, _, _) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(preparingTxs)),
+          TestBlock.create(Seq(invoke)),
+          v5Features
+        ) {
+          case (diff, _) =>
+            diff.errorMessage(invoke.id.value()).get.text shouldBe s"Alias should contain only following characters: ${Alias.AliasAlphabet}"
+        }
+    }
+  }
+
+  property(s"Lease action with empty amount") {
+    forAll(leasePreconditions(customAmount = Some(0))) {
+      case (preparingTxs, invoke, _, _, _, _) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(preparingTxs)),
+          TestBlock.create(Seq(invoke)),
+          v5Features
+        ) {
+          case (diff, _) =>
+            diff.errorMessage(invoke.id.value()).get.text shouldBe "NonPositiveAmount(0,waves)"
+        }
+    }
+  }
+
+  property(s"Lease action with negative amount") {
+    forAll(leasePreconditions(customAmount = Some(-100))) {
+      case (preparingTxs, invoke, _, _, _, _) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(preparingTxs)),
+          TestBlock.create(Seq(invoke)),
+          v5Features
+        ) {
+          case (diff, _) =>
+            diff.errorMessage(invoke.id.value()).get.text shouldBe "NonPositiveAmount(-100,waves)"
+        }
+    }
+  }
+
+  property(s"Lease action spends all dApp balance") {
+    val setScriptFee = ciFee(1).sample.get
+    val dAppBalance  = ENOUGH_AMT - setScriptFee
+    forAll(leasePreconditions(customSetScriptFee = Some(setScriptFee), customAmount = Some(dAppBalance))) {
+      case (preparingTxs, invoke, _, dAppAcc, _, _) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(preparingTxs)),
+          TestBlock.create(Seq(invoke)),
+          v5Features
+        ) {
+          case (_, blockchain) =>
+            blockchain.wavesPortfolio(dAppAcc).effectiveBalance shouldBe 0
+        }
+    }
+  }
+
+  property(s"Lease action on insufficient balance") {
+    val setScriptFee = ciFee(1).sample.get
+    val dAppBalance  = ENOUGH_AMT - setScriptFee
+    forAll(leasePreconditions(customSetScriptFee = Some(setScriptFee), customAmount = Some(dAppBalance + 1))) {
+      case (preparingTxs, invoke, _, _, _, _) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(preparingTxs)),
+          TestBlock.create(Seq(invoke)),
+          v5Features
+        ) {
+          case (diff, _) =>
+            diff.errorMessage(invoke.id.value()).get.text shouldBe s"Cannot lease more than own: Balance:$dAppBalance, already leased: 0"
+        }
+    }
+  }
+
+  property(s"Lease action on insufficient balance with other leases") {
+    val setScriptFee = ciFee(1).sample.get
+    val dAppBalance  = ENOUGH_AMT - setScriptFee
+    forAll(leasePreconditions(customSetScriptFee = Some(setScriptFee), customAmount = Some(dAppBalance))) {
+      case (preparingTxs, invoke, _, _, _, leaseTxs @ List(leaseFromDApp, _)) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(preparingTxs ::: leaseTxs)),
+          TestBlock.create(Seq(invoke)),
+          v5Features
+        ) {
+          case (diff, _) =>
+            diff.errorMessage(invoke.id.value()).get.text shouldBe
+              s"Cannot lease more than own: Balance:${dAppBalance - leaseFromDApp.fee}, already leased: ${leaseFromDApp.amount}"
+        }
+    }
+  }
+
+  property(s"Lease action to dApp itself") {
+    forAll(leasePreconditions(selfLease = true)) {
+      case (preparingTxs, invoke, _, _, _, _) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(preparingTxs)),
+          TestBlock.create(Seq(invoke)),
+          v5Features
+        ) {
+          case (diff, _) =>
+            diff.errorMessage(invoke.id.value()).get.text shouldBe "Cannot lease to self"
+        }
+    }
+  }
+
+  property(s"Lease action to dApp itself by alias") {
+    forAll(leasePreconditions(selfLease = true, useAlias = true)) {
+      case (preparingTxs, invoke, _, _, _, _) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(preparingTxs)),
+          TestBlock.create(Seq(invoke)),
+          v5Features
+        ) {
+          case (diff, _) =>
+            diff.errorMessage(invoke.id.value()).get.text shouldBe "Cannot lease to self"
+        }
+    }
+  }
+}

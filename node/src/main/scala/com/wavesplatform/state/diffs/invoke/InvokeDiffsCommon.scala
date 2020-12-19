@@ -433,7 +433,7 @@ object InvokeDiffsCommon {
 
           def applyLease(l: Lease): TracedResult[ValidationError, Diff] =
             for {
-              _ <- TracedResult(LeaseTxValidator.validateAmount(l.amount))
+              _         <- TracedResult(LeaseTxValidator.validateAmount(l.amount))
               recipient <- TracedResult(AddressOrAlias.fromRide(l.recipient))
               leaseId = Lease.calculateId(l, tx.id())
               diff <- DiffsCommon.processLease(blockchain, l.amount, dAppAddress, recipient, fee = 0, leaseId)
