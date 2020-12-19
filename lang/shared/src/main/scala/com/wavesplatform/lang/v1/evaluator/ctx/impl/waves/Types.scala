@@ -178,7 +178,7 @@ object Types {
     CASETYPEREF(
       FieldNames.LeaseCancel,
       List(
-        FieldNames.LeaseId -> STRING
+        FieldNames.LeaseId -> BYTESTR
       )
     )
 
