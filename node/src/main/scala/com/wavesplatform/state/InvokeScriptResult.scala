@@ -54,12 +54,12 @@ object InvokeScriptResult {
       "nonce"          -> iss.nonce
     )
   }
-  implicit val reissueFormat      = Json.writes[Reissue]
-  implicit val burnFormat         = Json.writes[Burn]
-  implicit val sponsorFeeFormat   = Json.writes[SponsorFee]
-  implicit val addressFormat      = Json.writes[Recipient.Address]
-  implicit val aliasFormat        = Json.writes[Recipient.Alias]
-  implicit val recipientFormat    = Writes[Recipient] {
+  implicit val reissueFormat    = Json.writes[Reissue]
+  implicit val burnFormat       = Json.writes[Burn]
+  implicit val sponsorFeeFormat = Json.writes[SponsorFee]
+  implicit val addressFormat    = Json.writes[Recipient.Address]
+  implicit val aliasFormat      = Json.writes[Recipient.Alias]
+  implicit val recipientFormat = Writes[Recipient] {
     case address: Recipient.Address => addressFormat.writes(address)
     case alias: Recipient.Alias     => aliasFormat.writes(alias)
   }
@@ -156,8 +156,8 @@ object InvokeScriptResult {
     PBInvokeScriptResult.SponsorFee(Some(Amount(sf.assetId.toByteString, sf.minSponsoredAssetFee.getOrElse(0))))
 
   private def toPbLease(l: Lease) = {
-    val recipientBytes = AddressOrAlias.fromRide(l.recipient).explicitGet().bytes
-    PBInvokeScriptResult.Lease(ByteString.copyFrom(recipientBytes), l.amount, l.nonce)
+    val recipient = PBRecipients.create(AddressOrAlias.fromRide(l.recipient).explicitGet())
+    PBInvokeScriptResult.Lease(Some(recipient), l.amount, l.nonce)
   }
 
   private def toPbLeaseCancel(l: LeaseCancel) =
@@ -183,7 +183,7 @@ object InvokeScriptResult {
   }
 
   private def toVanillaLease(l: PBInvokeScriptResult.Lease) = {
-    val recipient = AddressOrAlias.fromBytes(l.recipient.toByteArray, 0).explicitGet()._1.toRide
+    val recipient = PBRecipients.toAddressOrAlias(l.getRecipient, AddressScheme.current.chainId).explicitGet().toRide
     Lease(recipient, l.amount, l.nonce)
   }
 
