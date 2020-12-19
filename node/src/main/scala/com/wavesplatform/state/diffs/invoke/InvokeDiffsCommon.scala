@@ -295,7 +295,7 @@ object InvokeDiffsCommon {
     Either.cond(
       duplicates.isEmpty,
       (),
-      s"Duplicated LeaseCancel actions IDs: ${duplicates.distinct.map(_.leaseId).mkString(", ")}"
+      s"Duplicate LeaseCancel id(s): ${duplicates.distinct.map(_.leaseId).mkString(", ")}"
     )
   }
 
