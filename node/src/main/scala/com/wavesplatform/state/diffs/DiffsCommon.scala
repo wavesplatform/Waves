@@ -172,7 +172,7 @@ object DiffsCommon {
   def processLeaseCancel(blockchain: Blockchain, sender: Address, fee: Long, time: Long, leaseId: ByteStr): Either[ValidationError, Diff] = {
     val allowedTs = blockchain.settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp
     for {
-      lease     <- blockchain.leaseDetails(leaseId).toRight(GenericError(s"Related LeaseTransaction not found"))
+      lease     <- blockchain.leaseDetails(leaseId).toRight(GenericError(s"Lease with id=$leaseId not found"))
       recipient <- blockchain.resolveAlias(lease.recipient)
       _ <- Either.cond(
         lease.isActive || time <= allowedTs,

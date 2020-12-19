@@ -19,5 +19,9 @@ object LeaseCancelTxValidator extends TxValidator[LeaseCancelTransaction] {
   }
 
   def checkLeaseId(leaseId: ByteStr): Either[GenericError, Unit] =
-    Either.cond(leaseId.arr.length == crypto.DigestLength, (), GenericError("Lease transaction id is invalid"))
+    Either.cond(
+      leaseId.arr.length == crypto.DigestLength,
+      (),
+      GenericError(s"Lease id=$leaseId has invalid length = ${leaseId.arr.length} byte(s) while expecting ${crypto.DigestLength}")
+    )
 }
