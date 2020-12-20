@@ -261,7 +261,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     } stateHash.addAssetScript(address, script)
 
     diff.leaseState.foreach {
-      case (leaseId, status) =>
+      case (leaseId, (status, _)) =>
         stateHash.addLeaseStatus(TransactionId @@ leaseId, status)
     }
 
@@ -280,7 +280,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       updatedBalances.map { case (a, v) => addressIdWithFallback(a, newAddressIds) -> v },
       leaseBalances,
       addressTransactions,
-      diff.leaseState,
+      diff.leaseState.view.mapValues(_._1).toMap,
       diff.issuedAssets,
       diff.updatedAssets,
       newFills,

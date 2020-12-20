@@ -11,7 +11,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.traits.domain._
-import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, Diff, LeaseBalance, Portfolio, SponsorshipValue}
+import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, Diff, LeaseActionInfo, LeaseBalance, Portfolio, SponsorshipValue}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -148,7 +148,8 @@ object DiffsCommon {
       sender: Address,
       recipient: AddressOrAlias,
       fee: Long,
-      txId: ByteStr
+      leaseId: ByteStr,
+      actionInfo: Option[LeaseActionInfo]
   ): Either[ValidationError, Diff] =
     for {
       recipientAddress <- blockchain.resolveAlias(recipient)
@@ -166,7 +167,7 @@ object DiffsCommon {
       )
     } yield Diff.stateOps(
       portfolios = portfolioDiff,
-      leaseState = Map(txId -> true)
+      leaseState = Map((leaseId, (true, actionInfo)))
     )
 
   def processLeaseCancel(blockchain: Blockchain, sender: Address, fee: Long, time: Long, leaseId: ByteStr): Either[ValidationError, Diff] = {
@@ -191,7 +192,7 @@ object DiffsCommon {
       recipientPortfolio = Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0)))
     } yield Diff.stateOps(
       portfolios = senderPortfolio |+| recipientPortfolio,
-      leaseState = Map(leaseId -> false)
+      leaseState = Map((leaseId , (false, None)))
     )
   }
 }

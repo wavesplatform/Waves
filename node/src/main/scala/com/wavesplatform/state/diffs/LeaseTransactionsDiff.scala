@@ -7,7 +7,7 @@ import com.wavesplatform.transaction.lease._
 object LeaseTransactionsDiff {
   def lease(blockchain: Blockchain)(tx: LeaseTransaction): Either[ValidationError, Diff] =
     DiffsCommon
-      .processLease(blockchain, tx.amount, tx.sender.toAddress, tx.recipient, tx.fee, tx.id.value())
+      .processLease(blockchain, tx.amount, tx.sender.toAddress, tx.recipient, tx.fee, tx.id.value(), None)
       .map(_.bindTransaction(tx).copy(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
 
   def leaseCancel(blockchain: Blockchain, time: Long)(tx: LeaseCancelTransaction): Either[ValidationError, Diff] =
