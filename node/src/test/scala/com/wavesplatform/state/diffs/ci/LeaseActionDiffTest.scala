@@ -109,7 +109,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
   private def leasePreconditions(
       useAlias: Boolean = false,
       selfLease: Boolean = false,
-      cancelLease: Boolean = false,
+      useLeaseCancelDApp: Boolean = false,
       customRecipient: Option[Recipient] = None,
       customAmount: Option[Long] = None,
       customSetScriptFee: Option[Long] = None,
@@ -156,7 +156,8 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
         leaseFromDApp <- LeaseTransaction.selfSigned(2.toByte, dAppAcc, invoker.toAddress, leaseTxAmount1, fee, ts)
         leaseToDApp   <- LeaseTransaction.selfSigned(2.toByte, invoker, dAppAcc.toAddress, leaseTxAmount2, fee, ts)
         leaseCancel   <- LeaseCancelTransaction.signed(2.toByte, dAppAcc.publicKey, leaseFromDApp.id.value(), fee, ts, dAppAcc.privateKey)
-        dApp = if (cancelLease) singleLeaseCancelDApp(leaseFromDApp.id.value()) else customDApp.getOrElse(singleLeaseDApp(recipient, leaseAmount))
+        dApp = if (useLeaseCancelDApp) singleLeaseCancelDApp(leaseFromDApp.id.value())
+        else customDApp.getOrElse(singleLeaseDApp(recipient, leaseAmount))
         setDApp <- SetScriptTransaction.selfSigned(1.toByte, dAppAcc, Some(dApp), setScriptFee, ts)
         preparingTxs = List(genesis, genesis2) ::: aliasTxs ::: List(setDApp)
         leaseTxs     = List(leaseFromDApp, leaseToDApp)
@@ -423,7 +424,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
   }
 
   property(s"LeaseCancel action for lease performed via LeaseTransaction") {
-    forAll(leasePreconditions(cancelLease = true)) {
+    forAll(leasePreconditions(useLeaseCancelDApp = true)) {
       case (preparingTxs, invoke, _, dAppAcc, invoker, leaseTxs @ List(leaseFromDApp, _), _) =>
         assertDiffAndState(
           Seq(TestBlock.create(preparingTxs ++ leaseTxs)),
@@ -485,7 +486,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
   }
 
   property(s"LeaseCancel action for already cancelled lease") {
-    forAll(leasePreconditions(cancelLease = true)) {
+    forAll(leasePreconditions(useLeaseCancelDApp = true)) {
       case (preparingTxs, invoke, _, _, _, leaseTxs, leaseCancelTx) =>
         assertDiffAndState(
           Seq(TestBlock.create(preparingTxs ++ leaseTxs ++ List(leaseCancelTx))),
