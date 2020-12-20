@@ -152,13 +152,17 @@ object DiffsCommon {
       actionInfo: Option[LeaseActionInfo]
   ): Either[ValidationError, Diff] =
     for {
+      recipientAddress <- blockchain.resolveAlias(recipient)
+      _ <- Either.cond(
+        recipientAddress != sender,
+        (),
+        GenericError("Cannot lease to self")
+      )
       _ <- Either.cond(
         blockchain.leaseDetails(leaseId).isEmpty,
         (),
         GenericError(s"Lease with id=$leaseId is already in the state")
       )
-      recipientAddress <- blockchain.resolveAlias(recipient)
-      _                <- Either.cond(recipientAddress != sender, (), GenericError("Cannot lease to self"))
       leaseBalance  = blockchain.leaseBalance(sender)
       senderBalance = blockchain.balance(sender, Waves)
       _ <- Either.cond(
@@ -197,7 +201,7 @@ object DiffsCommon {
       recipientPortfolio = Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0)))
     } yield Diff.stateOps(
       portfolios = senderPortfolio |+| recipientPortfolio,
-      leaseState = Map((leaseId , (false, None)))
+      leaseState = Map((leaseId, (false, None)))
     )
   }
 }
