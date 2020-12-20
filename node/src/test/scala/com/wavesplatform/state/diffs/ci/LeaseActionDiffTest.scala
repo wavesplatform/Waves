@@ -110,6 +110,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
       useAlias: Boolean = false,
       selfLease: Boolean = false,
       useLeaseCancelDApp: Boolean = false,
+      cancelLeaseActionByTx: Boolean = false,
       customRecipient: Option[Recipient] = None,
       customAmount: Option[Long] = None,
       customSetScriptFee: Option[Long] = None,
@@ -155,7 +156,9 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
         invoke        <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, dAppAcc.toAddress, None, Nil, fee, Waves, ts)
         leaseFromDApp <- LeaseTransaction.selfSigned(2.toByte, dAppAcc, invoker.toAddress, leaseTxAmount1, fee, ts)
         leaseToDApp   <- LeaseTransaction.selfSigned(2.toByte, invoker, dAppAcc.toAddress, leaseTxAmount2, fee, ts)
-        leaseCancel   <- LeaseCancelTransaction.signed(2.toByte, dAppAcc.publicKey, leaseFromDApp.id.value(), fee, ts, dAppAcc.privateKey)
+        leaseCancelId = if (cancelLeaseActionByTx) Lease.calculateId(Lease(recipient, leaseAmount, 0), invoke.id.value())
+        else leaseFromDApp.id.value()
+        leaseCancel <- LeaseCancelTransaction.signed(2.toByte, dAppAcc.publicKey, leaseCancelId, fee, ts, dAppAcc.privateKey)
         dApp = if (useLeaseCancelDApp) singleLeaseCancelDApp(leaseFromDApp.id.value())
         else customDApp.getOrElse(singleLeaseDApp(recipient, leaseAmount))
         setDApp <- SetScriptTransaction.selfSigned(1.toByte, dAppAcc, Some(dApp), setScriptFee, ts)
@@ -203,6 +206,22 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           case (diff, _) =>
             diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee, LeaseBalance(leaseAmount, out = 0))
             diff.portfolios(dAppAcc) shouldBe Portfolio(0, LeaseBalance(in = 0, leaseAmount))
+        }
+    }
+  }
+
+  property(s"Lease action cancelled by LeaseCancelTransaction") {
+    forAll(leasePreconditions(cancelLeaseActionByTx = true)) {
+      case (preparingTxs, invoke, _, dAppAcc, invoker, _, leaseCancelTx) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(preparingTxs)),
+          TestBlock.create(Seq(invoke, leaseCancelTx)),
+          v5Features
+        ) {
+          case (diff, _) =>
+            diff.errorMessage(invoke.id.value()) shouldBe empty
+            diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee)
+            diff.portfolios(dAppAcc) shouldBe Portfolio(-leaseCancelTx.fee)
         }
     }
   }
