@@ -17,8 +17,8 @@ import com.wavesplatform.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.transaction.{Authorized, GenesisTransaction, Transaction}
+import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{EitherValues, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -26,6 +26,9 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scala.util.Random
 
 class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDomain with EitherValues {
+  private val time = new TestTime
+  private def ts   = time.getTimestamp()
+
   private def features(activateV5: Boolean): FunctionalitySettings = {
     val v5ForkO = if (activateV5) Seq(BlockchainFeatures.ContinuationTransaction) else Seq()
     val parameters =
@@ -157,10 +160,9 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
       dAppAcc         <- accountGen
       invoker         <- accountGen
       generatedAmount <- positiveLongGen
-      ts              <- timestampGen
       fee             <- ciFee(1)
-      leaseTxAmount1  <- smallFeeGen
-      leaseTxAmount2  <- smallFeeGen
+      leaseTxAmount1  <- positiveLongGen
+      leaseTxAmount2  <- positiveLongGen
       invokerAlias = Alias.create("invoker_alias").explicitGet()
       dAppAlias    = Alias.create("dapp_alias").explicitGet()
       invokeAliasTx <- createAliasGen(invoker, invokerAlias, fee, ts)
@@ -219,17 +221,147 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
     }
   }
 
-  property(s"Lease action by address") {
+  property(s"Lease action by address (invoker - recipient)") {
     forAll(leasePreconditions()) {
       case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, _, _) =>
-        assertDiffAndState(
-          Seq(TestBlock.create(preparingTxs)),
-          TestBlock.create(Seq(invoke)),
-          v5Features
-        ) {
-          case (diff, _) =>
-            diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee, LeaseBalance(leaseAmount, out = 0))
-            diff.portfolios(dAppAcc) shouldBe Portfolio(0, LeaseBalance(in = 0, leaseAmount))
+        withDomain(domainSettingsWithFS(v5Features)) { d =>
+          d.appendBlock(preparingTxs: _*)
+          d.appendBlock(invoke)
+
+          val invokerSpentFee  = preparingTxs.collect { case a: Authorized if a.sender.toAddress == invoker => a.assetFee._2 }.sum
+          val invokerPortfolio = d.blockchain.wavesPortfolio(invoker)
+          invokerPortfolio.lease shouldBe LeaseBalance(leaseAmount, out = 0)
+          invokerPortfolio.balance shouldBe ENOUGH_AMT - invokerSpentFee - invoke.fee
+          invokerPortfolio.spendableBalance shouldBe ENOUGH_AMT - invokerSpentFee - invoke.fee
+          invokerPortfolio.effectiveBalance shouldBe ENOUGH_AMT - invokerSpentFee - invoke.fee + leaseAmount
+
+          val dAppSpentFee  = preparingTxs.collect { case a: Authorized if a.sender.toAddress == dAppAcc => a.assetFee._2 }.sum
+          val dAppPortfolio = d.blockchain.wavesPortfolio(dAppAcc)
+          dAppPortfolio.lease shouldBe LeaseBalance(in = 0, leaseAmount)
+          dAppPortfolio.balance shouldBe ENOUGH_AMT - dAppSpentFee
+          dAppPortfolio.spendableBalance shouldBe ENOUGH_AMT - dAppSpentFee - leaseAmount
+          dAppPortfolio.effectiveBalance shouldBe ENOUGH_AMT - dAppSpentFee - leaseAmount
+
+          d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee - invoke.fee + leaseAmount
+          d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee - leaseAmount
+          d.appendBlock()
+          d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee
+          d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee - leaseAmount
+        }
+    }
+  }
+
+  property(s"Lease action with active lease from dApp") {
+    forAll(leasePreconditions()) {
+      case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, leaseTxFromDApp :: _, _) =>
+        withDomain(domainSettingsWithFS(v5Features)) { d =>
+          val invokerSpentFee = preparingTxs.collect { case a: Authorized if a.sender.toAddress == invoker                      => a.assetFee._2 }.sum
+          val dAppSpentFee    = (preparingTxs :+ leaseTxFromDApp).collect { case a: Authorized if a.sender.toAddress == dAppAcc => a.assetFee._2 }.sum
+
+          d.appendBlock(preparingTxs: _*)
+          d.appendBlock(leaseTxFromDApp)
+
+          d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee + leaseTxFromDApp.amount
+          d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee - leaseTxFromDApp.amount
+
+          d.appendBlock(invoke)
+          val totalLeaseAmount = leaseAmount + leaseTxFromDApp.amount
+
+          val invokerPortfolio = d.blockchain.wavesPortfolio(invoker)
+          invokerPortfolio.lease shouldBe LeaseBalance(totalLeaseAmount, out = 0)
+          invokerPortfolio.balance shouldBe ENOUGH_AMT - invokerSpentFee - invoke.fee
+          invokerPortfolio.spendableBalance shouldBe ENOUGH_AMT - invokerSpentFee - invoke.fee
+          invokerPortfolio.effectiveBalance shouldBe ENOUGH_AMT - invokerSpentFee - invoke.fee + totalLeaseAmount
+
+          val dAppPortfolio = d.blockchain.wavesPortfolio(dAppAcc)
+          dAppPortfolio.lease shouldBe LeaseBalance(in = 0, totalLeaseAmount)
+          dAppPortfolio.balance shouldBe ENOUGH_AMT - dAppSpentFee
+          dAppPortfolio.spendableBalance shouldBe ENOUGH_AMT - dAppSpentFee - totalLeaseAmount
+          dAppPortfolio.effectiveBalance shouldBe ENOUGH_AMT - dAppSpentFee - totalLeaseAmount
+
+          d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee
+          d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee - totalLeaseAmount
+          d.appendBlock()
+          d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee
+          d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee - totalLeaseAmount
+        }
+    }
+  }
+
+  property(s"Lease action with active lease from invoke-recipient") {
+    forAll(leasePreconditions()) {
+      case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, _ :: leaseTxToDApp :: Nil, _) =>
+        withDomain(domainSettingsWithFS(v5Features)) { d =>
+          val invokerSpentFee = (preparingTxs :+ leaseTxToDApp).collect { case a: Authorized if a.sender.toAddress == invoker => a.assetFee._2 }.sum
+          val dAppSpentFee    = preparingTxs.collect { case a: Authorized if a.sender.toAddress == dAppAcc                    => a.assetFee._2 }.sum
+
+          d.appendBlock(preparingTxs: _*)
+          d.appendBlock(leaseTxToDApp)
+
+          d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee - leaseTxToDApp.amount
+          d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee + leaseTxToDApp.amount
+
+          d.appendBlock(invoke)
+          val leaseAmountDiff = leaseAmount - leaseTxToDApp.amount
+
+          val invokerPortfolio = d.blockchain.wavesPortfolio(invoker)
+          invokerPortfolio.lease shouldBe LeaseBalance(in = leaseAmount, out = leaseTxToDApp.amount)
+          invokerPortfolio.balance shouldBe ENOUGH_AMT - invokerSpentFee - invoke.fee
+          invokerPortfolio.spendableBalance shouldBe ENOUGH_AMT - invokerSpentFee - invoke.fee - leaseTxToDApp.amount
+          invokerPortfolio.effectiveBalance shouldBe ENOUGH_AMT - invokerSpentFee - invoke.fee + leaseAmountDiff
+
+          val dAppPortfolio = d.blockchain.wavesPortfolio(dAppAcc)
+          dAppPortfolio.lease shouldBe LeaseBalance(in = leaseTxToDApp.amount, out = leaseAmount)
+          dAppPortfolio.balance shouldBe ENOUGH_AMT - dAppSpentFee
+          dAppPortfolio.spendableBalance shouldBe ENOUGH_AMT - dAppSpentFee - leaseAmount
+          dAppPortfolio.effectiveBalance shouldBe ENOUGH_AMT - dAppSpentFee - leaseAmountDiff
+
+          d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee - leaseTxToDApp.amount
+          d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee - leaseAmountDiff.max(0)
+          d.appendBlock()
+          d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee - leaseTxToDApp.amount
+          d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee - leaseAmountDiff.max(0)
+        }
+    }
+  }
+
+  property(s"Lease action with active lease from both dApp and invoke-recipient") {
+    forAll(leasePreconditions()) {
+      case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, leaseTxFromDApp :: leaseTxToDApp :: Nil, _) =>
+        withDomain(domainSettingsWithFS(v5Features)) { d =>
+          val invokerSpentFee = (preparingTxs :+ leaseTxToDApp).collect { case a: Authorized if a.sender.toAddress == invoker   => a.assetFee._2 }.sum
+          val dAppSpentFee    = (preparingTxs :+ leaseTxFromDApp).collect { case a: Authorized if a.sender.toAddress == dAppAcc => a.assetFee._2 }.sum
+
+          d.appendBlock(preparingTxs: _*)
+          d.appendBlock(leaseTxFromDApp, leaseTxToDApp)
+
+          d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee - leaseTxToDApp.amount + leaseTxFromDApp.amount
+          d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee + leaseTxToDApp.amount - leaseTxFromDApp.amount
+
+          d.appendBlock(invoke)
+          val leaseAmountDiff = leaseAmount - leaseTxToDApp.amount + leaseTxFromDApp.amount
+
+          val invokerPortfolio = d.blockchain.wavesPortfolio(invoker)
+          invokerPortfolio.lease shouldBe LeaseBalance(in = leaseAmount + leaseTxFromDApp.amount, out = leaseTxToDApp.amount)
+          invokerPortfolio.balance shouldBe ENOUGH_AMT - invokerSpentFee - invoke.fee
+          invokerPortfolio.spendableBalance shouldBe ENOUGH_AMT - invokerSpentFee - invoke.fee - leaseTxToDApp.amount
+          invokerPortfolio.effectiveBalance shouldBe ENOUGH_AMT - invokerSpentFee - invoke.fee + leaseAmountDiff
+
+          val dAppPortfolio = d.blockchain.wavesPortfolio(dAppAcc)
+          dAppPortfolio.lease shouldBe LeaseBalance(in = leaseTxToDApp.amount, out = leaseAmount + leaseTxFromDApp.amount)
+          dAppPortfolio.balance shouldBe ENOUGH_AMT - dAppSpentFee
+          dAppPortfolio.spendableBalance shouldBe ENOUGH_AMT - dAppSpentFee - leaseAmount - leaseTxFromDApp.amount
+          dAppPortfolio.effectiveBalance shouldBe ENOUGH_AMT - dAppSpentFee - leaseAmountDiff
+
+          d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee + leaseTxToDApp.fee.min(
+            leaseTxFromDApp.amount - leaseTxToDApp.amount
+          )
+          d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee + leaseTxFromDApp.fee.min(-leaseAmountDiff)
+          d.appendBlock()
+          d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee + leaseTxToDApp.fee.min(
+            leaseTxFromDApp.amount - leaseTxToDApp.amount
+          )
+          d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee + leaseTxFromDApp.fee.min(-leaseAmountDiff)
         }
     }
   }
@@ -501,17 +633,29 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
     val recipient = accountGen.sample.get.toAddress
     val amount    = positiveLongGen.sample.get
     forAll(leasePreconditions(customDApp = Some(leaseWithLeaseCancelDApp(recipient.toRide, amount)))) {
-      case (preparingTxs, invoke, _, dAppAcc, invoker, _, _) =>
-        assertDiffAndState(
-          Seq(TestBlock.create(preparingTxs)),
-          TestBlock.create(Seq(invoke)),
-          v5Features
-        ) {
-          case (diff, _) =>
-            diff.errorMessage(invoke.id.value()) shouldBe empty
-            diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee)
-            diff.portfolios(dAppAcc) shouldBe Portfolio()
-            diff.portfolios(recipient) shouldBe Portfolio()
+      case (preparingTxs, invoke, _, dAppAcc, _, _, _) =>
+        withDomain(domainSettingsWithFS(v5Features)) { d =>
+          d.appendBlock(preparingTxs: _*)
+          d.appendBlock(invoke)
+
+          val recipientPortfolio = d.blockchain.wavesPortfolio(recipient)
+          recipientPortfolio.lease shouldBe LeaseBalance.empty
+          recipientPortfolio.balance shouldBe 0
+          recipientPortfolio.spendableBalance shouldBe 0
+          recipientPortfolio.effectiveBalance shouldBe 0
+
+          val dAppSpentFee  = preparingTxs.collect { case a: Authorized if a.sender.toAddress == dAppAcc => a.assetFee._2 }.sum
+          val dAppPortfolio = d.blockchain.wavesPortfolio(dAppAcc)
+          dAppPortfolio.lease shouldBe LeaseBalance.empty
+          dAppPortfolio.balance shouldBe ENOUGH_AMT - dAppSpentFee
+          dAppPortfolio.spendableBalance shouldBe ENOUGH_AMT - dAppSpentFee
+          dAppPortfolio.effectiveBalance shouldBe ENOUGH_AMT - dAppSpentFee
+
+          d.blockchain.generatingBalance(recipient) shouldBe 0
+          d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee
+          d.appendBlock()
+          d.blockchain.generatingBalance(recipient) shouldBe 0
+          d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee
         }
     }
   }
