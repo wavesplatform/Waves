@@ -208,11 +208,11 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
 
   property(s"Lease action is restricted before activation ${BlockchainFeatures.ContinuationTransaction}") {
     forAll(leasePreconditions()) {
-      case (preparingTxs, invoke, _, _, _, _, _) =>
+      case (preparingTxs, _, _, _, _, _, _) =>
         def r(): Unit =
           assertDiffEi(
             Seq(TestBlock.create(preparingTxs)),
-            TestBlock.create(Seq(invoke)),
+            TestBlock.create(Seq()),
             v4Features
           )(_ => ())
         (the[RuntimeException] thrownBy r()).getMessage should include("Continuation Transaction feature has not been activated yet")
