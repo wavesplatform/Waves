@@ -62,6 +62,16 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
   private def singleLeaseDApp(recipient: Recipient, amount: Long): Script =
     dApp(s"[Lease(${recipientStr(recipient)}, $amount)]")
 
+  private def duplicateLeaseDApp(recipient: Recipient, amount: Long): Script =
+    dApp(
+      s"""
+         | [
+         |   Lease(${recipientStr(recipient)}, $amount),
+         |   Lease(${recipientStr(recipient)}, $amount)
+         | ]
+       """.stripMargin
+    )
+
   private def singleLeaseCancelDApp(leaseId: ByteStr): Script =
     dApp(s"[LeaseCancel(base58'$leaseId')]")
 
@@ -401,6 +411,23 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           case (diff, _) =>
             diff.errorMessage(invoke.id.value()).get.text shouldBe
               s"Cannot lease more than own: Balance:${dAppBalance - leaseFromDApp.fee}, already leased: ${leaseFromDApp.amount}"
+        }
+    }
+  }
+
+  property(s"Duplicate lease action") {
+    val recipient = accountGen.sample.get.toAddress.toRide
+    val amount    = positiveLongGen.sample.get
+    forAll(leasePreconditions(customDApp = Some(duplicateLeaseDApp(recipient, amount)))) {
+      case (preparingTxs, invoke, _, _, _, _, _) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(preparingTxs)),
+          TestBlock.create(Seq(invoke)),
+          v5Features
+        ) {
+          case (diff, _) =>
+            val id = Lease.calculateId(Lease(recipient, amount, nonce = 0), invoke.id.value())
+            diff.errorMessage(invoke.id.value()).get.text shouldBe s"Lease with id=$id is already in the state"
         }
     }
   }

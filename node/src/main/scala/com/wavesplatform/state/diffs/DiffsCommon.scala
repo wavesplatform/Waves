@@ -152,6 +152,11 @@ object DiffsCommon {
       actionInfo: Option[LeaseActionInfo]
   ): Either[ValidationError, Diff] =
     for {
+      _ <- Either.cond(
+        blockchain.leaseDetails(leaseId).isEmpty,
+        (),
+        GenericError(s"Lease with id=$leaseId is already in the state")
+      )
       recipientAddress <- blockchain.resolveAlias(recipient)
       _                <- Either.cond(recipientAddress != sender, (), GenericError("Cannot lease to self"))
       leaseBalance  = blockchain.leaseBalance(sender)
