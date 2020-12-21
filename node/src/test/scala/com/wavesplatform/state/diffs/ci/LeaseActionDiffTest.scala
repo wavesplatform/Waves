@@ -12,7 +12,7 @@ import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
-import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -229,13 +229,11 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
   property(s"Lease action is restricted before activation ${BlockchainFeatures.ContinuationTransaction}") {
     forAll(leasePreconditions()) {
       case (preparingTxs, _, _, _, _, _, _) =>
-        def r(): Unit =
           assertDiffEi(
-            Seq(TestBlock.create(preparingTxs)),
-            TestBlock.create(Seq()),
+            Seq(),
+            TestBlock.create(preparingTxs),
             v4Features
-          )(_ => ())
-        (the[RuntimeException] thrownBy r()).getMessage should include("Continuation Transaction feature has not been activated yet")
+          )(_ should produce("Continuation Transaction feature has not been activated yet"))
     }
   }
 
