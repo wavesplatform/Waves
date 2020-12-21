@@ -1,6 +1,8 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
+import com.wavesplatform.api.common.CommonTransactionsApi
+import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.api.http.DebugApiRoute
 import com.wavesplatform.block.SignedBlockHeader
@@ -9,23 +11,23 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.it.util._
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.lang.v1.traits.domain.Issue
+import com.wavesplatform.lang.v1.traits.domain.{Issue, LeaseCancel}
 import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.StateHash.SectionId
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, NG, StateHash}
+import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, InvokeScriptResult, NG, StateHash}
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet}
+import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet, TransactionGen}
 import monix.eval.Task
 import org.scalamock.scalatest.PathMockFactory
-import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
+import play.api.libs.json._
 
 import scala.util.Random
-
 //noinspection ScalaStyle
 class DebugApiRouteSpec
     extends RouteSpec("/debug")
@@ -33,7 +35,8 @@ class DebugApiRouteSpec
     with TestWallet
     with NTPTime
     with PathMockFactory
-    with BlockchainStubHelpers {
+    with BlockchainStubHelpers
+    with TransactionGen {
 
   val wavesSettings = WavesSettings.default()
   val configObject  = wavesSettings.config.root()
@@ -53,7 +56,7 @@ class DebugApiRouteSpec
       blockchain,
       null,
       null,
-      null,
+      stub[CommonTransactionsApi],
       null,
       PeerDatabase.NoOp,
       null,
@@ -502,6 +505,126 @@ class DebugApiRouteSpec
 
     }
 
+    "invoke tx returning leases" in {
+      val dAppPk  = accountGen.sample.get.publicKey
+      val invoke  = TxHelpers.invoke(dAppPk.toAddress, "test")
+      val leaseId = ByteStr(bytes32gen.sample.get)
+
+      val blockchain = createBlockchainStub { blockchain =>
+        (blockchain.balance _).when(*, *).returns(Long.MaxValue)
+
+        val (dAppScript, _) = ScriptCompiler
+          .compile(
+            s"""
+               |{-# STDLIB_VERSION 5 #-}
+               |{-# SCRIPT_TYPE ACCOUNT #-}
+               |{-# CONTENT_TYPE DAPP #-}
+               |
+               |@Callable(i)
+               |func test() = {
+               |  let test = 1
+               |  if (test == 1)
+               |    then
+               |      [
+               |        Lease(Address(base58'3NAgxLPGnw3RGv9JT6NTDaG5D1iLUehg2xd'), 100), Lease(Alias("some_alias"), 20, 2),
+               |        LeaseCancel(base58'$leaseId')
+               |      ]
+               |    else []
+               |}
+               |""".stripMargin,
+            ScriptEstimatorV3
+          )
+          .explicitGet()
+
+        (blockchain.accountScript _)
+          .when(*)
+          .returns(
+            Some(
+              AccountScriptInfo(
+                TxHelpers.defaultSigner.publicKey,
+                dAppScript,
+                0L,
+                Map(3 -> Seq("test").map(_ -> 0L).toMap)
+              )
+            )
+          )
+
+        (blockchain.hasAccountScript _).when(*).returns(true)
+
+        (blockchain.leaseDetails _)
+          .when(leaseId)
+          .returns(Some(LeaseDetails(dAppPk, accountGen.sample.get.toAddress, 1, 100, true)))
+          .anyNumberOfTimes()
+
+        (blockchain.leaseDetails _)
+          .when(*)
+          .returns(None)
+          .anyNumberOfTimes()
+
+        (blockchain.resolveAlias _)
+          .when(*)
+          .returns(Right(accountGen.sample.get.toAddress))
+          .anyNumberOfTimes()
+      }
+      val route = debugApiRoute.copy(blockchain = blockchain).route
+
+      Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, invoke.json().toString())) ~> route ~> check {
+        val json = Json.parse(responseAs[String])
+        (json \ "valid").as[Boolean] shouldBe true
+        (json \ "trace").as[JsArray] shouldBe Json.parse(
+          s"""
+            | [
+            |  {
+            |    "type": "verifier",
+            |    "id": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+            |    "result": "success",
+            |    "error": null
+            |  },
+            |  {
+            |    "type": "dApp",
+            |    "id": "${dAppPk.toAddress}",
+            |    "function": "test",
+            |    "args": [],
+            |    "result": {
+            |      "data": [],
+            |      "transfers": [],
+            |      "issues": [],
+            |      "reissues": [],
+            |      "burns": [],
+            |      "sponsorFees": [],
+            |      "leases": [
+            |        {
+            |          "recipient": "3NAgxLPGnw3RGv9JT6NTDaG5D1iLUehg2xd",
+            |          "amount": 100,
+            |          "nonce": 0
+            |        },
+            |        {
+            |          "recipient": "alias:T:some_alias",
+            |          "amount": 20,
+            |          "nonce": 2
+            |        }
+            |      ],
+            |      "leaseCancels": [
+            |        {
+            |          "leaseId": "$leaseId"
+            |        }
+            |      ]
+            |    },
+            |    "error": null,
+            |    "vars": [
+            |      {
+            |        "name": "test",
+            |        "type": "Int",
+            |        "value": 1
+            |      }
+            |    ]
+            |  }
+            | ]
+          """.stripMargin
+        )
+      }
+    }
+
     "transfer transaction with asset fail" in {
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue / 2)
@@ -544,6 +667,38 @@ class DebugApiRouteSpec
 
         (json \ "valid").as[Boolean] shouldBe false
         (json \ "transaction").as[JsObject] shouldBe tx.json()
+      }
+    }
+  }
+
+  routePath("/stateChanges/info/") - {
+    "provides lease and lease cancel actions stateChanges" in {
+      val invokeAddress    = accountGen.sample.get.toAddress
+      val leaseId          = ByteStr(bytes32gen.sample.get)
+      val recipientAddress = accountGen.sample.get.toAddress
+      val recipientAlias   = aliasGen.sample.get
+      val invoke           = TxHelpers.invoke(invokeAddress, "test")
+      val scriptResult = InvokeScriptResult(
+        leases = Seq(InvokeScriptResult.Lease(recipientAddress, 100, 1), InvokeScriptResult.Lease(recipientAlias, 200, 3)),
+        leaseCancels = Seq(LeaseCancel(leaseId))
+      )
+
+      (() => blockchain.activatedFeatures).when().returning(Map.empty).anyNumberOfTimes()
+      (transactionsApi.transactionById _)
+        .when(invoke.id())
+        .returning(Some(TransactionMeta.Invoke(Height(1), invoke, succeeded = true, Some(scriptResult))))
+        .once()
+
+      Get(routePath(s"/stateChanges/info/${invoke.id()}")) ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+        (responseAs[JsObject] \ "stateChanges").as[JsObject] shouldBe Json.toJsObject(scriptResult)
+        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 0 \ "recipient").get shouldBe JsString(recipientAddress.stringRepr)
+        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 0 \ "amount").get shouldBe JsNumber(100)
+        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 0 \ "nonce").get shouldBe JsNumber(1)
+        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 1 \ "recipient").get shouldBe JsString(recipientAlias.stringRepr)
+        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 1 \ "amount").get shouldBe JsNumber(200)
+        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 1 \ "nonce").get shouldBe JsNumber(3)
+        (responseAs[JsObject] \ "stateChanges" \ "leaseCancels" \ 0 \ "leaseId").get shouldBe JsString(leaseId.toString)
       }
     }
   }
