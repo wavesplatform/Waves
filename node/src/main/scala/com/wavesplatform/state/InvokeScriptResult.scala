@@ -2,7 +2,7 @@ package com.wavesplatform.state
 
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme}
+import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, Alias}
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.v1.evaluator.{IncompleteResult, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.domain._
@@ -22,7 +22,7 @@ final case class InvokeScriptResult(
     reissues: Seq[Reissue] = Nil,
     burns: Seq[Burn] = Nil,
     sponsorFees: Seq[SponsorFee] = Nil,
-    leases: Seq[Lease] = Nil,
+    leases: Seq[InvokeScriptResult.Lease] = Nil,
     leaseCancels: Seq[LeaseCancel] = Nil,
     error: Option[ErrorMessage] = None
 )
@@ -34,6 +34,16 @@ object InvokeScriptResult {
   final case class Payment(address: Address, asset: Asset, amount: Long)
   object Payment {
     implicit val jsonWrites = Json.writes[Payment]
+  }
+
+  case class Lease(recipient: AddressOrAlias, amount: Long, nonce: Long)
+  object Lease {
+    implicit val recipientWrites = Writes[AddressOrAlias] {
+      case address: Address => implicitly[Writes[Address]].writes(address)
+      case alias: Alias     => JsString(alias.stringRepr)
+      case _                => JsNull
+    }
+    implicit val jsonWrites = Json.writes[Lease]
   }
 
   def paymentsFromPortfolio(addr: Address, portfolio: Portfolio): Seq[Payment] = {
@@ -57,13 +67,6 @@ object InvokeScriptResult {
   implicit val reissueFormat    = Json.writes[Reissue]
   implicit val burnFormat       = Json.writes[Burn]
   implicit val sponsorFeeFormat = Json.writes[SponsorFee]
-  implicit val addressFormat    = Json.writes[Recipient.Address]
-  implicit val aliasFormat      = Json.writes[Recipient.Alias]
-  implicit val recipientFormat = Writes[Recipient] {
-    case address: Recipient.Address => addressFormat.writes(address)
-    case alias: Recipient.Alias     => aliasFormat.writes(alias)
-  }
-  implicit val leaseFormat        = Json.writes[Lease]
   implicit val leaseCancelFormat  = Json.writes[LeaseCancel]
   implicit val errorMessageFormat = Json.writes[ErrorMessage]
   implicit val jsonFormat         = Json.writes[InvokeScriptResult]
@@ -115,18 +118,23 @@ object InvokeScriptResult {
     def langTransferToPayment(t: lang.AssetTransfer): Payment =
       Payment(langAddressToAddress(t.recipient), Asset.fromCompatId(t.assetId), t.amount)
 
+    def langLeaseToLease(l: lang.Lease): Lease =
+      Lease(AddressOrAlias.fromRide(l.recipient).explicitGet(), l.amount, l.nonce)
+
     result match {
       case ScriptResultV3(ds, ts) =>
         InvokeScriptResult(data = ds.map(DataEntry.fromLangDataOp), transfers = ts.map(langTransferToPayment))
 
       case ScriptResultV4(actions) =>
-        val issues      = actions.collect { case i: lang.Issue         => i }
-        val reissues    = actions.collect { case ri: lang.Reissue      => ri }
-        val burns       = actions.collect { case b: lang.Burn          => b }
-        val sponsorFees = actions.collect { case sf: lang.SponsorFee   => sf }
-        val dataOps     = actions.collect { case d: lang.DataOp        => DataEntry.fromLangDataOp(d) }
-        val transfers   = actions.collect { case t: lang.AssetTransfer => langTransferToPayment(t) }
-        InvokeScriptResult(dataOps, transfers, issues, reissues, burns, sponsorFees)
+        val issues       = actions.collect { case i: lang.Issue         => i }
+        val reissues     = actions.collect { case ri: lang.Reissue      => ri }
+        val burns        = actions.collect { case b: lang.Burn          => b }
+        val sponsorFees  = actions.collect { case sf: lang.SponsorFee   => sf }
+        val dataOps      = actions.collect { case d: lang.DataOp        => DataEntry.fromLangDataOp(d) }
+        val transfers    = actions.collect { case t: lang.AssetTransfer => langTransferToPayment(t) }
+        val leases       = actions.collect { case l: lang.Lease         => langLeaseToLease(l) }
+        val leaseCancels = actions.collect { case l: lang.LeaseCancel   => l }
+        InvokeScriptResult(dataOps, transfers, issues, reissues, burns, sponsorFees, leases, leaseCancels)
 
       case i: IncompleteResult => throw new IllegalArgumentException(s"Cannot cast incomplete result: $i")
     }
@@ -155,10 +163,8 @@ object InvokeScriptResult {
   private def toPbSponsorFee(sf: SponsorFee) =
     PBInvokeScriptResult.SponsorFee(Some(Amount(sf.assetId.toByteString, sf.minSponsoredAssetFee.getOrElse(0))))
 
-  private def toPbLease(l: Lease) = {
-    val recipient = PBRecipients.create(AddressOrAlias.fromRide(l.recipient).explicitGet())
-    PBInvokeScriptResult.Lease(Some(recipient), l.amount, l.nonce)
-  }
+  private def toPbLease(l: Lease) =
+    PBInvokeScriptResult.Lease(Some(PBRecipients.create(l.recipient)), l.amount, l.nonce)
 
   private def toPbLeaseCancel(l: LeaseCancel) =
     PBInvokeScriptResult.LeaseCancel(ByteString.copyFrom(l.leaseId.arr))
@@ -183,7 +189,7 @@ object InvokeScriptResult {
   }
 
   private def toVanillaLease(l: PBInvokeScriptResult.Lease) = {
-    val recipient = PBRecipients.toAddressOrAlias(l.getRecipient, AddressScheme.current.chainId).explicitGet().toRide
+    val recipient = PBRecipients.toAddressOrAlias(l.getRecipient, AddressScheme.current.chainId).explicitGet()
     Lease(recipient, l.amount, l.nonce)
   }
 

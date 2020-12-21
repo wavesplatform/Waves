@@ -181,7 +181,10 @@ object InvokeDiffsCommon {
         reissueList,
         burnList,
         sponsorFeeList,
-        leaseList,
+        leaseList.map {
+          case Lease(recipient, amount, nonce) =>
+            InvokeScriptResult.Lease(AddressOrAlias.fromRide(recipient).explicitGet(), amount, nonce)
+        },
         leaseCancelList
       )
 
