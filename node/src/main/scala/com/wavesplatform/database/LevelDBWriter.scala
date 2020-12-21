@@ -463,8 +463,13 @@ abstract class LevelDBWriter private[database] (
       for ((leaseId, (isActive, actionInfoOpt)) <- leaseStates) {
         actionInfoOpt.foreach {
           case LeaseActionInfo(_, dAppPublicKey, recipient, amount) =>
-            val details = Some(LeaseDetails(dAppPublicKey, recipient, height, amount, isActive))
-            rw.put(Keys.leaseActionDetails(leaseId), details)
+            val key = Keys.leaseActionDetails(leaseId)
+            val details = rw.get(key).fold(
+              LeaseDetails(dAppPublicKey, recipient, height, amount, isActive)
+            )(
+              _.copy(isActive = isActive)
+            )
+            rw.put(key, Some(details))
         }
         rw.put(Keys.leaseStatus(leaseId)(height), isActive)
         expiredKeys ++= updateHistory(rw, Keys.leaseStatusHistory(leaseId), threshold, Keys.leaseStatus(leaseId))
