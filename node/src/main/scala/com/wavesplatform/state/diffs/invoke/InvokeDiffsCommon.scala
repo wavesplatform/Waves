@@ -182,8 +182,9 @@ object InvokeDiffsCommon {
         burnList,
         sponsorFeeList,
         leaseList.map {
-          case Lease(recipient, amount, nonce) =>
-            InvokeScriptResult.Lease(AddressOrAlias.fromRide(recipient).explicitGet(), amount, nonce)
+          case l @ Lease(recipient, amount, nonce) =>
+            val id = Lease.calculateId(l, tx.id.value())
+            InvokeScriptResult.Lease(AddressOrAlias.fromRide(recipient).explicitGet(), amount, nonce, id)
         },
         leaseCancelList
       )

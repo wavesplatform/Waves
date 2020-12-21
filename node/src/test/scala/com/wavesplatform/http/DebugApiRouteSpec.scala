@@ -11,7 +11,7 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.it.util._
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.lang.v1.traits.domain.{Issue, LeaseCancel}
+import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, LeaseCancel, Recipient}
 import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.StateHash.SectionId
@@ -506,9 +506,19 @@ class DebugApiRouteSpec
     }
 
     "invoke tx returning leases" in {
-      val dAppPk  = accountGen.sample.get.publicKey
-      val invoke  = TxHelpers.invoke(dAppPk.toAddress, "test")
-      val leaseId = ByteStr(bytes32gen.sample.get)
+      val dAppPk        = accountGen.sample.get.publicKey
+      val invoke        = TxHelpers.invoke(dAppPk.toAddress, "test")
+      val leaseCancelId = ByteStr(bytes32gen.sample.get)
+
+      val amount1    = 100
+      val recipient1 = Recipient.Address(ByteStr.decodeBase58("3NAgxLPGnw3RGv9JT6NTDaG5D1iLUehg2xd").get)
+      val nonce1     = 0
+      val leaseId1   = Lease.calculateId(Lease(recipient1, amount1, nonce1), invoke.id.value())
+
+      val amount2    = 20
+      val recipient2 = Recipient.Alias("some_alias")
+      val nonce2     = 2
+      val leaseId2   = Lease.calculateId(Lease(recipient2, amount2, nonce2), invoke.id.value())
 
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue)
@@ -526,8 +536,9 @@ class DebugApiRouteSpec
                |  if (test == 1)
                |    then
                |      [
-               |        Lease(Address(base58'3NAgxLPGnw3RGv9JT6NTDaG5D1iLUehg2xd'), 100), Lease(Alias("some_alias"), 20, 2),
-               |        LeaseCancel(base58'$leaseId')
+               |        Lease(Address(base58'${recipient1.bytes}'), $amount1, $nonce1),
+               |        Lease(Alias("${recipient2.name}"), $amount2, $nonce2),
+               |        LeaseCancel(base58'$leaseCancelId')
                |      ]
                |    else []
                |}
@@ -552,7 +563,7 @@ class DebugApiRouteSpec
         (blockchain.hasAccountScript _).when(*).returns(true)
 
         (blockchain.leaseDetails _)
-          .when(leaseId)
+          .when(leaseCancelId)
           .returns(Some(LeaseDetails(dAppPk, accountGen.sample.get.toAddress, 1, 100, true)))
           .anyNumberOfTimes()
 
@@ -594,19 +605,21 @@ class DebugApiRouteSpec
             |      "sponsorFees": [],
             |      "leases": [
             |        {
-            |          "recipient": "3NAgxLPGnw3RGv9JT6NTDaG5D1iLUehg2xd",
-            |          "amount": 100,
-            |          "nonce": 0
+            |          "recipient": "${recipient1.bytes}",
+            |          "amount": $amount1,
+            |          "nonce": $nonce1,
+            |          "leaseId": "$leaseId1"
             |        },
             |        {
-            |          "recipient": "alias:T:some_alias",
-            |          "amount": 20,
-            |          "nonce": 2
+            |          "recipient": "alias:T:${recipient2.name}",
+            |          "amount": $amount2,
+            |          "nonce": $nonce2,
+            |          "leaseId": "$leaseId2"
             |        }
             |      ],
             |      "leaseCancels": [
             |        {
-            |          "leaseId": "$leaseId"
+            |          "leaseId": "$leaseCancelId"
             |        }
             |      ]
             |    },
@@ -674,13 +687,15 @@ class DebugApiRouteSpec
   routePath("/stateChanges/info/") - {
     "provides lease and lease cancel actions stateChanges" in {
       val invokeAddress    = accountGen.sample.get.toAddress
-      val leaseId          = ByteStr(bytes32gen.sample.get)
+      val leaseId1         = ByteStr(bytes32gen.sample.get)
+      val leaseId2         = ByteStr(bytes32gen.sample.get)
+      val leaseCancelId    = ByteStr(bytes32gen.sample.get)
       val recipientAddress = accountGen.sample.get.toAddress
       val recipientAlias   = aliasGen.sample.get
       val invoke           = TxHelpers.invoke(invokeAddress, "test")
       val scriptResult = InvokeScriptResult(
-        leases = Seq(InvokeScriptResult.Lease(recipientAddress, 100, 1), InvokeScriptResult.Lease(recipientAlias, 200, 3)),
-        leaseCancels = Seq(LeaseCancel(leaseId))
+        leases = Seq(InvokeScriptResult.Lease(recipientAddress, 100, 1, leaseId1), InvokeScriptResult.Lease(recipientAlias, 200, 3, leaseId2)),
+        leaseCancels = Seq(LeaseCancel(leaseCancelId))
       )
 
       (() => blockchain.activatedFeatures).when().returning(Map.empty).anyNumberOfTimes()
@@ -695,10 +710,12 @@ class DebugApiRouteSpec
         (responseAs[JsObject] \ "stateChanges" \ "leases" \ 0 \ "recipient").get shouldBe JsString(recipientAddress.stringRepr)
         (responseAs[JsObject] \ "stateChanges" \ "leases" \ 0 \ "amount").get shouldBe JsNumber(100)
         (responseAs[JsObject] \ "stateChanges" \ "leases" \ 0 \ "nonce").get shouldBe JsNumber(1)
+        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 0 \ "leaseId").get shouldBe JsString(leaseId1.toString)
         (responseAs[JsObject] \ "stateChanges" \ "leases" \ 1 \ "recipient").get shouldBe JsString(recipientAlias.stringRepr)
         (responseAs[JsObject] \ "stateChanges" \ "leases" \ 1 \ "amount").get shouldBe JsNumber(200)
         (responseAs[JsObject] \ "stateChanges" \ "leases" \ 1 \ "nonce").get shouldBe JsNumber(3)
-        (responseAs[JsObject] \ "stateChanges" \ "leaseCancels" \ 0 \ "leaseId").get shouldBe JsString(leaseId.toString)
+        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 1 \ "leaseId").get shouldBe JsString(leaseId2.toString)
+        (responseAs[JsObject] \ "stateChanges" \ "leaseCancels" \ 0 \ "leaseId").get shouldBe JsString(leaseCancelId.toString)
       }
     }
   }

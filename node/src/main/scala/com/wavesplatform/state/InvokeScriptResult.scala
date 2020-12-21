@@ -3,6 +3,7 @@ package com.wavesplatform.state
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, Alias}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.v1.evaluator.{IncompleteResult, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.domain._
@@ -36,7 +37,7 @@ object InvokeScriptResult {
     implicit val jsonWrites = Json.writes[Payment]
   }
 
-  case class Lease(recipient: AddressOrAlias, amount: Long, nonce: Long)
+  case class Lease(recipient: AddressOrAlias, amount: Long, nonce: Long, leaseId: ByteStr)
   object Lease {
     implicit val recipientWrites = Writes[AddressOrAlias] {
       case address: Address => implicitly[Writes[Address]].writes(address)
@@ -109,7 +110,7 @@ object InvokeScriptResult {
     )
   }
 
-  def fromLangResult(result: ScriptResult): InvokeScriptResult = {
+  def fromLangResult(invokeId: ByteStr, result: ScriptResult): InvokeScriptResult = {
     import com.wavesplatform.lang.v1.traits.{domain => lang}
 
     def langAddressToAddress(a: lang.Recipient.Address): Address =
@@ -119,7 +120,7 @@ object InvokeScriptResult {
       Payment(langAddressToAddress(t.recipient), Asset.fromCompatId(t.assetId), t.amount)
 
     def langLeaseToLease(l: lang.Lease): Lease =
-      Lease(AddressOrAlias.fromRide(l.recipient).explicitGet(), l.amount, l.nonce)
+      Lease(AddressOrAlias.fromRide(l.recipient).explicitGet(), l.amount, l.nonce, lang.Lease.calculateId(l, invokeId))
 
     result match {
       case ScriptResultV3(ds, ts) =>
@@ -164,7 +165,7 @@ object InvokeScriptResult {
     PBInvokeScriptResult.SponsorFee(Some(Amount(sf.assetId.toByteString, sf.minSponsoredAssetFee.getOrElse(0))))
 
   private def toPbLease(l: Lease) =
-    PBInvokeScriptResult.Lease(Some(PBRecipients.create(l.recipient)), l.amount, l.nonce)
+    PBInvokeScriptResult.Lease(Some(PBRecipients.create(l.recipient)), l.amount, l.nonce, l.leaseId.toByteString)
 
   private def toPbLeaseCancel(l: LeaseCancel) =
     PBInvokeScriptResult.LeaseCancel(ByteString.copyFrom(l.leaseId.arr))
@@ -190,7 +191,7 @@ object InvokeScriptResult {
 
   private def toVanillaLease(l: PBInvokeScriptResult.Lease) = {
     val recipient = PBRecipients.toAddressOrAlias(l.getRecipient, AddressScheme.current.chainId).explicitGet()
-    Lease(recipient, l.amount, l.nonce)
+    Lease(recipient, l.amount, l.nonce, l.leaseId.toByteStr)
   }
 
   private def toVanillaLeaseCancel(sf: PBInvokeScriptResult.LeaseCancel) =
