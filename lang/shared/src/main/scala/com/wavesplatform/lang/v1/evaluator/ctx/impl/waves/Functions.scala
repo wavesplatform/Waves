@@ -477,7 +477,7 @@ object Functions {
       Map[StdLibVersion, Long](V4 -> 30L),
       CALLDAPP,
       ANY,
-      ("dapp", addressType),
+      ("dapp", addressOrAliasType),
       ("name", optionString),
       ("args", LIST(ANY)),
       ("payments", listPayment)
