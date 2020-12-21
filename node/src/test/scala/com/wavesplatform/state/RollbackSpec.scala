@@ -13,7 +13,7 @@ import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{Account, V4}
+import com.wavesplatform.lang.directives.values.{Account, V4, V5}
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -22,6 +22,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v1.traits.domain.Lease
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.reader.LeaseDetails
@@ -430,6 +431,20 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           )
         )
 
+      def leaseFunctionCallGen(address: Address): Gen[(Long, Terms.FUNCTION_CALL)] =
+        for {
+          leaseAmount <- Gen.choose(1L, 100000L)
+        } yield (
+          leaseAmount,
+          Terms.FUNCTION_CALL(
+            FunctionHeader.User("lease"),
+            List(
+              Terms.CONST_BYTESTR(ByteStr(address.bytes)).explicitGet(),
+              Terms.CONST_LONG(leaseAmount)
+            )
+          )
+        )
+
       def getAsset(d: Domain, txId: ByteStr): IssuedAsset = {
         val sr = d.blockchainUpdater.bestLiquidDiff.get.scriptResults(txId)
         sr.error shouldBe empty
@@ -450,7 +465,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
       def appendBlock(d: Domain, invoker: KeyPair, dApp: KeyPair)(parentBlockId: ByteStr, fc: Terms.FUNCTION_CALL): ByteStr = {
         val fee = 150000000L
-        val issue =
+        val invoke =
           InvokeScriptTransaction
             .selfSigned(2.toByte, invoker, dApp.toAddress, Some(fc), Seq.empty, fee, Waves, nextTs)
             .explicitGet()
@@ -459,15 +474,15 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           TestBlock.create(
             nextTs,
             parentBlockId,
-            Seq(issue)
+            Seq(invoke)
           )
         )
-        issue.id()
+        invoke.id()
       }
 
       "issue" in forAll(scenario) {
         case (dApp, invoker, genesis, setScript) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0)) { d =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, ContinuationTransaction -> 0)) { d =>
             val append = appendBlock(d, invoker, dApp) _
 
             d.appendBlock(genesis)
@@ -498,7 +513,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
       "reissue" in forAll(scenario) {
         case (dApp, invoker, genesis, setScript) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0)) { d =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, ContinuationTransaction -> 0)) { d =>
             val append = appendBlock(d, invoker, dApp) _
 
             d.appendBlock(genesis)
@@ -536,7 +551,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
       "burn" in forAll(scenario) {
         case (dApp, invoker, genesis, setScript) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0)) { d =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, ContinuationTransaction -> 0)) { d =>
             val append = appendBlock(d, invoker, dApp) _
 
             d.appendBlock(genesis)
@@ -574,7 +589,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
       "sponsorFee" in forAll(scenario) {
         case (dApp, invoker, genesis, setScript) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0)) { d =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, ContinuationTransaction -> 0)) { d =>
             val append = appendBlock(d, invoker, dApp) _
 
             d.appendBlock(genesis)
@@ -606,6 +621,58 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             d.blockchainUpdater.removeAfter(issueBlockId).explicitGet()
             d.blockchainUpdater.assetDescription(asset).get.sponsorship shouldBe 0L
             d.blockchainUpdater.assetDescription(asset) shouldBe issueDescription
+          }
+      }
+
+      "lease" in forAll(scenario) {
+        case (dApp, invoker, genesis, setScript) =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, ContinuationTransaction -> 0)) { d =>
+            val append = appendBlock(d, invoker, dApp) _
+
+            d.appendBlock(genesis)
+            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript)))
+            val beforeInvoke1 = d.lastBlockId
+
+            val (leaseAmount, leaseFc) = leaseFunctionCallGen(invoker.toAddress).sample.get
+            def leaseDetails(height: Int) = Some(LeaseDetails(dApp.publicKey, invoker.toAddress, height, leaseAmount, isActive = true))
+
+            // liquid block rollback
+            val invokeId1 = append(d.lastBlockId, leaseFc)
+            val leaseId1 = Lease.calculateId(Lease(invoker.toAddress.toRide, leaseAmount, 0), invokeId1)
+
+            d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance(in = leaseAmount, out = 0)
+            d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance(in = 0, out = leaseAmount)
+            d.blockchain.leaseDetails(leaseId1) shouldBe leaseDetails(d.blockchain.height)
+            d.levelDBWriter.leaseDetails(leaseId1) shouldBe None
+            d.appendBlock()
+            d.levelDBWriter.leaseDetails(leaseId1) shouldBe leaseDetails(d.blockchain.height - 1)
+
+            d.blockchain.removeAfter(beforeInvoke1).explicitGet()
+
+            d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance.empty
+            d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance.empty
+            d.blockchain.leaseDetails(leaseId1) shouldBe None
+            d.levelDBWriter.leaseDetails(leaseId1) shouldBe None
+
+            // hardened block rollback
+            val beforeInvoke2 = d.lastBlockId
+            val invokeId2 = append(d.lastBlockId, leaseFc)
+            val leaseId2 = Lease.calculateId(Lease(invoker.toAddress.toRide, leaseAmount, 0), invokeId2)
+
+            d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance(in = leaseAmount, out = 0)
+            d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance(in = 0, out = leaseAmount)
+            d.blockchain.leaseDetails(leaseId2) shouldBe leaseDetails(d.blockchain.height)
+            d.levelDBWriter.leaseDetails(leaseId2) shouldBe None
+            d.appendBlock()
+            d.levelDBWriter.leaseDetails(leaseId2) shouldBe leaseDetails(d.blockchain.height - 1)
+
+            d.appendBlock()
+            d.blockchain.removeAfter(beforeInvoke2).explicitGet()
+
+            d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance.empty
+            d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance.empty
+            d.blockchain.leaseDetails(leaseId2) shouldBe None
+            d.levelDBWriter.leaseDetails(leaseId2) shouldBe None
           }
       }
     }
@@ -818,12 +885,12 @@ object RollbackSpec {
   private val issueReissueBurnScript = {
     import com.wavesplatform.lang.directives.values.{DApp => DAppType}
 
-    val stdLibVersion = V4
+    val stdLibVersion = V5
 
     val expr = {
       val script =
         s"""
-           |{-# STDLIB_VERSION 4 #-}
+           |{-# STDLIB_VERSION ${stdLibVersion.id} #-}
            |{-# CONTENT_TYPE DAPP #-}
            |{-#SCRIPT_TYPE ACCOUNT#-}
            |
@@ -842,6 +909,11 @@ object RollbackSpec {
            |@Callable(i)
            |func sponsor(assetId: ByteVector, minSponsoredAssetFee: Int) =
            |  [SponsorFee(assetId, minSponsoredAssetFee)]
+           |
+           |@Callable(i)
+           |func lease(address: ByteVector, amount: Int) =
+           |  [Lease(Address(address), amount)]
+           |
            |""".stripMargin
 
       Parser.parseContract(script).get.value
@@ -859,6 +931,6 @@ object RollbackSpec {
           )
         )
     }
-    ContractScript(V4, compiler.ContractCompiler(ctx.compilerContext, expr, stdLibVersion).explicitGet()).explicitGet()
+    ContractScript(stdLibVersion, compiler.ContractCompiler(ctx.compilerContext, expr, stdLibVersion).explicitGet()).explicitGet()
   }
 }

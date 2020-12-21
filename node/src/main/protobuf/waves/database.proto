@@ -4,6 +4,7 @@ option java_package = "com.wavesplatform.database.protobuf";
 
 import "waves/block.proto";
 import "waves/transaction.proto";
+import "waves/recipient.proto";
 
 message AssetDetails {
     bytes name = 1;
@@ -66,4 +67,12 @@ message DataEntry {
         bytes binary_value = 3;
         string string_value = 4;
     }
+}
+
+message LeaseDetails {
+    bytes sender_public_key = 1;
+    Recipient recipient = 2;
+    int32 height = 3;
+    int64 amount = 4;
+    bool is_active = 5;
 }
