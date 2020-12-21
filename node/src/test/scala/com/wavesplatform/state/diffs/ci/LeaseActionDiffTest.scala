@@ -151,6 +151,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
       useLeaseCancelDApp: Boolean = false,
       leaseCancelCount: Int = 1,
       cancelLeaseActionByTx: Boolean = false,
+      cancelLeaseFromInvoker: Boolean = false,
       customRecipient: Option[Recipient] = None,
       customAmount: Option[Long] = None,
       customSetScriptFee: Option[Long] = None,
@@ -197,11 +198,14 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           i => LeaseTransaction.selfSigned(2.toByte, dAppAcc, invoker.toAddress, leaseTxAmount1, fee, ts + i)
         )
         leaseToDApp <- LeaseTransaction.selfSigned(2.toByte, invoker, dAppAcc.toAddress, leaseTxAmount2, fee, ts + 100)
-        leaseCancelId = if (cancelLeaseActionByTx) Lease.calculateId(Lease(recipient, leaseAmount, 0), invoke.id.value())
+        calculatedId = Lease.calculateId(Lease(recipient, leaseAmount, 0), invoke.id.value())
+        leaseCancelId = if (cancelLeaseActionByTx) calculatedId
+        else if (cancelLeaseFromInvoker) leaseToDApp.id.value()
         else leasesFromDApp.head.id.value()
-        leaseCancel <- LeaseCancelTransaction.signed(2.toByte, dAppAcc.publicKey, leaseCancelId, fee, ts + 100, dAppAcc.privateKey)
-        dApp = if (useLeaseCancelDApp) multipleLeaseCancelsDApp(leasesFromDApp.map(_.id.value()))
-        else customDApp.getOrElse(singleLeaseDApp(recipient, leaseAmount))
+        leaseCancelAcc = if (cancelLeaseFromInvoker) invoker else dAppAcc
+        leaseCancel <- LeaseCancelTransaction.signed(2.toByte, leaseCancelAcc.publicKey, leaseCancelId, fee, ts + 100, leaseCancelAcc.privateKey)
+        multipleCancelDApp = multipleLeaseCancelsDApp(leasesFromDApp.map(_.id.value()))
+        dApp               = if (useLeaseCancelDApp) multipleCancelDApp else customDApp.getOrElse(singleLeaseDApp(recipient, leaseAmount))
         setDApp <- SetScriptTransaction.selfSigned(1.toByte, dAppAcc, Some(dApp), setScriptFee, ts + 100)
         preparingTxs = List(genesis, genesis2) ::: aliasTxs ::: List(setDApp)
         leaseTxs     = leasesFromDApp :+ leaseToDApp
@@ -288,7 +292,47 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
     }
   }
 
-  property(s"Lease action with active lease from invoke-recipient") {
+  property(s"Lease action with active lease from dApp and cancelled lease from invoker-recipient") {
+    forAll(leasePreconditions(cancelLeaseFromInvoker = true)) {
+      case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, leaseTxFromDApp :: leaseTxToDApp :: Nil, leaseTxToDAppCancel) =>
+        withDomain(domainSettingsWithFS(v5Features)) { d =>
+          val invokerSpentFee =
+            (preparingTxs ++ Seq(leaseTxToDApp, leaseTxToDAppCancel))
+              .collect { case a: Authorized if a.sender.toAddress == invoker => a.assetFee._2}
+              .sum
+          val dAppSpentFee = (preparingTxs :+ leaseTxFromDApp).collect { case a: Authorized if a.sender.toAddress == dAppAcc => a.assetFee._2 }.sum
+
+          d.appendBlock(preparingTxs: _*)
+          d.appendBlock(leaseTxFromDApp, leaseTxToDApp, leaseTxToDAppCancel)
+
+          d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee + leaseTxFromDApp.amount
+          d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee - leaseTxFromDApp.amount
+
+          d.appendBlock(invoke)
+          val totalLeaseAmount = leaseAmount + leaseTxFromDApp.amount
+
+          val invokerPortfolio = d.blockchain.wavesPortfolio(invoker)
+          invokerPortfolio.lease shouldBe LeaseBalance(totalLeaseAmount, out = 0)
+          invokerPortfolio.balance shouldBe ENOUGH_AMT - invokerSpentFee - invoke.fee
+          invokerPortfolio.spendableBalance shouldBe ENOUGH_AMT - invokerSpentFee - invoke.fee
+          invokerPortfolio.effectiveBalance shouldBe ENOUGH_AMT - invokerSpentFee - invoke.fee + totalLeaseAmount
+
+          val dAppPortfolio = d.blockchain.wavesPortfolio(dAppAcc)
+          dAppPortfolio.lease shouldBe LeaseBalance(in = 0, totalLeaseAmount)
+          dAppPortfolio.balance shouldBe ENOUGH_AMT - dAppSpentFee
+          dAppPortfolio.spendableBalance shouldBe ENOUGH_AMT - dAppSpentFee - totalLeaseAmount
+          dAppPortfolio.effectiveBalance shouldBe ENOUGH_AMT - dAppSpentFee - totalLeaseAmount
+
+          d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee + leaseTxToDApp.fee + leaseTxToDAppCancel.fee
+          d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee - totalLeaseAmount
+          d.appendBlock()
+          d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee + leaseTxToDApp.fee + leaseTxToDAppCancel.fee
+          d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee - totalLeaseAmount
+        }
+    }
+  }
+
+  property(s"Lease action with active lease from invoker-recipient") {
     forAll(leasePreconditions()) {
       case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, _ :: leaseTxToDApp :: Nil, _) =>
         withDomain(domainSettingsWithFS(v5Features)) { d =>
@@ -325,7 +369,47 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
     }
   }
 
-  property(s"Lease action with active lease from both dApp and invoke-recipient") {
+  property(s"Lease action with active lease from invoker-recipient and cancelled lease from dApp") {
+    forAll(leasePreconditions()) {
+      case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, leaseTxFromDApp :: leaseTxToDApp :: Nil, leaseTxFromDAppCancel) =>
+        withDomain(domainSettingsWithFS(v5Features)) { d =>
+          val invokerSpentFee = (preparingTxs :+ leaseTxToDApp).collect { case a: Authorized if a.sender.toAddress == invoker => a.assetFee._2 }.sum
+          val dAppSpentFee =
+            (preparingTxs ++ Seq(leaseTxFromDApp, leaseTxFromDAppCancel))
+              .collect { case a: Authorized if a.sender.toAddress == dAppAcc => a.assetFee._2}
+              .sum
+
+          d.appendBlock(preparingTxs: _*)
+          d.appendBlock(leaseTxToDApp, leaseTxFromDApp, leaseTxFromDAppCancel)
+
+          d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee - leaseTxToDApp.amount
+          d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee + leaseTxToDApp.amount
+
+          d.appendBlock(invoke)
+          val leaseAmountDiff = leaseAmount - leaseTxToDApp.amount
+
+          val invokerPortfolio = d.blockchain.wavesPortfolio(invoker)
+          invokerPortfolio.lease shouldBe LeaseBalance(in = leaseAmount, out = leaseTxToDApp.amount)
+          invokerPortfolio.balance shouldBe ENOUGH_AMT - invokerSpentFee - invoke.fee
+          invokerPortfolio.spendableBalance shouldBe ENOUGH_AMT - invokerSpentFee - invoke.fee - leaseTxToDApp.amount
+          invokerPortfolio.effectiveBalance shouldBe ENOUGH_AMT - invokerSpentFee - invoke.fee + leaseAmountDiff
+
+          val dAppPortfolio = d.blockchain.wavesPortfolio(dAppAcc)
+          dAppPortfolio.lease shouldBe LeaseBalance(in = leaseTxToDApp.amount, out = leaseAmount)
+          dAppPortfolio.balance shouldBe ENOUGH_AMT - dAppSpentFee
+          dAppPortfolio.spendableBalance shouldBe ENOUGH_AMT - dAppSpentFee - leaseAmount
+          dAppPortfolio.effectiveBalance shouldBe ENOUGH_AMT - dAppSpentFee - leaseAmountDiff
+
+          d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee - leaseTxToDApp.amount
+          d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee - leaseAmountDiff.max(-leaseTxFromDApp.fee - leaseTxFromDAppCancel.fee)
+          d.appendBlock()
+          d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee - leaseTxToDApp.amount
+          d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee - leaseAmountDiff.max(-leaseTxFromDApp.fee - leaseTxFromDAppCancel.fee)
+        }
+    }
+  }
+
+  property(s"Lease action with active lease from both dApp and invoker-recipient") {
     forAll(leasePreconditions()) {
       case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, leaseTxFromDApp :: leaseTxToDApp :: Nil, _) =>
         withDomain(domainSettingsWithFS(v5Features)) { d =>
