@@ -552,7 +552,7 @@ class DebugApiRouteSpec
           .returns(
             Some(
               AccountScriptInfo(
-                TxHelpers.defaultSigner.publicKey,
+                dAppPk,
                 dAppScript,
                 0L,
                 Map(3 -> Seq("test").map(_ -> 0L).toMap)
