@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats.implicits._
-import com.wavesplatform.account.{Address, AddressOrAlias}
+import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.ComplexityCheckPolicyProvider._
@@ -145,16 +145,17 @@ object DiffsCommon {
   def processLease(
       blockchain: Blockchain,
       amount: Long,
-      sender: Address,
+      sender: PublicKey,
       recipient: AddressOrAlias,
       fee: Long,
       leaseId: ByteStr,
-      actionInfo: Option[LeaseActionInfo]
-  ): Either[ValidationError, Diff] =
+      invokeId: Option[ByteStr]
+  ): Either[ValidationError, Diff] = {
+    val senderAddress = sender.toAddress
     for {
       recipientAddress <- blockchain.resolveAlias(recipient)
       _ <- Either.cond(
-        recipientAddress != sender,
+        recipientAddress != senderAddress,
         (),
         GenericError("Cannot lease to self")
       )
@@ -163,24 +164,33 @@ object DiffsCommon {
         (),
         GenericError(s"Lease with id=$leaseId is already in the state")
       )
-      leaseBalance  = blockchain.leaseBalance(sender)
-      senderBalance = blockchain.balance(sender, Waves)
+      leaseBalance  = blockchain.leaseBalance(senderAddress)
+      senderBalance = blockchain.balance(senderAddress, Waves)
       _ <- Either.cond(
         senderBalance - leaseBalance.out >= amount,
         (),
         GenericError(s"Cannot lease more than own: Balance:$senderBalance, already leased: ${leaseBalance.out}")
       )
       portfolioDiff = Map(
-        sender           -> Portfolio(-fee, LeaseBalance(0, amount)),
+        senderAddress    -> Portfolio(-fee, LeaseBalance(0, amount)),
         recipientAddress -> Portfolio(0, LeaseBalance(amount, 0))
       )
+      actionInfo = invokeId.map(LeaseActionInfo(_, sender, recipient, amount))
     } yield Diff.stateOps(
       portfolios = portfolioDiff,
       leaseState = Map((leaseId, (true, actionInfo)))
     )
+  }
 
-  def processLeaseCancel(blockchain: Blockchain, sender: Address, fee: Long, time: Long, leaseId: ByteStr): Either[ValidationError, Diff] = {
-    val allowedTs = blockchain.settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp
+  def processLeaseCancel(
+      blockchain: Blockchain,
+      sender: PublicKey,
+      fee: Long,
+      time: Long,
+      leaseId: ByteStr,
+      invokeId: Option[ByteStr]
+  ): Either[ValidationError, Diff] = {
+    val allowedTs     = blockchain.settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp
     for {
       lease     <- blockchain.leaseDetails(leaseId).toRight(GenericError(s"Lease with id=$leaseId not found"))
       recipient <- blockchain.resolveAlias(lease.recipient)
@@ -190,18 +200,19 @@ object DiffsCommon {
         GenericError(s"Cannot cancel already cancelled lease")
       )
       _ <- Either.cond(
-        sender == lease.sender.toAddress || time < allowedTs,
+        sender == lease.sender || time < allowedTs,
         (),
         GenericError(
           s"LeaseTransaction was leased by other sender and " +
             s"time=$time > allowMultipleLeaseCancelTransactionUntilTimestamp=$allowedTs"
         )
       )
-      senderPortfolio    = Map(sender    -> Portfolio(-fee, LeaseBalance(0, -lease.amount)))
+      senderPortfolio    = Map(sender.toAddress -> Portfolio(-fee, LeaseBalance(0, -lease.amount)))
       recipientPortfolio = Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0)))
+      actionInfo         = invokeId.map(LeaseActionInfo(_, sender, lease.recipient, lease.amount))
     } yield Diff.stateOps(
       portfolios = senderPortfolio |+| recipientPortfolio,
-      leaseState = Map((leaseId, (false, None)))
+      leaseState = Map((leaseId, (false, actionInfo)))
     )
   }
 }

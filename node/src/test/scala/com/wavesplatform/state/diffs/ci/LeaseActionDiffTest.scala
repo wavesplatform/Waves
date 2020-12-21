@@ -104,6 +104,19 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
        """.stripMargin
     )
 
+  private def differentLeaseAfterLeaseCancelDApp(recipient: Recipient, amount: Long): Script =
+    dApp(
+      s"""
+         | let lease = Lease(${recipientStr(recipient)}, $amount)
+         | let id    = calculateLeaseId(lease)
+         | [
+         |   lease,
+         |   LeaseCancel(id),
+         |   Lease(${recipientStr(recipient)}, $amount, 1)
+         | ]
+       """.stripMargin
+    )
+
   private def duplicatedLeaseCancelDApp(recipient: Recipient, amount: Long): Script =
     dApp(
       s"""
@@ -754,6 +767,22 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
     val recipient = accountGen.sample.get.toAddress
     val amount    = positiveLongGen.sample.get
     forAll(leasePreconditions(customDApp = Some(leaseAfterLeaseCancelDApp(recipient.toRide, amount)))) {
+      case (preparingTxs, invoke, _, _, _, _, _) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(preparingTxs)),
+          TestBlock.create(Seq(invoke)),
+          v5Features
+        ) {
+          case (diff, _) =>
+            diff.errorMessage(invoke.id.value()).get.text should include("is already in the state")
+        }
+    }
+  }
+
+  property(s"LeaseCancel action between two Lease actions with different nonces") {
+    val recipient = accountGen.sample.get.toAddress
+    val amount    = positiveLongGen.sample.get
+    forAll(leasePreconditions(customDApp = Some(differentLeaseAfterLeaseCancelDApp(recipient.toRide, amount)))) {
       case (preparingTxs, invoke, _, dAppAcc, invoker, _, _) =>
         assertDiffAndState(
           Seq(TestBlock.create(preparingTxs)),
@@ -763,7 +792,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           case (diff, _) =>
             diff.errorMessage(invoke.id.value()) shouldBe empty
             diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee)
-            diff.portfolios(dAppAcc) shouldBe Portfolio(0, LeaseBalance(in = 0, out = amount))
+            diff.portfolios(dAppAcc) shouldBe Portfolio(lease = LeaseBalance(in = 0, out = amount))
             diff.portfolios(recipient) shouldBe Portfolio(lease = LeaseBalance(in = amount, 0))
         }
     }

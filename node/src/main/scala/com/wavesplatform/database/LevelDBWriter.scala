@@ -671,10 +671,15 @@ abstract class LevelDBWriter private[database] (
             }
           }
 
-          writableDB.withResource(loadLeaseIds(_, currentHeight, currentHeight))
+          writableDB
+            .withResource(loadLeaseIds(_, currentHeight, currentHeight, includeCancelled = true))
             .foreach { leaseId =>
               rollbackLeaseStatus(rw, leaseId, currentHeight)
-              rw.delete(Keys.leaseActionDetails(leaseId))
+              val key = Keys.leaseActionDetails(leaseId)
+              rw.get(key).foreach {
+                case lease if lease.isActive => rw.delete(key)
+                case lease                   => rw.put(key, Some(lease.copy(isActive = true)))
+              }
             }
 
           rollbackAssetsInfo(rw, currentHeight)

@@ -621,7 +621,7 @@ package object database extends ScorexLogging {
 
   def loadActiveLeases(db: DB, fromHeight: Int, toHeight: Int): Seq[LeaseTransaction] = db.withResource { r =>
     (for {
-      id          <- loadLeaseIds(r, fromHeight, toHeight)
+      id          <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
       leaseStatus <- fromHistory(r, Keys.leaseStatusHistory(id), Keys.leaseStatus(id))
       if leaseStatus
       pb.TransactionMeta(h, n, _, _) <- r.get(Keys.transactionMetaById(TransactionId(id)))
@@ -631,7 +631,7 @@ package object database extends ScorexLogging {
     }.toSeq
   }
 
-  def loadLeaseIds(resource: DBResource, fromHeight: Int, toHeight: Int): Set[ByteStr] = {
+  def loadLeaseIds(resource: DBResource, fromHeight: Int, toHeight: Int, includeCancelled: Boolean): Set[ByteStr] = {
     val leaseIds = mutable.Set.empty[ByteStr]
     val iterator = resource.iterator
 
@@ -645,7 +645,10 @@ package object database extends ScorexLogging {
     while (iterator.hasNext && keyInRange()) {
       val e       = iterator.next()
       val leaseId = ByteStr(e.getKey.drop(6))
-      if (Option(e.getValue).exists(_(0) == 1)) leaseIds += leaseId else leaseIds -= leaseId
+      if (includeCancelled || Option(e.getValue).exists(_(0) == 1))
+        leaseIds += leaseId
+      else
+        leaseIds -= leaseId
     }
 
     leaseIds.toSet
