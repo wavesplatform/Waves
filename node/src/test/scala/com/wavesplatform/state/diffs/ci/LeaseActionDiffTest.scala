@@ -20,6 +20,7 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.{Authorized, GenesisTransaction, Transaction}
 import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
 import org.scalacheck.Gen
+import org.scalatest.exceptions.TestFailedException
 import org.scalatest.{EitherValues, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -289,6 +290,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee
           d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee - totalLeaseAmount
         }
+      case a => throw new TestFailedException(s"Unexpected preconditions $a", 0)
     }
   }
 
@@ -329,6 +331,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee + leaseTxToDApp.fee + leaseTxToDAppCancel.fee
           d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee - totalLeaseAmount
         }
+      case a => throw new TestFailedException(s"Unexpected preconditions $a", 0)
     }
   }
 
@@ -366,6 +369,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee - leaseTxToDApp.amount
           d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee - leaseAmountDiff.max(0)
         }
+      case a => throw new TestFailedException(s"Unexpected preconditions $a", 0)
     }
   }
 
@@ -406,6 +410,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           d.blockchain.generatingBalance(invoker) shouldBe ENOUGH_AMT - invokerSpentFee - leaseTxToDApp.amount
           d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee - leaseAmountDiff.max(-leaseTxFromDApp.fee - leaseTxFromDAppCancel.fee)
         }
+      case a => throw new TestFailedException(s"Unexpected preconditions $a", 0)
     }
   }
 
@@ -447,6 +452,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
           )
           d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee + leaseTxFromDApp.fee.min(-leaseAmountDiff)
         }
+      case a => throw new TestFailedException(s"Unexpected preconditions $a", 0)
     }
   }
 
