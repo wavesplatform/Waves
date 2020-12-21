@@ -2184,13 +2184,13 @@ class InvokeScriptTransactionDiffTest
              |{-#SCRIPT_TYPE ACCOUNT#-}
              |
              | @Callable(i)
-             | func bar() = {
+             | func default() = {
              |   ([IntegerEntry("bar", 1)], "return")
              | }
              |
              | @Callable(i)
              | func foo() = {
-             |  let r = Invoke(this, "bar", [], [])
+             |  let r = Invoke(this, unit, [], [])
              |  if r == "return"
              |  then
              |   let data = getIntegerValue(this, "bar")

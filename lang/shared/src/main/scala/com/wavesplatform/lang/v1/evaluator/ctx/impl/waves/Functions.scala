@@ -478,29 +478,45 @@ object Functions {
       CALLDAPP,
       ANY,
       ("dapp", addressType),
-      ("name", STRING),
+      ("name", optionString),
       ("args", LIST(ANY)),
       ("payments", listPayment)
     ) {
       new ContextfulNativeFunction[Environment]("Invoke", ANY, Seq(("dapp", BYTESTR), ("name", STRING), ("args", LIST(ANY)), ("payments", listPayment))) {
-        override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
-          input match {
-            case (env, (dapp: CaseObj) :: CONST_STRING(name) :: ARR(args) :: ARR(payments) :: Nil) if dapp.caseType == addressType =>
-              val dappBytes = dapp.fields("bytes") match {
-                case CONST_BYTESTR(d) => d
-                case _ => ???
-              }
-              env
-                .callScript(Recipient.Address(dappBytes), name, args.toList, (payments.map {
-                  case (p: CaseObj) if p.caseType == paymentType => List("assetId", "amount").map(p.fields) match {
-                    case List(CONST_BYTESTR(a), CONST_LONG(v)) => (Some(a.arr), v)
-                    case List(CaseObj(UNIT, _), CONST_LONG(v)) => (None, v)
-                  }
+        override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] = {
+          for {
+            dappBytes <- input match {
+              case (env, (dapp: CaseObj) :: _) if dapp.caseType == addressType =>
+                dapp.fields("bytes") match {
+                  case CONST_BYTESTR(d) => d.pure[F]
                   case _ => ???
-                }))
-                .map(_.leftMap(_.toString))
-            case (_, xs) => notImplemented[F, EVALUATED](s"Invoke(dapp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
-          }
+                }
+              case (env, (dapp: CaseObj) :: _) if dapp.caseType == aliasType =>
+                dapp.fields("alias") match {
+                  case CONST_STRING(a) => env.resolveAlias(a).map(_.explicitGet().bytes)
+                }
+              case _ => ???
+            }
+            name = input match {
+              case (_, _ :: CONST_STRING(name) :: _) => name
+              case (_, _ :: CaseObj(UNIT, _) :: _) => "default"
+              case _ => ???
+            }
+            result <- input match {
+              case (env,  _ :: _ :: ARR(args) :: ARR(payments) :: Nil) =>
+                env
+                  .callScript(Recipient.Address(dappBytes), name, args.toList, (payments.map {
+                    case (p: CaseObj) if p.caseType == paymentType => List("assetId", "amount").map(p.fields) match {
+                      case List(CONST_BYTESTR(a), CONST_LONG(v)) => (Some(a.arr), v)
+                      case List(CaseObj(UNIT, _), CONST_LONG(v)) => (None, v)
+                    }
+                    case _ => ???
+                  }))
+                  .map(_.leftMap(_.toString))
+              case (_, xs) => notImplemented[F, EVALUATED](s"Invoke(dapp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
+            }
+          } yield result
+        }
       }
     }
 
