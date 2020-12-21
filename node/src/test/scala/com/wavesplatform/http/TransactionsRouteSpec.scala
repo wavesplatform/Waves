@@ -1,7 +1,7 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model._
-import com.wavesplatform.account.{Address, AddressScheme, KeyPair, PublicKey}
+import com.wavesplatform.account.{AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.api.http.ApiError._
