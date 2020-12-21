@@ -2251,8 +2251,12 @@ class InvokeScriptTransactionDiffTest
              |
              | @Callable(i)
              | func bar(a: ByteVector) = {
-             |   let n = Issue("barAsset", "bar asset", 1, 0, false, unit, 0) 
-             |   ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit), BinaryEntry("asset", n.calculateAssetId()), n, ScriptTransfer(Address(a), 1, n.calculateAssetId())], 17)
+             |   if i.caller.bytes == a && addressFromPublicKey(i.callerPublicKey).bytes == a
+             |   then
+             |     let n = Issue("barAsset", "bar asset", 1, 0, false, unit, 0) 
+             |     ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit), BinaryEntry("asset", n.calculateAssetId()), n, ScriptTransfer(Address(a), 1, n.calculateAssetId())], 17)
+             |   else
+             |     throw("Bad caller")
              | }
              |""".stripMargin
         Parser.parseContract(script).get.value

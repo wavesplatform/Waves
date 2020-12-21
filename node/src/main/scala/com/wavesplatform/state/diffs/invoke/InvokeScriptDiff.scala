@@ -65,7 +65,7 @@ object InvokeScriptDiff {
                 val invocation = ContractEvaluator.Invocation(
                   functionCall,
                   Recipient.Address(ByteStr(invoker.bytes)),
-                  ByteStr(tx.senderDApp.bytes),
+                  ByteStr(tx.sender.arr),
                   payments,
                   tx.root.id(),
                   tx.root.fee,
@@ -82,6 +82,7 @@ object InvokeScriptDiff {
                   directives,
                   tx.root,
                   tx.dAppAddress,
+                  pk,
                   tx.senderDApp,
                   runsLimit-1,
                   invokeDeep-1

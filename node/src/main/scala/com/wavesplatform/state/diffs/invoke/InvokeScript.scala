@@ -14,10 +14,12 @@ trait InvokeScriptLike {
     def enableEmptyKeys: Boolean = root.isProtobufVersion
     def checkedAssets: Seq[IssuedAsset] = payments collect { case Payment(_, assetId: IssuedAsset) => assetId }
     def senderAddress: Address
+    def sender: PublicKey
 }
 
 case class InvokeScript(
      senderDApp: Address,
+     sender: PublicKey,
      dAppAddress: Address,
      funcCall: FUNCTION_CALL,
      payments: Seq[Payment],

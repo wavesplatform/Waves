@@ -202,6 +202,7 @@ class DAppEnvironment(
     ds: DirectiveSet,
     tx: InvokeScriptTransaction,
     currentDApp: com.wavesplatform.account.Address,
+    currentDAppPk: com.wavesplatform.account.PublicKey,
     senderDApp: com.wavesplatform.account.Address,
     var runsLimit: Int,
     invokeDeep: Int
@@ -213,7 +214,7 @@ class DAppEnvironment(
 
   override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)]): Either[ValidationError, EVALUATED] = {
     com.wavesplatform.account.Address.fromBytes(dApp.bytes.arr).flatMap { dApp =>
-      val inv: InvokeScript = InvokeScript(currentDApp, dApp, FUNCTION_CALL(User(func, func), args), payments.map(p => Payment(p._2, p._1.fold(Waves:Asset)(a => IssuedAsset(ByteStr(a))))), tx.root)
+      val inv: InvokeScript = InvokeScript(currentDApp, currentDAppPk, dApp, FUNCTION_CALL(User(func, func), args), payments.map(p => Payment(p._2, p._1.fold(Waves:Asset)(a => IssuedAsset(ByteStr(a))))), tx.root)
       InvokeScriptDiff(currentBlockchain(), blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp+1, false, runsLimit, invokeDeep)(inv).resultE.map {
         case (diff, res) =>
           currentDiff = currentDiff combine diff
