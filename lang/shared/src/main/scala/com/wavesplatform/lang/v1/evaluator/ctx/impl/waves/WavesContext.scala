@@ -96,7 +96,7 @@ object WavesContext {
       version match {
         case V1 | V2 => Array(txByIdF(proofsEnabled, version)) ++ balanceV123Functions
         case V3      => fromV3Funcs(proofsEnabled, version) ++ balanceV123Functions
-        case V4      => fromV4Funcs(proofsEnabled, version) ++ balanceV4Functions
+        case V4 | V5 => fromV4Funcs(proofsEnabled, version) ++ balanceV4Functions
      }
     commonFuncs ++ versionSpecificFuncs
   }
@@ -111,7 +111,7 @@ object WavesContext {
     version match {
       case V1 => Map(txVal)
       case V2 => Map(sell, buy, txVal)
-      case V3 | V4 =>
+      case V3 | V4 | V5 =>
         val `this` = if (isTokenContext) assetThis(version) else accountThis
         val txO    = if (contentType == Expression) Map(txVal) else Map()
         val common = Map(sell, buy, lastBlock(version), `this`)
