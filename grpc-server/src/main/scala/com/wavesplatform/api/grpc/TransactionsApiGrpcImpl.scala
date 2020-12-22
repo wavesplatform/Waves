@@ -3,6 +3,8 @@ package com.wavesplatform.api.grpc
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
+import com.wavesplatform.api.grpc.TransactionsApiGrpcImpl.toGrpc
+import com.wavesplatform.api.grpc.{ApplicationStatus => GrpcApplicationStatus}
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBRecipientImplicitConversionOps
@@ -96,12 +98,7 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
           .map(_ => TransactionStatus(txId, TransactionStatus.Status.UNCONFIRMED))
           .orElse {
             commonApi.transactionById(txId.toByteStr).map { m =>
-              val status = m.succeeded match {
-                case ApplicationStatus.Succeeded => ApplicationStatus.SUCCEEDED
-                case ApplicationStatus.ScriptExecutionFailed => ApplicationStatus.SCRIPT_EXECUTION_FAILED
-                case ApplicationStatus.ScriptExecutionInProgress => ApplicationStatus.SCRIPT_EXECUTION_IN_PROGRESS
-              }
-              TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, m.height, status)
+              TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, m.height, toGrpc(m.succeeded))
             }
           }
           .getOrElse(TransactionStatus(txId, TransactionStatus.Status.NOT_EXISTS))
@@ -126,7 +123,7 @@ private object TransactionsApiGrpcImpl {
   def toTransactionResponse(meta: TransactionMeta): TransactionResponse = {
     val TransactionMeta(height, tx, succeeded) = meta
     val transactionId                          = tx.id().toByteString
-    val status                                 = if (succeeded) ApplicationStatus.SUCCEEDED else ApplicationStatus.SCRIPT_EXECUTION_FAILED
+    val status                                 = toGrpc(succeeded)
     val invokeScriptResult = meta match {
       case TransactionMeta.Invoke(_, _, _, r) => r.map(VISR.toPB)
       case _                                  => None
@@ -134,4 +131,11 @@ private object TransactionsApiGrpcImpl {
 
     TransactionResponse(transactionId, height, Some(tx.toPB), status, invokeScriptResult)
   }
+
+  def toGrpc(status: ApplicationStatus): GrpcApplicationStatus =
+    status match {
+      case ApplicationStatus.Succeeded                 => GrpcApplicationStatus.SUCCEEDED
+      case ApplicationStatus.ScriptExecutionFailed     => GrpcApplicationStatus.SCRIPT_EXECUTION_FAILED
+      case ApplicationStatus.ScriptExecutionInProgress => GrpcApplicationStatus.SCRIPT_EXECUTION_IN_PROGRESS
+    }
 }
