@@ -286,11 +286,11 @@ object InvokeDiffsCommon {
       failed: Boolean
   ): Diff = {
     val dAppAddress                      = blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
-    val diffWithState                    = diff.addContinuationState(dAppAddress, tx.nonce, ContinuationState.Finished)
+    val diffWithState                    = diff.addContinuationState(dAppAddress, ContinuationState.Finished)
     val StepInfo(_, stepFee, scriptsRun) = stepInfo(diffWithState, blockchain, invoke)
     val status                           = if (failed) ScriptExecutionFailed else Succeeded
     diffWithState |+| Diff.empty.copy(
-      portfolios = unusedFeePortfolios(invoke, blockchain, stepFee),
+      portfolios = unusedFeePortfolios(dAppAddress, invoke, blockchain, stepFee),
       scriptsRun = scriptsRun,
       scriptsComplexity = spentComplexity,
       replacingTransactions = Seq(
@@ -306,8 +306,11 @@ object InvokeDiffsCommon {
       invoke: InvokeScriptTransaction
   ): StepInfo = {
     val dAppAddress = blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
-    val isFirstStep = diff.continuationStates.get(dAppAddress).exists(_._1 == 0)
-    val isLastStep  = diff.continuationStates.get(dAppAddress).exists(_._2 == ContinuationState.Finished)
+    val isFirstStep = diff.continuationStates.get(dAppAddress).exists {
+      case s: ContinuationState.InProgress if s.precedingStepCount == 0 => true
+      case _                                                            => false
+    }
+    val isLastStep = diff.continuationStates.get(dAppAddress).contains(ContinuationState.Finished)
 
     val scriptResult = diff.scriptResults.getOrElse(invoke.id.value(), InvokeScriptResult())
     val assetActions =
@@ -330,13 +333,14 @@ object InvokeDiffsCommon {
   }
 
   def unusedFeePortfolios(
+      dAppAddress: Address,
       invoke: InvokeScriptTransaction,
       blockchain: Blockchain,
       lastStepFee: Long
   ): Map[Address, Portfolio] = {
-    val stepCount   = blockchain.continuationTransactionIds(invoke.id.value()).length
-    val consumedFee = (stepCount + 1) * expectedStepFeeInAttachedAsset(invoke, blockchain) + lastStepFee
-    val unusedFee   = invoke.fee - consumedFee
+    val precedingStepCount = blockchain.continuationStates(dAppAddress).asInstanceOf[ContinuationState.InProgress].precedingStepCount
+    val consumedFee        = (precedingStepCount + 1) * expectedStepFeeInAttachedAsset(invoke, blockchain) + lastStepFee
+    val unusedFee          = invoke.fee - consumedFee
     invoke.assetFee._1 match {
       case Waves =>
         Map(invoke.sender.toAddress -> Portfolio(unusedFee))

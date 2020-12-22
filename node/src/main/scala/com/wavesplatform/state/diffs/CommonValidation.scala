@@ -270,7 +270,7 @@ object CommonValidation {
       case authorized: AuthorizedTransaction =>
         blockchain.continuationStates
           .exists {
-            case (dAppAddress, (_, _: ContinuationState.InProgress)) =>
+            case (dAppAddress, (_: ContinuationState.InProgress)) =>
                 authorized match {
                   case a if a.sender.toAddress == dAppAddress =>
                     true

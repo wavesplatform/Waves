@@ -421,10 +421,7 @@ class UtxPoolImpl(
 
       def continuations(seed: PackResult): Iterable[ContinuationTransaction] =
         CompositeBlockchain(blockchain, Some(seed.totalDiff)).continuationStates
-          .collect {
-            case (_, (_, ContinuationState.InProgress(_, _, invokeId))) =>
-              generateContinuation(invokeId)
-          }
+          .collect { case (_, state: ContinuationState.InProgress) => generateContinuation(state.invokeScriptTransactionId) }
 
       @tailrec def generateContinuation(invokeId: ByteStr): ContinuationTransaction = {
         val c = ContinuationTransaction(invokeId, Random.nextInt(Int.MaxValue), 0L, Waves, time.correctedTime())

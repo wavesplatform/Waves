@@ -179,16 +179,16 @@ object InvokeScriptTransactionDiff {
               case ScriptResultV3(dataItems, transfers, _) => doProcessActions(dataItems ::: transfers)
               case ScriptResultV4(actions, _)              => doProcessActions(actions)
               case ir: IncompleteResult =>
-                val state = ContinuationState.InProgress(ir.expr, ir.unusedComplexity, tx.id.value())
-                val stateDiff = Diff.empty
+                val state = ContinuationState.InProgress(ir.expr, ir.unusedComplexity, tx.id.value(), 0)
+                val diffWithState = Diff.empty
                   .copy(
                     transactions = Map(tx.id.value() -> NewTransactionInfo(tx, Set(), ScriptExecutionInProgress)),
                     scriptsComplexity = fullLimit - ir.unusedComplexity
                   )
-                  .addContinuationState(dAppAddress, nonce = 0, state = state)
-                val StepInfo(_, _, scriptsRun) = InvokeDiffsCommon.stepInfo(stateDiff, blockchain, tx)
+                  .addContinuationState(dAppAddress, state)
+                val StepInfo(_, _, scriptsRun) = InvokeDiffsCommon.stepInfo(diffWithState, blockchain, tx)
                 val portfolios = Diff.stateOps(portfolios = totalFeePortfolio, scriptsRun = scriptsRun)
-                TracedResult.wrapValue(InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()) |+| stateDiff |+| portfolios)
+                TracedResult.wrapValue(InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()) |+| diffWithState |+| portfolios)
             }
           } yield resultDiff
         } yield result

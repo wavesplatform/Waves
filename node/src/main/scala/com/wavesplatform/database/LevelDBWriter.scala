@@ -281,8 +281,8 @@ abstract class LevelDBWriter private[database] (
     stateFeatures ++ settings.functionalitySettings.preActivatedFeatures
   }
 
-  override def loadContinuationStates(): mutable.Map[Address, (Int, ContinuationState)] = {
-    val states = mutable.Map[Address, (Int, ContinuationState)]()
+  override def loadContinuationStates(): mutable.Map[Address, ContinuationState] = {
+    val states = mutable.Map[Address, ContinuationState]()
     readOnly { db =>
       db.iterateOver(KeyTags.ContinuationHistory) { entry =>
         val dAppAddressId            = AddressId(Longs.fromByteArray(entry.getKey.takeRight(8)))
@@ -402,7 +402,7 @@ abstract class LevelDBWriter private[database] (
       scriptResults: Map[ByteStr, InvokeScriptResult],
       failedTransactionIds: Set[ByteStr],
       stateHash: StateHashBuilder.Result,
-      continuationStates: Map[AddressId, (Int, ContinuationState)],
+      continuationStates: Map[AddressId, ContinuationState],
       replacingTransactions: Seq[NewTransactionInfo]
   ): Unit = {
     log.trace(s"Persisting block ${block.id()} at height $height")
@@ -419,8 +419,8 @@ abstract class LevelDBWriter private[database] (
 
       def inProgress(i: InvokeScriptTransaction): Boolean =
         continuationStates.exists {
-          case (_, (_, s: ContinuationState.InProgress)) if s.invokeScriptTransactionId == i.id.value() => true
-          case _                                                                                        => false
+          case (_, s: ContinuationState.InProgress) if s.invokeScriptTransactionId == i.id.value() => true
+          case _                                                                                   => false
         }
 
       val newTransactions: Map[TransactionId, (Transaction, TxNum, Int, ApplicationStatus)] =
@@ -637,9 +637,9 @@ abstract class LevelDBWriter private[database] (
 
       continuationStates
         .foreach {
-          case (dAppAddressId, (nonce, state: ContinuationState.InProgress)) =>
+          case (dAppAddressId, state: ContinuationState.InProgress) =>
             val invokeId = TransactionId(state.invokeScriptTransactionId)
-            if (nonce == 0) {
+            if (state.precedingStepCount == 0) {
               val hKey = Keys.continuationHistory(dAppAddressId)
               expiredKeys ++= updateHistory[(Height, TransactionId)](
                 rw,
@@ -650,7 +650,7 @@ abstract class LevelDBWriter private[database] (
                 h => (Height(h), invokeId)
               )
             }
-            rw.put(Keys.continuationState(invokeId, Height(height)), Some((nonce, state)))
+            rw.put(Keys.continuationState(invokeId, Height(height)), Some(state))
           case _ =>
         }
 

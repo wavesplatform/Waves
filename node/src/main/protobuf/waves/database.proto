@@ -80,4 +80,5 @@ message ContinuationState {
     bytes expr = 1;
     int32 unused_complexity = 2;
     bytes invoke_script_transaction_id = 3;
+    int32 preceding_step_count = 4;
 }

@@ -259,26 +259,25 @@ package object database extends ScorexLogging {
     b.array()
   }
 
-  def readContinuationState(bytes: Array[Byte]): (Int, ContinuationState.InProgress) = {
-    val step = Ints.fromByteArray(bytes.take(4))
-    val pb.ContinuationState(exprBytes, unusedComplexity, invokeScriptTransactionId) =
-      pb.ContinuationState.parseFrom(bytes.drop(4))
-    val expr  = Serde.deserialize(exprBytes.asReadOnlyByteBuffer(), allowObjects = true).explicitGet()
-    val state = ContinuationState.InProgress(expr, unusedComplexity, invokeScriptTransactionId.toByteStr)
-    (step, state)
+  def readContinuationState(bytes: Array[Byte]): ContinuationState.InProgress = {
+    val state = pb.ContinuationState.parseFrom(bytes)
+    val expr  = Serde.deserialize(state.expr.asReadOnlyByteBuffer(), allowObjects = true).explicitGet()
+    ContinuationState.InProgress(
+      expr,
+      state.unusedComplexity,
+      state.invokeScriptTransactionId.toByteStr,
+      state.precedingStepCount
+    )
   }
 
-  def writeContinuationState(continuationState: (Int, ContinuationState.InProgress)): Array[Byte] = {
-    val stepBytes = Ints.toByteArray(continuationState._1)
-    val stateBytes = pb
-      .ContinuationState(
-        ByteString.copyFrom(Serde.serialize(continuationState._2.expr, allowObjects = true)),
-        continuationState._2.unusedComplexity,
-        ByteString.copyFrom(continuationState._2.invokeScriptTransactionId.arr)
+  def writeContinuationState(continuationState: ContinuationState.InProgress): Array[Byte] = {
+    pb.ContinuationState(
+        ByteString.copyFrom(Serde.serialize(continuationState.expr, allowObjects = true)),
+        continuationState.unusedComplexity,
+        ByteString.copyFrom(continuationState.invokeScriptTransactionId.arr),
+        continuationState.precedingStepCount
       )
       .toByteArray
-
-    stepBytes ++ stateBytes
   }
 
   def readContinuationHistory(bytes: Array[Byte]): Seq[(Height, TransactionId)] = {

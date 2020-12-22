@@ -146,8 +146,13 @@ case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: Ass
 
 sealed trait ContinuationState
 object ContinuationState {
-  case class InProgress(expr: EXPR, unusedComplexity: Int, invokeScriptTransactionId: ByteStr) extends ContinuationState
-  case object Finished                                                                         extends ContinuationState
+  case class InProgress(
+      expr: EXPR,
+      unusedComplexity: Int,
+      invokeScriptTransactionId: ByteStr,
+      precedingStepCount: Int
+  ) extends ContinuationState
+  case object Finished extends ContinuationState
 }
 
 case class Diff(
@@ -165,14 +170,14 @@ case class Diff(
     scriptsRun: Int,
     scriptsComplexity: Long,
     scriptResults: Map[ByteStr, InvokeScriptResult],
-    continuationStates: Map[Address, (Int, ContinuationState)],
+    continuationStates: Map[Address, ContinuationState],
     replacingTransactions: Seq[NewTransactionInfo]
 ) {
   def bindTransaction(tx: Transaction): Diff =
     copy(transactions = transactions.concat(Map(Diff.toDiffTxData(tx, portfolios, accountData))))
 
-  def addContinuationState(address: Address, nonce: Int, state: ContinuationState): Diff =
-    copy(continuationStates = continuationStates + ((address, (nonce, state))))
+  def addContinuationState(address: Address, state: ContinuationState): Diff =
+    copy(continuationStates = continuationStates + ((address, state)))
 }
 
 object Diff {
@@ -189,7 +194,7 @@ object Diff {
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
       scriptsRun: Int = 0,
-      continuationStates: Map[Address, (Int, ContinuationState)] = Map.empty,
+      continuationStates: Map[Address, ContinuationState] = Map.empty,
       replacingTransactions: Seq[NewTransactionInfo] = Seq()
   ): Diff =
     Diff(
@@ -226,7 +231,7 @@ object Diff {
       scriptsRun: Int = 0,
       scriptsComplexity: Long = 0,
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
-      continuationStates: Map[Address, (Int, ContinuationState)] = Map.empty
+      continuationStates: Map[Address, ContinuationState] = Map.empty
   ): Diff =
     Diff(
       // should be changed to VectorMap after 2.13 https://github.com/scala/scala/pull/6854

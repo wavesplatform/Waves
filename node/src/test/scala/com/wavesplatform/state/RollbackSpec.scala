@@ -940,9 +940,9 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           def continuation(i: InvokeScriptTransaction, step: Int): ContinuationTransaction =
             ContinuationTransaction(i.id.value(), step, fee = 0L, Waves, nextTs)
 
-          def assertStateInProgress(states: Iterable[(Address, (Int, ContinuationState))], step: Int): Unit =
+          def assertStateInProgress(states: Iterable[(Address, ContinuationState)], step: Int): Unit =
             inside(states.toList) {
-              case List((`dAppAcc`, (`step`, ContinuationState.InProgress(_, _, _)))) =>
+              case List((`dAppAcc`, s: ContinuationState.InProgress)) if s.precedingStepCount == step =>
             }
 
           def appendAndAssertChain(invoke: InvokeScriptTransaction): ((ByteStr, ByteStr, ByteStr), (Long, Long)) = {
@@ -975,10 +975,10 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             d.appendBlock(continuation(invoke, 2))
             d.balance(caller) shouldBe startCallerBalance - 3 * FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit - paymentAmount
             d.balance(dAppAcc) shouldBe startDAppBalance + paymentAmount
-            d.blockchainUpdater.continuationStates shouldBe Map((dAppAcc, (2, ContinuationState.Finished)))
+            d.blockchainUpdater.continuationStates shouldBe Map((dAppAcc, ContinuationState.Finished))
 
             d.appendBlock()
-            d.levelDBWriter.continuationStates shouldBe Map((dAppAcc, (2, ContinuationState.Finished)))
+            d.levelDBWriter.continuationStates shouldBe Map((dAppAcc, ContinuationState.Finished))
             d.levelDBWriter.loadContinuationStates() shouldBe Map()
 
             ((beforeInvoke, afterInvoke, afterFirstStep), (startCallerBalance, startDAppBalance))

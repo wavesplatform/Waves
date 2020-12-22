@@ -74,7 +74,7 @@ trait EmptyBlockchain extends Blockchain {
 
   override def leaseBalance(address: Address): LeaseBalance = LeaseBalance.empty
 
-  override def continuationStates: Map[Address, (Int, ContinuationState)] = Map()
+  override def continuationStates: Map[Address, ContinuationState] = Map()
 
   override def continuationTransactionIds(invokeId: ByteStr): Seq[ByteStr] = Seq()
 }
