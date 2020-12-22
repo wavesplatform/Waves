@@ -417,11 +417,11 @@ abstract class LevelDBWriter private[database] (
         rw.put(Keys.safeRollbackHeight, height - dbSettings.maxRollbackDepth)
       }
 
-      def inProgress(i: InvokeScriptTransaction): Boolean = {
-        val address = resolveAlias(i.dAppAddressOrAlias).explicitGet()
-        val id      = addressId(address).getOrElse(newAddresses(address))
-        continuationStates.get(id).exists(_._2.isInstanceOf[ContinuationState.InProgress])
-      }
+      def inProgress(i: InvokeScriptTransaction): Boolean =
+        continuationStates.exists {
+          case (_, (_, s: ContinuationState.InProgress)) if s.invokeScriptTransactionId == i.id.value() => true
+          case _                                                                                        => false
+        }
 
       val newTransactions: Map[TransactionId, (Transaction, TxNum, Int, ApplicationStatus)] =
         block.transactionData.zipWithIndex.map {
