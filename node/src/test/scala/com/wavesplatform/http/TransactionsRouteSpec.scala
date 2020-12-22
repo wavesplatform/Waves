@@ -263,7 +263,7 @@ class TransactionsRouteSpec
       (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
       (addressTransactions.transactionsByAddress _)
         .expects(account.toAddress, *, *, None)
-        .returning(Observable(TransactionMeta.Invoke(Height(1), transaction, succeeded = Succeeded, Some(InvokeScriptResult()))))
+        .returning(Observable(TransactionMeta.Invoke(Height(1), transaction, status = Succeeded, Some(InvokeScriptResult()))))
         .once()
 
       Get(routePath(s"/address/${account.toAddress}/limit/1")) ~> route ~> check {
@@ -321,7 +321,7 @@ class TransactionsRouteSpec
       (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
       (addressTransactions.transactionById _)
         .expects(transaction.id())
-        .returning(Some(TransactionMeta.Invoke(Height(1), transaction, succeeded = Succeeded, Some(InvokeScriptResult()))))
+        .returning(Some(TransactionMeta.Invoke(Height(1), transaction, status = Succeeded, Some(InvokeScriptResult()))))
         .once()
 
       Get(routePath(s"/info/${transaction.id()}")) ~> route ~> check {
@@ -337,7 +337,7 @@ class TransactionsRouteSpec
         tx =>
           (addressTransactions.transactionById _)
             .expects(tx.id())
-            .returns(Some(TransactionMeta.Invoke(Height(1), tx, succeeded = Succeeded, Some(InvokeScriptResult()))))
+            .returns(Some(TransactionMeta.Invoke(Height(1), tx, status = Succeeded, Some(InvokeScriptResult()))))
             .repeat(3)
       )
 

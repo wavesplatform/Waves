@@ -321,7 +321,7 @@ object TransactionsApiRoute {
 
       Seq(
         TransactionJsonSerializer.height(meta.height),
-        applicationStatus(meta.height, meta.succeeded),
+        applicationStatus(meta.height, meta.status),
         stateChanges,
         specificInfo
       ).reduce(_ ++ _)

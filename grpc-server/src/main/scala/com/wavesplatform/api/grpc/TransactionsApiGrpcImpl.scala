@@ -98,7 +98,7 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
           .map(_ => TransactionStatus(txId, TransactionStatus.Status.UNCONFIRMED))
           .orElse {
             commonApi.transactionById(txId.toByteStr).map { m =>
-              TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, m.height, toGrpc(m.succeeded))
+              TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, m.height, toGrpc(m.status))
             }
           }
           .getOrElse(TransactionStatus(txId, TransactionStatus.Status.NOT_EXISTS))
@@ -121,15 +121,15 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
 
 private object TransactionsApiGrpcImpl {
   def toTransactionResponse(meta: TransactionMeta): TransactionResponse = {
-    val TransactionMeta(height, tx, succeeded) = meta
+    val TransactionMeta(height, tx, status) = meta
     val transactionId                          = tx.id().toByteString
-    val status                                 = toGrpc(succeeded)
+    val grpcStatus                                 = toGrpc(status)
     val invokeScriptResult = meta match {
       case TransactionMeta.Invoke(_, _, _, r) => r.map(VISR.toPB)
       case _                                  => None
     }
 
-    TransactionResponse(transactionId, height, Some(tx.toPB), status, invokeScriptResult)
+    TransactionResponse(transactionId, height, Some(tx.toPB), grpcStatus, invokeScriptResult)
   }
 
   def toGrpc(status: ApplicationStatus): GrpcApplicationStatus =

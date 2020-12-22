@@ -71,7 +71,7 @@ class CustomJsonMarshallerSpec
   property("/transactions/info/{id}") {
     forAll(leaseGen) { lt =>
       val height: Height = Height(1)
-      (transactionsApi.transactionById _).expects(lt.id()).returning(Some(TransactionMeta.Default(height, lt, succeeded = Succeeded))).twice()
+      (transactionsApi.transactionById _).expects(lt.id()).returning(Some(TransactionMeta.Default(height, lt, status = Succeeded))).twice()
       (blockchain.leaseDetails _)
         .expects(lt.id())
         .returning(Some(LeaseDetails(lt.sender, lt.recipient, 1, lt.amount, true)))

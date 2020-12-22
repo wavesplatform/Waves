@@ -49,17 +49,17 @@ object CommonTransactionsApi {
   sealed trait TransactionMeta {
     def height: Height
     def transaction: Transaction
-    def succeeded: ApplicationStatus
+    def status: ApplicationStatus
   }
 
   object TransactionMeta {
-    final case class Default(height: Height, transaction: Transaction, succeeded: ApplicationStatus) extends TransactionMeta
+    final case class Default(height: Height, transaction: Transaction, status: ApplicationStatus) extends TransactionMeta
 
-    final case class Invoke(height: Height, transaction: InvokeScriptTransaction, succeeded: ApplicationStatus, invokeScriptResult: Option[InvokeScriptResult])
+    final case class Invoke(height: Height, transaction: InvokeScriptTransaction, status: ApplicationStatus, invokeScriptResult: Option[InvokeScriptResult])
         extends TransactionMeta
 
     def unapply(tm: TransactionMeta): Option[(Height, Transaction, ApplicationStatus)] =
-      Some((tm.height, tm.transaction, tm.succeeded))
+      Some((tm.height, tm.transaction, tm.status))
 
     def create(height: Height, transaction: Transaction, succeeded: ApplicationStatus)(
         result: InvokeScriptTransaction => Option[InvokeScriptResult]
