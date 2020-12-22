@@ -1126,7 +1126,7 @@ abstract class LevelDBWriter private[database] (
     txs.toList
   }
 
-  override def continuationTransactionIds(invokeId: ByteStr): Seq[ByteStr] =
+  def continuationTransactionIds(invokeId: ByteStr): Seq[ByteStr] =
     readOnly(
       db =>
         for {

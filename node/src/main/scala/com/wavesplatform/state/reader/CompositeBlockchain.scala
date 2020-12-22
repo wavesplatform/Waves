@@ -15,7 +15,6 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.smart.ContinuationTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{ApplicationStatus, Asset, Transaction}
 
@@ -160,11 +159,6 @@ final case class CompositeBlockchain(
 
   override def continuationStates: Map[Address, ContinuationState] =
     inner.continuationStates ++ diff.continuationStates
-
-  override def continuationTransactionIds(invokeId: ByteStr): Seq[ByteStr] = {
-    val diffIds = diff.replacingTransactions.collect { case NewTransactionInfo(c: ContinuationTransaction, _, _) => c.id.value() }
-    inner.continuationTransactionIds(invokeId) ++ diffIds
-  }
 }
 
 object CompositeBlockchain {

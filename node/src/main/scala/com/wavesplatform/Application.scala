@@ -317,7 +317,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
-        BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi, blockchainUpdater),
+        BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi, extensionContext.transactionsApi),
         TransactionsApiRoute(
           settings.restAPISettings,
           extensionContext.transactionsApi,

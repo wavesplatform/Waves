@@ -277,10 +277,10 @@ object TransactionsApiRoute {
     def height(height: Int): JsObject =
       Json.obj("height" -> height)
 
-    def continuationTransactionIds(tx: Transaction, blockchain: Blockchain): JsObject =
+    def continuationTransactionIds(tx: Transaction, commonApi: CommonTransactionsApi): JsObject =
       tx match {
         case i: InvokeScriptTransaction if i.version == TxVersion.V3 =>
-          Json.obj("continuationTransactionIds" -> blockchain.continuationTransactionIds(i.id.value()).map(_.toString))
+          Json.obj("continuationTransactionIds" -> commonApi.continuationTransactionIds(i.id.value()).map(_.toString))
         case _ =>
           Json.obj()
       }
@@ -309,7 +309,7 @@ object TransactionsApiRoute {
 
       Seq(
         TransactionJsonSerializer.height(meta.height),
-        TransactionJsonSerializer.continuationTransactionIds(meta.transaction, blockchain),
+        TransactionJsonSerializer.continuationTransactionIds(meta.transaction, commonApi),
         applicationStatus(meta.height, meta.status),
         stateChanges,
         specificInfo
