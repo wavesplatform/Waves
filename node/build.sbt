@@ -15,7 +15,6 @@ coverageExcludedPackages := ""
 
 inConfig(Compile)(
   Seq(
-    PB.protoSources in Compile := Seq(sourceDirectory.value / "protobuf"),
     PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
     PB.deleteTargetDirectory := false,
     packageDoc / publishArtifact := false,
@@ -64,7 +63,8 @@ bashScriptExtraDefines ++= Seq(
   s"""addJava "-Dwaves.defaults.blockchain.type=${network.value}"""",
   s"""addJava "-Dwaves.defaults.directory=/var/lib/${(Universal / normalizedName).value}"""",
   s"""addJava "-Dwaves.defaults.config.directory=/etc/${(Universal / normalizedName).value}""""
-);
+)
+
 inConfig(Universal)(
   Seq(
     mappings += (baseDirectory.value / s"waves-sample.conf" -> "doc/waves.conf.sample"),
@@ -83,21 +83,13 @@ inConfig(Universal)(
     javaOptions ++= Seq(
       // -J prefix is required by the bash script
       "-J-server",
-      // JVM memory tuning for 2g ram
-      "-J-Xms128m",
       "-J-Xmx2g",
       "-J-XX:+ExitOnOutOfMemoryError",
-      // from https://groups.google.com/d/msg/akka-user/9s4Yl7aEz3E/zfxmdc0cGQAJ
       "-J-XX:+UseG1GC",
-      "-J-XX:+UseNUMA",
-      "-J-XX:+AlwaysPreTouch",
-      // probably can't use these with jstack and others tools
-      "-J-XX:+PerfDisableSharedMem",
       "-J-XX:+ParallelRefProcEnabled",
       "-J-XX:+UseStringDeduplication",
       // JVM default charset for proper and deterministic getBytes behaviour
-      "-J-Dfile.encoding=UTF-8",
-      "-J-XX:+UseStringDeduplication"
+      "-J-Dfile.encoding=UTF-8"
     )
   )
 )

@@ -19,7 +19,7 @@ import scala.util.{Left, Right}
 
 package object appender extends ScorexLogging {
 
-  private val MaxTimeDrift: Long = 100 // millis
+  val MaxTimeDrift: Long = 100 // millis
 
   // Invalid blocks, that are already in blockchain
   private val exceptions = List(
@@ -84,15 +84,19 @@ package object appender extends ScorexLogging {
       baseHeight <- appendBlock(blockchainUpdater, utxStorage, verify = true)(block, hitSource)
     } yield baseHeight
 
-  private def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPoolImpl, verify: Boolean)(
+  private def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain, utx: UtxPoolImpl, verify: Boolean)(
       block: Block,
       hitSource: ByteStr
-  ): Either[ValidationError, Option[Int]] =
-    metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify)).map { discDiffs =>
-      metrics.utxRemoveAll.measure(utxStorage.removeAll(block.transactionData))
-      metrics.utxDiscardedPut.measure(utxStorage.addAndCleanupPriority(discDiffs))
-      Some(blockchainUpdater.height)
+  ): Either[ValidationError, Option[Int]] = {
+    utx.priorityPool.lockedWrite {
+      metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify)).map { discDiffs =>
+        utx.removeAll(block.transactionData)
+        utx.setPriorityDiffs(discDiffs)
+        utx.runCleanup()
+        Some(blockchainUpdater.height)
+      }
     }
+  }
 
   private def blockConsensusValidation(blockchain: Blockchain, pos: PoSSelector, currentTs: Long, block: Block)(
       genBalance: (Int, BlockId) => Either[String, Long]
@@ -142,8 +146,6 @@ package object appender extends ScorexLogging {
   private[this] object metrics {
     val blockConsensusValidation = Kamon.timer("block-appender.block-consensus-validation").withoutTags()
     val appendBlock              = Kamon.timer("block-appender.blockchain-append-block").withoutTags()
-    val utxRemoveAll             = Kamon.timer("block-appender.utx-remove-all").withoutTags()
-    val utxDiscardedPut          = Kamon.timer("block-appender.utx-discarded-put").withoutTags()
   }
 
 }

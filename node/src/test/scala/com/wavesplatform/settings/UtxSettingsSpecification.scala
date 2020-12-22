@@ -14,6 +14,7 @@ class UtxSettingsSpecification extends FlatSpec with Matchers {
         |    max-scripted-size = 100
         |    blacklist-sender-addresses = ["a"]
         |    allow-blacklisted-transfer-to = ["b"]
+        |    fast-lane-addresses = ["c"]
         |    allow-transactions-from-smart-accounts = false
         |    allow-skip-checks = false
         |  }
@@ -25,6 +26,7 @@ class UtxSettingsSpecification extends FlatSpec with Matchers {
     settings.maxScriptedSize shouldBe 100
     settings.blacklistSenderAddresses shouldBe Set("a")
     settings.allowBlacklistedTransferTo shouldBe Set("b")
+    settings.fastLaneAddresses shouldBe Set("c")
     settings.allowTransactionsFromSmartAccounts shouldBe false
     settings.allowSkipChecks shouldBe false
   }

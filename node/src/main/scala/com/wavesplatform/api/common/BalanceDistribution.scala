@@ -70,8 +70,8 @@ object BalanceDistribution {
             }
           }
 
-          pendingPortfolios -= address
           val adjustedBalance = longSemigroup.combine(balance, pendingPortfolios.get(address).fold(0L)(balanceOf))
+          pendingPortfolios -= address
 
           if (currentHeight <= height && adjustedBalance > 0) Some(address -> adjustedBalance)
           else findNextBalance()

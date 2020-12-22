@@ -2,11 +2,11 @@ package com.wavesplatform.http
 
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
+import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.BlocksApiRoute
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.{NoShrink, TestWallet}
 import monix.reactive.Observable

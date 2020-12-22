@@ -415,7 +415,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       val maxKeySize    = if (v < 2) 100 else 400
       val maxValueSize  = Short.MaxValue
       val maxEntryCount = 100
-      val TooBig        = "Too big sequences requested"
+      val TooBig        = "Too big sequence requested"
       val extraKey      = "a" * (maxKeySize + 1)
       val data          = List(BooleanDataEntry(extraKey, false))
 

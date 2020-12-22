@@ -25,13 +25,15 @@ object GRPCErrors {
     code.withDescription(api.message).asException(metadata)
   }
 
-  def toStatusException(exc: Throwable): StatusException = {
-    val status = exc match {
-      case _: IllegalArgumentException => Status.INVALID_ARGUMENT
-      case _: NoSuchElementException   => Status.NOT_FOUND
-      case _: IllegalStateException    => Status.FAILED_PRECONDITION
-      case _                           => Status.fromThrowable(exc)
-    }
-    new StatusException(status.withCause(exc).withDescription(exc.getMessage))
+  def toStatusException(exc: Throwable): StatusException = exc match {
+    case se: StatusException => se
+    case _ =>
+      val status = exc match {
+        case _: NoSuchElementException => Status.NOT_FOUND
+        case _: IllegalStateException  => Status.FAILED_PRECONDITION
+        case _: RuntimeException       => Status.INVALID_ARGUMENT
+        case _                         => Status.fromThrowable(exc)
+      }
+      new StatusException(status.withCause(exc).withDescription(exc.getMessage))
   }
 }

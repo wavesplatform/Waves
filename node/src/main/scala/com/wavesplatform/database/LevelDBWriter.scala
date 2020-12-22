@@ -19,7 +19,7 @@ import com.wavesplatform.database.protobuf.TransactionMeta
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBTransactions
-import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings, WavesSettings}
+import com.wavesplatform.settings.{BlockchainSettings, DBSettings, WavesSettings}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -112,8 +112,12 @@ object LevelDBWriter extends ScorexLogging {
 
   def apply(db: DB, spendableBalanceChanged: Observer[(Address, Asset)], settings: WavesSettings): LevelDBWriter with AutoCloseable = {
     val expectedHeight = loadHeight(db)
-    def load(name: String, key: KeyTags.KeyTag): BloomFilterImpl =
-      BloomFilter.loadOrPopulate(db, settings.dbSettings.directory, name, expectedHeight, key, 100000000)
+    def load(name: String, key: KeyTags.KeyTag): Option[BloomFilterImpl] = {
+      if (settings.dbSettings.useBloomFilter)
+        Some(BloomFilter.loadOrPopulate(db, settings.dbSettings.directory, name, expectedHeight, key, 100000000))
+      else
+        None
+    }
 
     val _orderFilter        = load("orders", KeyTags.FilledVolumeAndFeeHistory)
     val _dataKeyFilter      = load("account-data", KeyTags.DataHistory)
@@ -121,18 +125,18 @@ object LevelDBWriter extends ScorexLogging {
     val _assetBalanceFilter = load("asset-balances", KeyTags.AssetBalanceHistory)
     new LevelDBWriter(db, spendableBalanceChanged, settings.blockchainSettings, settings.dbSettings) with AutoCloseable {
 
-      override val orderFilter: BloomFilter        = _orderFilter
-      override val dataKeyFilter: BloomFilter      = _dataKeyFilter
-      override val wavesBalanceFilter: BloomFilter = _wavesBalanceFilter
-      override val assetBalanceFilter: BloomFilter = _assetBalanceFilter
+      override val orderFilter: BloomFilter        = _orderFilter.getOrElse(BloomFilter.AlwaysEmpty)
+      override val dataKeyFilter: BloomFilter      = _dataKeyFilter.getOrElse(BloomFilter.AlwaysEmpty)
+      override val wavesBalanceFilter: BloomFilter = _wavesBalanceFilter.getOrElse(BloomFilter.AlwaysEmpty)
+      override val assetBalanceFilter: BloomFilter = _assetBalanceFilter.getOrElse(BloomFilter.AlwaysEmpty)
 
       override def close(): Unit = {
         log.debug("Shutting down LevelDBWriter")
         val lastHeight = LevelDBWriter.loadHeight(db)
-        _orderFilter.save(lastHeight)
-        _dataKeyFilter.save(lastHeight)
-        _wavesBalanceFilter.save(lastHeight)
-        _assetBalanceFilter.save(lastHeight)
+        _orderFilter.foreach(_.save(lastHeight))
+        _dataKeyFilter.foreach(_.save(lastHeight))
+        _wavesBalanceFilter.foreach(_.save(lastHeight))
+        _assetBalanceFilter.foreach(_.save(lastHeight))
       }
     }
   }
@@ -140,9 +144,12 @@ object LevelDBWriter extends ScorexLogging {
   def readOnly(db: DB, settings: WavesSettings): LevelDBWriter = {
     val expectedHeight = loadHeight(db)
     def loadFilter(filterName: String) =
-      BloomFilter
-        .tryLoad(db, filterName, settings.dbSettings.directory, expectedHeight)
-        .fold(_ => BloomFilter.AlwaysEmpty, gf => new Wrapper(gf))
+      if (settings.dbSettings.useBloomFilter)
+        BloomFilter
+          .tryLoad(db, filterName, settings.dbSettings.directory, expectedHeight)
+          .fold(_ => BloomFilter.AlwaysEmpty, gf => new Wrapper(gf))
+      else
+        BloomFilter.AlwaysEmpty
 
     new LevelDBWriter(db, Observer.stopped, settings.blockchainSettings, settings.dbSettings) {
       override val orderFilter: BloomFilter        = loadFilter("orders")
@@ -273,8 +280,9 @@ abstract class LevelDBWriter private[database] (
   }
 
   override def wavesAmount(height: Int): BigInt = readOnly { db =>
-    if (db.has(Keys.wavesAmount(height))) db.get(Keys.wavesAmount(height))
-    else BigInt(Constants.UnitsInWave * Constants.TotalWaves)
+    val factHeight = height.min(this.height)
+    if (db.has(Keys.wavesAmount(factHeight))) db.get(Keys.wavesAmount(factHeight))
+    else settings.genesisSettings.initialBalance
   }
 
   override def blockReward(height: Int): Option[Long] =
@@ -315,18 +323,18 @@ abstract class LevelDBWriter private[database] (
             changedAssetBalances.put(a, addressId.toLong)
             rw.put(Keys.assetBalance(addressId, a)(height), balance)
             val kabh = Keys.assetBalanceHistory(addressId, a)
+            val isNFT = balance > 0 && issuedAssets
+              .get(a)
+              .map(_.static.nft)
+              .orElse(assetDescription(a).map(_.nft))
+              .getOrElse(false)
             if (assetBalanceFilter.mightContain(kabh.suffix)) {
+              if (rw.get(kabh).isEmpty && isNFT) updatedNftLists.put(addressId.toLong, a)
               updateHistory(rw, kabh, threshold, Keys.assetBalance(addressId, a)).foreach(rw.delete)
             } else {
               rw.put(kabh, Seq(height))
               assetBalanceFilter.put(kabh.suffix)
-              if (balance > 0 && issuedAssets
-                    .get(a)
-                    .map(_.static.nft)
-                    .orElse(assetDescription(a).map(_.nft))
-                    .getOrElse(false)) {
-                updatedNftLists.put(addressId.toLong, a)
-              }
+              if (isNFT) updatedNftLists.put(addressId.toLong, a)
             }
         }
       }
@@ -367,7 +375,8 @@ abstract class LevelDBWriter private[database] (
       reward: Option[Long],
       hitSource: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult],
-      failedTransactionIds: Set[ByteStr]
+      failedTransactionIds: Set[ByteStr],
+      stateHash: StateHashBuilder.Result
   ): Unit = {
     log.trace(s"Persisting block ${block.id()} at height $height")
     readWrite { rw =>
@@ -562,6 +571,21 @@ abstract class LevelDBWriter private[database] (
       }
 
       rw.put(Keys.hitSource(height), Some(hitSource))
+
+      if (dbSettings.storeStateHashes) {
+        val prevStateHash =
+          if (height == 1) ByteStr.empty
+          else
+            rw.get(Keys.stateHash(height - 1))
+              .fold(
+                throw new IllegalStateException(
+                  s"Couldn't load state hash for ${height - 1}. Please rebuild the state or disable db.store-state-hashes"
+                )
+              )(_.totalHash)
+
+        val newStateHash = stateHash.createStateHash(prevStateHash)
+        rw.put(Keys.stateHash(height), Some(newStateHash))
+      }
     }
 
     log.trace(s"Finished persisting block ${block.id()} at height $height")
@@ -615,6 +639,7 @@ abstract class LevelDBWriter private[database] (
               rw.delete(Keys.data(addressId, k)(currentHeight))
               rw.filterHistory(Keys.dataHistory(address, k), currentHeight)
             }
+            rw.delete(Keys.changedDataKeys(currentHeight, addressId))
 
             balancesToInvalidate += (address -> Waves)
             rw.delete(Keys.wavesBalance(addressId)(currentHeight))
@@ -699,6 +724,7 @@ abstract class LevelDBWriter private[database] (
           rw.delete(Keys.blockTransactionsFee(currentHeight))
           rw.delete(Keys.blockReward(currentHeight))
           rw.delete(Keys.wavesAmount(currentHeight))
+          rw.delete(Keys.stateHash(currentHeight))
 
           if (DisableHijackedAliases.height == currentHeight) {
             disabledAliases = DisableHijackedAliases.revert(rw)
@@ -768,7 +794,7 @@ abstract class LevelDBWriter private[database] (
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
     for {
       TransactionMeta(height, num, TransferTransaction.typeId, _) <- db.get(Keys.transactionMetaById(TransactionId @@ id))
-      tx <- db.get(Keys.transactionAt(Height(height), TxNum(num.toShort))).collect { case (t: TransferTransaction, true) => t }
+      tx                                                          <- db.get(Keys.transactionAt(Height(height), TxNum(num.toShort))).collect { case (t: TransferTransaction, true) => t }
     } yield (height, tx)
   }
 
@@ -894,6 +920,10 @@ abstract class LevelDBWriter private[database] (
   override def hitSource(height: Int): Option[ByteStr] = readOnly { db =>
     db.get(Keys.hitSource(height))
       .filter(_.arr.length == Block.HitSourceLength)
+  }
+
+  def loadStateHash(height: Int): Option[StateHash] = readOnly { db =>
+    db.get(Keys.stateHash(height))
   }
 
   private def transactionsAtHeight(h: Height): List[(TxNum, Transaction)] = readOnly { db =>

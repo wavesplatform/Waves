@@ -152,7 +152,7 @@ final case class CompositeBlockchain(
 
   override def blockRewardVotes(height: Int): Seq[Long] = inner.blockRewardVotes(height)
 
-  override def wavesAmount(height: Int): BigInt = inner.wavesAmount(height)
+  override def wavesAmount(height: Int): BigInt = inner.wavesAmount(height) + BigInt(reward.getOrElse(0L))
 
   override def hitSource(height: Int): Option[ByteStr] = hitSource.filter(_ => this.height == height) orElse inner.hitSource(height)
 }

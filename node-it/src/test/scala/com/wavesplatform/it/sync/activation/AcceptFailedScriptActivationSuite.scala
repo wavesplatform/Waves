@@ -64,6 +64,8 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     )
 
     sender.setScript(dAppKP, dAppScript, setScriptFee, waitForTx = true).id
+    nodes.waitForEmptyUtx()
+    nodes.waitForHeightArise()
   }
 
   test("reject failed transaction before activation height") {
@@ -201,26 +203,29 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
   test("accept invalid by asset script in payment InvokeScriptTransaction to utx and save it as failed after activation height") {
     sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(true), waitForTx = true)
 
+    val invokesCount = MaxTxsInMicroBlock * 2
     val callerBalance = sender.balance(caller).balance
     val callerAssetBalance = {
       val balance = sender.assetBalance(caller, asset).balance
-      if (balance < MaxTxsInMicroBlock * 2) {
-        sender.transfer(dAppKP, caller, (MaxTxsInMicroBlock * 2) - balance, minFee + 2 * smartFee, Some(asset), waitForTx = true)
+      if (balance < invokesCount) {
+        sender.transfer(dAppKP, caller, invokesCount - balance, minFee + 2 * smartFee, Some(asset), waitForTx = true)
       }
       sender.assetBalance(caller, asset).balance
     }
     val dAppAssetBalance = sender.assetBalance(dApp, asset).balance
 
+    nodes.waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
+    nodes.waitForHeightArise()
     overflowBlock()
 
     val txs =
-      (1 to MaxTxsInMicroBlock * 2).map { _ =>
+      (1 to invokesCount).map { _ =>
         sender
           .invokeScript(
             callerKP,
             dApp,
             Some("write"),
-            payment = Seq(InvokeScriptTransaction.Payment(1, IssuedAsset(ByteStr.decodeBase58(asset).get))),
+            payment = Seq(InvokeScriptTransaction.Payment(1L, IssuedAsset(ByteStr.decodeBase58(asset).get))),
             fee = minInvokeFee
           )
           ._1
@@ -237,9 +242,9 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       all(failed.map(_.status)) shouldBe "confirmed"
       all(failed.map(_.applicationStatus)) shouldBe Some("script_execution_failed")
 
-      sender.balance(caller).balance shouldBe callerBalance - MaxTxsInMicroBlock * 2 * minInvokeFee
-      sender.assetBalance(caller, asset).balance shouldBe callerAssetBalance
-      sender.assetBalance(dApp, asset).balance shouldBe dAppAssetBalance
+      sender.balance(caller).balance shouldBe callerBalance - invokesCount * minInvokeFee
+      sender.assetBalance(caller, asset).balance should be > 0L
+      sender.assetBalance(dApp, asset).balance shouldBe dAppAssetBalance +- invokesCount
 
       assertApiError(
         sender
@@ -291,7 +296,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       dAppKP.publicKey,
       assetPair.get,
       smartMatcherFee,
-      100,
+      100L,
       ts,
       ts + Order.MaxLiveTime,
       smartMatcherFee
@@ -303,7 +308,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       dAppKP.publicKey,
       assetPair.get,
       smartMatcherFee,
-      100,
+      100L,
       ts,
       ts + Order.MaxLiveTime,
       smartMatcherFee
@@ -363,8 +368,8 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
         otherCallerKP,
         dAppKP.publicKey,
         assetPair,
-        10,
-        100,
+        10L,
+        100L,
         ts,
         ts + Order.MaxLiveTime,
         smartMatcherFee,
@@ -376,8 +381,8 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
           callerKP,
           dAppKP.publicKey,
           assetPair,
-          10,
-          100,
+          10L,
+          100L,
           ts,
           ts + Order.MaxLiveTime,
           smartMatcherFee,

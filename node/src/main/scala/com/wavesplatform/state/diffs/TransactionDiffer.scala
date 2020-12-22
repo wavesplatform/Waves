@@ -21,7 +21,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.smart.script.trace.{TraceStep, TracedResult}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, Verifier}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import play.api.libs.json.Json
@@ -34,8 +34,8 @@ object TransactionDiffer {
       tx: Transaction
   ): TracedResult[ValidationError, Diff] =
     validate(prevBlockTs, currentBlockTs, verify, limitedExecution = false)(blockchain, tx) match {
-      case isFailedTransaction((complexity, scriptResult)) if acceptFailed(blockchain) =>
-        failedTransactionDiff(blockchain, tx, complexity, scriptResult).traced
+      case isFailedTransaction((complexity, scriptResult, trace)) if acceptFailed(blockchain) =>
+        TracedResult(failedTransactionDiff(blockchain, tx, complexity, scriptResult), trace)
       case result => result
     }
 
@@ -261,13 +261,13 @@ object TransactionDiffer {
   }
 
   private object isFailedTransaction {
-    def unapply(result: TracedResult[ValidationError, Diff]): Option[(Long, Option[InvokeScriptResult])] =
+    def unapply(result: TracedResult[ValidationError, Diff]): Option[(Long, Option[InvokeScriptResult], List[TraceStep])] =
       result match {
-        case TracedResult(Left(TransactionValidationError(e: FailedTransactionError, tx)), _) => Some((e.spentComplexity, scriptResult(e, tx)))
-        case _                                                                                => None
+        case TracedResult(Left(TransactionValidationError(e: FailedTransactionError, tx)), trace) => Some((e.spentComplexity, scriptResult(e), trace))
+        case _                                                                                    => None
       }
 
-    def scriptResult(cf: FailedTransactionError, tx: Transaction): Option[InvokeScriptResult] =
+    private[this] def scriptResult(cf: FailedTransactionError): Option[InvokeScriptResult] =
       Some(InvokeScriptResult(error = Some(ErrorMessage(cf.code, cf.message))))
   }
 
@@ -298,6 +298,7 @@ object TransactionDiffer {
     }
 
   private implicit final class EitherOps[E, A](val ei: Either[E, A]) extends AnyVal {
+    // Not really traced, just wraps value with an empty trace value
     def traced: TracedResult[E, A] = TracedResult.wrapE(ei)
   }
 

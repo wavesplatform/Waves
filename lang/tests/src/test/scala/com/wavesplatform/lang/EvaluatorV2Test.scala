@@ -661,7 +661,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
          | a$count() == a$count()
       """.stripMargin
 
-    println(eval(script, 10000))
+    eval(script, 10000)
   }
 
   property("big let assignment chain with function") {
@@ -673,7 +673,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
          | a$count == a$count
       """.stripMargin
 
-    println(eval(script, 20000)._3)
+    eval(script, 20000)._3
   }
 
   property("let ctx") {
@@ -828,6 +828,74 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
         }
       summarizedCost shouldBe precalculatedComplexity
       resultExpr shouldBe evaluated
+    }
+  }
+
+  property("strict evaluation") {
+    val strictScript =
+      """
+        |func testFunc() = {
+        |  strict a = 100500 + 42
+        |  a
+        |}
+        |testFunc()
+        |
+      """.stripMargin.trim
+
+    inside(eval(strictScript, limit = 100)) {
+      case (expr, _, cost) =>
+        expr shouldBe CONST_LONG(100542)
+        cost shouldBe 6
+    }
+  }
+
+  property("strict with throw expression") {
+    val strictScript =
+      """
+        |func testFunc() = {
+        |  strict a = throw("Strict executed error")
+        |  true
+        |}
+        |testFunc()
+        |
+      """.stripMargin.trim
+
+    (the[RuntimeException] thrownBy eval(strictScript, limit = 100)).getMessage shouldBe "Strict executed error"
+  }
+
+  property("strict var add cost without usage") {
+    val defaultScript =
+      """
+        |func testFunc() = {
+        |  let a = 1 + 2 + 3 + 4 + 5 + 5 + 6 + 7 + 8 + 9 + 100500
+        |  let z = "42"
+        |  z
+        |}
+        |testFunc()
+        |
+      """.stripMargin.trim
+
+    inside(eval(defaultScript, limit = 100)) {
+      case (expr, _, cost) =>
+        expr shouldBe CONST_STRING("42").explicitGet()
+        cost shouldBe 1
+    }
+
+    val strictScript =
+      """
+        |func testFunc() = {
+        |  strict a = 1 + 2 + 3 + 4 + 5 + 5 + 6 + 7 + 8 + 9 + 100500
+        |  let z = "42"
+        |  z
+        |}
+        |testFunc()
+        |
+      """.stripMargin.trim
+
+    inside(eval(strictScript, limit = 100)) {
+      case (expr, _, cost) =>
+        expr shouldBe CONST_STRING("42").explicitGet()
+        cost shouldBe 15
     }
   }
 }

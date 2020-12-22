@@ -1,7 +1,6 @@
 package com.wavesplatform.state
 
 import cats.syntax.monoid._
-
 import com.wavesplatform.account.Address
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
@@ -29,9 +28,9 @@ object DiffToStateApplier {
         bs += Waves -> (blockchain.balance(address, Waves) + portfolioDiff.balance)
       }
 
-      portfolioDiff.assets.foreach {
-        case (asset, newBalance) =>
-          bs += asset -> (blockchain.balance(address, asset) + newBalance)
+      portfolioDiff.assets.collect {
+        case (asset, balanceDiff) if balanceDiff != 0 =>
+          bs += asset -> (blockchain.balance(address, asset) + balanceDiff)
       }
 
       balances += address -> bs.result()

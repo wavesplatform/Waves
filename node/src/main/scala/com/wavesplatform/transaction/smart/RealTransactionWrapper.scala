@@ -8,6 +8,7 @@ import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven}
 import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
@@ -73,8 +74,8 @@ object RealTransactionWrapper {
         Tx.Issue(
             proven(i),
             i.quantity,
-            ByteStr(i.name.toByteArray),
-            ByteStr(i.description.toByteArray),
+            i.name.toByteStr,
+            i.description.toByteStr,
             i.reissuable,
             i.decimals,
             i.script.map(_.bytes())

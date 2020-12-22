@@ -219,7 +219,7 @@ class BlockchainUpdaterImplSpec
 
             // microblock 1
             (triggersMock.onProcessMicroBlock _)
-              .expects(where { (microBlock, diff, bc, _) =>
+              .expects(where { (microBlock, diff, bc, _, _) =>
                 bc.height == 1 &&
                 microBlock.transactionData.length == 2 &&
                 // miner reward, no NG — all txs fees
@@ -230,7 +230,7 @@ class BlockchainUpdaterImplSpec
 
             // microblock 2
             (triggersMock.onProcessMicroBlock _)
-              .expects(where { (microBlock, diff, bc, _) =>
+              .expects(where { (microBlock, diff, bc, _, _) =>
                 bc.height == 1 &&
                 microBlock.transactionData.length == 1 &&
                 // miner reward, no NG — all txs fees
@@ -256,7 +256,7 @@ class BlockchainUpdaterImplSpec
 
             // microblock 3
             (triggersMock.onProcessMicroBlock _)
-              .expects(where { (microBlock, _, bc, _) =>
+              .expects(where { (microBlock, _, bc, _, _) =>
                 bc.height == 2 && microBlock.reference == block2.signature
               })
               .once()

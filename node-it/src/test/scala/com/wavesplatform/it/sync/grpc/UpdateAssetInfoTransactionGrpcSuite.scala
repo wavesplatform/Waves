@@ -16,7 +16,7 @@ import scala.util.Random
 
 class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with TableDrivenPropertyChecks {
   import UpdateAssetInfoTransactionGrpcSuite._
-  val updateInterval                              = 2
+  val updateInterval                              = 5
   override protected def nodeConfigs: Seq[Config] = Seq(configWithUpdateIntervalSetting(updateInterval).withFallback(Miners.head))
 
   val issuer      = firstAcc
@@ -66,13 +66,12 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
   }
 
   test("not able to update name/description more than once within interval") {
-    val nextTermEnd = issueHeight + 2 * updateInterval
     assertGrpcError(
       sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee),
       s"Can't update info of asset with id=$assetId",
       Code.INVALID_ARGUMENT
     )
-    sender.waitForHeight(nextTermEnd)
+    sender.waitForHeight(sender.height + updateInterval / 2, 2.minutes)
 
     assertGrpcError(
       sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee),
@@ -104,7 +103,7 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
     val tooBigDescription = Random.nextString(1001)
     assertGrpcError(
       sender.updateAssetInfo(issuer, assetId, "updatedName", tooBigDescription, minFee),
-      "Too big sequences requested",
+      "Too big sequence requested",
       Code.INVALID_ARGUMENT
     )
   }
@@ -176,14 +175,9 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
 object UpdateAssetInfoTransactionGrpcSuite {
   private def configWithUpdateIntervalSetting(interval: Long) =
     ConfigFactory.parseString(
-      s"""
-         |waves {
-         |   blockchain.custom {
-         |      functionality {
-         |        min-asset-info-update-interval = $interval
-         |      }
-         |   }
-         |   miner.quorum = 0
+      s"""waves {
+         |  blockchain.custom.functionality.min-asset-info-update-interval = $interval
+         |  miner.quorum = 0
          |}""".stripMargin
     )
 }

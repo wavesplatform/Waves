@@ -14,22 +14,23 @@ object Dependencies {
   private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
 
   private def catsModule(module: String, version: String = "2.1.0") = Def.setting("org.typelevel" %%% s"cats-$module"  % version)
-  private def monixModule(module: String)                           = Def.setting("io.monix"      %%% s"monix-$module" % "3.2.1")
+  def monixModule(module: String)                                   = Def.setting("io.monix"      %%% s"monix-$module" % "3.3.0")
 
   private val kindProjector = compilerPlugin("org.typelevel" % "kind-projector" % "0.11.0" cross CrossVersion.full)
 
-  val akkaHttp                   = akkaHttpModule("akka-http")
-  private val jacksonModuleScala = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
-  private val googleGuava        = "com.google.guava" % "guava" % "27.0.1-jre"
-  private val kamonCore          = kamonModule("core")
-  private val machinist          = "org.typelevel" %% "machinist" % "0.6.8"
-  val logback                    = "ch.qos.logback" % "logback-classic" % "1.2.3"
-  val janino                     = "org.codehaus.janino" % "janino" % "3.0.12"
-  val asyncHttpClient            = "org.asynchttpclient" % "async-http-client" % "2.7.0"
+  val akkaHttp           = akkaHttpModule("akka-http")
+  val jacksonModuleScala = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
+  val googleGuava        = "com.google.guava" % "guava" % "27.0.1-jre"
+  val kamonCore          = kamonModule("core")
+  val machinist          = "org.typelevel" %% "machinist" % "0.6.8"
+  val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
+  val janino             = "org.codehaus.janino" % "janino" % "3.0.12"
+  val asyncHttpClient    = "org.asynchttpclient" % "async-http-client" % "2.7.0"
+  val curve25519         = "com.wavesplatform" % "curve25519-java" % "0.6.4"
 
-  private val catsEffect = catsModule("effect", "2.1.3")
-  private val catsCore   = catsModule("core")
-  private val shapeless  = Def.setting("com.chuusai" %%% "shapeless" % "2.3.3")
+  val catsEffect = catsModule("effect", "2.1.3")
+  val catsCore   = catsModule("core")
+  val shapeless  = Def.setting("com.chuusai" %%% "shapeless" % "2.3.3")
 
   val scalaTest = "org.scalatest" %% "scalatest" % "3.0.8" % Test
 
@@ -96,7 +97,7 @@ object Dependencies {
       ("org.typelevel" %% "cats-mtl-core" % "0.7.1").exclude("org.scalacheck", "scalacheck_2.13"),
       "ch.obermuhlner" % "big-math" % "2.1.0",
       ("org.scorexfoundation" %% "scrypto" % "2.1.8").exclude("org.whispersystems", "curve25519-java"),
-      "com.wavesplatform" % "curve25519-java" % "0.6.3",
+      curve25519,
       bouncyCastle("bcpkix"),
       bouncyCastle("bcprov"),
       kindProjector,
@@ -160,11 +161,11 @@ object Dependencies {
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test,
       ("org.iq80.leveldb" % "leveldb" % "0.12").exclude("com.google.guava", "guava") % Test
-    ) ++ test ++ console ++ logDeps ++ levelDBJNA
+    ) ++ test ++ console ++ logDeps ++ levelDBJNA ++ protobuf.value
   )
 
   private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.2.6" classifier "proto"
+    "com.wavesplatform" % "protobuf-schemas" % "1.2.10" classifier "proto" intransitive ()
 
   lazy val scalapbRuntime = Def.setting {
     val version = scalapb.compiler.Version.scalapbVersion

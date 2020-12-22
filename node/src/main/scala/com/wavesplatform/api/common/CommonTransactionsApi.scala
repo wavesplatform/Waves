@@ -18,17 +18,12 @@ import com.wavesplatform.wallet.Wallet
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
 
+import scala.concurrent.Future
+
 trait CommonTransactionsApi {
   import CommonTransactionsApi._
 
   def aliasesOfAddress(address: Address): Observable[(Height, CreateAliasTransaction)]
-
-  def transactionsByAddress(
-      subject: AddressOrAlias,
-      sender: Option[Address],
-      transactionTypes: Set[Byte],
-      fromId: Option[ByteStr] = None
-  ): Observable[(Height, Transaction, Boolean)]
 
   def transactionById(txId: ByteStr): Option[TransactionMeta]
 
@@ -38,9 +33,9 @@ trait CommonTransactionsApi {
 
   def calculateFee(tx: Transaction): Either[ValidationError, (Asset, Long, Long)]
 
-  def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean]
+  def broadcastTransaction(tx: Transaction): Future[TracedResult[ValidationError, Boolean]]
 
-  def invokeScriptResults(
+  def transactionsByAddress(
       subject: AddressOrAlias,
       sender: Option[Address],
       transactionTypes: Set[Byte],
@@ -51,7 +46,32 @@ trait CommonTransactionsApi {
 }
 
 object CommonTransactionsApi {
-  type TransactionMeta = (Height, Either[Transaction, (InvokeScriptTransaction, Option[InvokeScriptResult])], Boolean)
+  sealed trait TransactionMeta {
+    def height: Height
+    def transaction: Transaction
+    def succeeded: Boolean
+  }
+
+  object TransactionMeta {
+    final case class Default(height: Height, transaction: Transaction, succeeded: Boolean) extends TransactionMeta
+
+    final case class Invoke(height: Height, transaction: InvokeScriptTransaction, succeeded: Boolean, invokeScriptResult: Option[InvokeScriptResult])
+        extends TransactionMeta
+
+    def unapply(tm: TransactionMeta): Option[(Height, Transaction, Boolean)] =
+      Some((tm.height, tm.transaction, tm.succeeded))
+
+    def create(height: Height, transaction: Transaction, succeeded: Boolean)(
+        result: InvokeScriptTransaction => Option[InvokeScriptResult]
+    ): TransactionMeta =
+      transaction match {
+        case ist: InvokeScriptTransaction =>
+          Invoke(height, ist, succeeded, result(ist))
+
+        case _ =>
+          Default(height, transaction, succeeded)
+      }
+  }
 
   def apply(
       maybeDiff: => Option[(Height, Diff)],
@@ -59,7 +79,7 @@ object CommonTransactionsApi {
       blockchain: Blockchain,
       utx: UtxPool,
       wallet: Wallet,
-      publishTransaction: Transaction => TracedResult[ValidationError, Boolean],
+      publishTransaction: Transaction => Future[TracedResult[ValidationError, Boolean]],
       blockAt: Int => Option[(BlockMeta, Seq[Transaction])]
   ): CommonTransactionsApi = new CommonTransactionsApi {
     private def resolve(subject: AddressOrAlias): Option[Address] = blockchain.resolveAlias(subject).toOption
@@ -71,22 +91,18 @@ object CommonTransactionsApi {
         sender: Option[Address],
         transactionTypes: Set[Byte],
         fromId: Option[ByteStr] = None
-    ): Observable[(Height, Transaction, Boolean)] = resolve(subject).fold(Observable.empty[(Height, Transaction, Boolean)]) { subjectAddress =>
+    ): Observable[TransactionMeta] = resolve(subject).fold(Observable.empty[TransactionMeta]) { subjectAddress =>
       common.addressTransactions(db, maybeDiff, subjectAddress, sender, transactionTypes, fromId)
     }
 
     override def transactionById(transactionId: ByteStr): Option[TransactionMeta] =
       blockchain.transactionInfo(transactionId).map {
-        case (height, ist: InvokeScriptTransaction, status) =>
-          (
-            Height(height),
-            Right(
-              ist -> maybeDiff.flatMap(_._2.scriptResults.get(transactionId)).orElse(AddressTransactions.loadInvokeScriptResult(db, transactionId))
-            ),
-            status
-          )
-        case (height, tx, status) => (Height(height), Left(tx), status)
-
+        case (height, transaction, succeeded) =>
+          TransactionMeta.create(Height(height), transaction, succeeded) { _ =>
+            maybeDiff
+              .flatMap { case (_, diff) => diff.scriptResults.get(transactionId) }
+              .orElse(AddressTransactions.loadInvokeScriptResult(db, transactionId))
+          }
       }
 
     override def unconfirmedTransactions: Seq[Transaction] = utx.all
@@ -102,17 +118,7 @@ object CommonTransactionsApi {
             (asset, feeInAsset, feeInWaves)
         }
 
-    override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] = publishTransaction(tx)
-
-    override def invokeScriptResults(
-        subject: AddressOrAlias,
-        sender: Option[Address],
-        transactionTypes: Set[Byte],
-        fromId: Option[ByteStr] = None
-    ): Observable[TransactionMeta] =
-      resolve(subject).fold(Observable.empty[TransactionMeta]) { subjectAddress =>
-        common.invokeScriptResults(db, maybeDiff, subjectAddress, sender, transactionTypes, fromId)
-      }
+    override def broadcastTransaction(tx: Transaction): Future[TracedResult[ValidationError, Boolean]] = publishTransaction(tx)
 
     override def transactionProofs(transactionIds: List[ByteStr]): List[TransactionProof] =
       for {

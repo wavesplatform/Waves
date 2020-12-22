@@ -5,13 +5,12 @@ import java.net.InetSocketAddress
 import akka.http.scaladsl.model.StatusCodes.BadRequest
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
-import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.IssueRequest
+import com.wavesplatform.api.http.{ApiError, DebugMessage}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
-import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync._
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -204,6 +203,9 @@ object SyncHttpApi extends Assertions {
 
     def accountBalances(acc: String): (Long, Long) =
       sync(async(n).accountBalances(acc))
+
+    def balanceAtHeight(address: String, height: Int): Long =
+      sync(async(n).balanceAtHeight(address, height))
 
     def accountsBalances(height: Option[Int], accounts: Seq[String], asset: Option[String] = None): Seq[(String, Long)] =
       sync(async(n).accountsBalances(height, accounts, asset))
@@ -642,6 +644,9 @@ object SyncHttpApi extends Assertions {
     def waitFor[A](desc: String)(f: Node => A, cond: A => Boolean, retryInterval: FiniteDuration): A =
       sync(async(n).waitFor[A](desc)(x => Future.successful(f(x.n)), cond, retryInterval), 5.minutes)
 
+    def waitForEmptyUtx(): Unit =
+      sync(async(n).waitFor("empty utx")(_.utxSize, (_: Int) == 0, 1 second), 5 minutes)
+
     def waitForBlackList(blackList: Int): Seq[BlacklistedPeer] =
       sync(async(n).waitForBlackList(blackList))
 
@@ -763,6 +768,9 @@ object SyncHttpApi extends Assertions {
         async(nodes).waitFor(desc)(retryInterval)((n: Node) => Future(request(n))(scala.concurrent.ExecutionContext.Implicits.global), cond),
         ConditionAwaitTime
       )
+
+    def waitForEmptyUtx(): Unit =
+      waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
 
     def rollbackWithoutBlacklisting(height: Int, returnToUTX: Boolean = true): Unit = {
       sync(

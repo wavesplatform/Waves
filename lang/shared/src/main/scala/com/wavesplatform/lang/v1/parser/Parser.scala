@@ -15,7 +15,7 @@ object Parser {
   private val Global                 = com.wavesplatform.lang.hacks.Global // Hack for IDEA
   implicit def hack(p: fastparse.P[Any]): fastparse.P[Unit] = p.map(_ => ())
 
-  def keywords                = Set("let", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
+  def keywords                = Set("let", "strict", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
   def lowerChar[_:P]          = CharIn("a-z")
   def upperChar[_:P]          = CharIn("A-Z")
   def char[_:P]               = lowerChar | upperChar
@@ -217,7 +217,7 @@ object Parser {
   def singleTypeP[_:P]: P[Single] = (anyVarName ~~ ("[" ~~ Index ~ unionTypeP ~ Index ~~ "]").?).map {
     case (t, param) => Single(t, param.map { case (start, param, end) => VALID(Pos(start, end), param) })
   }
-  def unionTypeP[_:P]: P[Type] = P(singleTypeP | tupleTypeP).rep(1, comment ~ "|" ~ comment).map(Union.apply)
+  def unionTypeP[_:P]: P[Type] = (Index ~ P("Any") ~ Index).map { case (start, end) => AnyType(Pos(start, end)) } | P(singleTypeP | tupleTypeP).rep(1, comment ~ "|" ~ comment).map(Union.apply)
   def tupleTypeP[_:P]: P[Tuple] =
     ("(" ~
       P(unionTypeP).rep(
@@ -249,17 +249,19 @@ object Parser {
   def matchCaseP(implicit c: fastparse.P[Any]): P[MATCH_CASE] = {
     def checkForGenericAndGetLastPos(t: Type): Either[INVALID, Option[Pos]] =
       t match {
+        case Single(VALID(position, "List"), Some(VALID(_, AnyType(_)))) => Right(Some(position))
         case Single(name, parameter) =>
           parameter
             .toLeft(Some(name.position))
             .leftMap {
-              case VALID(position, v)              => INVALID(position, s"Unexpected generic match type [$v]")
+              case VALID(position, v)              => INVALID(position, s"Unexpected generic match type $t")
               case PART.INVALID(position, message) => INVALID(position, message)
             }
         case Union(types) =>
           types.lastOption.flatTraverse(checkForGenericAndGetLastPos)
         case Tuple(types) =>
           types.lastOption.flatTraverse(checkForGenericAndGetLastPos)
+        case AnyType(pos) => Right(Some(pos))
       }
 
     def restMatchCaseInvalidP(implicit c: fastparse.P[Any]): P[String] = P((!P("=>") ~~ AnyChar.!).repX.map(_.mkString))
@@ -392,6 +394,44 @@ object Parser {
           }
       }
 
+  // Hack to force parse of "\n". Otherwise it is treated as a separator
+  def newLineSep(implicit c: fastparse.P[Any]) = {
+    P(CharsWhileIn(" \t\r").repX  ~~ "\n").repX(1)
+  }
+
+  def strictLetP[_:P]: P[Seq[LET]] = {
+    P(Index ~~ "strict" ~~ &(CharIn(" \t\n\r")) ~/ comment ~ letNameP ~ comment ~ Index ~ ("=" ~/ Index ~ baseExpr.?).? ~~ Index)
+      .map {
+        case (start, names, valuePosStart, valueRawOpt, end) =>
+          val value = extractValue(valuePosStart, valueRawOpt)
+          val pos = Pos(start, end)
+
+          names.map { case (nameStart, nameRaw) =>
+            val name = extractName(Pos(nameStart, nameStart), nameRaw)
+            LET(pos, name, value)
+          }
+      }
+  }
+
+  def strictLetBlockP[_:P]: P[EXPR] = {
+    P(
+      Index ~~
+        strictLetP ~/
+        Pass ~~
+        (
+          ("" ~ ";") ~/ (baseExpr | invalid).? |
+            newLineSep ~/ (baseExpr | invalid).? |
+            (Index ~~ CharPred(_ != '\n').repX).map(pos => Some(INVALID(Pos(pos, pos), "expected ';'")))
+          ) ~~
+        Index
+    ).map {
+      case (start, strictLet, body, end) => {
+        val blockPos = Pos(start, end)
+        Macro.unwrapStrict(blockPos, strictLet.head, body.getOrElse(INVALID(Pos(end, end), "expected a body")))
+      }
+    }
+  }
+
   private def extractName(
     namePos: Pos,
     nameRaw: Option[PART[String]]
@@ -410,11 +450,6 @@ object Parser {
 
   private def blockOr(otherExpr: Pos => EXPR)(implicit c: fastparse.P[Any]): P[EXPR] = {
     def declaration(implicit c: fastparse.P[Any]) = letP | funcP.map(Seq(_))
-
-    // Hack to force parse of "\n". Otherwise it is treated as a separator
-    def newLineSep(implicit c: fastparse.P[Any]) = {
-      P(CharsWhileIn(" \t\r").repX  ~~ "\n").repX(1)
-    }
 
     P(
       Index ~~
@@ -442,7 +477,7 @@ object Parser {
     comment ~ P(foldP | ifP | matchP | ep | maybeAccessP) ~ comment
   }
 
-  def baseExpr[_:P] = P(binaryOp(baseAtom(block(_))(_), opsByPriority))
+  def baseExpr[_:P] = P(strictLetBlockP | binaryOp(baseAtom(block(_))(_), opsByPriority))
 
   def blockOrDecl[_:P] = baseAtom(blockOr(p => REF(p, VALID(p, "unit")))(_))
   def baseExprOrDecl[_:P] = binaryOp(baseAtom(blockOrDecl(_))(_), opsByPriority)
@@ -529,5 +564,84 @@ object Parser {
       case Parsed.Success((s, _), v) => Parsed.Success(s,v)
       case Parsed.Failure(m, o, e) => Parsed.Failure(m, o, e)
     }
+  }
+
+  type RemovedCharPos = Pos
+
+  def parseExpressionWithErrorRecovery(scriptStr: String): Either[Throwable, (SCRIPT, Option[RemovedCharPos])] = {
+
+    def parse(str: String): Either[Parsed.Failure, SCRIPT] =
+      parseExpr(str) match {
+        case Parsed.Success(resExpr, _) => Right(SCRIPT(resExpr.position, resExpr))
+        case f @ Parsed.Failure(_, _, _) => Left(f)
+      }
+
+    parseWithError[SCRIPT](
+      new StringBuilder(scriptStr),
+      parse,
+      SCRIPT(Pos(0, scriptStr.length - 1), INVALID(Pos(0, scriptStr.length - 1), "Parsing failed. Unknown error."))
+    ).map {
+      exprAndErrorIndexes =>
+        val removedCharPosOpt = if (exprAndErrorIndexes._2.isEmpty) None else Some(Pos(exprAndErrorIndexes._2.min, exprAndErrorIndexes._2.max))
+        (exprAndErrorIndexes._1, removedCharPosOpt)
+    }
+  }
+
+  def parseDAPPWithErrorRecovery(scriptStr: String): Either[Throwable, (DAPP, Option[RemovedCharPos])] = {
+
+    def parse(str: String): Either[Parsed.Failure, DAPP] =
+      parseContract(str) match {
+        case Parsed.Success(resDAPP, _) => Right(resDAPP)
+        case f @ Parsed.Failure(_, _, _) => Left(f)
+      }
+
+    parseWithError[DAPP](
+      new StringBuilder(scriptStr),
+      parse,
+      DAPP(Pos(0, scriptStr.length - 1), List.empty, List.empty)
+    ).map {
+      dAppAndErrorIndexes =>
+        val removedCharPosOpt = if (dAppAndErrorIndexes._2.isEmpty) None else Some(Pos(dAppAndErrorIndexes._2.min, dAppAndErrorIndexes._2.max))
+        (dAppAndErrorIndexes._1, removedCharPosOpt)
+    }
+  }
+
+  private def clearChar(source: StringBuilder, pos: Int): Int = {
+    if (pos >= 0) {
+      if (" \n\r".contains(source.charAt(pos))) {
+        clearChar(source, pos - 1)
+      } else {
+        source.setCharAt(pos, ' ')
+        pos
+      }
+    } else {
+      0
+    }
+  }
+
+  private def parseWithError[T](
+                                 source: StringBuilder,
+                                 parse: String => Either[Parsed.Failure, T],
+                                 defaultResult: T
+                               ): Either[Throwable, (T, Iterable[Int])] = {
+    parse(source.toString())
+      .map(dApp => (dApp, Nil))
+      .left
+      .flatMap {
+        case ex: Parsed.Failure => {
+          val errorLastPos = ex.index
+          val lastRemovedCharPos = clearChar(source, errorLastPos - 1)
+          val posList = Set(errorLastPos, lastRemovedCharPos)
+          if (lastRemovedCharPos > 0) {
+            parseWithError(source, parse, defaultResult)
+              .map(dAppAndErrorIndexes => (dAppAndErrorIndexes._1, posList ++ dAppAndErrorIndexes._2.toList))
+          } else {
+            Right((defaultResult, posList))
+          }
+
+
+        }
+        case _ => Left(new Exception("Unknown parsing error."))
+      }
   }
 }

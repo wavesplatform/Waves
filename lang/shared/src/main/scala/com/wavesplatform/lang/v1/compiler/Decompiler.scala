@@ -109,11 +109,19 @@ object Decompiler {
   val MatchRef = """(\$match\d*)""".r
 
   private[lang] def expr(e: Coeval[EXPR], ctx: DecompilerContext, braces: BlockBraces, firstLinePolicy: FirstLinePolicy): Coeval[String] = {
+    def checkBrackets(expr: EXPR) = expr match {
+      // no need while all binaty ops is bracked. // case Terms.FUNCTION_CALL(FunctionHeader.Native(id), _) if ctx.binaryOps.contains(id) /* || ctx.unaryOps.contains(id) */ => ("(", ")")
+      case Terms.IF(_, _, _) => ("(", ")")
+      case Terms.LET_BLOCK(_, _) => ("(", ")")
+      case Terms.BLOCK(_, _) => ("(", ")")
+      case _ => ("", "")
+    }
+
     def argsStr(args: List[EXPR]) = args.map(argStr).toVector.sequence
     def listStr(elems: List[EXPR]) = argsStr(elems).map(_.mkString("[", ", ", "]"))
     def argStr(elem: EXPR) = expr(pure(elem), ctx, BracesWhenNeccessary, DontIndentFirstLine)
 
-    val i = if (firstLinePolicy == DontIndentFirstLine /*braces == BracesWhenNeccessary*/) 0 else ctx.ident
+    val i = if (firstLinePolicy == DontIndentFirstLine) 0 else ctx.ident
 
     e flatMap {
       case Terms.BLOCK(Terms.LET(MatchRef(name), e), body) => matchBlock(name, pure(body), ctx.incrementIdent()) flatMap { b =>
@@ -150,7 +158,9 @@ object Decompiler {
       case Terms.CONST_STRING(s)         => pureOut("\"" ++ s ++ "\"", i)
       case Terms.CONST_BYTESTR(bs)       => pureOut(if(bs.size <= 128) { "base58'" ++ bs.toString ++ "'" } else { "base64'" ++ bs.base64Raw ++ "'" }, i)
       case Terms.REF(ref)                => pureOut(ref, i)
-      case Terms.GETTER(getExpr, fld)    => expr(pure(getExpr), ctx, BracesWhenNeccessary, firstLinePolicy).map(a => a + "." + fld)
+      case Terms.GETTER(getExpr, fld)    =>
+        val (bs, be) = checkBrackets(getExpr)
+        expr(pure(getExpr), ctx, NoBraces, firstLinePolicy).map(a => s"$bs$a$be.$fld")
       case Terms.IF(cond, it, iff) =>
         for {
           c   <- expr(pure(cond), ctx, BracesWhenNeccessary, DontIndentFirstLine)
@@ -167,12 +177,22 @@ object Decompiler {
           case (elems, Some(listVar))      => listStr(elems).map(v => s"$v :: $listVar")
         }
       case FUNCTION_CALL(`listElem`, List(list, index)) =>
-        for (l <- argStr(list); i <- argStr(index)) yield s"$l[$i]"
+        val (bs,be) = checkBrackets(list)
+        for (l <- argStr(list); i <- argStr(index)) yield s"$bs$l$be[$i]"
       case Terms.FUNCTION_CALL(func, args) =>
         val argsCoeval = argsStr(args)
         func match {
           case FunctionHeader.Native(id) if ctx.binaryOps.contains(id) =>
-            argsCoeval.map(as => out(s"(${as(0)} ${ctx.binaryOps(id)} ${as(1)})", i))
+            val (bs0, be0) = args(0) match {
+              case Terms.IF(_,_,_) => ("(", ")")
+              case _ => ("", "")
+            }
+            val (bs1, be1) = args(1) match {
+              case Terms.IF(_,_,_) => ("(", ")")
+              case _ => ("", "")
+            }
+
+            argsCoeval.map(as => out(s"(${bs0}${as(0)}${be0} ${ctx.binaryOps(id)} ${bs1}${as(1)}${be1})", i))
 
           case FunctionHeader.User(internalName, _) if internalName == "!=" =>
             argsCoeval.map(as => out(s"(${as(0)} != ${as(1)})", i))
