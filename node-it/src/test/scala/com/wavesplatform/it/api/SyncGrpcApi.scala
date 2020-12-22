@@ -342,9 +342,8 @@ object SyncGrpcApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).broadcastLeaseCancel(source, leaseId, fee, version)), waitForTx)
     }
 
-    def getActiveLeases(address: ByteString): List[PBSignedTransaction] = {
-      val leases = accounts.getActiveLeases(AccountRequest.of(address))
-      leases.toList.map(resp => resp.getTransaction)
+    def getActiveLeases(address: ByteString): List[LeaseResponse] = {
+       accounts.getActiveLeases(AccountRequest.of(address)).toList
     }
 
     def updateAssetInfo(
