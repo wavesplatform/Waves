@@ -269,14 +269,12 @@ package object database extends ScorexLogging {
   }
 
   def writeContinuationState(continuationState: (Int, ContinuationState.InProgress)): Array[Byte] = {
-    val (step, ContinuationState.InProgress(expr, unusedComplexity, invokeScriptTransactionId)) = continuationState
-
-    val stepBytes = Ints.toByteArray(step)
+    val stepBytes = Ints.toByteArray(continuationState._1)
     val stateBytes = pb
       .ContinuationState(
-        ByteString.copyFrom(Serde.serialize(expr, allowObjects = true)),
-        unusedComplexity,
-        ByteString.copyFrom(invokeScriptTransactionId.arr)
+        ByteString.copyFrom(Serde.serialize(continuationState._2.expr, allowObjects = true)),
+        continuationState._2.unusedComplexity,
+        ByteString.copyFrom(continuationState._2.invokeScriptTransactionId.arr)
       )
       .toByteArray
 
