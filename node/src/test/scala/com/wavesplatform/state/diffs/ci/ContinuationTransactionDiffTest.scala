@@ -331,13 +331,16 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
     resultUnusedComplexity should be < sigVerifyComplexity
     val spentComplexity = ContractLimits.MaxComplexityByVersion(V5) + startUnusedComplexity - resultUnusedComplexity
 
-    val r = ContinuationTransactionDiff(blockchain, continuation.timestamp, false)(continuation).resultE.explicitGet()
-    r.replacingTransactions shouldBe Seq(NewTransactionInfo(continuation.copy(fee = stepFee), Set(), Succeeded))
-    r.scriptsRun shouldBe 1
-    r.scriptsComplexity shouldBe spentComplexity
-    r.continuationStates.size shouldBe 1
-    val state = r.continuationStates(invoke.dAppAddressOrAlias.asInstanceOf[Address])
-    state shouldBe ContinuationState.InProgress(result, resultUnusedComplexity, invoke.id.value(), precedingStepCount + 1)
+    val state = ContinuationState.InProgress(result, resultUnusedComplexity, invoke.id.value(), precedingStepCount + 1)
+    ContinuationTransactionDiff(blockchain, continuation.timestamp, false)(continuation).resultE shouldBe
+      Right(
+        Diff.empty.copy(
+          replacingTransactions = Seq(NewTransactionInfo(continuation.copy(fee = stepFee), Set(), Succeeded)),
+          scriptsRun = 1,
+          scriptsComplexity = spentComplexity,
+          continuationStates = Map(invoke.dAppAddressOrAlias.asInstanceOf[Address] -> state)
+        )
+      )
   }
 
   property("continuation finish result with scripted actions and payment") {
@@ -355,34 +358,33 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
     val estimatedComplexity = actualComplexity + Random.nextInt(1000)
     val blockchain          = blockchainMock(invoke, ("oneStepExpr", estimatedComplexity), Some((precedingStepCount, expr, 0)))
 
-    val r = ContinuationTransactionDiff(blockchain, continuation.timestamp, false)(continuation).resultE.explicitGet()
-    r.copy(continuationStates = Map()) shouldBe
-      Diff.empty.copy(
-        portfolios = Map(
-          invoke.sender.toAddress -> Portfolio(invoke.fee - stepFee),
-          dAppAddress             -> Portfolio.build(scriptedAsset, reissueAmount - burnAmount - transferAmount),
-          transferAddress         -> Portfolio.build(scriptedAsset, transferAmount)
-        ),
-        accountData = Map(dAppAddress -> AccountDataInfo(Map("isAllowed" -> BooleanDataEntry("isAllowed", true)))),
-        scriptsRun = actionScriptInvocations + 1, // with step
-        scriptResults = Map(
-          invoke.id.value() -> InvokeScriptResult(
-            data = Seq(BooleanDataEntry("isAllowed", true)),
-            transfers = Seq(InvokeScriptResult.Payment(transferAddress, scriptedAsset, transferAmount)),
-            reissues = Seq(Reissue(scriptedAssetId, true, reissueAmount)),
-            burns = Seq(Burn(scriptedAssetId, burnAmount))
-          )
-        ),
-        scriptsComplexity = actualComplexity + actionScriptInvocations * assetScriptComplexity,
-        updatedAssets = Map(scriptedAsset -> Ior.Right(AssetVolumeInfo(true, reissueAmount - burnAmount))),
-        replacingTransactions = Seq(
-          NewTransactionInfo(continuation.copy(fee = stepFee), Set(), Succeeded),
-          NewTransactionInfo(invoke, Set(dAppAddress, transferAddress), Succeeded)
+    ContinuationTransactionDiff(blockchain, continuation.timestamp, false)(continuation).resultE shouldBe
+      Right(
+        Diff.empty.copy(
+          portfolios = Map(
+            invoke.sender.toAddress -> Portfolio(invoke.fee - stepFee),
+            dAppAddress             -> Portfolio.build(scriptedAsset, reissueAmount - burnAmount - transferAmount),
+            transferAddress         -> Portfolio.build(scriptedAsset, transferAmount)
+          ),
+          accountData = Map(dAppAddress -> AccountDataInfo(Map("isAllowed" -> BooleanDataEntry("isAllowed", true)))),
+          scriptsRun = actionScriptInvocations + 1, // with step
+          scriptResults = Map(
+            invoke.id.value() -> InvokeScriptResult(
+              data = Seq(BooleanDataEntry("isAllowed", true)),
+              transfers = Seq(InvokeScriptResult.Payment(transferAddress, scriptedAsset, transferAmount)),
+              reissues = Seq(Reissue(scriptedAssetId, true, reissueAmount)),
+              burns = Seq(Burn(scriptedAssetId, burnAmount))
+            )
+          ),
+          scriptsComplexity = actualComplexity + actionScriptInvocations * assetScriptComplexity,
+          updatedAssets = Map(scriptedAsset -> Ior.Right(AssetVolumeInfo(true, reissueAmount - burnAmount))),
+          replacingTransactions = Seq(
+            NewTransactionInfo(continuation.copy(fee = stepFee), Set(), Succeeded),
+            NewTransactionInfo(invoke, Set(dAppAddress, transferAddress), Succeeded)
+          ),
+          continuationStates = Map(invoke.dAppAddressOrAlias.asInstanceOf[Address] -> ContinuationState.Finished)
         )
       )
-
-    r.continuationStates.size shouldBe 1
-    r.continuationStates(invoke.dAppAddressOrAlias.asInstanceOf[Address]) shouldBe ContinuationState.Finished
   }
 
   property("failed continuation") {
