@@ -252,7 +252,8 @@ class UtxPoolImpl(
   }
 
   private[utx] def nonPriorityTransactions(continuations: Iterable[ContinuationTransaction] = Nil): Seq[Transaction] = {
-    (transactions.values.asScala.toVector ++ continuations)
+    (transactions.values.asScala.view ++ continuations.view)
+      .toSeq
       .sorted(inUTXPoolOrdering)
   }
 
