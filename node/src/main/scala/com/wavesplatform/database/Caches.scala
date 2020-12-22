@@ -153,7 +153,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   protected val continuationStatesCache: mutable.Map[Address, (Int, ContinuationState)] = loadContinuationStates()
   protected def loadContinuationStates(): mutable.Map[Address, (Int, ContinuationState)]
-  override def continuationStates: collection.Map[Address, (Int, ContinuationState)] = continuationStatesCache
+  override def continuationStates: Map[Address, (Int, ContinuationState)] = continuationStatesCache.toMap
 
   //noinspection ScalaStyle
   protected def doAppend(

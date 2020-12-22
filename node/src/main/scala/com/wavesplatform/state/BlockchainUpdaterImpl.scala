@@ -690,7 +690,7 @@ class BlockchainUpdaterImpl(
     }
   }
 
-  override def continuationStates: collection.Map[Address, (Int, ContinuationState)] = readLock {
+  override def continuationStates: Map[Address, (Int, ContinuationState)] = readLock {
     compositeBlockchain.continuationStates
   }
 
