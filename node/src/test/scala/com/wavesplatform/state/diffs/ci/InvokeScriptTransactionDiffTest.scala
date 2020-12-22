@@ -2221,9 +2221,7 @@ class InvokeScriptTransactionDiffTest
         master  <- accountGen
         invoker <- accountGen
         ts      <- timestampGen
-        fee     = 100500000
-//        fee     <- ciFee(240)
-//        _ = println(fee)
+        fee     <- ciFee(1)
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
@@ -2245,6 +2243,69 @@ class InvokeScriptTransactionDiffTest
         }
     }
   }
+
+  property("Crosscontract call require extra fee") {
+     def contract(): DApp = {
+      val expr = {
+        val script =
+          s"""
+             |{-# STDLIB_VERSION 5 #-}
+             |{-# CONTENT_TYPE DAPP #-}
+             |{-#SCRIPT_TYPE ACCOUNT#-}
+             |
+             | @Callable(i)
+             | func default() = {
+             |   ([IntegerEntry("bar", 1)], "return")
+             | }
+             |
+             | @Callable(i)
+             | func foo() = {
+             |  let r = Invoke(this, unit, [], [])
+             |  if r == "return"
+             |  then
+             |   let data = getIntegerValue(this, "bar")
+             |   if data == 1
+             |   then
+             |    [
+             |     IntegerEntry("key", 1)
+             |    ]
+             |   else
+             |    throw("Bad state")
+             |  else
+             |   throw("Bad returned value")
+             | }
+             |""".stripMargin
+        Parser.parseContract(script).get.value
+      }
+
+      compileContractFromExpr(expr, V5)
+    }
+    val scenario =
+      for {
+        master  <- accountGen
+        invoker <- accountGen
+        ts      <- timestampGen
+        fee     <- ciFee(0)
+        gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+        gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+
+        script     = ContractScript(V5, contract())
+        ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 5).explicitGet()
+        fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
+        payments   = List(Payment(10, Waves))
+        invokeTx = InvokeScriptTransaction
+          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .explicitGet()
+      } yield (Seq(gTx1, gTx2, ssTx), invokeTx, master.toAddress)
+
+    forAll(scenario) {
+      case (genesisTxs, invokeTx, dApp) =>
+        assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { ei =>
+          ei should produce("Too many scripts run while invoke")
+        }
+    }
+  }
+
 
   property("Crosscontract call (two accaunts)") {
      def contract(): DApp = {
@@ -2320,8 +2381,7 @@ class InvokeScriptTransactionDiffTest
         invoker <- accountGen
         service <- accountGen
         ts      <- timestampGen
-        fee     = 100500000
-        //fee     <- ciFee(240)
+        fee     <- ciFee(1)
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
@@ -2534,8 +2594,7 @@ class InvokeScriptTransactionDiffTest
         invoker <- accountGen
         service <- accountGen
         ts      <- timestampGen
-        fee     = 100500000
-        //fee     <- ciFee(240)
+        fee     <- ciFee(2)
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
@@ -2639,8 +2698,7 @@ class InvokeScriptTransactionDiffTest
         invoker <- accountGen
         service <- accountGen
         ts      <- timestampGen
-        fee     = 100500000
-        //fee     <- ciFee(240)
+        fee     <- ciFee(2)
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
@@ -2696,9 +2754,7 @@ class InvokeScriptTransactionDiffTest
         master  <- accountGen
         invoker <- accountGen
         ts      <- timestampGen
-        fee     = 100500000
-//        fee     <- ciFee(240)
-//        _ = println(fee)
+        fee     <- ciFee(240)
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
@@ -2808,8 +2864,7 @@ class InvokeScriptTransactionDiffTest
         invoker <- accountGen
         service <- accountGen
         ts      <- timestampGen
-        fee     = 100500000
-        //fee     <- ciFee(240)
+        fee     <- ciFee(3)
         iTx = IssueTransaction
           .selfSigned(2.toByte, service, "True asset", "", ENOUGH_AMT, 8, reissuable = true, Some(assetScript), fee, ts + 1)
           .explicitGet()
@@ -2926,8 +2981,7 @@ class InvokeScriptTransactionDiffTest
         invoker <- accountGen
         service <- accountGen
         ts      <- timestampGen
-        fee     = 100500000
-        //fee     <- ciFee(240)
+        fee     <- ciFee(3)
         iTx = IssueTransaction
           .selfSigned(2.toByte, service, "False asset", "", ENOUGH_AMT, 8, reissuable = true, Some(assetScript), fee, ts + 1)
           .explicitGet()
@@ -3034,8 +3088,7 @@ class InvokeScriptTransactionDiffTest
         invoker <- accountGen
         service <- accountGen
         ts      <- timestampGen
-        fee     = 100500000
-        //fee     <- ciFee(240)
+        fee     <- ciFee(2)
         iTx = IssueTransaction
           .selfSigned(2.toByte, master, "False asset", "", ENOUGH_AMT, 8, reissuable = true, None, fee, ts + 1)
           .explicitGet()
