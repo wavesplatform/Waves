@@ -245,26 +245,6 @@ object TransactionsApiRoute {
     val ScriptExecutionInProgress = "script_execution_in_progress"
   }
 
-  def applicationStatusJsField(isBlockV5: Boolean, applicationStatus: ApplicationStatus): JsObject =
-    if (isBlockV5) {
-      val textValue =
-        applicationStatus match {
-          case Succeeded                 => "succeeded"
-          case ScriptExecutionFailed     => "script_execution_failed"
-          case ScriptExecutionInProgress => "script_execution_in_progress"
-        }
-      JsObject(Map("applicationStatus" -> JsString(textValue)))
-    } else
-      JsObject.empty
-
-  def continuationJsFields(tx: Transaction, blockchain: Blockchain): JsObject =
-    tx match {
-      case i: InvokeScriptTransaction if i.version == TxVersion.V3 =>
-        Json.obj("continuationTransactionIds" -> blockchain.continuationTransactionIds(i.id.value()).map(_.toString))
-      case _ =>
-        Json.obj()
-    }
-
   implicit val transactionProofWrites: Writes[TransactionProof] = Writes { mi =>
     Json.obj(
       "id"               -> mi.id.toString,
@@ -296,6 +276,14 @@ object TransactionsApiRoute {
 
     def height(height: Int): JsObject =
       Json.obj("height" -> height)
+
+    def continuationTransactionIds(tx: Transaction, blockchain: Blockchain): JsObject =
+      tx match {
+        case i: InvokeScriptTransaction if i.version == TxVersion.V3 =>
+          Json.obj("continuationTransactionIds" -> blockchain.continuationTransactionIds(i.id.value()).map(_.toString))
+        case _ =>
+          Json.obj()
+      }
   }
 
   private[http] final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: CommonTransactionsApi) {
@@ -321,6 +309,7 @@ object TransactionsApiRoute {
 
       Seq(
         TransactionJsonSerializer.height(meta.height),
+        TransactionJsonSerializer.continuationTransactionIds(meta.transaction, blockchain),
         applicationStatus(meta.height, meta.status),
         stateChanges,
         specificInfo

@@ -113,7 +113,7 @@ object BlocksApiRoute {
     "transactions" -> JsArray(transactions.map {
       case (transaction, succeeded) =>
         transaction.json() ++
-          TransactionsApiRoute.continuationJsFields(transaction, blockchain) ++
+          TransactionJsonSerializer.continuationTransactionIds(transaction, blockchain) ++
          TransactionJsonSerializer.applicationStatus(blockVersion >= Block.ProtoBlockVersion, succeeded)
     })
   )
