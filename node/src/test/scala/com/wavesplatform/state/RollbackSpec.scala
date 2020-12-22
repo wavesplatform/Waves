@@ -938,7 +938,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.appendBlock(setScript)
 
           def continuation(i: InvokeScriptTransaction, step: Int): ContinuationTransaction =
-            ContinuationTransaction(i.id.value(), step, fee = 0L, Waves)
+            ContinuationTransaction(i.id.value(), step, fee = 0L, Waves, nextTs)
 
           def assertStateInProgress(states: Iterable[(Address, (Int, ContinuationState))], step: Int): Unit =
             inside(states.toList) {

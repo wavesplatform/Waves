@@ -350,7 +350,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
           timestamp
         )
         .explicitGet()
-      continuation = ContinuationTransaction(invoke.id.value(), nonce = 0, fee = 0L, Waves)
+      continuation = ContinuationTransaction(invoke.id.value(), nonce = 0, fee = 0L, Waves, timestamp)
       transfer = TransferTransaction
         .selfSigned(TxVersion.V2, dAppAcc, master.toAddress, Waves, 1L, Waves, fee, ByteStr.empty, timestamp)
         .explicitGet()

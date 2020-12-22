@@ -420,7 +420,7 @@ class UtxPoolImpl(
           }
 
       @tailrec def generateContinuation(invokeId: ByteStr): ContinuationTransaction = {
-        val c = ContinuationTransaction(invokeId, Random.nextInt(Int.MaxValue), 0L, Waves)
+        val c = ContinuationTransaction(invokeId, Random.nextInt(Int.MaxValue), 0L, Waves, time.correctedTime())
         if (blockchain.containsTransaction(c) || transactions.contains(c))
           generateContinuation(invokeId)
         else

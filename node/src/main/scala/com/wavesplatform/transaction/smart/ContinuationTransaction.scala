@@ -16,7 +16,8 @@ case class ContinuationTransaction(
     invokeScriptTransactionId: ByteStr,
     nonce: Int,
     fee: TxAmount,
-    feeAssetId: Asset
+    feeAssetId: Asset,
+    timestamp: TxTimestamp
 ) extends Transaction
     with VersionedTransaction
     with TxWithFee.InCustomAsset {
@@ -46,8 +47,6 @@ case class ContinuationTransaction(
   override val id: Coeval[ByteStr] =
     Coeval.now(FastHashId.create(invokeScriptTransactionId.arr ++ Ints.toByteArray(nonce)))
 
-  override def timestamp: TxTimestamp =
-    0L
 }
 
 object ContinuationTransaction extends TransactionParser {

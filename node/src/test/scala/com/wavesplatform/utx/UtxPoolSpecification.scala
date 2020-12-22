@@ -1088,12 +1088,12 @@ class UtxPoolSpecification
           inside(packResult) {
             case Some(
                 Seq(
-                  ContinuationTransaction(`prioritizedId`, _, 0L, Waves),
-                  ContinuationTransaction(`tailId`, _, 0L, Waves),
-                  ContinuationTransaction(`prioritizedId`, _, 0L, Waves),
-                  ContinuationTransaction(`tailId`, _, 0L, Waves),
-                  ContinuationTransaction(`prioritizedId`, _, 0L, Waves),
-                  ContinuationTransaction(`tailId`, _, 0L, Waves)
+                  ContinuationTransaction(`prioritizedId`, _, 0L, Waves, _),
+                  ContinuationTransaction(`tailId`, _, 0L, Waves, _),
+                  ContinuationTransaction(`prioritizedId`, _, 0L, Waves, _),
+                  ContinuationTransaction(`tailId`, _, 0L, Waves, _),
+                  ContinuationTransaction(`prioritizedId`, _, 0L, Waves, _),
+                  ContinuationTransaction(`tailId`, _, 0L, Waves, _)
                 )
                 ) =>
           }
@@ -1175,9 +1175,9 @@ class UtxPoolSpecification
           val packResult = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1
           inside(packResult) {
             case Some(Seq(
-            ContinuationTransaction(`invokeId`, _, 0L, Waves),
-            ContinuationTransaction(`invokeId`, _, 0L, Waves),
-            ContinuationTransaction(`invokeId`, _, 0L, Waves),
+            ContinuationTransaction(`invokeId`, _, 0L, Waves, _),
+            ContinuationTransaction(`invokeId`, _, 0L, Waves, _),
+            ContinuationTransaction(`invokeId`, _, 0L, Waves, _),
             `transfer`
             )) =>
           }

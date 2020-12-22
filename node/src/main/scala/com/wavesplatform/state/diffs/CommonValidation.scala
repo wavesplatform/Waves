@@ -224,7 +224,7 @@ object CommonValidation {
 
       case _: UpdateAssetInfoTransaction => activationBarrier(BlockchainFeatures.BlockV5)
 
-      case t: ContinuationTransaction => Right(t) // TODO
+      case t: ContinuationTransaction => activationBarrier(BlockchainFeatures.ContinuationTransaction)
 
       case _ => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
@@ -252,7 +252,6 @@ object CommonValidation {
 
   def disallowTxFromPast[T <: Transaction](settings: FunctionalitySettings, prevBlockTime: Option[Long], tx: T): Either[ValidationError, T] =
     prevBlockTime match {
-      case _ if tx.isInstanceOf[ContinuationTransaction] => Right(tx)
       case Some(t) if (t - tx.timestamp) > settings.maxTransactionTimeBackOffset.toMillis =>
         Left(
           Mistiming(
