@@ -7,6 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.TransactionMeta
 import com.wavesplatform.protobuf.transaction.PBRecipients
+import com.wavesplatform.state
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{ApplicationStatus, Transaction}
@@ -176,8 +177,8 @@ object Keys {
   def continuationHistory(addressId: AddressId): Key[Seq[(Height, TransactionId)]] =
     Key(ContinuationHistory, addressId.toByteArray, readContinuationHistory, writeContinuationHistory)
 
-  def continuationState(invokeId: TransactionId, height: Height): Key[Option[(Int, ContinuationState.InProgress)]] =
-    Key.opt(ContinuationStateKey, h(height) ++ invokeId.arr, readContinuationState, writeContinuationState)
+  def continuationState(invokeId: TransactionId, height: Height): Key[Option[(Int, state.ContinuationState.InProgress)]] =
+    Key.opt(ContinuationState, h(height) ++ invokeId.arr, readContinuationState, writeContinuationState)
 
   def continuationTransactions(invokeId: TransactionId): Key[Seq[(Height, TxNum)]] =
     Key(ContinuationTransactions, invokeId.arr, readContinuationTransactions, writeContinuationTransactions)
