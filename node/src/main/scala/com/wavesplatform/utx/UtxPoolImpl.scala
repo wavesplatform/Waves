@@ -213,9 +213,15 @@ class UtxPoolImpl(
     val diffEi = {
       def calculateDiff() = {
         if (forceValidate)
-          TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime(), checkContinuation = false)(priorityPool.compositeBlockchain, tx)
+          TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime(), checkContinuation = false)(
+            priorityPool.compositeBlockchain,
+            tx
+          )
         else
-          TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify, checkContinuation = false)(priorityPool.compositeBlockchain, tx)
+          TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify, checkContinuation = false)(
+            priorityPool.compositeBlockchain,
+            tx
+          )
       }
 
       if (canLock) priorityPool.optimisticRead(calculateDiff())(_.resultE.isLeft)
@@ -252,8 +258,7 @@ class UtxPoolImpl(
   }
 
   private[utx] def nonPriorityTransactions(continuations: Iterable[ContinuationTransaction] = Nil): Seq[Transaction] = {
-    (transactions.values.asScala.view ++ continuations.view)
-      .toSeq
+    (transactions.values.asScala.view ++ continuations.view).toSeq
       .sorted(inUTXPoolOrdering)
   }
 
@@ -280,7 +285,8 @@ class UtxPoolImpl(
   }
 
   private def resolveInvoke(c: ContinuationTransaction): InvokeScriptTransaction =
-    transactions.asScala.get(c.invokeScriptTransactionId)
+    transactions.asScala
+      .get(c.invokeScriptTransactionId)
       .orElse(blockchain.resolveInvoke(c))
       .get
       .asInstanceOf[InvokeScriptTransaction]
@@ -414,7 +420,7 @@ class UtxPoolImpl(
           }
 
       def continuations(seed: PackResult): Iterable[ContinuationTransaction] =
-        (blockchain.continuationStates ++ seed.totalDiff.continuationStates)
+        CompositeBlockchain(blockchain, Some(seed.totalDiff)).continuationStates
           .collect {
             case (_, (_, ContinuationState.InProgress(_, _, invokeId))) =>
               generateContinuation(invokeId)
@@ -428,7 +434,7 @@ class UtxPoolImpl(
           c
       }
 
-      def allValidated(seed: PackResult) : Boolean =
+      def allValidated(seed: PackResult): Boolean =
         (transactions.keys().asScala ++ priorityPool.priorityTransactionIds ++ continuations(seed).map(_.id.value()))
           .forall(seed.validatedTransactions)
 
