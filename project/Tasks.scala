@@ -114,6 +114,7 @@ object Tasks {
     val (vars, funcs)     = readV1V2Data()
     val (varsV3, funcsV3) = readCategorizedData("3")
     val (varsV4, funcsV4) = readCategorizedData("4")
+    val (varsV5, funcsV5) = readCategorizedData("5")
 
     val sourceStr =
       s"""
@@ -122,10 +123,11 @@ object Tasks {
          | object DocSource {
          |   private val regex = "\\\\[(.+?)\\\\]\\\\(.+?\\\\)".r
          |
-         |   lazy val varData  = $vars ++ $varsV3 ++ $varsV4
-         |   lazy val funcData = $funcs ++ (categorizedfuncDataV3 ++ categorizedfuncDataV4).view.mapValues(v => (regex.replaceAllIn(v._1, _.group(1)), v._2, v._4))
+         |   lazy val varData  = $vars ++ $varsV3 ++ $varsV4 ++ $varsV5
+         |   lazy val funcData = $funcs ++ (categorizedfuncDataV3 ++ categorizedfuncDataV4 ++ categorizedfuncDataV5).view.mapValues(v => (regex.replaceAllIn(v._1, _.group(1)), v._2, v._4))
          |   lazy val categorizedfuncDataV3 = $funcsV3
          |   lazy val categorizedfuncDataV4 = $funcsV4
+         |   lazy val categorizedfuncDataV5 = $funcsV5
          | }
       """.stripMargin
 

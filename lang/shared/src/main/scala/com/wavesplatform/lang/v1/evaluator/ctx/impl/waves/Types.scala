@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import com.wavesplatform.lang.ExecutionError
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5}
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.traits.domain.AttachedPayments._
 
@@ -194,9 +194,9 @@ object Types {
 
   def callableReturnType(v: StdLibVersion): Either[ExecutionError, FINAL] =
     v match {
-      case V3 => Right(callableV3ReturnType)
-      case V4 => Right(callableV4ReturnType)
-      case v  => Left(s"DApp is not supported for V$v")
+      case V3      => Right(callableV3ReturnType)
+      case V4 | V5 => Right(callableV4ReturnType)
+      case v       => Left(s"DApp is not supported for $v")
     }
 
   private def payments(multiPaymentAllowed: Boolean) =
