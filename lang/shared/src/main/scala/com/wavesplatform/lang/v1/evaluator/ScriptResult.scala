@@ -260,7 +260,6 @@ object ScriptResult {
           case f                       => err(f, version)
         }
       case (CaseObj(tpe, fields), V5) if fields.size == 2 =>
-                          // XXX V5 need
                           // XXX check tpe
                               (fields("_1"), fields("_2")) match {
                                 case (ARR(actions), ret) => processScriptResultV4(ctx, txId, actions, ret)

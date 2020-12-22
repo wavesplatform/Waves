@@ -74,8 +74,12 @@ object WavesContext {
       calculateAssetIdF,
       transactionFromProtoBytesF(proofsEnabled, version),
       simplifiedIssueActionConstructor,
-      detailedIssueActionConstructor,
-      callDAppF(version)  // Need to move to the V5
+      detailedIssueActionConstructor
+    )
+
+  private def fromV5Funcs(proofsEnabled: Boolean, version: StdLibVersion) =
+    fromV4Funcs(proofsEnabled, version) ++ Array(
+      callDAppF(version)
     )
 
   private def variableFuncs(version: StdLibVersion, c: ContentType, proofsEnabled: Boolean) = {
@@ -97,7 +101,8 @@ object WavesContext {
       version match {
         case V1 | V2 => Array(txByIdF(proofsEnabled, version)) ++ balanceV123Functions
         case V3      => fromV3Funcs(proofsEnabled, version) ++ balanceV123Functions
-        case V4 | V5 => fromV4Funcs(proofsEnabled, version) ++ balanceV4Functions
+        case V4      => fromV4Funcs(proofsEnabled, version) ++ balanceV4Functions
+        case V5      => fromV5Funcs(proofsEnabled, version) ++ balanceV4Functions
      }
     commonFuncs ++ versionSpecificFuncs
   }

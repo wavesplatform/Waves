@@ -75,12 +75,13 @@ class InvokeScriptTransactionDiffTest
 
   private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
-      BlockchainFeatures.SmartAccounts.id   -> 0,
-      BlockchainFeatures.SmartAssets.id     -> 0,
-      BlockchainFeatures.Ride4DApps.id      -> 0,
-      BlockchainFeatures.FeeSponsorship.id  -> 0,
-      BlockchainFeatures.DataTransaction.id -> 0,
-      BlockchainFeatures.BlockV5.id         -> 0
+      BlockchainFeatures.SmartAccounts.id           -> 0,
+      BlockchainFeatures.SmartAssets.id             -> 0,
+      BlockchainFeatures.Ride4DApps.id              -> 0,
+      BlockchainFeatures.FeeSponsorship.id          -> 0,
+      BlockchainFeatures.DataTransaction.id         -> 0,
+      BlockchainFeatures.BlockV5.id                 -> 0,
+      BlockchainFeatures.ContinuationTransaction.id -> 0
     )
   )
 
@@ -2184,7 +2185,7 @@ class InvokeScriptTransactionDiffTest
       val expr = {
         val script =
           s"""
-             |{-# STDLIB_VERSION 4 #-}
+             |{-# STDLIB_VERSION 5 #-}
              |{-# CONTENT_TYPE DAPP #-}
              |{-#SCRIPT_TYPE ACCOUNT#-}
              |
@@ -2213,7 +2214,7 @@ class InvokeScriptTransactionDiffTest
         Parser.parseContract(script).get.value
       }
 
-      compileContractFromExpr(expr, V4)
+      compileContractFromExpr(expr, V5)
     }
     val scenario =
       for {
@@ -2226,7 +2227,7 @@ class InvokeScriptTransactionDiffTest
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        script     = ContractScript(V4, contract())
+        script     = ContractScript(V5, contract())
         ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 5).explicitGet()
         fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments   = List(Payment(10, Waves))
@@ -2250,7 +2251,7 @@ class InvokeScriptTransactionDiffTest
       val expr = {
         val script =
           s"""
-             |{-# STDLIB_VERSION 4 #-}
+             |{-# STDLIB_VERSION 5 #-}
              |{-# CONTENT_TYPE DAPP #-}
              |{-#SCRIPT_TYPE ACCOUNT#-}
              |
@@ -2267,14 +2268,14 @@ class InvokeScriptTransactionDiffTest
         Parser.parseContract(script).get.value
       }
 
-      compileContractFromExpr(expr, V4)
+      compileContractFromExpr(expr, V5)
     }
  
      def contract1(otherAcc: Address, alias: Alias): DApp = {
       val expr = {
         val script =
           s"""
-             |{-# STDLIB_VERSION 4 #-}
+             |{-# STDLIB_VERSION 5 #-}
              |{-# CONTENT_TYPE DAPP #-}
              |{-#SCRIPT_TYPE ACCOUNT#-}
              |
@@ -2311,7 +2312,7 @@ class InvokeScriptTransactionDiffTest
         Parser.parseContract(script).get.value
       }
 
-      compileContractFromExpr(expr, V4)
+      compileContractFromExpr(expr, V5)
     }
     val scenario =
       for {
@@ -2327,8 +2328,8 @@ class InvokeScriptTransactionDiffTest
 
         alias   = Alias.create("alias").explicitGet()
         aliasTx <- createAliasGen(service, alias, fee, ts)
-        script1 = ContractScript(V4, contract1(service.toAddress, alias))
-        script  = ContractScript(V4, contract())
+        script1 = ContractScript(V5, contract1(service.toAddress, alias))
+        script  = ContractScript(V5, contract())
         ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
         ssTx1      = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
         fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
@@ -2353,7 +2354,7 @@ class InvokeScriptTransactionDiffTest
       val expr = {
         val script =
           s"""
-             |{-# STDLIB_VERSION 4 #-}
+             |{-# STDLIB_VERSION 5 #-}
              |{-# CONTENT_TYPE DAPP #-}
              |{-#SCRIPT_TYPE ACCOUNT#-}
              |
@@ -2365,14 +2366,14 @@ class InvokeScriptTransactionDiffTest
         Parser.parseContract(script).get.value
       }
 
-      compileContractFromExpr(expr, V4)
+      compileContractFromExpr(expr, V5)
     }
  
      def contract1(otherAcc: Address): DApp = {
       val expr = {
         val script =
           s"""
-             |{-# STDLIB_VERSION 4 #-}
+             |{-# STDLIB_VERSION 5 #-}
              |{-# CONTENT_TYPE DAPP #-}
              |{-#SCRIPT_TYPE ACCOUNT#-}
              |
@@ -2419,7 +2420,7 @@ class InvokeScriptTransactionDiffTest
         Parser.parseContract(script).get.value
       }
 
-      compileContractFromExpr(expr, V4)
+      compileContractFromExpr(expr, V5)
     }
     val scenario =
       for {
@@ -2433,8 +2434,8 @@ class InvokeScriptTransactionDiffTest
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        script1    = ContractScript(V4, contract1(service.toAddress))
-        script      = ContractScript(V4, contract())
+        script1    = ContractScript(V5, contract1(service.toAddress))
+        script      = ContractScript(V5, contract())
         ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
         ssTx1      = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
         fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
@@ -2459,7 +2460,7 @@ class InvokeScriptTransactionDiffTest
       val expr = {
         val script =
           s"""
-             |{-# STDLIB_VERSION 4 #-}
+             |{-# STDLIB_VERSION 5 #-}
              |{-# CONTENT_TYPE DAPP #-}
              |{-#SCRIPT_TYPE ACCOUNT#-}
              |
@@ -2476,14 +2477,14 @@ class InvokeScriptTransactionDiffTest
         Parser.parseContract(script).get.value
       }
 
-      compileContractFromExpr(expr, V4)
+      compileContractFromExpr(expr, V5)
     }
  
      def contract1(otherAcc: Address): DApp = {
       val expr = {
         val script =
           s"""
-             |{-# STDLIB_VERSION 4 #-}
+             |{-# STDLIB_VERSION 5 #-}
              |{-# CONTENT_TYPE DAPP #-}
              |{-#SCRIPT_TYPE ACCOUNT#-}
              |
@@ -2525,7 +2526,7 @@ class InvokeScriptTransactionDiffTest
         Parser.parseContract(script).get.value
       }
 
-      compileContractFromExpr(expr, V4)
+      compileContractFromExpr(expr, V5)
     }
     val scenario =
       for {
@@ -2539,8 +2540,8 @@ class InvokeScriptTransactionDiffTest
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        script1    = ContractScript(V4, contract1(service.toAddress))
-        script      = ContractScript(V4, contract())
+        script1    = ContractScript(V5, contract1(service.toAddress))
+        script      = ContractScript(V5, contract())
         ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
         ssTx1      = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
         fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
@@ -2565,7 +2566,7 @@ class InvokeScriptTransactionDiffTest
       val expr = {
         val script =
           s"""
-             |{-# STDLIB_VERSION 4 #-}
+             |{-# STDLIB_VERSION 5 #-}
              |{-# CONTENT_TYPE DAPP #-}
              |{-#SCRIPT_TYPE ACCOUNT#-}
              |
@@ -2582,14 +2583,14 @@ class InvokeScriptTransactionDiffTest
         Parser.parseContract(script).get.value
       }
 
-      compileContractFromExpr(expr, V4)
+      compileContractFromExpr(expr, V5)
     }
  
      def contract1(otherAcc: Address): DApp = {
       val expr = {
         val script =
           s"""
-             |{-# STDLIB_VERSION 4 #-}
+             |{-# STDLIB_VERSION 5 #-}
              |{-# CONTENT_TYPE DAPP #-}
              |{-#SCRIPT_TYPE ACCOUNT#-}
              |
@@ -2630,7 +2631,7 @@ class InvokeScriptTransactionDiffTest
         Parser.parseContract(script).get.value
       }
 
-      compileContractFromExpr(expr, V4)
+      compileContractFromExpr(expr, V5)
     }
     val scenario =
       for {
@@ -2644,8 +2645,8 @@ class InvokeScriptTransactionDiffTest
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        script1    = ContractScript(V4, contract1(service.toAddress))
-        script      = ContractScript(V4, contract())
+        script1    = ContractScript(V5, contract1(service.toAddress))
+        script      = ContractScript(V5, contract())
         ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
         ssTx1      = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
         fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
@@ -2670,7 +2671,7 @@ class InvokeScriptTransactionDiffTest
       val expr = {
         val script =
           s"""
-             |{-# STDLIB_VERSION 4 #-}
+             |{-# STDLIB_VERSION 5 #-}
              |{-# CONTENT_TYPE DAPP #-}
              |{-#SCRIPT_TYPE ACCOUNT#-}
              |
@@ -2688,7 +2689,7 @@ class InvokeScriptTransactionDiffTest
         Parser.parseContract(script).get.value
       }
 
-      compileContractFromExpr(expr, V4)
+      compileContractFromExpr(expr, V5)
     }
     val scenario =
       for {
@@ -2701,7 +2702,7 @@ class InvokeScriptTransactionDiffTest
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        script     = ContractScript(V4, contract())
+        script     = ContractScript(V5, contract())
         ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 5).explicitGet()
         fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments   = List(Payment(10, Waves))
@@ -2721,7 +2722,7 @@ class InvokeScriptTransactionDiffTest
   property("Smart asset transfer by nested contract actions") {
      val (assetScript, _) = {
        val script = """
-         |{-# STDLIB_VERSION 4 #-}
+         |{-# STDLIB_VERSION 5 #-}
          |{-# CONTENT_TYPE EXPRESSION #-}
          |
          |true""".stripMargin
@@ -2732,7 +2733,7 @@ class InvokeScriptTransactionDiffTest
       val expr = {
         val script =
           s"""
-             |{-# STDLIB_VERSION 4 #-}
+             |{-# STDLIB_VERSION 5 #-}
              |{-# CONTENT_TYPE DAPP #-}
              |{-#SCRIPT_TYPE ACCOUNT#-}
              |
@@ -2749,14 +2750,14 @@ class InvokeScriptTransactionDiffTest
         Parser.parseContract(script).get.value
       }
 
-      compileContractFromExpr(expr, V4)
+      compileContractFromExpr(expr, V5)
     }
  
      def contract1(otherAcc: Address, asset: ByteStr): DApp = {
       val expr = {
         val script =
           s"""
-             |{-# STDLIB_VERSION 4 #-}
+             |{-# STDLIB_VERSION 5 #-}
              |{-# CONTENT_TYPE DAPP #-}
              |{-#SCRIPT_TYPE ACCOUNT#-}
              |
@@ -2799,7 +2800,7 @@ class InvokeScriptTransactionDiffTest
         Parser.parseContract(script).get.value
       }
 
-      compileContractFromExpr(expr, V4)
+      compileContractFromExpr(expr, V5)
     }
     val scenario =
       for {
@@ -2816,8 +2817,8 @@ class InvokeScriptTransactionDiffTest
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        script1    = ContractScript(V4, contract1(service.toAddress, iTx.id()))
-        script      = ContractScript(V4, contract(iTx.id()))
+        script1    = ContractScript(V5, contract1(service.toAddress, iTx.id()))
+        script      = ContractScript(V5, contract(iTx.id()))
         ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
         ssTx1      = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
         fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
@@ -2840,7 +2841,7 @@ class InvokeScriptTransactionDiffTest
   property("Asset transfer disabled in nested contract actions") {
      val (assetScript, _) = {
        val script = """
-         |{-# STDLIB_VERSION 4 #-}
+         |{-# STDLIB_VERSION 5 #-}
          |{-# CONTENT_TYPE EXPRESSION #-}
          |
          |false""".stripMargin
@@ -2851,7 +2852,7 @@ class InvokeScriptTransactionDiffTest
       val expr = {
         val script =
           s"""
-             |{-# STDLIB_VERSION 4 #-}
+             |{-# STDLIB_VERSION 5 #-}
              |{-# CONTENT_TYPE DAPP #-}
              |{-#SCRIPT_TYPE ACCOUNT#-}
              |
@@ -2868,14 +2869,14 @@ class InvokeScriptTransactionDiffTest
         Parser.parseContract(script).get.value
       }
 
-      compileContractFromExpr(expr, V4)
+      compileContractFromExpr(expr, V5)
     }
  
      def contract1(otherAcc: Address): DApp = {
       val expr = {
         val script =
           s"""
-             |{-# STDLIB_VERSION 4 #-}
+             |{-# STDLIB_VERSION 5 #-}
              |{-# CONTENT_TYPE DAPP #-}
              |{-#SCRIPT_TYPE ACCOUNT#-}
              |
@@ -2917,7 +2918,7 @@ class InvokeScriptTransactionDiffTest
         Parser.parseContract(script).get.value
       }
 
-      compileContractFromExpr(expr, V4)
+      compileContractFromExpr(expr, V5)
     }
     val scenario =
       for {
@@ -2934,8 +2935,8 @@ class InvokeScriptTransactionDiffTest
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        script1    = ContractScript(V4, contract1(service.toAddress))
-        script      = ContractScript(V4, contract(iTx.id()))
+        script1    = ContractScript(V5, contract1(service.toAddress))
+        script      = ContractScript(V5, contract(iTx.id()))
         ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
         ssTx1      = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
         fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
@@ -2959,7 +2960,7 @@ class InvokeScriptTransactionDiffTest
       val expr = {
         val script =
           s"""
-             |{-# STDLIB_VERSION 4 #-}
+             |{-# STDLIB_VERSION 5 #-}
              |{-# CONTENT_TYPE DAPP #-}
              |{-#SCRIPT_TYPE ACCOUNT#-}
              |
@@ -2976,14 +2977,14 @@ class InvokeScriptTransactionDiffTest
         Parser.parseContract(script).get.value
       }
 
-      compileContractFromExpr(expr, V4)
+      compileContractFromExpr(expr, V5)
     }
  
      def contract1(otherAcc: Address): DApp = {
       val expr = {
         val script =
           s"""
-             |{-# STDLIB_VERSION 4 #-}
+             |{-# STDLIB_VERSION 5 #-}
              |{-# CONTENT_TYPE DAPP #-}
              |{-#SCRIPT_TYPE ACCOUNT#-}
              |
@@ -3025,7 +3026,7 @@ class InvokeScriptTransactionDiffTest
         Parser.parseContract(script).get.value
       }
 
-      compileContractFromExpr(expr, V4)
+      compileContractFromExpr(expr, V5)
     }
     val scenario =
       for {
@@ -3042,8 +3043,8 @@ class InvokeScriptTransactionDiffTest
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        script1    = ContractScript(V4, contract1(service.toAddress))
-        script      = ContractScript(V4, contract(iTx.id()))
+        script1    = ContractScript(V5, contract1(service.toAddress))
+        script      = ContractScript(V5, contract(iTx.id()))
         ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
         ssTx1      = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
         fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
