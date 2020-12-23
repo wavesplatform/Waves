@@ -10,9 +10,9 @@ import com.wavesplatform.database.Keys
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
-import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult, TransactionId}
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult, NewTransactionInfo, TransactionId}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction}
 import com.wavesplatform.transaction.{ApplicationStatus, Asset, CreateAliasTransaction, Transaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -135,10 +135,21 @@ object CommonTransactionsApi {
         transactionProof         <- block.transactionProof(transaction, allTransactions)
       } yield transactionProof
 
-    override def continuationTransactionIds(invokeId: ByteStr): Seq[ByteStr] =
-      for {
-        (height, num)     <- db.get(Keys.continuationTransactions(TransactionId(invokeId)))
-        (continuation, _) <- db.get(Keys.transactionAt(height, num)).toSeq
-      } yield continuation.id.value()
+    override def continuationTransactionIds(invokeId: ByteStr): Seq[ByteStr] = {
+      val dbContinuations =
+        for {
+          (height, num)     <- db.get(Keys.continuationTransactions(TransactionId(invokeId)))
+          (continuation, _) <- db.get(Keys.transactionAt(height, num)).toSeq
+        } yield continuation.id.value()
+      val diffContinuations =
+        maybeDiff.fold(Iterable.empty[ByteStr]) {
+          case (_, diff) =>
+            diff.replacingTransactions.collect {
+              case NewTransactionInfo(c: ContinuationTransaction, _, _) if c.invokeScriptTransactionId == invokeId =>
+                c.id.value()
+            }
+        }
+      (dbContinuations ++ diffContinuations).distinct
+    }
   }
 }
