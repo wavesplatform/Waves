@@ -60,10 +60,10 @@ class LeaseActionSuite extends BaseTransactionSuite {
 
   test("active leases") {
     val leaseTxId     = sender.lease(dAppAcc, invokerAddress, leaseAmount, smartMinFee, TxVersion.V2, waitForTx = true).id
-    val leaseTxHeight = sender.height
+    val leaseTxHeight = sender.transactionStatus(leaseTxId).height.get
 
     val invokeId     = sender.invokeScript(invoker, dAppAddress, Some("lease"), Nil, fee = invokeFee, waitForTx = true)._1.id
-    val invokeHeight = sender.height
+    val invokeHeight = sender.transactionStatus(invokeId).height.get
 
     val recipient     = Recipient.Address(ByteStr.decodeBase58(invokerAddress).get)
     val leaseActionId = Lease.calculateId(Lease(recipient, leaseAmount, 0), ByteStr.decodeBase58(invokeId).get).toString
