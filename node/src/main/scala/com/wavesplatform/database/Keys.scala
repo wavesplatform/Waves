@@ -174,7 +174,7 @@ object Keys {
   def nftAt(addressId: AddressId, index: Int, assetId: IssuedAsset): Key[Option[Unit]] =
     Key.opt(NftPossession, addressId.toByteArray ++ Longs.toByteArray(index) ++ assetId.id.arr, _ => (), _ => Array.emptyByteArray)
 
-  def continuationHistory(addressId: AddressId): Key[Seq[(Height, TransactionId)]] =
+  def continuationHistory(addressId: AddressId): Key[Seq[(Height, Option[TransactionId])]] =
     Key(ContinuationHistory, addressId.toByteArray, readContinuationHistory, writeContinuationHistory)
 
   def continuationState(invokeId: TransactionId, height: Height): Key[Option[state.ContinuationState.InProgress]] =

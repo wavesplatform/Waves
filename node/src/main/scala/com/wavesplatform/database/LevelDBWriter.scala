@@ -285,13 +285,13 @@ abstract class LevelDBWriter private[database] (
     val states = mutable.Map[Address, ContinuationState]()
     readOnly { db =>
       db.iterateOver(KeyTags.ContinuationHistory) { entry =>
-        val dAppAddressId            = AddressId(Longs.fromByteArray(entry.getKey.takeRight(8)))
-        val (invokeHeight, invokeId) = readContinuationHistory(entry.getValue).head
-        val stateHeight              = db.get(Keys.continuationTransactions(invokeId)).lastOption.map(_._1).getOrElse(invokeHeight)
-        db.get(Keys.continuationState(invokeId, stateHeight)).foreach { state =>
-          val dAppAddress = db.get(Keys.idToAddress(dAppAddressId))
-          states.put(dAppAddress, state)
-        }
+        for {
+          (stateHeight, invokeIdOpt) <- readContinuationHistory(entry.getValue).headOption
+          invokeId                   <- invokeIdOpt
+          state                      <- db.get(Keys.continuationState(invokeId, stateHeight))
+          dAppAddressId = AddressId(Longs.fromByteArray(entry.getKey.takeRight(8)))
+          dAppAddress   = db.get(Keys.idToAddress(dAppAddressId))
+        } states.put(dAppAddress, state)
       }
     }
     states
@@ -307,19 +307,19 @@ abstract class LevelDBWriter private[database] (
     readOnly(_.db.get(Keys.blockReward(height)))
 
   private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] =
-    updateHistory[Int](rw, key, threshold, kf.andThen(_.keyBytes), identity, identity)
+    updateHistory[Int](rw, key, threshold, kf.andThen(key => Some(key.keyBytes)), identity, identity)
 
   private def updateHistory[A](
       rw: RW,
       key: Key[Seq[A]],
       threshold: Int,
-      keyBytes: A => Array[Byte],
+      keyBytes: A => Option[Array[Byte]],
       toHeight: A => Int,
       headElement: Int => A
   ): Seq[Array[Byte]] = {
     val (c1, c2) = rw.get(key).partition(v => toHeight(v) > threshold)
     rw.put(key, (headElement(height) +: c1) ++ c2.headOption)
-    c2.drop(1).map(keyBytes)
+    c2.drop(1).flatMap(keyBytes)
   }
 
   private def appendBalances(
@@ -637,21 +637,24 @@ abstract class LevelDBWriter private[database] (
 
       continuationStates
         .foreach {
-          case (dAppAddressId, state: ContinuationState.InProgress) =>
-            val invokeId = TransactionId(state.invokeScriptTransactionId)
-            if (state.precedingStepCount == 0) {
-              val hKey = Keys.continuationHistory(dAppAddressId)
-              expiredKeys ++= updateHistory[(Height, TransactionId)](
-                rw,
-                hKey,
-                threshold,
-                { case (height, id) => Keys.continuationState(id, height).keyBytes },
-                { case (height, _)  => height },
-                h => (Height(h), invokeId)
-              )
+          case (dAppAddressId, state) =>
+            val invokeIdOpt = state match {
+              case inProgress: ContinuationState.InProgress =>
+                val invokeId = TransactionId(inProgress.invokeScriptTransactionId)
+                rw.put(Keys.continuationState(invokeId, Height(height)), Some(inProgress))
+                Some(invokeId)
+              case ContinuationState.Finished =>
+                None
             }
-            rw.put(Keys.continuationState(invokeId, Height(height)), Some(state))
-          case _ =>
+            val hKey = Keys.continuationHistory(dAppAddressId)
+            expiredKeys ++= updateHistory[(Height, Option[TransactionId])](
+              rw,
+              hKey,
+              threshold,
+              { case (height, idOpt) => idOpt.map(Keys.continuationState(_, height).keyBytes) },
+              { case (height, _)  => height },
+              h => (Height(h), invokeIdOpt)
+            )
         }
 
       transactions
@@ -813,14 +816,9 @@ abstract class LevelDBWriter private[database] (
                 case tx: InvokeScriptTransaction =>
                   val invokeId      = TransactionId(tx.id.value())
                   val address       = resolveAlias(tx.dAppAddressOrAlias).explicitGet()
-                  val dAppAddressId = addressId(address).get
 
-                  val heightIds = rw.get(Keys.continuationHistory(dAppAddressId))
-                  if (heightIds.headOption.exists(_._2 == invokeId))
-                    if (heightIds.size == 1)
-                      rw.delete(Keys.continuationHistory(dAppAddressId))
-                    else
-                      rw.put(Keys.continuationHistory(dAppAddressId), heightIds.tail)
+                  val dAppAddressId      = rw.get(Keys.addressId(address)).get
+                  clearContinuationHistory(rw, dAppAddressId, currentHeight)
 
                   rw.delete(Keys.continuationState(invokeId, Height(currentHeight)))
                   rw.delete(Keys.continuationTransactions(invokeId))
@@ -833,6 +831,9 @@ abstract class LevelDBWriter private[database] (
                   val invoke   = this.resolveInvoke(tx).get
                   val invokeId = TransactionId(invoke.id.value())
                   val address  = resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
+
+                  val dAppAddressId      = rw.get(Keys.addressId(address)).get
+                  clearContinuationHistory(rw, dAppAddressId, currentHeight)
 
                   continuationDataToDiscard.updateWith(invokeId)(
                     current =>
@@ -903,6 +904,16 @@ abstract class LevelDBWriter private[database] (
         }
       case _ =>
     }
+
+  private def clearContinuationHistory(rw: RW, dAppAddressId: AddressId, height: Int): Unit = {
+    val heightIds = rw.get(Keys.continuationHistory(dAppAddressId))
+    if (heightIds.headOption.exists(_._1 == height))
+      if (heightIds.size == 1) {
+        rw.delete(Keys.continuationHistory(dAppAddressId))
+      } else {
+        rw.put(Keys.continuationHistory(dAppAddressId), heightIds.tail)
+      }
+  }
 
   private def updateContinuationCache(rw: RW, address: Address, continuations: Seq[(Height, TxNum)], invokeId: TransactionId): Unit = {
     val addressId      = rw.get(Keys.addressId(address)).get

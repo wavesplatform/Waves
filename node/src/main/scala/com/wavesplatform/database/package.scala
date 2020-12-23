@@ -280,7 +280,7 @@ package object database extends ScorexLogging {
       .toByteArray
   }
 
-  def readContinuationHistory(bytes: Array[Byte]): Seq[(Height, TransactionId)] = {
+  def readContinuationHistory(bytes: Array[Byte]): Seq[(Height, Option[TransactionId])] = {
     if (bytes == null)
       Seq()
     else {
@@ -288,20 +288,25 @@ package object database extends ScorexLogging {
       (1 to in.readInt()).map { _ =>
         val height = Height(in.readInt())
         val idSize = in.readShort()
-        val id     = TransactionId(in.readByteStr(idSize))
+        val id     = if (idSize == 0) None else Some(TransactionId(in.readByteStr(idSize)))
         (height, id)
       }
     }
   }
 
-  def writeContinuationHistory(states: Seq[(Height, TransactionId)]): Array[Byte] = {
+  def writeContinuationHistory(states: Seq[(Height, Option[TransactionId])]): Array[Byte] = {
     val out = newDataOutput()
     out.writeInt(states.size)
     states.foreach {
       case (height, id) =>
         out.writeInt(height)
-        out.writeShort(id.size)
-        out.writeByteStr(id)
+        id.fold {
+          out.writeShort(0)
+        } { id =>
+          out.writeShort(id.size)
+          out.writeByteStr(id)
+
+        }
     }
     out.toByteArray
   }
