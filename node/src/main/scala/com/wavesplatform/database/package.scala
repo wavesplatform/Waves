@@ -19,6 +19,7 @@ import com.wavesplatform.crypto._
 import com.wavesplatform.database.protobuf.DataEntry.Value
 import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
+import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state.StateHash.SectionId
@@ -293,7 +294,7 @@ package object database extends ScorexLogging {
   def readAssetStaticInfo(bb: Array[Byte]): AssetStaticInfo = {
     val sai = pb.StaticAssetInfo.parseFrom(bb)
     AssetStaticInfo(
-      TransactionId(ByteStr(sai.sourceId.toByteArray)),
+      TransactionId(sai.sourceId.toByteStr),
       PublicKey(sai.issuerPublicKey.toByteArray),
       sai.decimals,
       sai.isNft
@@ -314,18 +315,18 @@ package object database extends ScorexLogging {
       )
       .toByteArray
 
-  def readBlockMeta(height: Int)(bs: Array[Byte]): BlockMeta = {
+  def readBlockMeta(bs: Array[Byte]): BlockMeta = {
     val pbbm = pb.BlockMeta.parseFrom(bs)
     BlockMeta(
       PBBlocks.vanilla(pbbm.header.get),
-      ByteStr(pbbm.signature.toByteArray),
-      Option(pbbm.headerHash).collect { case bs if !bs.isEmpty => ByteStr(bs.toByteArray) },
+      pbbm.signature.toByteStr,
+      Option(pbbm.headerHash).collect { case bs if !bs.isEmpty => bs.toByteStr },
       pbbm.height,
       pbbm.size,
       pbbm.transactionCount,
       pbbm.totalFeeInWaves,
       Option(pbbm.reward).filter(_ >= 0),
-      Option(pbbm.vrf).collect { case bs if !bs.isEmpty => ByteStr(bs.toByteArray) }
+      Option(pbbm.vrf).collect { case bs if !bs.isEmpty => bs.toByteStr }
     )
   }
 
@@ -360,11 +361,11 @@ package object database extends ScorexLogging {
   }
 
   def readStateHash(bs: Array[Byte]): StateHash = {
-    val ndi = newDataInput(bs)
+    val ndi           = newDataInput(bs)
     val sectionsCount = ndi.readByte()
     val sections = (0 until sectionsCount).map { _ =>
       val sectionId = ndi.readByte()
-      val value = ndi.readByteStr(DigestLength)
+      val value     = ndi.readByteStr(DigestLength)
       SectionId(sectionId) -> value
     }
     val totalHash = ndi.readByteStr(DigestLength)
@@ -373,11 +374,12 @@ package object database extends ScorexLogging {
 
   def writeStateHash(sh: StateHash): Array[Byte] = {
     val sorted = sh.sectionHashes.toSeq.sortBy(_._1)
-    val ndo = newDataOutput(crypto.DigestLength + 1 + sorted.length * (1 + crypto.DigestLength))
+    val ndo    = newDataOutput(crypto.DigestLength + 1 + sorted.length * (1 + crypto.DigestLength))
     ndo.writeByte(sorted.length)
-    sorted.foreach { case (sectionId, value) =>
-      ndo.writeByte(sectionId.id.toByte)
-      ndo.writeByteStr(value.ensuring(_.arr.length == DigestLength))
+    sorted.foreach {
+      case (sectionId, value) =>
+        ndo.writeByte(sectionId.id.toByte)
+        ndo.writeByteStr(value.ensuring(_.arr.length == DigestLength))
     }
     ndo.writeByteStr(sh.totalHash.ensuring(_.arr.length == DigestLength))
     ndo.toByteArray
@@ -388,7 +390,7 @@ package object database extends ScorexLogging {
       case Value.Empty              => EmptyDataEntry(key)
       case Value.IntValue(value)    => IntegerDataEntry(key, value)
       case Value.BoolValue(value)   => BooleanDataEntry(key, value)
-      case Value.BinaryValue(value) => BinaryDataEntry(key, ByteStr(value.toByteArray))
+      case Value.BinaryValue(value) => BinaryDataEntry(key, value.toByteStr)
       case Value.StringValue(value) => StringDataEntry(key, value)
     }
 
@@ -554,18 +556,19 @@ package object database extends ScorexLogging {
   }
 
   def loadTransactions(height: Height, db: ReadOnlyDB): Option[Seq[(Transaction, Boolean)]] =
-    for {
-      meta <- db.get(Keys.blockMetaAt(height))
-    } yield (0 until meta.transactionCount).toList.flatMap { n =>
-      db.get(Keys.transactionAt(height, TxNum(n.toShort)))
+    if (height < 1 || db.get(Keys.height) < height) None
+    else {
+      val transactions = Seq.newBuilder[(Transaction, Boolean)]
+      db.iterateOver(KeyTags.NthTransactionInfoAtHeight.prefixBytes ++ Ints.toByteArray(height)) { e =>
+        transactions += readTransaction(e.getValue)
+      }
+      Some(transactions.result())
     }
 
   def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] =
     for {
-      meta <- db.get(Keys.blockMetaAt(height))
-      txs = (0 until meta.transactionCount).toList.flatMap { n =>
-        db.get(Keys.transactionAt(height, TxNum(n.toShort)))
-      }
+      meta  <- db.get(Keys.blockMetaAt(height))
+      txs   <- loadTransactions(height, db)
       block <- createBlock(meta.header, meta.signature, txs.map(_._1)).toOption
     } yield block
 

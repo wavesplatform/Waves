@@ -129,7 +129,7 @@ object Global extends BaseGlobal {
       .longExact
   }
 
-  implicit class BigIntOps(v: BigInteger) {
+  implicit class BigIntOps(val v: BigInteger) extends AnyVal {
     // absent in scala.js BigInteger
     def longExact: Either[String, Long] =
       Either.cond(

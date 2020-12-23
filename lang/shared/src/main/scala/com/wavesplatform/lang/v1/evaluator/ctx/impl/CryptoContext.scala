@@ -16,6 +16,8 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, EvaluationContext, NativeFunction}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 
+import scala.collection.mutable
+
 object CryptoContext {
 
   private val rsaTypeNames = List("NoAlg", "Md5", "Sha1", "Sha224", "Sha256", "Sha384", "Sha512", "Sha3224", "Sha3256", "Sha3384", "Sha3512")
@@ -25,7 +27,7 @@ object CryptoContext {
   }
 
   private def digestAlgorithmType(v: StdLibVersion) =
-    UNION.create(rsaHashAlgs(v), (if(v > V3) { Some("RsaDigestAlgs") } else { None }))
+    UNION.create(rsaHashAlgs(v), if (v > V3) Some("RsaDigestAlgs") else None)
 
   private val rsaHashLib = {
     import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA._
@@ -39,7 +41,14 @@ object CryptoContext {
   private def digestAlgValue(tpe: CASETYPEREF): ContextfulVal[NoContext] =
     ContextfulVal.pure(CaseObj(tpe, Map.empty))
 
-  def build(global: BaseGlobal, version: StdLibVersion): CTX[NoContext] = {
+  def build(global: BaseGlobal, version: StdLibVersion): CTX[NoContext] =
+    ctxCache.getOrElse((global, version), ctxCache.synchronized {
+      ctxCache.getOrElseUpdate((global, version), buildNew(global, version))
+    })
+
+  private val ctxCache = mutable.AnyRefMap.empty[(BaseGlobal, StdLibVersion), CTX[NoContext]]
+
+  private def buildNew(global: BaseGlobal, version: StdLibVersion): CTX[NoContext] = {
     def lgen(
         lim: Array[Int],
         name: ((Int, Int)) => (String, Short),
@@ -86,8 +95,9 @@ object CryptoContext {
         (n => (s"${name}_${n._1}Kb", (internalName + n._2).toShort)),
         costs,
         (n => {
-          case CONST_BYTESTR(msg: ByteStr) :: _ => Either.cond(msg.size <= n * 1024, (), s"Invalid message size = ${msg.size} bytes, must be not greater than $n KB")
-          case xs                               => notImplemented[Id, Unit](s"${name}_${n}Kb(bytes: ByteVector)", xs)
+          case CONST_BYTESTR(msg: ByteStr) :: _ =>
+            Either.cond(msg.size <= n * 1024, (), s"Invalid message size = ${msg.size} bytes, must be not greater than $n KB")
+          case xs => notImplemented[Id, Unit](s"${name}_${n}Kb(bytes: ByteVector)", xs)
         }),
         BYTESTR,
         ("bytes", BYTESTR)
@@ -459,13 +469,13 @@ object CryptoContext {
     val rsaVarNames = List("NOALG", "MD5", "SHA1", "SHA224", "SHA256", "SHA384", "SHA512", "SHA3224", "SHA3256", "SHA3384", "SHA3512")
 
     val v4RsaDig = rsaHashAlgs(V4)
-    val v4Types = v4RsaDig :+ digestAlgorithmType(V4)
+    val v4Types  = v4RsaDig :+ digestAlgorithmType(V4)
 
     val v4Vars: Map[String, (FINAL, ContextfulVal[NoContext])] =
       rsaVarNames.zip(v4RsaDig.map(t => (t, digestAlgValue(t)))).toMap
 
     val v3RsaDig = rsaHashAlgs(V3)
-    val v3Types = v3RsaDig :+ digestAlgorithmType(V3)
+    val v3Types  = v3RsaDig :+ digestAlgorithmType(V3)
 
     val v3Vars: Map[String, (FINAL, ContextfulVal[NoContext])] =
       rsaVarNames.zip(v3RsaDig.map(t => (t, digestAlgValue(t)))).toMap
@@ -482,7 +492,8 @@ object CryptoContext {
       Array(
         bls12Groth16VerifyF,
         bn256Groth16VerifyF,
-        createMerkleRootF, ecrecover,// new in V4
+        createMerkleRootF,
+        ecrecover, // new in V4
         rsaVerifyF,
         toBase16StringF(checkLength = true),
         fromBase16StringF(checkLength = true) // from V3

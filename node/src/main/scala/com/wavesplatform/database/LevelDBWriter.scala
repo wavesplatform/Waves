@@ -19,7 +19,7 @@ import com.wavesplatform.database.protobuf.TransactionMeta
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBTransactions
-import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings, WavesSettings}
+import com.wavesplatform.settings.{BlockchainSettings, DBSettings, WavesSettings}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -280,8 +280,9 @@ abstract class LevelDBWriter private[database] (
   }
 
   override def wavesAmount(height: Int): BigInt = readOnly { db =>
-    if (db.has(Keys.wavesAmount(height))) db.get(Keys.wavesAmount(height))
-    else BigInt(Constants.UnitsInWave * Constants.TotalWaves)
+    val factHeight = height.min(this.height)
+    if (db.has(Keys.wavesAmount(factHeight))) db.get(Keys.wavesAmount(factHeight))
+    else settings.genesisSettings.initialBalance
   }
 
   override def blockReward(height: Int): Option[Long] =
@@ -793,7 +794,7 @@ abstract class LevelDBWriter private[database] (
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
     for {
       TransactionMeta(height, num, TransferTransaction.typeId, _) <- db.get(Keys.transactionMetaById(TransactionId @@ id))
-      tx <- db.get(Keys.transactionAt(Height(height), TxNum(num.toShort))).collect { case (t: TransferTransaction, true) => t }
+      tx                                                          <- db.get(Keys.transactionAt(Height(height), TxNum(num.toShort))).collect { case (t: TransferTransaction, true) => t }
     } yield (height, tx)
   }
 

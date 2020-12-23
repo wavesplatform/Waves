@@ -8,19 +8,12 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter, TestStorageFactory, loadActiveLeases}
 import com.wavesplatform.events.BlockchainUpdateTriggers
-import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{
-  BlockchainSettings,
-  FunctionalitySettings,
-  TestSettings,
-  WavesSettings,
-  loadConfig,
-  TestFunctionalitySettings => TFS
-}
+import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings, loadConfig, TestFunctionalitySettings => TFS}
 import com.wavesplatform.state.diffs.{BlockDiffer, produce}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestLevelDB
@@ -53,9 +46,9 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
     }
   }
 
-  protected def withLevelDBWriter[A](bs: BlockchainSettings)(test: LevelDBWriter => A): A = tempDb { db =>
+  protected def withLevelDBWriter[A](ws: WavesSettings)(test: LevelDBWriter => A): A = tempDb { db =>
     val (_, ldb) = TestStorageFactory(
-      TestSettings.Default.copy(blockchainSettings = bs),
+      ws,
       db,
       ntpTime,
       ignoreSpendableBalanceChanged,
@@ -63,6 +56,9 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
     )
     test(ldb)
   }
+
+  protected def withLevelDBWriter[A](bs: BlockchainSettings)(test: LevelDBWriter => A): A =
+    withLevelDBWriter(TestSettings.Default.copy(blockchainSettings = bs))(test)
 
   def withLevelDBWriter[A](fs: FunctionalitySettings)(test: LevelDBWriter => A): A =
     withLevelDBWriter(TestLevelDB.createTestBlockchainSettings(fs))(test)
@@ -163,9 +159,14 @@ trait WithDomain extends WithState { _: Suite =>
     ds.copy(blockchainSettings = ds.blockchainSettings.copy(functionalitySettings = fs))
   }
 
-  def withDomain[A](settings: WavesSettings = defaultDomainSettings)(test: Domain => A): A =
-    withLevelDBWriter(settings.blockchainSettings) { blockchain =>
-      val bcu = new BlockchainUpdaterImpl(blockchain, Observer.stopped, settings, ntpTime, ignoreBlockchainUpdateTriggers, loadActiveLeases(db, _, _))
+  def domainSettingsWithFeatures(fs: BlockchainFeature*): WavesSettings =
+    domainSettingsWithFS(defaultDomainSettings.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = fs.map(_.id -> 0).toMap))
+
+  def withDomain[A](settings: WavesSettings = defaultDomainSettings, triggers: BlockchainUpdateTriggers = ignoreBlockchainUpdateTriggers)(
+      test: Domain => A
+  ): A =
+    withLevelDBWriter(settings) { blockchain =>
+      val bcu = new BlockchainUpdaterImpl(blockchain, Observer.stopped, settings, ntpTime, triggers, loadActiveLeases(db, _, _))
       try test(Domain(db, bcu, blockchain))
       finally bcu.shutdown()
     }

@@ -17,12 +17,17 @@ import org.iq80.leveldb.DB
 case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter) {
   import Domain._
 
+  def blockchain: BlockchainUpdaterImpl = blockchainUpdater
+
   def lastBlock: Block = {
     blockchainUpdater
       .liquidBlock(blockchainUpdater.lastBlockId.get)
       .orElse(levelDBWriter.lastBlock)
       .get
   }
+
+  def liquidDiff: Diff =
+    blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty)
 
   def effBalance(a: Address): Long = blockchainUpdater.effectiveBalance(a, 1000)
 

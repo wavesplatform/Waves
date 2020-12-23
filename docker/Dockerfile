@@ -22,24 +22,10 @@ RUN                                                                             
     echo "Downloading Waves '${WAVES_VERSION}' from GitHub"                 &&  \
     mkdir -p /waves/node/target                                             &&  \
     releaseUrl="https://github.com/wavesplatform/Waves/releases/download"   &&  \
-    rawContentUrl="https://raw.githubusercontent.com/wavesplatform/Waves"   &&  \
                                                                                 \
     echo "Downloading jar file"                                             &&  \
     curl -fL ${releaseUrl}/v${WAVES_VERSION}/waves-all-${WAVES_VERSION}.jar     \
-        -o /waves/node/target/waves-all-${WAVES_VERSION}.jar                &&  \
-                                                                                \
-    echo "Downloading mainnet config"                                       &&  \
-    curl -fL ${rawContentUrl}/v${WAVES_VERSION}/node/waves-mainnet.conf         \
-        -o /waves/node/waves-mainnet.conf                                   &&  \
-                                                                                \
-    echo "Downloading testnet config"                                       &&  \
-    curl -fL ${rawContentUrl}/v${WAVES_VERSION}/node/waves-testnet.conf         \
-        -o /waves/node/waves-testnet.conf                                   &&  \
-    echo "Downloading stagenet config"                                      &&  \
-    curl -fL ${rawContentUrl}/v${WAVES_VERSION}/node/waves-stagenet.conf        \
-        -o /waves/node/waves-stagenet.conf                                  ||  \
-            curl -fL ${rawContentUrl}/master/node/waves-stagenet.conf           \
-            -o /waves/node/waves-stagenet.conf                                  \
+        -o /waves/node/target/waves-all-${WAVES_VERSION}.jar                    \
 ;} ||                                                                           \
 {                                                                               \
     echo "Downloading sbt '${SBT_VERSION}'"                                 &&  \
@@ -77,7 +63,6 @@ ENV WAVES_HEAP_SIZE=$WAVES_HEAP_SIZE
 ENV WAVES_NETWORK=$WAVES_NETWORK
 
 COPY --from=builder /waves/node/target/waves-all-*.jar /usr/share/waves/lib/
-COPY --from=builder /waves/node/waves-*.conf /usr/share/waves/conf/
 COPY entrypoint.sh /usr/share/waves/bin/
 
 RUN groupadd -g 143 waves                                                   &&  \

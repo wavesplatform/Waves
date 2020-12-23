@@ -15,7 +15,6 @@ import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
-import com.wavesplatform.http.{ApiMarshallers, PlayJsonException}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
@@ -130,12 +129,12 @@ package object http extends ApiMarshallers with ScorexLogging {
 
   val PublicKeySegment: PathMatcher1[PublicKey] = base58Segment(Some(crypto.KeyLength), _ => InvalidPublicKey).map(s => PublicKey(s))
 
-  private val jsonRejectionHandler = RejectionHandler
+  val jsonRejectionHandler: RejectionHandler = RejectionHandler
     .newBuilder()
     .handle { case ValidationRejection(_, Some(PlayJsonException(cause, errors))) => complete(WrongJson(cause, errors)) }
     .result()
 
-  private val jsonExceptionHandler: ExceptionHandler = ExceptionHandler {
+  val jsonExceptionHandler: ExceptionHandler = ExceptionHandler {
     case JsResultException(err)                                         => complete(WrongJson(errors = err))
     case PlayJsonException(cause, errors)                               => complete(WrongJson(cause, errors))
     case e: NoSuchElementException                                      => complete(WrongJson(Some(e)))
@@ -145,20 +144,10 @@ package object http extends ApiMarshallers with ScorexLogging {
   }
 
   def jsonPost[A: Reads](f: A => ToResponseMarshallable): Route =
-    post((handleExceptions(jsonExceptionHandler) & handleRejections(jsonRejectionHandler)) {
-      entity(as[A]) { a =>
-        complete(f(a))
-      }
-    }) ~ get(complete(StatusCodes.MethodNotAllowed))
+    jsonPostD[A].apply(obj => complete(f(obj))) ~ get(complete(StatusCodes.MethodNotAllowed))
 
-  def jsonParammedPost[A: Reads](f: (A, Map[String, String]) => ToResponseMarshallable): Route =
-    post((handleExceptions(jsonExceptionHandler) & handleRejections(jsonRejectionHandler)) {
-      parameterMap { params =>
-        entity(as[A]) { a =>
-          complete(f(a, params))
-        }
-      }
-    }) ~ get(complete(StatusCodes.MethodNotAllowed))
+  def jsonPostD[A: Reads]: Directive1[A] =
+    (post & handleExceptions(jsonExceptionHandler) & handleRejections(jsonRejectionHandler) & entity(as[A]))
 
   def extractScheduler: Directive1[Scheduler] = extractExecutionContext.map(ec => Scheduler(ec))
 

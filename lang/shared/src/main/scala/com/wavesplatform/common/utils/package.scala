@@ -5,7 +5,7 @@ import scala.util.{Failure, Success, Try}
 package object utils {
   val Base58Alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
-  implicit class EitherExt2[A, B](ei: Either[A, B]) {
+  implicit class EitherExt2[A, B](val ei: Either[A, B]) extends AnyVal {
     def explicitGet(): B = ei match {
       case Left(value)  => throw makeException(value)
       case Right(value) => value

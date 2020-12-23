@@ -1,7 +1,9 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.server.Route
+import akka.NotUsed
+import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
+import akka.http.scaladsl.server.{Directive0, Route}
+import akka.stream.scaladsl.Source
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.ApiError._
@@ -10,15 +12,14 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.crypto
 import com.wavesplatform.features.EstimatorProvider._
-import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.meta.FunctionSignatures
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.{Global, ValidationError}
-import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.state.{Blockchain, DataEntry}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{Asset, TransactionFactory}
@@ -33,10 +34,11 @@ case class AddressApiRoute(
     settings: RestAPISettings,
     wallet: Wallet,
     blockchain: Blockchain,
-    utxPoolSynchronizer: UtxPoolSynchronizer,
+    transactionPublisher: TransactionPublisher,
     time: Time,
     limitedScheduler: Scheduler,
-    commonAccountsApi: CommonAccountsApi
+    commonAccountsApi: CommonAccountsApi,
+    maxBalanceDepth: Int
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute
@@ -111,17 +113,20 @@ case class AddressApiRoute(
   }
 
   def balances: Route = (path("balance") & get & parameters(("height".as[Int].?, "address".as[String].*, "asset".?))) {
-    (height, addresses, assetId) =>
-      complete(
-        balancesJson(height.getOrElse(blockchain.height), addresses.toSeq, assetId.fold(Waves: Asset)(a => IssuedAsset(ByteStr.decodeBase58(a).get)))
+    (maybeHeight, addresses, assetId) =>
+      val height = maybeHeight.getOrElse(blockchain.height)
+      validateBalanceDepth(height)(
+        complete(
+          balancesJson(height, addresses.toSeq, assetId.fold(Waves: Asset)(a => IssuedAsset(ByteStr.decodeBase58(a).get)))
+        )
       )
   }
 
   def balancesPost: Route = (path("balance") & (post & entity(as[JsObject]))) { request =>
-    val height    = (request \ "height").asOpt[Int]
+    val height    = (request \ "height").asOpt[Int].getOrElse(blockchain.height)
     val addresses = (request \ "addresses").as[Seq[String]]
     val assetId   = (request \ "asset").asOpt[String]
-    complete(balancesJson(height.getOrElse(blockchain.height), addresses, assetId.fold(Waves: Asset)(a => IssuedAsset(ByteStr.decodeBase58(a).get))))
+    validateBalanceDepth(height)(complete(balancesJson(height, addresses, assetId.fold(Waves: Asset)(a => IssuedAsset(ByteStr.decodeBase58(a).get)))))
   }
 
   def balanceDetails: Route = (path("balance" / "details" / AddrSegment) & get) { address =>
@@ -135,7 +140,9 @@ case class AddressApiRoute(
   def balanceWithConfirmations: Route = {
     (path("balance" / AddrSegment / IntNumber) & get) {
       case (address, confirmations) =>
-        complete(balanceJson(address, confirmations))
+        validateBalanceDepth(blockchain.height - confirmations)(
+          complete(balanceJson(address, confirmations))
+        )
     }
   }
 
@@ -147,8 +154,8 @@ case class AddressApiRoute(
 
   def effectiveBalanceWithConfirmations: Route = {
     path("effectiveBalance" / AddrSegment / IntNumber) { (address, confirmations) =>
-      complete(
-        effectiveBalanceJson(address, confirmations)
+      validateBalanceDepth(blockchain.height - confirmations)(
+        complete(effectiveBalanceJson(address, confirmations))
       )
     }
   }
@@ -173,21 +180,21 @@ case class AddressApiRoute(
 
   def getData: Route =
     pathPrefix("data" / AddrSegment) { address =>
+      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[JsValue, NotUsed]] = jsonStreamMarshaller()
+
       (path(Segment) & get) { key =>
         complete(accountDataEntry(address, key))
       } ~ extractScheduler(
         implicit sc =>
           (formField("matches") | parameter("matches")) { matches =>
-            complete(
-              Try(matches.r)
-                .fold(
-                  { e =>
-                    log.trace(s"Error compiling regex $matches: ${e.getMessage}")
-                    ApiError.fromValidationError(GenericError(s"Cannot compile regex"))
-                  },
-                  _ => accountData(address, matches)
-                )
-            )
+            Try(matches.r)
+              .fold(
+                { e =>
+                  log.trace(s"Error compiling regex $matches: ${e.getMessage}")
+                  complete(ApiError.fromValidationError(GenericError(s"Cannot compile regex")))
+                },
+                _ => complete(accountData(address, matches))
+              )
           } ~ anyParam("key").filter(_.nonEmpty) { keys =>
             complete(accountDataList(address, keys.toSeq: _*))
           } ~ get {
@@ -203,9 +210,9 @@ case class AddressApiRoute(
   def seq: Route = {
     (path("seq" / IntNumber / IntNumber) & get) {
       case (start, end) =>
-        if (start >= 0 && end >= 0 && start - end < MaxAddressesPerRequest) {
-          complete(wallet.privateKeyAccounts.map(_.toAddress).slice(start, end))
-        } else complete(TooBigArrayAllocation)
+        if (start < 0 || end < 0 || start > end) complete(GenericError("Invalid sequence"))
+        else if (end - start >= MaxAddressesPerRequest) complete(TooBigArrayAllocation(MaxAddressesPerRequest))
+        else complete(wallet.privateKeyAccounts.map(_.toAddress).slice(start, end))
     }
   }
 
@@ -232,8 +239,9 @@ case class AddressApiRoute(
       ToResponseMarshallable(balances)
     }
 
-  private def balanceJson(acc: Address, confirmations: Int) =
+  private def balanceJson(acc: Address, confirmations: Int) = {
     Balance(acc.stringRepr, confirmations, commonAccountsApi.balance(acc, confirmations))
+  }
 
   private def balanceJson(acc: Address) = Balance(acc.stringRepr, 0, commonAccountsApi.balance(acc))
 
@@ -251,21 +259,32 @@ case class AddressApiRoute(
     Balance(acc.stringRepr, confirmations, commonAccountsApi.effectiveBalance(acc, confirmations))
   }
 
-  private def accountData(address: Address)(implicit sc: Scheduler) =
-    commonAccountsApi.dataStream(address, None).toListL.runAsyncLogErr.map(_.sortBy(_.key))
+  private[this] def validateBalanceDepth(height: Int): Directive0 = {
+    if (height < blockchain.height - maxBalanceDepth)
+      complete(CustomValidationError(s"Unable to get balance past height ${blockchain.height - maxBalanceDepth}"))
+    else
+      pass
+  }
 
-  private def accountData(addr: Address, regex: String)(implicit sc: Scheduler): ToResponseMarshallable =
+  private def accountData(address: Address)(implicit sc: Scheduler) =
+    commonAccountsApi
+      .dataStream(address, None)
+      .toListL
+      .runAsyncLogErr
+      .map(data => Source.fromIterator(() => data.sortBy(_.key).iterator.map(Json.toJson[DataEntry[_]])))
+
+  private def accountData(addr: Address, regex: String)(implicit sc: Scheduler) =
     commonAccountsApi
       .dataStream(addr, Some(regex))
       .toListL
       .runAsyncLogErr
-      .map(_.sortBy(_.key))
+      .map(data => Source.fromIterator(() => data.sortBy(_.key).iterator.map(Json.toJson[DataEntry[_]])))
 
   private def accountDataEntry(address: Address, key: String): ToResponseMarshallable =
     commonAccountsApi.data(address, key).toRight(DataKeyDoesNotExist)
 
-  private def accountDataList(address: Address, keys: String*): ToResponseMarshallable =
-    keys.flatMap(commonAccountsApi.data(address, _))
+  private def accountDataList(address: Address, keys: String*) =
+    Source.fromIterator(() => keys.flatMap(commonAccountsApi.data(address, _)).iterator.map(Json.toJson[DataEntry[_]]))
 
   private def signPath(address: Address, encode: Boolean): Route = (post & entity(as[String])) { message =>
     withAuth {

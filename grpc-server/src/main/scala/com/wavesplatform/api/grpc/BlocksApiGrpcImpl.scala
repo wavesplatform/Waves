@@ -7,6 +7,7 @@ import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.grpc.BlockRangeRequest.Filter
 import com.wavesplatform.api.grpc.BlockRequest.Request
 import com.wavesplatform.api.http.ApiError.BlockDoesNotExist
+import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.block.PBBlock
 import com.wavesplatform.transaction.Transaction
 import io.grpc.stub.StreamObserver
@@ -31,7 +32,7 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
         commonApi
           .metaRange(request.fromHeight, request.toHeight)
           .map { meta =>
-            BlockWithHeight(Some(PBBlock(Some(meta.header.toPBHeader), meta.signature)), meta.height)
+            BlockWithHeight(Some(PBBlock(Some(meta.header.toPBHeader), meta.signature.toByteString)), meta.height)
           }
 
     responseObserver.completeWith(request.filter match {
@@ -42,29 +43,32 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
   }
 
   override def getBlock(request: BlockRequest): Future[BlockWithHeight] = Future {
-    val result = request.request match {
+    (request.request match {
       case Request.BlockId(blockId) =>
-        commonApi
-          .block(blockId)
-          .map(toBlockWithHeight)
+        if (request.includeTransactions)
+          commonApi
+            .block(blockId.toByteStr)
+            .map(toBlockWithHeight)
+        else commonApi.meta(blockId.toByteStr).map(toBlockWithHeight)
 
       case Request.Height(height) =>
         val actualHeight = if (height > 0) height else commonApi.currentHeight + height
-        commonApi
-          .blockAtHeight(actualHeight)
-          .map(toBlockWithHeight)
+        if (request.includeTransactions)
+          commonApi
+            .blockAtHeight(actualHeight)
+            .map(toBlockWithHeight)
+        else commonApi.metaAtHeight(actualHeight).map(toBlockWithHeight)
 
       case Request.Empty =>
         None
-    }
-
-    val finalResult = if (request.includeTransactions) result else result.map(_.update(_.block.transactions := Nil))
-    finalResult.explicitGetErr(BlockDoesNotExist)
+    }).explicitGetErr(BlockDoesNotExist)
   }
 }
 
 object BlocksApiGrpcImpl {
-  private def toBlockWithHeight(v: (BlockMeta, Seq[(Transaction, Boolean)])) = {
-    BlockWithHeight(Some(PBBlock(Some(v._1.header.toPBHeader), v._1.signature.toPBByteString, v._2.map(_._1.toPB))), v._1.height)
-  }
+  private def toBlockWithHeight(v: (BlockMeta, Seq[(Transaction, Boolean)])) =
+    BlockWithHeight(Some(PBBlock(Some(v._1.header.toPBHeader), v._1.signature.toByteString, v._2.map(_._1.toPB))), v._1.height)
+
+  private def toBlockWithHeight(m: BlockMeta) =
+    BlockWithHeight(Some(PBBlock(Some(m.header.toPBHeader), m.signature.toByteString)), m.height)
 }

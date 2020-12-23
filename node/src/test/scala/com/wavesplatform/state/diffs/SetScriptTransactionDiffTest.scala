@@ -9,15 +9,14 @@ import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.directives.values.{DApp => DAppType}
-import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
-import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
@@ -144,7 +143,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
         | rsaVerify(SHA256, base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')
       """.stripMargin
 
-      val expr = ExpressionCompiler.compile(script, ctx.compilerContext).explicitGet()
+      val expr = ExpressionCompiler.compileBoolean(script, ctx.compilerContext).explicitGet()
       ExprScript(V3, expr).explicitGet()
     }
 
@@ -194,7 +193,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
         | groth16Verify_5inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK') || groth16Verify_1inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')
       """.stripMargin
 
-      val expr = ExpressionCompiler.compile(script, ctx.compilerContext).explicitGet()
+      val expr = ExpressionCompiler.compileBoolean(script, ctx.compilerContext).explicitGet()
       ExprScript(V4, expr).explicitGet()
     }
 

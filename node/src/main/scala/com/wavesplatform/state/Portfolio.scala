@@ -50,7 +50,7 @@ object Portfolio {
       )
   }
 
-  implicit class PortfolioExt(self: Portfolio) {
+  implicit class PortfolioExt(val self: Portfolio) extends AnyVal {
     def spendableBalanceOf(assetId: Asset): Long = assetId.fold(self.spendableBalance)(self.assets.getOrElse(_, 0L))
 
     def pessimistic: Portfolio = Portfolio(

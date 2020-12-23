@@ -72,7 +72,7 @@ object JavaAdapter {
       directiveSet: DirectiveSet
   ): Either[ExecutionError, lang.Expression] =
     for {
-      expr  <- ExpressionCompiler.compile(input, compilerContext)
+      expr  <- ExpressionCompiler.compileBoolean(input, compilerContext)
       bytes <- Right(Global.serializeExpression(expr, directiveSet.stdLibVersion))
     } yield new lang.Expression(
       bytes,

@@ -49,7 +49,7 @@ object ContractLimits {
       EMPTYARR_WEIGHT + (ELEM_WEIGHT + 64L) * 8L +                            // proofs
       EMPTYARR_WEIGHT + (ELEM_WEIGHT + OBJ_WEIGHT + FIELD_WEIGHT * 2L) * 100L // Data entries
 
-  val MaxCmpWeight = 13000L
+  val MaxCmpWeight = 13000
 
   val MinTupleSize = 2
   val MaxTupleSize = 22

@@ -1,9 +1,9 @@
 package com.wavesplatform.api.common
 
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.{protobuf => pb}
-import com.wavesplatform.database.{DBExt, DBResource, Keys}
+import com.wavesplatform.database.{DBExt, DBResource, Keys, protobuf => pb}
 import com.wavesplatform.state.{Diff, Height, InvokeScriptResult, NewTransactionInfo, TransactionId, TxNum}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.{Authorized, GenesisTransaction, Transaction}
@@ -21,28 +21,19 @@ trait AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Observable[(Height, Transaction, Boolean)] =
-    Observable.fromIterator(Task(allAddressTransactions(db, maybeDiff, subject, sender, types, fromId)))
-
-  def invokeScriptResults(
-      db: DB,
-      maybeDiff: Option[(Height, Diff)],
-      subject: Address,
-      sender: Option[Address],
-      types: Set[Transaction.Type],
-      fromId: Option[ByteStr]
   ): Observable[TransactionMeta] =
     Observable
       .fromIterator(Task(allAddressTransactions(db, maybeDiff, subject, sender, types, fromId).map {
-        case (h, ist: InvokeScriptTransaction, status) =>
-          (h, Right(ist -> maybeDiff.flatMap(_._2.scriptResults.get(ist.id())).orElse(loadInvokeScriptResult(db, ist.id()))), status)
-        case (h, tx, status) => (h, Left(tx), status)
+        case (height, transaction, succeeded) =>
+          TransactionMeta.create(height, transaction, succeeded) { ist =>
+            maybeDiff
+              .flatMap { case (_, diff) => diff.scriptResults.get(ist.id()) }
+              .orElse(loadInvokeScriptResult(db, ist.id()))
+          }
       }))
 }
 
 object AddressTransactions {
-  type TransactionMeta = (Height, Either[Transaction, (InvokeScriptTransaction, Option[InvokeScriptResult])], Boolean)
-
   private def loadTransaction(db: DB, height: Height, txNum: TxNum, sender: Option[Address]): Option[(Height, Transaction, Boolean)] =
     db.get(Keys.transactionAt(height, txNum)) match {
       case Some((tx: Authorized, status)) if sender.forall(_ == tx.sender.toAddress) => Some((height, tx, status))
@@ -53,8 +44,8 @@ object AddressTransactions {
   private def loadInvokeScriptResult(resource: DBResource, txId: ByteStr): Option[InvokeScriptResult] =
     for {
       pb.TransactionMeta(h, txNum, InvokeScriptTransaction.typeId, _) <- resource.get(Keys.transactionMetaById(TransactionId(txId)))
-      r                                                               <- resource.get(Keys.invokeScriptResult(h, TxNum(txNum.toShort)))
-    } yield r
+      scriptResult                                                    <- resource.get(Keys.invokeScriptResult(h, TxNum(txNum.toShort)))
+    } yield scriptResult
 
   def loadInvokeScriptResult(db: DB, txId: ByteStr): Option[InvokeScriptResult] =
     db.withResource(r => loadInvokeScriptResult(r, txId))
@@ -111,10 +102,10 @@ object AddressTransactions {
       fromId: Option[ByteStr]
   ): Iterator[(Height, Transaction, Boolean)] =
     (for {
-      (h, diff)                                 <- maybeDiff.toSeq
-      NewTransactionInfo(tx, addresses, status) <- diff.transactions.values.toSeq.reverse
+      (height, diff)                               <- maybeDiff.toSeq
+      NewTransactionInfo(tx, addresses, succeeded) <- diff.transactions.values.toSeq.reverse
       if addresses(subject)
-    } yield (h, tx, status))
+    } yield (height, tx, succeeded))
       .dropWhile { case (_, tx, _) => fromId.isDefined && !fromId.contains(tx.id()) }
       .dropWhile { case (_, tx, _) => fromId.contains(tx.id()) }
       .filter { case (_, tx, _) => types.isEmpty || types.contains(tx.typeId) }
