@@ -670,8 +670,8 @@ abstract class LevelDBWriter private[database] (
         }
         .foreach {
           case (id, newContinuations) =>
-            val currentContinuations = rw.get(Keys.continuationTransactions(id))
-            rw.put(Keys.continuationTransactions(id), currentContinuations ++ newContinuations)
+            val currentContinuations = rw.get(Keys.continuationTransactionsHeightsAndNums(id))
+            rw.put(Keys.continuationTransactionsHeightsAndNums(id), currentContinuations ++ newContinuations)
         }
 
       expiredKeys.foreach(rw.delete(_, "expired-keys"))
@@ -820,7 +820,7 @@ abstract class LevelDBWriter private[database] (
 
                   clearContinuationHistory(rw, dAppAddressId, currentHeight)
                   rw.delete(Keys.continuationState(invokeId, Height(currentHeight)))
-                  rw.delete(Keys.continuationTransactions(invokeId))
+                  rw.delete(Keys.continuationTransactionsHeightsAndNums(invokeId))
                   rw.delete(Keys.invokeScriptResult(h, num))
 
                   continuationStatesCache = continuationStatesCache - address
@@ -895,10 +895,10 @@ abstract class LevelDBWriter private[database] (
       case (invokeId, Some((count, address))) =>
         readWrite { rw =>
           val h                = Height(height)
-          val continuations    = rw.get(Keys.continuationTransactions(invokeId))
+          val continuations    = rw.get(Keys.continuationTransactionsHeightsAndNums(invokeId))
           val newContinuations = continuations.dropRight(count)
 
-          rw.put(Keys.continuationTransactions(invokeId), newContinuations)
+          rw.put(Keys.continuationTransactionsHeightsAndNums(invokeId), newContinuations)
           rw.delete(Keys.continuationState(invokeId, h))
           rw.delete(Keys.invokeScriptResult(h, TxNum(continuations.last._2)))
 
@@ -1143,7 +1143,7 @@ abstract class LevelDBWriter private[database] (
     readOnly(
       db =>
         for {
-          (height, num)     <- db.get(Keys.continuationTransactions(TransactionId(invokeId)))
+          (height, num)     <- db.get(Keys.continuationTransactionsHeightsAndNums(TransactionId(invokeId)))
           (continuation, _) <- db.get(Keys.transactionAt(height, num))
         } yield continuation.id.value()
     )

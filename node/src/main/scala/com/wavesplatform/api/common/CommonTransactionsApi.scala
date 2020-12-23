@@ -138,7 +138,7 @@ object CommonTransactionsApi {
     override def continuationTransactionIds(invokeId: ByteStr): Seq[ByteStr] = {
       val dbContinuations =
         for {
-          (height, num)     <- db.get(Keys.continuationTransactions(TransactionId(invokeId)))
+          (height, num)     <- db.get(Keys.continuationTransactionsHeightsAndNums(TransactionId(invokeId)))
           (continuation, _) <- db.get(Keys.transactionAt(height, num)).toSeq
         } yield continuation.id.value()
       val diffContinuations =

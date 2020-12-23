@@ -180,8 +180,8 @@ object Keys {
   def continuationState(invokeId: TransactionId, height: Height): Key[Option[state.ContinuationState.InProgress]] =
     Key.opt(ContinuationState, h(height) ++ invokeId.arr, readContinuationState, writeContinuationState)
 
-  def continuationTransactions(invokeId: TransactionId): Key[Seq[(Height, TxNum)]] =
-    Key(ContinuationTransactions, invokeId.arr, readContinuationTransactions, writeContinuationTransactions)
+  def continuationTransactionsHeightsAndNums(invokeId: TransactionId): Key[Seq[(Height, TxNum)]] =
+    Key(ContinuationTransactionsHeightsAndNums, invokeId.arr, readContinuationTransactions, writeContinuationTransactions)
 
   def bloomFilterChecksum(filterName: String): Key[Array[Byte]] = Key(KeyTags.BloomFilterChecksum, filterName.utf8Bytes, identity, identity)
 

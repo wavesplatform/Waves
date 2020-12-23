@@ -60,7 +60,7 @@ object KeyTags extends Enumeration {
   StateHash,
   ContinuationHistory,
   ContinuationState,
-  ContinuationTransactions = Value
+  ContinuationTransactionsHeightsAndNums = Value
 
   final implicit class KeyTagExt(val t: KeyTag) extends AnyVal {
     @inline def prefixBytes: Array[Byte] = Shorts.toByteArray(t.id.toShort)
