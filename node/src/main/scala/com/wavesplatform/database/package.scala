@@ -283,32 +283,27 @@ package object database extends ScorexLogging {
   def readContinuationHistory(bytes: Array[Byte]): Seq[(Height, Option[TransactionId])] = {
     if (bytes == null)
       Seq()
-    else {
-      val in = newDataInput(bytes)
-      (1 to in.readInt()).map { _ =>
-        val height = Height(in.readInt())
-        val idSize = in.readShort()
-        val id     = if (idSize == 0) None else Some(TransactionId(in.readByteStr(idSize)))
-        (height, id)
-      }
-    }
+    else
+      pb.ContinuationHistory
+        .parseFrom(bytes)
+        .entries
+        .map { entry =>
+          val invokeIdOpt = entry.optionalId.invokeScriptTransactionId.map(b => TransactionId(b.toByteStr))
+          (Height(entry.height), invokeIdOpt)
+        }
   }
 
   def writeContinuationHistory(states: Seq[(Height, Option[TransactionId])]): Array[Byte] = {
-    val out = newDataOutput()
-    out.writeInt(states.size)
-    states.foreach {
-      case (height, id) =>
-        out.writeInt(height)
-        id.fold {
-          out.writeShort(0)
-        } { id =>
-          out.writeShort(id.size)
-          out.writeByteStr(id)
-
-        }
+    val entries = states.map {
+      case (height, invokeIdOpt) =>
+        pb.ContinuationHistoryEntry(
+          height,
+          invokeIdOpt.fold[pb.ContinuationHistoryEntry.OptionalId](
+            pb.ContinuationHistoryEntry.OptionalId.Empty
+          )(invokeId => pb.ContinuationHistoryEntry.OptionalId.InvokeScriptTransactionId(ByteString.copyFrom(invokeId.arr)))
+        )
     }
-    out.toByteArray
+    pb.ContinuationHistory(entries).toByteArray
   }
 
   def readContinuationTransactions(bytes: Array[Byte]): Seq[(Height, TxNum)] = {

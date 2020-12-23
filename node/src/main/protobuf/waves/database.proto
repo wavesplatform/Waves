@@ -82,3 +82,14 @@ message ContinuationState {
     bytes invoke_script_transaction_id = 3;
     int32 preceding_step_count = 4;
 }
+
+message ContinuationHistory {
+    repeated ContinuationHistoryEntry entries = 1;
+}
+
+message ContinuationHistoryEntry {
+    int32 height = 1;
+    oneof optional_id {
+        bytes invoke_script_transaction_id = 2;
+    }
+}
