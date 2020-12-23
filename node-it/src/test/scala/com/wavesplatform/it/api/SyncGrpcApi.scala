@@ -389,5 +389,10 @@ object SyncGrpcApi extends Assertions {
     }
 
     def getStatuses(request: TransactionsByIdRequest): Seq[PBTransactionStatus] = sync(async(n).getStatuses(request))
+
+    def getStatus(txId: String): PBTransactionStatus = {
+      val request = TransactionsByIdRequest.of(Seq(ByteString.copyFrom(Base58.decode(txId))))
+      sync(async(n).getStatuses(request)).head
+    }
   }
 }
