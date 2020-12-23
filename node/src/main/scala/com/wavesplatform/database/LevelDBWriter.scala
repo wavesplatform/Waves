@@ -897,11 +897,12 @@ abstract class LevelDBWriter private[database] (
           val h                = Height(height)
           val continuations    = rw.get(Keys.continuationTransactions(invokeId))
           val newContinuations = continuations.dropRight(count)
+
           rw.put(Keys.continuationTransactions(invokeId), newContinuations)
           rw.delete(Keys.continuationState(invokeId, h))
           rw.delete(Keys.invokeScriptResult(h, TxNum(continuations.last._2)))
 
-          updateContinuationCache(rw, address, newContinuations, invokeId)
+          updateContinuationCache(rw, address, invokeId)
           setStatusInProgress(rw, invokeId)
         }
       case _ =>
@@ -916,9 +917,9 @@ abstract class LevelDBWriter private[database] (
         rw.put(Keys.continuationHistory(dAppAddressId), heightIds.tail)
   }
 
-  private def updateContinuationCache(rw: RW, address: Address, continuations: Seq[(Height, TxNum)], invokeId: TransactionId): Unit = {
+  private def updateContinuationCache(rw: RW, address: Address, invokeId: TransactionId): Unit = {
     val addressId      = rw.get(Keys.addressId(address)).get
-    val previousHeight = continuations.lastOption.getOrElse(rw.get(Keys.continuationHistory(addressId)).head)._1
+    val previousHeight = rw.get(Keys.continuationHistory(addressId)).head._1
     val previousState  = rw.get(Keys.continuationState(invokeId, previousHeight)).get
     continuationStatesCache.put(address, previousState)
   }
