@@ -89,7 +89,5 @@ message ContinuationHistory {
 
 message ContinuationHistoryEntry {
     int32 height = 1;
-    oneof optional_id {
-        bytes invoke_script_transaction_id = 2;
-    }
+    bytes invoke_script_transaction_id = 2;
 }

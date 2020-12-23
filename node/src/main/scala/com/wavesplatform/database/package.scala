@@ -288,7 +288,11 @@ package object database extends ScorexLogging {
         .parseFrom(bytes)
         .entries
         .map { entry =>
-          val invokeIdOpt = entry.optionalId.invokeScriptTransactionId.map(b => TransactionId(b.toByteStr))
+          val invokeIdOpt =
+            if (entry.invokeScriptTransactionId.isEmpty)
+              None
+            else
+              Some(TransactionId(entry.invokeScriptTransactionId.toByteStr))
           (Height(entry.height), invokeIdOpt)
         }
   }
@@ -298,9 +302,7 @@ package object database extends ScorexLogging {
       case (height, invokeIdOpt) =>
         pb.ContinuationHistoryEntry(
           height,
-          invokeIdOpt.fold[pb.ContinuationHistoryEntry.OptionalId](
-            pb.ContinuationHistoryEntry.OptionalId.Empty
-          )(invokeId => pb.ContinuationHistoryEntry.OptionalId.InvokeScriptTransactionId(ByteString.copyFrom(invokeId.arr)))
+          invokeIdOpt.fold(ByteString.EMPTY)(invokeId => ByteString.copyFrom(invokeId.arr))
         )
     }
     pb.ContinuationHistory(entries).toByteArray
