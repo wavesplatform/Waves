@@ -17,17 +17,11 @@ trait PoSCalculator {
   ): Long
 
   def calculateDelay(hit: BigInt, bt: Long, balance: Long): Long
-
-  def calculateInitialBaseTarget(
-      hit: BigInt,
-      desiredDelay: Long,
-      balance: Long
-  ): Long
 }
 
 object PoSCalculator {
   private[consensus] val HitSize: Int        = 8
-  private[consensus] val MinBaseTarget: Long = 9
+  val MinBaseTarget: Long = 9
 
   def generationSignature(signature: ByteStr, publicKey: PublicKey): Array[Byte] = {
     val s = new Array[Byte](crypto.DigestLength * 2)
@@ -88,14 +82,11 @@ object NxtPoSCalculator extends PoSCalculator {
   }
 
   def calculateDelay(hit: BigInt, bt: Long, balance: Long): Long = Math.ceil((BigDecimal(hit) / (BigDecimal(bt) * balance)).toDouble).toLong * 1000
-
-  def calculateInitialBaseTarget(hit: BigInt, desiredDelay: Long, balance: Long): Long =
-    Math.ceil(((BigDecimal(hit) * 1000) / (BigDecimal(desiredDelay) * balance)).toDouble).toLong
 }
 
 object FairPoSCalculator {
-  lazy val V1 = FairPoSCalculator(5000, 0)
-  lazy val V2 = FairPoSCalculator(15000, 8)
+  lazy val V1: FairPoSCalculator = FairPoSCalculator(5000, 0)
+  lazy val V2: FairPoSCalculator = FairPoSCalculator(15000, 8)
 
   def fromSettings(fs: FunctionalitySettings): PoSCalculator =
     if (fs.minBlockTime.toSeconds == 15 && fs.delayDelta == 8) V2
@@ -136,11 +127,5 @@ case class FairPoSCalculator(minBlockTime: Int, delayDelta: Int) extends PoSCalc
         else if (avg < minDelay) prevBaseTarget - math.max(1, prevBaseTarget / 100)
         else prevBaseTarget
     }
-  }
-
-  def calculateInitialBaseTarget(hit: BigInt, desiredDelay: Long, balance: Long): Long = {
-    val h  = (BigDecimal(hit) / MaxHit).toDouble
-    val bt = C2 * math.log(h) / balance / (1 - math.pow(math.E, (desiredDelay - minBlockTime).toDouble / C1))
-    Math.floor(bt).toLong
   }
 }

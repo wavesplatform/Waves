@@ -4,22 +4,16 @@ import java.io.{File, FileNotFoundException}
 import java.nio.file.Files
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{Address, AddressScheme, Alias, KeyPair}
-import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{Block, SignedBlockHeader}
+import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSCalculator.{generationSignature, hit}
 import com.wavesplatform.consensus.{FairPoSCalculator, NxtPoSCalculator, PoSCalculator}
 import com.wavesplatform.crypto._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
-import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
-import com.wavesplatform.state._
-import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, GenesisTransaction, Transaction}
+import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
+import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.utils._
 import com.wavesplatform.wallet.Wallet
 import net.ceedubs.ficus.Ficus._
@@ -33,7 +27,7 @@ object GenesisBlockGenerator extends App {
   private type SeedText = String
   private type Share    = Long
 
-  case class DistributionItem(seedText: String, nonce: Int, amount: Share, miner: Boolean = true)
+  case class DistributionItem(seedText: String, nonce: Int = 0, amount: Share, miner: Boolean = true)
 
   case class Settings(
       networkType: String,
@@ -202,7 +196,7 @@ object GenesisBlockGenerator extends App {
         else FairPoSCalculator.V1
       else NxtPoSCalculator
 
-    val hitSource = ByteStr(Array.fill(crypto.DigestLength)(0: Byte))
+    val hitSource = ByteStr(new Array[Byte](crypto.DigestLength))
 
     def getHit(account: KeyPair): BigInt = {
       val gs = if (settings.preActivated(BlockchainFeatures.BlockV5)) {
@@ -213,63 +207,23 @@ object GenesisBlockGenerator extends App {
       hit(gs)
     }
 
-    val (bt, delay, account, balance) =
-      shares
-        .filter(_._1.miner)
-        .map {
-          case (accountInfo, amount) =>
-            def calc(delay: FiniteDuration) = posCalculator.calculateInitialBaseTarget(getHit(accountInfo.account), delay.toMillis, amount)
+    shares.collect {
+      case (accountInfo, amount) if accountInfo.miner =>
+        val hit = getHit(accountInfo.account)
 
-            @tailrec
-            def search(delay: FiniteDuration): Long = {
-              val bt = calc(delay)
-              if (bt > 0) bt else search(delay + 10.millis)
+        @tailrec def calculateBaseTarget(keyPair: KeyPair, minBT: Long, maxBT: Long, balance: Long): Long =
+          if (maxBT - minBT <= 1) maxBT
+          else {
+            val newBT = (maxBT + minBT) / 2
+            val delay = posCalculator.calculateDelay(hit, newBT, balance)
+            if (math.abs(delay - settings.averageBlockDelay.toMillis) < 1000) newBT
+            else {
+              val (min, max) = if (delay > settings.averageBlockDelay.toMillis) (newBT, maxBT) else (minBT, newBT)
+              calculateBaseTarget(keyPair, min, max, balance)
             }
+          }
 
-            val calculatedBT = calc(settings.averageBlockDelay)
-            val initialBT =
-              if (calculatedBT > 0) calculatedBT
-              else search(settings.averageBlockDelay + 10.millis)
-
-            val calcDelay = posCalculator.calculateDelay(getHit(accountInfo.account), initialBT, amount)
-            (initialBT, calcDelay, accountInfo.account, amount)
-        }
-        .filter(_._2 >= settings.averageBlockDelay.toMillis)
-        .minBy(_._2 - settings.averageBlockDelay.toMillis)
-
-    //noinspection ScalaStyle
-    println(s"First generated block timestamp: ${timestamp + posCalculator.calculateDelay(getHit(account), bt, balance)}, delay: $delay")
-    bt
+        calculateBaseTarget(accountInfo.account, PoSCalculator.MinBaseTarget, 1000000, amount)
+    }.max
   }
-}
-
-case class InitialBlockchain(hitSource: ByteStr, settings: BlockchainSettings) extends Blockchain {
-  def height: Int                                                                              = 1
-  def score: BigInt                                                                            = 0
-  def blockHeader(height: Int): Option[SignedBlockHeader]                                      = None
-  def hitSource(height: Int): Option[ByteStr]                                                  = Some(hitSource)
-  def carryFee: Long                                                                           = 0
-  def heightOf(blockId: ByteStr): Option[Int]                                                  = None
-  def approvedFeatures: Map[Short, Int]                                                        = Map()
-  def activatedFeatures: Map[Short, Int]                                                       = settings.functionalitySettings.preActivatedFeatures
-  def featureVotes(height: Int): Map[Short, Int]                                               = Map()
-  def blockReward(height: Int): Option[Long]                                                   = None
-  def blockRewardVotes(height: Int): Seq[Long]                                                 = Seq()
-  def wavesAmount(height: Int): BigInt                                                         = 0
-  def transferById(id: ByteStr): Option[(Int, TransferTransaction)]                            = None
-  def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)]                        = None
-  def transactionMeta(id: ByteStr): Option[(Int, Boolean)]                                     = None
-  def containsTransaction(tx: Transaction): Boolean                                            = false
-  def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription]                        = None
-  def resolveAlias(a: Alias): Either[ValidationError, Address]                                 = Left(GenericError("Empty blockchain"))
-  def leaseDetails(leaseId: ByteStr): Option[LeaseDetails]                                     = None
-  def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee                                       = VolumeAndFee.empty
-  def balanceAtHeight(address: Address, height: Int, assetId: Asset): Option[(Int, Long)]      = None
-  def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = Seq()
-  def accountScript(address: Address): Option[AccountScriptInfo]                               = None
-  def hasAccountScript(address: Address): Boolean                                              = false
-  def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo]                              = None
-  def accountData(acc: Address, key: String): Option[DataEntry[_]]                             = None
-  def leaseBalance(address: Address): LeaseBalance                                             = LeaseBalance.empty
-  def balance(address: Address, mayBeAssetId: Asset): Long                                     = 0
 }
