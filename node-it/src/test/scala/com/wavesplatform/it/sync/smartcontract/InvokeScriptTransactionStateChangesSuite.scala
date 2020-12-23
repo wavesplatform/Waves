@@ -33,70 +33,6 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
   private lazy val recipientAddress: String = recipient.toAddress.toString
   private lazy val callerAddress: String    = caller.toAddress.toString
 
-  test("prepare") {
-    simpleAsset = sender.issue(contract, "simple", "", 9000, 0).id
-    assetSponsoredByDApp = sender.issue(contract, "DApp asset", "", 9000, 0).id
-    assetSponsoredByRecipient = sender.issue(recipient, "Recipient asset", "", 9000, 0, waitForTx = true).id
-    sender.massTransfer(contract, List(Transfer(callerAddress, 3000), Transfer(recipientAddress, 3000)), 0.01.waves, assetId = Some(simpleAsset))
-    sender.massTransfer(
-      contract,
-      List(Transfer(callerAddress, 3000), Transfer(recipientAddress, 3000)),
-      0.01.waves,
-      assetId = Some(assetSponsoredByDApp)
-    )
-    sender.massTransfer(
-      recipient,
-      List(Transfer(callerAddress, 3000), Transfer(contractAddress, 3000)),
-      0.01.waves,
-      assetId = Some(assetSponsoredByRecipient)
-    )
-    sender.sponsorAsset(contract, assetSponsoredByDApp, 1, fee = sponsorReducedFee + smartFee)
-    sender.sponsorAsset(recipient, assetSponsoredByRecipient, 5, fee = sponsorReducedFee + smartFee)
-
-    val script = ScriptCompiler
-      .compile(
-        """
-        |{-# STDLIB_VERSION 3 #-}
-        |{-# CONTENT_TYPE DAPP #-}
-        |{-# SCRIPT_TYPE ACCOUNT #-}
-        |
-        |@Callable(i)
-        |func write(value: Int) = {
-        |    WriteSet([DataEntry("result", value)])
-        |}
-        |
-        |@Callable(i)
-        |func sendAsset(recipient: String, amount: Int, assetId: String) = {
-        |    TransferSet([ScriptTransfer(Address(recipient.fromBase58String()), amount, assetId.fromBase58String())])
-        |}
-        |
-        |@Callable(i)
-        |func writeAndSendWaves(value: Int, recipient: String, amount: Int) = {
-        |    ScriptResult(
-        |        WriteSet([DataEntry("result", value)]),
-        |        TransferSet([ScriptTransfer(Address(recipient.fromBase58String()), amount, unit)])
-        |    )
-        |}
-      """.stripMargin,
-        ScriptEstimatorV2
-      )
-      .explicitGet()
-      ._1
-      .bytes()
-      .base64
-    sender.setScript(contract, Some(script), setScriptFee, waitForTx = true)
-
-    initCallerTxs = sender.transactionsByAddress(callerAddress, 100).length
-    initDAppTxs = sender.transactionsByAddress(contractAddress, 100).length
-    initRecipientTxs = sender.transactionsByAddress(recipientAddress, 100).length
-    initCallerStateChanges = sender.debugStateChangesByAddress(callerAddress, 100).length
-    initDAppStateChanges = sender.debugStateChangesByAddress(contractAddress, 100).length
-    initRecipientStateChanges = sender.debugStateChangesByAddress(recipientAddress, 100).length
-    initCallerTxs shouldBe initCallerStateChanges
-    initDAppTxs shouldBe initDAppStateChanges
-    initRecipientTxs shouldBe initRecipientStateChanges
-  }
-
   test("write") {
     val data = 10
 
@@ -110,8 +46,9 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
 
     val js = invokeTx._2
 
-    (js \ "trace" \ 0 \ "result" \ "vars" \ 0 \ "name").as[String] shouldBe "value"
-    (js \ "trace" \ 0 \ "result" \ "vars" \ 0 \ "value").as[String] shouldBe data.toString
+    (js \ "trace" \ 0 \ "vars" \ 0 \ "name").as[String] shouldBe "value"
+    (js \ "trace" \ 0 \ "vars" \ 0 \ "type").as[String] shouldBe "Int"
+    (js \ "trace" \ 0 \ "vars" \ 0 \ "value").as[Int] shouldBe data
 
     val id = sender.signedBroadcast(invokeTx._1, waitForTx = true).id
 
@@ -365,6 +302,74 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       }
     }
 
+  }
+
+  protected override def beforeAll(): Unit = {
+    super.beforeAll()
+
+    simpleAsset = sender.issue(contract, "simple", "", 9000, 0).id
+    assetSponsoredByDApp = sender.issue(contract, "DApp asset", "", 9000, 0).id
+    assetSponsoredByRecipient = sender.issue(recipient, "Recipient asset", "", 9000, 0, waitForTx = true).id
+    sender.massTransfer(contract, List(Transfer(callerAddress, 3000), Transfer(recipientAddress, 3000)), 0.01.waves, assetId = Some(simpleAsset))
+    sender.massTransfer(
+      contract,
+      List(Transfer(callerAddress, 3000), Transfer(recipientAddress, 3000)),
+      0.01.waves,
+      assetId = Some(assetSponsoredByDApp)
+    )
+    sender.massTransfer(
+      recipient,
+      List(Transfer(callerAddress, 3000), Transfer(contractAddress, 3000)),
+      0.01.waves,
+      assetId = Some(assetSponsoredByRecipient)
+    )
+    sender.sponsorAsset(contract, assetSponsoredByDApp, 1, fee = sponsorReducedFee + smartFee)
+    sender.sponsorAsset(recipient, assetSponsoredByRecipient, 5, fee = sponsorReducedFee + smartFee)
+
+    val script = ScriptCompiler
+      .compile(
+        """
+          |{-# STDLIB_VERSION 3 #-}
+          |{-# CONTENT_TYPE DAPP #-}
+          |{-# SCRIPT_TYPE ACCOUNT #-}
+          |
+          |@Callable(i)
+          |func write(value: Int) = {
+          |    WriteSet([DataEntry("result", value)])
+          |}
+          |
+          |@Callable(i)
+          |func sendAsset(recipient: String, amount: Int, assetId: String) = {
+          |    TransferSet([ScriptTransfer(Address(recipient.fromBase58String()), amount, assetId.fromBase58String())])
+          |}
+          |
+          |@Callable(i)
+          |func writeAndSendWaves(value: Int, recipient: String, amount: Int) = {
+          |    ScriptResult(
+          |        WriteSet([DataEntry("result", value)]),
+          |        TransferSet([ScriptTransfer(Address(recipient.fromBase58String()), amount, unit)])
+          |    )
+          |}
+      """.stripMargin,
+        ScriptEstimatorV2
+      )
+      .explicitGet()
+      ._1
+      .bytes()
+      .base64
+    sender.setScript(contract, Some(script), setScriptFee, waitForTx = true)
+    nodes.waitForEmptyUtx()
+    nodes.waitForHeightArise()
+
+    initCallerTxs = sender.transactionsByAddress(callerAddress, 100).length
+    initDAppTxs = sender.transactionsByAddress(contractAddress, 100).length
+    initRecipientTxs = sender.transactionsByAddress(recipientAddress, 100).length
+    initCallerStateChanges = sender.debugStateChangesByAddress(callerAddress, 100).length
+    initDAppStateChanges = sender.debugStateChangesByAddress(contractAddress, 100).length
+    initRecipientStateChanges = sender.debugStateChangesByAddress(recipientAddress, 100).length
+    initCallerTxs shouldBe initCallerStateChanges
+    initDAppTxs shouldBe initDAppStateChanges
+    initRecipientTxs shouldBe initRecipientStateChanges
   }
 
   def txInfoShouldBeEqual(info: TransactionInfo, stateChanges: DebugStateChanges)(implicit pos: Position): Unit = {

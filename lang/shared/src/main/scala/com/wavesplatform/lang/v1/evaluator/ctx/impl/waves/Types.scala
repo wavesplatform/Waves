@@ -90,7 +90,7 @@ object Types {
   val deleteDataEntry: CASETYPEREF  = CASETYPEREF(FieldNames.DeleteEntry, List("key" -> STRING))
 
   private val typedDataEntries =
-    List(booleanDataEntry, stringDataEntry, binaryDataEntry, intDataEntry)
+    List(booleanDataEntry, stringDataEntry, binaryDataEntry, intDataEntry, deleteDataEntry)
 
   def commonDataEntryType(v: StdLibVersion): FINAL =
     if (v >= V4) UNION(typedDataEntries) else genericDataEntry
@@ -188,7 +188,7 @@ object Types {
     UNION(callableV3Results: _*)
 
   private val callableV4ReturnType =
-    LIST(UNION.create(commonDataEntryType(V4) :: deleteDataEntry :: scriptTransfer :: callableV4Actions))
+    LIST(UNION.create(commonDataEntryType(V4) :: scriptTransfer :: callableV4Actions))
 
   def callableReturnType(v: StdLibVersion): Either[ExecutionError, FINAL] =
     v match {
@@ -263,7 +263,8 @@ object Types {
     )
   )
 
-  def buildInvokeScriptTransactionType(proofsEnabled: Boolean, version: StdLibVersion) =
+  def buildInvokeScriptTransactionType(proofsEnabled: Boolean, version: StdLibVersion) = {
+    val argTypes = UNION(LONG, STRING, BOOLEAN, BYTESTR, LIST(UNION(LONG, STRING, BOOLEAN, BYTESTR)))
     CASETYPEREF(
       "InvokeScriptTransaction",
       addProofsIfNeeded(
@@ -271,11 +272,12 @@ object Types {
           "dApp"       -> addressOrAliasType,
           "feeAssetId" -> optionByteVector,
           "function"   -> STRING,
-          "args"       -> LIST(UNION(LONG, STRING, BOOLEAN, BYTESTR))
+          "args"       -> LIST(argTypes)
         ) ++ header ++ proven :+ payments(version.supportsMultiPayment),
         proofsEnabled
       )
     )
+  }
 
   def buildReissueTransactionType(proofsEnabled: Boolean) = CASETYPEREF(
     "ReissueTransaction",
@@ -506,6 +508,6 @@ object Types {
       transactionsCommonType
     ) ++
       transactionTypes ++
-      (if (v >= V4) balanceDetailsType :: deleteDataEntry :: typedDataEntries else Seq(genericDataEntry))
+      (if (v >= V4) balanceDetailsType :: typedDataEntries else Seq(genericDataEntry))
   }
 }

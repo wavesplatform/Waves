@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.block.{PBBlockHeaders, PBBlocks}
+import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state._
@@ -78,7 +78,7 @@ object Block extends ScorexLogging {
 
   def protoHeaderHash(h: BlockHeader): ByteStr = {
     require(h.version >= ProtoBlockVersion)
-    ByteStr(crypto.fastHash(PBBlockHeaders.protobuf(h).toByteArray))
+    ByteStr(crypto.fastHash(PBBlocks.protobuf(h).toByteArray))
   }
 
   def referenceLength(version: Byte): Int =

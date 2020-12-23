@@ -1,5 +1,9 @@
 package com.wavesplatform.mining
 
+import scala.concurrent.duration._
+import scala.util.Random
+
+import com.wavesplatform.{TestValues, TransactionGen}
 import com.wavesplatform.account.Alias
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils._
@@ -11,13 +15,9 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction, TxVersion}
 import com.wavesplatform.utils.Schedulers
 import com.wavesplatform.utx.UtxPoolImpl
-import com.wavesplatform.{TestValues, TransactionGen}
 import monix.execution.Scheduler
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{FlatSpec, Matchers}
-
-import scala.concurrent.duration._
-import scala.util.Random
 
 class MicroBlockMinerSpec extends FlatSpec with Matchers with PathMockFactory with WithDomain with TransactionGen {
   "Micro block miner" should "generate microblocks in flat interval" in {
@@ -35,7 +35,8 @@ class MicroBlockMinerSpec extends FlatSpec with Matchers with PathMockFactory wi
         utxPool,
         settings.minerSettings,
         scheduler,
-        scheduler
+        scheduler,
+        identity
       )
 
       def generateBlocks(
@@ -59,7 +60,7 @@ class MicroBlockMinerSpec extends FlatSpec with Matchers with PathMockFactory wi
         result match {
           case res @ MicroBlockMinerImpl.Success(b, totalConstraint) =>
             val isFirstBlock = block.transactionData.isEmpty
-            val elapsed = (res.nanoTime - startTime).nanos.toMillis
+            val elapsed      = (res.nanoTime - startTime).nanos.toMillis
 
             if (isFirstBlock) elapsed should be < 1000L
             else elapsed shouldBe settings.minerSettings.microBlockInterval.toMillis +- 1000
@@ -89,8 +90,8 @@ class MicroBlockMinerSpec extends FlatSpec with Matchers with PathMockFactory wi
       d.appendBlock(baseBlock)
 
       val constraint = OneDimensionalMiningConstraint(5, TxEstimators.one, "limit")
-      val lastBlock = generateBlocks(baseBlock, constraint, 0)
+      val lastBlock  = generateBlocks(baseBlock, constraint, 0)
       lastBlock.transactionData should have size constraint.rest.toInt
     }
-    }
+  }
 }

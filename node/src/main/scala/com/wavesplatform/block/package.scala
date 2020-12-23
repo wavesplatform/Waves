@@ -15,13 +15,13 @@ import scala.util.Try
 package object block {
 
   // Validation
-  private[block] implicit class BlockValidationOps(block: Block) {
+  private[block] implicit class BlockValidationOps(val block: Block) extends AnyVal {
     def validate: Validation[Block]                             = validateBlock(block)
     def validateToTry: Try[Block]                               = toTry(validateBlock(block))
     def validateGenesis(gs: GenesisSettings): Validation[Block] = validateGenesisBlock(block, gs)
   }
 
-  private[block] implicit class MicroBlockValidationOps(microBlock: MicroBlock) {
+  private[block] implicit class MicroBlockValidationOps(val microBlock: MicroBlock) extends AnyVal  {
     def validate: Validation[MicroBlock] = validateMicroBlock(microBlock)
     def validateToTry: Try[MicroBlock]   = toTry(validateMicroBlock(microBlock))
   }
@@ -29,11 +29,11 @@ package object block {
   private def toTry[A](result: Validation[A]): Try[A] = result.leftMap(ge => new IllegalArgumentException(ge.err)).toTry
 
   // Sign
-  private[block] implicit class BlockSignOps(block: Block) {
+  private[block] implicit class BlockSignOps(val block: Block) extends AnyVal  {
     def sign(signer: PrivateKey): Block = block.copy(signature = crypto.sign(signer, block.bodyBytes()))
   }
 
-  private[block] implicit class MicroBlockSignOps(microBlock: MicroBlock) {
+  private[block] implicit class MicroBlockSignOps(val microBlock: MicroBlock) extends AnyVal  {
     def sign(signer: PrivateKey): MicroBlock = microBlock.copy(signature = crypto.sign(signer, microBlock.bytesWithoutSignature()))
   }
 

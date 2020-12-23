@@ -20,7 +20,7 @@ object JavaAdapter {
 
   def compile(input: String): EXPR = {
     ExpressionCompiler
-      .compile(input, ctx)
+      .compileBoolean(input, ctx)
       .fold(
         error => throw new IllegalArgumentException(error),
         res => res

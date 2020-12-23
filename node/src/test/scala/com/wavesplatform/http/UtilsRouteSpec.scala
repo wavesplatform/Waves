@@ -3,13 +3,14 @@ package com.wavesplatform.http
 import akka.http.scaladsl.testkit.RouteTestTimeout
 import cats.implicits._
 import com.google.protobuf.ByteString
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
+import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.UtilsApiRoute
 import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
-import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
@@ -23,17 +24,19 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v1.{FunctionHeader, Serde}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
-import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.{Schedulers, Time}
 import io.netty.util.HashedWheelTimer
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json.{JsArray, JsObject, JsString, JsValue}
+import play.api.libs.json._
 
 import scala.concurrent.duration._
 class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks with PathMockFactory {
@@ -41,13 +44,15 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   implicit val timeout          = routeTestTimeout.duration
 
   private val estimator = ScriptEstimatorV2
-  private val route = UtilsApiRoute(
+
+  private val utilsApi: UtilsApiRoute = UtilsApiRoute(
     new Time {
       def correctedTime(): Long = System.currentTimeMillis()
-      def getTimestamp(): Long  = System.currentTimeMillis()
+
+      def getTimestamp(): Long = System.currentTimeMillis()
     },
     restAPISettings,
-    estimator,
+    () => estimator,
     Schedulers.timeBoundedFixedPool(
       new HashedWheelTimer(),
       5.seconds,
@@ -55,7 +60,8 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       "rest-time-limited"
     ),
     stub[Blockchain]("globalBlockchain")
-  ).route
+  )
+  private val route = utilsApi.route
 
   val script = FUNCTION_CALL(
     function = PureContext.eq.header,
@@ -671,6 +677,111 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         val seed = Base58.tryDecodeWithLimit((responseAs[JsValue] \ "seed").as[String])
         seed.get.length shouldEqual l
       }
+    }
+  }
+
+  routePath("/script/evaluate/{address}") in {
+    val testScript = {
+      val str = s"""
+                   |{-# STDLIB_VERSION 4 #-}
+                   |{-# CONTENT_TYPE DAPP #-}
+                   |{-# SCRIPT_TYPE ACCOUNT #-}
+                   |
+                   |func test(i: Int) = i * 10
+                   |func testB() = true
+                   |func testBS() = base58'MATCHER'
+                   |func testS() = "Test"
+                   |func testF() = throw("Test")
+                   |func testCompl() = ${"sigVerify(base58'', base58'', base58'') ||" * 100} true
+                   |func testThis() = this
+                   |func testListArg(list: List[String|ByteVector|Int], str: String, bytes: ByteVector) = list.containsElement(str)
+                   |
+                   |@Callable(i)
+                   |func testCallable() = [BinaryEntry("test", i.caller.bytes)]
+                   |""".stripMargin
+
+      val (script, _) = ScriptCompiler.compile(str, ScriptEstimatorV2).explicitGet()
+      AccountScriptInfo(PublicKey(new Array[Byte](32)), script, 0, Map.empty)
+    }
+
+    val dAppAddress = TxHelpers.defaultSigner.toAddress
+
+    def evalScript(text: String) =
+      Post(routePath(s"/script/evaluate/$dAppAddress"), Json.obj("expr" -> text))
+
+    def evalBin(expr: EXPR) = {
+      val serialized = ByteStr(Serde.serialize(expr))
+      Post(routePath(s"/script/evaluate/$dAppAddress"), Json.obj("expr" -> serialized.toString))
+    }
+
+    def responseJson: JsObject = {
+      val fullJson = responseAs[JsObject]
+      (fullJson \ "address").as[String] shouldBe dAppAddress.stringRepr
+      (fullJson \ "expr").as[String] should not be empty
+      (fullJson \ "result").asOpt[JsObject].getOrElse(fullJson - "address" - "expr")
+    }
+
+    (utilsApi.blockchain.hasAccountScript _).when(dAppAddress).returning(false).once()
+
+    evalScript("testNone()") ~> route ~> check {
+      responseAs[JsObject] shouldBe Json.obj("error" -> 199, "message" -> s"Address $dAppAddress is not dApp")
+    }
+
+    (utilsApi.blockchain.hasAccountScript _).when(dAppAddress).returning(true).anyNumberOfTimes()
+    (utilsApi.blockchain.accountScript _).when(dAppAddress).returning(Some(testScript)).anyNumberOfTimes()
+
+    evalScript("testListArg([\"test\", 111, base64'dGVzdA==', false], \"test\", base58'aaa')") ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Boolean", "value" -> true)
+    }
+
+    evalScript("testCallable()") ~> route ~> check {
+      responseAs[String] shouldBe "{\"result\":{\"type\":\"Array\",\"value\":[{\"type\":\"BinaryEntry\",\"value\":{\"key\":{\"type\":\"String\",\"value\":\"test\"},\"value\":{\"type\":\"ByteVector\",\"value\":\"11111111111111111111111111\"}}}]},\"expr\":\"testCallable()\",\"address\":\"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9\"}"
+    }
+
+    evalScript("testThis()") ~> route ~> check {
+      responseJson shouldBe Json.obj(
+        "type"  -> "Address",
+        "value" -> Json.obj("bytes" -> Json.obj("type" -> "ByteVector", "value" -> "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"))
+      )
+    }
+
+    evalScript("testNone()") ~> route ~> check {
+      responseJson shouldBe Json.obj("error" -> 306, "message" -> "Function or type 'testNone' not found")
+    }
+
+    evalScript("testCompl()") ~> route ~> check {
+      responseJson shouldBe Json.obj("error" -> 306, "message" -> "Calculation complexity limit exceeded")
+    }
+
+    evalScript("testF()") ~> route ~> check {
+      responseJson shouldBe Json.obj("error" -> 306, "message" -> "Test")
+    }
+
+    evalScript("test(123)") ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Int", "value" -> 1230)
+    }
+
+    evalBin(FUNCTION_CALL(FunctionHeader.User("test"), List(CONST_LONG(123)))) ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Int", "value" -> 1230)
+    }
+
+    evalScript("testS()") ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "String", "value" -> "Test")
+    }
+
+    evalScript("testB()") ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Boolean", "value" -> true)
+    }
+
+    evalScript("testBS()") ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "ByteVector", "value" -> "MATCHER")
+    }
+
+    evalScript("""match test(123) {
+        |  case i: Int => i * 123
+        |  case _ => throw("")
+        |}""".stripMargin) ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Int", "value" -> 151290)
     }
   }
 

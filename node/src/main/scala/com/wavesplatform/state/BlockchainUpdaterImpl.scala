@@ -56,8 +56,11 @@ class BlockchainUpdaterImpl(
 
   private lazy val maxBlockReadinessAge = wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
 
-  private var ngState: Option[NgState]              = Option.empty
-  private var restTotalConstraint: MiningConstraint = MiningConstraints(leveldb, leveldb.height).total
+  @volatile
+  private[this] var ngState: Option[NgState] = Option.empty
+
+  @volatile
+  private[this] var restTotalConstraint: MiningConstraint = MiningConstraints(leveldb, leveldb.height).total
 
   private val internalLastBlockInfo = ReplaySubject.createLimited[LastBlockInfo](1)
 
@@ -494,7 +497,7 @@ class BlockchainUpdaterImpl(
               val transactionsRoot = ng.createTransactionsRoot(microBlock)
               blockchainUpdateTriggers.onProcessMicroBlock(microBlock, detailedDiff, this, blockId, transactionsRoot)
 
-              ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis, Some(blockId))
+              this.ngState = Some(ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis, Some(blockId)))
 
               log.info(s"${microBlock.stringRepr(blockId)} appended, diff=${diff.hashString}")
               internalLastBlockInfo.onNext(LastBlockInfo(blockId, height, score, ready = true))
@@ -561,8 +564,9 @@ class BlockchainUpdaterImpl(
   override def wavesAmount(height: Int): BigInt = readLock {
     ngState match {
       case Some(ng) if this.height == height =>
-        leveldb.wavesAmount(height - 1) + ng.reward.fold(BigInt(0))(BigInt(_))
-      case _ => leveldb.wavesAmount(height)
+        leveldb.wavesAmount(height - 1) + BigInt(ng.reward.getOrElse(0L))
+      case _ =>
+        leveldb.wavesAmount(height)
     }
   }
 
@@ -689,6 +693,7 @@ class BlockchainUpdaterImpl(
   private[this] def compositeBlockchain =
     ngState.fold(leveldb: Blockchain)(CompositeBlockchain(leveldb, _))
 
+  //noinspection ScalaStyle,TypeAnnotation
   private[this] object metrics {
     val blockMicroForkStats       = Kamon.counter("blockchain-updater.block-micro-fork").withoutTags()
     val microMicroForkStats       = Kamon.counter("blockchain-updater.micro-micro-fork").withoutTags()

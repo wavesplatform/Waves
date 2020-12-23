@@ -1,8 +1,8 @@
 package com.wavesplatform.transaction.smart.script.trace
 
 import cats.implicits._
-import cats.{Applicative, Apply, Functor}
 import cats.kernel.Semigroup
+import cats.{Applicative, Apply, Functor}
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.transaction.Transaction
 import play.api.libs.json.{JsObject, Json}
@@ -49,13 +49,13 @@ final case class TracedResult[+E, +A](
 object TracedResult {
   implicit def wrapE[A, E](e: Either[E, A]): TracedResult[E, A] = TracedResult(e)
 
-  implicit def wrapValue[A, E](value: A): TracedResult[E, A] = TracedResult(Right(value))
+  def wrapValue[A, E](value: A): TracedResult[E, A] = TracedResult(Right(value))
 
   implicit def tracedResultSemigroup[A: Semigroup, E]: Semigroup[TracedResult[E, A]] =
     (a, b) =>
       TracedResult(
         a.resultE |+| b.resultE,
-        if (a.resultE.isRight) a.trace |+| b.trace else a.trace
+        a.trace |+| b.trace
       )
 
   implicit def applicativeTracedResult[L]: Applicative[TracedResult[L, ?]] with Apply[TracedResult[L, ?]] with Functor[TracedResult[L, ?]]  = new Applicative[TracedResult[L, ?]] {

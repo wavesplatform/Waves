@@ -103,7 +103,7 @@ object Keys {
     Key(ChangedDataKeys, hBytes(addressId.toByteArray, height), readStrings, writeStrings)
 
   def blockMetaAt(height: Height): Key[Option[BlockMeta]] =
-    Key.opt(BlockInfoAtHeight, h(height), readBlockMeta(height), writeBlockMeta)
+    Key.opt(BlockInfoAtHeight, h(height), readBlockMeta, writeBlockMeta)
 
   def blockInfoBytesAt(height: Height): Key[Option[Array[Byte]]] =
     Key.opt(

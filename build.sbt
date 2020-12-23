@@ -7,9 +7,8 @@
  */
 
 import sbt.Keys._
-import sbt._
+import sbt.{Project, _}
 import sbtcrossproject.CrossPlugin.autoImport.{CrossType, crossProject}
-import sbtcrossproject.CrossProject
 
 val langPublishSettings = Seq(
   coverageExcludedPackages := "",
@@ -36,7 +35,7 @@ lazy val lang =
           PB.protoSources := Seq(PB.externalIncludePath.value, baseDirectory.value.getParentFile / "shared" / "src" / "main" / "protobuf"),
           includeFilter in PB.generate := { (f: File) =>
             (** / "DAppMeta.proto").matches(f.toPath) ||
-              (** / "waves" / "*.proto").matches(f.toPath)
+            (** / "waves" / "*.proto").matches(f.toPath)
           },
           PB.deleteTargetDirectory := false
         )
@@ -82,7 +81,7 @@ lazy val `node-it`        = project.dependsOn(node, `grpc-server`)
 lazy val `node-generator` = project.dependsOn(node, `node` % "compile")
 lazy val benchmark        = project.dependsOn(node % "compile;test->test")
 
-lazy val `blockchain-updates` = project.dependsOn(node % "compile;test->test;runtime->provided")
+lazy val `curve25519-test` = project.dependsOn(node)
 
 lazy val root = (project in file("."))
   .aggregate(
@@ -93,8 +92,7 @@ lazy val root = (project in file("."))
     node,
     `node-it`,
     `node-generator`,
-    benchmark,
-    `blockchain-updates`
+    benchmark
   )
 
 inScope(Global)(
@@ -102,7 +100,7 @@ inScope(Global)(
     scalaVersion := "2.13.3",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
-    V.fallback := (1, 2, 13),
+    V.fallback := (1, 2, 16),
     organizationHomepage := Some(url("https://wavesplatform.com")),
     scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/Waves"), "git@github.com:wavesplatform/Waves.git", None)),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
@@ -116,7 +114,8 @@ inScope(Global)(
       "-Ywarn-unused:-implicits",
       "-Xlint",
       "-opt:l:inline",
-      "-opt-inline-from:**"
+      "-opt-inline-from:**",
+      "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s" // Ignore gRPC warnings
     ),
     crossPaths := false,
     scalafmtOnCompile := false,
@@ -156,8 +155,6 @@ packageAll := Def
       (node / Debian / packageBin).value
       (`grpc-server` / Universal / packageZipTarball).value
       (`grpc-server` / Debian / packageBin).value
-      (`blockchain-updates` / Universal / packageZipTarball).value
-      (`blockchain-updates` / Debian / packageBin).value
     }
   )
   .value
@@ -170,16 +167,20 @@ checkPRRaw := Def
       (Test / compile).value
       (`lang-tests` / Test / test).value
       (`lang-js` / Compile / fastOptJS).value
+      (`grpc-server` / Test / test).value
       (node / Test / test).value
     }
   )
   .value
 
 def checkPR: Command = Command.command("checkPR") { state =>
-  val updatedState = Project
+  val newState = Project
     .extract(state)
-    .appendWithoutSession(Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings")), state)
-  Project.extract(updatedState).runTask(checkPRRaw, updatedState)
+    .appendWithoutSession(
+      Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings")),
+      state
+    )
+  Project.extract(newState).runTask(checkPRRaw, newState)
   state
 }
 

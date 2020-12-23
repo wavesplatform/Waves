@@ -162,7 +162,6 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         Recipient.Address(callerAddress),
         callerPublicKey,
         AttachedPayments.Single(None),
-        ByteStr.empty,
         transactionId,
         fee,
         feeAssetId
@@ -174,7 +173,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
   def parseCompileAndVerify(script: String, tx: Tx): Either[ExecutionError, EVALUATED] = {
     val parsed   = Parser.parseContract(script).get.value
     val compiled = ContractCompiler(ctx.compilerContext, parsed, V3).explicitGet()
-    val txObject = Bindings.transactionObject(tx, proofsEnabled = true)
+    val txObject = Bindings.transactionObject(tx, proofsEnabled = true, V3)
     ContractEvaluator.verify(
       compiled.decs,
       compiled.verifierFuncOpt.get,

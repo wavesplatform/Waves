@@ -18,9 +18,8 @@ import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
 import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.http.{BroadcastRoute, CustomJson}
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -32,6 +31,7 @@ import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
+import io.netty.util.concurrent.DefaultThreadFactory
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import play.api.libs.json._
@@ -41,19 +41,26 @@ import scala.concurrent.Future
 case class AssetsApiRoute(
     settings: RestAPISettings,
     wallet: Wallet,
-    utxPoolSynchronizer: UtxPoolSynchronizer,
+    transactionPublisher: TransactionPublisher,
     blockchain: Blockchain,
     time: Time,
     commonAccountApi: CommonAccountsApi,
-    commonAssetsApi: CommonAssetsApi
+    commonAssetsApi: CommonAssetsApi,
+    maxDistributionDepth: Int
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {
 
-  private[this] val distributionTaskScheduler = {
-    val executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue[Runnable](AssetsApiRoute.MAX_DISTRIBUTION_TASKS))
-    Scheduler(executor)
-  }
+  private[this] val distributionTaskScheduler = Scheduler(
+    new ThreadPoolExecutor(
+      1,
+      1,
+      0L,
+      TimeUnit.MILLISECONDS,
+      new LinkedBlockingQueue[Runnable](AssetsApiRoute.MAX_DISTRIBUTION_TASKS),
+      new DefaultThreadFactory("balance-distribution", true)
+    )
+  )
 
   private def deprecatedRoute: Route =
     (path("transfer") & withAuth) {
@@ -177,7 +184,7 @@ case class AssetsApiRoute(
     optionalHeaderValueByType[Accept](()) { accept =>
       val paramsEi: Either[ValidationError, DistributionParams] =
         AssetsApiRoute
-          .validateDistributionParams(blockchain, heightParam, limitParam, settings.distributionAddressLimit, afterParam)
+          .validateDistributionParams(blockchain, heightParam, limitParam, settings.distributionAddressLimit, afterParam, maxDistributionDepth)
 
       paramsEi match {
         case Right((height, limit, after)) =>
@@ -263,34 +270,44 @@ object AssetsApiRoute {
       heightParam: Int,
       limitParam: Int,
       maxLimit: Int,
-      afterParam: Option[String]
+      afterParam: Option[String],
+      maxDistributionDepth: Int
   ): Either[ValidationError, DistributionParams] = {
     for {
       limit  <- validateLimit(limitParam, maxLimit)
-      height <- validateHeight(blockchain, heightParam)
+      height <- validateHeight(blockchain, heightParam, maxDistributionDepth)
       after <- afterParam
         .fold[Either[ValidationError, Option[Address]]](Right(None))(addrString => Address.fromString(addrString).map(Some(_)))
     } yield (height, limit, after)
   }
 
-  def validateHeight(blockchain: Blockchain, height: Int): Either[ValidationError, Int] = {
+  def validateHeight(blockchain: Blockchain, height: Int, maxDistributionDepth: Int): Either[ValidationError, Int] = {
     for {
+      _ <- Either.cond(height > 0, (), GenericError(s"Height should be greater than zero"))
+      _ <- Either.cond(
+        height != blockchain.height,
+        (),
+        GenericError(s"Using 'assetDistributionAtHeight' on current height can lead to inconsistent result")
+      )
+      _ <- Either.cond(
+        height < blockchain.height,
+        (),
+        GenericError(s"Asset distribution available only at height not greater than ${blockchain.height - 1}")
+      )
       _ <- Either
-        .cond(height > 0, (), GenericError(s"Height should be greater than zero"))
-      _ <- Either
-        .cond(height != blockchain.height, (), GenericError(s"Using 'assetDistributionAtHeight' on current height can lead to inconsistent result"))
-      _ <- Either
-        .cond(height < blockchain.height, (), GenericError(s"Asset distribution available only at height not greater than ${blockchain.height - 1}"))
+        .cond(
+          height >= blockchain.height - maxDistributionDepth,
+          (),
+          GenericError(s"Unable to get distribution past height ${blockchain.height - maxDistributionDepth}")
+        )
     } yield height
 
   }
 
   def validateLimit(limit: Int, maxLimit: Int): Either[ValidationError, Int] = {
     for {
-      _ <- Either
-        .cond(limit > 0, (), GenericError("Limit should be greater than 0"))
-      _ <- Either
-        .cond(limit < maxLimit, (), GenericError(s"Limit should be less than $maxLimit"))
+      _ <- Either.cond(limit > 0, (), GenericError("Limit should be greater than 0"))
+      _ <- Either.cond(limit <= maxLimit, (), GenericError(s"Limit should be less than or equal to $maxLimit"))
     } yield limit
   }
 
@@ -311,7 +328,7 @@ object AssetsApiRoute {
       } yield (ts, h)
 
     for {
-      tsh <- additionalInfo(description.source)
+      tsh <- additionalInfo(description.assetId)
       (timestamp, height) = tsh
       script              = description.script.filter(_ => full)
       name                = description.name.toStringUtf8
@@ -333,7 +350,7 @@ object AssetsApiRoute {
           case 0           => JsNull
           case sponsorship => JsNumber(sponsorship)
         }),
-        "originTransactionId" -> JsString(description.source.toString)
+        "originTransactionId" -> JsString(description.assetId.toString)
       ) ++ script.toSeq.map {
         case AssetScriptInfo(script, complexity) =>
           "scriptDetails" -> Json.obj(

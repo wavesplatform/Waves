@@ -55,7 +55,7 @@ object Exporter extends ScorexLogging {
         IO.createOutputStream(outputFilename) match {
           case Success(output) =>
             var exportedBytes = 0L
-            val bos           = new BufferedOutputStream(output)
+            val bos           = new BufferedOutputStream(output, 10 * 1024 * 1024)
             val start         = System.currentTimeMillis()
             exportedBytes += IO.writeHeader(bos, format)
             (2 to height).foreach { h =>
@@ -153,9 +153,13 @@ object Exporter extends ScorexLogging {
         .action((h, c) => c.copy(exportHeight = Some(h)))
         .validate(h => if (h > 0) success else failure("Export height must be > 0")),
       opt[String]('f', "format")
+        .hidden()
         .text("Output file format")
         .valueName(s"<${Formats.list.mkString("|")}> (default is ${Formats.default})")
-        .action((f, c) => c.copy(format = f))
+        .action { (f, c) =>
+          log.warn("Export file format option is deprecated and will be removed eventually")
+          c.copy(format = f)
+        }
         .validate {
           case f if Formats.isSupported(f.toUpperCase) => success
           case f                                       => failure(s"Unsupported format: $f")

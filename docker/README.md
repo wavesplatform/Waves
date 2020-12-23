@@ -8,18 +8,20 @@ Waves is a decentralized platform that allows any user to issue, transfer, swap 
 This Docker image contains scripts and configs to run Waves Node for `mainnet`, 'testnet' or 'stagenet' networks.
 The image is focused on fast and convenient deployment of Waves Node.
 
+GitHub repository: https://github.com/wavesplatform/Waves/tree/master/docker
+
 ## Prerequisites
 It is highly recommended to read more about [Waves Node configuration](https://docs.wavesplatform.com/en/waves-Node/Node-configuration.html) before running the container.
 
 ## Building Docker image
 
 Dockerfile supports 3 main scenarios:
-1. Basic scenario `docker build .` - build an image with the latest Waves Node release available
+1. Basic scenario `docker build -t wavesplatform/wavesnode .` - build an image with the latest Waves Node release available
 *Note*: pre-releases are skipped
 2. Existing Version scenario `docker build --build-arg WAVES_VERSION=1.1.1` - specify the version of Waves Node available in GitHub Releases. If this version does not exist, this is the next scenario.
 3. Build scenario `docker build --build-arg WAVES_VERSION=99.99.99 --build-arg BRANCH=version-0.17.x` - this scenario assumes that you want to build Waves Node from sources. Use `WAVES_VERSION` build argument to specify a Git tag ('v' is added automatically) and `BRANCH` to specify a Git branch to checkout to. Make sure you specify a tag that does not exist in the repo, otherwise it is the previous scenario.
 
-**You can specify following aarguments when building the inage:**
+**You can specify following arguments when building the image:**
 
 
 |Argument              | Default value |Description   |
@@ -47,7 +49,7 @@ docker run -v /docker/waves/waves-data:/var/lib/waves -v /docker/waves/waves-con
 
 3. By default, `/etc/waves/waves.conf` config includes `/etc/waves/local.conf`. Custom `/etc/waves/local.conf` can be used to override default config entries. Custom `/etc/waves/waves.conf` can be used to override or the whole configuration. For additional information about Docker volumes mapping please refer to `Managing data` item.
 
-### Environment Variables
+### Environment variables
 
 **You can run container with predefined environment variables:**
 

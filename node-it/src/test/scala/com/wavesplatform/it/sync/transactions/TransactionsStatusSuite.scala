@@ -57,7 +57,7 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
     result.size shouldBe maxTxList.size
     result.forall(_ == result.head)
 
-    assertBadRequestAndMessage(notMiner.transactionStatus(maxTxList :+ txIds.head), "Too big sequences requested")
+    assertBadRequestAndMessage(notMiner.transactionStatus(maxTxList :+ txIds.head), "Too big sequence requested")
     assertBadRequestAndMessage(notMiner.transactionStatus(Seq()), "Empty request")
 
     assertApiError(notMiner.transactionStatus(Random.shuffle(txIds :+ "illegal id")), InvalidIds(Seq("illegal id")))

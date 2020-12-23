@@ -27,7 +27,7 @@ trait Transaction {
     case _               => false
   }
 
-  override def hashCode(): Int = id().hashCode
+  override def hashCode(): Int = id().hashCode()
 
   val bodyBytes: Coeval[Array[Byte]]
   def checkedAssets: Seq[IssuedAsset] = Nil

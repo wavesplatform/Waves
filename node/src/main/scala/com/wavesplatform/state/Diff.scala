@@ -13,8 +13,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, Transaction}
 import play.api.libs.json._
 
-import scala.collection.mutable
-import scala.collection.mutable.LinkedHashMap
+import scala.collection.immutable.VectorMap
 
 case class LeaseBalance(in: Long, out: Long)
 
@@ -67,7 +66,7 @@ object AssetVolumeInfo {
 case class AssetScriptInfo(script: Script, complexity: Long)
 
 case class AssetDescription(
-    source: ByteStr,
+    assetId: ByteStr,
     issuer: PublicKey,
     name: ByteString,
     description: ByteString,
@@ -179,7 +178,7 @@ object Diff {
       scriptsRun: Int = 0
   ): Diff =
     Diff(
-      transactions = mutable.LinkedHashMap(),
+      transactions = VectorMap.empty,
       portfolios = portfolios,
       issuedAssets = issuedAssets,
       updatedAssets = updatedAssets,
@@ -213,7 +212,7 @@ object Diff {
   ): Diff =
     Diff(
       // should be changed to VectorMap after 2.13 https://github.com/scala/scala/pull/6854
-      transactions = LinkedHashMap(toDiffTxData(tx, portfolios, accountData)),
+      transactions = VectorMap(toDiffTxData(tx, portfolios, accountData)),
       portfolios = portfolios,
       issuedAssets = issuedAssets,
       updatedAssets = updatedAssets,
@@ -238,7 +237,7 @@ object Diff {
 
   val empty =
     new Diff(
-      LinkedHashMap(),
+      VectorMap.empty,
       Map.empty,
       Map.empty,
       Map.empty,
