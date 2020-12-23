@@ -16,7 +16,7 @@ import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
-import com.wavesplatform.database.protobuf.ApplicationStatus.{SCRIPT_EXECUTION_FAILED, SCRIPT_EXECUTION_IN_PROGRESS, SUCCEEDED, Unrecognized}
+import com.wavesplatform.database.protobuf.ApplicationStatus._
 import com.wavesplatform.database.protobuf.DataEntry.Value
 import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
@@ -28,16 +28,8 @@ import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ApplicationStatus._
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{
-  ApplicationStatus,
-  GenesisTransaction,
-  LegacyPBSwitch,
-  PaymentTransaction,
-  Transaction,
-  TransactionParsers,
-  TxValidationError
-}
 import com.wavesplatform.utils.{ScorexLogging, _}
 import monix.eval.Task
 import monix.reactive.Observable
