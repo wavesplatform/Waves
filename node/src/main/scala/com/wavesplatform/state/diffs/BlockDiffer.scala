@@ -144,7 +144,7 @@ object BlockDiffer extends ScorexLogging {
           (txDiff.replacingTransactions.map(_.transaction) ++ transactions)
             .collectFirst { case i: InvokeScriptTransaction if i.id.value() == c.invokeScriptTransactionId => i }
             .orElse(blockchain.resolveInvoke(c))
-            .get
+            .getOrElse(throw new RuntimeException(s"Can't find InvokeScriptTransaction with id=${c.invokeScriptTransactionId}"))
         val StepInfo(feeInWaves, _, _) = InvokeDiffsCommon.stepInfo(txDiff, blockchain, invoke)
         Some((Waves, feeInWaves))
       case _ =>
