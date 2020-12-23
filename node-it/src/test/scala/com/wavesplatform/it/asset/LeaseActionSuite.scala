@@ -55,14 +55,14 @@ class LeaseActionSuite extends BaseTransactionSuite {
        |  }
      """.stripMargin
     )
-    sender.setScript(dAppAcc, Some(dApp))
+    sender.setScript(dAppAcc, Some(dApp), waitForTx = true)
   }
 
   test("active leases") {
     val leaseTxId     = sender.lease(dAppAcc, invokerAddress, leaseAmount, smartMinFee, TxVersion.V2, waitForTx = true).id
     val leaseTxHeight = sender.height
 
-    val invokeId      = sender.invokeScript(invoker, dAppAddress, Some("lease"), Nil, fee = invokeFee, waitForTx = true)._1.id
+    val invokeId     = sender.invokeScript(invoker, dAppAddress, Some("lease"), Nil, fee = invokeFee, waitForTx = true)._1.id
     val invokeHeight = sender.height
 
     val recipient     = Recipient.Address(ByteStr.decodeBase58(invokerAddress).get)
@@ -74,7 +74,7 @@ class LeaseActionSuite extends BaseTransactionSuite {
     )
 
     val leaseTxIdParam = List(CONST_BYTESTR(ByteStr.decodeBase58(leaseTxId).get).explicitGet())
-    sender.invokeScript(dAppAcc, dAppAddress, Some("leaseCancel"), leaseTxIdParam, fee = smartMinFee, waitForTx = true)
+    sender.invokeScript(dAppAcc, dAppAddress, Some("leaseCancel"), leaseTxIdParam, fee = invokeFee, waitForTx = true)
     sender.activeLeases(dAppAddress) shouldBe Seq(
       LeaseInfo(leaseActionId, invokeId, dAppAddress, invokerAddress, leaseAmount, invokeHeight)
     )
