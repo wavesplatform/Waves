@@ -124,7 +124,7 @@ object CommonAccountsApi extends ScorexLogging {
     }
 
     override def activeLeases(address: Address): Observable[LeaseInfo] = {
-      addressTransactions(db, Some(Height(blockchain.height) -> diff), address, None, Set(LeaseTransaction.typeId), None)
+      addressTransactions(db, Some(Height(blockchain.height) -> diff), address, None, Set(), None)
         .flatMapIterable {
           case TransactionMeta(h, lt: LeaseTransaction, true) if leaseIsActive(lt.id()) =>
             val recipient = blockchain.resolveAlias(lt.recipient).explicitGet()
@@ -134,8 +134,9 @@ object CommonAccountsApi extends ScorexLogging {
               .toSeq
               .flatMap(_.leases.filter(l => leaseIsActive(l.leaseId)))
               .map { lease =>
+                val sender = blockchain.resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
                 val recipient = blockchain.resolveAlias(lease.recipient).explicitGet()
-                LeaseInfo(lease.leaseId, invoke.id.value(), invoke.sender.toAddress, recipient, lease.amount, height)
+                LeaseInfo(lease.leaseId, invoke.id.value(), sender, recipient, lease.amount, height)
               }
           case _ => Seq()
         }
