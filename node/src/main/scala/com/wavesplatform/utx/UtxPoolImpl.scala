@@ -284,12 +284,13 @@ class UtxPoolImpl(
     case _                                                                => Set.empty
   }
 
-  private def resolveInvoke(c: ContinuationTransaction): InvokeScriptTransaction =
+  private def resolveInvoke(c: ContinuationTransaction): InvokeScriptTransaction = {
     transactions.asScala
       .get(c.invokeScriptTransactionId)
       .orElse(blockchain.resolveInvoke(c))
-      .get
-      .asInstanceOf[InvokeScriptTransaction]
+      .collect { case i: InvokeScriptTransaction => i }
+      .getOrElse(throw new RuntimeException(s"Can't find InvokeScriptTransaction with id=${c.invokeScriptTransactionId}"))
+  }
 
   private[this] case class TxEntry(tx: Transaction, priority: Boolean)
 
