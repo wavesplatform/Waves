@@ -652,7 +652,7 @@ abstract class LevelDBWriter private[database] (
               hKey,
               threshold,
               { case (height, idOpt) => idOpt.map(Keys.continuationState(_, height).keyBytes) },
-              { case (height, _)  => height },
+              { case (height, _)     => height },
               h => (Height(h), invokeIdOpt)
             )
         }
@@ -816,10 +816,9 @@ abstract class LevelDBWriter private[database] (
                 case tx: InvokeScriptTransaction =>
                   val invokeId      = TransactionId(tx.id.value())
                   val address       = resolveAlias(tx.dAppAddressOrAlias).explicitGet()
+                  val dAppAddressId = rw.get(Keys.addressId(address)).get
 
-                  val dAppAddressId      = rw.get(Keys.addressId(address)).get
                   clearContinuationHistory(rw, dAppAddressId, currentHeight)
-
                   rw.delete(Keys.continuationState(invokeId, Height(currentHeight)))
                   rw.delete(Keys.continuationTransactions(invokeId))
                   rw.delete(Keys.invokeScriptResult(h, num))
@@ -831,9 +830,6 @@ abstract class LevelDBWriter private[database] (
                   val invoke   = this.resolveInvoke(tx).get
                   val invokeId = TransactionId(invoke.id.value())
                   val address  = resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
-
-                  val dAppAddressId      = rw.get(Keys.addressId(address)).get
-                  clearContinuationHistory(rw, dAppAddressId, currentHeight)
 
                   continuationDataToDiscard.updateWith(invokeId)(
                     current =>
@@ -862,6 +858,12 @@ abstract class LevelDBWriter private[database] (
           rw.delete(Keys.blockReward(currentHeight))
           rw.delete(Keys.wavesAmount(currentHeight))
           rw.delete(Keys.stateHash(currentHeight))
+          continuationDataToDiscard.foreach {
+            case (_, Some((_, address))) =>
+              val dAppAddressId = rw.get(Keys.addressId(address)).get
+              clearContinuationHistory(rw, dAppAddressId, currentHeight)
+            case (_, None) =>
+          }
 
           if (DisableHijackedAliases.height == currentHeight) {
             disabledAliases = DisableHijackedAliases.revert(rw)
@@ -908,11 +910,10 @@ abstract class LevelDBWriter private[database] (
   private def clearContinuationHistory(rw: RW, dAppAddressId: AddressId, height: Int): Unit = {
     val heightIds = rw.get(Keys.continuationHistory(dAppAddressId))
     if (heightIds.headOption.exists(_._1 == height))
-      if (heightIds.size == 1) {
+      if (heightIds.size == 1)
         rw.delete(Keys.continuationHistory(dAppAddressId))
-      } else {
+      else
         rw.put(Keys.continuationHistory(dAppAddressId), heightIds.tail)
-      }
   }
 
   private def updateContinuationCache(rw: RW, address: Address, continuations: Seq[(Height, TxNum)], invokeId: TransactionId): Unit = {
