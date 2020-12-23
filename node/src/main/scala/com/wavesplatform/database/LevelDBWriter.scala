@@ -281,7 +281,7 @@ abstract class LevelDBWriter private[database] (
     stateFeatures ++ settings.functionalitySettings.preActivatedFeatures
   }
 
-  override def loadContinuationStates(): mutable.Map[Address, ContinuationState] = {
+  override def loadContinuationStates(): Map[Address, ContinuationState] = {
     val states = mutable.Map[Address, ContinuationState]()
     readOnly { db =>
       db.iterateOver(KeyTags.ContinuationHistory) { entry =>
@@ -294,7 +294,7 @@ abstract class LevelDBWriter private[database] (
         } states.put(dAppAddress, state)
       }
     }
-    states
+    states.toMap
   }
 
   override def wavesAmount(height: Int): BigInt = readOnly { db =>
@@ -823,7 +823,7 @@ abstract class LevelDBWriter private[database] (
                   rw.delete(Keys.continuationTransactions(invokeId))
                   rw.delete(Keys.invokeScriptResult(h, num))
 
-                  continuationStatesCache.remove(address)
+                  continuationStatesCache = continuationStatesCache - address
                   continuationDataToDiscard.put(invokeId, None)
 
                 case tx: ContinuationTransaction =>
@@ -921,7 +921,7 @@ abstract class LevelDBWriter private[database] (
     val addressId      = rw.get(Keys.addressId(address)).get
     val previousHeight = rw.get(Keys.continuationHistory(addressId)).head._1
     val previousState  = rw.get(Keys.continuationState(invokeId, previousHeight)).get
-    continuationStatesCache.put(address, previousState)
+    continuationStatesCache = continuationStatesCache + ((address, previousState))
   }
 
   private def setStatusInProgress(rw: RW, invokeId: TransactionId): Unit = {

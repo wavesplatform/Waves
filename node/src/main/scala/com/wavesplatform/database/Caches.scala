@@ -19,7 +19,6 @@ import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
 
-import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 import scala.reflect.ClassTag
@@ -151,9 +150,10 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def loadActivatedFeatures(): Map[Short, Int]
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
-  protected val continuationStatesCache: mutable.Map[Address, ContinuationState] = loadContinuationStates()
-  protected def loadContinuationStates(): mutable.Map[Address, ContinuationState]
-  override def continuationStates: Map[Address, ContinuationState] = continuationStatesCache.toMap
+  @volatile
+  protected var continuationStatesCache: Map[Address, ContinuationState] = loadContinuationStates()
+  protected def loadContinuationStates(): Map[Address, ContinuationState]
+  override def continuationStates: Map[Address, ContinuationState] = continuationStatesCache
 
   //noinspection ScalaStyle
   protected def doAppend(
@@ -346,7 +346,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     blocksTs.put(newHeight, block.header.timestamp)
 
     accountDataCache.putAll(newData.asJava)
-    continuationStatesCache ++= diff.continuationStates
+    continuationStatesCache = continuationStatesCache ++ diff.continuationStates
 
     forgetBlocks()
   }
