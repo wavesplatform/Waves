@@ -10,6 +10,7 @@ import com.wavesplatform.api.grpc.{TransactionStatus => PBTransactionStatus, _}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi.RequestAwaitTime
+import com.wavesplatform.it.sync._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
@@ -290,7 +291,7 @@ object SyncGrpcApi extends Assertions {
     def setScript(
         sender: KeyPair,
         script: Either[Array[Byte], Option[Script]],
-        fee: Long,
+        fee: Long = setScriptFee,
         timestamp: Long = System.currentTimeMillis(),
         version: Int = 1,
         waitForTx: Boolean = false
@@ -319,7 +320,7 @@ object SyncGrpcApi extends Assertions {
         dApp: Recipient,
         functionCall: Option[FUNCTION_CALL],
         payments: Seq[Amount] = Seq.empty,
-        fee: Long,
+        fee: Long = invokeFee,
         version: Int = 2,
         feeAssetId: ByteString = ByteString.EMPTY,
         waitForTx: Boolean = false
