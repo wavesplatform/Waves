@@ -21,7 +21,6 @@ class LeaseActionSuite extends BaseTransactionSuite {
     NodeConfigs
       .Builder(Default, 2, Seq.empty)
       .overrideBase(_.preactivatedFeatures((BlockchainFeatures.ContinuationTransaction.id, 1)))
-      .overrideBase(_.raw("waves.blockchain.use-evaluator-v2 = true"))
       .buildNonConflicting()
 
   private def compile(script: String): String =
