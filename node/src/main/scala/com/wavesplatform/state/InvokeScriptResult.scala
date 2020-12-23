@@ -116,8 +116,8 @@ object InvokeScriptResult {
         val transfers   = actions.collect { case t: lang.AssetTransfer => langTransferToPayment(t) }
         InvokeScriptResult(dataOps, transfers, issues, reissues, burns, sponsorFees)
 
-      case i: IncompleteResult =>
-        throw new IllegalArgumentException(s"Cannot cast incomplete result: $i")
+      case _: IncompleteResult =>
+        InvokeScriptResult.empty
     }
   }
 
