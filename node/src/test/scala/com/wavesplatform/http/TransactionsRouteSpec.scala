@@ -601,6 +601,7 @@ class TransactionsRouteSpec
           )
 
         (blockchain.hasAccountScript _).when(*).returns(true)
+        (() => blockchain.continuationStates).when().returns(Map())
       }
       val publisher = createTxPublisherStub(blockchain)
       val route     = transactionsApiRoute.copy(blockchain = blockchain, transactionPublisher = publisher).route
