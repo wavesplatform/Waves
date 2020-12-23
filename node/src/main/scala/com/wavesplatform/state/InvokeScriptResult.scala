@@ -80,8 +80,9 @@ object InvokeScriptResult {
     override val empty: InvokeScriptResult =
       InvokeScriptResult.this.empty
 
-    override def combine(x: InvokeScriptResult, y: InvokeScriptResult): InvokeScriptResult =
-      InvokeScriptResult(x.data ++ y.data, x.transfers ++ y.transfers)
+    override def combine(x: InvokeScriptResult, y: InvokeScriptResult): InvokeScriptResult = {
+      InvokeScriptResult(/*x.data ++ y.data, x.transfers ++ y.transfers,*/ invokes = x.invokes ++ y.invokes)
+    }
   }
 
   def toBytes(isr: InvokeScriptResult): Array[Byte] = {
