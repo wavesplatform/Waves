@@ -111,7 +111,7 @@ class AssetsRouteSpec
   } yield (
     smartAssetTx,
     AssetDescription(
-      source = smartAssetTx.id(),
+      assetId = smartAssetTx.id(),
       issuer = smartAssetTx.sender,
       name = smartAssetTx.name,
       description = smartAssetTx.description,
@@ -176,7 +176,7 @@ class AssetsRouteSpec
   } yield (
     sillyAssetTx,
     AssetDescription(
-      source = sillyAssetTx.id(),
+      assetId = sillyAssetTx.id(),
       issuer = sillyAssetTx.sender,
       name = sillyAssetTx.name,
       description = sillyAssetTx.description,

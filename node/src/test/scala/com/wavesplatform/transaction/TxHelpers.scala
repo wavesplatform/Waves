@@ -19,6 +19,7 @@ import com.wavesplatform.transaction.transfer.TransferTransaction
 object TxHelpers {
   def signer(i: Int): KeyPair = KeyPair(Ints.toByteArray(i))
   val defaultSigner: KeyPair  = signer(0)
+  val defaultAddress: Address = defaultSigner.toAddress
 
   private[this] var lastTimestamp = System.currentTimeMillis()
   def timestamp: Long = {
@@ -81,8 +82,15 @@ object TxHelpers {
     SetScriptTransaction.selfSigned(TxVersion.V1, acc, Some(script), TestValues.fee, timestamp).explicitGet()
   }
 
-  def invoke(dApp: AddressOrAlias, func: String, args: Seq[EXPR] = Nil, payments: Seq[Payment] = Nil): InvokeScriptTransaction = {
+  def invoke(
+      dApp: AddressOrAlias,
+      func: String,
+      args: Seq[EXPR] = Nil,
+      payments: Seq[Payment] = Nil,
+      fee: Long = TestValues.fee,
+      feeAssetId: Asset = Waves
+  ): InvokeScriptTransaction = {
     val fc = FUNCTION_CALL(FunctionHeader.User(func), args.toList)
-    InvokeScriptTransaction.selfSigned(TxVersion.V1, defaultSigner, dApp, Some(fc), payments, TestValues.fee, Asset.Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, timestamp).explicitGet()
+    InvokeScriptTransaction.selfSigned(TxVersion.V1, defaultSigner, dApp, Some(fc), payments, fee, feeAssetId, InvokeScriptTransaction.DefaultExtraFeePerStep, timestamp).explicitGet()
   }
 }

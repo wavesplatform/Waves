@@ -10,21 +10,23 @@ import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.{Base58, _}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.network.TransactionPublisher
-import com.wavesplatform.state.{Blockchain, Height, InvokeScriptResult}
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Height, InvokeScriptResult}
 import com.wavesplatform.transaction.ApplicationStatus.{ScriptExecutionFailed, Succeeded}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.{Asset, Proofs, TxHelpers, TxVersion}
-import com.wavesplatform.{BlockGen, NoShrink, TestTime, TestWallet, TransactionGen}
+import com.wavesplatform.{BlockGen, BlockchainStubHelpers, NoShrink, TestTime, TestWallet, TransactionGen}
 import monix.reactive.Observable
 import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
@@ -47,7 +49,8 @@ class TransactionsRouteSpec
     with PropertyChecks
     with OptionValues
     with TestWallet
-    with NoShrink {
+    with NoShrink
+    with BlockchainStubHelpers {
 
   private val blockchain          = mock[Blockchain]
   private val utxPoolSynchronizer = mock[TransactionPublisher]
@@ -55,18 +58,17 @@ class TransactionsRouteSpec
   private val utxPoolSize         = mockFunction[Int]
   private val testTime            = new TestTime
 
-  private val route =
-    seal(
-      new TransactionsApiRoute(
-        restAPISettings,
-        addressTransactions,
-        testWallet,
-        blockchain,
-        utxPoolSize,
-        utxPoolSynchronizer,
-        testTime
-      ).route
-    )
+  private val transactionsApiRoute = new TransactionsApiRoute(
+    restAPISettings,
+    addressTransactions,
+    testWallet,
+    blockchain,
+    utxPoolSize,
+    utxPoolSynchronizer,
+    testTime
+  )
+
+  private val route = seal(transactionsApiRoute.route)
 
   private val invalidBase58Gen = alphaNumStr.map(_ + "0")
 
@@ -563,6 +565,92 @@ class TransactionsRouteSpec
       }
       Post(routePath("/broadcast?trace=false"), ist.json()) ~> route ~> check {
         (responseAs[JsObject] \ "trace") shouldBe empty
+      }
+    }
+
+    "generates valid trace with vars" in {
+      val blockchain = createBlockchainStub { blockchain =>
+        val (dAppScript, _) = ScriptCompiler
+          .compile(
+            s"""
+               |{-# STDLIB_VERSION 4 #-}
+               |{-# SCRIPT_TYPE ACCOUNT #-}
+               |{-# CONTENT_TYPE DAPP #-}
+               |
+               |@Callable(i)
+               |func test() = {
+               |  let test = 1
+               |  if (test == 1) then [] else []
+               |}
+               |""".stripMargin,
+            ScriptEstimatorV3
+          )
+          .explicitGet()
+
+        (blockchain.accountScript _)
+          .when(*)
+          .returns(
+            Some(
+              AccountScriptInfo(
+                TxHelpers.defaultSigner.publicKey,
+                dAppScript,
+                0L,
+                Map(3 -> Seq("test").map(_ -> 0L).toMap)
+              )
+            )
+          )
+
+        (blockchain.hasAccountScript _).when(*).returns(true)
+      }
+      val publisher = createTxPublisherStub(blockchain)
+      val route     = transactionsApiRoute.copy(blockchain = blockchain, transactionPublisher = publisher).route
+
+      val tx = TxHelpers.invoke(TxHelpers.defaultAddress, "test")
+      Post(routePath("/broadcast?trace=true"), tx.json()) ~> route ~> check {
+        responseAs[JsObject] shouldBe Json.parse(
+          s"""{
+            |  "type" : 16,
+            |  "id" : "${tx.id()}",
+            |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+            |  "senderPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+            |  "fee" : 1000000,
+            |  "feeAssetId" : null,
+            |  "timestamp" : ${tx.timestamp},
+            |  "proofs" : [ "${tx.signature}" ],
+            |  "version" : 1,
+            |  "dApp" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+            |  "payment" : [ ],
+            |  "call" : {
+            |    "function" : "test",
+            |    "args" : [ ]
+            |  },
+            |  "trace" : [ {
+            |    "type" : "verifier",
+            |    "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+            |    "result" : "success",
+            |    "error" : null
+            |  }, {
+            |    "type" : "dApp",
+            |    "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+            |    "function" : "test",
+            |    "args" : [ ],
+            |    "result" : {
+            |      "data" : [ ],
+            |      "transfers" : [ ],
+            |      "issues" : [ ],
+            |      "reissues" : [ ],
+            |      "burns" : [ ],
+            |      "sponsorFees" : [ ]
+            |    },
+            |    "error" : null,
+            |    "vars" : [ {
+            |      "name" : "test",
+            |      "type" : "Int",
+            |      "value" : 1
+            |    } ]
+            |  } ]
+            |}""".stripMargin
+        )
       }
     }
   }

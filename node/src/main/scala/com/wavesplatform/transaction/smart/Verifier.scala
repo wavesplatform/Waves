@@ -21,6 +21,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
+import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, AssetVerifierTrace, TraceStep, TracedResult}
 import com.wavesplatform.utils.ScorexLogging
 import org.msgpack.core.annotations.VisibleForTesting
@@ -61,21 +62,23 @@ object Verifier extends ScorexLogging {
 
   /** Verifies asset scripts and returns diff with complexity. In case of error returns spent complexity */
   def assets(blockchain: Blockchain, remainingComplexity: Int)(tx: Transaction): TracedResult[(Long, ValidationError), Diff] = {
+    case class AssetForCheck(asset: IssuedAsset, script: AssetScriptInfo, assetType: AssetContext)
+
     @tailrec
     def loop(
-        assets: List[(AssetScriptInfo, IssuedAsset)],
+        assets: List[AssetForCheck],
         fullComplexity: Long,
         fullTrace: List[TraceStep]
     ): (Long, TracedResult[ValidationError, Transaction]) = {
       assets match {
-        case (AssetScriptInfo(script, complexity), asset) :: remaining =>
+        case AssetForCheck(asset, AssetScriptInfo(script, complexity), context) :: remaining =>
           val complexityLimit =
             if (remainingComplexity == Int.MaxValue) remainingComplexity
             else remainingComplexity - fullComplexity.toInt
 
           val spentComplexity = fullComplexity + complexity
           stats.assetScriptExecution
-            .measureForType(tx.typeId)(verifyTx(blockchain, script, tx, Some(asset.id), complexityLimit)) match {
+            .measureForType(tx.typeId)(verifyTx(blockchain, script, tx, Some(asset.id), complexityLimit, context)) match {
             case TracedResult(e @ Left(_), trace) => (spentComplexity, TracedResult(e, fullTrace ::: trace))
             case TracedResult(Right(_), trace)    => loop(remaining, spentComplexity, fullTrace ::: trace)
           }
@@ -83,17 +86,24 @@ object Verifier extends ScorexLogging {
       }
     }
 
-    val assets = tx.checkedAssets.flatMap { asset =>
-      blockchain.assetDescription(asset).flatMap(_.script).map(script => (script, asset))
-    }.toList
+    def assetScript(asset: IssuedAsset): Option[AssetScriptInfo] =
+      blockchain.assetDescription(asset).flatMap(_.script)
 
-    val additionalAssets = (tx match {
-      case etx: ExchangeTransaction => List(etx.buyOrder.matcherFeeAssetId, etx.sellOrder.matcherFeeAssetId)
-      case _                        => List.empty
-    }).distinct.collect {
-      case ia: IssuedAsset =>
-        blockchain.assetDescription(ia).flatMap(_.script).map(script => (script, ia))
-    }.flatten
+    val assets = for {
+      asset  <- tx.checkedAssets.toList
+      script <- assetScript(asset)
+      context = AssetContext.fromTxAndAsset(tx, asset)
+    } yield AssetForCheck(asset, script, context)
+
+    val additionalAssets = tx match {
+      case e: ExchangeTransaction =>
+        for {
+          asset  <- List(e.buyOrder.matcherFeeAssetId, e.sellOrder.matcherFeeAssetId).distinct.collect { case ia: IssuedAsset => ia }
+          script <- assetScript(asset)
+        } yield AssetForCheck(asset, script, AssetContext.MatcherFee)
+
+      case _ => Nil
+    }
 
     val (complexity, result)  = loop(assets, 0L, Nil)
     val (_, additionalResult) = loop(additionalAssets, 0L, Nil)
@@ -120,7 +130,8 @@ object Verifier extends ScorexLogging {
       script: Script,
       transaction: Transaction,
       assetIdOpt: Option[ByteStr],
-      complexityLimit: Int = Int.MaxValue
+      complexityLimit: Int = Int.MaxValue,
+      assetContext: AssetContext.Value = AssetContext.Unknown
   ): TracedResult[ValidationError, Transaction] = {
 
     val isAsset       = assetIdOpt.nonEmpty
@@ -145,19 +156,18 @@ object Verifier extends ScorexLogging {
         Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, assetIdOpt))
       case Success(s) => s
     }
-    val error2Trace: Option[ValidationError] => List[TraceStep] =
-      e => {
-        val trace = assetIdOpt.fold[TraceStep](
-          AccountVerifierTrace(senderAddress, e)
-        )(
-          (id: ByteStr) => AssetVerifierTrace(id, e)
-        )
-        List(trace)
+
+    val createTrace = { maybeError: Option[ValidationError] =>
+      val trace = assetIdOpt match {
+        case Some(assetId) => AssetVerifierTrace(assetId, maybeError, assetContext)
+        case None          => AccountVerifierTrace(senderAddress, maybeError)
       }
+      List(trace)
+    }
 
     txE match {
-      case r @ Right(_) => TracedResult(r, error2Trace(None))
-      case l @ Left(e)  => TracedResult(l, error2Trace(Some(e)))
+      case Right(_)    => TracedResult(txE, createTrace(None))
+      case Left(error) => TracedResult(txE, createTrace(Some(error)))
     }
   }
 

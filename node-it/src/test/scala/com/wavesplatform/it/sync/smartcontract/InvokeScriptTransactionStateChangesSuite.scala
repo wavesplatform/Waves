@@ -46,8 +46,9 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
 
     val js = invokeTx._2
 
-    (js \ "trace" \ 0 \ "result" \ "vars" \ 0 \ "name").as[String] shouldBe "value"
-    (js \ "trace" \ 0 \ "result" \ "vars" \ 0 \ "value").as[String] shouldBe data.toString
+    (js \ "trace" \ 0 \ "vars" \ 0 \ "name").as[String] shouldBe "value"
+    (js \ "trace" \ 0 \ "vars" \ 0 \ "type").as[String] shouldBe "Int"
+    (js \ "trace" \ 0 \ "vars" \ 0 \ "value").as[Int] shouldBe data
 
     val id = sender.signedBroadcast(invokeTx._1, waitForTx = true).id
 

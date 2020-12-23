@@ -17,6 +17,8 @@ import org.iq80.leveldb.DB
 case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter) {
   import Domain._
 
+  def blockchain: BlockchainUpdaterImpl = blockchainUpdater
+
   def lastBlock: Block = {
     blockchainUpdater
       .liquidBlock(blockchainUpdater.lastBlockId.get)

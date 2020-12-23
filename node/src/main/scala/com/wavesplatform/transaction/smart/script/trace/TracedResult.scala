@@ -1,8 +1,8 @@
 package com.wavesplatform.transaction.smart.script.trace
 
 import cats.implicits._
-import cats.{Applicative, Apply, Functor}
 import cats.kernel.Semigroup
+import cats.{Applicative, Apply, Functor}
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.transaction.Transaction
 import play.api.libs.json.{JsObject, Json}
@@ -59,7 +59,7 @@ object TracedResult {
     (a, b) =>
       TracedResult(
         a.resultE |+| b.resultE,
-        if (a.resultE.isRight) a.trace |+| b.trace else a.trace
+        a.trace |+| b.trace
       )
 
   implicit def applicativeTracedResult[L]: Applicative[TracedResult[L, ?]] with Apply[TracedResult[L, ?]] with Functor[TracedResult[L, ?]]  = new Applicative[TracedResult[L, ?]] {

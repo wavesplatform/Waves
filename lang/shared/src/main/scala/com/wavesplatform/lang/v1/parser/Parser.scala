@@ -15,7 +15,7 @@ object Parser {
   private val Global                 = com.wavesplatform.lang.hacks.Global // Hack for IDEA
   implicit def hack(p: fastparse.P[Any]): fastparse.P[Unit] = p.map(_ => ())
 
-  def keywords                = Set("let", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
+  def keywords                = Set("let", "strict", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
   def lowerChar[_:P]          = CharIn("a-z")
   def upperChar[_:P]          = CharIn("A-Z")
   def char[_:P]               = lowerChar | upperChar
@@ -394,6 +394,44 @@ object Parser {
           }
       }
 
+  // Hack to force parse of "\n". Otherwise it is treated as a separator
+  def newLineSep(implicit c: fastparse.P[Any]) = {
+    P(CharsWhileIn(" \t\r").repX  ~~ "\n").repX(1)
+  }
+
+  def strictLetP[_:P]: P[Seq[LET]] = {
+    P(Index ~~ "strict" ~~ &(CharIn(" \t\n\r")) ~/ comment ~ letNameP ~ comment ~ Index ~ ("=" ~/ Index ~ baseExpr.?).? ~~ Index)
+      .map {
+        case (start, names, valuePosStart, valueRawOpt, end) =>
+          val value = extractValue(valuePosStart, valueRawOpt)
+          val pos = Pos(start, end)
+
+          names.map { case (nameStart, nameRaw) =>
+            val name = extractName(Pos(nameStart, nameStart), nameRaw)
+            LET(pos, name, value)
+          }
+      }
+  }
+
+  def strictLetBlockP[_:P]: P[EXPR] = {
+    P(
+      Index ~~
+        strictLetP ~/
+        Pass ~~
+        (
+          ("" ~ ";") ~/ (baseExpr | invalid).? |
+            newLineSep ~/ (baseExpr | invalid).? |
+            (Index ~~ CharPred(_ != '\n').repX).map(pos => Some(INVALID(Pos(pos, pos), "expected ';'")))
+          ) ~~
+        Index
+    ).map {
+      case (start, strictLet, body, end) => {
+        val blockPos = Pos(start, end)
+        Macro.unwrapStrict(blockPos, strictLet.head, body.getOrElse(INVALID(Pos(end, end), "expected a body")))
+      }
+    }
+  }
+
   private def extractName(
     namePos: Pos,
     nameRaw: Option[PART[String]]
@@ -412,11 +450,6 @@ object Parser {
 
   private def blockOr(otherExpr: Pos => EXPR)(implicit c: fastparse.P[Any]): P[EXPR] = {
     def declaration(implicit c: fastparse.P[Any]) = letP | funcP.map(Seq(_))
-
-    // Hack to force parse of "\n". Otherwise it is treated as a separator
-    def newLineSep(implicit c: fastparse.P[Any]) = {
-      P(CharsWhileIn(" \t\r").repX  ~~ "\n").repX(1)
-    }
 
     P(
       Index ~~
@@ -444,7 +477,7 @@ object Parser {
     comment ~ P(foldP | ifP | matchP | ep | maybeAccessP) ~ comment
   }
 
-  def baseExpr[_:P] = P(binaryOp(baseAtom(block(_))(_), opsByPriority))
+  def baseExpr[_:P] = P(strictLetBlockP | binaryOp(baseAtom(block(_))(_), opsByPriority))
 
   def blockOrDecl[_:P] = baseAtom(blockOr(p => REF(p, VALID(p, "unit")))(_))
   def baseExprOrDecl[_:P] = binaryOp(baseAtom(blockOrDecl(_))(_), opsByPriority)

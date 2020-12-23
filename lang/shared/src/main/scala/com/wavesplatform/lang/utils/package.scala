@@ -9,9 +9,9 @@ import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
 import com.wavesplatform.lang.v1.estimator.v3.{ContinuationFirstStepEstimator, FunctionInfo}
-import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, UserFunction}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader}
@@ -113,7 +113,13 @@ package object utils {
 
     val functionsCostsWithExprs =
       ctx.functions
-        .map(f => (f._1, (f._2.costByLibVersion(V4), f._2.expr.map(_(environment)))))
+        .map { f =>
+          val expr = f._2 match {
+            case UserFunction(_, _, _, _, ev, _) => Some(ev(environment))
+            case _                               => None
+          }
+          (f._1, (f._2.costByLibVersion(V4), expr))
+        }
 
     val vars      = varNames(version, DApp)
     val costs     = functionCosts(version)
