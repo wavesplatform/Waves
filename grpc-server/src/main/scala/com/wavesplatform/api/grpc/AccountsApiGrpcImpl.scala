@@ -5,11 +5,9 @@ import com.google.protobuf.wrappers.{BytesValue, StringValue}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.common.CommonAccountsApi.LeaseInfo
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.fromAssetIdAndAmount
-import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset
 import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
@@ -17,7 +15,7 @@ import monix.reactive.Observable
 
 import scala.concurrent.Future
 
-class AccountsApiGrpcImpl(commonApi: CommonAccountsApi, blockchain: Blockchain)(implicit sc: Scheduler) extends AccountsApiGrpc.AccountsApi {
+class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) extends AccountsApiGrpc.AccountsApi {
 
   private def loadWavesBalance(address: Address): BalanceResponse = {
     val details = commonApi.balanceDetails(address)
@@ -69,28 +67,19 @@ class AccountsApiGrpcImpl(commonApi: CommonAccountsApi, blockchain: Blockchain)(
   override def getActiveLeases(request: AccountRequest, responseObserver: StreamObserver[LeaseResponse]): Unit =
     responseObserver.interceptErrors {
       val result =
-        if (blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction))
-          commonApi
-            .activeLeases(request.address.toAddress)
-            .map {
-              case LeaseInfo(leaseId, originTransactionId, sender, recipient, amount, height) =>
-                LeaseResponse(
-                  leaseId.toByteString,
-                  originTransactionId.toByteString,
-                  ByteString.copyFrom(sender.bytes),
-                  ByteString.copyFrom(recipient.bytes),
-                  amount,
-                  height
-                )
-            } else
-          commonApi
-            .activeLeasesOld(request.address.toAddress)
-            .map {
-              case (height, tx) =>
-                val recipient = ByteString.copyFrom(blockchain.resolveAlias(tx.recipient).explicitGetErr().bytes)
-                val id        = tx.id().toByteString
-                LeaseResponse(id, id, tx.sender.toByteString, recipient, tx.amount, height)
-            }
+        commonApi
+          .activeLeases(request.address.toAddress)
+          .map {
+            case LeaseInfo(leaseId, originTransactionId, sender, recipient, amount, height) =>
+              LeaseResponse(
+                leaseId.toByteString,
+                originTransactionId.toByteString,
+                ByteString.copyFrom(sender.bytes),
+                ByteString.copyFrom(recipient.bytes),
+                amount,
+                height
+              )
+          }
       responseObserver.completeWith(result)
     }
 
