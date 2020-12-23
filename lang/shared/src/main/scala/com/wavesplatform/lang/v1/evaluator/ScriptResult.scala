@@ -15,6 +15,7 @@ import com.wavesplatform.lang.v1.traits.domain._
 
 sealed trait ScriptResult {
   def returnedValue: EVALUATED = unit
+  def invokes: Seq[(Address, String, Seq[EVALUATED], Seq[CaseObj], ScriptResult)] = Nil
 }
 
 case class ScriptResultV3(ds: List[DataItem[_]], ts: List[AssetTransfer]) extends ScriptResult
