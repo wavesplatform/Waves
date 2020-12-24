@@ -304,7 +304,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val assetA     = issueValidated(acc, simpleReissuableAsset)
 
       sender.debugStateChangesByAddress(addressStr, 100).flatMap(_.stateChanges) should matchPattern {
-        case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, Nil, None)) if issue.name == simpleReissuableAsset.name =>
+        case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, Nil, None, Nil)) if issue.name == simpleReissuableAsset.name =>
       }
 
       val height = nodes.waitForHeightArise()
@@ -326,7 +326,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       nodes.rollback(height, returnToUTX = false)
 
       sender.debugStateChangesByAddress(addressStr, 100).flatMap(_.stateChanges) should matchPattern {
-        case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, Nil, None)) if issue.name == simpleReissuableAsset.name =>
+        case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, Nil, None, Nil)) if issue.name == simpleReissuableAsset.name =>
       }
       assertApiError(sender.debugStateChanges(txId), TransactionDoesNotExist)
 

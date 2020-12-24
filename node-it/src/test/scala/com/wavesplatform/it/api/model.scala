@@ -416,6 +416,23 @@ object AssetPairResponse {
   implicit val pairResponseFormat: Format[AssetPairResponse] = Json.format
 }
 
+case class Call(function: String, args: Seq[JsObject])
+object Call {
+  implicit val callFormat: Reads[Call] = Json.reads[Call]
+}
+
+case class AttachedPayment(asset: Option[String], amount: Long)
+object AttachedPayment {
+  implicit val attachedPaymentFormat: Reads[AttachedPayment] = Json.reads[AttachedPayment]
+}
+
+case class Invokation(dApp: String, call: Call, payments: Seq[AttachedPayment], stateChanges: StateChangesDetails)
+object Invokation {
+  implicit val invokationFormat: Reads[Invokation] = new Reads[Invokation] {
+    override def reads(json: JsValue) = JsSuccess(Invokation((json \ "dApp").as[String], (json \ "call").as[Call], (json \ "payments").as[Seq[AttachedPayment]], (json \ "stateChanges").as[StateChangesDetails]))
+  }
+}
+
 case class StateChangesDetails(
     data: Seq[DataResponse],
     transfers: Seq[TransfersInfoResponse],
@@ -423,7 +440,8 @@ case class StateChangesDetails(
     reissues: Seq[ReissueInfoResponse],
     burns: Seq[BurnInfoResponse],
     sponsorFees: Seq[SponsorFeeResponse],
-    error: Option[ErrorMessageInfoResponse]
+    error: Option[ErrorMessageInfoResponse],
+    invokes: Seq[Invokation] = Nil
 )
 object StateChangesDetails {
   implicit val stateChangeResponseFormat: Reads[StateChangesDetails] = Json.reads[StateChangesDetails]
