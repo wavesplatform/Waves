@@ -110,7 +110,4 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
     sender.invokeScript(dApp1, dAppAddress2, Some("bar"), fee = invFee, waitForTx = true)
     sender.balance(dAppAddress1).balance shouldBe callerBalanceBefore - invFee + 100
   }
-
-
-
 }
