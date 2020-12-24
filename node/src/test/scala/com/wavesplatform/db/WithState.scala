@@ -8,7 +8,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter, TestStorageFactory, loadActiveLeases}
 import com.wavesplatform.events.BlockchainUpdateTriggers
-import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
@@ -48,7 +48,7 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
 
   protected def withLevelDBWriter[A](ws: WavesSettings)(test: LevelDBWriter => A): A = tempDb { db =>
     val (_, ldb) = TestStorageFactory(
-     ws,
+      ws,
       db,
       ntpTime,
       ignoreSpendableBalanceChanged,
@@ -159,7 +159,12 @@ trait WithDomain extends WithState { _: Suite =>
     ds.copy(blockchainSettings = ds.blockchainSettings.copy(functionalitySettings = fs))
   }
 
-  def withDomain[A](settings: WavesSettings = defaultDomainSettings, triggers: BlockchainUpdateTriggers = ignoreBlockchainUpdateTriggers)(test: Domain => A): A =
+  def domainSettingsWithFeatures(fs: BlockchainFeature*): WavesSettings =
+    domainSettingsWithFS(defaultDomainSettings.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = fs.map(_.id -> 0).toMap))
+
+  def withDomain[A](settings: WavesSettings = defaultDomainSettings, triggers: BlockchainUpdateTriggers = ignoreBlockchainUpdateTriggers)(
+      test: Domain => A
+  ): A =
     withLevelDBWriter(settings) { blockchain =>
       val bcu = new BlockchainUpdaterImpl(blockchain, Observer.stopped, settings, ntpTime, triggers, loadActiveLeases(db, _, _))
       try test(Domain(db, bcu, blockchain))

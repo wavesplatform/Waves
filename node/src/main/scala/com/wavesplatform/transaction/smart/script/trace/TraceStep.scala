@@ -5,40 +5,72 @@ import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
-import com.wavesplatform.lang.v1.evaluator.{IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
-import com.wavesplatform.lang.v1.traits.domain._
-import com.wavesplatform.transaction.TxValidationError.{ScriptExecutionError, TransactionNotAllowedByScript}
+import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult}
+import com.wavesplatform.serialization.ScriptValuesJson
+import com.wavesplatform.state.InvokeScriptResult
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, ScriptExecutionError, TransactionNotAllowedByScript}
+import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
 
 sealed abstract class TraceStep {
-  def json: JsObject
+  def json: JsObject // TODO: Is this format necessary?
   def loggedJson: JsObject = json
 }
 
 case class AccountVerifierTrace(
     address: Address,
-    errorO: Option[ValidationError]
+    errorOpt: Option[ValidationError]
 ) extends TraceStep {
 
-  override lazy val json: JsObject = Json.obj(
-    "address" -> address.stringRepr
-  ) ++ (errorO match {
-    case Some(e) => Json.obj("error"  -> TraceStep.errorJson(e))
-    case None    => Json.obj("result" -> "ok")
-  })
+  override lazy val json: JsObject = Json
+    .obj(
+      "type" -> "verifier",
+      "id"   -> address.stringRepr
+    ) ++ TraceStep.maybeErrorJson(errorOpt)
+}
+
+object AssetVerifierTrace {
+  type AssetContext = AssetContext.Value
+  object AssetContext extends Enumeration {
+    val Unknown, OrderAmount, OrderPrice, MatcherFee, Payment, Reissue, Burn, Sponsor, Transfer, UpdateInfo = Value
+
+    def fromTxAndAsset(tx: Transaction, asset: IssuedAsset): AssetContext = tx match {
+      case i: InvokeScriptTransaction if i.payments.exists(_.assetId == asset) => AssetContext.Payment
+
+      case e: ExchangeTransaction if e.order1.assetPair.amountAsset == asset                            => AssetContext.OrderAmount
+      case e: ExchangeTransaction if e.order1.assetPair.priceAsset == asset                             => AssetContext.OrderPrice
+      case e: ExchangeTransaction if Set(e.order1.matcherFeeAssetId, e.order2.matcherFeeAssetId)(asset) => AssetContext.OrderPrice
+
+      case r: ReissueTransaction if r.asset == asset           => AssetContext.Reissue
+      case r: BurnTransaction if r.asset == asset              => AssetContext.Burn
+      case s: SponsorFeeTransaction if s.asset == asset        => AssetContext.Sponsor
+      case u: UpdateAssetInfoTransaction if u.assetId == asset => AssetContext.UpdateInfo
+      case u: SetAssetScriptTransaction if u.asset == asset    => AssetContext.UpdateInfo
+
+      case t: TransferTransaction if t.assetId == asset       => AssetContext.Transfer
+      case mt: MassTransferTransaction if mt.assetId == asset => AssetContext.Transfer
+
+      case _ => AssetContext.Unknown
+    }
+  }
 }
 
 case class AssetVerifierTrace(
     id: ByteStr,
-    errorO: Option[ValidationError]
+    errorOpt: Option[ValidationError],
+    context: AssetVerifierTrace.AssetContext = AssetVerifierTrace.AssetContext.Unknown
 ) extends TraceStep {
   override lazy val json: JsObject = Json.obj(
-    "assetId" -> id.toString
-  ) ++ (errorO match {
-    case Some(e) => Json.obj("error"  -> TraceStep.errorJson(e))
-    case None    => Json.obj("result" -> "ok")
-  })
+    "type"    -> "asset",
+    "context" -> context.toString.updated(0, context.toString.charAt(0).toLower),
+    "id"      -> id.toString
+  ) ++ TraceStep.maybeErrorJson(errorOpt)
 }
 
 case class InvokeScriptTrace(
@@ -47,121 +79,42 @@ case class InvokeScriptTrace(
     resultE: Either[ValidationError, ScriptResult],
     log: Log[Id]
 ) extends TraceStep {
+  override lazy val json: JsObject       = maybeLoggedJson(false)
+  override lazy val loggedJson: JsObject = maybeLoggedJson(true)
 
-  override lazy val json: JsObject = maybeLogged(false)
-
-  override lazy val loggedJson: JsObject = maybeLogged(true)
-
-  private def maybeLogged(logged: Boolean): JsObject = {
+  private[this] def maybeLoggedJson(logged: Boolean): JsObject = {
     Json.obj(
-      "dApp"     -> dAppAddressOrAlias.stringRepr,
+      "type"     -> "dApp",
+      "id"       -> dAppAddressOrAlias.stringRepr,
       "function" -> functionCall.function.funcName,
-      "args"     -> functionCall.args.map(_.toString),
-      resultE match {
-        case Right(value) =>
-          "result" ->
-            ({ v: JsObject =>
-              if (logged) {
-                v ++ Json.obj(TraceStep.logJson(log))
-              } else {
-                v
-              }
-            })(toJson(value))
-        case Left(e) => "error" -> TraceStep.errorJson(e)
-      }
-    )
+      "args"     -> functionCall.args.map(_.toString)
+    ) ++ (resultE match {
+      case Right(value) => TraceStep.maybeErrorJson(None) ++ Json.obj("result" -> TraceStep.scriptResultJson(value))
+      case Left(e)      => TraceStep.maybeErrorJson(Some(e))
+    }) ++ (if (logged) Json.obj(TraceStep.logJson(log)) else JsObject.empty)
   }
-
-  private def toJson(v: ScriptResult) =
-    v match {
-      case ScriptResultV3(ds, ts) =>
-        Json.obj(
-          "data"      -> ds.map(dataItemJson),
-          "transfers" -> ts.map(transferJson)
-        )
-      case ScriptResultV4(actions) =>
-        Json.obj(
-          "actions" -> actions.map {
-            case transfer: AssetTransfer => transferJson(transfer) + ("type" -> JsString("transfer"))
-            case issue: Issue            => issueJson(issue) + ("type"       -> JsString("issue"))
-            case reissue: Reissue        => reissueJson(reissue) + ("type"   -> JsString("reissue"))
-            case burn: Burn              => burnJson(burn) + ("type"         -> JsString("burn"))
-            case sponsorFee: SponsorFee  => sponsorFeeJson(sponsorFee) + ("type" -> JsString("sponsorFee"))
-            case item: DataOp            => dataItemJson(item) + ("type"     -> JsString("dataItem"))
-          }
-        )
-      case i: IncompleteResult =>
-        throw new RuntimeException(s"Unexpected $i")
-    }
-
-  private def transferJson(transfer: AssetTransfer) =
-    Json.obj(
-      "address" -> transfer.recipient.bytes.toString,
-      "amount"  -> transfer.amount,
-      "assetId" -> (transfer.assetId match {
-        case Some(id) => id.toString
-        case None     => JsNull
-      })
-    )
-
-  private def dataItemJson(item: DataOp) =
-    Json.obj(
-      "key"   -> item.key,
-      "value" -> (item match {
-        case DataItem.Lng(_, v) => Json.toJson(v)
-        case DataItem.Bool(_, v) => Json.toJson(v)
-        case DataItem.Bin(_, v) => Json.toJson(v.toString)
-        case DataItem.Str(_, v) => Json.toJson(v)
-        case DataItem.Delete(_) => JsNull
-      })
-    )
-
-  private def issueJson(issue: Issue) =
-    Json.obj(
-      "script" -> (issue.compiledScript match {
-        case Some(script) => script.toString
-        case None         => JsNull
-      }),
-      "decimals"    -> issue.decimals,
-      "description" -> issue.description,
-      "reissuable"  -> issue.isReissuable,
-      "quantity"    -> issue.quantity,
-      "name"        -> issue.name
-    )
-
-  private def reissueJson(reissue: Reissue) =
-    Json.obj(
-      "assetId"    -> reissue.assetId.toString,
-      "reissuable" -> reissue.isReissuable,
-      "quantity"   -> reissue.quantity
-    )
-
-  private def burnJson(burn: Burn) =
-    Json.obj(
-      "assetId"  -> burn.assetId.toString,
-      "quantity" -> burn.quantity
-    )
-
-  private def sponsorFeeJson(sponsorFee: SponsorFee) =
-    Json.obj(
-      "assetId"              -> sponsorFee.assetId.toString,
-      "minSponsoredAssetFee" -> sponsorFee.minSponsoredAssetFee
-    )
 }
 
 object TraceStep {
-  def errorJson(e: ValidationError): JsValue = e match {
-    case see: ScriptExecutionError          => Json.obj(logType(see.isAssetScript), logJson(see.log), "reason" -> see.error)
-    case tne: TransactionNotAllowedByScript => Json.obj(logType(tne.isAssetScript), logJson(tne.log))
-    case a                                  => JsString(a.toString)
+  private[trace] def scriptResultJson(v: ScriptResult): JsObject =
+    Json.toJsObject(InvokeScriptResult.fromLangResult(v))
+
+  private[trace] def maybeErrorJson(errorOpt: Option[ValidationError]): JsObject =
+    errorOpt match {
+      case Some(e) => Json.obj("result" -> "failure") ++ TraceStep.errorJson(e)
+      case None    => Json.obj("result" -> "success", "error" -> JsNull)
+    }
+
+  private def errorJson(e: ValidationError): JsObject = e match {
+    case see: ScriptExecutionError          => Json.obj(logJson(see.log), "error" -> see.error)
+    case tne: TransactionNotAllowedByScript => Json.obj(logJson(tne.log), "error" -> JsNull)
+    case fte: FailedTransactionError        => Json.obj(logJson(fte.log), "error" -> fte.error.map(JsString))
+    case a                                  => Json.obj("error"                   -> a.toString)
   }
 
-  private def logType(isAssetScript: Boolean): (String, JsValueWrapper) =
-    "type" -> (if (isAssetScript) "Asset" else "Account")
-
-  def logJson(l: Log[Id]): (String, JsValueWrapper) =
+  private[trace] def logJson(l: Log[Id]): (String, JsValueWrapper) =
     "vars" -> l.map {
-      case (k, Right(v))  => Json.obj("name" -> k, "value" -> v.toString)
+      case (k, Right(v))  => Json.obj("name" -> k) ++ ScriptValuesJson.serializeValue(v)
       case (k, Left(err)) => Json.obj("name" -> k, "error" -> err)
     }
 }

@@ -328,7 +328,7 @@ object AssetsApiRoute {
       } yield (ts, h)
 
     for {
-      tsh <- additionalInfo(description.source)
+      tsh <- additionalInfo(description.assetId)
       (timestamp, height) = tsh
       script              = description.script.filter(_ => full)
       name                = description.name.toStringUtf8
@@ -350,7 +350,7 @@ object AssetsApiRoute {
           case 0           => JsNull
           case sponsorship => JsNumber(sponsorship)
         }),
-        "originTransactionId" -> JsString(description.source.toString)
+        "originTransactionId" -> JsString(description.assetId.toString)
       ) ++ script.toSeq.map {
         case AssetScriptInfo(script, complexity) =>
           "scriptDetails" -> Json.obj(
