@@ -94,7 +94,8 @@ class InvokeScriptTransactionRideV5Suite extends BaseTransactionSuite with Cance
     sender.setScript(dAppV5PK, Some(scriptV5.compiled), setScriptFee, waitForTx = true)
   }
 
-  test("Can't invoke Ride V5 DApp via InvokeScriptTx V1") {
+  //TODO enable in SC-695
+  ignore("Can't invoke Ride V5 DApp via InvokeScriptTx V1") {
     assertApiError(
       sender.invokeScript(callerPK, dAppV5, version = TxVersion.V1)
     ) { error =>
@@ -110,7 +111,8 @@ class InvokeScriptTransactionRideV5Suite extends BaseTransactionSuite with Cance
     }
   }
 
-  test("Can't invoke Ride V5 DApp via InvokeScriptTx V2") {
+  //TODO enable in SC-695
+  ignore("Can't invoke Ride V5 DApp via InvokeScriptTx V2") {
     assertApiError(
       sender.invokeScript(callerPK, dAppV5, version = TxVersion.V2)
     ) { error =>
@@ -126,11 +128,13 @@ class InvokeScriptTransactionRideV5Suite extends BaseTransactionSuite with Cance
     }
   }
 
-  test("Can invoke Ride V5 DApp via InvokeScriptTx V3") {
+  //TODO enable in SC-695
+  ignore("Can invoke Ride V5 DApp via InvokeScriptTx V3") {
     sender.invokeScript(callerPK, dAppV5, version = TxVersion.V3, waitForTx = true)
     sender.invokeScript(callerPK, alias(dAppAliasV5), version = TxVersion.V3, waitForTx = true)
   }
 
+  //TODO enable in SC-695
   ignore("Can't invoke Ride V3 DApp via InvokeScriptTx V3 if extraFeePerStep is specified") {
     //TODO add extraFeePerStep
     assertApiError(
@@ -148,6 +152,7 @@ class InvokeScriptTransactionRideV5Suite extends BaseTransactionSuite with Cance
     }
   }
 
+  //TODO enable in SC-695
   ignore("Can't invoke Ride V4 DApp via InvokeScriptTx V3 if extraFeePerStep is specified") {
     //TODO add extraFeePerStep
     assertApiError(
