@@ -297,7 +297,8 @@ class DebugApiRouteSpec
                     |    "issues" : [ ],
                     |    "reissues" : [ ],
                     |    "burns" : [ ],
-                    |    "sponsorFees" : [ ]
+                    |    "sponsorFees" : [ ],
+                    |    "invokes" : [ ]
                     |  },
                     |  "error" : null,
                     |  "vars" : [ ]
@@ -355,7 +356,8 @@ class DebugApiRouteSpec
                |    "issues" : [ ],
                |    "reissues" : [ ],
                |    "burns" : [ ],
-               |    "sponsorFees" : [ ]
+               |    "sponsorFees" : [ ],
+               |    "invokes" : [ ]
                |  },
                |  "error" : null,
                |  "vars" : [ ]
@@ -400,7 +402,8 @@ class DebugApiRouteSpec
           |    } ],
           |    "reissues" : [ ],
           |    "burns" : [ ],
-          |    "sponsorFees" : [ ]
+          |    "sponsorFees" : [ ],
+          |    "invokes" : [ ]
           |  },
           |  "error" : null,
           |  "vars" : [ {
@@ -433,7 +436,8 @@ class DebugApiRouteSpec
                |      "quantity" : 1
                |    } ],
                |    "burns" : [ ],
-               |    "sponsorFees" : [ ]
+               |    "sponsorFees" : [ ],
+               |    "invokes" : [ ]
                |  },
                |  "error" : null,
                |  "vars" : [ ]
@@ -472,7 +476,8 @@ class DebugApiRouteSpec
                |      "assetId" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
                |      "quantity" : 1
                |    } ],
-               |    "sponsorFees" : [ ]
+               |    "sponsorFees" : [ ],
+               |    "invokes" : [ ]
                |  },
                |  "error" : null,
                |  "vars" : [ ]
