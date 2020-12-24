@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs.ci
 
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.{NoShrink, TransactionGen}
@@ -12,7 +12,6 @@ import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.state.{IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
