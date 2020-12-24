@@ -217,7 +217,12 @@ class DAppEnvironment(
       val inv: InvokeScript = InvokeScript(currentDApp, currentDAppPk, dApp, FUNCTION_CALL(User(func, func), args), payments.map(p => Payment(p._2, p._1.fold(Waves:Asset)(a => IssuedAsset(ByteStr(a))))), tx.root)
       InvokeScriptDiff(currentBlockchain(), blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp+1, false, runsLimit, invokeDeep)(inv).resultE.map {
         case (diff, res) =>
-          currentDiff = currentDiff combine diff
+          val fixedDiff = diff.copy(scriptResults = Map(tx.root.id() ->
+            InvokeScriptResult(invokes = Seq(InvokeScriptResult.Invokation(dApp,
+                                                                           InvokeScriptResult.Call(func, args),
+                                                                           payments.map(p => InvokeScriptResult.AttachedPayment(p._1.fold(Asset.Waves:Asset)(a => IssuedAsset(ByteStr(a))), p._2)),
+                                                                           diff.scriptResults(tx.root.id()))))))
+          currentDiff = currentDiff combine fixedDiff
           runsLimit = runsLimit - diff.scriptsRun
           res
       }

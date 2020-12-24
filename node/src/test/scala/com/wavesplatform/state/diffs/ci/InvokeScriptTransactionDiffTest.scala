@@ -1402,8 +1402,11 @@ class InvokeScriptTransactionDiffTest
           version match {
             case V3 => fs
             case V4 => fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
-            case V5 => fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0) + (BlockchainFeatures.ContinuationTransaction.id -> 0))
-            case v  => throw new TestFailedException(s"Unexpected $v", 0)
+            case V5 =>
+              fs.copy(
+                preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0) + (BlockchainFeatures.ContinuationTransaction.id -> 0)
+              )
+            case v => throw new TestFailedException(s"Unexpected $v", 0)
           }
 
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), settings) {
@@ -1661,8 +1664,10 @@ class InvokeScriptTransactionDiffTest
     forAll(uniqueAssetIdScenario) {
       case (asset, invoke, master, script, funcBinding) =>
         (() => blockchain.settings).expects().returning(TestSettings.Default.blockchainSettings)
-        (blockchain.assetScript _).expects(*).returning(None)
-          .anyNumberOfTimes()   // XXX Why?
+        (blockchain.assetScript _)
+          .expects(*)
+          .returning(None)
+          .anyNumberOfTimes() // XXX Why?
         (blockchain.accountScript _)
           .expects(master.toAddress)
           .returning(Some(AccountScriptInfo(master.publicKey, script.explicitGet(), 10L, Map(1 -> Map(funcBinding -> 10L)))))
@@ -2084,7 +2089,9 @@ class InvokeScriptTransactionDiffTest
           assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
             case (diff, bc) =>
               val invocationComplexity =
-                InvokeDiffsCommon.getInvocationComplexity(bc, invokeTx.funcCall, bc.accountScript(dApp).get.complexitiesByEstimator, dApp).explicitGet()
+                InvokeDiffsCommon
+                  .getInvocationComplexity(bc, invokeTx.funcCall, bc.accountScript(dApp).get.complexitiesByEstimator, dApp)
+                  .explicitGet()
               diff.scriptsComplexity shouldBe invocationComplexity
           }
         }
@@ -2181,7 +2188,7 @@ class InvokeScriptTransactionDiffTest
   }
 
   property("Crosscontract call (same accaunt)") {
-     def contract(): DApp = {
+    def contract(): DApp = {
       val expr = {
         val script =
           s"""
@@ -2225,10 +2232,10 @@ class InvokeScriptTransactionDiffTest
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        script     = ContractScript(V5, contract())
-        ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 5).explicitGet()
-        fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
-        payments   = List(Payment(10, Waves))
+        script   = ContractScript(V5, contract())
+        ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 5).explicitGet()
+        fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
+        payments = List(Payment(10, Waves))
         invokeTx = InvokeScriptTransaction
           .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
           .explicitGet()
@@ -2238,14 +2245,14 @@ class InvokeScriptTransactionDiffTest
       case (genesisTxs, invokeTx, dApp) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
-            bc.accountData(dApp, "key") shouldBe Some(IntegerDataEntry("key",1))
-            bc.accountData(dApp, "bar") shouldBe Some(IntegerDataEntry("bar",1))
+            bc.accountData(dApp, "key") shouldBe Some(IntegerDataEntry("key", 1))
+            bc.accountData(dApp, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
         }
     }
   }
 
   property("Crosscontract call require extra fee") {
-     def contract(): DApp = {
+    def contract(): DApp = {
       val expr = {
         val script =
           s"""
@@ -2289,10 +2296,10 @@ class InvokeScriptTransactionDiffTest
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        script     = ContractScript(V5, contract())
-        ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 5).explicitGet()
-        fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
-        payments   = List(Payment(10, Waves))
+        script   = ContractScript(V5, contract())
+        ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 5).explicitGet()
+        fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
+        payments = List(Payment(10, Waves))
         invokeTx = InvokeScriptTransaction
           .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
           .explicitGet()
@@ -2306,9 +2313,8 @@ class InvokeScriptTransactionDiffTest
     }
   }
 
-
   property("Crosscontract call (two accaunts)") {
-     def contract(): DApp = {
+    def contract(): DApp = {
       val expr = {
         val script =
           s"""
@@ -2331,8 +2337,8 @@ class InvokeScriptTransactionDiffTest
 
       compileContractFromExpr(expr, V5)
     }
- 
-     def contract1(otherAcc: Address, alias: Alias): DApp = {
+
+    def contract1(otherAcc: Address, alias: Alias): DApp = {
       val expr = {
         val script =
           s"""
@@ -2386,14 +2392,14 @@ class InvokeScriptTransactionDiffTest
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        alias   = Alias.create("alias").explicitGet()
+        alias = Alias.create("alias").explicitGet()
         aliasTx <- createAliasGen(service, alias, fee, ts)
-        script1 = ContractScript(V5, contract1(service.toAddress, alias))
-        script  = ContractScript(V5, contract())
-        ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
-        ssTx1      = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
-        fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
-        payments   = List(Payment(10, Waves))
+        script1  = ContractScript(V5, contract1(service.toAddress, alias))
+        script   = ContractScript(V5, contract())
+        ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
+        ssTx1    = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
+        fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
+        payments = List(Payment(10, Waves))
         invokeTx = InvokeScriptTransaction
           .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
           .explicitGet()
@@ -2403,14 +2409,14 @@ class InvokeScriptTransactionDiffTest
       case (genesisTxs, invokeTx, dApp, service) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
-            bc.accountData(dApp, "key") shouldBe Some(IntegerDataEntry("key",1))
-            bc.accountData(service, "bar") shouldBe Some(IntegerDataEntry("bar",1))
+            bc.accountData(dApp, "key") shouldBe Some(IntegerDataEntry("key", 1))
+            bc.accountData(service, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
         }
     }
   }
 
   property("Crosscontract call (two accaunts, double call)") {
-     def contract(): DApp = {
+    def contract(): DApp = {
       val expr = {
         val script =
           s"""
@@ -2428,8 +2434,8 @@ class InvokeScriptTransactionDiffTest
 
       compileContractFromExpr(expr, V5)
     }
- 
-     def contract1(otherAcc: Address): DApp = {
+
+    def contract1(otherAcc: Address): DApp = {
       val expr = {
         val script =
           s"""
@@ -2488,18 +2494,18 @@ class InvokeScriptTransactionDiffTest
         invoker <- accountGen
         service <- accountGen
         ts      <- timestampGen
-        fee     = 100500000
+        fee = 100500000
         //fee     <- ciFee(240)
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        script1    = ContractScript(V5, contract1(service.toAddress))
-        script      = ContractScript(V5, contract())
-        ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
-        ssTx1      = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
-        fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
-        payments   = List(Payment(10, Waves))
+        script1  = ContractScript(V5, contract1(service.toAddress))
+        script   = ContractScript(V5, contract())
+        ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
+        ssTx1    = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
+        fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
+        payments = List(Payment(10, Waves))
         invokeTx = InvokeScriptTransaction
           .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
           .explicitGet()
@@ -2509,14 +2515,14 @@ class InvokeScriptTransactionDiffTest
       case (genesisTxs, invokeTx, dApp, service) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
-            bc.accountData(dApp, "key") shouldBe Some(IntegerDataEntry("key",1))
-            bc.accountData(service, "bar") shouldBe Some(IntegerDataEntry("bar",1))
+            bc.accountData(dApp, "key") shouldBe Some(IntegerDataEntry("key", 1))
+            bc.accountData(service, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
         }
     }
   }
 
   property("Crosscontract nested call (two accaunts)") {
-     def contract(): DApp = {
+    def contract(): DApp = {
       val expr = {
         val script =
           s"""
@@ -2539,8 +2545,8 @@ class InvokeScriptTransactionDiffTest
 
       compileContractFromExpr(expr, V5)
     }
- 
-     def contract1(otherAcc: Address): DApp = {
+
+    def contract1(otherAcc: Address): DApp = {
       val expr = {
         val script =
           s"""
@@ -2599,12 +2605,12 @@ class InvokeScriptTransactionDiffTest
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        script1    = ContractScript(V5, contract1(service.toAddress))
-        script      = ContractScript(V5, contract())
-        ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
-        ssTx1      = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
-        fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
-        payments   = List(Payment(10, Waves))
+        script1  = ContractScript(V5, contract1(service.toAddress))
+        script   = ContractScript(V5, contract())
+        ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
+        ssTx1    = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
+        fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
+        payments = List(Payment(10, Waves))
         invokeTx = InvokeScriptTransaction
           .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
           .explicitGet()
@@ -2614,14 +2620,14 @@ class InvokeScriptTransactionDiffTest
       case (genesisTxs, invokeTx, dApp, service) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
-            bc.accountData(dApp, "key") shouldBe Some(IntegerDataEntry("key",1))
-            bc.accountData(service, "bar") shouldBe Some(IntegerDataEntry("bar",1))
+            bc.accountData(dApp, "key") shouldBe Some(IntegerDataEntry("key", 1))
+            bc.accountData(service, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
         }
     }
   }
 
   property("Crosscontract callback with payment") {
-     def contract(): DApp = {
+    def contract(): DApp = {
       val expr = {
         val script =
           s"""
@@ -2644,8 +2650,8 @@ class InvokeScriptTransactionDiffTest
 
       compileContractFromExpr(expr, V5)
     }
- 
-     def contract1(otherAcc: Address): DApp = {
+
+    def contract1(otherAcc: Address): DApp = {
       val expr = {
         val script =
           s"""
@@ -2703,12 +2709,12 @@ class InvokeScriptTransactionDiffTest
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        script1    = ContractScript(V5, contract1(service.toAddress))
-        script      = ContractScript(V5, contract())
-        ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
-        ssTx1      = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
-        fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
-        payments   = List(Payment(10, Waves))
+        script1  = ContractScript(V5, contract1(service.toAddress))
+        script   = ContractScript(V5, contract())
+        ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
+        ssTx1    = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
+        fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
+        payments = List(Payment(10, Waves))
         invokeTx = InvokeScriptTransaction
           .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
           .explicitGet()
@@ -2718,14 +2724,14 @@ class InvokeScriptTransactionDiffTest
       case (genesisTxs, invokeTx, dApp, service) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
-            bc.accountData(dApp, "key") shouldBe Some(IntegerDataEntry("key",1))
-            bc.accountData(service, "bar") shouldBe Some(IntegerDataEntry("bar",1))
+            bc.accountData(dApp, "key") shouldBe Some(IntegerDataEntry("key", 1))
+            bc.accountData(service, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
         }
     }
   }
 
   property("Infilite recurcive crosscontract call") {
-     def contract(): DApp = {
+    def contract(): DApp = {
       val expr = {
         val script =
           s"""
@@ -2758,10 +2764,10 @@ class InvokeScriptTransactionDiffTest
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        script     = ContractScript(V5, contract())
-        ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 5).explicitGet()
-        fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
-        payments   = List(Payment(10, Waves))
+        script   = ContractScript(V5, contract())
+        ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 5).explicitGet()
+        fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
+        payments = List(Payment(10, Waves))
         invokeTx = InvokeScriptTransaction
           .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
           .explicitGet()
@@ -2776,16 +2782,16 @@ class InvokeScriptTransactionDiffTest
   }
 
   property("Smart asset transfer by nested contract actions") {
-     val (assetScript, _) = {
-       val script = """
+    val (assetScript, _) = {
+      val script = """
          |{-# STDLIB_VERSION 5 #-}
          |{-# CONTENT_TYPE EXPRESSION #-}
          |
          |true""".stripMargin
-       ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()
-     }
+      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()
+    }
 
-     def contract(asset: ByteStr): DApp = {
+    def contract(asset: ByteStr): DApp = {
       val expr = {
         val script =
           s"""
@@ -2808,8 +2814,8 @@ class InvokeScriptTransactionDiffTest
 
       compileContractFromExpr(expr, V5)
     }
- 
-     def contract1(otherAcc: Address, asset: ByteStr): DApp = {
+
+    def contract1(otherAcc: Address, asset: ByteStr): DApp = {
       val expr = {
         val script =
           s"""
@@ -2872,12 +2878,12 @@ class InvokeScriptTransactionDiffTest
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        script1    = ContractScript(V5, contract1(service.toAddress, iTx.id()))
-        script      = ContractScript(V5, contract(iTx.id()))
-        ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
-        ssTx1      = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
-        fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
-        payments   = List(Payment(10, Waves))
+        script1  = ContractScript(V5, contract1(service.toAddress, iTx.id()))
+        script   = ContractScript(V5, contract(iTx.id()))
+        ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
+        ssTx1    = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
+        fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
+        payments = List(Payment(10, Waves))
         invokeTx = InvokeScriptTransaction
           .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
           .explicitGet()
@@ -2887,23 +2893,23 @@ class InvokeScriptTransactionDiffTest
       case (genesisTxs, invokeTx, dApp, service, asset) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
-            bc.accountData(dApp, "key") shouldBe Some(IntegerDataEntry("key",1))
-            bc.accountData(service, "bar") shouldBe Some(IntegerDataEntry("bar",1))
+            bc.accountData(dApp, "key") shouldBe Some(IntegerDataEntry("key", 1))
+            bc.accountData(service, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
         }
     }
   }
 
   property("Asset transfer disabled in nested contract actions") {
-     val (assetScript, _) = {
-       val script = """
+    val (assetScript, _) = {
+      val script = """
          |{-# STDLIB_VERSION 5 #-}
          |{-# CONTENT_TYPE EXPRESSION #-}
          |
          |false""".stripMargin
-       ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()
-     }
+      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()
+    }
 
-     def contract(asset: ByteStr): DApp = {
+    def contract(asset: ByteStr): DApp = {
       val expr = {
         val script =
           s"""
@@ -2926,8 +2932,8 @@ class InvokeScriptTransactionDiffTest
 
       compileContractFromExpr(expr, V5)
     }
- 
-     def contract1(otherAcc: Address): DApp = {
+
+    def contract1(otherAcc: Address): DApp = {
       val expr = {
         val script =
           s"""
@@ -2989,12 +2995,12 @@ class InvokeScriptTransactionDiffTest
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        script1    = ContractScript(V5, contract1(service.toAddress))
-        script      = ContractScript(V5, contract(iTx.id()))
-        ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
-        ssTx1      = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
-        fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
-        payments   = List(Payment(10, Waves))
+        script1  = ContractScript(V5, contract1(service.toAddress))
+        script   = ContractScript(V5, contract(iTx.id()))
+        ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
+        ssTx1    = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
+        fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
+        payments = List(Payment(10, Waves))
         invokeTx = InvokeScriptTransaction
           .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
           .explicitGet()
@@ -3010,7 +3016,7 @@ class InvokeScriptTransactionDiffTest
 
   property("Payment in transaction process after Invoke") {
 
-     def contract(asset: ByteStr): DApp = {
+    def contract(asset: ByteStr): DApp = {
       val expr = {
         val script =
           s"""
@@ -3033,8 +3039,8 @@ class InvokeScriptTransactionDiffTest
 
       compileContractFromExpr(expr, V5)
     }
- 
-     def contract1(otherAcc: Address): DApp = {
+
+    def contract1(otherAcc: Address): DApp = {
       val expr = {
         val script =
           s"""
@@ -3096,12 +3102,12 @@ class InvokeScriptTransactionDiffTest
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        script1    = ContractScript(V5, contract1(service.toAddress))
-        script      = ContractScript(V5, contract(iTx.id()))
-        ssTx       = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
-        ssTx1      = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
-        fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
-        payments   = List(Payment(20, IssuedAsset(iTx.id())))
+        script1  = ContractScript(V5, contract1(service.toAddress))
+        script   = ContractScript(V5, contract(iTx.id()))
+        ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
+        ssTx1    = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
+        fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
+        payments = List(Payment(20, IssuedAsset(iTx.id())))
         invokeTx = InvokeScriptTransaction
           .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
           .explicitGet()
@@ -3110,10 +3116,171 @@ class InvokeScriptTransactionDiffTest
     forAll(scenario) {
       case (genesisTxs, invokeTx, dApp, service, asset) =>
         assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { ei =>
-          ei should produce(s"Attempt to transfer unavailable funds: Transaction application leads to negative asset '$asset' balance to (at least) temporary negative state, current balance is 0")
+          ei should produce(
+            s"Attempt to transfer unavailable funds: " +
+              s"Transaction application leads to negative asset '$asset' balance to (at least) temporary negative state, current balance is 0"
+          )
         }
     }
   }
 
+  property("Check balances in payment and asset scripts") {
+    val transferAmount              = 3
+    val paymentFromClientDAppAmount = 5
+    val paymentFromInvokerAmount    = 10
+    val returnValue                 = 17
 
+    val invoker = accountGen.sample.get
+    val fee     = ciFee(3).sample.get
+
+    val paymentScript = {
+      val script = s"""
+                      | {-# STDLIB_VERSION 5        #-}
+                      | {-# SCRIPT_TYPE ASSET       #-}
+                      | {-# CONTENT_TYPE EXPRESSION #-}
+                      | # assetBalance(this.issuer, this.id) == $ENOUGH_AMT
+                      | false # SHOULD FAIL!!!
+                    """.stripMargin
+      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
+    }
+
+    val transferScript = {
+      val script = s"""
+                      | {-# STDLIB_VERSION 5        #-}
+                      | {-# SCRIPT_TYPE ASSET       #-}
+                      | {-# CONTENT_TYPE EXPRESSION #-}
+                      |
+                      | let paymentAsset = this.issuer.getBinaryValue("paymentAsset")
+                      | let startWavesBalance = this.issuer.getIntegerValue("startWavesBalance")
+                      | let startInvokerBalance = this.issuer.getIntegerValue("startInvokerBalance")
+                      | let resultInvokerBalance = wavesBalance(Address(base58'${invoker.toAddress.stringRepr}')).regular
+                      |
+                      | assetBalance(this.issuer, this.id) == $ENOUGH_AMT                                     &&
+                      | assetBalance(this.issuer, paymentAsset) == $ENOUGH_AMT - $paymentFromClientDAppAmount &&
+                      | wavesBalance(this.issuer).regular == startWavesBalance + $paymentFromInvokerAmount    &&
+                      | resultInvokerBalance == startInvokerBalance - $fee - $paymentFromInvokerAmount
+                    """.stripMargin
+      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
+    }
+
+    def serviceDApp(): DApp = {
+      val expr = {
+        val script =
+          s"""
+             |{-# STDLIB_VERSION 5   #-}
+             |{-# CONTENT_TYPE DAPP  #-}
+             |{-#SCRIPT_TYPE ACCOUNT #-}
+             |
+             | @Callable(i)
+             | func bar(startInvokerBalance: Int, startWavesBalance: Int, startPaymentAssetBalance: Int, paymentAsset: ByteVector) = {
+             |   let resultInvokerBalance = wavesBalance(Address(base58'${invoker.toAddress.stringRepr}')).regular
+             |
+             |   if (
+             |     startInvokerBalance == resultInvokerBalance         &&
+             |     startWavesBalance == wavesBalance(i.caller).regular &&
+             |     startPaymentAssetBalance == assetBalance(i.caller, paymentAsset)
+             |   )
+             |     then
+             |       ([IntegerEntry("bar", 1)], $returnValue)
+             |     else
+             |       throw("Balance check failed")
+             | }
+             |""".stripMargin
+        Parser.parseContract(script).get.value
+      }
+      compileContractFromExpr(expr, V5)
+    }
+
+    def clientDApp(serviceDAppAddress: Address, transferAsset: ByteStr, paymentAsset: ByteStr): DApp = {
+      val expr = {
+        val script =
+          s"""
+             |{-# STDLIB_VERSION 5    #-}
+             |{-# CONTENT_TYPE DAPP   #-}
+             |{-# SCRIPT_TYPE ACCOUNT #-}
+             |
+             | @Callable(i)
+             | func foo() = {
+             |  strict startInvokerBalance = wavesBalance(Address(base58'${invoker.toAddress.stringRepr}')).regular
+             |  strict startWavesBalance = wavesBalance(this).regular
+             |  strict startPaymentAssetBalance = assetBalance(this, base58'$paymentAsset')
+             |
+             |  strict r = Invoke(
+             |    Address(base58'$serviceDAppAddress'),
+             |    "bar",
+             |    [startInvokerBalance, startWavesBalance, startPaymentAssetBalance, base58'$paymentAsset'],
+             |    [AttachedPayment(base58'$paymentAsset', $paymentFromClientDAppAmount)]
+             |  )
+             |
+             |  strict resultWavesBalance = wavesBalance(this).regular
+             |  strict resultPaymentAssetBalance = assetBalance(this, base58'$paymentAsset')
+             |
+             |  if (
+             |    startWavesBalance == resultWavesBalance &&
+             |    resultPaymentAssetBalance == startPaymentAssetBalance - $paymentFromClientDAppAmount
+             |  )
+             |  then
+             |   [
+             |     BinaryEntry("paymentAsset", base58'$paymentAsset'),
+             |     IntegerEntry("startInvokerBalance", startInvokerBalance),
+             |     IntegerEntry("startWavesBalance", startWavesBalance),
+             |     IntegerEntry("startPaymentAssetBalance", startPaymentAssetBalance),
+             |     ScriptTransfer(Address(base58'$serviceDAppAddress'), $transferAmount, base58'$transferAsset'),
+             |     IntegerEntry("key", 1)
+             |   ]
+             |  else
+             |   throw("Balance check failed")
+             | }
+           """.stripMargin
+        Parser.parseContract(script).get.value
+      }
+      compileContractFromExpr(expr, V5)
+    }
+
+    val scenario =
+      for {
+        clientDAppAcc  <- accountGen
+        serviceDAppAcc <- accountGen
+        ts             <- timestampGen
+        paymentIssue = IssueTransaction
+          .selfSigned(2.toByte, clientDAppAcc, "Payment asset", "", ENOUGH_AMT, 8, reissuable = true, Some(paymentScript), fee, ts + 1)
+          .explicitGet()
+        transferIssue = IssueTransaction
+          .selfSigned(2.toByte, clientDAppAcc, "Transfer asset", "", ENOUGH_AMT, 8, reissuable = true, Some(transferScript), fee, ts + 2)
+          .explicitGet()
+        gTx1 = GenesisTransaction.create(clientDAppAcc.toAddress, ENOUGH_AMT - 1, ts).explicitGet()
+        gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+        gTx3 = GenesisTransaction.create(serviceDAppAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
+
+        clientDAppScript  = ContractScript(V5, clientDApp(serviceDAppAcc.toAddress, transferIssue.id(), paymentIssue.id()))
+        serviceDAppScript = ContractScript(V5, serviceDApp())
+        setClientDApp     = SetScriptTransaction.selfSigned(1.toByte, clientDAppAcc, clientDAppScript.toOption, fee, ts + 5).explicitGet()
+        setServiceDApp    = SetScriptTransaction.selfSigned(1.toByte, serviceDAppAcc, serviceDAppScript.toOption, fee, ts + 5).explicitGet()
+        fc                = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
+        payments          = List(Payment(paymentFromInvokerAmount, Waves))
+        invokeTx = InvokeScriptTransaction
+          .selfSigned(TxVersion.V3, invoker, clientDAppAcc.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .explicitGet()
+      } yield (
+        Seq(gTx1, gTx2, gTx3, setServiceDApp, setClientDApp, paymentIssue, transferIssue),
+        invokeTx,
+        clientDAppAcc.toAddress,
+        serviceDAppAcc.toAddress,
+        transferIssue.id()
+      )
+
+    forAll(scenario) {
+      case (genesisTxs, invokeTx, clientDApp, serviceDApp, transferAsset) =>
+        assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
+          case (diff, bc) =>
+            diff.errorMessage(invokeTx.id.value()) shouldBe None
+
+            bc.accountData(clientDApp, "key") shouldBe Some(IntegerDataEntry("key", 1))
+            bc.accountData(serviceDApp, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
+
+            bc.balance(clientDApp, IssuedAsset(transferAsset)) shouldBe ENOUGH_AMT - transferAmount
+            bc.balance(serviceDApp, IssuedAsset(transferAsset)) shouldBe 3
+        }
+    }
+  }
 }

@@ -41,7 +41,7 @@ object InvokeScriptDiff {
   import stats.TxTimerExt
 
   def apply(blockchain: Blockchain, blockTime: Long, limitedExecution: Boolean, runsLimit: Int, invokeDeep: Int)(tx: InvokeScript): TracedResult[ValidationError, (Diff, EVALUATED)] = {
-    if(runsLimit <= 0 || invokeDeep <= 0) return TracedResult(Left(ValidationError.ScriptRunsLimitError(s"Too many scripts run while invoke $tx")))
+    if(runsLimit <= 0 || invokeDeep <= 0) return TracedResult(Left(ValidationError.ScriptRunsLimitError(s"Too many scripts run while invoke $tx, maybe not enough fee.")))
     val dAppAddress = tx.dAppAddress
     val accScript = blockchain.accountScript(dAppAddress)
     val functionCall  = tx.funcCall

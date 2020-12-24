@@ -5,13 +5,14 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.v1.evaluator.{IncompleteResult, ScriptResult, ScriptResultV3, ScriptResultV4}
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.traits.domain.{Burn, Issue, Reissue, SponsorFee}
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.protobuf.{Amount, _}
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.Asset.{Waves, IssuedAsset}
 import com.wavesplatform.utils._
 import play.api.libs.json._
 
@@ -22,12 +23,21 @@ final case class InvokeScriptResult(
     reissues: Seq[Reissue] = Nil,
     burns: Seq[Burn] = Nil,
     sponsorFees: Seq[SponsorFee] = Nil,
+    invokes: Seq[InvokeScriptResult.Invokation] = Nil,
     error: Option[ErrorMessage] = None
 )
 
 //noinspection TypeAnnotation
 object InvokeScriptResult {
   val empty = InvokeScriptResult()
+
+  final case class AttachedPayment(asset: Asset, amount: Long)
+  implicit val attachedPaymentWrites = Json.writes[AttachedPayment]
+
+  final case class Call(function: String, args: Seq[EVALUATED])
+  implicit val callWrites = Json.writes[Call]
+
+  final case class Invokation(dApp: Address, call: Call, payments: Seq[AttachedPayment], stateChanges: InvokeScriptResult)
 
   final case class Payment(address: Address, asset: Asset, amount: Long)
   object Payment {
@@ -56,14 +66,23 @@ object InvokeScriptResult {
   implicit val burnFormat         = Json.writes[Burn]
   implicit val sponsorFeeFormat   = Json.writes[SponsorFee]
   implicit val errorMessageFormat = Json.writes[ErrorMessage]
+  implicit val invokationFormat: Writes[Invokation] = new Writes[Invokation] {
+    override def writes(i: Invokation) = Json.obj(
+        "dApp" -> i.dApp,
+        "call" -> i.call,
+        "payments" -> i.payments,
+        "stateChanges" -> jsonFormat.writes(i.stateChanges)
+      )
+  }
   implicit val jsonFormat         = Json.writes[InvokeScriptResult]
 
   implicit val monoid = new Monoid[InvokeScriptResult] {
     override val empty: InvokeScriptResult =
       InvokeScriptResult.this.empty
 
-    override def combine(x: InvokeScriptResult, y: InvokeScriptResult): InvokeScriptResult =
-      InvokeScriptResult(x.data ++ y.data, x.transfers ++ y.transfers)
+    override def combine(x: InvokeScriptResult, y: InvokeScriptResult): InvokeScriptResult = {
+      InvokeScriptResult(/*x.data ++ y.data, x.transfers ++ y.transfers,*/ invokes = x.invokes ++ y.invokes)
+    }
   }
 
   def toBytes(isr: InvokeScriptResult): Array[Byte] = {
@@ -115,7 +134,15 @@ object InvokeScriptResult {
         val sponsorFees = actions.collect { case sf: lang.SponsorFee   => sf }
         val dataOps     = actions.collect { case d: lang.DataOp        => DataEntry.fromLangDataOp(d) }
         val transfers   = actions.collect { case t: lang.AssetTransfer => langTransferToPayment(t) }
-        InvokeScriptResult(dataOps, transfers, issues, reissues, burns, sponsorFees)
+        val invokes     = result.invokes.map {
+          case (dApp, fname, args, payments, r) => Invokation(langAddressToAddress(dApp), Call(fname, args), (payments.map { case CaseObj(t, fields) =>
+             (fields("assetId"), fields("amount")) match {
+               case (CONST_BYTESTR(b), CONST_LONG(a)) => InvokeScriptResult.AttachedPayment(IssuedAsset(b), a)
+               case (_, CONST_LONG(a)) => InvokeScriptResult.AttachedPayment(Waves, a)
+             }
+          }), fromLangResult(r))
+        }
+        InvokeScriptResult(dataOps, transfers, issues, reissues, burns, sponsorFees, invokes)
 
       case i: IncompleteResult => throw new IllegalArgumentException(s"Cannot cast incomplete result: $i")
     }
@@ -177,6 +204,7 @@ object InvokeScriptResult {
       pbValue.reissues.map(toVanillaReissue),
       pbValue.burns.map(toVanillaBurn),
       pbValue.sponsorFees.map(toVanillaSponsorFee),
+      Nil, // XXX
       pbValue.errorMessage.map(toVanillaErrorMessage)
     )
   }
