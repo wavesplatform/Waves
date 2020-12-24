@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.invoke
 
 import cats.Id
 import cats.implicits._
+import com.google.common.base.Throwables
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -21,19 +22,23 @@ import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.CompositeBlockchain
 //import com.wavesplatform.state.InvokeScriptResult.Payment
 import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.TxValidationError
 import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
-import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
+import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult, AssetVerifierTrace}
 import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import monix.eval.Coeval
 import shapeless.Coproduct
 
-import scala.util.{Right, Try}
+import scala.util.{Right, Try, Failure, Success}
 
 object InvokeScriptDiff {
 
@@ -55,6 +60,52 @@ object InvokeScriptDiff {
 
           directives <- TracedResult.wrapE(DirectiveSet(version, Account, DAppType).leftMap(GenericError.apply))
           payments   <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DAppTarget).leftMap(GenericError.apply))
+          checkedPayments = payments.payments.flatMap {
+            case (amount, Some(assetId)) => blockchain.assetScript(IssuedAsset(assetId)).flatMap(s => Some((s.script, amount, assetId)))
+            case _ => None
+          }
+          _ <- checkedPayments.foldLeft(TracedResult(Right(()):TxValidationError.Validation[Unit])) { (prev, a) => (prev, a) match {
+              case (TracedResult(Left(_), _), _) => prev
+              case (_, (script, amount, assetId)) =>
+                val pseudoTx:PseudoTx = ScriptTransfer(
+                  Some(assetId),
+                  Recipient.Address(ByteStr(tx.senderDApp.bytes)),
+                  tx.sender,
+                  Recipient.Address(ByteStr(tx.dAppAddress.bytes)),
+                  amount,
+                  tx.root.timestamp,
+                  tx.root.id()
+                )
+                Try {
+                  ScriptRunner(
+                    Coproduct[TxOrd](pseudoTx),
+                    blockchain,
+                    script,
+                    isAssetScript = true,
+                    scriptContainerAddress = Coproduct[Environment.Tthis](Environment.AssetId(assetId.arr)),
+                    Int.MaxValue
+                  )  match {
+                     case (log, Left(error))  =>
+                       val err = FailedTransactionError.assetExecutionInAction(error, 0, log, assetId)
+                       TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
+                     case (log, Right(FALSE)) =>
+                       val err = FailedTransactionError.notAllowedByAssetInAction(0, log, assetId)
+                       TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
+                     case (log, Right(TRUE))  => TracedResult(Right(()))
+                     case (log, Right(x)) =>
+                       val err = FailedTransactionError.assetExecutionInAction(s"Script returned not a boolean result, but $x", 0, log, assetId)
+                       TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
+                   }
+                } match {
+                  case Failure(e) =>
+                    TracedResult(Left(
+                      FailedTransactionError
+                        .assetExecutionInAction(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", 0L, List.empty, assetId)
+                    ))
+                  case Success(s) => s
+                }
+              }
+          }
           tthis = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(dAppAddress.bytes)))
           input <- TracedResult.wrapE(buildThisValue(Coproduct[TxOrd](tx.root: Transaction), blockchain, directives, tthis).leftMap(GenericError.apply))
 
@@ -84,7 +135,7 @@ object InvokeScriptDiff {
                   tx.dAppAddress,
                   pk,
                   tx.senderDApp,
-                  runsLimit-1,
+                  runsLimit-1-checkedPayments.size,
                   invokeDeep-1
                 )
 
@@ -127,7 +178,7 @@ object InvokeScriptDiff {
               tx,
               CompositeBlockchain(blockchain, Some(scriptResult._1)),
               blockTime,
-              runsLimit - scriptResult._1.scriptsRun,
+              runsLimit - scriptResult._1.scriptsRun-checkedPayments.size,
               limitedExecution
             )
 
