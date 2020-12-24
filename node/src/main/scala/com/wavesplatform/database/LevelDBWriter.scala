@@ -827,7 +827,7 @@ abstract class LevelDBWriter private[database] (
                   continuationDataToDiscard.put(invokeId, None)
 
                 case tx: ContinuationTransaction =>
-                  val invoke   = this.resolveInvoke(tx).get
+                  val invoke   = this.resolveInvoke(tx).explicitGet()
                   val invokeId = TransactionId(invoke.id.value())
                   val address  = resolveAlias(invoke.dAppAddressOrAlias).explicitGet()
 

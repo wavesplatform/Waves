@@ -266,29 +266,24 @@ object TransactionDiffer {
       case ist: InvokeScriptTransaction => blockchain.resolveAlias(ist.dAppAddressOrAlias).map(Some(_))
       case _                            => Right(None)
     }
-
     for {
       portfolios <- feePortfolios(blockchain, tx)
       maybeDApp  <- extractDAppAddress
-    } yield {
-      val commonDiff =
-        Diff.empty.copy(
-          portfolios = portfolios,
-          scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
-          scriptsComplexity = spentComplexity
-        )
-
-      tx match {
+      commonDiff = Diff.empty.copy(
+        portfolios = portfolios,
+        scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
+        scriptsComplexity = spentComplexity
+      )
+      result <- tx match {
         case c: ContinuationTransaction =>
-          val invoke = blockchain.resolveInvoke(c).get
-          InvokeDiffsCommon.finishContinuation(commonDiff, c, blockchain, invoke, spentComplexity = 0, failed = true)
+          blockchain.resolveInvoke(c)
+            .map(invoke => InvokeDiffsCommon.finishContinuation(commonDiff, c, blockchain, invoke, spentComplexity = 0, failed = true))
         case _ =>
-          commonDiff |+| Diff.empty.copy(
-            transactions =
-              mutable.LinkedHashMap((tx.id(), NewTransactionInfo(tx, (portfolios.keys ++ maybeDApp.toList).toSet, ScriptExecutionFailed)))
-          )
+          val txInfo = NewTransactionInfo(tx, (portfolios.keys ++ maybeDApp.toList).toSet, ScriptExecutionFailed)
+          val txDiff = Diff.empty.copy(transactions = mutable.LinkedHashMap((tx.id(), txInfo)))
+          (commonDiff |+| txDiff).asRight[ValidationError]
       }
-    }
+    } yield result
   }
 
   private object isFailedTransaction {
@@ -305,16 +300,16 @@ object TransactionDiffer {
   // helpers
   private def feePortfolios(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Map[Address, Portfolio]] =
     tx match {
-      case _: GenesisTransaction        => Map.empty[Address, Portfolio].asRight
-      case ptx: PaymentTransaction      => Map(ptx.sender.toAddress -> Portfolio(balance = -ptx.fee, LeaseBalance.empty, assets = Map.empty)).asRight
-      case ptx: ProvenTransaction       => makeFeePortfolios(blockchain, ptx, ptx.sender)
-      case c: ContinuationTransaction   => makeFeePortfolios(blockchain, c, blockchain.resolveInvoke(c).get.sender)
-      case _                            => UnsupportedTransactionType.asLeft
+      case _: GenesisTransaction      => Map.empty[Address, Portfolio].asRight
+      case ptx: PaymentTransaction    => Map(ptx.sender.toAddress -> Portfolio(balance = -ptx.fee, LeaseBalance.empty, assets = Map.empty)).asRight
+      case ptx: ProvenTransaction     => makeFeePortfolios(blockchain, ptx, ptx.sender)
+      case c: ContinuationTransaction => blockchain.resolveInvoke(c).flatMap(invoke => makeFeePortfolios(blockchain, c, invoke.sender))
+      case _                          => UnsupportedTransactionType.asLeft
     }
 
-  private def makeFeePortfolios(blockchain: Blockchain, tx: Transaction, sender: PublicKey): Either[GenericError, Map[Address, Portfolio]] =
+  private def makeFeePortfolios(blockchain: Blockchain, tx: Transaction, txSender: PublicKey): Either[GenericError, Map[Address, Portfolio]] =
     tx.assetFee match {
-      case (Waves, fee) => Map(sender.toAddress -> Portfolio(-fee, LeaseBalance.empty, Map.empty)).asRight
+      case (Waves, fee) => Map(txSender.toAddress -> Portfolio(-fee, LeaseBalance.empty, Map.empty)).asRight
       case (asset @ IssuedAsset(_), fee) =>
         for {
           assetInfo <- blockchain
@@ -326,7 +321,7 @@ object TransactionDiffer {
             GenericError(s"Asset $asset is not sponsored, cannot be used to pay fees")
           )
         } yield Monoid.combine(
-          Map(sender.toAddress           -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -fee))),
+          Map(txSender.toAddress         -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -fee))),
           Map(assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> fee)))
         )
     }

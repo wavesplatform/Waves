@@ -4,8 +4,10 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction}
 import com.wavesplatform.transaction.{Authorized, Transaction}
 
-case class TransactionsOrdering(whitelistAddresses: Set[String], resolveInvoke: ContinuationTransaction => InvokeScriptTransaction)
-    extends Ordering[Transaction] {
+case class TransactionsOrdering(
+    whitelistAddresses: Set[String],
+    resolveInvoke: ContinuationTransaction => Option[InvokeScriptTransaction]
+) extends Ordering[Transaction] {
 
   private def orderBy(tx: Transaction): (Boolean, Double, Long, Long) = {
     val commonFee = if (tx.assetFee._1 != Waves) 0 else -tx.assetFee._2
@@ -26,7 +28,7 @@ case class TransactionsOrdering(whitelistAddresses: Set[String], resolveInvoke: 
 
   private def maybeContinuation(t: Transaction): Transaction =
     t match {
-      case c: ContinuationTransaction => resolveInvoke(c)
+      case c: ContinuationTransaction => resolveInvoke(c).getOrElse(c)
       case _                          => t
     }
 

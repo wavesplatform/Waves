@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v1.traits.domain.Issue
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
+import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -181,8 +181,10 @@ object Blockchain {
       else if (height > 1) PlainBlockVersion
       else GenesisBlockVersion
 
-    def resolveInvoke(c: ContinuationTransaction): Option[InvokeScriptTransaction] =
-      blockchain.transactionInfo(c.invokeScriptTransactionId)
+    def resolveInvoke(c: ContinuationTransaction): Either[ValidationError, InvokeScriptTransaction] =
+      blockchain
+        .transactionInfo(c.invokeScriptTransactionId)
         .collect { case (_, i: InvokeScriptTransaction, _) => i }
+        .toRight(GenericError(s"Can't find InvokeScriptTransaction with id=${c.invokeScriptTransactionId}"))
   }
 }

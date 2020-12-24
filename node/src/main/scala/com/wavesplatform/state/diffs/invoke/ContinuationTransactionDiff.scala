@@ -4,7 +4,6 @@ import cats.Id
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, DApp}
 import com.wavesplatform.lang.v1.ContractLimits
@@ -24,7 +23,7 @@ import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
-import com.wavesplatform.transaction.smart.{ContinuationTransaction, WavesEnvironment, buildThisValue}
+import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction, WavesEnvironment, buildThisValue}
 import monix.eval.Coeval
 import shapeless.Coproduct
 
@@ -32,14 +31,16 @@ object ContinuationTransactionDiff {
   def apply(blockchain: Blockchain, blockTime: Long, limitedExecution: Boolean = true)(
       tx: ContinuationTransaction
   ): TracedResult[ValidationError, Diff] = {
-    val dAppAddressOrAlias = blockchain.resolveInvoke(tx).get.dAppAddressOrAlias
-    val dAppAddress        = blockchain.resolveAlias(dAppAddressOrAlias).explicitGet()
-    blockchain.continuationStates(dAppAddress) match {
-      case ContinuationState.InProgress(expr, unusedComplexity, _, precedingStepCount) =>
-        applyDiff(blockchain, blockTime, limitedExecution, tx, expr, unusedComplexity, precedingStepCount)
-      case _ =>
-        TracedResult.wrapValue(Diff.empty)
-    }
+    for {
+      invoke      <- TracedResult(blockchain.resolveInvoke(tx))
+      dAppAddress <- TracedResult(blockchain.resolveAlias(invoke.dAppAddressOrAlias))
+      diff <- blockchain.continuationStates(dAppAddress) match {
+        case ContinuationState.InProgress(expr, unusedComplexity, _, precedingStepCount) =>
+          applyDiff(blockchain, blockTime, limitedExecution, tx, invoke, expr, unusedComplexity, precedingStepCount)
+        case _ =>
+          TracedResult.wrapValue(Diff.empty)
+      }
+    } yield diff
   }
 
   private def applyDiff(
@@ -47,11 +48,11 @@ object ContinuationTransactionDiff {
       blockTime: Long,
       limitedExecution: Boolean,
       tx: ContinuationTransaction,
+      invoke: InvokeScriptTransaction,
       expr: Terms.EXPR,
       unusedComplexity: Int,
       precedingStepCount: Int
   ): TracedResult[ValidationError, Diff] = {
-    val invoke = blockchain.resolveInvoke(tx).get
     for {
       dAppAddress <- TracedResult(blockchain.resolveAlias(invoke.dAppAddressOrAlias))
       AccountScriptInfo(dAppPublicKey, script, _, _) <- TracedResult(

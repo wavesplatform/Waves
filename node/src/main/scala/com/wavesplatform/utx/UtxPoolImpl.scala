@@ -5,6 +5,7 @@ import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 
 import cats.Monoid
+import cats.implicits.catsSyntaxEitherId
 import cats.syntax.monoid._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
@@ -65,7 +66,7 @@ class UtxPoolImpl(
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionMeta(_).isDefined) // TODO delete in the future
 
-  private[this] val inUTXPoolOrdering = TransactionsOrdering(utxSettings.fastLaneAddresses, resolveInvoke)
+  private[this] val inUTXPoolOrdering = TransactionsOrdering(utxSettings.fastLaneAddresses, resolveInvoke(_).toOption)
 
   override def putIfNew(tx: Transaction, forceValidate: Boolean): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id()) || priorityPool.contains(tx.id())) TracedResult.wrapValue(false)
@@ -277,20 +278,18 @@ class UtxPoolImpl(
       Set(i.sender.toAddress)
         .filter(blockchain.hasAccountScript) ++ blockchain.resolveAlias(i.dAppAddressOrAlias).fold[Set[Address]](_ => Set.empty, Set(_))
     case c: ContinuationTransaction =>
-      scriptedAddresses(resolveInvoke(c))
+      resolveInvoke(c).fold(_ => Set.empty, scriptedAddresses)
     case e: ExchangeTransaction =>
       Set(e.sender.toAddress, e.buyOrder.sender.toAddress, e.sellOrder.sender.toAddress).filter(blockchain.hasAccountScript)
     case a: Authorized if blockchain.hasAccountScript(a.sender.toAddress) => Set(a.sender.toAddress)
     case _                                                                => Set.empty
   }
 
-  private def resolveInvoke(c: ContinuationTransaction): InvokeScriptTransaction = {
+  private def resolveInvoke(c: ContinuationTransaction): Either[ValidationError, InvokeScriptTransaction] =
     transactions.asScala
       .get(c.invokeScriptTransactionId)
-      .orElse(blockchain.resolveInvoke(c))
-      .collect { case i: InvokeScriptTransaction => i }
-      .getOrElse(throw new RuntimeException(s"Can't find InvokeScriptTransaction with id=${c.invokeScriptTransactionId}"))
-  }
+      .collect { case i: InvokeScriptTransaction => i.asRight[ValidationError] }
+      .getOrElse(blockchain.resolveInvoke(c))
 
   private[this] case class TxEntry(tx: Transaction, priority: Boolean)
 
@@ -421,7 +420,8 @@ class UtxPoolImpl(
           }
 
       def continuations(seed: PackResult): Iterable[ContinuationTransaction] =
-        CompositeBlockchain(blockchain, Some(seed.totalDiff)).continuationStates
+        CompositeBlockchain(blockchain, Some(seed.totalDiff))
+          .continuationStates
           .collect { case (_, state: ContinuationState.InProgress) => generateContinuation(state.invokeScriptTransactionId) }
 
       @tailrec def generateContinuation(invokeId: ByteStr): ContinuationTransaction = {
