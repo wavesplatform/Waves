@@ -3110,10 +3110,166 @@ class InvokeScriptTransactionDiffTest
     forAll(scenario) {
       case (genesisTxs, invokeTx, dApp, service, asset) =>
         assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { ei =>
-          ei should produce(s"Attempt to transfer unavailable funds: Transaction application leads to negative asset '$asset' balance to (at least) temporary negative state, current balance is 0")
+          ei should produce(
+            s"Attempt to transfer unavailable funds: " +
+            s"Transaction application leads to negative asset '$asset' balance to (at least) temporary negative state, current balance is 0"
+          )
         }
     }
   }
 
+  property("Check balances in payment and asset scripts") {
+    val transferAmount = 3
+    val paymentFromClientDAppAmount = 5
+    val paymentFromInvokerAmount = 10
+    val returnValue = 17
 
+    val invoker = accountGen.sample.get
+    val fee     = ciFee(3).sample.get
+
+    val paymentScript = {
+      val script = s"""
+                      | {-# STDLIB_VERSION 5        #-}
+                      | {-# SCRIPT_TYPE ASSET       #-}
+                      | {-# CONTENT_TYPE EXPRESSION #-}
+                      | # assetBalance(this.issuer, this.id) == $ENOUGH_AMT
+                      | false # SHOULD FAIL!!!
+                    """.stripMargin
+      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
+    }
+
+    val transferScript = {
+      val script = s"""
+                      | {-# STDLIB_VERSION 5        #-}
+                      | {-# SCRIPT_TYPE ASSET       #-}
+                      | {-# CONTENT_TYPE EXPRESSION #-}
+                      |
+                      | let paymentAsset = this.issuer.getBinaryValue("paymentAsset")
+                      | let startWavesBalance = this.issuer.getIntegerValue("startWavesBalance")
+                      | let startInvokerBalance = this.issuer.getIntegerValue("startInvokerBalance")
+                      | let resultInvokerBalance = wavesBalance(Address(base58'${invoker.toAddress.stringRepr}')).regular
+                      |
+                      | assetBalance(this.issuer, this.id) == $ENOUGH_AMT                                     &&
+                      | assetBalance(this.issuer, paymentAsset) == $ENOUGH_AMT - $paymentFromClientDAppAmount &&
+                      | wavesBalance(this.issuer).regular == startWavesBalance + $paymentFromInvokerAmount    &&
+                      | resultInvokerBalance == startInvokerBalance - $fee - $paymentFromInvokerAmount
+                    """.stripMargin
+      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
+    }
+
+    def serviceDApp(): DApp = {
+      val expr = {
+        val script =
+          s"""
+             |{-# STDLIB_VERSION 5   #-}
+             |{-# CONTENT_TYPE DAPP  #-}
+             |{-#SCRIPT_TYPE ACCOUNT #-}
+             |
+             | @Callable(i)
+             | func bar(startInvokerBalance: Int, startWavesBalance: Int, startPaymentAssetBalance: Int, paymentAsset: ByteVector) = {
+             |   let resultInvokerBalance = wavesBalance(Address(base58'${invoker.toAddress.stringRepr}')).regular
+             |
+             |   if (
+             |     startInvokerBalance == resultInvokerBalance         &&
+             |     startWavesBalance == wavesBalance(i.caller).regular &&
+             |     startPaymentAssetBalance == assetBalance(i.caller, paymentAsset)
+             |   )
+             |     then
+             |       ([IntegerEntry("bar", 1)], $returnValue)
+             |     else
+             |       throw("Balance check failed")
+             | }
+             |""".stripMargin
+        Parser.parseContract(script).get.value
+      }
+      compileContractFromExpr(expr, V5)
+    }
+
+    def clientDApp(serviceDAppAddress: Address, transferAsset: ByteStr, paymentAsset: ByteStr): DApp = {
+      val expr = {
+        val script =
+          s"""
+             |{-# STDLIB_VERSION 5    #-}
+             |{-# CONTENT_TYPE DAPP   #-}
+             |{-# SCRIPT_TYPE ACCOUNT #-}
+             |
+             | @Callable(i)
+             | func foo() = {
+             |  strict startInvokerBalance = wavesBalance(Address(base58'${invoker.toAddress.stringRepr}')).regular
+             |  strict startWavesBalance = wavesBalance(this).regular
+             |  strict startPaymentAssetBalance = assetBalance(this, base58'$paymentAsset')
+             |
+             |  strict r = Invoke(
+             |    Address(base58'$serviceDAppAddress'),
+             |    "bar",
+             |    [startInvokerBalance, startWavesBalance, startPaymentAssetBalance, base58'$paymentAsset'],
+             |    [AttachedPayment(base58'$paymentAsset', $paymentFromClientDAppAmount)]
+             |  )
+             |
+             |  strict resultWavesBalance = wavesBalance(this).regular
+             |  strict resultPaymentAssetBalance = assetBalance(this, base58'$paymentAsset')
+             |
+             |  if (
+             |    startWavesBalance == resultWavesBalance &&
+             |    resultPaymentAssetBalance == startPaymentAssetBalance - $paymentFromClientDAppAmount
+             |  )
+             |  then
+             |   [
+             |     BinaryEntry("paymentAsset", base58'$paymentAsset'),
+             |     IntegerEntry("startInvokerBalance", startInvokerBalance),
+             |     IntegerEntry("startWavesBalance", startWavesBalance),
+             |     IntegerEntry("startPaymentAssetBalance", startPaymentAssetBalance),
+             |     ScriptTransfer(Address(base58'$serviceDAppAddress'), $transferAmount, base58'$transferAsset'),
+             |     IntegerEntry("key", 1)
+             |   ]
+             |  else
+             |   throw("Balance check failed")
+             | }
+           """.stripMargin
+        Parser.parseContract(script).get.value
+      }
+      compileContractFromExpr(expr, V5)
+    }
+
+    val scenario =
+      for {
+      clientDAppAcc  <- accountGen
+      serviceDAppAcc <- accountGen
+        ts      <- timestampGen
+        paymentIssue = IssueTransaction
+          .selfSigned(2.toByte, clientDAppAcc, "Payment asset", "", ENOUGH_AMT, 8, reissuable = true, Some(paymentScript), fee, ts + 1)
+          .explicitGet()
+        transferIssue = IssueTransaction
+          .selfSigned(2.toByte, clientDAppAcc, "Transfer asset", "", ENOUGH_AMT, 8, reissuable = true, Some(transferScript), fee, ts + 2)
+          .explicitGet()
+        gTx1 = GenesisTransaction.create(clientDAppAcc.toAddress, ENOUGH_AMT - 1, ts).explicitGet()
+        gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+        gTx3 = GenesisTransaction.create(serviceDAppAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
+
+      clientDAppScript    = ContractScript(V5, clientDApp(serviceDAppAcc.toAddress, transferIssue.id(), paymentIssue.id()))
+      serviceDAppScript      = ContractScript(V5, serviceDApp())
+      setClientDApp       = SetScriptTransaction.selfSigned(1.toByte, clientDAppAcc, clientDAppScript.toOption, fee, ts + 5).explicitGet()
+      setServiceDApp      = SetScriptTransaction.selfSigned(1.toByte, serviceDAppAcc, serviceDAppScript.toOption, fee, ts + 5).explicitGet()
+        fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
+        payments   = List(Payment(paymentFromInvokerAmount, Waves))
+        invokeTx = InvokeScriptTransaction
+          .selfSigned(TxVersion.V3, invoker, clientDAppAcc.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .explicitGet()
+      } yield (Seq(gTx1, gTx2, gTx3, setServiceDApp, setClientDApp, paymentIssue, transferIssue), invokeTx, clientDAppAcc.toAddress,
+      serviceDAppAcc.toAddress, transferIssue.id())
+
+    forAll(scenario) {
+      case (genesisTxs, invokeTx, clientDApp, serviceDApp, transferAsset) =>
+        assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
+          case (diff, bc) =>
+            diff.errorMessage(invokeTx.id.value()) shouldBe None
+
+            bc.accountData(clientDApp, "key") shouldBe Some(IntegerDataEntry("key",1))
+            bc.accountData(serviceDApp, "bar") shouldBe Some(IntegerDataEntry("bar",1))
+
+            bc.balance(clientDApp, IssuedAsset(transferAsset)) shouldBe ENOUGH_AMT - transferAmount
+            bc.balance(serviceDApp, IssuedAsset(transferAsset)) shouldBe 3
+        }
+    }
+  }
 }
