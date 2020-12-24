@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.{NoShrink, TransactionGen}
 import com.wavesplatform.db.{DBCacheSettings, WithState}
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -12,15 +13,18 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.state.{EmptyDataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.state.{IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -147,6 +151,8 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
       case (genesisTxs, invokeTx, secondDApp) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
+            diff.errorMessage(invokeTx.id.value()) shouldBe None
+
             bc.accountData(secondDApp, invokeEntry1Key) shouldBe Some(IntegerDataEntry(invokeEntry1Key, invokeEntry1Val))
             bc.accountData(secondDApp, invokeEntry2Key) shouldBe Some(IntegerDataEntry(invokeEntry2Key, invokeEntry2NewVal))
         }
@@ -233,6 +239,8 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
       case (genesisTxs, invokeTx, mainDApp) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
+            diff.errorMessage(invokeTx.id.value()) shouldBe None
+
             bc.accountData(mainDApp, invokeEntry1Key) shouldBe Some(IntegerDataEntry(invokeEntry1Key, invokeEntry1Val))
             bc.accountData(mainDApp, invokeEntry2Key) shouldBe Some(IntegerDataEntry(invokeEntry2Key, invokeEntry2NewVal))
         }
@@ -241,11 +249,35 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
 
   property("Crosscontract call - multiple internal invokes - state update") {
 
-    val (invokeEntry1Key, invokeEntry1Val)    = ("entry1", 42)
-    val (invokeEntry2Key, invokeEntry2NewVal) = ("entry2", 100500)
-    val invokeEntry3Key                       = "entry3"
+    val (invokeEntry1Key, invokeEntry1Val) = ("entry1", 42)
+    val transferAssetAmount                = 100542
+    val paymentAssetAmount                 = 99111
 
-    def contractMain(secondAcc: Address, thirdAcc: Address): DApp = {
+    def paymentAssetScript(thirdAcc: Address) = {
+      val script = s"""
+                      | {-# STDLIB_VERSION 5        #-}
+                      | {-# SCRIPT_TYPE ASSET       #-}
+                      | {-# CONTENT_TYPE EXPRESSION #-}
+                      |
+                      | getIntegerValue(Address(base58'$thirdAcc'), "$invokeEntry1Key") == $invokeEntry1Val
+                      |
+                    """.stripMargin
+      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
+    }
+
+    def transferAssetScript(thirdAcc: Address) = {
+      val script = s"""
+                      | {-# STDLIB_VERSION 5        #-}
+                      | {-# SCRIPT_TYPE ASSET       #-}
+                      | {-# CONTENT_TYPE EXPRESSION #-}
+                      |
+                      | getIntegerValue(Address(base58'$thirdAcc'), "$invokeEntry1Key") == $invokeEntry1Val
+                      |
+                    """.stripMargin
+      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
+    }
+
+    def contractMain(secondAcc: Address, thirdAcc: Address, paymentAsset: ByteStr): DApp = {
       val expr = {
         val script =
           s"""
@@ -258,9 +290,15 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
              |    let secondDAppAddr = Address(base58'$secondAcc')
              |    let thirdDAppAddr = Address(base58'$thirdAcc')
              |
-             |    strict invResult = Invoke(secondDAppAddr, "bar", [], [])
+             |    strict invBarResult = Invoke(secondDAppAddr, "bar", [], [])
              |
              |    let thirdDAppDataEntryIsOK = getIntegerValue(thirdDAppAddr, "$invokeEntry1Key") == $invokeEntry1Val
+             |
+             |    strict invAnotherBazResult = Invoke(
+             |      thirdDAppAddr,
+             |      "anotherBaz",
+             |      [],
+             |      [AttachedPayment(base58'$paymentAsset', $paymentAssetAmount)])
              |
              |    if thirdDAppDataEntryIsOK
              |    then
@@ -275,7 +313,7 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
       compileContractFromExpr(expr, V5)
     }
 
-    def contractSecond(thirdAcc: Address): DApp = {
+    def contractSecond(thirdAcc: Address, transferAsset: ByteStr): DApp = {
       val expr = {
         val script =
           s"""
@@ -287,14 +325,13 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
              | func bar() = {
              |    let thirdDAppAddr = Address(base58'$thirdAcc')
              |
-             |    strict invResult = Invoke(thirdDAppAddr, "bar", [], [])
+             |    strict invBazResult = Invoke(thirdDAppAddr, "baz", [], [])
              |
              |    let thirdDAppDataEntryIsOK = getIntegerValue(thirdDAppAddr, "$invokeEntry1Key") == $invokeEntry1Val
              |
              |    if thirdDAppDataEntryIsOK
              |    then
-             |      сделать экшон с переводом ассета
-             |      ([], unit)
+             |      ([ScriptTransfer(thirdDAppAddr, $transferAssetAmount, base58'$transferAsset')], unit)
              |    else
              |      throw("Internal invoke chain state update error")
              | }
@@ -322,6 +359,11 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
              |      unit
              |    )
              | }
+             |
+             | @Callable(i)
+             | func anotherBaz() = {
+             |    ([], unit)
+             | }
              |""".stripMargin
         Parser.parseContract(script).get.value
       }
@@ -334,34 +376,72 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
         mainAcc   <- accountGen
         invoker   <- accountGen
         secondAcc <- accountGen
-        thirdAcc <- accountGen
+        thirdAcc  <- accountGen
         ts        <- timestampGen
         fee       <- ciFee(1)
+
+        paymentIssue = IssueTransaction
+          .selfSigned(
+            2.toByte,
+            mainAcc,
+            "Payment asset",
+            "",
+            ENOUGH_AMT,
+            8,
+            reissuable = true,
+            Some(paymentAssetScript(thirdAcc.toAddress)),
+            fee,
+            ts + 1
+          )
+          .explicitGet()
+        transferIssue = IssueTransaction
+          .selfSigned(
+            2.toByte,
+            secondAcc,
+            "Transfer asset",
+            "",
+            ENOUGH_AMT,
+            8,
+            reissuable = true,
+            Some(transferAssetScript(thirdAcc.toAddress)),
+            fee,
+            ts + 2
+          )
+          .explicitGet()
+
         gTx1 = GenesisTransaction.create(mainAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(secondAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx4 = GenesisTransaction.create(thirdAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        scriptMain   = ContractScript(V5, contractMain(secondAcc.toAddress, thirdAcc.toAddress))
-        scriptSecond = ContractScript(V5, contractSecond(thirdAcc.toAddress))
-        scriptThird = ContractScript(V5, contractThird())
+        scriptMain   = ContractScript(V5, contractMain(secondAcc.toAddress, thirdAcc.toAddress, paymentIssue.id()))
+        scriptSecond = ContractScript(V5, contractSecond(thirdAcc.toAddress, transferIssue.id()))
+        scriptThird  = ContractScript(V5, contractThird())
         ssTxMain     = SetScriptTransaction.selfSigned(1.toByte, mainAcc, scriptMain.toOption, fee, ts + 5).explicitGet()
         ssTxSecond   = SetScriptTransaction.selfSigned(1.toByte, secondAcc, scriptSecond.toOption, fee, ts + 5).explicitGet()
-        ssTxThird   = SetScriptTransaction.selfSigned(1.toByte, thirdAcc, scriptThird.toOption, fee, ts + 5).explicitGet()
+        ssTxThird    = SetScriptTransaction.selfSigned(1.toByte, thirdAcc, scriptThird.toOption, fee, ts + 5).explicitGet()
 
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments = List(Payment(10, Waves))
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, mainAcc.toAddress, Some(fc), payments, fee, Waves, ts + 10)
+          .selfSigned(TxVersion.V3, invoker, mainAcc.toAddress, Some(fc), payments, fee * 100, Waves, ts + 10)
           .explicitGet()
-      } yield (Seq(gTx1, gTx2, gTx3, gTx4, ssTxMain, ssTxSecond, ssTxThird), invokeTx, secondAcc.toAddress)
+      } yield (
+        Seq(gTx1, gTx2, gTx3, gTx4, ssTxMain, ssTxSecond, ssTxThird, paymentIssue, transferIssue),
+        invokeTx,
+        thirdAcc.toAddress,
+        transferIssue.id(),
+        paymentIssue.id()
+      )
 
     forAll(scenario) {
-      case (genesisTxs, invokeTx, secondDApp) =>
+      case (genesisTxs, invokeTx, thirdAcc, transferAsset, paymentAsset) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
-            bc.accountData(secondDApp, invokeEntry1Key) shouldBe Some(IntegerDataEntry(invokeEntry1Key, invokeEntry1Val))
-            bc.accountData(secondDApp, invokeEntry2Key) shouldBe Some(IntegerDataEntry(invokeEntry2Key, invokeEntry2NewVal))
+            diff.errorMessage(invokeTx.id.value()) shouldBe None
+
+            bc.balance(thirdAcc, IssuedAsset(transferAsset)) shouldBe transferAssetAmount
+            bc.balance(thirdAcc, IssuedAsset(paymentAsset)) shouldBe paymentAssetAmount
         }
     }
   }
