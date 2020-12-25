@@ -48,7 +48,7 @@ object InvokeDiffsCommon {
       stepLimit: Long,
       invocationComplexity: Long,
       issueList: List[Issue],
-      actionScriptsInvoked: Int
+      additionalScriptsInvoked: Int
   ): TracedResult[ValidationError, (Long, Map[Address, Portfolio])] =
     TracedResult {
       val stepsNumber =
@@ -82,7 +82,7 @@ object InvokeDiffsCommon {
         _ <- {
           val dAppFee    = expectedStepFeeInWaves(tx, blockchain) * stepsNumber
           val issuesFee  = issueList.count(!blockchain.isNFT(_)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
-          val actionsFee = actionScriptsInvoked * ScriptExtraFee
+          val actionsFee = additionalScriptsInvoked * ScriptExtraFee
           val minFee     = dAppFee + issuesFee + actionsFee
 
           lazy val errorMessage = {
@@ -99,8 +99,8 @@ object InvokeDiffsCommon {
                 ""
 
             val totalScriptsInvokedInfo =
-              if (actionScriptsInvoked > 0)
-                s" with $actionScriptsInvoked total scripts invoked"
+              if (additionalScriptsInvoked > 0)
+                s" with $additionalScriptsInvoked total scripts invoked"
               else
                 ""
 
@@ -228,7 +228,7 @@ object InvokeDiffsCommon {
         burnList.map(b => IssuedAsset(b.assetId)) ++
         sponsorFeeList.map(sf => IssuedAsset(sf.assetId))
 
-      actionScriptsInvoked = actionAssets.count(blockchain.hasAssetScript) +
+      additionalScriptsInvoked = actionAssets.count(blockchain.hasAssetScript) +
         (if (blockchain.hasAccountScript(tx.sender.toAddress)) 1 else 0)
 
       stepLimit = ContractLimits.MaxComplexityByVersion(version)
@@ -242,7 +242,7 @@ object InvokeDiffsCommon {
           stepLimit,
           invocationComplexity,
           issueList,
-          actionScriptsInvoked
+          additionalScriptsInvoked
         ).map(_._2)
 
       paymentsAndFeeDiff = if (isContinuation) Diff(tx = tx.root) else paymentsPart(tx, dAppAddress, feeDiff)
@@ -273,7 +273,7 @@ object InvokeDiffsCommon {
 
       resultDiff = compositeDiff.copy(
         transactions = updatedTxDiff,
-        scriptsRun = if (isContinuation) 0 else actionScriptsInvoked + 1,
+        scriptsRun = if (isContinuation) 0 else additionalScriptsInvoked + 1,
         scriptResults = Map(tx.root.id() -> isr),
         scriptsComplexity = (if (isContinuation) 0 else invocationComplexity) + compositeDiff.scriptsComplexity
       )

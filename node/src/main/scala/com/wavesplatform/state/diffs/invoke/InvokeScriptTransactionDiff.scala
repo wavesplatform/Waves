@@ -77,7 +77,7 @@ object InvokeScriptTransactionDiff {
             stepLimit,
             invocationComplexity,
             issueList = Nil,
-            actionScriptsInvoked = 0
+            additionalScriptsInvoked = 0
           )
           runsLimit = BigDecimal((feeInWaves - FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit) / ScriptExtraFee).toIntExact
 
