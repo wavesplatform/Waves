@@ -66,7 +66,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     def leaseCancel(from: KeyPair, leaseId: ByteStr, timestamp: Gen[Long] = timestampGen): Gen[LeaseCancelTransaction] =
       for {
         timestamp <- timestamp
-      } yield LeaseCancelTransaction.signed(1.toByte, from.publicKey, leaseId, FeeAmount, timestamp, from.privateKey).explicitGet()
+      } yield LeaseCancelTransaction.selfSigned(1.toByte, from, leaseId, FeeAmount, timestamp).explicitGet()
 
     def data(from: KeyPair, dataKey: String, timestamp: Gen[Long] = timestampGen): Gen[DataTransaction] =
       for {
