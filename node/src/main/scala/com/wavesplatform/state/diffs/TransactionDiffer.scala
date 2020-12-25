@@ -46,8 +46,7 @@ object TransactionDiffer {
   def limitedExecution(
       prevBlockTimestamp: Option[Long],
       currentBlockTimestamp: Long,
-      verify: Boolean = true,
-      checkForContinuation: Boolean
+      verify: Boolean = true
   )(
       blockchain: Blockchain,
       tx: Transaction
@@ -57,7 +56,7 @@ object TransactionDiffer {
       currentBlockTimestamp,
       verify,
       limitedExecution = mayFail(tx) && acceptFailed(blockchain),
-      checkForContinuation
+      checkForContinuation = false
     )(blockchain, tx)
   }
 

@@ -219,7 +219,7 @@ class UtxPoolImpl(
             tx
           )
         else
-          TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify, checkForContinuation = false)(
+          TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(
             priorityPool.compositeBlockchain,
             tx
           )
@@ -309,7 +309,7 @@ class UtxPoolImpl(
   private def cleanUnconfirmed(): Unit = {
     log.trace(s"Starting UTX cleanup at height ${blockchain.height}")
 
-    pack(TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), checkForContinuation = true))(
+    pack(TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime()))(
       MultiDimensionalMiningConstraint.unlimited,
       PackStrategy.Unlimited,
       () => false,
