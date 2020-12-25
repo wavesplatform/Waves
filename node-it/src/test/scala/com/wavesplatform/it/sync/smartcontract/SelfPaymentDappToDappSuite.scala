@@ -107,7 +107,11 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
   test("self payment doesn't fail if invoked dApp calls caller dApp with payment") {
     val callerBalanceBefore = sender.balance(dAppAddress1).balance
     val invFee = 2 * invokeFee + smartFee
-    sender.invokeScript(dApp1, dAppAddress2, Some("bar"), fee = invFee, waitForTx = true)
+    val invoke = sender.invokeScript(dApp1, dAppAddress2, Some("bar"), fee = invFee, waitForTx = true)
     sender.balance(dAppAddress1).balance shouldBe callerBalanceBefore - invFee + 100
+    val st = sender.debugStateChanges(invoke._1.id)
+    val invokes = st.stateChanges.get.invokes
+    invokes.size shouldBe 1
+    invokes(0).call.function shouldBe "bar"
   }
 }
