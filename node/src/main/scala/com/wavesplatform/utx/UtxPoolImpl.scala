@@ -303,7 +303,7 @@ class UtxPoolImpl(
       cancelled: () => Boolean
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
     val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime()) _
-    pack(differ)(initialConstraint, strategy, cancelled, withContinuations = true)
+    pack(differ)(initialConstraint, strategy, cancelled, generateContinuations = true)
   }
 
   private def cleanUnconfirmed(): Unit = {
@@ -313,7 +313,7 @@ class UtxPoolImpl(
       MultiDimensionalMiningConstraint.unlimited,
       PackStrategy.Unlimited,
       () => false,
-      withContinuations = false
+      generateContinuations = false
     )
   }
 
@@ -321,7 +321,7 @@ class UtxPoolImpl(
       initialConstraint: MultiDimensionalMiningConstraint,
       strategy: PackStrategy,
       cancelled: () => Boolean,
-      withContinuations: Boolean
+      generateContinuations: Boolean
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
     val packResult = PoolMetrics.packTimeStats.measure {
       val startTime = nanoTimeSource()
@@ -423,7 +423,7 @@ class UtxPoolImpl(
           }
 
       def continuations(seed: PackResult): Iterable[ContinuationTransaction] = {
-        if (withContinuations)
+        if (generateContinuations)
           CompositeBlockchain(blockchain, Some(seed.totalDiff)).continuationStates
             .collect { case (_, state: ContinuationState.InProgress) => generateContinuation(state.invokeScriptTransactionId) }
         else
