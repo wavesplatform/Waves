@@ -214,12 +214,12 @@ class UtxPoolImpl(
     val diffEi = {
       def calculateDiff() = {
         if (forceValidate)
-          TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime(), checkContinuation = false)(
+          TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(
             priorityPool.compositeBlockchain,
             tx
           )
         else
-          TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify, checkContinuation = false)(
+          TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify, checkForContinuation = false)(
             priorityPool.compositeBlockchain,
             tx
           )
@@ -309,7 +309,7 @@ class UtxPoolImpl(
   private def cleanUnconfirmed(): Unit = {
     log.trace(s"Starting UTX cleanup at height ${blockchain.height}")
 
-    pack(TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime()))(
+    pack(TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), checkForContinuation = true))(
       MultiDimensionalMiningConstraint.unlimited,
       PackStrategy.Unlimited,
       () => false,

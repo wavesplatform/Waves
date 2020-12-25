@@ -31,23 +31,23 @@ object TransactionDiffer {
       blockchain: Blockchain,
       tx: Transaction
   ): TracedResult[ValidationError, Diff] =
-    validate(prevBlockTs, currentBlockTs, verify, limitedExecution = false)(blockchain, tx) match {
+    validate(prevBlockTs, currentBlockTs, verify, limitedExecution = false, checkForContinuation = true)(blockchain, tx) match {
       case isFailedTransaction((complexity, scriptResult, trace)) if acceptFailed(blockchain) =>
         TracedResult(failedTransactionDiff(blockchain, tx, complexity, scriptResult), trace)
       case result => result
     }
 
-  def forceValidate(prevBlockTs: Option[Long], currentBlockTs: Long, checkContinuation: Boolean = true)(
+  def forceValidate(prevBlockTs: Option[Long], currentBlockTs: Long)(
       blockchain: Blockchain,
       tx: Transaction
   ): TracedResult[ValidationError, Diff] =
-    validate(prevBlockTs, currentBlockTs, verify = true, limitedExecution = false, checkContinuation)(blockchain, tx)
+    validate(prevBlockTs, currentBlockTs, verify = true, limitedExecution = false, checkForContinuation = false)(blockchain, tx)
 
   def limitedExecution(
       prevBlockTimestamp: Option[Long],
       currentBlockTimestamp: Long,
       verify: Boolean = true,
-      checkContinuation: Boolean = true
+      checkForContinuation: Boolean
   )(
       blockchain: Blockchain,
       tx: Transaction
@@ -57,7 +57,7 @@ object TransactionDiffer {
       currentBlockTimestamp,
       verify,
       limitedExecution = mayFail(tx) && acceptFailed(blockchain),
-      checkContinuation
+      checkForContinuation
     )(blockchain, tx)
   }
 
@@ -65,21 +65,21 @@ object TransactionDiffer {
     * Validates transaction.
     * @param limitedExecution skip execution of the DApp and asset scripts
     * @param verify validate common checks, proofs and asset scripts execution. If `skipFailing` is true asset scripts will not be executed
-    * @param checkContinuation check if evaluation is in progress for continuation transaction
+    * @param checkForContinuation check if evaluation is in progress for continuation transaction
     */
   private def validate(
       prevBlockTimestamp: Option[Long],
       currentBlockTimestamp: Long,
       verify: Boolean,
       limitedExecution: Boolean,
-      checkContinuation: Boolean = true
+      checkForContinuation: Boolean
   )(
       blockchain: Blockchain,
       tx: Transaction
   ): TracedResult[ValidationError, Diff] = {
     val verifyAssets = verify || (mayFail(tx) && acceptFailed(blockchain))
     val result = for {
-      _               <- validateCommon(blockchain, tx, prevBlockTimestamp, currentBlockTimestamp, verify, checkContinuation).traced
+      _               <- validateCommon(blockchain, tx, prevBlockTimestamp, currentBlockTimestamp, verify, checkForContinuation).traced
       _               <- validateFunds(blockchain, tx).traced
       verifierDiff    <- if (verify) verifierDiff(blockchain, tx) else Right(Diff.empty).traced
       transactionDiff <- transactionDiff(blockchain, tx, verifierDiff, currentBlockTimestamp, limitedExecution)
@@ -97,7 +97,7 @@ object TransactionDiffer {
       prevBlockTs: Option[Long],
       currentBlockTs: Long,
       verify: Boolean,
-      checkForContinuations: Boolean
+      checkForContinuation: Boolean
   ): Either[ValidationError, Unit] =
     if (verify)
       stats.commonValidation
@@ -109,7 +109,7 @@ object TransactionDiffer {
             _ <- CommonValidation.disallowBeforeActivationTime(blockchain, tx)
             _ <- CommonValidation.disallowDuplicateIds(blockchain, tx)
             _ <- CommonValidation.disallowSendingGreaterThanBalance(blockchain, currentBlockTs, tx)
-            _ <- if (checkForContinuations) CommonValidation.disallowIfContinuationInProgress(blockchain, tx) else Right(())
+            _ <- if (checkForContinuation) CommonValidation.disallowIfContinuationInProgress(blockchain, tx) else Right(())
             _ <- FeeValidation(blockchain, tx)
           } yield ()
         } else Right(())
