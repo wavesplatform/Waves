@@ -468,7 +468,7 @@ class TransactionsRouteSpec
       val transactionsApi = stub[CommonTransactionsApi]
       (transactionsApi.transactionById _).when(lease.id()).returns(Some(TransactionMeta.Default(Height(1), lease, succeeded = true)))
       (transactionsApi.transactionById _).when(leaseCancel.id()).returns(Some(TransactionMeta.Default(Height(1), leaseCancel, succeeded = true)))
-      (transactionsApi.unconfirmedTransactions _).when().returns(Seq(leaseCancel))
+      (() => transactionsApi.unconfirmedTransactions).when().returns(Seq(leaseCancel))
       (transactionsApi.unconfirmedTransactionById _).when(leaseCancel.id()).returns(Some(leaseCancel))
       (transactionsApi.aliasesOfAddress _).when(*).returns(Observable.empty)
 
