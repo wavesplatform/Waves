@@ -2261,6 +2261,7 @@ class InvokeScriptTransactionDiffTest
       case (genesisTxs, invokeTx, dApp) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
+            diff.errorMessage(invokeTx.id.value()) shouldBe None
             bc.accountData(dApp, "key") shouldBe Some(IntegerDataEntry("key", 1))
             bc.accountData(dApp, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
         }
@@ -3397,16 +3398,13 @@ class InvokeScriptTransactionDiffTest
         invokeTx,
         clientDAppAcc.toAddress,
         serviceDAppAcc.toAddress,
-        transferIssue.id(),
-        paymentIssue.id()
+        transferIssue.id()
       )
 
     forAll(scenario) {
-      case (genesisTxs, invokeTx, clientDApp, serviceDApp, transferAsset, paymentAsset) =>
+      case (genesisTxs, invokeTx, clientDApp, serviceDApp, transferAsset) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, bc) =>
-            println(transferAsset)
-            println(paymentAsset)
             diff.errorMessage(invokeTx.id.value()) shouldBe None
 
             bc.accountData(clientDApp, "key") shouldBe Some(IntegerDataEntry("key", 1))
