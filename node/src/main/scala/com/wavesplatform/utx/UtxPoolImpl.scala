@@ -302,7 +302,8 @@ class UtxPoolImpl(
       strategy: PackStrategy,
       cancelled: () => Boolean
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
-    pack(TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime()))(initialConstraint, strategy, cancelled)
+    val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime()) _
+    pack(differ)(initialConstraint, strategy, cancelled, withContinuations = true)
   }
 
   private def cleanUnconfirmed(): Unit = {
@@ -311,14 +312,16 @@ class UtxPoolImpl(
     pack(TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime()))(
       MultiDimensionalMiningConstraint.unlimited,
       PackStrategy.Unlimited,
-      () => false
+      () => false,
+      withContinuations = false
     )
   }
 
   private def pack(differ: (Blockchain, Transaction) => TracedResult[ValidationError, Diff])(
       initialConstraint: MultiDimensionalMiningConstraint,
       strategy: PackStrategy,
-      cancelled: () => Boolean
+      cancelled: () => Boolean,
+      withContinuations: Boolean
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
     val packResult = PoolMetrics.packTimeStats.measure {
       val startTime = nanoTimeSource()
@@ -419,10 +422,13 @@ class UtxPoolImpl(
               }
           }
 
-      def continuations(seed: PackResult): Iterable[ContinuationTransaction] =
-        CompositeBlockchain(blockchain, Some(seed.totalDiff))
-          .continuationStates
-          .collect { case (_, state: ContinuationState.InProgress) => generateContinuation(state.invokeScriptTransactionId) }
+      def continuations(seed: PackResult): Iterable[ContinuationTransaction] = {
+        if (withContinuations)
+          CompositeBlockchain(blockchain, Some(seed.totalDiff)).continuationStates
+            .collect { case (_, state: ContinuationState.InProgress) => generateContinuation(state.invokeScriptTransactionId) }
+        else
+          Seq()
+      }
 
       @tailrec def generateContinuation(invokeId: ByteStr): ContinuationTransaction = {
         val c = ContinuationTransaction(invokeId, Random.nextInt(Int.MaxValue), 0L, Waves, time.correctedTime())
