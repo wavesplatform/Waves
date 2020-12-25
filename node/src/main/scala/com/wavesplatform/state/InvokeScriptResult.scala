@@ -4,6 +4,7 @@ import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.utils._
+import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.evaluator.{IncompleteResult, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.traits.domain.{Burn, Issue, Reissue, SponsorFee}
@@ -109,7 +110,8 @@ object InvokeScriptResult {
       isr.reissues.map(toPbReissue),
       isr.burns.map(toPbBurn),
       isr.error.map(toPbErrorMessage),
-      isr.sponsorFees.map(toPbSponsorFee)
+      isr.sponsorFees.map(toPbSponsorFee),
+      isr.invokes.map(toPbInvokation)
     )
   }
 
@@ -148,6 +150,19 @@ object InvokeScriptResult {
     }
   }
 
+  private def toPbCall(c: Call): PBInvokeScriptResult.Call = {
+    PBInvokeScriptResult.Call(c.function, c.args.map(b => ByteString.copyFrom(Serde.serialize(b, true))))
+  }
+
+  private def toPbInvokation(i: Invokation) = {
+    PBInvokeScriptResult.Invokation(
+      ByteString.copyFrom(i.dApp.bytes),
+      Some(toPbCall(i.call)),
+      i.payments.map(p => Amount(PBAmounts.toPBAssetId(p.asset), p.amount)),
+      Some(toPB(i.stateChanges))
+      )
+  }
+
   private def toPbIssue(r: Issue) = {
     assert(r.compiledScript.isEmpty)
     PBInvokeScriptResult.Issue(
@@ -173,6 +188,22 @@ object InvokeScriptResult {
 
   private def toPbErrorMessage(em: ErrorMessage) =
     PBInvokeScriptResult.ErrorMessage(em.code, em.text)
+
+  private def toVanillaCall(i: PBInvokeScriptResult.Call): Call = {
+    Call(i.function, i.args.map(a => Serde.deserialize(a.toByteArray, true, true).explicitGet()._1.asInstanceOf[EVALUATED]))
+  }
+
+  private def toVanillaInvokation(i: PBInvokeScriptResult.Invokation) : Invokation = {
+    Invokation(
+      PBRecipients.toAddress(i.dApp.toByteArray, AddressScheme.current.chainId).explicitGet(),
+      toVanillaCall(i.call.get),
+      i.payments.map { p =>
+        val (asset, amount) = PBAmounts.toAssetAndAmount(p)
+        InvokeScriptResult.AttachedPayment(asset, amount)
+      },
+      fromPB(i.stateChanges.get)
+    )
+  }
 
   private def toVanillaIssue(r: PBInvokeScriptResult.Issue): Issue = {
     assert(r.script.isEmpty)
@@ -204,7 +235,7 @@ object InvokeScriptResult {
       pbValue.reissues.map(toVanillaReissue),
       pbValue.burns.map(toVanillaBurn),
       pbValue.sponsorFees.map(toVanillaSponsorFee),
-      Nil, // XXX
+      pbValue.invokes.map(toVanillaInvokation),
       pbValue.errorMessage.map(toVanillaErrorMessage)
     )
   }
