@@ -275,6 +275,26 @@ class TransactionsRouteSpec
   }
 
   routePath("/info/{id}") - {
+    "returns lease tx for lease cancel tx" in {
+      val lease       = TxHelpers.lease()
+      val leaseCancel = TxHelpers.leaseCancel(lease.id())
+
+      val blockchain = createBlockchainStub { blockchain =>
+        (blockchain.transactionInfo _).when(lease.id()).returns(Some((1, lease, true)))
+        (blockchain.transactionInfo _).when(leaseCancel.id()).returns(Some((1, leaseCancel, true)))
+      }
+
+      val transactionsApi = stub[CommonTransactionsApi]
+      (transactionsApi.transactionById _).when(lease.id()).returns(Some(TransactionMeta.Default(Height(1), lease, succeeded = true)))
+      (transactionsApi.transactionById _).when(leaseCancel.id()).returns(Some(TransactionMeta.Default(Height(1), leaseCancel, succeeded = true)))
+
+      val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
+      Get(routePath(s"/info/${leaseCancel.id()}")) ~> route ~> check {
+        val json = responseAs[JsObject]
+        json shouldBe leaseCancel.json() ++ Json.obj("lease" -> lease.json(), "height" -> 1, "applicationStatus" -> "succeeded")
+      }
+    }
+
     "handles invalid signature" in {
       forAll(invalidBase58Gen) { invalidBase58 =>
         Get(routePath(s"/info/$invalidBase58")) ~> route should produce(InvalidTransactionId("Wrong char"), matchMsg = true)

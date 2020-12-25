@@ -12,14 +12,19 @@ import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderType}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 
 object TxHelpers {
-  def signer(i: Int): KeyPair = KeyPair(Ints.toByteArray(i))
+  def signer(i: Int): KeyPair  = KeyPair(Ints.toByteArray(i))
+  def address(i: Int): Address = signer(i).toAddress
+
   val defaultSigner: KeyPair  = signer(0)
   val defaultAddress: Address = defaultSigner.toAddress
+  val secondSigner: KeyPair   = signer(1)
+  val secondAddress: Address  = secondSigner.toAddress
 
   private[this] var lastTimestamp = System.currentTimeMillis()
   def timestamp: Long = {
@@ -30,7 +35,7 @@ object TxHelpers {
   def genesis(address: Address, amount: Long = 1000.waves): GenesisTransaction =
     GenesisTransaction.create(address, amount, timestamp).explicitGet()
 
-  def transfer(from: KeyPair, to: AddressOrAlias, amount: Long = 1.waves, asset: Asset = Waves): TransferTransaction =
+  def transfer(from: KeyPair = defaultSigner, to: AddressOrAlias = secondAddress, amount: Long = 1.waves, asset: Asset = Waves): TransferTransaction =
     TransferTransaction.selfSigned(TxVersion.V1, from, to, asset, amount, Waves, TestValues.fee, ByteStr.empty, timestamp).explicitGet()
 
   def issue(amount: Long = 1000, script: Script = null): IssueTransaction =
@@ -92,5 +97,13 @@ object TxHelpers {
   ): InvokeScriptTransaction = {
     val fc = FUNCTION_CALL(FunctionHeader.User(func), args.toList)
     InvokeScriptTransaction.selfSigned(TxVersion.V1, defaultSigner, dApp, Some(fc), payments, fee, feeAssetId, timestamp).explicitGet()
+  }
+
+  def lease(recipient: AddressOrAlias = secondAddress, amount: TxAmount = 10.waves): LeaseTransaction = {
+    LeaseTransaction.selfSigned(TxVersion.V2, defaultSigner, recipient, amount, TestValues.fee, timestamp).explicitGet()
+  }
+
+  def leaseCancel(leaseId: ByteStr): LeaseCancelTransaction = {
+    LeaseCancelTransaction.selfSigned(TxVersion.V2, defaultSigner, leaseId, TestValues.fee, timestamp).explicitGet()
   }
 }
