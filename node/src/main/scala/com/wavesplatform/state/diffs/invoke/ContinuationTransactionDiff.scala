@@ -118,6 +118,7 @@ object ContinuationTransactionDiff {
             blockTime,
             runsLimit = 0,
             isContinuation = true,
+            isSyncCall = false,
             limitedExecution
           )
           .map(

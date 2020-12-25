@@ -172,6 +172,7 @@ object InvokeScriptTransactionDiff {
               blockTime,
               runsLimit - invocationDiff.scriptsRun,
               isContinuation = false,
+              isSyncCall = false,
               limitedExecution
             )
 

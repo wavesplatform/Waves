@@ -188,6 +188,7 @@ object InvokeDiffsCommon {
       blockTime: Long,
       runsLimit: Int,
       isContinuation: Boolean, // TODO refactor?
+      isSyncCall: Boolean,
       limitedExecution: Boolean
   ): TracedResult[ValidationError, Diff] = {
     val complexityLimit =
@@ -232,7 +233,7 @@ object InvokeDiffsCommon {
         (if (blockchain.hasAccountScript(tx.sender.toAddress)) 1 else 0)
 
       stepLimit = ContractLimits.MaxComplexityByVersion(version)
-      feeDiff <- if (isContinuation)
+      feeDiff <- if (isContinuation || isSyncCall)
         TracedResult.wrapValue(Map[Address, Portfolio]())
       else
         calcAndCheckFee(
@@ -244,6 +245,19 @@ object InvokeDiffsCommon {
           issueList,
           additionalScriptsInvoked
         ).map(_._2)
+
+      // TODO there will be no failed tests if code block below would be commented
+      // is it useful?
+      _ <- TracedResult(
+        Either.cond(
+          isContinuation || additionalScriptsInvoked <= runsLimit,
+          (),
+          FailedTransactionError.feeForActions(
+            s"Too many script runs: max: $runsLimit, actual: $additionalScriptsInvoked",
+            invocationComplexity
+          )
+        )
+      )
 
       paymentsAndFeeDiff = if (isContinuation) Diff(tx = tx.root) else paymentsPart(tx, dAppAddress, feeDiff)
 
@@ -273,7 +287,7 @@ object InvokeDiffsCommon {
 
       resultDiff = compositeDiff.copy(
         transactions = updatedTxDiff,
-        scriptsRun = if (isContinuation) 0 else additionalScriptsInvoked + 1,
+        scriptsRun = if (isContinuation || isSyncCall) 0 else additionalScriptsInvoked + 1,
         scriptResults = Map(tx.root.id() -> isr),
         scriptsComplexity = (if (isContinuation) 0 else invocationComplexity) + compositeDiff.scriptsComplexity
       )

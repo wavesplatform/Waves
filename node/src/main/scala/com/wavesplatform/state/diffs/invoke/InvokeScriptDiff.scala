@@ -179,6 +179,7 @@ object InvokeScriptDiff {
               blockTime,
               runsLimit - scriptResult._1.scriptsRun-checkedPayments.size,
               isContinuation = false,
+              isSyncCall = true,
               limitedExecution
             )
 
