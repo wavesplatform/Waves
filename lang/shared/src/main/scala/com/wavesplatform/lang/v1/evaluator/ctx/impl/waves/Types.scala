@@ -187,8 +187,10 @@ object Types {
   private val callableV3ReturnType =
     UNION(callableV3Results: _*)
 
-  private val callableV4ReturnType =
-    LIST(UNION.create(commonDataEntryType(V4) :: scriptTransfer :: callableV4Actions))
+  private val callableV4ReturnType = {
+    val actions = LIST(UNION.create(commonDataEntryType(V4) :: deleteDataEntry :: scriptTransfer :: callableV4Actions))
+    UNION(actions, TUPLE(List(actions, ANY)))
+  }
 
   def callableReturnType(v: StdLibVersion): Either[ExecutionError, FINAL] =
     v match {

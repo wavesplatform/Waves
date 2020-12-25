@@ -116,6 +116,7 @@ object ContinuationTransactionDiff {
             invoke,
             blockchain,
             blockTime,
+            runsLimit = 0,
             isContinuation = true,
             limitedExecution
           )
@@ -129,7 +130,7 @@ object ContinuationTransactionDiff {
       resultDiff <- scriptResult._1 match {
         case ScriptResultV3(dataItems, transfers, unusedComplexity) =>
           doProcessActions(dataItems ::: transfers, unusedComplexity)
-        case ScriptResultV4(actions, unusedComplexity) =>
+        case ScriptResultV4(actions, unusedComplexity, _) =>
           doProcessActions(actions, unusedComplexity)
         case ir: IncompleteResult =>
           val newState                         = ContinuationState.InProgress(ir.expr, ir.unusedComplexity, tx.invokeScriptTransactionId, precedingStepCount + 1)
