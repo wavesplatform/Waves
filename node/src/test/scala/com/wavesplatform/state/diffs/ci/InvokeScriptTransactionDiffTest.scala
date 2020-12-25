@@ -2253,7 +2253,7 @@ class InvokeScriptTransactionDiffTest
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments = List(Payment(10, Waves))
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 6)
           .explicitGet()
       } yield (Seq(gTx1, gTx2, ssTx), invokeTx, master.toAddress)
 
@@ -2317,7 +2317,7 @@ class InvokeScriptTransactionDiffTest
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments = List(Payment(10, Waves))
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 6)
           .explicitGet()
       } yield (Seq(gTx1, gTx2, ssTx), invokeTx, master.toAddress)
 
@@ -2415,9 +2415,9 @@ class InvokeScriptTransactionDiffTest
         ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, script1.toOption, fee, ts + 5).explicitGet()
         ssTx1    = SetScriptTransaction.selfSigned(1.toByte, service, script.toOption, fee, ts + 5).explicitGet()
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
-        payments = List(Payment(10, Waves))
+        payments = List(Payment(10L, Waves))
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 6)
           .explicitGet()
       } yield (Seq(gTx1, gTx2, gTx3, aliasTx, ssTx1, ssTx), invokeTx, master.toAddress, service.toAddress)
 
@@ -2523,7 +2523,7 @@ class InvokeScriptTransactionDiffTest
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments = List(Payment(10, Waves))
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 6)
           .explicitGet()
       } yield (Seq(gTx1, gTx2, gTx3, ssTx1, ssTx), invokeTx, master.toAddress, service.toAddress)
 
@@ -2628,7 +2628,7 @@ class InvokeScriptTransactionDiffTest
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments = List(Payment(10, Waves))
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 6)
           .explicitGet()
       } yield (Seq(gTx1, gTx2, gTx3, ssTx1, ssTx), invokeTx, master.toAddress, service.toAddress)
 
@@ -2732,7 +2732,7 @@ class InvokeScriptTransactionDiffTest
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments = List(Payment(10, Waves))
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 6)
           .explicitGet()
       } yield (Seq(gTx1, gTx2, gTx3, ssTx1, ssTx), invokeTx, master.toAddress, service.toAddress)
 
@@ -2785,7 +2785,7 @@ class InvokeScriptTransactionDiffTest
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments = List(Payment(10, Waves))
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 6)
           .explicitGet()
       } yield (Seq(gTx1, gTx2, ssTx), invokeTx, master.toAddress)
 
@@ -2901,7 +2901,7 @@ class InvokeScriptTransactionDiffTest
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments = List(Payment(10, Waves))
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 6)
           .explicitGet()
       } yield (Seq(gTx1, gTx2, gTx3, ssTx1, ssTx, iTx), invokeTx, master.toAddress, service.toAddress, iTx.id())
 
@@ -3018,7 +3018,7 @@ class InvokeScriptTransactionDiffTest
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments = List(Payment(10, Waves))
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 6)
           .explicitGet()
       } yield (Seq(gTx1, gTx2, gTx3, ssTx1, ssTx, iTx), invokeTx, master.toAddress, service.toAddress, iTx.id())
 
@@ -3133,7 +3133,7 @@ class InvokeScriptTransactionDiffTest
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments = List(Payment(10, Waves))
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 6)
           .explicitGet()
       } yield (Seq(gTx1, gTx2, gTx3, ssTx1, ssTx, iTx), invokeTx, master.toAddress, service.toAddress, iTx.id())
 
@@ -3241,7 +3241,7 @@ class InvokeScriptTransactionDiffTest
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments = List(Payment(20, IssuedAsset(iTx.id())))
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 6)
           .explicitGet()
       } yield (Seq(gTx1, gTx2, gTx3, ssTx1, ssTx, iTx), invokeTx, master.toAddress, service.toAddress, iTx.id())
 
@@ -3390,7 +3390,7 @@ class InvokeScriptTransactionDiffTest
         fc                = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments          = List(Payment(paymentFromInvokerAmount, Waves))
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, clientDAppAcc.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .selfSigned(TxVersion.V3, invoker, clientDAppAcc.toAddress, Some(fc), payments, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 6)
           .explicitGet()
       } yield (
         Seq(gTx1, gTx2, gTx3, setServiceDApp, setClientDApp, paymentIssue, transferIssue),
