@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats._
 import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.OverdraftValidationProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.ValidationError
@@ -13,12 +14,13 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction.TxWithFee.InCustomAsset
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 
 import scala.util.{Left, Right}
@@ -222,6 +224,8 @@ object CommonValidation {
 
       case _: UpdateAssetInfoTransaction => activationBarrier(BlockchainFeatures.BlockV5)
 
+      case t: ContinuationTransaction => activationBarrier(BlockchainFeatures.ContinuationTransaction)
+
       case _ => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
 
@@ -260,4 +264,37 @@ object CommonValidation {
         )
       case _ => Right(tx)
     }
+
+  def disallowIfContinuationInProgress[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] = {
+    val isBlockedByContinuation = tx match {
+      case authorized: AuthorizedTransaction =>
+        blockchain.continuationStates
+          .exists {
+            case (dAppAddress, (_: ContinuationState.InProgress)) =>
+                authorized match {
+                  case a if a.sender.toAddress == dAppAddress =>
+                    true
+                  case e: ExchangeTransaction =>
+                    dAppAddress == e.order1.sender.toAddress || dAppAddress == e.order2.sender.toAddress
+                  case i: InvokeScriptTransaction =>
+                    dAppAddress == blockchain.resolveAlias(i.dAppAddressOrAlias).explicitGet()
+                  case a: InCustomAsset =>
+                    a.assetFee._1.fold(onWaves = false)(asset => {
+                      val issuer = blockchain.assetDescription(asset).get.issuer.toAddress
+                      dAppAddress == issuer
+                    })
+                  case _ =>
+                    false
+                }
+            case _ =>
+              false
+          }
+      case _ =>
+        false
+    }
+    if (isBlockedByContinuation)
+      Left(BlockedByContinuation)
+    else
+      Right(tx)
+  }
 }

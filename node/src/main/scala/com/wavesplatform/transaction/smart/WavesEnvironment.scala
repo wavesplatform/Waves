@@ -18,6 +18,7 @@ import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.ApplicationStatus.Succeeded
 import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
@@ -52,9 +53,10 @@ class WavesEnvironment(
     // There are no new transactions in currentBlockchain
     blockchain
       .transactionInfo(ByteStr(id))
-      .filter(_._3)
-      .map(_._2)
-      .map(tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, tthis)).explicitGet())
+      .collect {
+        case (_, transaction, Succeeded) =>
+          RealTransactionWrapper(transaction, blockchain, ds.stdLibVersion, paymentTarget(ds, tthis)).explicitGet()
+      }
 
   override def inputEntity: InputEntity =
     in.value()
@@ -129,7 +131,7 @@ class WavesEnvironment(
 
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
     // There are no new transactions in currentBlockchain
-    blockchain.transactionMeta(ByteStr(id)).collect { case (h, true) => h.toLong }
+    blockchain.transactionMeta(ByteStr(id)).collect { case (h, Succeeded) => h.toLong }
 
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
     for {
@@ -207,7 +209,7 @@ class DAppEnvironment(
     var runsLimit: Int,
     invokeDeep: Int
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id()) {
- 
+
   var currentDiff: Diff = Diff.empty
 
   override def currentBlockchain() = CompositeBlockchain(blockchain, Some(currentDiff))

@@ -184,6 +184,7 @@ trait BaseGlobal {
       userFunctionComplexities               <- ContractScript.estimateUserFunctions(stdLibVersion, dApp, estimator)
       globalVariableComplexities             <- ContractScript.estimateGlobalVariables(stdLibVersion, dApp, estimator)
       (maxComplexity, annotatedComplexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator)
+      stateCallsComplexities                 <- ContractScript.estimateStateCalls(stdLibVersion, dApp, dApp.callableFuncs)
       (verifierComplexity, callableComplexities) = dApp.verifierFuncOpt.fold(
         (0L, annotatedComplexities)
       )(v => (annotatedComplexities(v.u.name), annotatedComplexities - v.u.name))
@@ -196,6 +197,7 @@ trait BaseGlobal {
       annotatedComplexities,
       verifierComplexity,
       callableComplexities,
+      stateCallsComplexities.toMap,
       userFunctionComplexities.toMap,
       globalVariableComplexities.toMap
     )
@@ -343,6 +345,7 @@ object BaseGlobal {
       annotatedComplexities: Map[String, Long],
       verifierComplexity: Long,
       callableComplexities: Map[String, Long],
+      stateCallsComplexities: Map[String, Long],
       userFunctionComplexities: Map[String, Long],
       globalVariableComplexities: Map[String, Long]
   )

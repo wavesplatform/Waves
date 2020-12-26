@@ -30,6 +30,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         p = List(InvokeScriptTransaction.Payment(1L, Waves)),
         fee = 10000000L,
         feeAssetId = Waves,
+        InvokeScriptTransaction.DefaultExtraFeePerStep,
         timestamp = 1111L,
         proofs = Proofs(List(proof))
       )
@@ -48,7 +49,8 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         Right(
           ScriptResultV3(
             List(Lng("3FVV4W61poEVXEbFfPG1qfJhJxJ7Pk4M2To", 700000000)),
-            List(AssetTransfer(Recipient.Address(ByteStr(tx.dAppAddressOrAlias.bytes)), 1, None))
+            List(AssetTransfer(Recipient.Address(ByteStr(tx.dAppAddressOrAlias.bytes)), 1, None)),
+            0
           )
         ),
         vars

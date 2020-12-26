@@ -181,7 +181,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
           genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
           setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, dApp, fee, ts + 2)
-          ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3)
+          ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 3)
         } yield (List(genesis, genesis2), setDApp, ci, master)
       }.explicitGet()
 
@@ -220,7 +220,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
         genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
         genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
         setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, dApp, fee, ts + 2)
-        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3)
+        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 3)
       } yield (List(genesis, genesis2), setDApp, ci, issue, master, reissueAmount, burnAmount)
     }.explicitGet()
 
@@ -237,7 +237,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
         genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
         genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
         setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, dApp, fee, ts + 2)
-        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3)
+        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 3)
       } yield (List(genesis, genesis2), setDApp, ci, minSponsoredAssetFee)
     }.explicitGet()
 
@@ -343,7 +343,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
         genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
         genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
         setDApp  <- SetScriptTransaction.selfSigned(TxVersion.V1, master, dApp, fee, ts + 2)
-        ci       <- InvokeScriptTransaction.selfSigned(TxVersion.V1, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3)
+        ci       <- InvokeScriptTransaction.selfSigned(TxVersion.V1, invoker, master.toAddress, None, Nil, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 3)
       } yield (List(genesis, genesis2), setDApp, ci, issue, master, invoker, reissueAmount, burnAmount, transferAmount)
     }.explicitGet()
 
@@ -428,7 +428,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
         genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
         genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
         setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, dApp, fee, ts + 2)
-        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, ts + 3)
+        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, Nil, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 3)
       } yield (List(genesis, genesis2, setDApp), ci, master, invoker, amount)
     }.explicitGet()
 

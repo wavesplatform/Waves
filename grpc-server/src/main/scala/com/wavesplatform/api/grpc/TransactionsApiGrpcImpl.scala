@@ -3,11 +3,13 @@ package com.wavesplatform.api.grpc
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
+import com.wavesplatform.api.grpc.TransactionsApiGrpcImpl.toGrpc
+import com.wavesplatform.api.grpc.{ApplicationStatus => GrpcApplicationStatus}
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBRecipientImplicitConversionOps
 import com.wavesplatform.state.{InvokeScriptResult => VISR}
-import com.wavesplatform.transaction.Authorized
+import com.wavesplatform.transaction.{ApplicationStatus, Authorized}
 import io.grpc.stub.StreamObserver
 import io.grpc.{Status, StatusRuntimeException}
 import monix.execution.Scheduler
@@ -96,8 +98,7 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
           .map(_ => TransactionStatus(txId, TransactionStatus.Status.UNCONFIRMED))
           .orElse {
             commonApi.transactionById(txId.toByteStr).map { m =>
-              val status = if (m.succeeded) ApplicationStatus.SUCCEEDED else ApplicationStatus.SCRIPT_EXECUTION_FAILED
-              TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, m.height, status)
+              TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, m.height, toGrpc(m.status))
             }
           }
           .getOrElse(TransactionStatus(txId, TransactionStatus.Status.NOT_EXISTS))
@@ -120,14 +121,21 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
 
 private object TransactionsApiGrpcImpl {
   def toTransactionResponse(meta: TransactionMeta): TransactionResponse = {
-    val TransactionMeta(height, tx, succeeded) = meta
+    val TransactionMeta(height, tx, status) = meta
     val transactionId                          = tx.id().toByteString
-    val status                                 = if (succeeded) ApplicationStatus.SUCCEEDED else ApplicationStatus.SCRIPT_EXECUTION_FAILED
+    val grpcStatus                                 = toGrpc(status)
     val invokeScriptResult = meta match {
       case TransactionMeta.Invoke(_, _, _, r) => r.map(VISR.toPB)
       case _                                  => None
     }
 
-    TransactionResponse(transactionId, height, Some(tx.toPB), status, invokeScriptResult)
+    TransactionResponse(transactionId, height, Some(tx.toPB), grpcStatus, invokeScriptResult)
   }
+
+  def toGrpc(status: ApplicationStatus): GrpcApplicationStatus =
+    status match {
+      case ApplicationStatus.Succeeded                 => GrpcApplicationStatus.SUCCEEDED
+      case ApplicationStatus.ScriptExecutionFailed     => GrpcApplicationStatus.SCRIPT_EXECUTION_FAILED
+      case ApplicationStatus.ScriptExecutionInProgress => GrpcApplicationStatus.SCRIPT_EXECUTION_IN_PROGRESS
+    }
 }

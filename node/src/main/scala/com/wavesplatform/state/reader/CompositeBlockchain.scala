@@ -10,12 +10,13 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.ApplicationStatus.Succeeded
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{ApplicationStatus, Asset, Transaction}
 
 final case class CompositeBlockchain(
     inner: Blockchain,
@@ -47,7 +48,7 @@ final case class CompositeBlockchain(
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
     inner.leaseDetails(leaseId).map(ld => ld.copy(isActive = diff.leaseState.getOrElse(leaseId, ld.isActive))) orElse
       diff.transactions.get(leaseId).collect {
-        case NewTransactionInfo(lt: LeaseTransaction, _, true) =>
+        case NewTransactionInfo(lt: LeaseTransaction, _, Succeeded) =>
           LeaseDetails(lt.sender, lt.recipient, this.height, lt.amount, diff.leaseState(lt.id()))
       }
   }
@@ -56,21 +57,21 @@ final case class CompositeBlockchain(
     diff.transactions
       .get(id)
       .collect {
-        case NewTransactionInfo(tx: TransferTransaction, _, true) => (height, tx)
+        case NewTransactionInfo(tx: TransferTransaction, _, Succeeded) => (height, tx)
       }
       .orElse(inner.transferById(id))
   }
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)] =
+  override def transactionInfo(id: ByteStr): Option[(Int, Transaction, ApplicationStatus)] =
     diff.transactions
       .get(id)
-      .map(t => (this.height, t.transaction, t.applied))
+      .map(t => (this.height, t.transaction, t.status))
       .orElse(inner.transactionInfo(id))
 
-  override def transactionMeta(id: ByteStr): Option[(Int, Boolean)] =
+  override def transactionMeta(id: ByteStr): Option[(Int, ApplicationStatus)] =
     diff.transactions
       .get(id)
-      .map(info => (this.height, info.applied))
+      .map(info => (this.height, info.status))
       .orElse(inner.transactionMeta(id))
 
   override def height: Int = inner.height + newBlock.fold(0)(_ => 1)
@@ -155,6 +156,9 @@ final case class CompositeBlockchain(
   override def wavesAmount(height: Int): BigInt = inner.wavesAmount(height) + BigInt(reward.getOrElse(0L))
 
   override def hitSource(height: Int): Option[ByteStr] = hitSource.filter(_ => this.height == height) orElse inner.hitSource(height)
+
+  override def continuationStates: Map[Address, ContinuationState] =
+    inner.continuationStates ++ diff.continuationStates
 }
 
 object CompositeBlockchain {
@@ -228,7 +232,7 @@ object CompositeBlockchain {
     assetDescription map { z =>
       diff.transactions.values
         .foldLeft(z.copy(script = script)) {
-          case (acc, NewTransactionInfo(ut: UpdateAssetInfoTransaction, _, true)) if ut.assetId == asset =>
+          case (acc, NewTransactionInfo(ut: UpdateAssetInfoTransaction, _, Succeeded)) if ut.assetId == asset =>
             acc.copy(name = ByteString.copyFromUtf8(ut.name), description = ByteString.copyFromUtf8(ut.description), lastUpdatedAt = Height(height))
           case (acc, _) => acc
         }

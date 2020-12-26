@@ -20,8 +20,8 @@ object WavesContext {
       getBooleanFromStateF,
       getBinaryFromStateF,
       getStringFromStateF,
-      addressFromRecipientF,
-      )
+      addressFromRecipientF
+    )
 
   private val balanceV123Functions =
     Array(
@@ -35,6 +35,14 @@ object WavesContext {
       wavesBalanceV4F
     )
 
+  private def selfCallFunctions(v: StdLibVersion) =
+    Array(
+      getIntegerFromStateSelfF,
+      getBooleanFromStateSelfF,
+      getBinaryFromStateSelfF,
+      getStringFromStateSelfF
+    ) ++ extractedStateSelfFuncs(v)
+
   private val invariableCtx =
     CTX(Seq(), Map(height), commonFunctions)
 
@@ -46,18 +54,16 @@ object WavesContext {
     } yield DirectiveSet(version, scriptType, contentType)
 
   private val variableCtxCache: Map[DirectiveSet, CTX[Environment]] =
-    allDirectives
-      .collect { case Right(ds) => (ds, variableCtx(ds)) }
-      .toMap
+    allDirectives.collect { case Right(ds) => (ds, variableCtx(ds)) }.toMap
 
   private def variableCtx(ds: DirectiveSet): CTX[Environment] = {
-    val isTokenContext = ds.scriptType  == Asset
-    val proofsEnabled = !isTokenContext
-    val version = ds.stdLibVersion
+    val isTokenContext = ds.scriptType == Asset
+    val proofsEnabled  = !isTokenContext
+    val version        = ds.stdLibVersion
     CTX(
       variableTypes(version, proofsEnabled),
       variableVars(isTokenContext, version, ds.contentType, proofsEnabled),
-      variableFuncs(version, ds.contentType, proofsEnabled)
+      variableFuncs(version, ds.scriptType, proofsEnabled)
     )
   }
 
@@ -70,19 +76,21 @@ object WavesContext {
     )
 
   private def fromV4Funcs(proofsEnabled: Boolean, version: StdLibVersion) =
-    fromV3Funcs(proofsEnabled, version) ++ Array(
-      calculateAssetIdF,
-      transactionFromProtoBytesF(proofsEnabled, version),
-      simplifiedIssueActionConstructor,
-      detailedIssueActionConstructor
-    )
+    fromV3Funcs(proofsEnabled, version) ++
+      Array(
+        calculateAssetIdF,
+        transactionFromProtoBytesF(proofsEnabled, version),
+        simplifiedIssueActionConstructor,
+        detailedIssueActionConstructor
+      ) ++
+      balanceV4Functions
 
   private def fromV5Funcs(proofsEnabled: Boolean, version: StdLibVersion) =
     fromV4Funcs(proofsEnabled, version) ++ Array(
       callDAppF(version)
     )
 
-  private def variableFuncs(version: StdLibVersion, c: ContentType, proofsEnabled: Boolean) = {
+  private def variableFuncs(version: StdLibVersion, scriptType: ScriptType, proofsEnabled: Boolean) = {
     val commonFuncs =
       Array(
         getIntegerFromArrayF(version),
@@ -94,24 +102,25 @@ object WavesContext {
         getBinaryByIndexF(version),
         getStringByIndexF(version),
         addressFromPublicKeyF(version),
-        if (version >= V4) addressFromStringV4 else addressFromStringF(version),
+        if (version >= V4) addressFromStringV4 else addressFromStringF(version)
       )
 
     val versionSpecificFuncs =
       version match {
-        case V1 | V2 => Array(txByIdF(proofsEnabled, version)) ++ balanceV123Functions
-        case V3      => fromV3Funcs(proofsEnabled, version) ++ balanceV123Functions
-        case V4      => fromV4Funcs(proofsEnabled, version) ++ balanceV4Functions
-        case V5      => fromV5Funcs(proofsEnabled, version) ++ balanceV4Functions
-     }
+        case V1 | V2                     => Array(txByIdF(proofsEnabled, version)) ++ balanceV123Functions
+        case V3                          => fromV3Funcs(proofsEnabled, version) ++ balanceV123Functions
+        case V4                          => fromV4Funcs(proofsEnabled, version)
+        case V5 if scriptType == Account => fromV5Funcs(proofsEnabled, version) ++ selfCallFunctions(V5)
+        case V5                          => fromV5Funcs(proofsEnabled, version)
+      }
     commonFuncs ++ versionSpecificFuncs
   }
 
   private def variableVars(
-    isTokenContext: Boolean,
-    version:        StdLibVersion,
-    contentType:    ContentType,
-    proofsEnabled:  Boolean
+      isTokenContext: Boolean,
+      version: StdLibVersion,
+      contentType: ContentType,
+      proofsEnabled: Boolean
   ) = {
     val txVal = tx(isTokenContext, version, proofsEnabled)
     version match {
@@ -126,6 +135,6 @@ object WavesContext {
   }
 
   private def variableTypes(version: StdLibVersion, proofsEnabled: Boolean) =
-    buildWavesTypes(proofsEnabled, version)           ++
-    (if (version >= V3) dAppTypes(version) else Nil)
+    buildWavesTypes(proofsEnabled, version) ++
+      (if (version >= V3) dAppTypes(version) else Nil)
 }

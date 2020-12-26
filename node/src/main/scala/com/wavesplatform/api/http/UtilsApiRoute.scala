@@ -10,7 +10,6 @@ import com.wavesplatform.api.http.requests.{ScriptWithImportsRequest, byteStrFor
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values._
@@ -109,13 +108,7 @@ case class UtilsApiRoute(
 
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String])) { code =>
-      def stdLib: StdLibVersion =
-        if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {
-          V4
-        } else {
-          StdLibVersion.VersionDic.default
-        }
-      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator(), defaultStdLib = stdLib)) { result =>
+      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator(), blockchain)) { result =>
         complete(
           result
             .fold(
@@ -131,9 +124,7 @@ case class UtilsApiRoute(
               }
             )
         )
-
       }
-
     }
   }
 
@@ -297,7 +288,7 @@ object UtilsApiRoute {
 
         call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)
         limitedResult <- EvaluatorV2
-          .applyLimited(call, limit, ctx, script.stdLibVersion)
+          .applyLimited(call, limit, ctx, script.stdLibVersion, continuationFirstStepMode = false)
           .leftMap { case (err, log) => ScriptExecutionError.dAppExecution(err, log) }
         result <- limitedResult match {
           case (eval: EVALUATED, _, _) => Right(eval)

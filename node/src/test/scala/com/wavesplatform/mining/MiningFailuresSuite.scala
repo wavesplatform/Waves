@@ -77,6 +77,7 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PathMockFactory wi
     (blockchainUpdater.blockHeader _).when(*).returns(Some(SignedBlockHeader(genesis.header, genesis.signature)))
     (() => blockchainUpdater.activatedFeatures).when().returning(Map.empty)
     (() => blockchainUpdater.approvedFeatures).when().returning(Map.empty)
+    (() => blockchainUpdater.continuationStates).when().returning(Map.empty)
     (blockchainUpdater.hitSource _).when(*).returns(Some(ByteStr(new Array[Byte](32))))
     (blockchainUpdater.bestLastBlockInfo _)
       .when(*)

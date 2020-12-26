@@ -8,11 +8,14 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.invoke.InvokeDiffsCommon
+import com.wavesplatform.state.diffs.invoke.InvokeDiffsCommon.StepInfo
 import com.wavesplatform.state.patch._
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{ActivationError, _}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction}
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 
@@ -131,6 +134,28 @@ object BlockDiffer extends ScorexLogging {
       case _ => transactionFee
     }
 
+  private def maybeContinuation(
+      blockchain: Blockchain,
+      transactions: Seq[Transaction],
+      tx: Transaction,
+      txDiff: Diff
+  ): Either[ValidationError, Option[(Asset, Long)]] =
+    tx match {
+      case i: InvokeScriptTransaction if txDiff.continuationStates.nonEmpty =>
+        val StepInfo(feeInWaves, _, _) = InvokeDiffsCommon.stepInfo(txDiff, blockchain, i)
+        Right(Some((Waves, feeInWaves)))
+      case c: ContinuationTransaction =>
+        (txDiff.replacingTransactions.view.map(_.transaction) ++ transactions.view)
+          .collectFirst { case i: InvokeScriptTransaction if i.id.value() == c.invokeScriptTransactionId => i.asRight[ValidationError] }
+          .getOrElse(blockchain.resolveInvoke(c))
+          .map { invoke =>
+            val fee = InvokeDiffsCommon.stepInfo(txDiff, blockchain, invoke).feeInWaves
+            Some((Waves, fee))
+          }
+      case _ =>
+        Right(None)
+    }
+
   private[this] def apply(
       blockchain: Blockchain,
       initConstraint: MiningConstraint,
@@ -160,30 +185,31 @@ object BlockDiffer extends ScorexLogging {
             if (updatedConstraint.isOverfilled)
               TracedResult(Left(GenericError(s"Limit of txs was reached: $initConstraint -> $updatedConstraint")))
             else {
-              val (feeAsset, feeAmount) = maybeApplySponsorship(currBlockchain, hasSponsorship, tx.assetFee)
-              val currentBlockFee       = CurrentBlockFeePart(feeAmount)
+              maybeContinuation(currBlockchain, txs, tx, thisTxDiff)
+                .map { assetInfo =>
+                  val (feeAsset, feeAmount) = assetInfo.getOrElse(maybeApplySponsorship(currBlockchain, hasSponsorship, tx.assetFee))
+                  val currentBlockFee       = CurrentBlockFeePart(feeAmount)
 
-              // unless NG is activated, miner has already received all the fee from this block by the time the first
-              // transaction is processed (see abode), so there's no need to include tx fee into portfolio.
-              // if NG is activated, just give them their 40%
-              val minerPortfolio = if (!hasNg) Portfolio.empty else Portfolio.build(feeAsset, feeAmount).multiply(CurrentBlockFeePart)
+                  // unless NG is activated, miner has already received all the fee from this block by the time the first
+                  // transaction is processed (see abode), so there's no need to include tx fee into portfolio.
+                  // if NG is activated, just give them their 40%
+                  val minerPortfolio = if (!hasNg) Portfolio.empty else Portfolio.build(feeAsset, feeAmount).multiply(CurrentBlockFeePart)
 
-              // carry is 60% of waves fees the next miner will get. obviously carry fee only makes sense when both
-              // NG and sponsorship is active. also if sponsorship is active, feeAsset can only be Waves
-              val carry = if (hasNg && hasSponsorship) feeAmount - currentBlockFee else 0
+                  // carry is 60% of waves fees the next miner will get. obviously carry fee only makes sense when both
+                  // NG and sponsorship is active. also if sponsorship is active, feeAsset can only be Waves
+                  val carry = if (hasNg && hasSponsorship) feeAmount - currentBlockFee else 0
 
-              val totalWavesFee = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)
-              val minerDiff     = Diff.empty.copy(portfolios = Map(blockGenerator -> minerPortfolio))
+                  val totalWavesFee = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)
+                  val minerDiff     = Diff.empty.copy(portfolios = Map(blockGenerator -> minerPortfolio))
 
-              Right(
-                Result(
-                  currDiff |+| thisTxDiff |+| minerDiff,
-                  carryFee + carry,
-                  totalWavesFee,
-                  updatedConstraint,
-                  DetailedDiff(parentDiff.combine(minerDiff), thisTxDiff :: txDiffs)
-                )
-              )
+                  Result(
+                    currDiff |+| thisTxDiff |+| minerDiff,
+                    carryFee + carry,
+                    totalWavesFee,
+                    updatedConstraint,
+                    DetailedDiff(parentDiff.combine(minerDiff), thisTxDiff :: txDiffs)
+                  )
+                }
             }
           }
       }

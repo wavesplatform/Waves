@@ -20,8 +20,10 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.ApplicationStatus.{ScriptExecutionFailed, ScriptExecutionInProgress, Succeeded}
 import com.wavesplatform.transaction.lease._
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.{ApplicationStatus, _}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
@@ -85,7 +87,7 @@ case class TransactionsApiRoute(
   private[this] def loadTransactionStatus(id: ByteStr): JsObject = {
     import Status._
     val statusJson = blockchain.transactionInfo(id) match {
-      case Some((height, _, succeeded)) =>
+      case Some((height, t, succeeded)) =>
         Json.obj(
           "status"        -> Confirmed,
           "height"        -> height,
@@ -238,8 +240,9 @@ object TransactionsApiRoute {
   }
 
   object ApplicationStatus {
-    val Succeeded             = "succeeded"
-    val ScriptExecutionFailed = "script_execution_failed"
+    val Succeeded                 = "succeeded"
+    val ScriptExecutionFailed     = "script_execution_failed"
+    val ScriptExecutionInProgress = "script_execution_in_progress"
   }
 
   implicit val transactionProofWrites: Writes[TransactionProof] = Writes { mi =>
@@ -260,14 +263,27 @@ object TransactionsApiRoute {
   }
 
   private[http] object TransactionJsonSerializer {
-    def applicationStatus(isBlockV5: Boolean, succeeded: Boolean): JsObject =
-      if (isBlockV5)
-        Json.obj("applicationStatus" -> (if (succeeded) ApplicationStatus.Succeeded else ApplicationStatus.ScriptExecutionFailed))
-      else
+    def applicationStatus(isBlockV5: Boolean, succeeded: ApplicationStatus): JsObject =
+      if (isBlockV5) {
+        val status = succeeded match {
+          case Succeeded                 => ApplicationStatus.Succeeded
+          case ScriptExecutionFailed     => ApplicationStatus.ScriptExecutionFailed
+          case ScriptExecutionInProgress => ApplicationStatus.ScriptExecutionInProgress
+        }
+        Json.obj("applicationStatus" -> status)
+      } else
         JsObject.empty
 
     def height(height: Int): JsObject =
       Json.obj("height" -> height)
+
+    def continuationTransactionIds(tx: Transaction, commonApi: CommonTransactionsApi): JsObject =
+      tx match {
+        case i: InvokeScriptTransaction if i.version == TxVersion.V3 =>
+          Json.obj("continuationTransactionIds" -> commonApi.continuationTransactionIds(i.id.value()).map(_.toString))
+        case _ =>
+          Json.obj()
+      }
   }
 
   private[http] final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: CommonTransactionsApi) {
@@ -293,7 +309,8 @@ object TransactionsApiRoute {
 
       Seq(
         TransactionJsonSerializer.height(meta.height),
-        applicationStatus(meta.height, meta.succeeded),
+        TransactionJsonSerializer.continuationTransactionIds(meta.transaction, commonApi),
+        applicationStatus(meta.height, meta.status),
         stateChanges,
         specificInfo
       ).reduce(_ ++ _)
@@ -313,7 +330,7 @@ object TransactionsApiRoute {
       case t => t.json()
     }
 
-    def applicationStatus(height: Int, succeeded: Boolean): JsObject =
+    def applicationStatus(height: Int, succeeded: ApplicationStatus): JsObject =
       TransactionJsonSerializer.applicationStatus(isBlockV5(height), succeeded)
 
     private[this] def isBlockV5(height: Int): Boolean = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height)

@@ -119,6 +119,7 @@ class ProtoVersionTransactionsSpec extends FreeSpec with TransactionGen with Mat
           Seq(Payment(100, Asset.Waves)),
           InvokeScriptTxFee,
           IssuedAsset(feeAssetId),
+          InvokeScriptTransaction.DefaultExtraFeePerStep,
           Now
         )
         .explicitGet()

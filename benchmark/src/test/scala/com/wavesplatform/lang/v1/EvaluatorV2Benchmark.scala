@@ -4,15 +4,15 @@ import java.util.concurrent.TimeUnit
 
 import cats.Id
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.lang.v1.EvaluatorV2Benchmark._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
-import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.Common
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 

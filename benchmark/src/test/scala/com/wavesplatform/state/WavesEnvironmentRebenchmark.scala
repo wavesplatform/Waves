@@ -9,7 +9,7 @@ import com.wavesplatform.database.{DBExt, KeyTags, Keys}
 import com.wavesplatform.lang.v1.traits.DataType
 import com.wavesplatform.lang.v1.traits.DataType.{Boolean, ByteArray, Long}
 import com.wavesplatform.lang.v1.traits.domain.Recipient
-import com.wavesplatform.transaction.DataTransaction
+import com.wavesplatform.transaction.{DataTransaction, ApplicationStatus}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
@@ -185,7 +185,7 @@ object WavesEnvironmentRebenchmark {
             None
           else
             db.get(Keys.transactionAt(Height(h), TxNum(Random.nextInt(txCount).toShort)))
-              .collect { case (dataTx: DataTransaction, true) if dataTx.data.nonEmpty =>
+              .collect { case (dataTx: DataTransaction, ApplicationStatus.Succeeded) if dataTx.data.nonEmpty =>
                 (
                   dataTx.data(Random.nextInt(dataTx.data.length)),
                   Recipient.Address(ByteStr(dataTx.sender.toAddress.bytes))
@@ -205,7 +205,7 @@ object WavesEnvironmentRebenchmark {
             None
           else
             db.get(Keys.transactionAt(Height(h), TxNum(Random.nextInt(txCount).toShort)))
-              .collect { case (transferTx: TransferTransaction, true) => transferTx.id() }
+              .collect { case (transferTx: TransferTransaction, ApplicationStatus.Succeeded) => transferTx.id() }
         }
     }
 

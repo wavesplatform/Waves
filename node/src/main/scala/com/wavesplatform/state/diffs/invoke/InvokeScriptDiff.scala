@@ -173,18 +173,19 @@ object InvokeScriptDiff {
               version,
               dAppAddress,
               pk,
-              None,
               invocationComplexity,
               tx,
               CompositeBlockchain(blockchain, Some(scriptResult._1)),
               blockTime,
               runsLimit - scriptResult._1.scriptsRun-checkedPayments.size,
+              isContinuation = false,
+              isSyncCall = true,
               limitedExecution
             )
 
             resultDiff <- scriptResult._2._1 match {
-              case ScriptResultV3(dataItems, transfers)    => doProcessActions(dataItems ::: transfers).map(r => (r, unit))
-              case ScriptResultV4(actions, ret)            => doProcessActions(actions).map(r => (r, ret))
+              case ScriptResultV3(dataItems, transfers, _)    => doProcessActions(dataItems ::: transfers).map(r => (r, unit))
+              case ScriptResultV4(actions, _, ret)            => doProcessActions(actions).map(r => (r, ret))
               case _: IncompleteResult                     => TracedResult(Left(GenericError("Unexpected IncompleteResult")))
             }
           } yield resultDiff.copy(_1 = scriptResult._1 combine resultDiff._1)
@@ -211,7 +212,7 @@ object InvokeScriptDiff {
     val freezingLets  = wavesContext.evaluationContext(environment).letDefs
     val evaluationCtx = ctx.evaluationContext(environment)
 
-    Try(ContractEvaluator.applyV2(evaluationCtx, freezingLets, contract, invocation, version, limit))
+    Try(ContractEvaluator.applyV2(evaluationCtx, freezingLets, contract, invocation, version, limit, continuationFirstStepMode = false))
       .fold(
         e => Left((e.getMessage, Nil)),
         _.map { case (result, log) => (result, evaluationCtx, log) }
@@ -229,7 +230,7 @@ object InvokeScriptDiff {
       transactionId: ByteStr,
       failComplexity: Long
   ): Either[FailedTransactionError, (ScriptResult, Log[Id])] =
-    Try(ContractEvaluator.applyV2(evaluationCtx, Map[String, LazyVal[Id]](), expr, version, transactionId, limit))
+    Try(ContractEvaluator.applyV2(evaluationCtx, Map[String, LazyVal[Id]](), expr, version, transactionId, limit, continuationFirstStepMode = false))
       .fold(e => Left((e.getMessage, Nil)), identity)
       .leftMap { case (error, log) => FailedTransactionError.dAppExecution(error, failComplexity, log) }
 

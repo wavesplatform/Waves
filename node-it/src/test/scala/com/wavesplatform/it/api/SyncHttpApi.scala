@@ -313,6 +313,9 @@ object SyncHttpApi extends Assertions {
     def transactionStatus(txIds: Seq[String]): Seq[TransactionStatus] =
       sync(async(n).transactionsStatus(txIds))
 
+    def transactionStatus(txId: String): TransactionStatus =
+      sync(async(n).transactionsStatus(Seq(txId))).head
+
     def transactionsByAddress(address: String, limit: Int): Seq[TransactionInfo] =
       sync(async(n).transactionsByAddress(address, limit))
 
@@ -688,10 +691,11 @@ object SyncHttpApi extends Assertions {
         payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
         fee: Long = smartMinFee,
         feeAssetId: Option[String] = None,
+        extraFeePerStep: Long = InvokeScriptTransaction.DefaultExtraFeePerStep,
         version: TxVersion = TxVersion.V1,
         waitForTx: Boolean = false
     ): (Transaction, JsValue) = {
-      sync(async(n).invokeScript(caller, dappAddress, func, args, payment, fee, feeAssetId, version)) match {
+      sync(async(n).invokeScript(caller, dappAddress, func, args, payment, fee, feeAssetId, extraFeePerStep, version)) match {
         case (tx, js) => maybeWaitForTransaction(tx, waitForTx) -> js
       }
     }

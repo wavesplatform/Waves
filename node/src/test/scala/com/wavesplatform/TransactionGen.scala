@@ -578,7 +578,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       fee         <- smallFeeGen
       timestamp   <- timestampGen
     } yield InvokeScriptTransaction
-      .selfSigned(1.toByte, sender, dappAddress.toAddress, Some(fc), payments, fee, Waves, timestamp)
+      .selfSigned(1.toByte, sender, dappAddress.toAddress, Some(fc), payments, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, timestamp)
       .explicitGet()
 
   val paymentListGen: Gen[Seq[Payment]] =

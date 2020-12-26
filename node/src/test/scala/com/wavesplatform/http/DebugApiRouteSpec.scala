@@ -97,6 +97,7 @@ class DebugApiRouteSpec
     "valid tx" in {
       val blockchain = createBlockchainStub()
       (blockchain.balance _).when(TxHelpers.defaultSigner.publicKey.toAddress, *).returns(Long.MaxValue)
+      (() => blockchain.continuationStates).when().returning(Map.empty)
 
       val route = debugApiRoute.copy(blockchain = blockchain).route
 
@@ -126,6 +127,7 @@ class DebugApiRouteSpec
     "exchange tx with fail script" in {
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(TxHelpers.defaultAddress, *).returns(Long.MaxValue)
+      (() => blockchain.continuationStates).when().returning(Map.empty)
 
         val (assetScript, comp) = ScriptCompiler.compile("if true then throw(\"error\") else false", ScriptEstimatorV3).explicitGet()
         (blockchain.assetScript _).when(TestValues.asset).returns(Some(AssetScriptInfo(assetScript, comp)))
@@ -166,6 +168,7 @@ class DebugApiRouteSpec
     "invoke tx with asset failing" in {
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue / 2)
+        (() => blockchain.continuationStates).when().returns(Map())
 
         val (assetScript, assetScriptComplexity) = ScriptCompiler
           .compile(
@@ -500,6 +503,7 @@ class DebugApiRouteSpec
     "transfer transaction with asset fail" in {
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue / 2)
+        (() => blockchain.continuationStates).when().returns(Map())
 
         val (assetScript, assetScriptComplexity) = ScriptCompiler.compile("false", ScriptEstimatorV3).explicitGet()
         (blockchain.assetScript _).when(TestValues.asset).returns(Some(AssetScriptInfo(assetScript, assetScriptComplexity)))

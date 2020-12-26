@@ -15,7 +15,7 @@ import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{V2, V3}
+import com.wavesplatform.lang.directives.values.{Account, StdLibVersion, V2, V3, V4, V5, DApp => DAppType}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.ContractCompiler
@@ -39,6 +39,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
 
 import scala.concurrent.duration._
+
 class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks with PathMockFactory {
   implicit val routeTestTimeout = RouteTestTimeout(10.seconds)
   implicit val timeout          = routeTestTimeout.duration
@@ -263,6 +264,39 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       |@Verifier(tx)
       |func verify() = true && true && true && true && true && true && true && true && true && true
     """.stripMargin
+
+  private def dAppWithBigCallable(version: StdLibVersion) =
+    s"""
+       |{-# STDLIB_VERSION ${version.id} #-}
+       |{-# CONTENT_TYPE DAPP #-}
+       |{-# SCRIPT_TYPE ACCOUNT #-}
+       |
+       |@Callable(i)
+       |func callable(value: Int) = {
+       |  let a = !(${List.fill(100)("sigVerify(base64'',base64'',base64'')").mkString("||")})
+       |  if (a)
+       |    then
+       |      [BooleanEntry("isAllowed", true)]
+       |    else
+       |      throw("unexpected")
+       |}
+     """.stripMargin
+
+  private val dAppWithTooManyStateCalls =
+    s"""
+       |{-# STDLIB_VERSION 5 #-}
+       |{-# CONTENT_TYPE DAPP #-}
+       |
+       | @Callable(i)
+       | func foo() = {
+       |  let a =
+       |    ${List.fill(70)("transferTransactionById(base58'') == unit").mkString(" && ")} &&
+       |    !(${List.fill(150)("sigVerify(base64'',base64'',base64'')").mkString("||")})
+       |  if (a) then throw("fail") else []
+       | }
+       |
+     """.stripMargin
+
 
   routePath("/script/decompile") in {
     val base64 = ExprScript(script).explicitGet().bytes().base64
@@ -546,6 +580,26 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "error").as[Int] shouldBe 305
       (json \ "message").as[String] shouldBe "Script estimation was interrupted"
     }
+
+    Post(routePath("/script/compileCode"), dAppWithBigCallable(V4)) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "error").as[Int] shouldBe 305
+      (json \ "message").as[String] shouldBe "Contract function (callable) is too complex: 20431 > 4000"
+    }
+
+    Post(routePath("/script/compileCode"), dAppWithBigCallable(V5)) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "complexity").as[Long] shouldBe 20431
+      (json \ "verifierComplexity").as[Long] shouldBe 0
+      (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map("callable" -> 20431)
+      (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
+    }
+
+    Post(routePath("/script/compileCode"), dAppWithTooManyStateCalls) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "error").as[Int] shouldBe 305
+      (json \ "message").as[String] shouldBe "Complexity of state calls exceeding limit = 4000 for function(s): foo = 4200"
+    }
   }
 
   routePath("/script/compileWithImports") in {
@@ -608,17 +662,17 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
-    val ctx = {
-      val directives = DirectiveSet.contractDirectiveSet
-      PureContext.build(V3).withEnvironment[Environment] |+|
-        CryptoContext.build(Global, V3).withEnvironment[Environment] |+|
+    def ctx(version: StdLibVersion) = {
+      val directives = DirectiveSet(version, Account, DAppType).explicitGet()
+      PureContext.build(version).withEnvironment[Environment] |+|
+        CryptoContext.build(Global, version).withEnvironment[Environment] |+|
         WavesContext.build(directives)
     }
 
-    def dAppToBase64(dApp: String) = {
+    def dAppToBase64(dApp: String, version: StdLibVersion = V3) = {
       val r = for {
-        compiled   <- ContractCompiler.compile(dApp, ctx.compilerContext, V3)
-        serialized <- Global.serializeContract(compiled, V3)
+        compiled   <- ContractCompiler.compile(dApp, ctx(version).compilerContext, version)
+        serialized <- Global.serializeContract(compiled, version)
       } yield ByteStr(serialized).base64
 
       r.explicitGet()
@@ -627,6 +681,8 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     val dAppBase64                = dAppToBase64(dApp)
     val dAppWithoutVerifierBase64 = dAppToBase64(dAppWithoutVerifier)
     val emptyDAppBase64           = dAppToBase64(emptyDApp)
+    val bigDAppV4Base64           = dAppToBase64(dAppWithBigCallable(V4), V4)
+    val bigDAppV5Base64           = dAppToBase64(dAppWithBigCallable(V5), V5)
 
     Post(routePath("/script/estimate"), dAppBase64) ~> route ~> check {
       val json = responseAs[JsValue]
@@ -659,6 +715,27 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       val json = responseAs[JsValue]
       (json \ "error").as[Int] shouldBe 305
       (json \ "message").as[String] shouldBe "Script estimation was interrupted"
+    }
+
+    Post(routePath("/script/estimate"), bigDAppV4Base64) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "error").as[Int] shouldBe 305
+      (json \ "message").as[String] shouldBe "Contract function (callable) is too complex: 20431 > 4000"
+    }
+
+    Post(routePath("/script/estimate"), bigDAppV5Base64) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "script").as[String] shouldBe bigDAppV5Base64
+      (json \ "complexity").as[Long] shouldBe 20431
+      (json \ "verifierComplexity").as[Long] shouldBe 0
+      (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map("callable" -> 20431)
+      (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
+    }
+
+    Post(routePath("/script/estimate"), dAppToBase64(dAppWithTooManyStateCalls, V5)) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "error").as[Int] shouldBe 305
+      (json \ "message").as[String] shouldBe "Complexity of state calls exceeding limit = 4000 for function(s): foo = 4200"
     }
   }
 

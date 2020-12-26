@@ -81,7 +81,8 @@ object Script {
             version,
             contract,
             estimator,
-            useContractVerifierLimit
+            useContractVerifierLimit,
+            allowContinuation = script.stdLibVersion >= V5
           )
           complexityInfo = verifierFuncOpt.fold(
             ComplexityInfo(0L, callableComplexities, maxComplexity)

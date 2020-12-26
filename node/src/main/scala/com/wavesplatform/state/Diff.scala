@@ -8,9 +8,11 @@ import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.transaction.ApplicationStatus.Succeeded
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{ApplicationStatus, Asset, Transaction}
 import play.api.libs.json._
 
 import scala.collection.immutable.VectorMap
@@ -138,9 +140,20 @@ object Sponsorship {
     }
 }
 
-case class NewTransactionInfo(transaction: Transaction, affected: Set[Address], applied: Boolean)
+case class NewTransactionInfo(transaction: Transaction, affected: Set[Address], status: ApplicationStatus)
 
 case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: AssetVolumeInfo)
+
+sealed trait ContinuationState
+object ContinuationState {
+  case class InProgress(
+      expr: EXPR,
+      unusedComplexity: Int,
+      invokeScriptTransactionId: ByteStr,
+      precedingStepCount: Int
+  ) extends ContinuationState
+  case object Finished extends ContinuationState
+}
 
 case class Diff(
     transactions: collection.Map[ByteStr, NewTransactionInfo],
@@ -156,10 +169,15 @@ case class Diff(
     sponsorship: Map[IssuedAsset, Sponsorship],
     scriptsRun: Int,
     scriptsComplexity: Long,
-    scriptResults: Map[ByteStr, InvokeScriptResult]
+    scriptResults: Map[ByteStr, InvokeScriptResult],
+    continuationStates: Map[Address, ContinuationState],
+    replacingTransactions: Seq[NewTransactionInfo]
 ) {
   def bindTransaction(tx: Transaction): Diff =
     copy(transactions = transactions.concat(Map(Diff.toDiffTxData(tx, portfolios, accountData))))
+
+  def addContinuationState(address: Address, state: ContinuationState): Diff =
+    copy(continuationStates = continuationStates + ((address, state)))
 }
 
 object Diff {
@@ -175,7 +193,9 @@ object Diff {
       accountData: Map[Address, AccountDataInfo] = Map.empty,
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
-      scriptsRun: Int = 0
+      scriptsRun: Int = 0,
+      continuationStates: Map[Address, ContinuationState] = Map.empty,
+      replacingTransactions: Seq[NewTransactionInfo] = Seq()
   ): Diff =
     Diff(
       transactions = VectorMap.empty,
@@ -191,7 +211,9 @@ object Diff {
       sponsorship = sponsorship,
       scriptsRun = scriptsRun,
       scriptResults = scriptResults,
-      scriptsComplexity = 0
+      scriptsComplexity = 0,
+      continuationStates = continuationStates,
+      replacingTransactions = replacingTransactions
     )
 
   def apply(
@@ -208,7 +230,8 @@ object Diff {
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptsRun: Int = 0,
       scriptsComplexity: Long = 0,
-      scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
+      scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
+      continuationStates: Map[Address, ContinuationState] = Map.empty
   ): Diff =
     Diff(
       // should be changed to VectorMap after 2.13 https://github.com/scala/scala/pull/6854
@@ -225,7 +248,9 @@ object Diff {
       sponsorship = sponsorship,
       scriptsRun = scriptsRun,
       scriptResults = scriptResults,
-      scriptsComplexity = scriptsComplexity
+      scriptsComplexity = scriptsComplexity,
+      continuationStates = continuationStates,
+      replacingTransactions = Seq()
     )
 
   private def toDiffTxData(
@@ -233,7 +258,7 @@ object Diff {
       portfolios: Map[Address, Portfolio],
       accountData: Map[Address, AccountDataInfo]
   ): (ByteStr, NewTransactionInfo) =
-    tx.id() -> NewTransactionInfo(tx, (portfolios.keys ++ accountData.keys).toSet, true)
+    tx.id() -> NewTransactionInfo(tx, (portfolios.keys ++ accountData.keys).toSet, Succeeded)
 
   val empty =
     new Diff(
@@ -250,7 +275,9 @@ object Diff {
       Map.empty,
       0,
       0,
-      Map.empty
+      Map.empty,
+      Map.empty,
+      Seq()
     )
 
   implicit val diffMonoid: Monoid[Diff] = new Monoid[Diff] {
@@ -271,7 +298,9 @@ object Diff {
         sponsorship = older.sponsorship.combine(newer.sponsorship),
         scriptsRun = older.scriptsRun.combine(newer.scriptsRun),
         scriptResults = older.scriptResults.combine(newer.scriptResults),
-        scriptsComplexity = older.scriptsComplexity + newer.scriptsComplexity
+        scriptsComplexity = older.scriptsComplexity + newer.scriptsComplexity,
+        continuationStates = older.continuationStates ++ newer.continuationStates,
+        replacingTransactions = older.replacingTransactions ++ newer.replacingTransactions
       )
   }
 
@@ -282,4 +311,5 @@ object Diff {
     def hashString: String =
       Integer.toHexString(d.hashCode())
   }
+
 }

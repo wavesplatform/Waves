@@ -4,6 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{Keys, LevelDBWriter}
+import com.wavesplatform.transaction.ApplicationStatus
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.smart.Verifier
 import org.openjdk.jmh.annotations._
@@ -51,7 +52,7 @@ object BloomFilterBenchmark {
           (0 until txCount).flatMap(
             txNum =>
               db.get(Keys.transactionAt(Height(h), TxNum(txNum.toShort)))
-                .collect { case (tx: ExchangeTransaction, true) => tx }
+                .collect { case (tx: ExchangeTransaction, ApplicationStatus.Succeeded) => tx }
           )
       }
 

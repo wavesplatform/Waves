@@ -17,6 +17,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNC
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Height, InvokeScriptResult}
+import com.wavesplatform.transaction.ApplicationStatus.{ScriptExecutionFailed, Succeeded}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -264,7 +265,7 @@ class TransactionsRouteSpec
       (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
       (addressTransactions.transactionsByAddress _)
         .expects(account.toAddress, *, *, None)
-        .returning(Observable(TransactionMeta.Invoke(Height(1), transaction, succeeded = true, Some(InvokeScriptResult()))))
+        .returning(Observable(TransactionMeta.Invoke(Height(1), transaction, status = Succeeded, Some(InvokeScriptResult()))))
         .once()
 
       Get(routePath(s"/address/${account.toAddress}/limit/1")) ~> route ~> check {
@@ -294,7 +295,9 @@ class TransactionsRouteSpec
 
       forAll(txAvailability) {
         case (tx, succeed, height, acceptFailedActivationHeight) =>
-          (addressTransactions.transactionById _).expects(tx.id()).returning(Some(TransactionMeta.Default(Height(height), tx, succeed))).once()
+          val h: Height         = Height(height)
+          val applicationStatus = if (succeed) Succeeded else ScriptExecutionFailed
+          (addressTransactions.transactionById _).expects(tx.id()).returning(Some(TransactionMeta.Default(h, tx, applicationStatus))).once()
           (() => blockchain.activatedFeatures)
             .expects()
             .returning(Map(BlockchainFeatures.BlockV5.id -> acceptFailedActivationHeight))
@@ -320,7 +323,7 @@ class TransactionsRouteSpec
       (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
       (addressTransactions.transactionById _)
         .expects(transaction.id())
-        .returning(Some(TransactionMeta.Invoke(Height(1), transaction, succeeded = true, Some(InvokeScriptResult()))))
+        .returning(Some(TransactionMeta.Invoke(Height(1), transaction, status = Succeeded, Some(InvokeScriptResult()))))
         .once()
 
       Get(routePath(s"/info/${transaction.id()}")) ~> route ~> check {
@@ -336,7 +339,7 @@ class TransactionsRouteSpec
         tx =>
           (addressTransactions.transactionById _)
             .expects(tx.id())
-            .returns(Some(TransactionMeta.Invoke(Height(1), tx, succeeded = true, Some(InvokeScriptResult()))))
+            .returns(Some(TransactionMeta.Invoke(Height(1), tx, status = Succeeded, Some(InvokeScriptResult()))))
             .repeat(3)
       )
 
@@ -380,7 +383,8 @@ class TransactionsRouteSpec
 
       forAll(txAvailability) {
         case (tx, height, acceptFailedActivationHeight, succeed) =>
-          (blockchain.transactionInfo _).expects(tx.id()).returning(Some((height, tx, succeed))).anyNumberOfTimes()
+          val applicationStatus = if (succeed) Succeeded else ScriptExecutionFailed
+          (blockchain.transactionInfo _).expects(tx.id()).returning(Some((height, tx, applicationStatus))).anyNumberOfTimes()
           (() => blockchain.height).expects().returning(1000).anyNumberOfTimes()
           (() => blockchain.activatedFeatures)
             .expects()
@@ -526,6 +530,7 @@ class TransactionsRouteSpec
         Seq.empty,
         500000L,
         Asset.Waves,
+        InvokeScriptTransaction.DefaultExtraFeePerStep,
         testTime.getTimestamp(),
         Proofs.empty,
         AddressScheme.current.chainId
@@ -596,6 +601,7 @@ class TransactionsRouteSpec
           )
 
         (blockchain.hasAccountScript _).when(*).returns(true)
+        (() => blockchain.continuationStates).when().returns(Map())
       }
       val publisher = createTxPublisherStub(blockchain)
       val route     = transactionsApiRoute.copy(blockchain = blockchain, transactionPublisher = publisher).route

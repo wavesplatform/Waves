@@ -29,6 +29,10 @@ final case class TracedResult[+E, +A](
 
   def leftMap[E1](f: E => E1): TracedResult[E1, A] = copy(resultE.leftMap(f))
 
+  // added for for-comprehension destructuring
+  def withFilter(f: A => Boolean): TracedResult[E, A] =
+    copy(resultE.filterOrElse(f, throw new MatchError("TracedResult destructuring error")))
+
   def json(implicit ev1: E => ApiError, ev2: A => Transaction): JsObject = {
     val resultJson = resultE match {
       case Right(value) => value.json()

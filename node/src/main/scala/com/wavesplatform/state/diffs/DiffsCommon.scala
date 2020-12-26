@@ -40,7 +40,8 @@ object DiffsCommon {
   def countVerifierComplexity(
       script: Option[Script],
       blockchain: Blockchain,
-      isAsset: Boolean
+      isAsset: Boolean,
+      allowContinuation: Boolean = false
   ): Either[ValidationError, Option[(Script, Long)]] =
     script
       .traverse { script =>

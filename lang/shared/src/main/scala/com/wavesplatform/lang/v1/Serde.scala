@@ -37,7 +37,7 @@ object Serde {
 
   def serializeDeclaration(out: ByteArrayOutputStream, dec: DECLARATION, aux: EXPR => Coeval[Unit]): Coeval[Unit] = {
     dec match {
-      case LET(name, value) =>
+      case LET(name, value,_) =>
         Coeval.now {
           out.write(DEC_LET)
           out.writeString(name)
@@ -166,8 +166,8 @@ object Serde {
       .map((_, bb.remaining()))
   }
 
-  def deserialize(bb: ByteBuffer): Either[String, EXPR] =
-    Try(desAux(bb).value()).toEither.left.map(_.getMessage)
+  def deserialize(bb: ByteBuffer, allowObjects: Boolean): Either[String, EXPR] =
+    Try(desAux(bb, allowObjects).value()).toEither.left.map(_.getMessage)
 
   def serAux(out: ByteArrayOutputStream, acc: Coeval[Unit], expr: EXPR, allowObjects: Boolean = false): Coeval[Unit] = acc.flatMap { _ =>
     expr match {
@@ -188,7 +188,7 @@ object Serde {
         }
       case IF(cond, ifTrue, ifFalse) =>
         List(cond, ifTrue, ifFalse).foldLeft(Coeval.now(out.write(E_IF)))((acc, expr) => serAux(out, acc, expr, allowObjects))
-      case LET_BLOCK(LET(name, value), body) =>
+      case LET_BLOCK(LET(name, value,_), body) =>
         val n = Coeval.now[Unit] {
           out.write(E_BLOCK)
           out.writeString(name)

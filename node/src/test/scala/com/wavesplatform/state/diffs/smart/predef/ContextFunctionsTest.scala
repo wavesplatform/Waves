@@ -553,6 +553,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
               Seq.empty,
               FeeValidation.FeeUnit * (FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + FeeValidation.ScriptExtraFee),
               Waves,
+              InvokeScriptTransaction.DefaultExtraFeePerStep,
               System.currentTimeMillis()
             )
             .explicitGet()

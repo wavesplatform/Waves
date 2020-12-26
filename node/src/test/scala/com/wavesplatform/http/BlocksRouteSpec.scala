@@ -1,7 +1,7 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.api.common.CommonBlocksApi
+import com.wavesplatform.api.common.{CommonBlocksApi, CommonTransactionsApi}
 import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.BlocksApiRoute
 import com.wavesplatform.block.Block
@@ -15,8 +15,9 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
 
 class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with PropertyChecks with RestAPISettingsHelper with TestWallet with NoShrink {
-  private val blocksApi = mock[CommonBlocksApi]
-  private val route     = BlocksApiRoute(restAPISettings, blocksApi).route
+  private val blocksApi       = mock[CommonBlocksApi]
+  private val transactionsApi = mock[CommonTransactionsApi]
+  private val route           = BlocksApiRoute(restAPISettings, blocksApi, transactionsApi).route
 
   private val testBlock1 = TestBlock.create(Nil)
   private val testBlock2 = TestBlock.create(Nil, Block.ProtoBlockVersion)
@@ -89,7 +90,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
 
     Get(routePath(s"/signature/$invalidBlockId")) ~> route ~> check {
       response.status.isFailure() shouldBe true
-      responseAs[String] should include ("block does not exist")
+      responseAs[String] should include("block does not exist")
     }
   }
 
@@ -109,7 +110,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
 
     Get(routePath(s"/$invalidBlockId")) ~> route ~> check {
       response.status.isFailure() shouldBe true
-      responseAs[String] should include ("block does not exist")
+      responseAs[String] should include("block does not exist")
     }
   }
 
@@ -157,7 +158,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
 
     Get(routePath(s"/headers/$invalidBlockId")) ~> route ~> check {
       response.status.isFailure() shouldBe true
-      responseAs[String] should include ("block does not exist")
+      responseAs[String] should include("block does not exist")
     }
   }
 

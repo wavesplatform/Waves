@@ -3,27 +3,27 @@ package com.wavesplatform.state.diffs.ci
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithState}
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.state.{IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.{IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -140,9 +140,19 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
         dataTxSecond2 = DataTransaction.selfSigned(1.toByte, secondAcc, Seq(dataEntry2), fee, ts + 6).explicitGet()
 
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
-        payments = List(Payment(10, Waves))
+        payments = List(Payment(10L, Waves))
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, mainAcc.toAddress, Some(fc), payments, fee, Waves, ts + 10)
+          .selfSigned(
+            TxVersion.V3,
+            invoker,
+            mainAcc.toAddress,
+            Some(fc),
+            payments,
+            fee,
+            Waves,
+            InvokeScriptTransaction.DefaultExtraFeePerStep,
+            ts + 10
+          )
           .explicitGet()
       } yield (Seq(gTx1, gTx2, gTx3, ssTxMain, ssTxSecond, dataTxSecond, dataTxSecond2), invokeTx, secondAcc.toAddress)
 
@@ -228,9 +238,19 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
         dataTxMain2 = DataTransaction.selfSigned(1.toByte, mainAcc, Seq(dataEntry2), fee, ts + 6).explicitGet()
 
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
-        payments = List(Payment(10, Waves))
+        payments = List(Payment(10L, Waves))
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, mainAcc.toAddress, Some(fc), payments, fee, Waves, ts + 10)
+          .selfSigned(
+            TxVersion.V3,
+            invoker,
+            mainAcc.toAddress,
+            Some(fc),
+            payments,
+            fee,
+            Waves,
+            InvokeScriptTransaction.DefaultExtraFeePerStep,
+            ts + 10
+          )
           .explicitGet()
       } yield (Seq(gTx1, gTx2, ssTxMain, dataTxMain, dataTxMain2), invokeTx, mainAcc.toAddress)
 
@@ -421,9 +441,19 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
         ssTxThird    = SetScriptTransaction.selfSigned(1.toByte, thirdAcc, scriptThird.toOption, fee, ts + 5).explicitGet()
 
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
-        payments = List(Payment(10, Waves))
+        payments = List(Payment(10L, Waves))
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, mainAcc.toAddress, Some(fc), payments, fee * 100, Waves, ts + 10)
+          .selfSigned(
+            TxVersion.V3,
+            invoker,
+            mainAcc.toAddress,
+            Some(fc),
+            payments,
+            fee * 100,
+            Waves,
+            InvokeScriptTransaction.DefaultExtraFeePerStep,
+            ts + 10
+          )
           .explicitGet()
       } yield (
         Seq(gTx1, gTx2, gTx3, gTx4, ssTxMain, ssTxSecond, ssTxThird, paymentIssue, transferIssue),
