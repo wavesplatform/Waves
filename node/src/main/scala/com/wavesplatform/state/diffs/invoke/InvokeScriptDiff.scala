@@ -58,6 +58,14 @@ object InvokeScriptDiff {
             InvokeDiffsCommon.getInvocationComplexity(blockchain, tx.funcCall, callableComplexities, dAppAddress)
           }
 
+          _ <- TracedResult(
+            Either.cond(
+              invocationComplexity <= ContractLimits.MaxComplexityByVersion(version),
+              (),
+              GenericError("Continuation is not allowed for Invoke by script")
+            )
+          )
+
           directives <- TracedResult.wrapE(DirectiveSet(version, Account, DAppType).leftMap(GenericError.apply))
           payments   <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DAppTarget).leftMap(GenericError.apply))
           checkedPayments = payments.payments.flatMap {

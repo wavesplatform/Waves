@@ -113,7 +113,7 @@ object InvokeScriptTransactionDiff {
                   pk,
                   dAppAddress,
                   runsLimit,
-                  13
+                  (if(invocationComplexity <= stepLimit) { 13 } else { 0 })
                 )
 
                 //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
