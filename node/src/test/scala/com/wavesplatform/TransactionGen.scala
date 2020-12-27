@@ -13,6 +13,7 @@ import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
@@ -575,7 +576,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       sender      <- accountGen
       dappAddress <- accountGen
       fc          <- funcCallGen
-      fee         <- smallFeeGen
+      fee         <- ciFee()
       timestamp   <- timestampGen
     } yield InvokeScriptTransaction
       .selfSigned(1.toByte, sender, dappAddress.toAddress, Some(fc), payments, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, timestamp)
