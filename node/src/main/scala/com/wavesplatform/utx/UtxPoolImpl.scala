@@ -534,7 +534,10 @@ class UtxPoolImpl(
 
   /** DOES NOT verify transactions */
   def addAndCleanup(transactions: Iterable[Transaction]): Unit = {
-    transactions.foreach(addTransaction(_, verify = false))
+    transactions.foreach { tx =>
+      if (!tx.isInstanceOf[ContinuationTransaction])
+        addTransaction(tx, verify = false)
+    }
     TxCleanup.runCleanupAsync()
   }
 
