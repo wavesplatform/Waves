@@ -278,10 +278,10 @@ object TransactionsApiRoute {
           Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) Active else Canceled))
 
         case leaseCancel: LeaseCancelTransaction =>
-          val leaseId = blockchain.transactionInfo(leaseCancel.leaseId) map {
-            case (_, tx, _) => tx.id().toString
+          val leaseTx = blockchain.transactionInfo(leaseCancel.leaseId) map {
+            case (_, tx, _) => tx
           }
-          Json.obj("lease" -> leaseId)
+          Json.obj("lease" -> leaseTx)
 
         case _ => JsObject.empty
       }
@@ -305,10 +305,10 @@ object TransactionsApiRoute {
 
     def unconfirmedTxExtendedJson(tx: Transaction): JsObject = tx match {
       case leaseCancel: LeaseCancelTransaction =>
-        val leaseId = blockchain.transactionInfo(leaseCancel.leaseId) map {
-          case (_, tx, _) => tx.id().toString
+        val leaseTx = blockchain.transactionInfo(leaseCancel.leaseId) map {
+          case (_, tx, _) => tx.json()
         }
-        leaseCancel.json() ++ Json.obj("lease" -> leaseId)
+        leaseCancel.json() ++ Json.obj("lease" -> leaseTx)
 
       case t => t.json()
     }

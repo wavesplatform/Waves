@@ -23,7 +23,7 @@ import scala.concurrent.duration._
 
 //noinspection RedundantDefaultArgument
 class UtxFailedTxsSpec extends FlatSpec with Matchers with WithDomain with Eventually {
-  val dApp = TxHelpers.signer(1)
+  val dApp = TxHelpers.secondSigner
 
   "UTX pool" should s"drop failed Invoke with complexity <= ${ContractLimits.FailFreeInvokeComplexity}" in utxTest { (d, utx) =>
     d.appendBlock(TxHelpers.setScript(dApp, genScript(ContractLimits.FailFreeInvokeComplexity)))
