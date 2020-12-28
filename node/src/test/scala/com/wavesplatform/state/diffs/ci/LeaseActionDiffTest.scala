@@ -207,7 +207,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
       for {
         genesis  <- GenesisTransaction.create(dAppAcc.toAddress, ENOUGH_AMT, ts)
         genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
-        invoke   <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, dAppAcc.toAddress, None, Nil, fee, Waves, ts)
+        invoke   <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, dAppAcc.toAddress, None, Nil, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts)
         leasesFromDApp <- (1 to leaseCancelCount).toList.traverse(
           i => LeaseTransaction.selfSigned(2.toByte, dAppAcc, invoker.toAddress, leaseTxAmount1, fee, ts + i)
         )
