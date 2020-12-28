@@ -76,14 +76,14 @@ class LeaseActionGrpcSuite extends GrpcBaseTransactionSuite {
     val leaseActionId = Lease.calculateId(Lease(recipient, dAppLeaseAmount, 0), ByteStr.decodeBase58(invokeId).get).toString
 
     sender.getActiveLeases(dAppAddress) should contain theSameElementsAs Seq(
-      LeaseResponse(leaseTxId, leaseTxId, dAppAddress, invokerAddress, txLeaseAmount, leaseTxHeight),
-      LeaseResponse(leaseActionId, invokeId, dAppAddress, invokerAddress, dAppLeaseAmount, invokeHeight)
+      LeaseResponse(leaseTxId, leaseTxId, dAppAddress, Some(invokerRecipient), txLeaseAmount, leaseTxHeight),
+      LeaseResponse(leaseActionId, invokeId, dAppAddress, Some(invokerRecipient), dAppLeaseAmount, invokeHeight)
     )
 
     val leaseTxIdParam = List(CONST_BYTESTR(ByteStr.decodeBase58(leaseTxId).get).explicitGet())
     sender.broadcastInvokeScript(dAppAcc, dAppRecipient, Some(FUNCTION_CALL(User("leaseCancel"), leaseTxIdParam)), waitForTx = true)
     sender.getActiveLeases(dAppAddress) shouldBe Seq(
-      LeaseResponse(leaseActionId, invokeId, dAppAddress, invokerAddress, dAppLeaseAmount, invokeHeight)
+      LeaseResponse(leaseActionId, invokeId, dAppAddress, Some(invokerRecipient), dAppLeaseAmount, invokeHeight)
     )
   }
 }
