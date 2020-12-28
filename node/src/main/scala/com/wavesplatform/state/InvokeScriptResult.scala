@@ -119,7 +119,7 @@ object InvokeScriptResult {
       isr.burns.map(toPbBurn),
       isr.error.map(toPbErrorMessage),
       isr.sponsorFees.map(toPbSponsorFee),
-      isr.invokes.map(toPbInvocation)
+      invokes = isr.invokes.map(toPbInvocation)
     )
   }
 
