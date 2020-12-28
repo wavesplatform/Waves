@@ -19,6 +19,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, NativeFunction, Us
 import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction}
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Recipient}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
+import shapeless.Coproduct.unsafeGet
 
 object Functions {
   private def getDataFromStateF(name: String, internalName: Short, dataType: DataType, selfCall: Boolean): BaseFunction[Environment] = {
@@ -55,7 +56,7 @@ object Functions {
       new ContextfulNativeFunction[Environment](name, resultType, args) {
         override def ev[F[_]: Monad](input: (Environment[F], List[Terms.EVALUATED])): F[Either[ExecutionError, EVALUATED]] = {
           val (env, args) = input
-          (env.tthis, args) match {
+          (unsafeGet(env.tthis), args) match {
             case (address: Recipient.Address, CONST_STRING(key) :: Nil) if selfCall =>
               getData(env, Bindings.senderObject(address), key)
             case (_, (addressOrAlias: CaseObj) :: CONST_STRING(key) :: Nil) =>
