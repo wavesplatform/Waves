@@ -26,7 +26,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, Proofs, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{ApplicationStatus, Asset, Proofs, TxHelpers, TxVersion}
 import com.wavesplatform.{BlockGen, BlockchainStubHelpers, NoShrink, TestTime, TestWallet, TransactionGen}
 import monix.reactive.Observable
 import org.scalacheck.Gen._
@@ -292,7 +292,7 @@ class TransactionsRouteSpec
       (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
       (addressTransactions.transactionsByAddress _)
         .expects(invokeAddress, *, *, None)
-        .returning(Observable(TransactionMeta.Invoke(Height(1), invoke, succeeded = true, Some(scriptResult))))
+        .returning(Observable(TransactionMeta.Invoke(Height(1), invoke, ApplicationStatus.Succeeded, Some(scriptResult))))
         .once()
 
       Get(routePath(s"/address/${invokeAddress}/limit/1")) ~> route ~> check {
@@ -384,7 +384,7 @@ class TransactionsRouteSpec
       (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
       (addressTransactions.transactionById _)
         .expects(invoke.id())
-        .returning(Some(TransactionMeta.Invoke(Height(1), invoke, succeeded = true, Some(scriptResult))))
+        .returning(Some(TransactionMeta.Invoke(Height(1), invoke, ApplicationStatus.Succeeded, Some(scriptResult))))
         .once()
 
       Get(routePath(s"/info/${invoke.id()}")) ~> route ~> check {
