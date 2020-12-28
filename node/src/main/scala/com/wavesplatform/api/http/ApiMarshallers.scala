@@ -1,4 +1,4 @@
-package com.wavesplatform.http
+package com.wavesplatform.api.http
 
 import akka.NotUsed
 import akka.http.scaladsl.common.EntityStreamingSupport
@@ -9,7 +9,6 @@ import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromE
 import akka.http.scaladsl.util.FastFuture
 import akka.stream.scaladsl.{Flow, Source}
 import akka.util.ByteString
-import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.contract.meta.FunctionSignatures
@@ -46,7 +45,7 @@ trait ApiMarshallers {
         ae =>
           (
             ae.resultE.fold(_.code, _ => StatusCodes.OK),
-            ae.resultE.fold(_.json, writes.writes) ++ (if (includeTrace) Json.obj("trace" -> Json.toJson(ae.trace)) else Json.obj())
+            ae.resultE.fold(_.json, writes.writes) ++ (if (includeTrace) Json.obj("trace" -> ae.trace.map(_.loggedJson)) else Json.obj())
           )
       )
 

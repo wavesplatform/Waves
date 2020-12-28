@@ -70,7 +70,7 @@ object ScriptCompiler extends ScorexLogging {
     val ctx = compilerContext(version, cType, isAssetScript)
     try {
       cType match {
-        case Expression => ExpressionCompiler.compile(src, ctx).flatMap(expr => ExprScript.apply(version, expr))
+        case Expression => ExpressionCompiler.compileBoolean(src, ctx).flatMap(expr => ExprScript.apply(version, expr))
         case DApp       => ContractCompiler.compile(src, ctx, version).flatMap(expr => ContractScript.apply(version, expr))
         case Library    => ExpressionCompiler.compileDecls(src, ctx).flatMap(ExprScript(version, _))
       }

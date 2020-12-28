@@ -4,7 +4,7 @@ import cats.Id
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl._
@@ -255,7 +255,8 @@ object ScriptResult {
           case FieldNames.ScriptResult => processScriptResultV3(ctx, fields)
           case f                       => err(f, version)
         }
-      case (ARR(actions), V4) => processScriptResultV4(ctx, txId, actions)
+      case (ARR(actions), V4 | V5) =>
+        processScriptResultV4(ctx, txId, actions)
 
       case c => err(c.toString, version)
     }

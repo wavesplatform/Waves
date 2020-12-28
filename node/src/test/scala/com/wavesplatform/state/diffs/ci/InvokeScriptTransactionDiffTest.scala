@@ -46,6 +46,7 @@ import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.exceptions.TestFailedException
 import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -817,7 +818,7 @@ class InvokeScriptTransactionDiffTest
     }
   }
 
-  val chainId: Byte     = AddressScheme.current.chainId
+  val chainId: Byte       = AddressScheme.current.chainId
   val enoughFee: TxAmount = FeeValidation.ScriptExtraFee + FeeValidation.FeeConstants(IssueTransaction.typeId) * FeeValidation.FeeUnit
 
   property("invoking contract receive payment") {
@@ -911,8 +912,8 @@ class InvokeScriptTransactionDiffTest
           inside(blockDiffEi.trace) {
             case List(
                 InvokeScriptTrace(_, _, Right(ScriptResultV3(_, transfers)), _),
-                AssetVerifierTrace(transferringAssetId, None),
-                AssetVerifierTrace(attachedAssetId, None)
+                AssetVerifierTrace(transferringAssetId, None, _),
+                AssetVerifierTrace(attachedAssetId, None, _)
                 ) =>
               attachedAssetId shouldBe attachedAsset.id()
               transferringAssetId shouldBe transferringAsset.id()
@@ -952,7 +953,7 @@ class InvokeScriptTransactionDiffTest
         assertDiffEiTraced(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
           blockDiffEi.resultE should produce("TransactionNotAllowedByScript")
           inside(blockDiffEi.trace) {
-            case List(_, AssetVerifierTrace(assetId, Some(tne: TransactionNotAllowedByScript))) =>
+            case List(_, AssetVerifierTrace(assetId, Some(tne: TransactionNotAllowedByScript), _)) =>
               assetId shouldBe asset.id()
               tne.isAssetScript shouldBe true
           }
@@ -1061,8 +1062,8 @@ class InvokeScriptTransactionDiffTest
           inside(blockDiffEi.trace) {
             case List(
                 InvokeScriptTrace(dAppAddress, functionCall, Right(ScriptResultV3(_, transfers)), _),
-                AssetVerifierTrace(allowedAssetId, None),
-                AssetVerifierTrace(bannedAssetId, Some(_: FailedTransactionError))
+                AssetVerifierTrace(allowedAssetId, None, _),
+                AssetVerifierTrace(bannedAssetId, Some(_: FailedTransactionError), _)
                 ) =>
               dAppAddress shouldBe ci.dAppAddressOrAlias
               functionCall shouldBe ci.funcCall
@@ -1126,7 +1127,7 @@ class InvokeScriptTransactionDiffTest
           inside(blockDiffEi.trace) {
             case List(
                 InvokeScriptTrace(_, _, Right(ScriptResultV3(_, transfers)), _),
-                AssetVerifierTrace(transferringAssetId, Some(_))
+                AssetVerifierTrace(transferringAssetId, Some(_), _)
                 ) =>
               transferringAssetId shouldBe transferringAsset.id()
               transfers.head.assetId.get shouldBe transferringAsset.id()
@@ -1397,8 +1398,12 @@ class InvokeScriptTransactionDiffTest
     } yield (r._1, r._2, r._3, version)) {
       case (genesis, setScript, ci, version) =>
         val settings =
-          if (version == V3) fs
-          else fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
+          version match {
+            case V3 => fs
+            case V4 => fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
+            case V5 => fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0) + (BlockchainFeatures.ContinuationTransaction.id -> 0))
+            case v  => throw new TestFailedException(s"Unexpected $v", 0)
+          }
 
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), settings) {
           if (version == V3)

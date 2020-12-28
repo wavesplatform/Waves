@@ -285,7 +285,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   def compile(script: String): Either[String, Terms.EXPR] =
-    ExpressionCompiler.compile(script, CTX.empty.compilerContext)
+    ExpressionCompiler.compileBoolean(script, CTX.empty.compilerContext)
 
   property("wrong script return type") {
     compile("1") should produce("should return boolean")

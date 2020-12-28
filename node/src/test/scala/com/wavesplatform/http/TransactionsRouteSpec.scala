@@ -1,34 +1,38 @@
 package com.wavesplatform.http
 
-import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
+import akka.http.scaladsl.model._
 import com.wavesplatform.account.{AddressScheme, KeyPair, PublicKey}
 import com.wavesplatform.api.common.CommonTransactionsApi
+import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
 import com.wavesplatform.api.http.ApiError._
+import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.{Base58, _}
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.network.TransactionPublisher
-import com.wavesplatform.state.{Blockchain, Height}
-import com.wavesplatform.transaction.{Asset, Proofs, TxVersion}
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Height, InvokeScriptResult}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.{BlockGen, NoShrink, TestTime, TestWallet, TransactionGen}
+import com.wavesplatform.transaction.{Asset, Proofs, TxHelpers, TxVersion}
+import com.wavesplatform.{BlockGen, BlockchainStubHelpers, NoShrink, TestTime, TestWallet, TransactionGen}
 import monix.reactive.Observable
 import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Matchers, OptionValues}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
 
 import scala.concurrent.Future
@@ -44,7 +48,8 @@ class TransactionsRouteSpec
     with PropertyChecks
     with OptionValues
     with TestWallet
-    with NoShrink {
+    with NoShrink
+    with BlockchainStubHelpers {
 
   private val blockchain          = mock[Blockchain]
   private val utxPoolSynchronizer = mock[TransactionPublisher]
@@ -52,18 +57,17 @@ class TransactionsRouteSpec
   private val utxPoolSize         = mockFunction[Int]
   private val testTime            = new TestTime
 
-  private val route =
-    seal(
-      new TransactionsApiRoute(
-        restAPISettings,
-        addressTransactions,
-        testWallet,
-        blockchain,
-        utxPoolSize,
-        utxPoolSynchronizer,
-        testTime
-      ).route
-    )
+  private val transactionsApiRoute = new TransactionsApiRoute(
+    restAPISettings,
+    addressTransactions,
+    testWallet,
+    blockchain,
+    utxPoolSize,
+    utxPoolSynchronizer,
+    testTime
+  )
+
+  private val route = seal(transactionsApiRoute.route)
 
   private val invalidBase58Gen = alphaNumStr.map(_ + "0")
 
@@ -252,6 +256,22 @@ class TransactionsRouteSpec
         }
       }
     }
+
+    "provides stateChanges" in forAll(accountGen) { account =>
+      val transaction = TxHelpers.invoke(account.toAddress, "test")
+
+      (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
+      (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
+      (addressTransactions.transactionsByAddress _)
+        .expects(account.toAddress, *, *, None)
+        .returning(Observable(TransactionMeta.Invoke(Height(1), transaction, succeeded = true, Some(InvokeScriptResult()))))
+        .once()
+
+      Get(routePath(s"/address/${account.toAddress}/limit/1")) ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges").as[JsObject] shouldBe Json.toJsObject(InvokeScriptResult())
+      }
+    }
   }
 
   routePath("/info/{id}") - {
@@ -274,9 +294,7 @@ class TransactionsRouteSpec
 
       forAll(txAvailability) {
         case (tx, succeed, height, acceptFailedActivationHeight) =>
-          val h: Height = Height(height)
-          val info      = if (tx.typeId == InvokeScriptTransaction.typeId) Right((tx.asInstanceOf[InvokeScriptTransaction], None)) else Left(tx)
-          (addressTransactions.transactionById _).expects(tx.id()).returning(Some((h, info, succeed))).once()
+          (addressTransactions.transactionById _).expects(tx.id()).returning(Some(TransactionMeta.Default(Height(height), tx, succeed))).once()
           (() => blockchain.activatedFeatures)
             .expects()
             .returning(Map(BlockchainFeatures.BlockV5.id -> acceptFailedActivationHeight))
@@ -294,6 +312,50 @@ class TransactionsRouteSpec
 
           Get(routePath(s"/info/${tx.id().toString}")) ~> route ~> check(validateResponse())
       }
+    }
+
+    "provides stateChanges" in forAll(accountGen) { account =>
+      val transaction = TxHelpers.invoke(account.toAddress, "test")
+
+      (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
+      (addressTransactions.transactionById _)
+        .expects(transaction.id())
+        .returning(Some(TransactionMeta.Invoke(Height(1), transaction, succeeded = true, Some(InvokeScriptResult()))))
+        .once()
+
+      Get(routePath(s"/info/${transaction.id()}")) ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+        (responseAs[JsObject] \ "stateChanges").as[JsObject] shouldBe Json.toJsObject(InvokeScriptResult())
+      }
+    }
+
+    "handles multiple ids" in {
+      val txCount = 5
+      val txs     = (1 to txCount).map(_ => TxHelpers.invoke(TxHelpers.defaultSigner.toAddress, "test"))
+      txs.foreach(
+        tx =>
+          (addressTransactions.transactionById _)
+            .expects(tx.id())
+            .returns(Some(TransactionMeta.Invoke(Height(1), tx, succeeded = true, Some(InvokeScriptResult()))))
+            .repeat(3)
+      )
+
+      (() => blockchain.activatedFeatures).expects().returns(Map(BlockchainFeatures.BlockV5.id -> 1)).anyNumberOfTimes()
+
+      def checkResponse(): Unit = txs.zip(responseAs[JsArray].value) foreach {
+        case (tx, json) =>
+          val extraFields = Json.obj("height" -> 1, "applicationStatus" -> "succeeded", "stateChanges" -> InvokeScriptResult())
+          json shouldBe (tx.json() ++ extraFields)
+      }
+
+      Get(routePath(s"/info?${txs.map("id=" + _.id()).mkString("&")}")) ~> route ~> check(checkResponse())
+      Post(routePath("/info"), FormData(txs.map("id" -> _.id().toString): _*)) ~> route ~> check(checkResponse())
+      Post(
+        routePath("/info"),
+        HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(txs.map(_.id().toString: JsValueWrapper): _*)).toString())
+      ) ~> route ~> check(
+        checkResponse()
+      )
     }
   }
 
@@ -392,7 +454,7 @@ class TransactionsRouteSpec
   routePath("/unconfirmed/info/{id}") - {
     "handles invalid signature" in {
       forAll(invalidBase58Gen) { invalidBase58 =>
-        Get(routePath(s"/unconfirmed/info/$invalidBase58")) ~> route should produce(InvalidTransactionId("Wrong char"), true)
+        Get(routePath(s"/unconfirmed/info/$invalidBase58")) ~> route should produce(InvalidTransactionId("Wrong char"), matchMsg = true)
       }
 
       Get(routePath(s"/unconfirmed/info/")) ~> route should produce(InvalidSignature)
@@ -477,7 +539,8 @@ class TransactionsRouteSpec
         .expects(*, None)
         .returning(
           Future.successful(TracedResult(Right(true), List(accountTrace)))
-        ).once()
+        )
+        .once()
       Post(routePath("/broadcast?trace=true"), ist.json()) ~> route ~> check {
         val result = responseAs[JsObject]
         (result \ "trace").as[JsValue] shouldBe Json.arr(accountTrace.json)
@@ -490,12 +553,99 @@ class TransactionsRouteSpec
         .expects(*, None)
         .returning(
           Future.successful(TracedResult(Right(true), List(accountTrace)))
-        ).twice()
+        )
+        .twice()
       Post(routePath("/broadcast"), ist.json()) ~> route ~> check {
         (responseAs[JsObject] \ "trace") shouldBe empty
       }
       Post(routePath("/broadcast?trace=false"), ist.json()) ~> route ~> check {
         (responseAs[JsObject] \ "trace") shouldBe empty
+      }
+    }
+
+    "generates valid trace with vars" in {
+      val blockchain = createBlockchainStub { blockchain =>
+        val (dAppScript, _) = ScriptCompiler
+          .compile(
+            s"""
+               |{-# STDLIB_VERSION 4 #-}
+               |{-# SCRIPT_TYPE ACCOUNT #-}
+               |{-# CONTENT_TYPE DAPP #-}
+               |
+               |@Callable(i)
+               |func test() = {
+               |  let test = 1
+               |  if (test == 1) then [] else []
+               |}
+               |""".stripMargin,
+            ScriptEstimatorV3
+          )
+          .explicitGet()
+
+        (blockchain.accountScript _)
+          .when(*)
+          .returns(
+            Some(
+              AccountScriptInfo(
+                TxHelpers.defaultSigner.publicKey,
+                dAppScript,
+                0L,
+                Map(3 -> Seq("test").map(_ -> 0L).toMap)
+              )
+            )
+          )
+
+        (blockchain.hasAccountScript _).when(*).returns(true)
+      }
+      val publisher = createTxPublisherStub(blockchain)
+      val route     = transactionsApiRoute.copy(blockchain = blockchain, transactionPublisher = publisher).route
+
+      val tx = TxHelpers.invoke(TxHelpers.defaultAddress, "test")
+      Post(routePath("/broadcast?trace=true"), tx.json()) ~> route ~> check {
+        responseAs[JsObject] shouldBe Json.parse(
+          s"""{
+            |  "type" : 16,
+            |  "id" : "${tx.id()}",
+            |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+            |  "senderPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+            |  "fee" : 1000000,
+            |  "feeAssetId" : null,
+            |  "timestamp" : ${tx.timestamp},
+            |  "proofs" : [ "${tx.signature}" ],
+            |  "version" : 1,
+            |  "dApp" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+            |  "payment" : [ ],
+            |  "call" : {
+            |    "function" : "test",
+            |    "args" : [ ]
+            |  },
+            |  "trace" : [ {
+            |    "type" : "verifier",
+            |    "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+            |    "result" : "success",
+            |    "error" : null
+            |  }, {
+            |    "type" : "dApp",
+            |    "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+            |    "function" : "test",
+            |    "args" : [ ],
+            |    "result" : {
+            |      "data" : [ ],
+            |      "transfers" : [ ],
+            |      "issues" : [ ],
+            |      "reissues" : [ ],
+            |      "burns" : [ ],
+            |      "sponsorFees" : [ ]
+            |    },
+            |    "error" : null,
+            |    "vars" : [ {
+            |      "name" : "test",
+            |      "type" : "Int",
+            |      "value" : 1
+            |    } ]
+            |  } ]
+            |}""".stripMargin
+        )
       }
     }
   }

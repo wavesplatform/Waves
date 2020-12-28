@@ -10,7 +10,9 @@ import scala.util.Success
 
 sealed trait Asset
 object Asset {
-  final case class IssuedAsset(id: ByteStr) extends Asset
+  final case class IssuedAsset(id: ByteStr) extends Asset {
+    override def toString: String = id.toString
+  }
   case object Waves                         extends Asset
 
   implicit val assetReads: Reads[IssuedAsset] = Reads {

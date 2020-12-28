@@ -52,14 +52,14 @@ object AsyncGrpcApi {
     def stateChanges(
         request: TransactionsRequest
     ): Future[Seq[(com.wavesplatform.transaction.Transaction, StateChangesDetails)]] = {
-      val (obs, result) = createCallObserver[InvokeScriptResultResponse]
-      transactions.getStateChanges(request, obs)
+      val (obs, result) = createCallObserver[TransactionResponse]
+      transactions.getTransactions(request, obs)
       result.runToFuture.map { r =>
         import com.wavesplatform.state.{InvokeScriptResult => VISR}
         r.map { r =>
           val tx = PBTransactions.vanillaUnsafe(r.getTransaction)
-          assert(r.getResult.transfers.forall(_.address.size() == 20))
-          val result = Json.toJson(VISR.fromPB(r.getResult)).as[StateChangesDetails]
+          assert(r.getInvokeScriptResult.transfers.forall(_.address.size() == 20))
+          val result = Json.toJson(VISR.fromPB(r.getInvokeScriptResult)).as[StateChangesDetails]
           (tx, result)
         }
       }

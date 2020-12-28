@@ -2,6 +2,7 @@ package com.wavesplatform.state
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.v1.traits.domain.{DataItem, DataOp}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.DataEntry._
 import com.wavesplatform.transaction.TxVersion
@@ -82,6 +83,14 @@ object DataEntry {
 
   implicit class DataEntryExt(private val de: DataEntry[_]) extends AnyVal {
     def isEmpty: Boolean = de.isInstanceOf[EmptyDataEntry]
+  }
+
+  def fromLangDataOp(di: DataOp): DataEntry[_] = di match {
+    case DataItem.Lng(k, v)  => IntegerDataEntry(k, v)
+    case DataItem.Bool(k, v) => BooleanDataEntry(k, v)
+    case DataItem.Bin(k, v)  => BinaryDataEntry(k, v)
+    case DataItem.Str(k, v)  => StringDataEntry(k, v)
+    case DataItem.Delete(k)  => EmptyDataEntry(k)
   }
 }
 

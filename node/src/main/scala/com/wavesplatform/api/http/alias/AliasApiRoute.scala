@@ -7,9 +7,8 @@ import akka.stream.scaladsl.Source
 import cats.syntax.either._
 import com.wavesplatform.account.Alias
 import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.requests.CreateAliasRequest
-import com.wavesplatform.http.BroadcastRoute
+import com.wavesplatform.api.http.{BroadcastRoute, _}
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain

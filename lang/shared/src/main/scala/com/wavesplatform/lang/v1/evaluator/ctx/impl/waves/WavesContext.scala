@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import cats.implicits._
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.CTX
@@ -48,16 +47,11 @@ object WavesContext {
 
   private val variableCtxCache: Map[DirectiveSet, CTX[Environment]] =
     allDirectives
-      .filter(_.isRight)
-      .map(_.explicitGet())
-      .map(ds => (ds, variableCtx(ds)))
+      .collect { case Right(ds) => (ds, variableCtx(ds)) }
       .toMap
 
   private def variableCtx(ds: DirectiveSet): CTX[Environment] = {
-    val isTokenContext = ds.scriptType match {
-      case Account => false
-      case Asset   => true
-    }
+    val isTokenContext = ds.scriptType  == Asset
     val proofsEnabled = !isTokenContext
     val version = ds.stdLibVersion
     CTX(
@@ -102,7 +96,7 @@ object WavesContext {
       version match {
         case V1 | V2 => Array(txByIdF(proofsEnabled, version)) ++ balanceV123Functions
         case V3      => fromV3Funcs(proofsEnabled, version) ++ balanceV123Functions
-        case V4      => fromV4Funcs(proofsEnabled, version) ++ balanceV4Functions
+        case V4 | V5 => fromV4Funcs(proofsEnabled, version) ++ balanceV4Functions
      }
     commonFuncs ++ versionSpecificFuncs
   }
@@ -117,7 +111,7 @@ object WavesContext {
     version match {
       case V1 => Map(txVal)
       case V2 => Map(sell, buy, txVal)
-      case V3 | V4 =>
+      case V3 | V4 | V5 =>
         val `this` = if (isTokenContext) assetThis(version) else accountThis
         val txO    = if (contentType == Expression) Map(txVal) else Map()
         val common = Map(sell, buy, lastBlock(version), `this`)

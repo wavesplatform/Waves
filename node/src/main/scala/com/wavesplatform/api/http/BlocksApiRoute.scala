@@ -4,6 +4,7 @@ import akka.http.scaladsl.server.{Route, StandardRoute}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.http.ApiError.{BlockDoesNotExist, TooBigArrayAllocation}
+import com.wavesplatform.api.http.TransactionsApiRoute.TransactionJsonSerializer
 import com.wavesplatform.block.Block
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.transaction.Asset.Waves
@@ -89,14 +90,16 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi)
 }
 
 object BlocksApiRoute {
-  import TransactionsApiRoute.applicationStatus
-
-  private def toJson(v: (BlockMeta, Seq[(Transaction, Boolean)])): JsObject = v._1.json() ++ transactionField(v._1.header.version, v._2)
+  private def toJson(v: (BlockMeta, Seq[(Transaction, Boolean)])): JsObject = v match {
+    case (meta, transactions) =>
+      meta.json() ++ transactionField(meta.header.version, transactions)
+  }
 
   private def transactionField(blockVersion: Byte, transactions: Seq[(Transaction, Boolean)]): JsObject = Json.obj(
     "fee" -> transactions.map(_._1.assetFee).collect { case (Waves, feeAmt) => feeAmt }.sum,
     "transactions" -> JsArray(transactions.map {
-      case (transaction, succeeded) => transaction.json() ++ applicationStatus(blockVersion >= Block.ProtoBlockVersion, succeeded)
+      case (transaction, succeeded) =>
+        transaction.json() ++ TransactionJsonSerializer.applicationStatus(blockVersion >= Block.ProtoBlockVersion, succeeded)
     })
   )
 }

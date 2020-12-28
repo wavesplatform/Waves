@@ -36,7 +36,7 @@ class ProtoVersionTransactionsSpec
     with Matchers
     with OptionValues
     with TestWallet {
-  import com.wavesplatform.http.ApiMarshallers._
+  import com.wavesplatform.api.http.ApiMarshallers._
 
   private val MinFee: Long            = (0.001 * Constants.UnitsInWave).toLong
   private val DataTxFee: Long         = 15000000

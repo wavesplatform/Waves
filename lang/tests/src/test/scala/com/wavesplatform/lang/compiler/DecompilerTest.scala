@@ -216,10 +216,10 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   property("block getter idents") {
     val expr = GETTER(BLOCK(LET("a", FALSE), REF("a")), "foo")
     Decompiler(expr, decompilerContextV3) shouldEq
-      """{
+      """(
         |    let a = false
         |    a
-        |    }.foo""".stripMargin
+        |    ).foo""".stripMargin
   }
 
   property("Invoke contract with verifier decompilation") {
@@ -389,6 +389,30 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       """if (true)
         |    then 1
         |    else "XXX"""".stripMargin
+  }
+
+  property("if expression") {
+    val expr1 = FUNCTION_CALL(Native(101), List(IF(TRUE, CONST_LONG(1), CONST_LONG(2)), CONST_LONG(3)))
+    Decompiler(expr1, decompilerContextV3) shouldEq
+      """((if (true)
+        |    then 1
+        |    else 2) - 3)""".stripMargin
+    val expr2 = FUNCTION_CALL(Native(101), List(CONST_LONG(3), IF(TRUE, CONST_LONG(1), CONST_LONG(2))))
+    Decompiler(expr2, decompilerContextV3) shouldEq
+      """(3 - (if (true)
+        |    then 1
+        |    else 2))""".stripMargin
+    val expr3 = GETTER(IF(TRUE, CONST_LONG(1), CONST_LONG(2)), "foo")
+    Decompiler(expr3, decompilerContextV3) shouldEq
+      """(if (true)
+        |    then 1
+        |    else 2
+        |    ).foo""".stripMargin
+    val expr4 = FUNCTION_CALL(Native(401), List(IF(TRUE, REF("nil"), REF("nil")), CONST_LONG(0)))
+    Decompiler(expr4, decompilerContextV3) shouldEq
+      """(if (true)
+        |    then nil
+        |    else nil)[0]""".stripMargin
   }
 
   property("if with complicated else branch") {

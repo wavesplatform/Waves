@@ -13,7 +13,7 @@ import scorex.crypto.signatures.{Curve25519, Signature, PrivateKey => SPrivateKe
 
 import scala.util.Try
 
-package object crypto {
+package object crypto extends ScorexLogging {
   // Constants
   val SignatureLength: Int = Curve25519.SignatureLength
   val KeyLength: Int       = Curve25519.KeyLength
@@ -24,7 +24,9 @@ package object crypto {
     val constructor = classOf[OpportunisticCurve25519Provider].getDeclaredConstructors.head
       .asInstanceOf[Constructor[OpportunisticCurve25519Provider]]
     constructor.setAccessible(true)
-    constructor.newInstance()
+    val p = constructor.newInstance()
+    log.info(s"Native provider used: ${p.isNative}")
+    p
   }
 
   // Digests
