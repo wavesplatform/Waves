@@ -60,7 +60,7 @@ object InvokeScriptDiff {
 
           _ <- TracedResult(
             Either.cond(
-              invocationComplexity <= ContractLimits.MaxComplexityByVersion(version),
+              invocationComplexity <= ContractLimits.MaxComplexityByVersion(version) && blockchain.continuationStates.get(dAppAddress).forall(_ != ContinuationState.InProgress),
               (),
               GenericError("Continuation is not allowed for Invoke by script")
             )

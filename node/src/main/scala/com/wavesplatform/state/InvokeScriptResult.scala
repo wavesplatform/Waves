@@ -82,7 +82,15 @@ object InvokeScriptResult {
       InvokeScriptResult.this.empty
 
     override def combine(x: InvokeScriptResult, y: InvokeScriptResult): InvokeScriptResult = {
-      InvokeScriptResult(/*x.data ++ y.data, x.transfers ++ y.transfers,*/ invokes = x.invokes ++ y.invokes)
+      InvokeScriptResult(
+        data = x.data ++ y.data,
+        transfers = x.transfers ++ y.transfers,
+        issues = x.issues ++ y.issues,
+        reissues = x.reissues ++ y.reissues,
+        burns = x.burns ++ y.burns,
+        sponsorFees = x.sponsorFees ++ y.sponsorFees,
+        invokes = x.invokes ++ y.invokes,
+        error = x.error.orElse(y.error))
     }
   }
 
