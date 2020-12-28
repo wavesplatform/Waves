@@ -100,7 +100,7 @@ object ContinuationTransactionDiff {
           .leftMap { case (error, log) => FailedTransactionError.dAppExecution(error, limit, log) }
         TracedResult(
           r.map((_, limit)),
-          List(InvokeScriptTrace(invoke.dAppAddressOrAlias, invoke.funcCall, r.map(_._1), r.fold(_.log, _._2)))
+          List(InvokeScriptTrace(invoke.id.value(), invoke.dAppAddressOrAlias, invoke.funcCall, r.map(_._1), r.fold(_.log, _._2)))
         )
       }
 
