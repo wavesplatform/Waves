@@ -212,6 +212,7 @@ class ProtoVersionTransactionsSpec
           Seq(InvokeScriptTransaction.Payment(100L, Asset.Waves)),
           InvokeScriptTxFee,
           IssuedAsset(feeAssetId),
+          InvokeScriptTransaction.DefaultExtraFeePerStep,
           Now,
           Proofs.empty
         )

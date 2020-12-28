@@ -38,7 +38,7 @@ object Decompiler {
           fb =>
             out("func " + name + " (" + args.mkString(",") + ") = ", ctx.ident) +
               out(fb + NEWLINE, ctx.ident))
-      case Terms.LET(name, value) =>
+      case Terms.LET(name, value,_) =>
         expr(pure(value), ctx, BracesWhenNeccessary, DontIndentFirstLine).map(e => out("let " + name + " = " + e, ctx.ident))
       case _: FAILED_DEC => Coeval.now("FAILED_DEC")
     }
@@ -55,8 +55,8 @@ object Decompiler {
   object ANY_LET {
     def unapply(e: EXPR): Option[(String, EXPR, EXPR)] = {
       e match {
-        case LET_BLOCK(LET(name, v), body) => Some((name, v, body))
-        case BLOCK(LET(name, v), body) => Some((name, v, body))
+        case LET_BLOCK(LET(name, v,_), body) => Some((name, v, body))
+        case BLOCK(LET(name, v,_), body) => Some((name, v, body))
         case _ => None
       }
     }
@@ -124,7 +124,7 @@ object Decompiler {
     val i = if (firstLinePolicy == DontIndentFirstLine) 0 else ctx.ident
 
     e flatMap {
-      case Terms.BLOCK(Terms.LET(MatchRef(name), e), body) => matchBlock(name, pure(body), ctx.incrementIdent()) flatMap { b =>
+      case Terms.BLOCK(Terms.LET(MatchRef(name), e,_), body) => matchBlock(name, pure(body), ctx.incrementIdent()) flatMap { b =>
         expr(pure(e), ctx.incrementIdent(), NoBraces, DontIndentFirstLine) map { ex =>
           out("match " ++ ex ++ " {" ++ NEWLINE, ctx.ident) ++
           out( b, 0) ++

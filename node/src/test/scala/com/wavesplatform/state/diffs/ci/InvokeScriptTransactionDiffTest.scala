@@ -33,6 +33,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.state.diffs.invoke.{InvokeDiffsCommon, InvokeScriptTransactionDiff}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, produce}
+import com.wavesplatform.transaction.ApplicationStatus.ScriptExecutionFailed
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets._
@@ -79,8 +80,7 @@ class InvokeScriptTransactionDiffTest
       BlockchainFeatures.SmartAssets.id     -> 0,
       BlockchainFeatures.Ride4DApps.id      -> 0,
       BlockchainFeatures.FeeSponsorship.id  -> 0,
-      BlockchainFeatures.DataTransaction.id -> 0,
-      BlockchainFeatures.BlockV5.id         -> 0
+      BlockchainFeatures.DataTransaction.id -> 0,BlockchainFeatures.BlockV5.id        -> 0
     )
   )
 
@@ -399,6 +399,7 @@ class InvokeScriptTransactionDiffTest
           } else {
             Waves
           },
+          InvokeScriptTransaction.DefaultExtraFeePerStep,
           ts
         )
         .explicitGet()
@@ -462,6 +463,7 @@ class InvokeScriptTransactionDiffTest
           payment.toSeq,
           if (sponsored) sponsoredFee else fee,
           if (sponsored) sponsorTx.asset else Waves,
+          InvokeScriptTransaction.DefaultExtraFeePerStep,
           ts + 3
         )
         .explicitGet()
@@ -514,6 +516,7 @@ class InvokeScriptTransactionDiffTest
           } else {
             Waves
           },
+          InvokeScriptTransaction.DefaultExtraFeePerStep,
           ts + 3
         )
         .explicitGet()
@@ -565,6 +568,7 @@ class InvokeScriptTransactionDiffTest
           } else {
             Waves
           },
+          InvokeScriptTransaction.DefaultExtraFeePerStep,
           ts + 3
         )
         .explicitGet()
@@ -585,6 +589,7 @@ class InvokeScriptTransactionDiffTest
           } else {
             Waves
           },
+          InvokeScriptTransaction.DefaultExtraFeePerStep,
           ts + 3
         )
         .explicitGet()
@@ -911,7 +916,7 @@ class InvokeScriptTransactionDiffTest
           blockDiffEi.resultE.explicitGet().scriptsRun shouldBe 3
           inside(blockDiffEi.trace) {
             case List(
-                InvokeScriptTrace(_, _, _, Right(ScriptResultV3(_, transfers)), _),
+                InvokeScriptTrace(_, _, _, Right(ScriptResultV3(_, transfers, 3997)), _),
                 AssetVerifierTrace(transferringAssetId, None, _),
                 AssetVerifierTrace(attachedAssetId, None, _)
                 ) =>
@@ -1061,7 +1066,7 @@ class InvokeScriptTransactionDiffTest
           blockDiffEi.resultE should produce("Transaction is not allowed by script")
           inside(blockDiffEi.trace) {
             case List(
-                InvokeScriptTrace(_, dAppAddress, functionCall, Right(ScriptResultV3(_, transfers)), _),
+                InvokeScriptTrace(_, dAppAddress, functionCall, Right(ScriptResultV3(_, transfers, 3995)), _),
                 AssetVerifierTrace(allowedAssetId, None, _),
                 AssetVerifierTrace(bannedAssetId, Some(_: FailedTransactionError), _)
                 ) =>
@@ -1126,7 +1131,7 @@ class InvokeScriptTransactionDiffTest
           blockDiffEi.resultE should produce("TransactionValidationError")
           inside(blockDiffEi.trace) {
             case List(
-                InvokeScriptTrace(_, _, _, Right(ScriptResultV3(_, transfers)), _),
+                InvokeScriptTrace(_, _, _, Right(ScriptResultV3(_, transfers, 3997)), _),
                 AssetVerifierTrace(transferringAssetId, Some(_), _)
                 ) =>
               transferringAssetId shouldBe transferringAsset.id()
@@ -1178,7 +1183,7 @@ class InvokeScriptTransactionDiffTest
       funcBinding <- validAliasStringGen
       fee         <- ciFee(1)
       fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet()))
-      ci = InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, Some(fc), Seq(Payment(-1, Waves)), fee, Waves, ts)
+      ci = InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, Some(fc), Seq(Payment(-1, Waves)), fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts)
     } yield ci) { _ should produce("NonPositiveAmount") }
   }
 
@@ -1652,14 +1657,17 @@ class InvokeScriptTransactionDiffTest
 
         fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 3)
+          .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 3)
           .explicitGet()
       } yield (assetTx, invokeTx, master, script, funcBinding)
 
     val blockchain: Blockchain = mock[Blockchain]
     forAll(uniqueAssetIdScenario) {
       case (asset, invoke, master, script, funcBinding) =>
-        (() => blockchain.settings).expects().returning(TestSettings.Default.blockchainSettings)
+        (() => blockchain.settings)
+          .expects()
+          .returning(TestSettings.Default.blockchainSettings)
+          .anyNumberOfTimes()
         (blockchain.assetScript _).expects(*).returning(None)
         (blockchain.accountScript _)
           .expects(master.toAddress)
@@ -1680,6 +1688,14 @@ class InvokeScriptTransactionDiffTest
                 BlockHeader(1, 1, ByteStr.empty, 1, ByteStr.empty, PublicKey(new Array[Byte](32)), Seq(), 1, ByteStr.empty),
                 ByteStr.empty
               )
+            )
+          )
+          .anyNumberOfTimes()
+        (blockchain.blockHeader _)
+          .expects(*)
+          .returning(
+            Some(
+              SignedBlockHeader(BlockHeader(1, 1, ByteStr.empty, 1, ByteStr.empty, PublicKey(new Array[Byte](32)), Seq(), 1, ByteStr.empty), ByteStr.empty)
             )
           )
           .anyNumberOfTimes()
@@ -1725,7 +1741,7 @@ class InvokeScriptTransactionDiffTest
       setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
       fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
       invokeTx = InvokeScriptTransaction
-        .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 3)
+        .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 3)
         .explicitGet()
     } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, assetTx, setScriptTx))
 
@@ -1778,7 +1794,7 @@ class InvokeScriptTransactionDiffTest
       setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
       fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
       invokeTx = InvokeScriptTransaction
-        .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 3)
+        .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 3)
         .explicitGet()
     } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
 
@@ -1831,7 +1847,7 @@ class InvokeScriptTransactionDiffTest
       setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
       fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
       invokeTx = InvokeScriptTransaction
-        .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 3)
+        .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 3)
         .explicitGet()
     } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
 
@@ -1884,7 +1900,7 @@ class InvokeScriptTransactionDiffTest
       setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
       fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
       invokeTx = InvokeScriptTransaction
-        .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 3)
+        .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 3)
         .explicitGet()
     } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
 
@@ -1961,7 +1977,7 @@ class InvokeScriptTransactionDiffTest
         ssTx   = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
         fc     = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), args)
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, feeAsset, ts + 3)
+          .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, feeAsset, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 3)
           .explicitGet()
       } yield (invokeTx, (ENOUGH_AMT - enoughFee, i1Tx.quantity), Seq(g1Tx, g2Tx, g3Tx, i1Tx, i2Tx, sTx, tTx, ssTx))
 
@@ -1972,7 +1988,7 @@ class InvokeScriptTransactionDiffTest
             diff.scriptsRun shouldBe 0
             diff.portfolios(invoke.sender.toAddress).balanceOf(invoke.feeAssetId)
             state.balance(invoke.sender.toAddress, invoke.feeAssetId) shouldBe invoke.feeAssetId.fold(wavesBalance)(_ => sponsoredBalance) - invoke.fee
-            state.transactionInfo(invoke.id()).map(r => r._2 -> r._3) shouldBe Some((invoke, false))
+            state.transactionInfo(invoke.id()).map(r => r._2 -> r._3) shouldBe Some((invoke, ScriptExecutionFailed))
         }
     }
   }
@@ -2003,7 +2019,7 @@ class InvokeScriptTransactionDiffTest
         ssTx   = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
         fc     = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet()))
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, feeAsset, ts + 3)
+          .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, feeAsset, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 3)
           .explicitGet()
       } yield (invokeTx, Seq(g1Tx, g2Tx, iTx, sTx, tTx, ssTx))
 
@@ -2071,7 +2087,7 @@ class InvokeScriptTransactionDiffTest
           .map { arg =>
             val fc = Terms.FUNCTION_CALL(FunctionHeader.User("sameComplexity"), List(CONST_STRING(arg).explicitGet()))
             InvokeScriptTransaction
-              .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 4)
+              .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 4)
               .explicitGet()
           }
       } yield (Seq(gTx1, gTx2, ssTx, iTx), master.toAddress, txs)
@@ -2163,7 +2179,7 @@ class InvokeScriptTransactionDiffTest
         fc         = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments   = iTxs.takeRight(2).map(tx => Payment(10, IssuedAsset(tx.assetId)))
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 6)
           .explicitGet()
       } yield (Seq(gTx1, gTx2) ++ invokerScriptTx ++ iTxs ++ tTxs ++ saTxs :+ ssTx, invokeTx, master.toAddress, complexity)
 

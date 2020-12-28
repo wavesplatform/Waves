@@ -70,7 +70,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
       CreateAliasTransaction.selfSigned(TxVersion.V2, acc1, Alias.create("alias").explicitGet(), MinFee, ts).explicitGet()
     )
     setScript = SetScriptTransaction.selfSigned(1.toByte, dapp, Some(script("alias")), SetScriptFee, ts).explicitGet()
-    ci        = InvokeScriptTransaction.selfSigned(1.toByte, master, dapp.toAddress, functionCall, Nil, InvokeScriptTxFee, Waves, ts + 3).explicitGet()
+    ci        = InvokeScriptTransaction.selfSigned(1.toByte, master, dapp.toAddress, functionCall, Nil, InvokeScriptTxFee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 3).explicitGet()
     lease1    = LeaseTransaction.selfSigned(2.toByte, acc1, dapp.toAddress, 10 * Constants.UnitsInWave, MinFee, ts + 2).explicitGet()
     lease2    = LeaseTransaction.selfSigned(2.toByte, acc1, dapp.toAddress, 10 * Constants.UnitsInWave, MinFee, ts + 3).explicitGet()
     leaseD    = LeaseTransaction.selfSigned(2.toByte, dapp, acc1.toAddress, 1 * Constants.UnitsInWave, MinFee, ts + 3).explicitGet()
@@ -218,7 +218,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
         val setScript = SetScriptTransaction
           .selfSigned(1.toByte, acc1, Some(dappScript(ByteStr(acc2.toAddress.bytes), issue.id())), SetScriptFee, nextTs)
           .explicitGet()
-        val ci = InvokeScriptTransaction.selfSigned(1.toByte, acc1, acc1.toAddress, functionCall, Nil, InvokeScriptTxFee, Waves, nextTs).explicitGet()
+        val ci = InvokeScriptTransaction.selfSigned(1.toByte, acc1, acc1.toAddress, functionCall, Nil, InvokeScriptTxFee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, nextTs).explicitGet()
 
         assertDiffAndState(Seq(TestBlock.create(Seq(g1, g2, alias, issue, setScript))), TestBlock.create(Seq(ci)), rideV4Activated) {
           case (d, s) =>
@@ -310,7 +310,7 @@ class BalancesV4Test extends PropSpec with PropertyChecks with WithState with Tr
         val setScript = SetScriptTransaction
           .selfSigned(1.toByte, acc1, Some(dappScript(ByteStr(acc2.toAddress.bytes), issue.id())), SetScriptFee, nextTs)
           .explicitGet()
-        val ci = InvokeScriptTransaction.selfSigned(1.toByte, acc2, acc1.toAddress, functionCall, Nil, InvokeScriptTxFee, Waves, nextTs).explicitGet()
+        val ci = InvokeScriptTransaction.selfSigned(1.toByte, acc2, acc1.toAddress, functionCall, Nil, InvokeScriptTxFee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, nextTs).explicitGet()
 
         assertDiffAndState(Seq(TestBlock.create(Seq(g1, g2, issue, setScript))), TestBlock.create(Seq(ci)), rideV4Activated) {
           case (d, s) =>

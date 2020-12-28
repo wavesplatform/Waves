@@ -5,6 +5,7 @@ import com.wavesplatform.api.common.CommonAssetsApi.AssetInfo
 import com.wavesplatform.crypto
 import com.wavesplatform.database.{AddressId, KeyTags}
 import com.wavesplatform.state.{AssetDescription, Blockchain, Diff, Portfolio}
+import com.wavesplatform.transaction.ApplicationStatus.Succeeded
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import monix.reactive.Observable
@@ -32,7 +33,7 @@ object CommonAssetsApi {
       for {
         assetInfo <- blockchain.assetDescription(assetId)
         sponsorBalance = if (assetInfo.sponsorship != 0) Some(blockchain.wavesPortfolio(assetInfo.issuer.toAddress).spendableBalance) else None
-      } yield AssetInfo(assetInfo, blockchain.transactionInfo(assetId.id).collect { case (_, it: IssueTransaction, true) => it }, sponsorBalance)
+      } yield AssetInfo(assetInfo, blockchain.transactionInfo(assetId.id).collect { case (_, it: IssueTransaction, Succeeded) => it }, sponsorBalance)
 
     override def wavesDistribution(height: Int, after: Option[Address]): Observable[(Address, Long)] =
       balanceDistribution(

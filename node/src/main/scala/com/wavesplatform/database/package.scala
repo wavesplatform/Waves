@@ -16,18 +16,21 @@ import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
+import com.wavesplatform.database.protobuf.ApplicationStatus._
 import com.wavesplatform.database.protobuf.DataEntry.Value
 import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
+import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.transaction.ApplicationStatus._
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.{ScorexLogging, _}
 import monix.eval.Task
 import monix.reactive.Observable
@@ -268,6 +271,79 @@ package object database extends ScorexLogging {
       b.putShort(featureId).putInt(height)
 
     b.array()
+  }
+
+  def readContinuationState(bytes: Array[Byte]): ContinuationState.InProgress = {
+    val state = pb.ContinuationState.parseFrom(bytes)
+    val expr  = Serde.deserialize(state.expr.asReadOnlyByteBuffer(), allowObjects = true).explicitGet()
+    ContinuationState.InProgress(
+      expr,
+      state.unusedComplexity,
+      state.invokeScriptTransactionId.toByteStr,
+      state.precedingStepCount
+    )
+  }
+
+  def writeContinuationState(continuationState: ContinuationState.InProgress): Array[Byte] = {
+    pb.ContinuationState(
+        ByteString.copyFrom(Serde.serialize(continuationState.expr, allowObjects = true)),
+        continuationState.unusedComplexity,
+        ByteString.copyFrom(continuationState.invokeScriptTransactionId.arr),
+        continuationState.precedingStepCount
+      )
+      .toByteArray
+  }
+
+  def readContinuationHistory(bytes: Array[Byte]): Seq[(Height, Option[TransactionId])] = {
+    if (bytes == null)
+      Seq()
+    else
+      pb.ContinuationHistory
+        .parseFrom(bytes)
+        .entries
+        .map { entry =>
+          val invokeIdOpt =
+            if (entry.invokeScriptTransactionId.isEmpty)
+              None
+            else
+              Some(TransactionId(entry.invokeScriptTransactionId.toByteStr))
+          (Height(entry.height), invokeIdOpt)
+        }
+  }
+
+  def writeContinuationHistory(states: Seq[(Height, Option[TransactionId])]): Array[Byte] = {
+    val entries = states.map {
+      case (height, invokeIdOpt) =>
+        pb.ContinuationHistoryEntry(
+          height,
+          invokeIdOpt.fold(ByteString.EMPTY)(invokeId => ByteString.copyFrom(invokeId.arr))
+        )
+    }
+    pb.ContinuationHistory(entries).toByteArray
+  }
+
+  def readContinuationTransactions(bytes: Array[Byte]): Seq[(Height, TxNum)] = {
+    if (bytes == null)
+      Seq()
+    else {
+      val in = newDataInput(bytes)
+      (1 to in.readInt()).map { _ =>
+        val height = Height(in.readInt())
+        val num    = TxNum(in.readShort())
+        (height, num)
+      }
+    }
+  }
+
+  def writeContinuationTransactions(continuations: Seq[(Height, TxNum)]): Array[Byte] = {
+    val out = newDataOutput()
+    out.writeInt(continuations.size)
+    continuations.foreach {
+      case (height, num) =>
+        out.writeInt(height)
+        out.writeShort(num)
+    }
+    out.toByteArray
   }
 
   def readSponsorship(data: Array[Byte]): SponsorshipValue = {
@@ -520,27 +596,28 @@ package object database extends ScorexLogging {
     )
   }
 
-  def readTransaction(b: Array[Byte]): (Transaction, Boolean) = {
+  def readTransaction(b: Array[Byte]): (Transaction, ApplicationStatus) = {
     import pb.TransactionData.Transaction._
-
-    val data = pb.TransactionData.parseFrom(b)
-    data.transaction match {
-      case tx: LegacyBytes    => (TransactionParsers.parseBytes(tx.value.toByteArray).get, !data.failed)
-      case tx: NewTransaction => (PBTransactions.vanilla(tx.value).explicitGet(), !data.failed)
+    val data   = pb.TransactionData.parseFrom(b)
+    val status = fromDb(data.failed, data.applicationStatus)
+    val tx = data.transaction match {
+      case tx: LegacyBytes    => TransactionParsers.parseBytes(tx.value.toByteArray).get
+      case tx: NewTransaction => PBTransactions.vanilla(tx.value).explicitGet()
       case _                  => throw new IllegalArgumentException("Illegal transaction data")
     }
+    (tx, status)
   }
 
-  def writeTransaction(v: (Transaction, Boolean)): Array[Byte] = {
+  def writeTransaction(v: (Transaction, ApplicationStatus)): Array[Byte] = {
     import pb.TransactionData.Transaction._
-    val (tx, succeeded) = v
+    val (tx, status) = v
     val ptx = tx match {
       case lps: LegacyPBSwitch if !lps.isProtobufVersion => LegacyBytes(ByteString.copyFrom(tx.bytes()))
       case _: GenesisTransaction                         => LegacyBytes(ByteString.copyFrom(tx.bytes()))
       case _: PaymentTransaction                         => LegacyBytes(ByteString.copyFrom(tx.bytes()))
       case _                                             => NewTransaction(PBTransactions.protobuf(tx))
     }
-    pb.TransactionData(!succeeded, ptx).toByteArray
+    pb.TransactionData(applicationStatus = toDb(status), transaction = ptx).toByteArray
   }
 
   /** Returns status (succeed - true, failed -false) and bytes (left - legacy format bytes, right - new format bytes) */
@@ -569,18 +646,21 @@ package object database extends ScorexLogging {
         val statusFieldTag  = coded.readTag()
         val statusFieldNum  = WireFormat.getTagFieldNumber(statusFieldTag)
         val statusFieldType = WireFormat.getTagWireType(statusFieldTag)
-        require(statusFieldNum == FAILED_FIELD_NUMBER, "Unknown `failed` field in transaction data")
-        require(statusFieldType == WireFormat.WIRETYPE_VARINT, "Can't parse `failed` field in transaction data")
-        !coded.readBool()
+        require(statusFieldType == WireFormat.WIRETYPE_VARINT, "Can't parse application status field in transaction data")
+        statusFieldNum match {
+          case FAILED_FIELD_NUMBER             => !coded.readBool()
+          case APPLICATION_STATUS_FIELD_NUMBER => protobuf.ApplicationStatus.fromValue(coded.readEnum()) != SCRIPT_EXECUTION_FAILED
+          case _                               => throw new IllegalArgumentException("Unknown application status field in transaction data")
+        }
       }
 
     (succeed, bytes)
   }
 
-  def loadTransactions(height: Height, db: ReadOnlyDB): Option[Seq[(Transaction, Boolean)]] =
+  def loadTransactions(height: Height, db: ReadOnlyDB): Option[Seq[(Transaction, ApplicationStatus)]] =
     if (height < 1 || db.get(Keys.height) < height) None
     else {
-      val transactions = Seq.newBuilder[(Transaction, Boolean)]
+      val transactions = Seq.newBuilder[(Transaction, ApplicationStatus)]
       db.iterateOver(KeyTags.NthTransactionInfoAtHeight.prefixBytes ++ Ints.toByteArray(height)) { e =>
         transactions += readTransaction(e.getValue)
       }
@@ -624,10 +704,10 @@ package object database extends ScorexLogging {
       id          <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
       leaseStatus <- fromHistory(r, Keys.leaseStatusHistory(id), Keys.leaseStatus(id))
       if leaseStatus
-      pb.TransactionMeta(h, n, _, _) <- r.get(Keys.transactionMetaById(TransactionId(id)))
-      tx                             <- r.get(Keys.transactionAt(Height(h), TxNum(n.toShort)))
+      pb.TransactionMeta(h, n, _, _, _) <- r.get(Keys.transactionMetaById(TransactionId(id)))
+      tx                                <- r.get(Keys.transactionAt(Height(h), TxNum(n.toShort)))
     } yield tx).collect {
-      case (lt: LeaseTransaction, true) => lt
+      case (lt: LeaseTransaction, Succeeded) => lt
     }.toSeq
   }
 
@@ -667,4 +747,25 @@ package object database extends ScorexLogging {
   implicit class LongExt(val l: Long) extends AnyVal {
     def toByteArray: Array[Byte] = Longs.toByteArray(l)
   }
+
+  def toDb(status: ApplicationStatus): protobuf.ApplicationStatus =
+    status match {
+      case Succeeded                 => SUCCEEDED
+      case ScriptExecutionFailed     => SCRIPT_EXECUTION_FAILED
+      case ScriptExecutionInProgress => SCRIPT_EXECUTION_IN_PROGRESS
+    }
+
+  def fromDb(failed: Boolean, status: protobuf.ApplicationStatus): ApplicationStatus =
+    if (status == SUCCEEDED) fromDb(failed) else fromDb(status)
+
+  private def fromDb(failed: Boolean): ApplicationStatus =
+    if (failed) ScriptExecutionFailed else Succeeded
+
+  private def fromDb(status: protobuf.ApplicationStatus): ApplicationStatus =
+    status match {
+      case SUCCEEDED                    => Succeeded
+      case SCRIPT_EXECUTION_FAILED      => ScriptExecutionFailed
+      case SCRIPT_EXECUTION_IN_PROGRESS => ScriptExecutionInProgress
+      case Unrecognized(value)          => throw new IllegalArgumentException(s"Illegal transaction application status = $value")
+    }
 }

@@ -116,6 +116,7 @@ class Transaction(
     val id: String,
     val chainId: Option[Byte],
     val fee: Long,
+    val feeAssetId: Option[String],
     val timestamp: Long,
     val sender: Option[String],
     val version: Option[Byte],
@@ -135,7 +136,12 @@ class Transaction(
     val senderPublicKey: Option[String],
     val recipient: Option[String],
     val proofs: Option[Seq[String]],
-    val applicationStatus: Option[String]
+    val applicationStatus: Option[String],
+    val invokeScriptTransactionId: Option[String],
+    val nonce: Option[Int],
+    val extraFeePerStep: Option[Long],
+    val call: Option[JsObject],
+    val dApp: Option[String]
 ) {
   import Transaction._
   override def toString: String = Json.toJson(this).toString
@@ -153,6 +159,7 @@ object Transaction {
       id: String,
       chainId: Option[Byte],
       fee: Long,
+      feeAssetId: Option[String],
       timestamp: Long,
       sender: Option[String],
       version: Option[Byte],
@@ -172,12 +179,18 @@ object Transaction {
       senderPublicKey: Option[String],
       recipient: Option[String],
       proofs: Option[Seq[String]],
-      applicationStatus: Option[String]
+      applicationStatus: Option[String],
+      invokeScriptTransactionId: Option[String],
+      nonce: Option[Int],
+      extraFeePerStep: Option[Long],
+      call: Option[JsObject],
+      dApp: Option[String]
   ): Transaction = new Transaction(
     _type,
     id,
     chainId,
     fee,
+    feeAssetId,
     timestamp,
     sender,
     version,
@@ -197,7 +210,12 @@ object Transaction {
     senderPublicKey,
     recipient,
     proofs,
-    applicationStatus
+    applicationStatus,
+    invokeScriptTransactionId,
+    nonce,
+    extraFeePerStep,
+    call,
+    dApp
   )
 
   implicit val transactionFormat: Format[Transaction] = Format(
@@ -208,7 +226,8 @@ object Transaction {
           id          <- (jsv \ "id").validate[String]
           chainId     <- (jsv \ "chainId").validateOpt[Byte]
           fee         <- (jsv \ "fee").validate[Long]
-          timestamp   <- (jsv \ "timestamp").validate[Long]
+          feeAssetId  <- (jsv \ "feeAssetId").validateOpt[String]
+          timestamp   <- (jsv \ "timestamp").validateOpt[Long]
           sender      <- (jsv \ "sender").validateOpt[String]
           version     <- (jsv \ "version").validateOpt[Byte]
           name        <- (jsv \ "name").validateOpt[String]
@@ -218,25 +237,31 @@ object Transaction {
             case Some(v) if _type == 4 || _type == 11 => (jsv \ "attachment").validateOpt[String]
             case _                                    => JsSuccess(None)
           }
-          price                <- (jsv \ "price").validateOpt[Long]
-          sellMatcherFee       <- (jsv \ "sellMatcherFee").validateOpt[Long]
-          buyMatcherFee        <- (jsv \ "buyMatcherFee").validateOpt[Long]
-          sellOrderMatcherFee  <- (jsv \ "order2" \ "matcherFee").validateOpt[Long]
-          buyOrderMatcherFee   <- (jsv \ "order1" \ "matcherFee").validateOpt[Long]
-          data                 <- (jsv \ "data").validateOpt[Seq[DataEntry[_]]]
-          minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
-          transfers            <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
-          totalAmount          <- (jsv \ "totalAmount").validateOpt[Long]
-          senderPublicKey      <- (jsv \ "senderPublicKey").validateOpt[String]
-          recipient            <- (jsv \ "recipient").validateOpt[String]
-          proofs               <- (jsv \ "proofs").validateOpt[Seq[String]]
-          applicationStatus    <- (jsv \ "applicationStatus").validateOpt[String]
+          price                     <- (jsv \ "price").validateOpt[Long]
+          sellMatcherFee            <- (jsv \ "sellMatcherFee").validateOpt[Long]
+          buyMatcherFee             <- (jsv \ "buyMatcherFee").validateOpt[Long]
+          sellOrderMatcherFee       <- (jsv \ "order2" \ "matcherFee").validateOpt[Long]
+          buyOrderMatcherFee        <- (jsv \ "order1" \ "matcherFee").validateOpt[Long]
+          data                      <- (jsv \ "data").validateOpt[Seq[DataEntry[_]]]
+          minSponsoredAssetFee      <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
+          transfers                 <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
+          totalAmount               <- (jsv \ "totalAmount").validateOpt[Long]
+          senderPublicKey           <- (jsv \ "senderPublicKey").validateOpt[String]
+          recipient                 <- (jsv \ "recipient").validateOpt[String]
+          proofs                    <- (jsv \ "proofs").validateOpt[Seq[String]]
+          applicationStatus         <- (jsv \ "applicationStatus").validateOpt[String]
+          invokeScriptTransactionId <- (jsv \ "invokeScriptTransactionId").validateOpt[String]
+          nonce                      <- (jsv \ "nonce").validateOpt[Int]
+          extraFeePerStep           <- (jsv \ "extraFeePerStep").validateOpt[Long]
+          call                      <- (jsv \ "call").validateOpt[JsObject]
+          dApp                      <- (jsv \ "dApp").validateOpt[String]
         } yield new Transaction(
           _type,
           id,
           chainId,
           fee,
-          timestamp,
+          feeAssetId,
+          timestamp.getOrElse(0),
           sender,
           version,
           name,
@@ -255,7 +280,12 @@ object Transaction {
           senderPublicKey,
           recipient,
           proofs,
-          applicationStatus
+          applicationStatus,
+          invokeScriptTransactionId,
+          nonce,
+          extraFeePerStep,
+          call,
+          dApp
         )
     ),
     Writes { t =>
@@ -332,7 +362,7 @@ object TransactionInfo {
           _type                <- (jsv \ "type").validate[Int]
           id                   <- (jsv \ "id").validate[String]
           fee                  <- (jsv \ "fee").validate[Long]
-          timestamp            <- (jsv \ "timestamp").validate[Long]
+          timestamp            <- (jsv \ "timestamp").validateOpt[Long]
           sender               <- (jsv \ "sender").validateOpt[String]
           height               <- (jsv \ "height").validate[Int]
           minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
@@ -356,7 +386,7 @@ object TransactionInfo {
           id,
           chainId,
           fee,
-          timestamp,
+          timestamp.getOrElse(0),
           sender,
           name,
           description,
@@ -433,6 +463,7 @@ case class DebugStateChanges(
     _type: Int,
     id: String,
     fee: Long,
+    feeAssetId: Option[String],
     timestamp: Long,
     sender: Option[String],
     height: Int,
@@ -440,36 +471,50 @@ case class DebugStateChanges(
     recipient: Option[String],
     script: Option[String],
     stateChanges: Option[StateChangesDetails],
-    applicationStatus: Option[String]
+    applicationStatus: Option[String],
+    continuationTransactionIds: Option[Seq[String]],
+    call: Option[JsObject],
+    dApp: Option[String],
+    extraFeePerStep: Option[Long]
 ) extends TxInfo
 object DebugStateChanges {
   implicit val debugStateChanges: Reads[DebugStateChanges] =
     Reads(
       jsv =>
         for {
-          _type                <- (jsv \ "type").validate[Int]
-          id                   <- (jsv \ "id").validate[String]
-          fee                  <- (jsv \ "fee").validate[Long]
-          timestamp            <- (jsv \ "timestamp").validate[Long]
-          sender               <- (jsv \ "sender").validateOpt[String]
-          height               <- (jsv \ "height").validate[Int]
-          minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
-          recipient            <- (jsv \ "recipient").validateOpt[String]
-          script               <- (jsv \ "script").validateOpt[String]
-          stateChanges         <- (jsv \ "stateChanges").validateOpt[StateChangesDetails]
-          applicationStatus    <- (jsv \ "applicationStatus").validateOpt[String]
+          _type                      <- (jsv \ "type").validate[Int]
+          id                         <- (jsv \ "id").validate[String]
+          fee                        <- (jsv \ "fee").validate[Long]
+          feeAssetId                 <- (jsv \ "feeAssetId").validateOpt[String]
+          timestamp                  <- (jsv \ "timestamp").validateOpt[Long]
+          sender                     <- (jsv \ "sender").validateOpt[String]
+          height                     <- (jsv \ "height").validate[Int]
+          minSponsoredAssetFee       <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
+          recipient                  <- (jsv \ "recipient").validateOpt[String]
+          script                     <- (jsv \ "script").validateOpt[String]
+          stateChanges               <- (jsv \ "stateChanges").validateOpt[StateChangesDetails]
+          applicationStatus          <- (jsv \ "applicationStatus").validateOpt[String]
+          continuationTransactionIds <- (jsv \ "continuationTransactionIds").validateOpt[Seq[String]]
+          call                       <- (jsv \ "call").validateOpt[JsObject]
+          dApp                       <- (jsv \ "dApp").validateOpt[String]
+          extraFeePerStep            <- (jsv \ "extraFeePerStep").validateOpt[Long]
         } yield DebugStateChanges(
           _type,
           id,
           fee,
-          timestamp,
+          feeAssetId,
+          timestamp.getOrElse(0),
           sender,
           height,
           minSponsoredAssetFee,
           recipient,
           script,
           stateChanges,
-          applicationStatus
+          applicationStatus,
+          continuationTransactionIds,
+          call,
+          dApp,
+          extraFeePerStep
         )
     )
 }

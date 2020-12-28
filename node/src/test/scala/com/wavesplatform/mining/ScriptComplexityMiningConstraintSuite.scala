@@ -38,6 +38,7 @@ class ScriptComplexityMiningConstraintSuite
         (() => blockchain.settings).when().returning(settings.blockchainSettings)
         (() => blockchain.height).when().returning(1)
         (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.DataTransaction.id -> 0))
+        (() => blockchain.continuationStates).when().returning(Map.empty)
 
         val txDiffer =
           TransactionDiffer(Some(System.currentTimeMillis() - 1000), System.currentTimeMillis())(blockchain, _: Transaction).resultE.explicitGet()

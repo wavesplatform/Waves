@@ -15,6 +15,7 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.{Constants, TestFunctionalitySettings}
 import com.wavesplatform.state.Diff
 import com.wavesplatform.state.diffs._
+import com.wavesplatform.transaction.ApplicationStatus.ScriptExecutionFailed
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -102,7 +103,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
           TestBlock.create(Seq(ci)),
           features
         )(_ should matchPattern {
-          case Right(diff: Diff) if diff.transactions.exists(!_._2.applied) =>
+          case Right(diff: Diff) if diff.transactions.exists(_._2.status == ScriptExecutionFailed) =>
         })
     }
   }
@@ -234,7 +235,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
           val payments = issues.map(i => Payment(1, IssuedAsset(i.id())))
           (issues, payments)
         }
-        ci <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, payments, fee, Waves, ts + 3)
+        ci <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, payments, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 3)
       } yield (List(genesis, genesis2), setVerifier, setDApp, ci, issues, master, invoker, fee)
     }.explicitGet()
 

@@ -7,10 +7,11 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.TransactionMeta
 import com.wavesplatform.protobuf.transaction.PBRecipients
+import com.wavesplatform.state
 import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.{ApplicationStatus, Transaction}
 import com.wavesplatform.utils._
 
 object Keys {
@@ -48,7 +49,6 @@ object Keys {
     Key(UpdatedAssets, h(height), d => readAssetIds(d).map(IssuedAsset), ias => writeAssetIds(ias.map(_.id)))
   def sponsorshipAssets(height: Int): Key[Seq[IssuedAsset]] =
     Key(SponsoredAssets, h(height), d => readAssetIds(d).map(IssuedAsset), ias => writeAssetIds(ias.map(_.id)))
-
 
   def leaseBalanceHistory(addressId: AddressId): Key[Seq[Int]] = historyKey(LeaseBalanceHistory, addressId.toByteArray)
   def leaseBalance(addressId: AddressId)(height: Int): Key[LeaseBalance] =
@@ -116,8 +116,8 @@ object Keys {
       unsupported("Can not explicitly write block bytes")
     )
 
-  def transactionAt(height: Height, n: TxNum): Key[Option[(Transaction, Boolean)]] =
-    Key.opt[(Transaction, Boolean)](
+  def transactionAt(height: Height, n: TxNum): Key[Option[(Transaction, ApplicationStatus)]] =
+    Key.opt[(Transaction, ApplicationStatus)](
       NthTransactionInfoAtHeight,
       hNum(height, n),
       readTransaction,
@@ -176,6 +176,15 @@ object Keys {
 
   def nftAt(addressId: AddressId, index: Int, assetId: IssuedAsset): Key[Option[Unit]] =
     Key.opt(NftPossession, addressId.toByteArray ++ Longs.toByteArray(index) ++ assetId.id.arr, _ => (), _ => Array.emptyByteArray)
+
+  def continuationHistory(addressId: AddressId): Key[Seq[(Height, Option[TransactionId])]] =
+    Key(ContinuationHistory, addressId.toByteArray, readContinuationHistory, writeContinuationHistory)
+
+  def continuationState(invokeId: TransactionId, height: Height): Key[Option[state.ContinuationState.InProgress]] =
+    Key.opt(ContinuationState, h(height) ++ invokeId.arr, readContinuationState, writeContinuationState)
+
+  def continuationTransactionsHeightsAndNums(invokeId: TransactionId): Key[Seq[(Height, TxNum)]] =
+    Key(ContinuationTransactionsHeightsAndNums, invokeId.arr, readContinuationTransactions, writeContinuationTransactions)
 
   def bloomFilterChecksum(filterName: String): Key[Array[Byte]] = Key(KeyTags.BloomFilterChecksum, filterName.utf8Bytes, identity, identity)
 

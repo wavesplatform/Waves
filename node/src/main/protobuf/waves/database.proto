@@ -26,11 +26,18 @@ message BlockMeta {
     bytes vrf = 9;
 }
 
+enum ApplicationStatus {
+    SUCCEEDED = 0;
+    SCRIPT_EXECUTION_FAILED = 1;
+    SCRIPT_EXECUTION_IN_PROGRESS = 2;
+}
+
 message TransactionMeta {
     int32 height = 1;
     int32 num = 2;
     int32 type = 3;
     bool failed = 4;
+    ApplicationStatus application_status = 5;
 }
 
 message TransactionData {
@@ -39,6 +46,7 @@ message TransactionData {
         SignedTransaction new_transaction = 2;
     }
     bool failed = 3;
+    ApplicationStatus application_status = 4;
 }
 
 message AccountScriptInfo {
@@ -67,6 +75,22 @@ message DataEntry {
         bytes binary_value = 3;
         string string_value = 4;
     }
+}
+
+message ContinuationState {
+    bytes expr = 1;
+    int32 unused_complexity = 2;
+    bytes invoke_script_transaction_id = 3;
+    int32 preceding_step_count = 4;
+}
+
+message ContinuationHistory {
+    repeated ContinuationHistoryEntry entries = 1;
+}
+
+message ContinuationHistoryEntry {
+    int32 height = 1;
+    bytes invoke_script_transaction_id = 2;
 }
 
 message LeaseDetails {

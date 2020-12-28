@@ -14,6 +14,7 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, EmptyDataEntr
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
+import com.wavesplatform.transaction.smart.ContinuationTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
@@ -246,7 +247,7 @@ object PBTransactions {
           chainId
         )
 
-      case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments)) =>
+      case Data.InvokeScript(InvokeScriptTransactionData(Some(dAppAddress), functionCall, payments, extraFeePerStep)) =>
         import cats.instances.either._
         import cats.instances.option._
         import cats.syntax.traverse._
@@ -254,10 +255,10 @@ object PBTransactions {
         import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 
         for {
-          dApp <- PBRecipients.toAddressOrAlias(dappAddress, chainId)
+          dApp <- PBRecipients.toAddressOrAlias(dAppAddress, chainId)
 
           fcOpt <- Deser
-            .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
+            .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize(_, allowObjects = false))
             .sequence
             .left
             .map(e => GenericError(s"Invalid InvokeScript function call: $e"))
@@ -275,6 +276,7 @@ object PBTransactions {
             payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
             feeAmount,
             feeAssetId,
+            extraFeePerStep,
             timestamp,
             proofs
           )
@@ -293,6 +295,9 @@ object PBTransactions {
           proofs,
           chainId
         )
+
+      case Data.Continuation(ContinuationTransactionData(invokeTransactionId, nonce)) =>
+        Right(ContinuationTransaction(invokeTransactionId.toByteStr, nonce, feeAmount, feeAssetId, timestamp))
 
       case _ =>
         Left(TxValidationError.UnsupportedTransactionType)
@@ -468,20 +473,21 @@ object PBTransactions {
           chainId
         )
 
-      case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments)) =>
+      case Data.InvokeScript(InvokeScriptTransactionData(Some(dAppAddress), functionCall, payments, extraFeePerStep)) =>
         import com.wavesplatform.lang.v1.Serde
         import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 
         vt.smart.InvokeScriptTransaction(
           version.toByte,
           sender,
-          PBRecipients.toAddressOrAlias(dappAddress, chainId).explicitGet(),
+          PBRecipients.toAddressOrAlias(dAppAddress, chainId).explicitGet(),
           Deser
-            .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
+            .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize(_, allowObjects = false))
             .map(_.explicitGet().asInstanceOf[FUNCTION_CALL]),
           payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
           feeAmount,
           feeAssetId,
+          extraFeePerStep,
           timestamp,
           proofs,
           chainId
@@ -590,8 +596,20 @@ object PBTransactions {
         val data = SponsorFeeTransactionData(Some(Amount(assetId.id.toByteString, minSponsoredAssetFee.getOrElse(0L))))
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.SponsorFee(data))
 
-      case vt.smart.InvokeScriptTransaction(version, sender, dappAddress, fcOpt, payment, fee, feeAssetId, timestamp, proofs, chainId) =>
-        val data = Data.InvokeScript(toPBInvokeScriptData(dappAddress, fcOpt, payment))
+      case vt.smart.InvokeScriptTransaction(
+          version,
+          sender,
+          dAppAddress,
+          fcOpt,
+          payment,
+          fee,
+          feeAssetId,
+          extraFeePerStep,
+          timestamp,
+          proofs,
+          chainId
+      ) =>
+        val data = Data.InvokeScript(toPBInvokeScriptData(dAppAddress, fcOpt, payment, extraFeePerStep))
         PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, version, proofs, data)
 
       case tx @ vt.assets.UpdateAssetInfoTransaction(version, sender, assetId, name, description, timestamp, _, _, proofs, chainId) =>
@@ -604,18 +622,30 @@ object PBTransactions {
 
         PBTransactions.create(sender, chainId, feeAmount, feeAsset, timestamp, version, proofs, Data.UpdateAssetInfo(data))
 
+      case tx @ vt.smart.ContinuationTransaction(invokeScriptTransactionId, nonce, fee, feeAssetId, timestamp) =>
+        val data = Data.Continuation(ContinuationTransactionData(invokeScriptTransactionId.toByteString, nonce))
+        new SignedTransaction(
+          Some(Transaction(version = tx.version, fee = Some((feeAssetId, fee): Amount), data = data, timestamp = timestamp))
+        )
+
       case _ =>
         throw new IllegalArgumentException(s"Unsupported transaction: $tx")
     }
   }
 
-  def toPBInvokeScriptData(dappAddress: AddressOrAlias, fcOpt: Option[FUNCTION_CALL], payment: Seq[Payment]): InvokeScriptTransactionData = {
+  def toPBInvokeScriptData(
+      dAppAddress: AddressOrAlias,
+      fcOpt: Option[FUNCTION_CALL],
+      payment: Seq[Payment],
+      extraFeePerStep: Long
+  ): InvokeScriptTransactionData = {
     import com.wavesplatform.lang.v1.Serde
 
     InvokeScriptTransactionData(
-      Some(PBRecipients.create(dappAddress)),
+      Some(PBRecipients.create(dAppAddress)),
       ByteString.copyFrom(Deser.serializeOption(fcOpt)(Serde.serialize(_))),
-      payment.map(p => (p.assetId, p.amount): Amount)
+      payment.map(p => (p.assetId, p.amount): Amount),
+      extraFeePerStep
     )
   }
 

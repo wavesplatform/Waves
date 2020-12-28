@@ -41,7 +41,8 @@ object FeeValidation {
     SponsorFeeTransaction.typeId      -> 1000,
     SetAssetScriptTransaction.typeId  -> (1000 - 4),
     InvokeScriptTransaction.typeId    -> 5,
-    UpdateAssetInfoTransaction.typeId -> 1
+    UpdateAssetInfoTransaction.typeId -> 1,
+    ContinuationTransaction.typeId    -> 0
   )
 
   def apply(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Unit] = {

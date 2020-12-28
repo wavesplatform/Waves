@@ -189,10 +189,15 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
         sender.assetBalance(contractAddress, smartAsset) shouldBe prevAssetBalance
         sender.assetsBalance(contractAddress).balances should contain theSameElementsAs prevAssets.balances
 
-        val minFee        = if (typeName == "issue") invokeFee + issueFee else invokeFee + smartFee
-        val scriptInvoked = if (typeName == "issue") 0 else 1
+        val (scriptInvokedInfo, issuedInfo) =
+          if (typeName == "issue")
+            ("", " with 1 assets issued")
+          else
+            (" with 1 total scripts invoked", "")
+
+        val minFee = if (typeName == "issue") invokeFee + issueFee else invokeFee + smartFee
         val text = s"Fee in WAVES for InvokeScriptTransaction ($invokeFee in WAVES)" +
-          s" with $scriptInvoked total scripts invoked does not exceed minimal value of $minFee WAVES."
+          s"$scriptInvokedInfo$issuedInfo does not exceed minimal value of $minFee WAVES."
 
         failed.foreach { s =>
           checkStateChange(sender.debugStateChanges(s.id), 2, text)

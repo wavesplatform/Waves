@@ -76,11 +76,11 @@ class BlockchainUpdaterImpl(
 
   def liquidBlock(id: ByteStr): Option[Block] = readLock(ngState.flatMap(_.totalDiffOf(id).map(_._1)))
 
-  def liquidTransactions(id: ByteStr): Option[Seq[(Transaction, Boolean)]] =
+  def liquidTransactions(id: ByteStr): Option[Seq[(Transaction, ApplicationStatus)]] =
     readLock(
       ngState
         .flatMap(_.totalDiffOf(id))
-        .map { case (_, diff, _, _, _) => diff.transactions.values.toSeq.map(info => (info.transaction, info.applied)) }
+        .map { case (_, diff, _, _, _) => diff.transactions.values.toSeq.map(info => (info.transaction, info.status)) }
     )
 
   def liquidBlockMeta: Option[BlockMeta] =
@@ -621,7 +621,7 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.transferById(id)
   }
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)] = readLock {
+  override def transactionInfo(id: ByteStr): Option[(Int, Transaction, ApplicationStatus)] = readLock {
     compositeBlockchain.transactionInfo(id)
   }
 
@@ -671,7 +671,7 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.accountData(acc, key)
   }
 
-  override def transactionMeta(id: ByteStr): Option[(Int, Boolean)] = readLock {
+  override def transactionMeta(id: ByteStr): Option[(Int, ApplicationStatus)] = readLock {
     compositeBlockchain.transactionMeta(id)
   }
 
@@ -688,6 +688,10 @@ class BlockchainUpdaterImpl(
       case Some(ng) if this.height == height => ng.hitSource.some
       case _                                 => leveldb.hitSource(height)
     }
+  }
+
+  override def continuationStates: Map[Address, ContinuationState] = readLock {
+    compositeBlockchain.continuationStates
   }
 
   private[this] def compositeBlockchain =

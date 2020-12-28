@@ -123,10 +123,10 @@ object InvokeScriptResult {
       Lease(AddressOrAlias.fromRide(l.recipient).explicitGet(), l.amount, l.nonce, lang.Lease.calculateId(l, invokeId))
 
     result match {
-      case ScriptResultV3(ds, ts) =>
+      case ScriptResultV3(ds, ts, _) =>
         InvokeScriptResult(data = ds.map(DataEntry.fromLangDataOp), transfers = ts.map(langTransferToPayment))
 
-      case ScriptResultV4(actions) =>
+      case ScriptResultV4(actions, _) =>
         val issues       = actions.collect { case i: lang.Issue         => i }
         val reissues     = actions.collect { case ri: lang.Reissue      => ri }
         val burns        = actions.collect { case b: lang.Burn          => b }
@@ -137,7 +137,8 @@ object InvokeScriptResult {
         val leaseCancels = actions.collect { case l: lang.LeaseCancel   => l }
         InvokeScriptResult(dataOps, transfers, issues, reissues, burns, sponsorFees, leases, leaseCancels)
 
-      case i: IncompleteResult => throw new IllegalArgumentException(s"Cannot cast incomplete result: $i")
+      case _: IncompleteResult =>
+        InvokeScriptResult.empty
     }
   }
 

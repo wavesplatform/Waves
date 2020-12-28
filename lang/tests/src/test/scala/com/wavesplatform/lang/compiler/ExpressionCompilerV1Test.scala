@@ -358,6 +358,37 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       }
   }
 
+  property("self-functions are unavailable for previous versions and asset scripts") {
+    def expr(v: StdLibVersion, scriptType: ScriptType) = {
+      val script =
+        s"""
+           | {-# STDLIB_VERSION ${v.id}    #-}
+           | {-# SCRIPT_TYPE    ${scriptType.value}    #-}
+           | {-# CONTENT_TYPE   EXPRESSION #-}
+           |
+           | getInteger("key") == 1             &&
+           | getIntegerValue("key") == 1        &&
+           | getString("key")  == "text"        &&
+           | getStringValue("key")  == "text"   &&
+           | getBinary("key")  == base58''      &&
+           | getBinaryValue("key")  == base58'' &&
+           | getBoolean("key")  == false        &&
+           | getBooleanValue("key")  == false
+        """.stripMargin
+      Parser.parseExpr(script).get.value
+    }
+    for {
+      version    <- DirectiveDictionary[StdLibVersion].all
+      scriptType <- DirectiveDictionary[ScriptType].all
+    } {
+      val result = ExpressionCompiler(getTestContext(version, scriptType).compilerContext, expr(version, scriptType))
+      if (version < V5 || scriptType != Account)
+        result.swap.getOrElse(???).split("Can't find a function").length shouldBe 9
+      else
+        result shouldBe Symbol("right")
+    }
+  }
+
   property("V5 functions are unavailable for previous versions") {
     def expr(v: StdLibVersion) = {
       val script =

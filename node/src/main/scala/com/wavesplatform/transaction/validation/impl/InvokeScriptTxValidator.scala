@@ -8,7 +8,7 @@ import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.TxValidationError.{GenericError, NonPositiveAmount, TooBigArray}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.{DefaultExtraFeePerStep, Payment}
 import com.wavesplatform.transaction.validation.{TxValidator, ValidatedNV, ValidatedV}
 import com.wavesplatform.utils._
 
@@ -28,7 +28,7 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
     def checkLength =
       if (tx.isProtobufVersion)
         PBTransactions
-          .toPBInvokeScriptData(tx.dAppAddressOrAlias, tx.funcCallOpt, tx.payments)
+          .toPBInvokeScriptData(tx.dAppAddressOrAlias, tx.funcCallOpt, tx.payments, extraFeePerStep)
           .toByteArray
           .length <= ContractLimits.MaxInvokeScriptSizeInBytes
       else tx.bytes().length <= ContractLimits.MaxInvokeScriptSizeInBytes
@@ -51,6 +51,10 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
       ),
       checkAmounts(payments),
       V.fee(fee),
+      V.cond(
+        extraFeePerStep >= DefaultExtraFeePerStep,
+        GenericError(s"Extra fee per step = $extraFeePerStep must be more or equal than $DefaultExtraFeePerStep")
+      ),
       Try(checkLength)
         .toEither
         .leftMap(err => GenericError(err.getMessage))

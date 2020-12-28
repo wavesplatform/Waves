@@ -25,6 +25,7 @@ case class InvokeScriptTransaction(
     payments: Seq[Payment],
     fee: TxAmount,
     feeAssetId: Asset,
+    extraFeePerStep: Long,
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
@@ -46,10 +47,12 @@ case class InvokeScriptTransaction(
 }
 
 object InvokeScriptTransaction extends TransactionParser {
+  val DefaultExtraFeePerStep = 0L
+
   type TransactionT = InvokeScriptTransaction
 
   override val typeId: TxType                    = 16: Byte
-  override val supportedVersions: Set[TxVersion] = Set(1, 2)
+  override val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
 
   implicit val validator: TxValidator[InvokeScriptTransaction] = InvokeScriptTxValidator
 
@@ -75,10 +78,11 @@ object InvokeScriptTransaction extends TransactionParser {
       p: Seq[Payment],
       fee: TxAmount,
       feeAssetId: Asset,
+      extraFeePerStep: Long,
       timestamp: TxTimestamp,
-      proofs: Proofs
+      proofs: Proofs,
   ): Either[ValidationError, InvokeScriptTransaction] =
-    InvokeScriptTransaction(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, proofs, dappAddress.chainId).validatedEither
+    InvokeScriptTransaction(version, sender, dappAddress, fc, p, fee, feeAssetId, extraFeePerStep, timestamp, proofs, dappAddress.chainId).validatedEither
 
   def signed(
       version: TxVersion,
@@ -88,10 +92,11 @@ object InvokeScriptTransaction extends TransactionParser {
       p: Seq[Payment],
       fee: TxAmount,
       feeAssetId: Asset,
+      extraFeePerStep: Long,
       timestamp: TxTimestamp,
       signer: PrivateKey
   ): Either[ValidationError, InvokeScriptTransaction] =
-    create(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, Proofs.empty).map(_.signWith(signer))
+    create(version, sender, dappAddress, fc, p, fee, feeAssetId, extraFeePerStep, timestamp, Proofs.empty).map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,
@@ -101,7 +106,8 @@ object InvokeScriptTransaction extends TransactionParser {
       p: Seq[Payment],
       fee: TxAmount,
       feeAssetId: Asset,
+      extraFeePerStep: Long,
       timestamp: TxTimestamp
   ): Either[ValidationError, InvokeScriptTransaction] =
-    signed(version, sender.publicKey, dappAddress, fc, p, fee, feeAssetId, timestamp, sender.privateKey)
+    signed(version, sender.publicKey, dappAddress, fc, p, fee, feeAssetId, extraFeePerStep, timestamp, sender.privateKey)
 }
