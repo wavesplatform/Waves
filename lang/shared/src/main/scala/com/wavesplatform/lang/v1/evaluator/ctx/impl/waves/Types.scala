@@ -189,13 +189,19 @@ object Types {
 
   private val callableV4ReturnType = {
     val actions = LIST(UNION.create(commonDataEntryType(V4) :: deleteDataEntry :: scriptTransfer :: callableV4Actions))
+    actions
+  }
+
+  private val callableV5ReturnType = {
+    val actions = LIST(UNION.create(commonDataEntryType(V5) :: deleteDataEntry :: scriptTransfer :: callableV4Actions))
     UNION(actions, TUPLE(List(actions, ANY)))
   }
 
   def callableReturnType(v: StdLibVersion): Either[ExecutionError, FINAL] =
     v match {
-      case V3      => Right(callableV3ReturnType)
-      case V4 | V5 => Right(callableV4ReturnType)
+      case V3 => Right(callableV3ReturnType)
+      case V4 => Right(callableV4ReturnType)
+      case V5 => Right(callableV5ReturnType)
       case v       => Left(s"DApp is not supported for $v")
     }
 
