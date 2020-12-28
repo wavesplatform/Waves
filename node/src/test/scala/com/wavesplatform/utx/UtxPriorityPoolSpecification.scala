@@ -92,6 +92,7 @@ class UtxPriorityPoolSpecification
       (() => blockchain.settings).when().returning(settings.blockchainSettings)
       (() => blockchain.height).when().returning(1)
       (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SmartAccounts.id -> 0))
+      (() => blockchain.continuationStates).when().returning(Map())
 
       if (setBalance) (blockchain.balance _).when(*, *).returning(ENOUGH_AMT)
       (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
@@ -139,7 +140,7 @@ class UtxPriorityPoolSpecification
         utx.all shouldBe expectedTxs1
         assertPortfolios(utx, expectedTxs1)
 
-        val expectedTxs2 = expectedTxs1 ++ left.sorted(TransactionsOrdering.InUTXPool(Set()))
+        val expectedTxs2 = expectedTxs1 ++ left.sorted(TransactionsOrdering(Set(), null))
         utx.removeAll(expectedTxs2)
         left.foreach(utx.putIfNew(_).resultE should beRight)
         utx.setPriorityTxs(expectedTxs1)
@@ -160,9 +161,9 @@ class UtxPriorityPoolSpecification
 
         utx.setPriorityTxs(nonScripted)
         nonScripted.foreach(utx.putIfNew(_).resultE should beRight)
-        utx.nonPriorityTransactions shouldBe empty
+        utx.nonPriorityTransactions() shouldBe empty
         utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(nonScripted)
-        utx.nonPriorityTransactions shouldBe empty
+        utx.nonPriorityTransactions() shouldBe empty
     }
 
     val genDependent = for {
@@ -182,7 +183,7 @@ class UtxPriorityPoolSpecification
           new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
         utx.setPriorityTxs(Seq(tx1))
         utx.putNewTx(tx2, verify = false, forceValidate = false).resultE should beRight
-        utx.nonPriorityTransactions shouldBe Seq(tx2)
+        utx.nonPriorityTransactions() shouldBe Seq(tx2)
         utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(tx1 :: tx2 :: Nil)
     }
 
@@ -298,7 +299,7 @@ class UtxPriorityPoolSpecification
 
           mbs2.head.transactionData.foreach(utx.putIfNew(_).resultE should beRight)
           extAppender(Seq(block2)).runSyncUnsafe() should beRight
-          val expectedTxs1 = mbs1.last.transactionData ++ mbs2.head.transactionData.sorted(TransactionsOrdering.InUTXPool(Set()))
+          val expectedTxs1 = mbs1.last.transactionData ++ mbs2.head.transactionData.sorted(TransactionsOrdering(Set(), null))
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(expectedTxs1)
 
           mbs2.foreach(microBlockAppender(_).runSyncUnsafe() should beRight)
@@ -334,7 +335,7 @@ class UtxPriorityPoolSpecification
           new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
         utx.setPriorityTxs(Seq(tx1))
         utx.putNewTx(tx2, true, false).resultE.explicitGet()
-        utx.nonPriorityTransactions shouldBe Seq(tx2)
+        utx.nonPriorityTransactions() shouldBe Seq(tx2)
         utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(tx1 :: tx2 :: Nil)
     }
   }

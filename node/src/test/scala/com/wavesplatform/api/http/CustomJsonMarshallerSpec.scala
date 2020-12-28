@@ -15,6 +15,7 @@ import com.wavesplatform.http.{ApiErrorMatchers, RestAPISettingsHelper}
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{Blockchain, Height}
+import com.wavesplatform.transaction.ApplicationStatus.Succeeded
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utx.UtxPool
@@ -70,7 +71,7 @@ class CustomJsonMarshallerSpec
   property("/transactions/info/{id}") {
     forAll(leaseGen) { lt =>
       val height: Height = Height(1)
-      (transactionsApi.transactionById _).expects(lt.id()).returning(Some(TransactionMeta.Default(height, lt, succeeded = true))).twice()
+      (transactionsApi.transactionById _).expects(lt.id()).returning(Some(TransactionMeta.Default(height, lt, status = Succeeded))).twice()
       (blockchain.leaseDetails _)
         .expects(lt.id())
         .returning(Some(LeaseDetails(lt.sender, lt.recipient, 1, lt.amount, true)))

@@ -6,13 +6,14 @@ import com.wavesplatform.block
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.database.Keys
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
-import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult}
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult, NewTransactionInfo, TransactionId}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction}
+import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction}
+import com.wavesplatform.transaction.{ApplicationStatus, Asset, CreateAliasTransaction, Transaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import monix.reactive.Observable
@@ -43,25 +44,31 @@ trait CommonTransactionsApi {
   ): Observable[TransactionMeta]
 
   def transactionProofs(transactionIds: List[ByteStr]): List[TransactionProof]
+
+  def continuationTransactionIds(invokeId: ByteStr): Seq[ByteStr]
 }
 
 object CommonTransactionsApi {
   sealed trait TransactionMeta {
     def height: Height
     def transaction: Transaction
-    def succeeded: Boolean
+    def status: ApplicationStatus
   }
 
   object TransactionMeta {
-    final case class Default(height: Height, transaction: Transaction, succeeded: Boolean) extends TransactionMeta
+    final case class Default(height: Height, transaction: Transaction, status: ApplicationStatus) extends TransactionMeta
 
-    final case class Invoke(height: Height, transaction: InvokeScriptTransaction, succeeded: Boolean, invokeScriptResult: Option[InvokeScriptResult])
-        extends TransactionMeta
+    final case class Invoke(
+        height: Height,
+        transaction: InvokeScriptTransaction,
+        status: ApplicationStatus,
+        invokeScriptResult: Option[InvokeScriptResult]
+    ) extends TransactionMeta
 
-    def unapply(tm: TransactionMeta): Option[(Height, Transaction, Boolean)] =
-      Some((tm.height, tm.transaction, tm.succeeded))
+    def unapply(tm: TransactionMeta): Option[(Height, Transaction, ApplicationStatus)] =
+      Some((tm.height, tm.transaction, tm.status))
 
-    def create(height: Height, transaction: Transaction, succeeded: Boolean)(
+    def create(height: Height, transaction: Transaction, succeeded: ApplicationStatus)(
         result: InvokeScriptTransaction => Option[InvokeScriptResult]
     ): TransactionMeta =
       transaction match {
@@ -127,5 +134,22 @@ object CommonTransactionsApi {
         (meta, allTransactions)  <- blockAt(height) if meta.header.version >= Block.ProtoBlockVersion
         transactionProof         <- block.transactionProof(transaction, allTransactions)
       } yield transactionProof
+
+    override def continuationTransactionIds(invokeId: ByteStr): Seq[ByteStr] = {
+      val dbContinuations =
+        for {
+          (height, num)     <- db.get(Keys.continuationTransactionsHeightsAndNums(TransactionId(invokeId)))
+          (continuation, _) <- db.get(Keys.transactionAt(height, num)).toSeq
+        } yield continuation.id.value()
+      val diffContinuations =
+        maybeDiff.fold(Iterable.empty[ByteStr]) {
+          case (_, diff) =>
+            diff.replacingTransactions.collect {
+              case NewTransactionInfo(c: ContinuationTransaction, _, _) if c.invokeScriptTransactionId == invokeId =>
+                c.id.value()
+            }
+        }
+      (dbContinuations ++ diffContinuations).distinct
+    }
   }
 }

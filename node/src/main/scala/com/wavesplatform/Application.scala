@@ -36,7 +36,7 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
+import com.wavesplatform.transaction.{ApplicationStatus, Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.Schedulers._
 import com.wavesplatform.utils._
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
@@ -317,7 +317,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
-        BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi),
+        BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi, extensionContext.transactionsApi),
         TransactionsApiRoute(
           settings.restAPISettings,
           extensionContext.transactionsApi,
@@ -491,12 +491,12 @@ object Application extends ScorexLogging {
 
   private[wavesplatform] def loadBlockInfoAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(
       height: Int
-  ): Option[(BlockMeta, Seq[(Transaction, Boolean)])] =
+  ): Option[(BlockMeta, Seq[(Transaction, ApplicationStatus)])] =
     loadBlockMetaAt(db, blockchainUpdater)(height).map { meta =>
       meta -> blockchainUpdater
         .liquidTransactions(meta.id)
         .orElse(db.readOnly(ro => database.loadTransactions(Height(height), ro)))
-        .fold(Seq.empty[(Transaction, Boolean)])(identity)
+        .fold(Seq.empty[(Transaction, ApplicationStatus)])(identity)
     }
 
   private[wavesplatform] def loadBlockMetaAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] =

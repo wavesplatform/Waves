@@ -48,7 +48,12 @@ object InvokeScriptTxSerializer {
     ) ++ (funcCallOpt match {
       case Some(fc) => Json.obj("call" -> this.functionCallToJson(fc))
       case None     => JsObject.empty
-    })
+    }) ++ (
+      if (version >= TxVersion.V3)
+        Json.obj("extraFeePerStep" -> extraFeePerStep)
+      else
+        JsObject.empty
+      )
   }
 
   def bodyBytes(tx: InvokeScriptTransaction): Array[Byte] = {
@@ -90,11 +95,12 @@ object InvokeScriptTxSerializer {
 
     val sender       = buf.getPublicKey
     val dApp         = buf.getAddressOrAlias
-    val functionCall = Deser.parseOption(buf)(Serde.deserialize(_).explicitGet().asInstanceOf[FUNCTION_CALL])
+    val functionCall = Deser.parseOption(buf)(Serde.deserialize(_, allowObjects = false).explicitGet().asInstanceOf[FUNCTION_CALL])
     val payments     = Deser.parseArrays(buf).map(parsePayment)
     val fee          = buf.getLong
     val feeAssetId   = buf.getAsset
     val timestamp    = buf.getLong
-    InvokeScriptTransaction(TxVersion.V1, sender, dApp, functionCall, payments, fee, feeAssetId, timestamp, buf.getProofs, chainId)
+    InvokeScriptTransaction(TxVersion.V1, sender, dApp, functionCall, payments, fee, feeAssetId,
+      InvokeScriptTransaction.DefaultExtraFeePerStep, timestamp, buf.getProofs, chainId)
   }
 }

@@ -89,7 +89,7 @@ object Common {
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
     override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails]    = ???
     override def tthis: Environment.Tthis                                                                        = ???
-    override def multiPaymentAllowed: Boolean                                                                    =  true
+    override def multiPaymentAllowed: Boolean                                                                    = true
     override def txId: ByteStr                                                                                   = ???
     override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
     override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???

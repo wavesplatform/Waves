@@ -104,10 +104,10 @@ object InvokeScriptResult {
       Payment(langAddressToAddress(t.recipient), Asset.fromCompatId(t.assetId), t.amount)
 
     result match {
-      case ScriptResultV3(ds, ts) =>
+      case ScriptResultV3(ds, ts, _) =>
         InvokeScriptResult(data = ds.map(DataEntry.fromLangDataOp), transfers = ts.map(langTransferToPayment))
 
-      case ScriptResultV4(actions) =>
+      case ScriptResultV4(actions, _) =>
         val issues      = actions.collect { case i: lang.Issue         => i }
         val reissues    = actions.collect { case ri: lang.Reissue      => ri }
         val burns       = actions.collect { case b: lang.Burn          => b }
@@ -116,7 +116,8 @@ object InvokeScriptResult {
         val transfers   = actions.collect { case t: lang.AssetTransfer => langTransferToPayment(t) }
         InvokeScriptResult(dataOps, transfers, issues, reissues, burns, sponsorFees)
 
-      case i: IncompleteResult => throw new IllegalArgumentException(s"Cannot cast incomplete result: $i")
+      case _: IncompleteResult =>
+        InvokeScriptResult.empty
     }
   }
 

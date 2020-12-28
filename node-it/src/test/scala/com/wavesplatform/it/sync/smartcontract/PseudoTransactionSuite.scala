@@ -148,6 +148,7 @@ class PseudoTransactionSuite extends BaseTransactionSuite {
       Seq.empty,
       smartMinFee + smartFee,
       Waves,
+      0,
       System.currentTimeMillis()).explicitGet()
   }
 }

@@ -6,7 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{DBExt, DBResource, Keys, protobuf => pb}
 import com.wavesplatform.state.{Diff, Height, InvokeScriptResult, NewTransactionInfo, TransactionId, TxNum}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
-import com.wavesplatform.transaction.{Authorized, GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.{ApplicationStatus, Authorized, GenesisTransaction, Transaction}
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
@@ -34,7 +34,7 @@ trait AddressTransactions {
 }
 
 object AddressTransactions {
-  private def loadTransaction(db: DB, height: Height, txNum: TxNum, sender: Option[Address]): Option[(Height, Transaction, Boolean)] =
+  private def loadTransaction(db: DB, height: Height, txNum: TxNum, sender: Option[Address]): Option[(Height, Transaction, ApplicationStatus)] =
     db.get(Keys.transactionAt(height, txNum)) match {
       case Some((tx: Authorized, status)) if sender.forall(_ == tx.sender.toAddress) => Some((height, tx, status))
       case Some((gt: GenesisTransaction, status)) if sender.isEmpty                  => Some((height, gt, status))
@@ -43,8 +43,8 @@ object AddressTransactions {
 
   private def loadInvokeScriptResult(resource: DBResource, txId: ByteStr): Option[InvokeScriptResult] =
     for {
-      pb.TransactionMeta(h, txNum, InvokeScriptTransaction.typeId, _) <- resource.get(Keys.transactionMetaById(TransactionId(txId)))
-      scriptResult                                                    <- resource.get(Keys.invokeScriptResult(h, TxNum(txNum.toShort)))
+      pb.TransactionMeta(h, txNum, InvokeScriptTransaction.typeId, _, _) <- resource.get(Keys.transactionMetaById(TransactionId(txId)))
+      scriptResult                                                                  <- resource.get(Keys.invokeScriptResult(h, TxNum(txNum.toShort)))
     } yield scriptResult
 
   def loadInvokeScriptResult(db: DB, txId: ByteStr): Option[InvokeScriptResult] =
@@ -57,7 +57,7 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Iterator[(Height, Transaction, Boolean)] =
+  ): Iterator[(Height, Transaction, ApplicationStatus)] =
     transactionsFromDiff(maybeDiff, subject, sender, types, fromId) ++
       transactionsFromDB(
         db,
@@ -73,9 +73,9 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Iterator[(Height, Transaction, Boolean)] =
+  ): Iterator[(Height, Transaction, ApplicationStatus)] =
     db.get(Keys.addressId(subject))
-      .fold(Iterable.empty[(Height, Transaction, Boolean)]) { addressId =>
+      .fold(Iterable.empty[(Height, Transaction, ApplicationStatus)]) { addressId =>
         val (maxHeight, maxTxNum) =
           fromId
             .flatMap(id => db.get(Keys.transactionMetaById(TransactionId(id))))
@@ -100,7 +100,7 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Iterator[(Height, Transaction, Boolean)] =
+  ): Iterator[(Height, Transaction, ApplicationStatus)] =
     (for {
       (height, diff)                               <- maybeDiff.toSeq
       NewTransactionInfo(tx, addresses, succeeded) <- diff.transactions.values.toSeq.reverse

@@ -289,4 +289,56 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
 
     assertSuccess(contractV4WithCallableComplexityBetween3000And4000, rideV4Activated)
   }
+
+  property("disallow continuation dApps for version below V5") {
+    def continuationDApp(version: StdLibVersion) = {
+      val ctx = {
+        val directives = DirectiveSet(version, Account, DAppType).explicitGet()
+        PureContext.build(version).withEnvironment[Environment] |+|
+          CryptoContext.build(Global, version).withEnvironment[Environment] |+|
+          WavesContext.build(directives)
+      }
+      val script =
+        s"""
+           | {-# STDLIB_VERSION ${version.id} #-}
+           | {-# SCRIPT_TYPE ACCOUNT          #-}
+           | {-# CONTENT_TYPE DAPP            #-}
+           |
+           | @Callable(i)
+           | func default() = {
+           |   let a = !(${List.fill(100)("sigVerify(base64'',base64'',base64'')").mkString("||")})
+           |   if (a)
+           |     then
+           |       [BooleanEntry("isAllowed", true)]
+           |     else
+           |       throw("unexpected")
+           | }
+         """.stripMargin
+
+      val dApp = ContractCompiler.compile(script, ctx.compilerContext, version).explicitGet()
+      ContractScript(version, dApp).explicitGet()
+    }
+
+    val rideV5Activated = TestFunctionalitySettings.Enabled.copy(
+      preActivatedFeatures = Map(
+        BlockchainFeatures.Ride4DApps.id -> 0,
+        BlockchainFeatures.BlockV5.id    -> 0,
+        BlockchainFeatures.ContinuationTransaction.id -> 0
+      )
+    )
+
+    forAll(preconditionsAndSetCustomContract(continuationDApp(V4))) {
+      case (genesis, setScript) =>
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), rideV5Activated)(
+          _ should produce("Contract function (default) is too complex: 20408 > 4000")
+        )
+    }
+    forAll(preconditionsAndSetCustomContract(continuationDApp(V5))) {
+      case (genesis, setScript) =>
+        assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), rideV5Activated) {
+          case (_, newState) =>
+            newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
+        }
+    }
+  }
 }

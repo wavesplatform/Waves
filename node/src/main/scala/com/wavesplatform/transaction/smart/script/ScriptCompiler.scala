@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.smart.script
 
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.Directive.extractValue
 import com.wavesplatform.lang.directives.DirectiveKey._
 import com.wavesplatform.lang.directives._
@@ -9,6 +10,7 @@ import com.wavesplatform.lang.script.{ContractScript, Script, ScriptPreprocessor
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils._
 
 object ScriptCompiler extends ScorexLogging {
@@ -26,29 +28,36 @@ object ScriptCompiler extends ScorexLogging {
       estimator: ScriptEstimator,
       libraries: Map[String, String] = Map()
   ): Either[String, (Script, Long)] =
-    compileAndEstimate(scriptText, estimator, libraries, Script.estimate)
+    compileAndEstimate(scriptText, estimator, libraries, Script.estimate, None)
 
   def compileAndEstimateCallables(
       scriptText: String,
       estimator: ScriptEstimator,
-      libraries: Map[String, String] = Map(),
-      defaultStdLib: => StdLibVersion = StdLibVersion.VersionDic.default
+      blockchain: Blockchain
   ): Either[String, (Script, Script.ComplexityInfo)] =
-    compileAndEstimate(scriptText, estimator, libraries, Script.complexityInfo, defaultStdLib)
+    compileAndEstimate(scriptText, estimator, Map(), Script.complexityInfo, Some(blockchain))
 
-  def compileAndEstimate[C](
+  private def compileAndEstimate[C](
       scriptText: String,
       estimator: ScriptEstimator,
-      libraries: Map[String, String] = Map(),
+      libraries: Map[String, String],
       estimate: (Script, ScriptEstimator, Boolean) => Either[String, C],
-      defaultStdLib: => StdLibVersion = StdLibVersion.VersionDic.default
+      blockchain: Option[Blockchain]
   ): Either[String, (Script, C)] =
     for {
       directives  <- DirectiveParser(scriptText)
-      ds          <- Directive.extractDirectives(directives, defaultStdLib)
+      ds          <- Directive.extractDirectives(directives, defaultVersion(blockchain))
       linkedInput <- ScriptPreprocessor(scriptText, libraries, ds.imports)
       result      <- applyAndEstimate(linkedInput, ds.scriptType == Asset, estimator, estimate)
     } yield result
+
+  private def defaultVersion(b: Option[Blockchain]) =
+    b.map(
+      blockchain =>
+        if (blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction)) V5
+        else if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps)) V4
+        else StdLibVersion.VersionDic.default
+    ).getOrElse(StdLibVersion.VersionDic.default)
 
   private def applyAndEstimate[C](
       scriptText: String,

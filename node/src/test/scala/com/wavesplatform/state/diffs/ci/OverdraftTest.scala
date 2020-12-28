@@ -153,7 +153,7 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
         genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
         genesis2 <- GenesisTransaction.create(invoker.toAddress, invokerBalance, ts)
         setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, Some(dApp), SetScriptFee, ts + 2)
-        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, payment, fee, Waves, ts + 3)
+        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, payment, fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 3)
       } yield (List(genesis, genesis2), setDApp, ci, issue)
     }.explicitGet()
 
@@ -172,7 +172,7 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
         genesis  <- GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts)
         genesis2 <- GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts)
         setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, Some(payingAssetDApp(version, issue.assetId)), SetScriptFee, ts + 2)
-        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, payments, InvokeFee, Waves, ts + 3)
+        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, None, payments, InvokeFee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 3)
       } yield (List(genesis, genesis2), setDApp, ci, issue)
     }.explicitGet()
 

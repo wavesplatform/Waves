@@ -13,6 +13,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |  data-directory = "/waves/data"
         |  blockchain {
         |    type = CUSTOM
+        |    use-evaluator-v2 = true
         |    custom {
         |      address-scheme-character = "C"
         |      functionality {

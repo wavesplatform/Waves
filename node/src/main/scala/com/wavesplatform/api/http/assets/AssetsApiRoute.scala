@@ -22,6 +22,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain}
+import com.wavesplatform.transaction.ApplicationStatus.ScriptExecutionFailed
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -317,7 +318,7 @@ object AssetsApiRoute {
       for {
         tt <- blockchain
           .transactionInfo(id)
-          .filter { case (_, _, confirmed) => confirmed }
+          .filter(_._3 != ScriptExecutionFailed)
           .toRight("Failed to find issue/invokeScript transaction by ID")
         (h, mtx, _) = tt
         ts <- (mtx match {

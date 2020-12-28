@@ -33,16 +33,17 @@ object Terms {
     override def deepCopy: Eval[DECLARATION] =
       Eval.now(this)
   }
-  case class LET(name: String, var value: EXPR) extends DECLARATION {
+  case class LET(name: String, var value: EXPR, var checked: Boolean = false) extends DECLARATION {
     def toStr: Coeval[String] =
       for {
         e <- value.toStr
       } yield "LET(" ++ name ++ "," ++ e ++ ")"
 
     override def deepCopy: Eval[LET] =
-      value.deepCopy.map(LET(name, _))
+      value.deepCopy.map(LET(name, _, checked))
   }
-  case class FUNC(name: String, args: List[String], body: EXPR) extends DECLARATION {
+
+  case class FUNC(name: String, args: List[String], var body: EXPR) extends DECLARATION {
     def toStr: Coeval[String] =
       for {
         e <- body.toStr
@@ -113,7 +114,7 @@ object Terms {
       } yield BLOCK(l, b)
   }
 
-  case class IF(var cond: EXPR, ifTrue: EXPR, ifFalse: EXPR) extends EXPR {
+  case class IF(var cond: EXPR, var ifTrue: EXPR, var ifFalse: EXPR) extends EXPR {
     def toStr: Coeval[String] =
       for {
         c <- cond.toStr
@@ -138,7 +139,7 @@ object Terms {
   case class FUNCTION_CALL(function: FunctionHeader, var args: List[EXPR]) extends EXPR {
     def toStr: Coeval[String] =
       for {
-        e <- args.map(_.toStr).sequence
+        e <- Coeval.defer(args.traverse(_.toStr))
       } yield "FUNCTION_CALL(" ++ function.toString ++ "," ++ e.toString ++ ")"
 
     override def deepCopy: Eval[EXPR] =

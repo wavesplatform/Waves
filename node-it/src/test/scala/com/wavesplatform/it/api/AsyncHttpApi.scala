@@ -468,6 +468,7 @@ object AsyncHttpApi extends Assertions {
         payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
         fee: Long = 500000,
         feeAssetId: Option[String] = None,
+        extraFeePerStep: Long = InvokeScriptTransaction.DefaultExtraFeePerStep,
         version: TxVersion = TxVersion.V1
     ): Future[(Transaction, JsValue)] =
       signedTraceBroadcast(
@@ -479,6 +480,7 @@ object AsyncHttpApi extends Assertions {
           payment,
           fee,
           feeAssetId.map(aid => IssuedAsset(ByteStr.decodeBase58(aid).get)).getOrElse(Asset.Waves),
+          extraFeePerStep,
           System.currentTimeMillis(),
           Proofs.empty,
           AddressScheme.current.chainId
@@ -493,6 +495,7 @@ object AsyncHttpApi extends Assertions {
         payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
         fee: Long = 500000,
         feeAssetId: Option[String] = None,
+        extraFeePerStep: Long,
         version: TxVersion = TxVersion.V1
     ): Future[(JsValue, JsValue)] = {
       val jsObject = InvokeScriptTransaction(
@@ -503,6 +506,7 @@ object AsyncHttpApi extends Assertions {
         payment,
         fee,
         feeAssetId.map(aid => IssuedAsset(ByteStr.decodeBase58(aid).get)).getOrElse(Asset.Waves),
+        extraFeePerStep,
         System.currentTimeMillis(),
         Proofs.empty,
         AddressScheme.current.chainId

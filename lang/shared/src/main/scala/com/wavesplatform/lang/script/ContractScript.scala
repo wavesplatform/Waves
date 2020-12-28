@@ -4,11 +4,12 @@ import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values.{StdLibVersion, DApp => DAppType}
-import com.wavesplatform.lang.utils._
+import com.wavesplatform.lang.utils.{functionNativeCosts, _}
 import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.estimator.v3.ContinuationFirstStepEstimator
 import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
 import monix.eval.Coeval
 
@@ -52,98 +53,97 @@ object ContractScript {
     }
   }
 
+  def estimateComplexity(
+      version: StdLibVersion,
+      dApp: DApp,
+      estimator: ScriptEstimator,
+      useReducedVerifierLimit: Boolean = true,
+      allowContinuation: Boolean = false
+  ): Either[String, (Long, Map[String, Long])] =
+    for {
+      (maxComplexity, complexities) <- estimateComplexityExact(version, dApp, estimator)
+      _                             <- checkComplexity(version, dApp, maxComplexity, complexities, useReducedVerifierLimit, allowContinuation)
+    } yield (maxComplexity._2, complexities)
+
+  def estimateComplexityExact(
+      version: StdLibVersion,
+      dApp: DApp,
+      estimator: ScriptEstimator
+  ): Either[String, ((String, Long), Map[String, Long])] =
+    for {
+      annotatedFunctionComplexities <- estimateAnnotatedFunctions(version, dApp, estimator)
+      max = annotatedFunctionComplexities.maximumOption(_._2 compareTo _._2).getOrElse(("", 0L))
+    } yield (max, annotatedFunctionComplexities.toMap)
+
   private def estimateAnnotatedFunctions(
       version: StdLibVersion,
       dApp: DApp,
       estimator: ScriptEstimator
   ): Either[String, List[(String, Long)]] =
-    estimateDeclarations(version, dApp, estimator, annotatedFunctions(dApp))
-
-  def estimateUserFunctions(
-      version: StdLibVersion,
-      dApp: DApp,
-      estimator: ScriptEstimator
-  ): Either[String, List[(String, Long)]] =
-    estimateDeclarations(version, dApp, estimator, dApp.decs.collect { case f: FUNC => (None, f) })
+    estimateDeclarations(
+      dApp,
+      estimator(varNames(version, DAppType), functionCosts(version), _),
+      annotatedFunctions(dApp)
+    )
 
   def estimateGlobalVariables(
       version: StdLibVersion,
       dApp: DApp,
       estimator: ScriptEstimator
   ): Either[String, List[(String, Long)]] =
-    estimateDeclarations(version, dApp, estimator, dApp.decs.collect { case l: LET => (None, l) })
+    estimateDeclarations(
+      dApp,
+      estimator(varNames(version, DAppType), functionCosts(version), _),
+      dApp.decs.collect { case l: LET => (None, l) }
+    )
+
+  def estimateUserFunctions(
+      version: StdLibVersion,
+      dApp: DApp,
+      estimator: ScriptEstimator
+  ): Either[String, List[(String, Long)]] =
+    estimateDeclarations(
+      dApp,
+      estimator(varNames(version, DAppType), functionCosts(version), _),
+      dApp.decs.collect { case f: FUNC => (None, f) }
+    )
+
+  private def estimateDeclarations(
+      dApp: DApp,
+      estimator: EXPR => Either[String, Long],
+      declarations: List[(Option[String], DECLARATION)]
+  ): Either[String, List[(String, Long)]] =
+    declarations.traverse {
+      case (annotationArgName, declarationExpression) =>
+        val expr = constructExprFromDeclAndContext(dApp.decs, annotationArgName, declarationExpression)
+        estimator(expr).map((declarationExpression.name, _))
+    }
 
   private def annotatedFunctions(dApp: DApp): List[(Some[String], FUNC)] =
     (dApp.verifierFuncOpt ++ dApp.callableFuncs)
       .map(func => (Some(func.annotation.invocationArgName), func.u))
       .toList
 
-  private def estimateDeclarations(
-      version: StdLibVersion,
-      dApp: DApp,
-      estimator: ScriptEstimator,
-      functions: List[(Option[String], DECLARATION)]
-  ): Either[String, List[(String, Long)]] =
-    functions.traverse {
-      case (annotationArgName, funcExpr) =>
-        estimator(
-          varNames(version, DAppType),
-          functionCosts(version),
-          constructExprFromDeclAndContext(dApp.decs, annotationArgName, funcExpr)
-        ).map((funcExpr.name, _))
-    }
-
-  private[script] def constructExprFromDeclAndContext(
-    dec: List[DECLARATION],
-    annotationArgNameOpt: Option[String],
-    decl: DECLARATION
-  ): EXPR = {
-    val declExpr =
-      decl match {
-        case let@LET(name, _) =>
-          BLOCK(let, REF(name))
-        case func@FUNC(name, args, _) =>
-          BLOCK(
-            func,
-            FUNCTION_CALL(FunctionHeader.User(name), List.fill(args.size)(TRUE))
-          )
-        case Terms.FAILED_DEC() =>
-          FAILED_EXPR()
-      }
-    val funcWithContext =
-      annotationArgNameOpt.fold(declExpr)(
-        annotationArgName =>
-          BLOCK(LET(annotationArgName, TRUE), declExpr)
-      )
-    dec.foldRight(funcWithContext)((declaration, expr) => BLOCK(declaration, expr))
-  }
-
-  def estimateComplexity(
-      version: StdLibVersion,
-      dApp: DApp,
-      estimator: ScriptEstimator,
-      useReducedVerifierLimit: Boolean = true
-  ): Either[String, (Long, Map[String, Long])] =
-    for {
-      (maxComplexity, complexities) <- estimateComplexityExact(version, dApp, estimator)
-      _                             <- checkComplexity(version, dApp, maxComplexity, complexities, useReducedVerifierLimit)
-    } yield (maxComplexity._2, complexities)
-
   def checkComplexity(
       version: StdLibVersion,
       dApp: DApp,
       maxComplexity: (String, Long),
       complexities: Map[String, Long],
-      useReducedVerifierLimit: Boolean
+      useReducedVerifierLimit: Boolean,
+      allowContinuation: Boolean = false
   ): Either[String, Unit] =
     for {
       _ <- if (useReducedVerifierLimit) estimateVerifierReduced(dApp, complexities, version) else Right(())
-      limit = MaxComplexityByVersion(version)
-      _ <- Either.cond(
-        maxComplexity._2 <= limit,
-        (),
-        s"Contract function (${maxComplexity._1}) is too complex: ${maxComplexity._2} > $limit"
-      )
+      _ <- if (allowContinuation)
+        checkContinuationFirstStep(version, dApp, complexities)
+      else {
+        val limit = MaxComplexityByVersion(version)
+        Either.cond(
+          maxComplexity._2 <= limit,
+          (),
+          s"Contract function (${maxComplexity._1}) is too complex: ${maxComplexity._2} > $limit"
+        )
+      }
     } yield ()
 
   private def estimateVerifierReduced(
@@ -161,13 +161,58 @@ object ContractScript {
       )
     }
 
-  def estimateComplexityExact(
+  private def checkContinuationFirstStep(
       version: StdLibVersion,
       dApp: DApp,
-      estimator: ScriptEstimator
-  ): Either[String, ((String, Long), Map[String, Long])] =
+      complexities: Map[String, Long]
+  ): Either[String, Unit] = {
+    val limit = MaxComplexityByVersion(version)
+    val multiStepCallables = dApp.callableFuncs.filter(func => complexities(func.u.name) > limit)
     for {
-      annotatedFunctionComplexities <- estimateAnnotatedFunctions(version, dApp, estimator)
-      max = annotatedFunctionComplexities.maximumOption(_._2 compareTo _._2).getOrElse(("", 0L))
-    } yield (max, annotatedFunctionComplexities.toMap)
+      stateCallsComplexities <- estimateStateCalls(version, dApp, multiStepCallables)
+      exceedingFunctions = stateCallsComplexities
+        .collect { case (functionName, nativeCost) if nativeCost > limit => s"$functionName = $nativeCost" }
+        .mkString(", ")
+      _ <- Either.cond(
+        exceedingFunctions.isEmpty,
+        (),
+        s"Complexity of state calls exceeding limit = $limit for function(s): $exceedingFunctions"
+      )
+    } yield ()
+  }
+
+  def estimateStateCalls(
+      version: StdLibVersion,
+      dApp: DApp,
+      callables: List[DApp.CallableFunction]
+  ): Either[String, List[(String, Long)]] =
+    estimateDeclarations(
+      dApp,
+      ContinuationFirstStepEstimator.estimate(functionNativeCosts(version).value(), _),
+      callables.map(func => (Some(func.annotation.invocationArgName), func.u))
+    )
+
+  private[script] def constructExprFromDeclAndContext(
+      dec: List[DECLARATION],
+      annotationArgNameOpt: Option[String],
+      decl: DECLARATION
+  ): EXPR = {
+    val declExpr =
+      decl match {
+        case let @ LET(name, _, _) =>
+          BLOCK(let, REF(name))
+        case func @ FUNC(name, args, _) =>
+          BLOCK(
+            func,
+            FUNCTION_CALL(FunctionHeader.User(name), List.fill(args.size)(TRUE))
+          )
+        case Terms.FAILED_DEC() =>
+          FAILED_EXPR()
+      }
+    val funcWithContext =
+      annotationArgNameOpt.fold(declExpr)(
+        annotationArgName => BLOCK(LET(annotationArgName, TRUE), declExpr)
+      )
+    dec.foldRight(funcWithContext)((declaration, expr) => BLOCK(declaration, expr))
+  }
 }

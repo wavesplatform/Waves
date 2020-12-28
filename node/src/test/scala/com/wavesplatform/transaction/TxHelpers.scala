@@ -91,6 +91,6 @@ object TxHelpers {
       feeAssetId: Asset = Waves
   ): InvokeScriptTransaction = {
     val fc = FUNCTION_CALL(FunctionHeader.User(func), args.toList)
-    InvokeScriptTransaction.selfSigned(TxVersion.V1, defaultSigner, dApp, Some(fc), payments, fee, feeAssetId, timestamp).explicitGet()
+    InvokeScriptTransaction.selfSigned(TxVersion.V1, defaultSigner, dApp, Some(fc), payments, fee, feeAssetId, InvokeScriptTransaction.DefaultExtraFeePerStep, timestamp).explicitGet()
   }
 }
