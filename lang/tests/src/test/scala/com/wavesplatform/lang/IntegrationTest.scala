@@ -1850,6 +1850,16 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(script2, version = V4) shouldBe Right(CONST_BOOLEAN(true))
   }
 
+  property("Tuple of unions as function args") {
+    val script = """
+         func f(x: (Int|String, String|ByteVector)) = {
+           x._1
+         }
+         f((1,"qqq"))"""
+
+    eval(script, version = V4) shouldBe Right(CONST_LONG(1L))
+  }
+
   property("lists of complex types") {
     val script =
       """
@@ -2076,6 +2086,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
            match x { case n: Int => n*4-1 case a => 4 }
     }
     f("q")""", version = V4) shouldBe Right(CONST_LONG(4))
+    eval("""func f(x: Any) = { x+1 }
+            f(1)""", version = V4) shouldBe Symbol("left")
+
   }
 
   property("extracting data functions with DeleteEntry") {
