@@ -2,6 +2,7 @@ package com.wavesplatform
 
 import java.io.{File, FileNotFoundException}
 import java.nio.file.Files
+import java.time.Instant
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
@@ -35,17 +36,17 @@ object GenesisBlockGenerator extends App {
       averageBlockDelay: FiniteDuration,
       timestamp: Option[Long],
       distributions: List[DistributionItem],
-      preActivatedFeatures: Option[List[Int]],
+      preActivatedFeatures: List[Int] = List(BlockchainFeatures.FairPoS.id.toInt, BlockchainFeatures.BlockV5.id.toInt),
       minBlockTime: Option[FiniteDuration],
       delayDelta: Option[Int]
   ) {
 
     val initialBalance: Share = distributions.map(_.amount).sum
 
-    val chainId: Byte = networkType.head.toByte
+    val chainId: Char = networkType.head
 
-    private val features: Map[Short, Int] =
-      preActivatedFeatures.getOrElse(List(BlockchainFeatures.FairPoS.id.toInt, BlockchainFeatures.BlockV5.id.toInt)).map(f => f.toShort -> 0).toMap
+    val features: Map[Short, Int] =
+      preActivatedFeatures.map(f => f.toShort -> 0).toMap
 
     val functionalitySettings: FunctionalitySettings = FunctionalitySettings(
       Int.MaxValue,
@@ -100,7 +101,7 @@ object GenesisBlockGenerator extends App {
   }
 
   com.wavesplatform.account.AddressScheme.current = new AddressScheme {
-    override val chainId: Byte = settings.chainId
+    override val chainId: Byte = settings.chainId.toByte
   }
 
   val shares: Seq[(FullAddressInfo, Share)] = settings.distributions
@@ -111,15 +112,17 @@ object GenesisBlockGenerator extends App {
 
   val genesisTxs: Seq[GenesisTransaction] = shares.map {
     case (addrInfo, part) =>
-      GenesisTransaction(addrInfo.accountAddress, part, timestamp, ByteStr.empty, settings.chainId)
+      GenesisTransaction(addrInfo.accountAddress, part, timestamp, ByteStr.empty, settings.chainId.toByte)
   }
 
   report(
     addrInfos = shares.map(_._1),
-    settings = genesisSettings(settings.baseTarget)
+    settings = genesisSettings(settings.baseTarget),
+    settings.chainId,
+    settings.features
   )
 
-  private def report(addrInfos: Iterable[FullAddressInfo], settings: GenesisSettings): Unit = {
+  private def report(addrInfos: Iterable[FullAddressInfo], settings: GenesisSettings, chainId: Char, preActivatedFeatures: Map[Short, Int]): Unit = {
     val output = new StringBuilder(8192)
     output.append("Addresses:\n")
     addrInfos.foreach { acc =>
@@ -134,16 +137,35 @@ object GenesisBlockGenerator extends App {
              |""".stripMargin)
     }
 
-    val confBody = s"""genesis {
-         |  average-block-delay = ${settings.averageBlockDelay.toMillis}ms
-         |  initial-base-target = ${settings.initialBaseTarget}
-         |  timestamp = ${settings.timestamp}
-         |  block-timestamp = ${settings.blockTimestamp}
-         |  signature = "${settings.signature.get}"
-         |  initial-balance = ${settings.initialBalance}
-         |  transactions = [
-         |    ${settings.transactions.map(x => s"""{recipient = "${x.recipient}", amount = ${x.amount}}""").mkString(",\n    ")}
-         |  ]
+    val walletSettings = addrInfos
+      .collect {
+        case fai if fai.miner =>
+          s"""#  wallet {
+         |#    seed = ${fai.seed}
+         |#    password =
+         |#  }""".stripMargin
+      }
+      .mkString("\n", "\n", "")
+
+    val confBody = s"""waves {
+         |  blockchain.custom {
+         |    address-scheme-character = $chainId
+         |    functionality {
+         |      pre-activated-features = null # undefines all previously defined pre-activated features
+         |      pre-activated-features = ${preActivatedFeatures.map { case (f, h) => s"$f = $h" }.mkString("{", ", ", "}")}
+         |    }
+         |    genesis {
+         |      average-block-delay = ${settings.averageBlockDelay.toSeconds}s
+         |      initial-base-target = ${settings.initialBaseTarget}
+         |      timestamp = ${settings.timestamp} # ${Instant.ofEpochMilli(settings.timestamp)}
+         |      block-timestamp = ${settings.blockTimestamp} # ${Instant.ofEpochMilli(settings.blockTimestamp)}
+         |      signature = "${settings.signature.get}"
+         |      initial-balance = ${settings.initialBalance}
+         |      transactions = [
+         |        ${settings.transactions.map(x => s"""{recipient = "${x.recipient}", amount = ${x.amount}}""").mkString(",\n    ")}
+         |      ]
+         |    }
+         |  }$walletSettings
          |}
          |""".stripMargin
 
@@ -216,7 +238,7 @@ object GenesisBlockGenerator extends App {
           else {
             val newBT = (maxBT + minBT) / 2
             val delay = posCalculator.calculateDelay(hit, newBT, balance)
-            if (math.abs(delay - settings.averageBlockDelay.toMillis) < 1000) newBT
+            if (math.abs(delay - settings.averageBlockDelay.toMillis) < 100) newBT
             else {
               val (min, max) = if (delay > settings.averageBlockDelay.toMillis) (newBT, maxBT) else (minBT, newBT)
               calculateBaseTarget(keyPair, min, max, balance)
