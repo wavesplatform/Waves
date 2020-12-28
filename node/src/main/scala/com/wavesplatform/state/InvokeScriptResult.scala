@@ -24,7 +24,7 @@ final case class InvokeScriptResult(
     reissues: Seq[Reissue] = Nil,
     burns: Seq[Burn] = Nil,
     sponsorFees: Seq[SponsorFee] = Nil,
-    invokes: Seq[InvokeScriptResult.Invokation] = Nil,
+    invokes: Seq[InvokeScriptResult.Invocation] = Nil,
     error: Option[ErrorMessage] = None
 )
 
@@ -38,7 +38,7 @@ object InvokeScriptResult {
   final case class Call(function: String, args: Seq[EVALUATED])
   implicit val callWrites = Json.writes[Call]
 
-  final case class Invokation(dApp: Address, call: Call, payments: Seq[AttachedPayment], stateChanges: InvokeScriptResult)
+  final case class Invocation(dApp: Address, call: Call, payments: Seq[AttachedPayment], stateChanges: InvokeScriptResult)
 
   final case class Payment(address: Address, asset: Asset, amount: Long)
   object Payment {
@@ -67,8 +67,8 @@ object InvokeScriptResult {
   implicit val burnFormat         = Json.writes[Burn]
   implicit val sponsorFeeFormat   = Json.writes[SponsorFee]
   implicit val errorMessageFormat = Json.writes[ErrorMessage]
-  implicit val invokationFormat: Writes[Invokation] = new Writes[Invokation] {
-    override def writes(i: Invokation) = Json.obj(
+  implicit val invokationFormat: Writes[Invocation] = new Writes[Invocation] {
+    override def writes(i: Invocation) = Json.obj(
         "dApp" -> i.dApp,
         "call" -> i.call,
         "payments" -> i.payments,
@@ -111,7 +111,7 @@ object InvokeScriptResult {
       isr.burns.map(toPbBurn),
       isr.error.map(toPbErrorMessage),
       isr.sponsorFees.map(toPbSponsorFee),
-      isr.invokes.map(toPbInvokation)
+      isr.invokes.map(toPbInvocation)
     )
   }
 
@@ -137,7 +137,7 @@ object InvokeScriptResult {
         val dataOps     = actions.collect { case d: lang.DataOp        => DataEntry.fromLangDataOp(d) }
         val transfers   = actions.collect { case t: lang.AssetTransfer => langTransferToPayment(t) }
         val invokes     = result.invokes.map {
-          case (dApp, fname, args, payments, r) => Invokation(langAddressToAddress(dApp), Call(fname, args), (payments.map { case CaseObj(t, fields) =>
+          case (dApp, fname, args, payments, r) => Invocation(langAddressToAddress(dApp), Call(fname, args), (payments.map { case CaseObj(t, fields) =>
              (fields("assetId"), fields("amount")) match {
                case (CONST_BYTESTR(b), CONST_LONG(a)) => InvokeScriptResult.AttachedPayment(IssuedAsset(b), a)
                case (_, CONST_LONG(a)) => InvokeScriptResult.AttachedPayment(Waves, a)
@@ -155,8 +155,8 @@ object InvokeScriptResult {
     PBInvokeScriptResult.Call(c.function, c.args.map(b => ByteString.copyFrom(Serde.serialize(b, true))))
   }
 
-  private def toPbInvokation(i: Invokation) = {
-    PBInvokeScriptResult.Invokation(
+  private def toPbInvocation(i: Invocation) = {
+    PBInvokeScriptResult.Invocation(
       ByteString.copyFrom(i.dApp.bytes),
       Some(toPbCall(i.call)),
       i.payments.map(p => Amount(PBAmounts.toPBAssetId(p.asset), p.amount)),
@@ -236,7 +236,7 @@ object InvokeScriptResult {
       pbValue.reissues.map(toVanillaReissue),
       pbValue.burns.map(toVanillaBurn),
       pbValue.sponsorFees.map(toVanillaSponsorFee),
-      pbValue.invokes.map(toVanillaInvokation),
+      pbValue.invokes.map(toVanillaInvocation),
       pbValue.errorMessage.map(toVanillaErrorMessage)
     )
   }
