@@ -456,10 +456,10 @@ object AttachedPayment {
   implicit val attachedPaymentFormat: Reads[AttachedPayment] = Json.reads[AttachedPayment]
 }
 
-case class Invokation(dApp: String, call: Call, payments: Seq[AttachedPayment], stateChanges: StateChangesDetails)
-object Invokation {
-  implicit val invokationFormat: Reads[Invokation] = new Reads[Invokation] {
-    override def reads(json: JsValue) = JsSuccess(Invokation((json \ "dApp").as[String], (json \ "call").as[Call], (json \ "payments").as[Seq[AttachedPayment]], (json \ "stateChanges").as[StateChangesDetails]))
+case class Invocation(dApp: String, call: Call, payments: Seq[AttachedPayment], stateChanges: StateChangesDetails)
+object Invocation {
+  implicit val invokationFormat: Reads[Invocation] = new Reads[Invocation] {
+    override def reads(json: JsValue) = JsSuccess(Invocation((json \ "dApp").as[String], (json \ "call").as[Call], (json \ "payments").as[Seq[AttachedPayment]], (json \ "stateChanges").as[StateChangesDetails]))
   }
 }
 
@@ -471,7 +471,7 @@ case class StateChangesDetails(
     burns: Seq[BurnInfoResponse],
     sponsorFees: Seq[SponsorFeeResponse],
     error: Option[ErrorMessageInfoResponse],
-    invokes: Seq[Invokation] = Nil
+    invokes: Seq[Invocation] = Nil
 )
 object StateChangesDetails {
   implicit val stateChangeResponseFormat: Reads[StateChangesDetails] = Json.reads[StateChangesDetails]
