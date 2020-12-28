@@ -194,8 +194,8 @@ object InvokeScriptResult {
     Call(i.function, i.args.map(a => Serde.deserialize(a.toByteArray, true, true).explicitGet()._1.asInstanceOf[EVALUATED]))
   }
 
-  private def toVanillaInvokation(i: PBInvokeScriptResult.Invokation) : Invokation = {
-    Invokation(
+  private def toVanillaInvocation(i: PBInvokeScriptResult.Invocation) : Invocation = {
+    Invocation(
       PBRecipients.toAddress(i.dApp.toByteArray, AddressScheme.current.chainId).explicitGet(),
       toVanillaCall(i.call.get),
       i.payments.map { p =>
