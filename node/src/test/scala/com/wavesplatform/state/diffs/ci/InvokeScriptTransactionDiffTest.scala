@@ -2404,7 +2404,7 @@ class InvokeScriptTransactionDiffTest
         invoker <- accountGen
         service <- accountGen
         ts      <- timestampGen
-        fee     <- ciFee(1)
+        fee     <- ciFee(sc = 1, nonNftIssue = 1)
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
