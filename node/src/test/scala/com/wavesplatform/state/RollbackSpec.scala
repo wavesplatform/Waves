@@ -8,6 +8,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures._
+import com.wavesplatform.features.BlockchainFeatures.{ContinuationTransaction => ContinuationTransactionFeature}
 import com.wavesplatform.features.{BlockchainFeatures, _}
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -558,7 +559,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
       "issue" in forAll(scenario) {
         case (dApp, invoker, genesis, setScript) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, ContinuationTransaction -> 0)) { d =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, ContinuationTransactionFeature -> 0)) { d =>
             val append = appendBlock(d, invoker, dApp) _
 
             d.appendBlock(genesis)
@@ -589,7 +590,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
       "reissue" in forAll(scenario) {
         case (dApp, invoker, genesis, setScript) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, ContinuationTransaction -> 0)) { d =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, ContinuationTransactionFeature -> 0)) { d =>
             val append = appendBlock(d, invoker, dApp) _
 
             d.appendBlock(genesis)
@@ -627,7 +628,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
       "burn" in forAll(scenario) {
         case (dApp, invoker, genesis, setScript) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, ContinuationTransaction -> 0)) { d =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, ContinuationTransactionFeature -> 0)) { d =>
             val append = appendBlock(d, invoker, dApp) _
 
             d.appendBlock(genesis)
@@ -665,7 +666,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
       "sponsorFee" in forAll(scenario) {
         case (dApp, invoker, genesis, setScript) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, ContinuationTransaction -> 0)) { d =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, ContinuationTransactionFeature -> 0)) { d =>
             val append = appendBlock(d, invoker, dApp) _
 
             d.appendBlock(genesis)
@@ -702,7 +703,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
       "lease" in forAll(scenario) {
         case (dApp, invoker, genesis, setScript) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, ContinuationTransaction -> 0)) { d =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, ContinuationTransactionFeature -> 0)) { d =>
             val append = appendBlock(d, invoker, dApp) _
 
             d.appendBlock(genesis)
@@ -803,7 +804,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
       "leaseCancel with lease tx" in forAll(scenario) {
         case (dApp, invoker, genesis, setScript) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SmartAccounts -> 0, ContinuationTransaction -> 0)) { d =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SmartAccounts -> 0, ContinuationTransactionFeature -> 0)) { d =>
             val leaseAmount = smallFeeGen.sample.get
             val leaseTx     = LeaseTransaction.selfSigned(2.toByte, dApp, invoker.toAddress, leaseAmount, setScript.fee, nextTs).explicitGet()
             val leaseId     = leaseTx.id.value()
@@ -817,7 +818,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
       "leaseCancel with lease action" in forAll(scenario) {
         case (dApp, invoker, genesis, setScript) =>
-          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SmartAccounts -> 0, ContinuationTransaction -> 0)) { d =>
+          withDomain(createSettings(Ride4DApps -> 0, BlockV5 -> 0, SmartAccounts -> 0, ContinuationTransactionFeature -> 0)) { d =>
             d.appendBlock(genesis)
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript)))
 
