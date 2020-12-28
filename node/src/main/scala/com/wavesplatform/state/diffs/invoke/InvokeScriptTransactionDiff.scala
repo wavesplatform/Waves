@@ -165,7 +165,7 @@ object InvokeScriptTransactionDiff {
               )
             }
 
-            otherIssues = invocationDiff.scriptResults.get(ByteStr(dAppAddress.bytes)).fold(Seq.empty[Issue])(allIssues)
+            otherIssues = invocationDiff.scriptResults.get(tx.id()).fold(Seq.empty[Issue])(allIssues)
 
             doProcessActions = InvokeDiffsCommon.processActions(
               _,
