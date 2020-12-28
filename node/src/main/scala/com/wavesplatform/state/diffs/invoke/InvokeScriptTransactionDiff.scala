@@ -41,6 +41,10 @@ import scala.util.{Right, Try}
 
 object InvokeScriptTransactionDiff {
 
+  private def allIssues(r: InvokeScriptResult): Seq[Issue] = {
+    r.issues ++ r.invokes.flatMap(s => allIssues(s.stateChanges))
+  }
+
   private val stats = TxProcessingStats
   import stats.TxTimerExt
 
@@ -161,6 +165,8 @@ object InvokeScriptTransactionDiff {
               )
             }
 
+            otherIssues = invocationDiff.scriptResults.get(ByteStr(dAppAddress.bytes)).fold(Seq.empty[Issue])(allIssues)
+
             doProcessActions = InvokeDiffsCommon.processActions(
               _,
               version,
@@ -173,7 +179,8 @@ object InvokeScriptTransactionDiff {
               runsLimit - invocationDiff.scriptsRun,
               isContinuation = false,
               isSyncCall = false,
-              limitedExecution
+              limitedExecution,
+              otherIssues
             )
 
             resultDiff <- scriptResult match {

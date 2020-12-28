@@ -188,7 +188,8 @@ object InvokeScriptDiff {
               runsLimit - scriptResult._1.scriptsRun-checkedPayments.size,
               isContinuation = false,
               isSyncCall = true,
-              limitedExecution
+              limitedExecution,
+              Seq()
             )
 
             resultDiff <- scriptResult._2._1 match {

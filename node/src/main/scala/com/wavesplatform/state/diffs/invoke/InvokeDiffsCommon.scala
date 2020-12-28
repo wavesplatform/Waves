@@ -189,7 +189,8 @@ object InvokeDiffsCommon {
       runsLimit: Int,
       isContinuation: Boolean, // TODO refactor?
       isSyncCall: Boolean,
-      limitedExecution: Boolean
+      limitedExecution: Boolean,
+      otherIssues: Seq[Issue] = Seq()
   ): TracedResult[ValidationError, Diff] = {
     val complexityLimit =
       if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - invocationComplexity.toInt
@@ -242,7 +243,7 @@ object InvokeDiffsCommon {
           blockchain,
           stepLimit,
           invocationComplexity,
-          issueList,
+          issueList ++ otherIssues,
           additionalScriptsInvoked
         ).map(_._2)
 
