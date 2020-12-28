@@ -6,7 +6,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.common.CommonAccountsApi.LeaseInfo
 import com.wavesplatform.protobuf._
-import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.fromAssetIdAndAmount
 import com.wavesplatform.transaction.Asset
 import io.grpc.stub.StreamObserver
@@ -75,7 +75,7 @@ class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) 
                 leaseId.toByteString,
                 originTransactionId.toByteString,
                 ByteString.copyFrom(sender.bytes),
-                ByteString.copyFrom(recipient.bytes),
+                Some(PBRecipients.create(recipient)),
                 amount,
                 height
               )
