@@ -6,6 +6,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
 import com.wavesplatform.lang.v1.estimator.v3.{ContinuationFirstStepEstimator, FunctionInfo}
@@ -13,6 +15,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, UserFunction}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader}
 import monix.eval.Coeval
@@ -42,6 +45,7 @@ package object utils {
     override def multiPaymentAllowed: Boolean                                                                    = true
     override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
     override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???
+    override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)]): Either[ValidationError, EVALUATED] = ???
   }
 
   val lazyContexts: Map[DirectiveSet, Coeval[CTX[Environment]]] = {

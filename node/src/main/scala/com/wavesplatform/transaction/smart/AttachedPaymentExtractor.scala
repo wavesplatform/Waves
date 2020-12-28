@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.state.diffs.invoke.InvokeScriptLike
 import com.wavesplatform.features.MultiPaymentPolicyProvider._
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion
@@ -11,7 +12,7 @@ import com.wavesplatform.state.Blockchain
 
 object AttachedPaymentExtractor {
   def extractPayments(
-    tx:           InvokeScriptTransaction,
+    tx:           InvokeScriptLike,
     version:      StdLibVersion,
     blockchain:   Blockchain,
     targetScript: AttachedPaymentTarget
@@ -31,10 +32,10 @@ object AttachedPaymentExtractor {
       else
         multiple(tx)
 
-  private def single(tx: InvokeScriptTransaction) =
+  private def single(tx: InvokeScriptLike) =
     Right(AttachedPayments.Single(tx.payments.headOption.map(p => (p.amount, p.assetId.compatId))))
 
-  private def multiple(tx: InvokeScriptTransaction) =
+  private def multiple(tx: InvokeScriptLike) =
     Right(AttachedPayments.Multi(tx.payments.map(p => (p.amount, p.assetId.compatId))))
 
   private def scriptErrorMessage(apt: AttachedPaymentTarget, version: StdLibVersion): String = {

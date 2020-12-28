@@ -499,7 +499,8 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
             Seq(ReissueInfoResponse(reissueAssetId, true, 100)),
             Seq(BurnInfoResponse(burnAssetId, 100)),
             Nil,
-            None
+            None,
+            Nil
           )
           ) if Set(reissueAssetId, burnAssetId, transferAssetId.value).head == scriptedAssetId =>
     }

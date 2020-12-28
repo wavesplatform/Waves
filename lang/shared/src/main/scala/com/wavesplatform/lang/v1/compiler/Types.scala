@@ -163,6 +163,7 @@ object Types {
   val UNIT: CASETYPEREF    = CASETYPEREF("Unit", List.empty)
   val optionByteVector     = UNION(BYTESTR, UNIT)
   val optionLong           = UNION(LONG, UNIT)
+  val optionString         = UNION(STRING, UNIT)
   val listByteVector: LIST = LIST(BYTESTR)
   val listString: LIST     = LIST(STRING)
 }

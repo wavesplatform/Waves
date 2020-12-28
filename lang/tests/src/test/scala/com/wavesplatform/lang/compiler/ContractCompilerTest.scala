@@ -977,4 +977,80 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
 
     Global.compileContract(dApp, dAppV4Ctx, V4, ScriptEstimatorV3) should produce("Script is too large: 37551 bytes > 32768 bytes")
   }
+
+  property("@Callable Invoke") {
+    val expr = {
+      val script =
+        """
+          | {-# STDLIB_VERSION 5    #-}
+          | {-#CONTENT_TYPE    DAPP #-}
+          |
+          | @Callable(i)
+          | func bar() = {
+          |   ([], "return")
+          | }
+          |
+          | @Callable(i)
+          | func foo(a:ByteVector) = {
+          |  let r = Invoke(this, "bar", [], [])
+          |   [
+          |     IntegerEntry("key", 1),
+          |     BooleanEntry("key", true),
+          |     StringEntry("key", "str"),
+          |     BinaryEntry("key", base58''),
+          |     DeleteEntry("key"),
+          |     ScriptTransfer(i.caller, 1, base58''),
+          |     Issue("name", "description", 1000, 4, true, unit, 0),
+          |     Reissue(base58'', 1, false),
+          |     Burn(base58'', 1),
+          |     SponsorFee(base58'', 1)
+          |   ]
+          | }
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    val ctx =
+      PureContext.build(V5).withEnvironment[Environment] |+|
+      WavesContext.build(DirectiveSet(V5, Account, DAppType).explicitGet())
+
+    compiler.ContractCompiler(ctx.compilerContext, expr, V5) shouldBe Symbol("right")
+  }
+
+  property("@Callable Invoke isn't avalable for V4") {
+    val expr = {
+      val script =
+        """
+          | {-# STDLIB_VERSION 4    #-}
+          | {-#CONTENT_TYPE    DAPP #-}
+          |
+          | @Callable(i)
+          | func bar() = {
+          |   ([], "return")
+          | }
+          |
+          | @Callable(i)
+          | func foo(a:ByteVector) = {
+          |  let r = Invoke(this, "bar", [], [])
+          |   [
+          |     IntegerEntry("key", 1),
+          |     BooleanEntry("key", true),
+          |     StringEntry("key", "str"),
+          |     BinaryEntry("key", base58''),
+          |     DeleteEntry("key"),
+          |     ScriptTransfer(i.caller, 1, base58''),
+          |     Issue("name", "description", 1000, 4, true, unit, 0),
+          |     Reissue(base58'', 1, false),
+          |     Burn(base58'', 1),
+          |     SponsorFee(base58'', 1)
+          |   ]
+          | }
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    val ctx =
+      PureContext.build(V4).withEnvironment[Environment] |+|
+      WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
+
+    compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe Symbol("left")
+  }
 }

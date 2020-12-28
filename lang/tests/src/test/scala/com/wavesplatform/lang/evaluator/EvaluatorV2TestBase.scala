@@ -5,6 +5,7 @@ import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.NoShrink
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, DApp, V4}
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -26,7 +27,7 @@ class EvaluatorV2TestBase extends PropSpec with PropertyChecks with ScriptGen wi
   private val version = V4
   private val ctx =
     PureContext.build(version).withEnvironment[Environment] |+|
-    WavesContext.build(DirectiveSet(version, Account, DApp).explicitGet())
+      WavesContext.build(DirectiveSet(version, Account, DApp).explicitGet())
 
   private val environment = new Environment[Id] {
     override def chainId: Byte                                                                                       = ???
@@ -45,11 +46,12 @@ class EvaluatorV2TestBase extends PropSpec with PropertyChecks with ScriptGen wi
     override def txId: ByteStr                                                                                       = ???
     override def transferTransactionFromProto(b: Array[Byte]): Id[Option[Tx.Transfer]]                               = ???
     override def addressFromString(address: String): Either[String, Recipient.Address]                               = ???
+    override def callScript(a: Recipient.Address, f: String, e: List[EVALUATED], p: Seq[(Option[Array[Byte]], Long)]): Id[Either[ValidationError, EVALUATED]] = ???
 
     override def tthis: Tthis =
       Coproduct(Recipient.Address(ByteStr.empty))
 
-    override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Id[Option[Any]]  ={
+    override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Id[Option[Any]] = {
       if (key == "unexisting")
         None
       else

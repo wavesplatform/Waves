@@ -54,14 +54,12 @@ object WavesContext {
     } yield DirectiveSet(version, scriptType, contentType)
 
   private val variableCtxCache: Map[DirectiveSet, CTX[Environment]] =
-    allDirectives
-      .collect { case Right(ds) => (ds, variableCtx(ds)) }
-      .toMap
+    allDirectives.collect { case Right(ds) => (ds, variableCtx(ds)) }.toMap
 
   private def variableCtx(ds: DirectiveSet): CTX[Environment] = {
-    val isTokenContext = ds.scriptType  == Asset
-    val proofsEnabled = !isTokenContext
-    val version       = ds.stdLibVersion
+    val isTokenContext = ds.scriptType == Asset
+    val proofsEnabled  = !isTokenContext
+    val version        = ds.stdLibVersion
     CTX(
       variableTypes(version, proofsEnabled),
       variableVars(isTokenContext, version, ds.contentType, proofsEnabled),
@@ -88,7 +86,9 @@ object WavesContext {
       balanceV4Functions
 
   private def fromV5Funcs(proofsEnabled: Boolean, version: StdLibVersion) =
-    fromV4Funcs(proofsEnabled, version)
+    fromV4Funcs(proofsEnabled, version) ++ Array(
+      callDAppF(version)
+    )
 
   private def variableFuncs(version: StdLibVersion, scriptType: ScriptType, proofsEnabled: Boolean) = {
     val commonFuncs =
