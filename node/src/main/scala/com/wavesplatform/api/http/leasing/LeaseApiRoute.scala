@@ -6,7 +6,7 @@ import com.wavesplatform.api.common.CommonAccountsApi.LeaseInfo
 import com.wavesplatform.api.http.leasing.LeaseApiRoute._
 import com.wavesplatform.api.http.requests.{LeaseCancelRequest, LeaseRequest}
 import com.wavesplatform.api.http.{BroadcastRoute, _}
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.utils.byteStrFormat
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
@@ -15,7 +15,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
-import play.api.libs.json.{JsNumber, JsString, Json, Writes}
+import play.api.libs.json.{JsNumber, Json, Writes}
 
 case class LeaseApiRoute(
     settings: RestAPISettings,
@@ -61,6 +61,5 @@ case class LeaseApiRoute(
 }
 
 object LeaseApiRoute {
-  implicit lazy val byteStrWrites: Writes[ByteStr] = Writes[ByteStr](b => JsString(b.toString))
   implicit lazy val leaseInfoWrites: Writes[LeaseInfo] = Json.writes[LeaseInfo]
 }
