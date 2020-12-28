@@ -26,6 +26,10 @@ import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.metrics._
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
+import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.diffs.invoke.InvokeDiffsCommon.StepInfo
+import com.wavesplatform.transaction.ApplicationStatus.ScriptExecutionInProgress
+import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError._
@@ -38,6 +42,10 @@ import shapeless.Coproduct
 import scala.util.{Right, Try}
 
 object InvokeScriptTransactionDiff {
+
+  private def allIssues(r: InvokeScriptResult): Seq[Issue] = {
+    r.issues ++ r.invokes.flatMap(s => allIssues(s.stateChanges))
+  }
 
   private val stats = TxProcessingStats
   import stats.TxTimerExt
@@ -54,15 +62,8 @@ object InvokeScriptTransactionDiff {
           _           <- TracedResult.wrapE(checkCall(functionCall, blockchain).leftMap(GenericError.apply))
           dAppAddress <- TracedResult(dAppAddressEi)
 
-          feeInfo <- TracedResult(InvokeDiffsCommon.calcFee(blockchain, tx))
-
-          directives <- TracedResult.wrapE(DirectiveSet(version, Account, DAppType).leftMap(GenericError.apply))
-          payments   <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DAppTarget).leftMap(GenericError.apply))
-          tthis = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(dAppAddress.bytes)))
-          input <- TracedResult.wrapE(buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, tthis).leftMap(GenericError.apply))
-
           invocationComplexity <- TracedResult {
-            InvokeDiffsCommon.getInvocationComplexity(blockchain, tx, callableComplexities, dAppAddress)
+            InvokeDiffsCommon.getInvocationComplexity(blockchain, tx.funcCall, callableComplexities, dAppAddress)
           }
 
           stepLimit = ContractLimits.MaxComplexityByVersion(version)
@@ -78,15 +79,28 @@ object InvokeScriptTransactionDiff {
             Either.cond(
               feeInfo._1 >= minFee,
               (),
-              GenericError(
-                s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
-                  s" does not exceed minimal value of $minFee WAVES."
-              )
+              GenericError("Continuation is not allowed for Invoke Script Transaction with version below V3")
             )
-          }
+          )
+
+          (feeInWaves, totalFeePortfolio) <- InvokeDiffsCommon.calcAndCheckFee(
+            (message, _) => GenericError(message),
+            tx,
+            blockchain,
+            stepLimit,
+            invocationComplexity,
+            issueList = Nil,
+            additionalScriptsInvoked = 0
+          )
+          runsLimit = BigDecimal((feeInWaves - FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit) / ScriptExtraFee).toIntExact
+
+          directives <- TracedResult.wrapE(DirectiveSet(version, Account, DAppType).leftMap(GenericError.apply))
+          payments   <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DAppTarget).leftMap(GenericError.apply))
+          tthis = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(dAppAddress.bytes)))
+          input <- TracedResult.wrapE(buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, tthis).leftMap(GenericError.apply))
 
           result <- for {
-            scriptResult <- {
+            (invocationDiff, (scriptResult, fullLimit), _) <- {
               val scriptResultE = stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
                 val invoker = tx.sender.toAddress
                 val invocation = ContractEvaluator.Invocation(
@@ -100,23 +114,19 @@ object InvokeScriptTransactionDiff {
                 )
                 val height = blockchain.height
 
-                val disableThisWhenCalledByAlias = tx.dAppAddressOrAlias match {
-                  case _: Alias if AddressScheme.current.chainId == 'T'.toByte =>
-                    !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5) && blockchain.height > 1100000
-                  case _: Alias =>
-                    !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)
-                  case _ => false
-                }
-
-                val environment = new WavesEnvironment(
+                val environment = new DAppEnvironment(
                   AddressScheme.current.chainId,
                   Coeval.evalOnce(input),
                   Coeval(height),
                   blockchain,
                   tthis,
                   directives,
-                  tx.id(),
-                  disableThisWhenCalledByAlias
+                  tx,
+                  dAppAddress,
+                  pk,
+                  dAppAddress,
+                  runsLimit,
+                  (if(invocationComplexity <= stepLimit) { 13 } else { 0 })
                 )
 
                 //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
@@ -140,13 +150,15 @@ object InvokeScriptTransactionDiff {
                     case _ =>
                       Right((failFreeResult, Nil))
                   }
-                } yield (result, failFreeLog ::: log)
+                } yield (environment.currentDiff, (result, fullLimit), failFreeLog ::: log)
               })
               TracedResult(
                 scriptResultE,
-                List(InvokeScriptTrace(tx.dAppAddressOrAlias, functionCall, scriptResultE.map(_._1), scriptResultE.fold(_.log, _._2)))
+                List(InvokeScriptTrace(tx.dAppAddressOrAlias, functionCall, scriptResultE.map(_._2._1), scriptResultE.fold(_.log, _._3)))
               )
             }
+
+            otherIssues = invocationDiff.scriptResults.get(tx.id()).fold(Seq.empty[Issue])(allIssues)
 
             doProcessActions = InvokeDiffsCommon.processActions(
               _,
@@ -156,18 +168,32 @@ object InvokeScriptTransactionDiff {
               feeInfo,
               invocationComplexity,
               tx,
-              blockchain,
+              CompositeBlockchain(blockchain, Some(invocationDiff)),
               blockTime,
-              limitedExecution
+              runsLimit - invocationDiff.scriptsRun,
+              isContinuation = false,
+              isSyncCall = false,
+              limitedExecution,
+              otherIssues
             )
 
-            resultDiff <- scriptResult._1 match {
-              case ScriptResultV3(dataItems, transfers)    => doProcessActions(dataItems ::: transfers)
-              case ScriptResultV4(actions)                 => doProcessActions(actions)
+            resultDiff <- scriptResult match {
+              case ScriptResultV3(dataItems, transfers, _) => doProcessActions(dataItems ::: transfers)
+              case ScriptResultV4(actions, _, _)              => doProcessActions(actions)
               case _: IncompleteResult if limitedExecution => doProcessActions(Nil)
-              case _: IncompleteResult                     => TracedResult(Left(GenericError("Unexpected IncompleteResult")))
+              case ir: IncompleteResult =>
+                val state = ContinuationState.InProgress(ir.expr, ir.unusedComplexity, tx.id.value(), 0)
+                val diffWithState = Diff.empty
+                  .copy(
+                    transactions = Map(tx.id.value() -> NewTransactionInfo(tx, Set(), ScriptExecutionInProgress)),
+                    scriptsComplexity = fullLimit - ir.unusedComplexity
+                  )
+                  .addContinuationState(dAppAddress, state)
+                val StepInfo(_, _, scriptsRun) = InvokeDiffsCommon.stepInfo(diffWithState, blockchain, tx)
+                val portfolios = Diff.stateOps(portfolios = totalFeePortfolio, scriptsRun = scriptsRun)
+                TracedResult.wrapValue(InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()) |+| diffWithState |+| portfolios)
             }
-          } yield resultDiff
+          } yield invocationDiff |+| resultDiff
         } yield result
 
       case Left(l) => TracedResult(Left(l))
@@ -180,7 +206,7 @@ object InvokeScriptTransactionDiff {
       contract: DApp,
       directives: DirectiveSet,
       invocation: ContractEvaluator.Invocation,
-      environment: WavesEnvironment,
+      environment: Environment[Id],
       limit: Int
   ): Either[ScriptExecutionError, (ScriptResult, EvaluationContext[Environment, Id], Log[Id])] = {
     val wavesContext = WavesContext.build(directives)

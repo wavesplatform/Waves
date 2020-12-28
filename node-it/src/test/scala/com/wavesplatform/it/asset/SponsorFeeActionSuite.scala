@@ -53,7 +53,8 @@ class SponsorFeeActionSuite extends BaseSuite {
               Nil,
               Nil,
               Seq(SponsorFeeResponse(sponsorFeeAssetId, Some(`minSponsoredAssetFee`))),
-              None
+              None,
+              Nil
             )
             ) if issueAssetId == sponsorFeeAssetId =>
       }
@@ -221,7 +222,8 @@ class SponsorFeeActionSuite extends BaseSuite {
               Nil,
               Nil,
               sponsorFeeResponses,
-              None
+              None,
+              Nil
             )
             ) if sponsorFeeResponses.size == 9 && sponsorFeeResponses.last == SponsorFeeResponse(`assetId`, Some(`lastMinSponsoredAssetFee`)) =>
       }
@@ -268,7 +270,8 @@ class SponsorFeeActionSuite extends BaseSuite {
               Nil,
               Nil,
               Seq(SponsorFeeResponse(`assetId`, Some(100)), SponsorFeeResponse(`assetId`, None)),
-              None
+              None,
+              Nil
             )
             ) =>
       }

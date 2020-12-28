@@ -55,7 +55,8 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
               Nil,
               Nil,
               Seq(SponsorFeeResponse(sponsorFeeAssetId, Some(`minSponsoredAssetFee`))),
-              None
+              None,
+              Nil
             )
             ) if issueAssetId == sponsorFeeAssetId =>
       }
@@ -225,7 +226,8 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
               Nil,
               Nil,
               sponsorFeeResponses,
-              None
+              None,
+              Nil
             )
             ) if sponsorFeeResponses.size == 9 && sponsorFeeResponses.last == SponsorFeeResponse(`assetId`, Some(`lastMinSponsoredAssetFee`)) =>
       }
@@ -272,7 +274,8 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
               Nil,
               Nil,
               Seq(SponsorFeeResponse(`assetId`, Some(100)), SponsorFeeResponse(`assetId`, None)),
-              None
+              None,
+              Nil
             )
             ) =>
       }

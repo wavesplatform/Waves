@@ -63,6 +63,12 @@ class RideV5ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
       |this.quantity > 0
     """.stripMargin
 
+  private val scriptWithoutVersion =
+    """
+      |{-# CONTENT_TYPE DAPP #-}
+      |{-# SCRIPT_TYPE ACCOUNT #-}
+    """.stripMargin
+
   test("can't set V5 contracts before the feature activation") {
     def assertFeatureNotActivated[R](f: => R): Assertion = assertApiError(f) { e =>
       e.statusCode shouldBe 400
@@ -123,11 +129,21 @@ class RideV5ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
         |(this.quantity > 0)""".stripMargin
   }
 
+  //TODO enable in SC-695
+  ignore("script compiles as Ride V4 before the feature activation if STDLIB_VERSION isn't specified") {
+    sender.scriptDecompile(sender.scriptCompile(scriptWithoutVersion).script).script should startWith("{-# STDLIB_VERSION 4 #-}")
+  }
+
   test("wait for the feature activation") {
     sender.waitForHeight(activationHeight, 5.minutes)
   }
 
-  test("can set asset script V5 after the function activation") {
+  //TODO enable in SC-695
+  ignore("script compiles as Ride V5 before the feature activation if STDLIB_VERSION isn't specified") {
+    sender.scriptDecompile(sender.scriptCompile(scriptWithoutVersion).script).script should startWith("{-# STDLIB_VERSION 5 #-}")
+  }
+
+  test("can set asset script V5 after the feature activation") {
     val assetId = sender
       .issue(
         smartAccV5,
