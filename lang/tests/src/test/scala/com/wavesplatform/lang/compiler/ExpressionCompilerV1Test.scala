@@ -358,6 +358,68 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
       }
   }
 
+  property("self-functions are unavailable for previous versions and asset scripts") {
+    def expr(v: StdLibVersion, scriptType: ScriptType) = {
+      val script =
+        s"""
+           | {-# STDLIB_VERSION ${v.id}    #-}
+           | {-# SCRIPT_TYPE    ${scriptType.value}    #-}
+           | {-# CONTENT_TYPE   EXPRESSION #-}
+           |
+           | getInteger("key") == 1             &&
+           | getIntegerValue("key") == 1        &&
+           | getString("key")  == "text"        &&
+           | getStringValue("key")  == "text"   &&
+           | getBinary("key")  == base58''      &&
+           | getBinaryValue("key")  == base58'' &&
+           | getBoolean("key")  == false        &&
+           | getBooleanValue("key")  == false
+        """.stripMargin
+      Parser.parseExpr(script).get.value
+    }
+    for {
+      version    <- DirectiveDictionary[StdLibVersion].all
+      scriptType <- DirectiveDictionary[ScriptType].all
+    } {
+      val result = ExpressionCompiler(getTestContext(version, scriptType).compilerContext, expr(version, scriptType))
+      if (version < V5 || scriptType != Account)
+        result.swap.getOrElse(???).split("Can't find a function").length shouldBe 9
+      else
+        result shouldBe Symbol("right")
+    }
+  }
+
+  property("V5 functions are unavailable for previous versions") {
+    def expr(v: StdLibVersion) = {
+      val script =
+        s"""
+          | {-# STDLIB_VERSION ${v.id}    #-}
+          | {-# CONTENT_TYPE   EXPRESSION #-}
+          |
+          | let a = Lease(Address(base58''), 1)
+          | let b = Lease(Address(base58''), 1, 0)
+          | let c = calculateLeaseId(b)
+          | true
+        """.stripMargin
+      Parser.parseExpr(script).get.value
+    }
+
+    DirectiveDictionary[StdLibVersion].all
+      .foreach { version =>
+        val result = ExpressionCompiler(getTestContext(version).compilerContext, expr(version))
+        if (version < V5)
+          result should produce(
+            "Compilation failed: [" +
+              "Can't find a function 'Lease'(Address, Int) or it is @Callable in 75-102; " +
+              "Can't find a function 'Lease'(Address, Int, Int) or it is @Callable in 112-142; " +
+              "Can't find a function 'calculateLeaseId'(Nothing) or it is @Callable in 152-171" +
+              "]"
+          )
+        else
+          result shouldBe Symbol("right")
+      }
+  }
+
   treeTypeTest("GETTER")(
     ctx = CompilerContext(
       predefTypes = Map(pointType.name -> pointType),

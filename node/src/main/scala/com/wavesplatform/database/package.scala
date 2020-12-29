@@ -9,7 +9,7 @@ import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.google.protobuf.{ByteString, CodedInputStream, WireFormat}
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.validation.Validators
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -21,9 +21,11 @@ import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state._
+import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.transaction.ApplicationStatus._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
@@ -183,6 +185,27 @@ package object database extends ScorexLogging {
   def readLeaseBalance(data: Array[Byte]): LeaseBalance = Option(data).fold(LeaseBalance.empty) { d =>
     val ndi = newDataInput(d)
     LeaseBalance(ndi.readLong(), ndi.readLong())
+  }
+
+  def writeLeaseDetails(ld: LeaseDetails): Array[Byte] = {
+    pb.LeaseDetails(
+      ByteString.copyFrom(ld.sender.arr),
+      Some(PBRecipients.create(ld.recipient)),
+      ld.height,
+      ld.amount,
+      ld.isActive
+    ).toByteArray
+  }
+
+  def readLeaseDetails(data: Array[Byte]): LeaseDetails = {
+    val pb.LeaseDetails(sender, recipient, height, amount, isActive) = pb.LeaseDetails.parseFrom(data)
+    LeaseDetails(
+      sender.toPublicKey,
+      PBRecipients.toAddressOrAlias(recipient.get, AddressScheme.current.chainId).explicitGet(),
+      height,
+      amount,
+      isActive
+    )
   }
 
   def readVolumeAndFee(data: Array[Byte]): VolumeAndFee = Option(data).fold(VolumeAndFee.empty) { d =>
@@ -598,8 +621,20 @@ package object database extends ScorexLogging {
     )
 
   def loadActiveLeases(db: DB, fromHeight: Int, toHeight: Int): Seq[LeaseTransaction] = db.withResource { r =>
+    (for {
+      id          <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
+      leaseStatus <- fromHistory(r, Keys.leaseStatusHistory(id), Keys.leaseStatus(id))
+      if leaseStatus
+      pb.TransactionMeta(h, n, _, _, _) <- r.get(Keys.transactionMetaById(TransactionId(id)))
+      tx                                <- r.get(Keys.transactionAt(Height(h), TxNum(n.toShort)))
+    } yield tx).collect {
+      case (lt: LeaseTransaction, Succeeded) => lt
+    }.toSeq
+  }
+
+  def loadLeaseIds(resource: DBResource, fromHeight: Int, toHeight: Int, includeCancelled: Boolean): Set[ByteStr] = {
     val leaseIds = mutable.Set.empty[ByteStr]
-    val iterator = r.iterator
+    val iterator = resource.iterator
 
     @inline
     def keyInRange(): Boolean = {
@@ -611,18 +646,13 @@ package object database extends ScorexLogging {
     while (iterator.hasNext && keyInRange()) {
       val e       = iterator.next()
       val leaseId = ByteStr(e.getKey.drop(6))
-      if (Option(e.getValue).exists(_(0) == 1)) leaseIds += leaseId else leaseIds -= leaseId
+      if (includeCancelled || Option(e.getValue).exists(_(0) == 1))
+        leaseIds += leaseId
+      else
+        leaseIds -= leaseId
     }
 
-    (for {
-      id          <- leaseIds
-      leaseStatus <- fromHistory(r, Keys.leaseStatusHistory(id), Keys.leaseStatus(id))
-      if leaseStatus
-      pb.TransactionMeta(h, n, _, _) <- r.get(Keys.transactionMetaById(TransactionId(id)))
-      tx                             <- r.get(Keys.transactionAt(Height(h), TxNum(n.toShort)))
-    } yield tx).collect {
-      case (lt: LeaseTransaction, true) => lt
-    }.toSeq
+    leaseIds.toSet
   }
 
   object AddressId extends TaggedType[Long] {

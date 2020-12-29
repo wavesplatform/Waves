@@ -19,7 +19,6 @@ case object CancelLeaseOverflow extends DiffPatchFactory {
         Address.fromString(address).explicitGet() -> Portfolio(lease = lb)
     }
     val leasesToCancel = patch.cancelledLeases.map(str => ByteStr.decodeBase58(str).get)
-    val diff           = Diff.empty.copy(portfolios = pfs, leaseState = leasesToCancel.map(_ -> false).toMap)
-    diff
+    Diff.empty.copy(portfolios = pfs, leaseState = leasesToCancel.map((_, (false, None))).toMap)
   }
 }

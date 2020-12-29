@@ -43,6 +43,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
     )
     val trace = List(
       InvokeScriptTrace(
+        tx.id.value(),
         tx.dAppAddressOrAlias,
         tx.funcCall,
         Right(
@@ -116,6 +117,8 @@ class TraceResultJsonTest extends PropSpec with Matchers {
                                       |        "reissues": [],
                                       |        "burns": [],
                                       |        "sponsorFees": [],
+                                      |        "leases" : [],
+                                      |        "leaseCancels" : [],
                                       |        "invokes": []
                                       |      },
                                       |      "error": null
@@ -184,6 +187,8 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         |        "reissues": [],
         |        "burns": [],
         |        "sponsorFees": [],
+        |        "leases" : [],
+        |        "leaseCancels" : [],
         |        "invokes": []
         |      },
         |      "error": null,
@@ -214,6 +219,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
 
     val trace = List(
       InvokeScriptTrace(
+        tx.id.value(),
         tx.dAppAddressOrAlias,
         tx.funcCall,
         Left(TxValidationError.ScriptExecutionError(reason, vars, None)),

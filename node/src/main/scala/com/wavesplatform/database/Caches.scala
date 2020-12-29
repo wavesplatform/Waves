@@ -157,7 +157,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       balances: Map[AddressId, Map[Asset, Long]],
       leaseBalances: Map[AddressId, LeaseBalance],
       addressTransactions: Map[AddressId, Seq[TransactionId]],
-      leaseStates: Map[ByteStr, Boolean],
+      leaseStates: Map[ByteStr, (Boolean, Option[LeaseActionInfo])],
       issuedAssets: Map[IssuedAsset, NewAssetInfo],
       reissuedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
       filledQuantity: Map[ByteStr, VolumeAndFee],
@@ -261,7 +261,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     } stateHash.addAssetScript(address, script)
 
     diff.leaseState.foreach {
-      case (leaseId, status) =>
+      case (leaseId, (status, _)) =>
         stateHash.addLeaseStatus(TransactionId @@ leaseId, status)
     }
 

@@ -1,6 +1,8 @@
 package com.wavesplatform.transaction.validation.impl
 
 import cats.data.ValidatedNel
+import cats.implicits._
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -12,7 +14,14 @@ object LeaseCancelTxValidator extends TxValidator[LeaseCancelTransaction] {
     import tx._
     V.seq(tx)(
       V.fee(fee),
-      V.cond(leaseId.arr.length == crypto.DigestLength, GenericError("Lease transaction id is invalid"))
+      checkLeaseId(leaseId).toValidatedNel
     )
   }
+
+  def checkLeaseId(leaseId: ByteStr): Either[GenericError, Unit] =
+    Either.cond(
+      leaseId.arr.length == crypto.DigestLength,
+      (),
+      GenericError(s"Lease id=$leaseId has invalid length = ${leaseId.arr.length} byte(s) while expecting ${crypto.DigestLength}")
+    )
 }

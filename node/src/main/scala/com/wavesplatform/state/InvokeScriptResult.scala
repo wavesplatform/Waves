@@ -2,12 +2,13 @@ package com.wavesplatform.state
 
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, Alias}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.evaluator.{IncompleteResult, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.traits.domain.{Burn, Issue, Reissue, SponsorFee}
+import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.protobuf.{Amount, _}
@@ -24,6 +25,8 @@ final case class InvokeScriptResult(
     reissues: Seq[Reissue] = Nil,
     burns: Seq[Burn] = Nil,
     sponsorFees: Seq[SponsorFee] = Nil,
+    leases: Seq[InvokeScriptResult.Lease] = Nil,
+    leaseCancels: Seq[LeaseCancel] = Nil,
     invokes: Seq[InvokeScriptResult.Invocation] = Nil,
     error: Option[ErrorMessage] = None
 )
@@ -45,6 +48,16 @@ object InvokeScriptResult {
     implicit val jsonWrites = Json.writes[Payment]
   }
 
+  case class Lease(recipient: AddressOrAlias, amount: Long, nonce: Long, leaseId: ByteStr)
+  object Lease {
+    implicit val recipientWrites = Writes[AddressOrAlias] {
+      case address: Address => implicitly[Writes[Address]].writes(address)
+      case alias: Alias     => JsString(alias.stringRepr)
+      case _                => JsNull
+    }
+    implicit val jsonWrites = Json.writes[Lease]
+  }
+
   def paymentsFromPortfolio(addr: Address, portfolio: Portfolio): Seq[Payment] = {
     val waves  = InvokeScriptResult.Payment(addr, Waves, portfolio.balance)
     val assets = portfolio.assets.map { case (assetId, amount) => InvokeScriptResult.Payment(addr, assetId, amount) }
@@ -63,9 +76,10 @@ object InvokeScriptResult {
       "nonce"          -> iss.nonce
     )
   }
-  implicit val reissueFormat      = Json.writes[Reissue]
-  implicit val burnFormat         = Json.writes[Burn]
-  implicit val sponsorFeeFormat   = Json.writes[SponsorFee]
+  implicit val reissueFormat    = Json.writes[Reissue]
+  implicit val burnFormat       = Json.writes[Burn]
+  implicit val sponsorFeeFormat = Json.writes[SponsorFee]
+  implicit val leaseCancelFormat  = Json.writes[LeaseCancel]
   implicit val errorMessageFormat = Json.writes[ErrorMessage]
   implicit val invokationFormat: Writes[Invocation] = new Writes[Invocation] {
     override def writes(i: Invocation) = Json.obj(
@@ -119,11 +133,13 @@ object InvokeScriptResult {
       isr.burns.map(toPbBurn),
       isr.error.map(toPbErrorMessage),
       isr.sponsorFees.map(toPbSponsorFee),
-      invokes = isr.invokes.map(toPbInvocation)
+      isr.leases.map(toPbLease),
+      isr.leaseCancels.map(toPbLeaseCancel),
+      isr.invokes.map(toPbInvocation)
     )
   }
 
-  def fromLangResult(result: ScriptResult): InvokeScriptResult = {
+  def fromLangResult(invokeId: ByteStr, result: ScriptResult): InvokeScriptResult = {
     import com.wavesplatform.lang.v1.traits.{domain => lang}
 
     def langAddressToAddress(a: lang.Recipient.Address): Address =
@@ -131,6 +147,9 @@ object InvokeScriptResult {
 
     def langTransferToPayment(t: lang.AssetTransfer): Payment =
       Payment(langAddressToAddress(t.recipient), Asset.fromCompatId(t.assetId), t.amount)
+
+    def langLeaseToLease(l: lang.Lease): Lease =
+      Lease(AddressOrAlias.fromRide(l.recipient).explicitGet(), l.amount, l.nonce, lang.Lease.calculateId(l, invokeId))
 
     result match {
       case ScriptResultV3(ds, ts) =>
@@ -144,15 +163,17 @@ object InvokeScriptResult {
         val sponsorFees = actions.collect { case sf: lang.SponsorFee   => sf }
         val dataOps     = actions.collect { case d: lang.DataOp        => DataEntry.fromLangDataOp(d) }
         val transfers   = actions.collect { case t: lang.AssetTransfer => langTransferToPayment(t) }
+        val leases       = actions.collect { case l: lang.Lease         => langLeaseToLease(l) }
+        val leaseCancels = actions.collect { case l: lang.LeaseCancel   => l }
         val invokes     = result.invokes.map {
           case (dApp, fname, args, payments, r) => Invocation(langAddressToAddress(dApp), Call(fname, args), (payments.map { case CaseObj(t, fields) =>
              (fields("assetId"), fields("amount")) match {
                case (CONST_BYTESTR(b), CONST_LONG(a)) => InvokeScriptResult.AttachedPayment(IssuedAsset(b), a)
                case (_, CONST_LONG(a)) => InvokeScriptResult.AttachedPayment(Waves, a)
              }
-          }), fromLangResult(r))
+          }), fromLangResult(invokeId, r))
         }
-        InvokeScriptResult(dataOps, transfers, issues, reissues, burns, sponsorFees, invokes)
+        InvokeScriptResult(dataOps, transfers, issues, reissues, burns, sponsorFees, leases, leaseCancels, invokes)
 
       case i: IncompleteResult => throw new IllegalArgumentException(s"Cannot cast incomplete result: $i")
     }
@@ -194,6 +215,12 @@ object InvokeScriptResult {
   private def toPbSponsorFee(sf: SponsorFee) =
     PBInvokeScriptResult.SponsorFee(Some(Amount(sf.assetId.toByteString, sf.minSponsoredAssetFee.getOrElse(0))))
 
+  private def toPbLease(l: Lease) =
+    PBInvokeScriptResult.Lease(Some(PBRecipients.create(l.recipient)), l.amount, l.nonce, l.leaseId.toByteString)
+
+  private def toPbLeaseCancel(l: LeaseCancel) =
+    PBInvokeScriptResult.LeaseCancel(ByteString.copyFrom(l.leaseId.arr))
+
   private def toPbErrorMessage(em: ErrorMessage) =
     PBInvokeScriptResult.ErrorMessage(em.code, em.text)
 
@@ -229,6 +256,14 @@ object InvokeScriptResult {
     SponsorFee(amount.assetId.toByteStr, Some(amount.amount).filter(_ > 0))
   }
 
+  private def toVanillaLease(l: PBInvokeScriptResult.Lease) = {
+    val recipient = PBRecipients.toAddressOrAlias(l.getRecipient, AddressScheme.current.chainId).explicitGet()
+    Lease(recipient, l.amount, l.nonce, l.leaseId.toByteStr)
+  }
+
+  private def toVanillaLeaseCancel(sf: PBInvokeScriptResult.LeaseCancel) =
+    LeaseCancel(sf.leaseId.toByteStr)
+
   private def toVanillaErrorMessage(b: PBInvokeScriptResult.ErrorMessage) =
     ErrorMessage(b.code, b.text)
 
@@ -243,6 +278,8 @@ object InvokeScriptResult {
       pbValue.reissues.map(toVanillaReissue),
       pbValue.burns.map(toVanillaBurn),
       pbValue.sponsorFees.map(toVanillaSponsorFee),
+      pbValue.leases.map(toVanillaLease),
+      pbValue.leaseCancels.map(toVanillaLeaseCancel),
       pbValue.invokes.map(toVanillaInvocation),
       pbValue.errorMessage.map(toVanillaErrorMessage)
     )

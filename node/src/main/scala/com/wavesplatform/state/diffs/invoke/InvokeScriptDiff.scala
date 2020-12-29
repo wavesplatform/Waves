@@ -172,7 +172,7 @@ object InvokeScriptDiff {
               })
               TracedResult(
                 scriptResultE,
-                List(InvokeScriptTrace(tx.dAppAddress, functionCall, scriptResultE.map(_._2._1), scriptResultE.fold(_.log, _._2._2)))
+                List(InvokeScriptTrace(tx.root.id.value(), tx.dAppAddress, functionCall, scriptResultE.map(_._2._1), scriptResultE.fold(_.log, _._2._2)))
               )
             }
 

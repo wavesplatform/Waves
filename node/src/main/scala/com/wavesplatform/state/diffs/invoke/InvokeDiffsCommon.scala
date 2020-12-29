@@ -3,7 +3,7 @@ package com.wavesplatform.state.diffs.invoke
 import cats.implicits._
 import com.google.common.base.Throwables
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures.BlockV5
@@ -33,7 +33,7 @@ import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
-import com.wavesplatform.transaction.validation.impl.SponsorFeeTxValidator
+import com.wavesplatform.transaction.validation.impl.{LeaseCancelTxValidator, LeaseTxValidator, SponsorFeeTxValidator}
 import com.wavesplatform.utils._
 import shapeless.Coproduct
 
@@ -161,16 +161,19 @@ object InvokeDiffsCommon {
       if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - invocationComplexity.toInt
       else Int.MaxValue
 
-    val actionsByType  = actions.groupBy(a => if (classOf[DataOp].isAssignableFrom(a.getClass)) classOf[DataOp] else a.getClass).withDefaultValue(Nil)
-    val transferList   = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
-    val issueList      = actionsByType(classOf[Issue]).asInstanceOf[List[Issue]]
-    val reissueList    = actionsByType(classOf[Reissue]).asInstanceOf[List[Reissue]]
-    val burnList       = actionsByType(classOf[Burn]).asInstanceOf[List[Burn]]
-    val sponsorFeeList = actionsByType(classOf[SponsorFee]).asInstanceOf[List[SponsorFee]]
-    val dataEntries    = actionsByType(classOf[DataOp]).asInstanceOf[List[DataOp]].map(dataItemToEntry)
+    val actionsByType   = actions.groupBy(a => if (classOf[DataOp].isAssignableFrom(a.getClass)) classOf[DataOp] else a.getClass).withDefaultValue(Nil)
+    val transferList    = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
+    val issueList       = actionsByType(classOf[Issue]).asInstanceOf[List[Issue]]
+    val reissueList     = actionsByType(classOf[Reissue]).asInstanceOf[List[Reissue]]
+    val burnList        = actionsByType(classOf[Burn]).asInstanceOf[List[Burn]]
+    val sponsorFeeList  = actionsByType(classOf[SponsorFee]).asInstanceOf[List[SponsorFee]]
+    val leaseList       = actionsByType(classOf[Lease]).asInstanceOf[List[Lease]]
+    val leaseCancelList = actionsByType(classOf[LeaseCancel]).asInstanceOf[List[LeaseCancel]]
+    val dataEntries     = actionsByType(classOf[DataOp]).asInstanceOf[List[DataOp]].map(dataItemToEntry)
 
     for {
       _ <- TracedResult(checkDataEntries(tx, dataEntries, version)).leftMap(FailedTransactionError.dAppExecution(_, invocationComplexity))
+      _ <- TracedResult(checkLeaseCancels(leaseCancelList)).leftMap(FailedTransactionError.dAppExecution(_, invocationComplexity))
       _ <- TracedResult(
         Either.cond(
           actions.length - dataEntries.length <= ContractLimits.MaxCallableActionsAmount,
@@ -248,7 +251,13 @@ object InvokeDiffsCommon {
         issueList,
         reissueList,
         burnList,
-        sponsorFeeList
+        sponsorFeeList,
+        leaseList.map {
+          case l @ Lease(recipient, amount, nonce) =>
+            val id = Lease.calculateId(l, tx.root.id.value())
+            InvokeScriptResult.Lease(AddressOrAlias.fromRide(recipient).explicitGet(), amount, nonce, id)
+        },
+        leaseCancelList
       )
 
       resultDiff = compositeDiff.copy(
@@ -355,6 +364,15 @@ object InvokeDiffsCommon {
         s"WriteSet size can't exceed ${ContractLimits.MaxWriteSetSizeInBytes} bytes, actual: $totalDataBytes bytes"
       )
     } yield ()
+
+  private def checkLeaseCancels(leaseCancels: Seq[LeaseCancel]): Either[String, Unit] = {
+    val duplicates = leaseCancels.diff(leaseCancels.distinct)
+    Either.cond(
+      duplicates.isEmpty,
+      (),
+      s"Duplicate LeaseCancel id(s): ${duplicates.distinct.map(_.leaseId).mkString(", ")}"
+    )
+  }
 
   private def foldActions(
       sblockchain: Blockchain,
@@ -488,6 +506,20 @@ object InvokeDiffsCommon {
               r <- callAssetVerifierWithPseudoTx(sponsorDiff, sponsorFee.assetId, pseudoTx, AssetContext.Sponsor)
             } yield r
 
+          def applyLease(l: Lease): TracedResult[ValidationError, Diff] =
+            for {
+              _         <- TracedResult(LeaseTxValidator.validateAmount(l.amount))
+              recipient <- TracedResult(AddressOrAlias.fromRide(l.recipient))
+              leaseId = Lease.calculateId(l, tx.root.id())
+              diff <- DiffsCommon.processLease(blockchain, l.amount, pk, recipient, fee = 0, leaseId, Some(tx.root.id.value()))
+            } yield diff
+
+          def applyLeaseCancel(l: LeaseCancel): TracedResult[ValidationError, Diff] =
+            for {
+              _    <- TracedResult(LeaseCancelTxValidator.checkLeaseId(l.leaseId))
+              diff <- DiffsCommon.processLeaseCancel(blockchain, pk, fee = 0, blockTime, l.leaseId, Some(tx.root.id.value()))
+            } yield diff
+
           def callAssetVerifierWithPseudoTx(
               actionDiff: Either[FailedTransactionError, Diff],
               assetId: ByteStr,
@@ -522,11 +554,13 @@ object InvokeDiffsCommon {
               } else {
                 PublicKey(new Array[Byte](32))
               })
-            case d: DataOp      => applyDataItem(d)
-            case i: Issue       => applyIssue(tx, pk, i)
-            case r: Reissue     => applyReissue(r, pk)
-            case b: Burn        => applyBurn(b, pk)
-            case sf: SponsorFee => applySponsorFee(sf, pk)
+            case d: DataOp       => applyDataItem(d)
+            case i: Issue        => applyIssue(tx, pk, i)
+            case r: Reissue      => applyReissue(r, pk)
+            case b: Burn         => applyBurn(b, pk)
+            case sf: SponsorFee  => applySponsorFee(sf, pk)
+            case l: Lease        => applyLease(l).leftMap(asFailedScriptError)
+            case lc: LeaseCancel => applyLeaseCancel(lc).leftMap(asFailedScriptError)
           }
           diffAcc |+| diff.leftMap(_.addComplexity(curDiff.scriptsComplexity))
 

@@ -10,6 +10,7 @@ import com.wavesplatform.api.grpc.{TransactionStatus => PBTransactionStatus, _}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi.RequestAwaitTime
+import com.wavesplatform.it.sync._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
@@ -290,7 +291,7 @@ object SyncGrpcApi extends Assertions {
     def setScript(
         sender: KeyPair,
         script: Either[Array[Byte], Option[Script]],
-        fee: Long,
+        fee: Long = setScriptFee,
         timestamp: Long = System.currentTimeMillis(),
         version: Int = 1,
         waitForTx: Boolean = false
@@ -319,7 +320,7 @@ object SyncGrpcApi extends Assertions {
         dApp: Recipient,
         functionCall: Option[FUNCTION_CALL],
         payments: Seq[Amount] = Seq.empty,
-        fee: Long,
+        fee: Long = invokeFee,
         version: Int = 2,
         feeAssetId: ByteString = ByteString.EMPTY,
         waitForTx: Boolean = false
@@ -342,9 +343,8 @@ object SyncGrpcApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).broadcastLeaseCancel(source, leaseId, fee, version)), waitForTx)
     }
 
-    def getActiveLeases(address: ByteString): List[PBSignedTransaction] = {
-      val leases = accounts.getActiveLeases(AccountRequest.of(address))
-      leases.toList.map(resp => resp.getTransaction)
+    def getActiveLeases(address: ByteString): List[LeaseResponse] = {
+       accounts.getActiveLeases(AccountRequest.of(address)).toList
     }
 
     def updateAssetInfo(
@@ -390,5 +390,10 @@ object SyncGrpcApi extends Assertions {
     }
 
     def getStatuses(request: TransactionsByIdRequest): Seq[PBTransactionStatus] = sync(async(n).getStatuses(request))
+
+    def getStatus(txId: String): PBTransactionStatus = {
+      val request = TransactionsByIdRequest.of(Seq(ByteString.copyFrom(Base58.decode(txId))))
+      sync(async(n).getStatuses(request)).head
+    }
   }
 }

@@ -362,7 +362,7 @@ abstract class LevelDBWriter private[database] (
       balances: Map[AddressId, Map[Asset, Long]],
       leaseBalances: Map[AddressId, LeaseBalance],
       addressTransactions: Map[AddressId, Seq[TransactionId]],
-      leaseStates: Map[ByteStr, Boolean],
+      leaseStates: Map[ByteStr, (Boolean, Option[LeaseActionInfo])],
       issuedAssets: Map[IssuedAsset, NewAssetInfo],
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
       filledQuantity: Map[ByteStr, VolumeAndFee],
@@ -460,8 +460,18 @@ abstract class LevelDBWriter private[database] (
         expiredKeys ++= updateHistory(rw, Keys.assetDetailsHistory(asset), threshold, Keys.assetDetails(asset))
       }
 
-      for ((leaseId, state) <- leaseStates) {
-        rw.put(Keys.leaseStatus(leaseId)(height), state)
+      for ((leaseId, (isActive, actionInfoOpt)) <- leaseStates) {
+        actionInfoOpt.foreach {
+          case LeaseActionInfo(_, dAppPublicKey, recipient, amount) =>
+            val key = Keys.leaseActionDetails(leaseId)
+            val details = rw.get(key).fold(
+              LeaseDetails(dAppPublicKey, recipient, height, amount, isActive)
+            )(
+              _.copy(isActive = isActive)
+            )
+            rw.put(key, Some(details))
+        }
+        rw.put(Keys.leaseStatus(leaseId)(height), isActive)
         expiredKeys ++= updateHistory(rw, Keys.leaseStatusHistory(leaseId), threshold, Keys.leaseStatus(leaseId))
       }
 
@@ -666,6 +676,17 @@ abstract class LevelDBWriter private[database] (
             }
           }
 
+          writableDB
+            .withResource(loadLeaseIds(_, currentHeight, currentHeight, includeCancelled = true))
+            .foreach { leaseId =>
+              rollbackLeaseStatus(rw, leaseId, currentHeight)
+              val key = Keys.leaseActionDetails(leaseId)
+              rw.get(key).foreach {
+                case lease if lease.isActive => rw.delete(key)
+                case lease                   => rw.put(key, Some(lease.copy(isActive = true)))
+              }
+            }
+
           rollbackAssetsInfo(rw, currentHeight)
 
           val transactions = transactionsAtHeight(h)
@@ -681,10 +702,8 @@ abstract class LevelDBWriter private[database] (
                 case _: IssueTransaction | _: UpdateAssetInfoTransaction | _: ReissueTransaction | _: BurnTransaction | _: SponsorFeeTransaction =>
                 // asset info already restored
 
-                case tx: LeaseTransaction =>
-                  rollbackLeaseStatus(rw, tx.id(), currentHeight)
-                case tx: LeaseCancelTransaction =>
-                  rollbackLeaseStatus(rw, tx.leaseId, currentHeight)
+                case _: LeaseTransaction | _: LeaseCancelTransaction =>
+                // leases already restored
 
                 case tx: SetScriptTransaction =>
                   val address = tx.sender.toAddress
@@ -824,7 +843,10 @@ abstract class LevelDBWriter private[database] (
     transactionInfo(leaseId, db) match {
       case Some((h, lt: LeaseTransaction, true)) =>
         Some(LeaseDetails(lt.sender, lt.recipient, h, lt.amount, loadLeaseStatus(db, leaseId)))
-      case _ => None
+      case Some((_, _, ApplicationStatus.ScriptExecutionFailed)) =>
+        None
+      case _ =>
+        db.get(Keys.leaseActionDetails(leaseId))
     }
   }
 

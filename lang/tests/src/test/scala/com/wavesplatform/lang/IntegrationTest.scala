@@ -24,7 +24,8 @@ import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, Evaluator
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.Issue
+import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
+import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease}
 import com.wavesplatform.lang.v1.{CTX, ContractLimits}
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -101,6 +102,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         .leftMap(_.getMessage)
     )
   }
+
+  val v5Ctx = WavesContext.build(DirectiveSet(V5, Account, DApp).explicitGet())
 
   property("simple let") {
     val src =
@@ -2140,5 +2143,35 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       }
     }
     f("q")""", version = V4) shouldBe Symbol("Left")
+  }
+
+  property("different Lease action constructors") {
+    val script = " Lease(Address(base58''), 1234567) == Lease(Address(base58''), 1234567, 0) "
+    genericEval[Environment, EVALUATED](script, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe
+      Right(CONST_BOOLEAN(true))
+  }
+
+  property("calculateLeaseId") {
+    val txId = ByteStr.decodeBase58("aaaa").get
+    val id1 = Lease.calculateId(Lease(Address(ByteStr.decodeBase58("bbbb").get), 1234567, 123), txId)
+    val id2 = Lease.calculateId(Lease(Alias("alias"), 9876, 100), txId)
+    val script =
+      s"""
+         | calculateLeaseId(Lease(Address(base58'bbbb'), 1234567, 123)) == base58'$id1' &&
+         | calculateLeaseId(Lease(Alias("alias"), 9876, 100))           == base58'$id2' &&
+         | base58'$id1' != base58'$id2'
+       """.stripMargin
+    genericEval[Environment, EVALUATED](script, ctxt = v5Ctx, version = V5, env = utils.buildEnvironment(txId)) shouldBe
+      Right(CONST_BOOLEAN(true))
+  }
+
+  property("calculateLeaseId restrictions") {
+    val script1 = s" calculateLeaseId(Lease(Address(base58'${"a"* 36}'), 1234567, 123)) "
+    val script2 = s""" calculateLeaseId(Lease(Alias("${"a"* 31}"), 1234567, 123)) """
+
+    genericEval[Environment, EVALUATED](script1, ctxt = v5Ctx, version = V5, env = utils.environment) should
+      produce("Address bytes length=27 exceeds limit=26")
+    genericEval[Environment, EVALUATED](script2, ctxt = v5Ctx, version = V5, env = utils.environment) should
+      produce("Alias name length=31 exceeds limit=30")
   }
 }

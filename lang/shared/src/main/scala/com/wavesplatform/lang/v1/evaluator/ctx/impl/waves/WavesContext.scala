@@ -77,6 +77,9 @@ object WavesContext {
 
   private def fromV5Funcs(proofsEnabled: Boolean, version: StdLibVersion) =
     fromV4Funcs(proofsEnabled, version) ++ Array(
+      simplifiedLeaseActionConstructor,
+      detailedLeaseActionConstructor,
+      calculateLeaseId,
       callDAppF(version)
     )
 
