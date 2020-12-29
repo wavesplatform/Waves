@@ -120,7 +120,8 @@ class TraceResultJsonTest extends PropSpec with Matchers {
                                       |        "burns": [],
                                       |        "sponsorFees": [],
                                       |        "leases" : [],
-                                      |        "leaseCancels" : []
+                                      |        "leaseCancels" : [],
+                                      |        "invokes": []
                                       |      },
                                       |      "error": null
                                       |    }
@@ -189,7 +190,8 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         |        "burns": [],
         |        "sponsorFees": [],
         |        "leases" : [],
-        |        "leaseCancels" : []
+        |        "leaseCancels" : [],
+        |        "invokes": []
         |      },
         |      "error": null,
         |      "vars": [

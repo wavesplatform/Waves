@@ -9,7 +9,7 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, LIST, LONG, STRING, UNION, UNIT, optionLong}
+import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{scriptTransfer => _, _}
@@ -509,6 +509,56 @@ object Functions {
           }
       }
     }
+
+  def callDAppF(version: StdLibVersion): BaseFunction[Environment] =
+    NativeFunction.withEnvironment[Environment](
+      "Invoke",
+      Map[StdLibVersion, Long](V4 -> 30L),
+      CALLDAPP,
+      ANY,
+      ("dapp", addressOrAliasType),
+      ("name", optionString),
+      ("args", LIST(ANY)),
+      ("payments", listPayment)
+    ) {
+      new ContextfulNativeFunction[Environment]("Invoke", ANY, Seq(("dapp", BYTESTR), ("name", STRING), ("args", LIST(ANY)), ("payments", listPayment))) {
+        override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] = {
+          for {
+            dappBytes <- input match {
+              case (env, (dapp: CaseObj) :: _) if dapp.caseType == addressType =>
+                dapp.fields("bytes") match {
+                  case CONST_BYTESTR(d) => d.pure[F]
+                  case _ => ???
+                }
+              case (env, (dapp: CaseObj) :: _) if dapp.caseType == aliasType =>
+                dapp.fields("alias") match {
+                  case CONST_STRING(a) => env.resolveAlias(a).map(_.explicitGet().bytes)
+                }
+              case _ => ???
+            }
+            name = input match {
+              case (_, _ :: CONST_STRING(name) :: _) => name
+              case (_, _ :: CaseObj(UNIT, _) :: _) => "default"
+              case _ => ???
+            }
+            result <- input match {
+              case (env,  _ :: _ :: ARR(args) :: ARR(payments) :: Nil) =>
+                env
+                  .callScript(Recipient.Address(dappBytes), name, args.toList, (payments.map {
+                    case (p: CaseObj) if p.caseType == paymentType => List("assetId", "amount").map(p.fields) match {
+                      case List(CONST_BYTESTR(a), CONST_LONG(v)) => (Some(a.arr), v)
+                      case List(CaseObj(UNIT, _), CONST_LONG(v)) => (None, v)
+                    }
+                    case _ => ???
+                  }))
+                  .map(_.leftMap(_.toString))
+              case (_, xs) => notImplemented[F, EVALUATED](s"Invoke(dapp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
+            }
+          } yield result
+        }
+      }
+    }
+
 
   private def withExtract[C[_[_]]](f: BaseFunction[C], version: StdLibVersion): BaseFunction[C] = {
     val args = f.signature.args.zip(f.args).map {

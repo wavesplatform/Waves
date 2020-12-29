@@ -14,10 +14,17 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain._
 
-sealed trait ScriptResult
+sealed trait ScriptResult {
+  def returnedValue: EVALUATED                                                    = unit
+  def invokes: Seq[(Address, String, Seq[EVALUATED], Seq[CaseObj], ScriptResult)] = Nil
+}
 case class ScriptResultV3(ds: List[DataItem[_]], ts: List[AssetTransfer], unusedComplexity: Int) extends ScriptResult
-case class ScriptResultV4(actions: List[CallableAction], unusedComplexity: Int)                  extends ScriptResult
-case class IncompleteResult(expr: EXPR, unusedComplexity: Int)                                   extends ScriptResult
+case class ScriptResultV4(
+    actions: List[CallableAction],
+    unusedComplexity: Int,
+    override val returnedValue: EVALUATED = unit
+) extends ScriptResult
+case class IncompleteResult(expr: EXPR, unusedComplexity: Int) extends ScriptResult
 
 object ScriptResult {
   type ActionInput    = (EvaluationContext[Environment, Id], ByteStr, Map[String, EVALUATED])
@@ -267,7 +274,8 @@ object ScriptResult {
     actions: Seq[EVALUATED],
     handlers: ActionHandlers,
     version: StdLibVersion,
-    unusedComplexity: Int
+    unusedComplexity: Int,
+    ret: EVALUATED = unit
   ): Either[String, ScriptResultV4] =
     actions.toList
       .traverse {
@@ -279,7 +287,7 @@ object ScriptResult {
 
         case other => err(other, version)
       }
-      .map(ScriptResultV4(_, unusedComplexity))
+      .map(ScriptResultV4(_, unusedComplexity, ret))
 
   private def fromV4ActionHandlers(v: StdLibVersion): ActionHandlers =
     Map(
@@ -315,6 +323,12 @@ object ScriptResult {
       case (CaseObj(tpe, fields), V3) => processScriptResultV3(ctx, tpe, fields, unusedComplexity)
       case (ARR(actions), V4)         => processScriptResult(ctx, txId, actions, v4ActionHandlers, V4, unusedComplexity)
       case (ARR(actions), V5)         => processScriptResult(ctx, txId, actions, v5ActionHandlers, V5, unusedComplexity)
+      case (CaseObj(tpe, fields), V5) if fields.size == 2 =>
+        // XXX check tpe
+        (fields("_1"), fields("_2")) match {
+          case (ARR(actions), ret) => processScriptResult(ctx, txId, actions, v5ActionHandlers, V5, unusedComplexity, ret)
+          case _                   => err(tpe.name, version)
+        }
       case c => err(c.toString, version)
     }
 }

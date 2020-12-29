@@ -49,5 +49,12 @@
       paramsDoc: [ "Transfer transaction in protobuf-encoded binary format." ]
       complexity: 5
     }
+    {
+      name: "Invoke"
+      params: [ "Address|Alias", "String|Unit", "List[Any]", "List[AttachedPayment]" ]
+      doc: "Invoke function from other dApp. (Need to move to the V5)"
+      paramsDoc: [ "dApp", "function name", "arguments", "Attached payments" ]
+      complexity: 30
+    }
   ]
 }

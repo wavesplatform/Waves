@@ -757,7 +757,8 @@ class TransactionsRouteSpec
             |         {
             |            "leaseId":"$leaseCancelId"
             |         }
-            |      ]
+            |      ],
+            |      "invokes" : [ ]
             |    },
             |    "error" : null,
             |    "vars" : [ {

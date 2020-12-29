@@ -89,7 +89,8 @@ object WavesContext {
     fromV4Funcs(proofsEnabled, version) ++ Array(
       simplifiedLeaseActionConstructor,
       detailedLeaseActionConstructor,
-      calculateLeaseId
+      calculateLeaseId,
+      callDAppF(version)
     )
 
   private def variableFuncs(version: StdLibVersion, scriptType: ScriptType, proofsEnabled: Boolean) = {

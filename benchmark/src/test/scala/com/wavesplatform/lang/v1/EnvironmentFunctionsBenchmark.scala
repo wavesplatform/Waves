@@ -11,7 +11,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, DApp, V4}
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark._
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, EXPR, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, CONST_STRING, EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions
@@ -20,6 +20,7 @@ import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.{Common, Global}
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.wallet.Wallet
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
@@ -125,6 +126,7 @@ object EnvironmentFunctionsBenchmark {
           _.toString,
           address => Address(ByteStr(address.bytes))
         )
+    override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)]): Either[ValidationError, EVALUATED] = ???
   }
 
   val environmentFunctions = new EnvironmentFunctions(defaultEnvironment)

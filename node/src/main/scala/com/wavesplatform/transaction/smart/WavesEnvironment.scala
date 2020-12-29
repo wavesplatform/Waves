@@ -9,16 +9,22 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.MultiPaymentPolicyProvider._
 import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
 import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff}
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.ApplicationStatus.Succeeded
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import monix.eval.Coeval
 import shapeless._
 
@@ -33,16 +39,18 @@ class WavesEnvironment(
     blockchain: Blockchain,
     val tthis: Environment.Tthis,
     ds: DirectiveSet,
-    override val txId: ByteStr,
-    override val dAppAlias: Boolean = false
+    override val txId: ByteStr
 ) extends Environment[Id] {
   import com.wavesplatform.lang.v1.traits.Environment._
+
+  def currentBlockchain() = blockchain
 
   override def height: Long = h()
 
   override def multiPaymentAllowed: Boolean = blockchain.allowsMultiPayment
 
   override def transactionById(id: Array[Byte]): Option[Tx] =
+    // There are no new transactions in currentBlockchain
     blockchain
       .transactionInfo(ByteStr(id))
       .collect {
@@ -54,6 +62,7 @@ class WavesEnvironment(
     in.value()
 
   override def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer] =
+    // There are no new transactions in currentBlockchain
     blockchain
       .transferById(ByteStr(id))
       .map(t => RealTransactionWrapper.mapTransferTx(t._2))
@@ -71,7 +80,7 @@ class WavesEnvironment(
             .flatMap(blockchain.resolveAlias)
             .toOption
       }
-      data <- blockchain
+      data <- currentBlockchain()
         .accountData(address, key)
         .map((_, dataType))
         .flatMap {
@@ -84,6 +93,7 @@ class WavesEnvironment(
     } yield data
   }
   override def resolveAlias(name: String): Either[String, Recipient.Address] =
+    // There are no new aliases in currentBlockchain
     blockchain
       .resolveAlias(com.wavesplatform.account.Alias.create(name).explicitGet())
       .map(a => Recipient.Address(ByteStr(a.bytes)))
@@ -99,7 +109,7 @@ class WavesEnvironment(
         case Alias(name)    => com.wavesplatform.account.Alias.create(name)
       }
       address <- blockchain.resolveAlias(aoa)
-      balance = blockchain.balance(address, Asset.fromCompatId(maybeAssetId.map(ByteStr(_))))
+      balance = currentBlockchain().balance(address, Asset.fromCompatId(maybeAssetId.map(ByteStr(_))))
     } yield balance).left.map(_.toString)
   }
 
@@ -110,7 +120,7 @@ class WavesEnvironment(
         case Alias(name)    => com.wavesplatform.account.Alias.create(name)
       }
       address <- blockchain.resolveAlias(aoa)
-      portfolio = blockchain.wavesPortfolio(address)
+      portfolio = currentBlockchain().wavesPortfolio(address)
     } yield Environment.BalanceDetails(
       portfolio.balance - portfolio.lease.out,
       portfolio.balance,
@@ -120,11 +130,12 @@ class WavesEnvironment(
   }
 
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
+    // There are no new transactions in currentBlockchain
     blockchain.transactionMeta(ByteStr(id)).collect { case (h, Succeeded) => h.toLong }
 
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
     for {
-      assetDesc <- blockchain.assetDescription(IssuedAsset(ByteStr(id)))
+      assetDesc <- currentBlockchain().assetDescription(IssuedAsset(ByteStr(id)))
     } yield {
       ScriptAssetInfo(
         id = ByteStr(id),
@@ -142,15 +153,18 @@ class WavesEnvironment(
   }
 
   override def lastBlockOpt(): Option[BlockInfo] =
+    // There are no new blocks in currentBlockchain
     blockchain.lastBlockHeader
       .map(block => toBlockInfo(block.header, height.toInt, blockchain.vrf(height.toInt)))
 
   override def blockInfoByHeight(blockHeight: Int): Option[BlockInfo] =
+    // There are no new blocks in currentBlockchain
     blockchain
       .blockHeader(blockHeight)
       .map(blockHAndSize => toBlockInfo(blockHAndSize.header, blockHeight, blockchain.vrf(blockHeight)))
 
   private def toBlockInfo(blockH: BlockHeader, bHeight: Int, vrf: Option[ByteStr]) = {
+    // There are no new blocks in currentBlockchain
     BlockInfo(
       timestamp = blockH.timestamp,
       height = bHeight,
@@ -177,4 +191,43 @@ class WavesEnvironment(
         _.toString,
         address => Address(ByteStr(address.bytes))
       )
+
+  override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)]): Either[ValidationError, EVALUATED] = ???
+}
+
+class DAppEnvironment(
+    nByte: Byte,
+    in: Coeval[Environment.InputEntity],
+    h: Coeval[Int],
+    blockchain: Blockchain,
+    tthis: Environment.Tthis,
+    ds: DirectiveSet,
+    tx: InvokeScriptTransaction,
+    currentDApp: com.wavesplatform.account.Address,
+    currentDAppPk: com.wavesplatform.account.PublicKey,
+    senderDApp: com.wavesplatform.account.Address,
+    var runsLimit: Int,
+    invokeDeep: Int
+) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id()) {
+
+  var currentDiff: Diff = Diff.empty
+
+  override def currentBlockchain() = CompositeBlockchain(blockchain, Some(currentDiff))
+
+  override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)]): Either[ValidationError, EVALUATED] = {
+    com.wavesplatform.account.Address.fromBytes(dApp.bytes.arr).flatMap { dApp =>
+      val inv: InvokeScript = InvokeScript(currentDApp, currentDAppPk, dApp, FUNCTION_CALL(User(func, func), args), payments.map(p => Payment(p._2, p._1.fold(Waves:Asset)(a => IssuedAsset(ByteStr(a))))), tx.root)
+      InvokeScriptDiff(currentBlockchain(), blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp+1, false, runsLimit, invokeDeep)(inv).resultE.map {
+        case (diff, res) =>
+          val fixedDiff = diff.copy(scriptResults = Map(tx.root.id() ->
+            InvokeScriptResult(invokes = Seq(InvokeScriptResult.Invocation(dApp,
+                                                                           InvokeScriptResult.Call(func, args),
+                                                                           payments.map(p => InvokeScriptResult.AttachedPayment(p._1.fold(Asset.Waves:Asset)(a => IssuedAsset(ByteStr(a))), p._2)),
+                                                                           diff.scriptResults(tx.root.id()))))))
+          currentDiff = currentDiff combine fixedDiff
+          runsLimit = runsLimit - diff.scriptsRun
+          res
+      }
+    }
+  }
 }

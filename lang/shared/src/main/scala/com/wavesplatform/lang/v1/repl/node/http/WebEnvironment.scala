@@ -12,6 +12,8 @@ import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
+import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
+import com.wavesplatform.lang.ValidationError
 import io.circe.{Decoder, HCursor}
 import shapeless.Coproduct
 
@@ -143,4 +145,6 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
 
   private def getEntity[F[_]: Functor: ResponseWrapper, A : Decoder, B](url: String)(implicit ev: A => B): Future[F[B]] =
     client.get[F, A](url).map(_.map(ev))
+
+  override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)]): Future[Either[ValidationError, EVALUATED]] = ???
 }
