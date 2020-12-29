@@ -207,8 +207,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   }
 
   def createLeaseCancel(sender: KeyPair, leaseId: ByteStr, cancelFee: Long, timestamp: Long): Gen[LeaseCancelTransaction] = {
-    val v1 = LeaseCancelTransaction.signed(1.toByte, sender.publicKey, leaseId, cancelFee, timestamp + 1, sender.privateKey).explicitGet()
-    val v2 = LeaseCancelTransaction.signed(2.toByte, sender.publicKey, leaseId, cancelFee, timestamp + 1, sender.privateKey).explicitGet()
+    val v1 = LeaseCancelTransaction.selfSigned(1.toByte, sender, leaseId, cancelFee, timestamp + 1).explicitGet()
+    val v2 = LeaseCancelTransaction.selfSigned(2.toByte, sender, leaseId, cancelFee, timestamp + 1).explicitGet()
     Gen.oneOf(v1, v2)
   }
   val leaseAndCancelGen: Gen[(LeaseTransaction, LeaseCancelTransaction)] = for {

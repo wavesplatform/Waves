@@ -214,7 +214,7 @@ class DebugApiRouteSpec
                |     StringEntry("key", "str"),
                |     BinaryEntry("key", base58''),
                |     DeleteEntry("key"),
-               |     ScriptTransfer(Address(base58'${TxHelpers.signer(1).toAddress}'), 1, base58'${TestValues.asset}')
+               |     ScriptTransfer(Address(base58'${TxHelpers.secondAddress}'), 1, base58'${TestValues.asset}')
                |]
                |
                |@Callable(i)
@@ -267,7 +267,7 @@ class DebugApiRouteSpec
       }
 
       def testPayment(result: String) = withClue("payment") {
-        val tx = TxHelpers.invoke(TxHelpers.signer(1).toAddress, "test", fee = 800000, payments = Seq(Payment(1L, TestValues.asset)))
+        val tx = TxHelpers.invoke(TxHelpers.secondAddress, "test", fee = 800000, payments = Seq(Payment(1L, TestValues.asset)))
 
         jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
           val json = Json.parse(responseAs[String])
