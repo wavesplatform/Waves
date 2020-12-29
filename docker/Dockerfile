@@ -1,5 +1,5 @@
 FROM openjdk:8-jdk-stretch as builder
-ARG WAVES_VERSION="latest"
+ARG WAVES_VERSION="current"
 ARG BRANCH="version-1.1.x"
 ARG DEB_PACKAGE_NETWORKS
 
@@ -12,7 +12,7 @@ ENV DEB_PACKAGE_NETWORKS=$DEB_PACKAGE_NETWORKS
 RUN chmod +x /waves_current/docker/build.sh && /waves_current/docker/build.sh
 
 FROM openjdk:11-jre-slim
-ARG WAVES_VERSION="latest"
+ARG WAVES_VERSION="current"
 ARG WAVES_LOG_LEVEL="INFO"
 ARG WAVES_HEAP_SIZE="2g"
 ARG WAVES_NETWORK="mainnet"
