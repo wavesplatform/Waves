@@ -634,7 +634,8 @@ class DebugApiRouteSpec
             |        {
             |          "leaseId": "$leaseCancelId"
             |        }
-            |      ]
+            |      ],
+            |      "invokes": []
             |    },
             |    "error": null,
             |    "vars": [
