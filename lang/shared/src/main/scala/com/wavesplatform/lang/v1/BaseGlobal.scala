@@ -6,7 +6,7 @@ import cats.implicits._
 import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.meta.{FunctionSignatures, MetaMapper, ParsedMeta}
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
-import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, V1, V2, DApp => DAppType}
+import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, V1, V2, V5, DApp => DAppType}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
@@ -214,7 +214,14 @@ trait BaseGlobal {
         ContractScript.estimateComplexity(version, dApp, ScriptEstimatorV1)
       else
         Right(())
-      _ <- ContractScript.checkComplexity(version, dApp, maxComplexity, complexities, useReducedVerifierLimit = true, allowContinuation = true)
+      _ <- ContractScript.checkComplexity(
+        version,
+        dApp,
+        maxComplexity,
+        complexities,
+        useReducedVerifierLimit = true,
+        allowContinuation = version >= V5
+      )
     } yield ()
 
   def decompile(compiledCode: String): Either[ScriptParseError, String] =
