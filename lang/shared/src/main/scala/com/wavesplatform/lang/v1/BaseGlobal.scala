@@ -147,7 +147,7 @@ trait BaseGlobal {
     for {
       expr <- compiler(input, context)
       bytes = serializeExpression(expr, version)
-      _ <- ExprScript.validateBytes(bytes)
+      _          <- ExprScript.validateBytes(bytes)
       complexity <- ExprScript.estimateExact(expr, version, estimator)
     } yield (bytes, expr, complexity)
 
@@ -189,7 +189,7 @@ trait BaseGlobal {
         (0L, annotatedComplexities)
       )(v => (annotatedComplexities(v.u.name), annotatedComplexities - v.u.name))
       bytes <- serializeContract(dApp, stdLibVersion)
-      _ <- ContractScript.validateBytes(bytes)
+      _     <- ContractScript.validateBytes(bytes)
     } yield DAppInfo(
       bytes,
       dApp,
@@ -210,17 +210,17 @@ trait BaseGlobal {
       estimator: ScriptEstimator
   ): Either[String, Unit] =
     for {
-      _ <-
-        if (estimator == ScriptEstimatorV2)
-          ContractScript.estimateComplexity(version, dApp, ScriptEstimatorV1)
-        else
-          Right(())
-      _ <- ContractScript.checkComplexity(version, dApp, maxComplexity, complexities, useReducedVerifierLimit = true)
+      _ <- if (estimator == ScriptEstimatorV2)
+        ContractScript.estimateComplexity(version, dApp, ScriptEstimatorV1)
+      else
+        Right(())
+      _ <- ContractScript.checkComplexity(version, dApp, maxComplexity, complexities, useReducedVerifierLimit = true, allowContinuation = true)
     } yield ()
 
   def decompile(compiledCode: String): Either[ScriptParseError, String] =
-      Script.fromBase64String(compiledCode.trim)
-        .map(script => Script.decompile(script)._1)
+    Script
+      .fromBase64String(compiledCode.trim)
+      .map(script => Script.decompile(script)._1)
 
   def dAppFuncTypes(compiledCode: String): Either[ScriptParseError, FunctionSignatures] =
     for {
@@ -240,8 +240,9 @@ trait BaseGlobal {
       meta.callableFuncTypes.fold(List.empty[(String, List[(String, FINAL)])])(
         types =>
           (types zip dApp.callableFuncs)
-            .map { case (argTypes, func) =>
-              func.u.name -> (func.u.args zip argTypes)
+            .map {
+              case (argTypes, func) =>
+                func.u.name -> (func.u.args zip argTypes)
             }
       )
     FunctionSignatures(meta.version, argTypesWithFuncName)
@@ -278,7 +279,7 @@ trait BaseGlobal {
   def median(seq: Seq[Long]): Long = {
     @tailrec
     def findKMedianInPlace(arr: ArrayView, k: Int)(implicit choosePivot: ArrayView => Long): Long = {
-      val a = choosePivot(arr)
+      val a      = choosePivot(arr)
       val (s, b) = arr partitionInPlace (a >)
       if (s.size == k) a
       // The following test is used to avoid infinite repetition
@@ -324,12 +325,14 @@ object BaseGlobal {
       while (lower < upper) {
         while (lower < until && p(arr(lower))) lower += 1
         while (upper >= from && !p(arr(upper))) upper -= 1
-        if (lower < upper) { val tmp = arr(lower); arr(lower) = arr(upper); arr(upper) = tmp }
+        if (lower < upper) {
+          val tmp = arr(lower); arr(lower) = arr(upper); arr(upper) = tmp
+        }
       }
       (copy(until = lower), copy(from = lower))
     }
 
-    def size: Int = until - from
+    def size: Int        = until - from
     def isEmpty: Boolean = size <= 0
   }
 
