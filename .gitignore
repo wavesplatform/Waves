@@ -13,7 +13,6 @@ target
 *.*~
 
 # dotfiles
-.dockerignore
 .editorconfig
 .DS_Store
 
