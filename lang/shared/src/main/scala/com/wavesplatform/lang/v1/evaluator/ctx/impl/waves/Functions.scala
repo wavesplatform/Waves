@@ -17,7 +17,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.{addressOrAliasT
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, notImplemented, unit}
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, NativeFunction, UserFunction}
 import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction}
-import com.wavesplatform.lang.v1.traits.domain.{Issue, Recipient}
+import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import shapeless.Coproduct.unsafeGet
 
@@ -753,5 +753,70 @@ object Functions {
     ) { args =>
       val typedArgs = (issueActionType.fields.map(_._1) zip args).toMap
       Right(CaseObj(issueActionType, typedArgs))
+    }
+
+  val simplifiedLeaseActionConstructor: BaseFunction[Environment] =
+    NativeFunction(
+      "Lease",
+      1,
+      SIMPLIFIED_LEASE_ACTION_CONSTRUCTOR,
+      leaseActionType,
+      FieldNames.LeaseRecipient -> addressOrAliasType,
+      FieldNames.LeaseAmount    -> LONG
+    ) { args =>
+      val typedArgs = (leaseActionType.fields.map(_._1) zip args ::: List(CONST_LONG(0))).toMap
+      Right(CaseObj(leaseActionType, typedArgs))
+    }
+
+  val detailedLeaseActionConstructor: BaseFunction[Environment] =
+    NativeFunction(
+      "Lease",
+      1,
+      DETAILED_LEASE_ACTION_CONSTRUCTOR,
+      leaseActionType,
+      FieldNames.LeaseRecipient -> addressOrAliasType,
+      FieldNames.LeaseAmount    -> LONG,
+      FieldNames.LeaseNonce     -> LONG
+    ) { args =>
+      val typedArgs = (leaseActionType.fields.map(_._1) zip args).toMap
+      Right(CaseObj(leaseActionType, typedArgs))
+    }
+
+  val calculateLeaseId: BaseFunction[Environment] =
+    NativeFunction.withEnvironment[Environment](
+      "calculateLeaseId",
+      1,
+      CALCULATE_LEASE_ID,
+      BYTESTR,
+      ("lease", leaseActionType)
+    ) {
+      val AddressLength  = 26
+      val MaxAliasLength = 30
+      new ContextfulNativeFunction[Environment]("calculateLeaseId", BYTESTR, Seq(("lease", leaseActionType))) {
+        override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
+          input match {
+            case (env, CaseObj(`leaseActionType`, fields) :: Nil) =>
+              val recipient = caseObjToRecipient(fields(FieldNames.LeaseRecipient).asInstanceOf[CaseObj])
+              val r = recipient match {
+                case Recipient.Address(bytes) if bytes.arr.length > AddressLength =>
+                  Left(s"Address bytes length=${bytes.arr.length} exceeds limit=$AddressLength")
+                case Recipient.Alias(name) if name.length > MaxAliasLength =>
+                  Left(s"Alias name length=${name.length} exceeds limit=$MaxAliasLength")
+                case _ =>
+                  CONST_BYTESTR(
+                    Lease.calculateId(
+                      Lease(
+                        recipient,
+                        fields(FieldNames.LeaseAmount).asInstanceOf[CONST_LONG].t,
+                        fields(FieldNames.LeaseNonce).asInstanceOf[CONST_LONG].t
+                      ),
+                      env.txId
+                    )
+                  )
+              }
+              r.pure[F]
+            case (_, xs) => notImplemented[F, EVALUATED](s"calculateLeaseId(l: Lease)", xs)
+          }
+      }
     }
 }

@@ -86,10 +86,10 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
       val status1 = getStatus(createdLeaseTxId)
       status1 shouldBe LeaseStatus.Active
 
-      val activeLeases = sender.activeLeases(secondAddress)
+      val activeLeases = sender.activeLeasesOld(secondAddress)
       assert(activeLeases.forall(!_.sender.contains(secondAddress)))
 
-      val leases1 = sender.activeLeases(firstAddress)
+      val leases1 = sender.activeLeasesOld(firstAddress)
       assert(leases1.exists(_.id == createdLeaseTxId))
 
       val createdCancelLeaseTx = sender.cancelLease(firstKeyPair, createdLeaseTxId, minFee, v)
@@ -105,7 +105,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
       val status2 = getStatus(createdLeaseTxId)
       status2 shouldBe TransactionsApiRoute.LeaseStatus.Canceled
 
-      val leases2 = sender.activeLeases(firstAddress)
+      val leases2 = sender.activeLeasesOld(firstAddress)
       assert(leases2.forall(_.id != createdLeaseTxId))
 
       leases2.size shouldBe leases1.size - 1

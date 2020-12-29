@@ -26,11 +26,13 @@ package object utils {
 
   private val Global: BaseGlobal = com.wavesplatform.lang.Global // Hack for IDEA
 
-  val environment = new Environment[Id] {
+  val environment = buildEnvironment(ByteStr.empty)
+
+  def buildEnvironment(txIdParam: ByteStr) = new Environment[Id] {
     override def height: Long                                                                                    = 0
     override def chainId: Byte                                                                                   = 1: Byte
     override def inputEntity: Environment.InputEntity                                                            = null
-    override val txId: ByteStr                                                                                   = ByteStr.empty
+    override val txId: ByteStr                                                                                   = txIdParam
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
     override def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer]                                   = ???
     override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???

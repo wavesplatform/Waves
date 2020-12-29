@@ -161,7 +161,13 @@ object InvokeScriptTransactionDiff {
               })
               TracedResult(
                 scriptResultE,
-                List(InvokeScriptTrace(tx.dAppAddressOrAlias, functionCall, scriptResultE.map(_._2._1), scriptResultE.fold(_.log, _._3)))
+                List(InvokeScriptTrace(
+                  tx.id.value(),
+                  tx.dAppAddressOrAlias,
+                  functionCall,
+                  scriptResultE.map(_._2._1),
+                  scriptResultE.fold(_.log, _._3)
+                ))
               )
             }
 

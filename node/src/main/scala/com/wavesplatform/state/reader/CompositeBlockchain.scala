@@ -14,7 +14,6 @@ import com.wavesplatform.transaction.ApplicationStatus.Succeeded
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
-import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{ApplicationStatus, Asset, Transaction}
 
@@ -46,11 +45,9 @@ final case class CompositeBlockchain(
     CompositeBlockchain.assetDescription(asset, maybeDiff.orEmpty, inner.assetDescription(asset), inner.assetScript(asset), height)
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
-    inner.leaseDetails(leaseId).map(ld => ld.copy(isActive = diff.leaseState.getOrElse(leaseId, ld.isActive))) orElse
-      diff.transactions.get(leaseId).collect {
-        case NewTransactionInfo(lt: LeaseTransaction, _, Succeeded) =>
-          LeaseDetails(lt.sender, lt.recipient, this.height, lt.amount, diff.leaseState(lt.id()))
-      }
+    inner.leaseDetails(leaseId)
+      .map(ld => ld.copy(isActive = diff.leaseState.get(leaseId).map(_._1).getOrElse(ld.isActive)))
+      .orElse(diff.leaseDetails(leaseId, height))
   }
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = {

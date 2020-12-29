@@ -1102,3 +1102,15 @@ case class PaymentRequest(amount: Long, fee: Long, sender: String, recipient: St
 object PaymentRequest {
   implicit val paymentFormat: Format[PaymentRequest] = Json.format
 }
+
+case class LeaseInfo(
+  leaseId: String,
+  originTransactionId: String,
+  sender: String,
+  recipient: String,
+  amount: Long,
+  height: Int
+)
+object LeaseInfo {
+  implicit val format: Format[LeaseInfo] = Json.format
+}

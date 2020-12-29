@@ -15,6 +15,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.lang.v1.traits.domain.{Lease, LeaseCancel, Recipient}
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Height, InvokeScriptResult}
 import com.wavesplatform.transaction.ApplicationStatus.{ScriptExecutionFailed, Succeeded}
@@ -25,7 +26,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, Proofs, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{ApplicationStatus, Asset, Proofs, TxHelpers, TxVersion}
 import com.wavesplatform.{BlockGen, BlockchainStubHelpers, NoShrink, TestTime, TestWallet, TransactionGen}
 import monix.reactive.Observable
 import org.scalacheck.Gen._
@@ -273,6 +274,41 @@ class TransactionsRouteSpec
         (responseAs[JsArray] \ 0 \ 0 \ "stateChanges").as[JsObject] shouldBe Json.toJsObject(InvokeScriptResult())
       }
     }
+
+    "provides lease and lease cancel actions stateChanges" in {
+      val invokeAddress    = accountGen.sample.get.toAddress
+      val leaseId1         = ByteStr(bytes32gen.sample.get)
+      val leaseId2         = ByteStr(bytes32gen.sample.get)
+      val leaseCancelId    = ByteStr(bytes32gen.sample.get)
+      val recipientAddress = accountGen.sample.get.toAddress
+      val recipientAlias   = aliasGen.sample.get
+      val invoke           = TxHelpers.invoke(invokeAddress, "test")
+      val scriptResult = InvokeScriptResult(
+        leases = Seq(InvokeScriptResult.Lease(recipientAddress, 100, 1, leaseId1), InvokeScriptResult.Lease(recipientAlias, 200, 3, leaseId2)),
+        leaseCancels = Seq(LeaseCancel(leaseCancelId))
+      )
+
+      (() => blockchain.activatedFeatures).expects().returning(Map.empty).anyNumberOfTimes()
+      (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
+      (addressTransactions.transactionsByAddress _)
+        .expects(invokeAddress, *, *, None)
+        .returning(Observable(TransactionMeta.Invoke(Height(1), invoke, ApplicationStatus.Succeeded, Some(scriptResult))))
+        .once()
+
+      Get(routePath(s"/address/${invokeAddress}/limit/1")) ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges").as[JsObject] shouldBe Json.toJsObject(scriptResult)
+        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges" \ "leases" \ 0 \ "recipient").get shouldBe JsString(recipientAddress.stringRepr)
+        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges" \ "leases" \ 0 \ "amount").get shouldBe JsNumber(100)
+        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges" \ "leases" \ 0 \ "nonce").get shouldBe JsNumber(1)
+        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges" \ "leases" \ 0 \ "leaseId").get shouldBe JsString(leaseId1.toString)
+        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges" \ "leases" \ 1 \ "recipient").get shouldBe JsString(recipientAlias.stringRepr)
+        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges" \ "leases" \ 1 \ "amount").get shouldBe JsNumber(200)
+        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges" \ "leases" \ 1 \ "nonce").get shouldBe JsNumber(3)
+        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges" \ "leases" \ 1 \ "leaseId").get shouldBe JsString(leaseId2.toString)
+        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges" \ "leaseCancels" \ 0 \ "leaseId").get shouldBe JsString(leaseCancelId.toString)
+      }
+    }
   }
 
   routePath("/info/{id}") - {
@@ -329,6 +365,40 @@ class TransactionsRouteSpec
       Get(routePath(s"/info/${transaction.id()}")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
         (responseAs[JsObject] \ "stateChanges").as[JsObject] shouldBe Json.toJsObject(InvokeScriptResult())
+      }
+    }
+
+    "provides lease and lease cancel action stateChanges" in {
+      val invokeAddress    = accountGen.sample.get.toAddress
+      val leaseId1         = ByteStr(bytes32gen.sample.get)
+      val leaseId2         = ByteStr(bytes32gen.sample.get)
+      val leaseCancelId    = ByteStr(bytes32gen.sample.get)
+      val recipientAddress = accountGen.sample.get.toAddress
+      val recipientAlias   = aliasGen.sample.get
+      val invoke           = TxHelpers.invoke(invokeAddress, "test")
+      val scriptResult = InvokeScriptResult(
+        leases = Seq(InvokeScriptResult.Lease(recipientAddress, 100, 1, leaseId1), InvokeScriptResult.Lease(recipientAlias, 200, 3, leaseId2)),
+        leaseCancels = Seq(LeaseCancel(leaseCancelId))
+      )
+
+      (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
+      (addressTransactions.transactionById _)
+        .expects(invoke.id())
+        .returning(Some(TransactionMeta.Invoke(Height(1), invoke, ApplicationStatus.Succeeded, Some(scriptResult))))
+        .once()
+
+      Get(routePath(s"/info/${invoke.id()}")) ~> route ~> check {
+        status shouldEqual StatusCodes.OK
+        (responseAs[JsObject] \ "stateChanges").as[JsObject] shouldBe Json.toJsObject(scriptResult)
+        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 0 \ "recipient").get shouldBe JsString(recipientAddress.stringRepr)
+        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 0 \ "amount").get shouldBe JsNumber(100)
+        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 0 \ "nonce").get shouldBe JsNumber(1)
+        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 0 \ "leaseId").get shouldBe JsString(leaseId1.toString)
+        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 1 \ "recipient").get shouldBe JsString(recipientAlias.stringRepr)
+        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 1 \ "amount").get shouldBe JsNumber(200)
+        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 1 \ "nonce").get shouldBe JsNumber(3)
+        (responseAs[JsObject] \ "stateChanges" \ "leases" \ 1 \ "leaseId").get shouldBe JsString(leaseId2.toString)
+        (responseAs[JsObject] \ "stateChanges" \ "leaseCancels" \ 0 \ "leaseId").get shouldBe JsString(leaseCancelId.toString)
       }
     }
 
@@ -569,24 +639,52 @@ class TransactionsRouteSpec
     }
 
     "generates valid trace with vars" in {
+      val invoke        = TxHelpers.invoke(TxHelpers.defaultAddress, "test")
+      val leaseCancelId = ByteStr(bytes32gen.sample.get)
+
+      val amount1    = 100
+      val nonce1     = 0
+      val recipient1 = Recipient.Address(ByteStr.decodeBase58("3NAgxLPGnw3RGv9JT6NTDaG5D1iLUehg2xd").get)
+      val leaseId1   = Lease.calculateId(Lease(recipient1, amount1, nonce1), invoke.id.value())
+
+      val amount2    = 20
+      val nonce2     = 2
+      val recipient2 = Recipient.Alias("some_alias")
+      val leaseId2   = Lease.calculateId(Lease(recipient2, amount2, nonce2), invoke.id.value())
+
       val blockchain = createBlockchainStub { blockchain =>
         val (dAppScript, _) = ScriptCompiler
           .compile(
             s"""
-               |{-# STDLIB_VERSION 4 #-}
+               |{-# STDLIB_VERSION 5 #-}
                |{-# SCRIPT_TYPE ACCOUNT #-}
                |{-# CONTENT_TYPE DAPP #-}
                |
                |@Callable(i)
                |func test() = {
                |  let test = 1
-               |  if (test == 1) then [] else []
+               |  if (test == 1)
+               |    then
+               |      [
+               |        Lease(Address(base58'${recipient1.bytes}'), $amount1, $nonce1),
+               |        Lease(Alias("${recipient2.name}"), $amount2, $nonce2),
+               |        LeaseCancel(base58'$leaseCancelId')
+               |      ]
+               |    else []
                |}
                |""".stripMargin,
             ScriptEstimatorV3
           )
           .explicitGet()
 
+        (blockchain.leaseDetails _)
+          .when(*)
+          .returns(None)
+          .anyNumberOfTimes()
+        (blockchain.resolveAlias _)
+          .when(*)
+          .returns(Right(accountGen.sample.get.toAddress))
+          .anyNumberOfTimes()
         (blockchain.accountScript _)
           .when(*)
           .returns(
@@ -606,18 +704,17 @@ class TransactionsRouteSpec
       val publisher = createTxPublisherStub(blockchain)
       val route     = transactionsApiRoute.copy(blockchain = blockchain, transactionPublisher = publisher).route
 
-      val tx = TxHelpers.invoke(TxHelpers.defaultAddress, "test")
-      Post(routePath("/broadcast?trace=true"), tx.json()) ~> route ~> check {
+      Post(routePath("/broadcast?trace=true"), invoke.json()) ~> route ~> check {
         responseAs[JsObject] shouldBe Json.parse(
           s"""{
             |  "type" : 16,
-            |  "id" : "${tx.id()}",
+            |  "id" : "${invoke.id()}",
             |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
             |  "senderPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
             |  "fee" : 1000000,
             |  "feeAssetId" : null,
-            |  "timestamp" : ${tx.timestamp},
-            |  "proofs" : [ "${tx.signature}" ],
+            |  "timestamp" : ${invoke.timestamp},
+            |  "proofs" : [ "${invoke.signature}" ],
             |  "version" : 1,
             |  "dApp" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
             |  "payment" : [ ],
@@ -642,6 +739,25 @@ class TransactionsRouteSpec
             |      "reissues" : [ ],
             |      "burns" : [ ],
             |      "sponsorFees" : [ ],
+            |      "leases" : [
+            |         {
+            |           "recipient" : "${recipient1.bytes}",
+            |           "amount" : $amount1,
+            |           "nonce" : $nonce1,
+            |           "leaseId" : "$leaseId1"
+            |         },
+            |         {
+            |           "recipient" : "alias:T:${recipient2.name}",
+            |           "amount" : $amount2,
+            |           "nonce" : $nonce2,
+            |           "leaseId" : "$leaseId2"
+            |         }
+            |      ],
+            |      "leaseCancels" : [
+            |         {
+            |            "leaseId":"$leaseCancelId"
+            |         }
+            |      ],
             |      "invokes" : [ ]
             |    },
             |    "error" : null,

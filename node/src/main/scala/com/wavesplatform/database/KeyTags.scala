@@ -57,6 +57,7 @@ object KeyTags extends Enumeration {
   IssuedAssets,
   UpdatedAssets,
   SponsoredAssets,
+  LeaseActionDetails,
   StateHash,
   ContinuationHistory,
   ContinuationState,

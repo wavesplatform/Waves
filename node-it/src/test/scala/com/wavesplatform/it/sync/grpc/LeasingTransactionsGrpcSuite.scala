@@ -1,10 +1,14 @@
 package com.wavesplatform.it.sync.grpc
 
+import com.google.protobuf.ByteString
+import com.wavesplatform.api.grpc.LeaseResponse
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions, Recipient}
+import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.lease.LeaseTransaction
 import io.grpc.Status.Code
 
 class LeasingTransactionsGrpcSuite extends GrpcBaseTransactionSuite {
@@ -12,19 +16,22 @@ class LeasingTransactionsGrpcSuite extends GrpcBaseTransactionSuite {
 
   test("leasing waves decreases lessor's eff.b. and increases lessee's eff.b.; lessor pays fee") {
     for (v <- leaseTxSupportedVersions) {
-      val firstBalance     = sender.wavesBalance(firstAddress)
-      val secondBalance    = sender.wavesBalance(secondAddress)
+      val firstBalance  = sender.wavesBalance(firstAddress)
+      val secondBalance = sender.wavesBalance(secondAddress)
 
-      val leaseTx = sender.broadcastLease(firstAcc, PBRecipients.create(secondAcc.toAddress), leasingAmount, minFee, version = v, waitForTx = true)
-      val leaseTxId = PBTransactions.vanilla(leaseTx).explicitGet().id().toString
+      val leaseTx   = sender.broadcastLease(firstAcc, PBRecipients.create(secondAcc.toAddress), leasingAmount, minFee, version = v, waitForTx = true)
+      val vanillaTx = PBTransactions.vanilla(leaseTx).explicitGet()
+      val leaseTxId = vanillaTx.id().toString
+      val height    = sender.getStatus(leaseTxId).height
 
       sender.wavesBalance(firstAddress).regular shouldBe firstBalance.regular - minFee
       sender.wavesBalance(firstAddress).effective shouldBe firstBalance.effective - minFee - leasingAmount
       sender.wavesBalance(secondAddress).regular shouldBe secondBalance.regular
       sender.wavesBalance(secondAddress).effective shouldBe secondBalance.effective + leasingAmount
 
-      sender.getActiveLeases(secondAddress) shouldBe List(leaseTx)
-      sender.getActiveLeases(firstAddress) shouldBe List(leaseTx)
+      val response = toResponse(vanillaTx, height)
+      sender.getActiveLeases(secondAddress) shouldBe List(response)
+      sender.getActiveLeases(firstAddress) shouldBe List(response)
 
       sender.broadcastLeaseCancel(firstAcc, leaseTxId, minFee, waitForTx = true)
     }
@@ -32,10 +39,13 @@ class LeasingTransactionsGrpcSuite extends GrpcBaseTransactionSuite {
 
   test("cannot lease non-own waves") {
     for (v <- leaseTxSupportedVersions) {
-      val leaseTx = sender.broadcastLease(firstAcc, PBRecipients.create(secondAcc.toAddress), leasingAmount, minFee, version = v, waitForTx = true)
-      val leaseTxId = PBTransactions.vanilla(leaseTx).explicitGet().id().toString
+      val leaseTx   = sender.broadcastLease(firstAcc, PBRecipients.create(secondAcc.toAddress), leasingAmount, minFee, version = v, waitForTx = true)
+      val vanillaTx = PBTransactions.vanilla(leaseTx).explicitGet()
+      val leaseTxId = vanillaTx.id().toString
+      val height    = sender.getStatus(leaseTxId).height
+
       val secondEffBalance = sender.wavesBalance(secondAddress).effective
-      val thirdEffBalance = sender.wavesBalance(thirdAddress).effective
+      val thirdEffBalance  = sender.wavesBalance(thirdAddress).effective
 
       assertGrpcError(
         sender.broadcastLease(secondAcc, PBRecipients.create(thirdAcc.toAddress), secondEffBalance - minFee, minFee, version = v),
@@ -45,7 +55,9 @@ class LeasingTransactionsGrpcSuite extends GrpcBaseTransactionSuite {
 
       sender.wavesBalance(secondAddress).effective shouldBe secondEffBalance
       sender.wavesBalance(thirdAddress).effective shouldBe thirdEffBalance
-      sender.getActiveLeases(secondAddress) shouldBe List(leaseTx)
+
+      val response = toResponse(vanillaTx, height)
+      sender.getActiveLeases(secondAddress) shouldBe List(response)
       sender.getActiveLeases(thirdAddress) shouldBe List.empty
 
       sender.broadcastLeaseCancel(firstAcc, leaseTxId, minFee, waitForTx = true)
@@ -54,7 +66,7 @@ class LeasingTransactionsGrpcSuite extends GrpcBaseTransactionSuite {
 
   test("can not make leasing without having enough balance") {
     for (v <- leaseTxSupportedVersions) {
-      val firstBalance = sender.wavesBalance(firstAddress)
+      val firstBalance  = sender.wavesBalance(firstAddress)
       val secondBalance = sender.wavesBalance(secondAddress)
 
       //secondAddress effective balance more than general balance
@@ -85,10 +97,10 @@ class LeasingTransactionsGrpcSuite extends GrpcBaseTransactionSuite {
 
   test("lease cancellation reverts eff.b. changes; lessor pays fee for both lease and cancellation") {
     for (v <- leaseTxSupportedVersions) {
-      val firstBalance = sender.wavesBalance(firstAddress)
+      val firstBalance  = sender.wavesBalance(firstAddress)
       val secondBalance = sender.wavesBalance(secondAddress)
 
-      val leaseTx = sender.broadcastLease(firstAcc, PBRecipients.create(secondAcc.toAddress), leasingAmount, minFee, version = v, waitForTx = true)
+      val leaseTx   = sender.broadcastLease(firstAcc, PBRecipients.create(secondAcc.toAddress), leasingAmount, minFee, version = v, waitForTx = true)
       val leaseTxId = PBTransactions.vanilla(leaseTx).explicitGet().id().toString
 
       sender.broadcastLeaseCancel(firstAcc, leaseTxId, minFee, waitForTx = true)
@@ -104,10 +116,10 @@ class LeasingTransactionsGrpcSuite extends GrpcBaseTransactionSuite {
 
   test("lease cancellation can be done only once") {
     for (v <- leaseTxSupportedVersions) {
-      val firstBalance = sender.wavesBalance(firstAddress)
+      val firstBalance  = sender.wavesBalance(firstAddress)
       val secondBalance = sender.wavesBalance(secondAddress)
 
-      val leaseTx = sender.broadcastLease(firstAcc, PBRecipients.create(secondAcc.toAddress), leasingAmount, minFee, version = v, waitForTx = true)
+      val leaseTx   = sender.broadcastLease(firstAcc, PBRecipients.create(secondAcc.toAddress), leasingAmount, minFee, version = v, waitForTx = true)
       val leaseTxId = PBTransactions.vanilla(leaseTx).explicitGet().id().toString
 
       sender.broadcastLeaseCancel(firstAcc, leaseTxId, minFee, waitForTx = true)
@@ -129,11 +141,13 @@ class LeasingTransactionsGrpcSuite extends GrpcBaseTransactionSuite {
 
   test("only sender can cancel lease transaction") {
     for (v <- leaseTxSupportedVersions) {
-      val firstBalance = sender.wavesBalance(firstAddress)
+      val firstBalance  = sender.wavesBalance(firstAddress)
       val secondBalance = sender.wavesBalance(secondAddress)
 
-      val leaseTx = sender.broadcastLease(firstAcc, PBRecipients.create(secondAcc.toAddress), leasingAmount, minFee, version = v, waitForTx = true)
-      val leaseTxId = PBTransactions.vanilla(leaseTx).explicitGet().id().toString
+      val leaseTx   = sender.broadcastLease(firstAcc, PBRecipients.create(secondAcc.toAddress), leasingAmount, minFee, version = v, waitForTx = true)
+      val vanillaTx = PBTransactions.vanilla(leaseTx).explicitGet()
+      val leaseTxId = vanillaTx.id().toString
+      val height    = sender.getStatus(leaseTxId).height
 
       assertGrpcError(
         sender.broadcastLeaseCancel(secondAcc, leaseTxId, minFee),
@@ -144,8 +158,10 @@ class LeasingTransactionsGrpcSuite extends GrpcBaseTransactionSuite {
       sender.wavesBalance(firstAddress).effective shouldBe firstBalance.effective - minFee - leasingAmount
       sender.wavesBalance(secondAddress).regular shouldBe secondBalance.regular
       sender.wavesBalance(secondAddress).effective shouldBe secondBalance.effective + leasingAmount
-      sender.getActiveLeases(secondAddress) shouldBe List(leaseTx)
-      sender.getActiveLeases(firstAddress) shouldBe List(leaseTx)
+
+      val response = toResponse(vanillaTx, height)
+      sender.getActiveLeases(secondAddress) shouldBe List(response)
+      sender.getActiveLeases(firstAddress) shouldBe List(response)
 
       sender.broadcastLeaseCancel(firstAcc, leaseTxId, minFee, waitForTx = true)
     }
@@ -165,4 +181,16 @@ class LeasingTransactionsGrpcSuite extends GrpcBaseTransactionSuite {
     }
   }
 
+  private def toResponse(tx: Transaction, height: Long): LeaseResponse = {
+    val leaseTx   = tx.asInstanceOf[LeaseTransaction]
+    val leaseTxId = ByteString.copyFrom(leaseTx.id.value().arr)
+    LeaseResponse(
+      leaseId = leaseTxId,
+      originTransactionId = leaseTxId,
+      sender = ByteString.copyFrom(leaseTx.sender.toAddress.bytes),
+      recipient = Some(PBRecipients.create(leaseTx.recipient)),
+      amount = leaseTx.amount,
+      height = height.toInt
+    )
+  }
 }
