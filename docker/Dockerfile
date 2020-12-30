@@ -16,13 +16,17 @@ ARG WAVES_VERSION="current"
 ARG WAVES_LOG_LEVEL="INFO"
 ARG WAVES_HEAP_SIZE="2g"
 ARG WAVES_NETWORK="mainnet"
+ARG ENABLE_GRPC="false"
 
 ENV WAVES_VERSION=$WAVES_VERSION
 ENV WAVES_LOG_LEVEL=$WAVES_LOG_LEVEL
 ENV WAVES_HEAP_SIZE=$WAVES_HEAP_SIZE
 ENV WAVES_NETWORK=$WAVES_NETWORK
+ENV ENABLE_GRPC=$ENABLE_GRPC
 
 COPY --from=builder /waves/node/target/waves-all-*.jar /usr/share/waves/lib/
+COPY --from=builder /waves/grpc-server/target/universal /tmp/grpc-server
+COPY docker/install-grpc.sh /tmp/
 COPY docker/entrypoint.sh /usr/share/waves/bin/
 
 RUN groupadd -g 143 waves                                                   &&  \
@@ -31,6 +35,8 @@ RUN groupadd -g 143 waves                                                   &&  
     chown -R 143:143 /var/lib/waves /usr/share/waves /etc/waves             &&  \
     chmod -R 755 /var/lib/waves /usr/share/waves /etc/waves                 &&  \
     ln -fs /var/lib/waves/log /var/log/waves
+
+RUN chmod +x /tmp/install-grpc.sh && /tmp/install-grpc.sh
 
 WORKDIR /var/lib/waves
 EXPOSE 6869 6868 6863 6862

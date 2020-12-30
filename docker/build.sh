@@ -14,9 +14,11 @@ function downloadRelease() {
       mkdir -p /waves/node/target &&
       releaseUrl="https://github.com/wavesplatform/Waves/releases/download" &&
       echo "Downloading jar file" &&
-      mkdir -p /out/${network} &&
+      mkdir -p /waves/node/target /waves/grpc-server/target/universal &&
       curl -fL ${releaseUrl}/v${WAVES_VERSION}/waves-all-${WAVES_VERSION}.jar \
-        -o /waves/node/target/${network}/waves-all-${WAVES_VERSION}.jar
+        -o /waves/node/target/waves-all-${WAVES_VERSION}.jar
+      curl -fL ${releaseUrl}/v${WAVES_VERSION}/grpc-server-${WAVES_VERSION}.tgz \
+        -o /waves/grpc-server/target/universal/grpc-server-${WAVES_VERSION}.tgz
   } || {
     echo "Release $WAVES_VERSION not found"
     exit 1
@@ -45,7 +47,7 @@ function createSbtBuild() {
     curl -fL -o sbt-$SBT_VERSION.deb \
       https://dl.bintray.com/sbt/debian/sbt-$SBT_VERSION.deb &&
     dpkg -i sbt-$SBT_VERSION.deb && rm sbt-$SBT_VERSION.deb &&
-    SBT_OPTS="-Xmx2g -XX:ReservedCodeCacheSize=128m" sbt "node/assembly" &&
+    SBT_OPTS="-Xmx2g -XX:ReservedCodeCacheSize=128m" sbt node/assembly grpc-server/packageZipTarball &&
     for network in $DEB_PACKAGE_NETWORKS; do
       echo "Building '${network}' package" &&
         SBT_OPTS="-XX:ReservedCodeCacheSize=128m -Xmx2g -Dnetwork=${network}" sbt 'packageAll'
