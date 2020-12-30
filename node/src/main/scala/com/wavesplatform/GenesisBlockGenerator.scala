@@ -36,7 +36,7 @@ object GenesisBlockGenerator extends App {
       averageBlockDelay: FiniteDuration,
       timestamp: Option[Long],
       distributions: List[DistributionItem],
-      preActivatedFeatures: List[Int] = List(BlockchainFeatures.FairPoS.id.toInt, BlockchainFeatures.BlockV5.id.toInt),
+      preActivatedFeatures: List[Int] = BlockchainFeatures.implemented.map(_.toInt).toList,
       minBlockTime: Option[FiniteDuration],
       delayDelta: Option[Int]
   ) {
@@ -46,7 +46,7 @@ object GenesisBlockGenerator extends App {
     val chainId: Char = networkType.head
 
     val features: Map[Short, Int] =
-      preActivatedFeatures.map(f => f.toShort -> 0).toMap
+      preActivatedFeatures.map(_.toShort -> 0).toMap
 
     val functionalitySettings: FunctionalitySettings = FunctionalitySettings(
       Int.MaxValue,
