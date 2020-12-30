@@ -57,12 +57,41 @@ inTask(assembly)(
   )
 )
 
-scriptClasspath += "*" // adds "$lib_dir/*" to app_classpath in the executable file
+// Adds "$lib_dir/*" to app_classpath in the executable file
 // Logback creates a "waves.directory_UNDEFINED" without this option.
+scriptClasspath += "*"
+
 bashScriptExtraDefines ++= Seq(
   s"""addJava "-Dwaves.defaults.blockchain.type=${network.value}"""",
   s"""addJava "-Dwaves.defaults.directory=/var/lib/${(Universal / normalizedName).value}"""",
-  s"""addJava "-Dwaves.defaults.config.directory=/etc/${(Universal / normalizedName).value}""""
+  s"""addJava "-Dwaves.defaults.config.directory=/etc/${(Universal / normalizedName).value}"""",
+  // Workaround to ignore the -h option
+  """process_args() {
+    |  local no_more_snp_opts=0
+    |  while [[ $# -gt 0 ]]; do
+    |    case "$1" in
+    |    --) shift && no_more_snp_opts=1 && break ;;
+    |    -no-version-check) no_version_check=1 && shift ;;
+    |    -java-home) require_arg path "$1" "$2" && jre=$(eval echo $2) && java_cmd="$jre/bin/java" && shift 2 ;;
+    |    -D* | -agentlib* | -XX*) addJava "$1" && shift ;;
+    |    -J*) addJava "${1:2}" && shift ;;
+    |    *) addResidual "$1" && shift ;;
+    |    esac
+    |  done
+    |
+    |  if [[ no_more_snp_opts ]]; then
+    |    while [[ $# -gt 0 ]]; do
+    |      addResidual "$1" && shift
+    |    done
+    |  fi
+    |
+    |  is_function_defined process_my_args && {
+    |    myargs=("${residual_args[@]}")
+    |    residual_args=()
+    |    process_my_args "${myargs[@]}"
+    |  }
+    |}
+    |""".stripMargin
 )
 
 inConfig(Universal)(
