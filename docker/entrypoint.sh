@@ -48,6 +48,6 @@ exec java -Dlogback.stdout.level=${WAVES_LOG_LEVEL} \
   -Dlogback.file.directory=/var/log/waves \
   -Dconfig.override_with_env_vars=true \
   ${JAVA_OPTS} \
-  -cp "/usr/share/waves/lib/plugins/*:/usr/share/waves/lib/*" \
+  -cp '/usr/share/waves/lib/plugins/*:/usr/share/waves/lib/*' \
   com.wavesplatform.Application \
   /etc/waves/waves.conf

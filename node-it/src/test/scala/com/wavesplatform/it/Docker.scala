@@ -33,10 +33,10 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.io.IOUtils
 import org.asynchttpclient.Dsl._
 
-import scala.jdk.CollectionConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, blocking}
+import scala.jdk.CollectionConverters._
 import scala.util.control.NonFatal
 import scala.util.{Random, Try}
 
@@ -350,9 +350,8 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
       val renderedConfig = renderProperties(asProperties(configUpdates))
 
       log.debug("Set new config directly in the script for starting node")
-      val shPath = "/opt/waves/start-waves.sh"
-      val scriptCmd: Array[String] =
-        Array("sh", "-c", s"sed -i 's|$$WAVES_OPTS.*-cp|$$WAVES_OPTS $renderedConfig -cp|' $shPath && chmod +x $shPath")
+      val startScript = s"$ContainerRoot/bin/entrypoint.sh"
+      val scriptCmd = Array("sh", "-c", s"JAVA_OPTS='$renderedConfig' $startScript")
 
       val execScriptCmd = client.execCreate(node.containerId, scriptCmd).id()
       client.execStart(execScriptCmd)
@@ -523,9 +522,9 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 }
 
 object Docker {
-  val NodeImageName: String = "wavesplatform/wavesnode:latest"
+  val NodeImageName: String = "testnode:latest"
 
-  private val ContainerRoot = Paths.get("/opt/waves")
+  private val ContainerRoot = Paths.get("/usr/share/waves")
   private val ProfilerPort  = 10001
 
   private val RunId = Option(System.getenv("RUN_ID")).getOrElse(DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss").format(LocalDateTime.now()))
