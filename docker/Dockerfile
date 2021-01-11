@@ -1,6 +1,6 @@
 FROM openjdk:8-jdk-stretch as builder
 ARG WAVES_VERSION="current"
-ARG BRANCH="version-1.1.x"
+ARG BRANCH="version-1.2.x"
 ARG DEB_PACKAGE_NETWORKS
 
 # Run from the root directory: docker build -f docker/Dockerfile .
@@ -9,7 +9,7 @@ COPY . waves_current
 ENV WAVES_VERSION=$WAVES_VERSION
 ENV BRANCH=$BRANCH
 ENV DEB_PACKAGE_NETWORKS=$DEB_PACKAGE_NETWORKS
-RUN chmod +x /waves_current/docker/build.sh && /waves_current/docker/build.sh
+RUN /bin/bash /waves_current/docker/build.sh
 
 FROM openjdk:11-jre-slim
 ARG WAVES_VERSION="current"
@@ -26,17 +26,10 @@ ENV ENABLE_GRPC=$ENABLE_GRPC
 
 COPY --from=builder /waves/node/target/waves-all-*.jar /usr/share/waves/lib/
 COPY --from=builder /waves/grpc-server/target/universal /tmp/grpc-server
-COPY docker/install-grpc.sh /tmp/
+COPY docker/setup-node.sh /tmp/
 COPY docker/entrypoint.sh /usr/share/waves/bin/
 
-RUN groupadd -g 143 waves                                                   &&  \
-    useradd -d /var/lib/waves -g 143 -u 143 -s /bin/bash -M waves           &&  \
-    mkdir -p /var/lib/waves /etc/waves /usr/share/waves/lib/plugins         &&  \
-    chown -R 143:143 /var/lib/waves /usr/share/waves /etc/waves             &&  \
-    chmod -R 755 /var/lib/waves /usr/share/waves /etc/waves                 &&  \
-    ln -fs /var/lib/waves/log /var/log/waves
-
-RUN chmod +x /tmp/install-grpc.sh && /tmp/install-grpc.sh
+RUN /bin/bash /tmp/setup-node.sh
 
 WORKDIR /var/lib/waves
 EXPOSE 6869 6868 6863 6862
