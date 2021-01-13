@@ -146,6 +146,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   private val actionsFee    = smartFee * 3 + issueFee
   private val enoughFee     = pureInvokeFee * 1351 + actionsFee
   private val redundantFee  = pureInvokeFee * 10
+  private val paymentAmount = 123456L
 
   private val minSponsoredAssetFee      = 10000L
   private val sponsoredAssetAmount      = 10.waves
@@ -218,6 +219,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         args = List(CONST_BOOLEAN(false)),
         fee = enoughFee + redundantFee,
         version = TxVersion.V3,
+        payment = Seq(Payment(paymentAmount, Waves)),
         waitForTx = true
       )
       ._1
@@ -229,7 +231,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
 
     assertContinuationChain(invoke.id, endHeight, actionsFee = actionsFee)
     assertStateChanges(invoke)
-    assertBalances(startHeight, endHeight, enoughFee, actionsFee)
+    assertBalances(startHeight, endHeight, enoughFee, actionsFee, expectedPayment = Some(paymentAmount))
 
     testPartialRollback(startHeight, invoke, actionsFee)
     testFullRollback(startHeight, invoke)
@@ -274,7 +276,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         args = List(CONST_BOOLEAN(true)),
         fee = enoughFee + redundantFee,
         version = TxVersion.V3,
-        payment = Seq(Payment(123456L, Waves)),
+        payment = Seq(Payment(paymentAmount, Waves)),
         waitForTx = true
       )
       ._1
@@ -301,7 +303,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         fee = Sponsorship.fromWaves(enoughFee + redundantFee, minSponsoredAssetFee),
         feeAssetId = Some(sponsoredAssetId),
         version = TxVersion.V3,
-        payment = Seq(Payment(123456L, IssuedAsset(ByteStr.decodeBase58(sponsoredAssetId).get))),
+        payment = Seq(Payment(paymentAmount, IssuedAsset(ByteStr.decodeBase58(sponsoredAssetId).get))),
         waitForTx = true
       )
       ._1
@@ -310,7 +312,13 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
 
     assertContinuationChain(invoke.id, sender.height, shouldBeFailed = true, feeAssetInfo = sponsorFee)
     assertFailedStateChanges(invoke)
-    assertBalances(startHeight, endHeight, enoughFee - actionsFee, actionsFee = 0, Some((sponsoredAssetId, minSponsoredAssetFee, sponsoredAssetIssuer)))
+    assertBalances(
+      startHeight,
+      endHeight,
+      enoughFee - actionsFee,
+      actionsFee = 0,
+      Some((sponsoredAssetId, minSponsoredAssetFee, sponsoredAssetIssuer))
+    )
   }
 
   test("continuation prioritization") {
@@ -460,7 +468,8 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       endHeight: Int,
       totalFee: Long,
       actionsFee: Long,
-      sponsorship: Option[(String, Long, KeyPair)] = None
+      sponsorship: Option[(String, Long, KeyPair)] = None,
+      expectedPayment: Option[Long] = None
   ): Unit = {
     def balanceDiff(address: String, assetId: Option[String] = None): Long = {
       val startBalance  = sender.accountsBalances(Some(startHeight - 1), Seq(address), assetId).head._2
@@ -495,13 +504,15 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     minersBalanceIncrease should contain theSameElementsAs blockRewardDistribution
 
     sponsorship.fold {
-      balanceDiff(callerAddress) shouldBe -totalFee
+      balanceDiff(callerAddress) shouldBe -totalFee - expectedPayment.getOrElse(0L)
+      balanceDiff(dAppAddress) shouldBe expectedPayment.getOrElse(0L)
     } {
       case (assetId, minSponsoredFee, assetIssuer) =>
         val feeInAsset = Sponsorship.fromWaves(totalFee, minSponsoredFee)
         balanceDiff(assetIssuer.toAddress.toString) shouldBe -totalFee
         balanceDiff(assetIssuer.toAddress.toString, Some(assetId)) shouldBe feeInAsset
-        balanceDiff(callerAddress, Some(assetId)) shouldBe -feeInAsset
+        balanceDiff(callerAddress, Some(assetId)) shouldBe -feeInAsset - expectedPayment.getOrElse(0L)
+        balanceDiff(dAppAddress) shouldBe expectedPayment.getOrElse(0L)
     }
   }
 
