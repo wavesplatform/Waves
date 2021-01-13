@@ -531,7 +531,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
           ) if Set(reissueAssetId, burnAssetId, transferAssetId.value).head == scriptedAssetId =>
     }
     sender.debugStateChanges(invoke.id).stateChanges.toSeq should matchExpectingChanges
-    sender.debugStateChangesByAddress(dAppAddress, 10).flatMap(_.stateChanges) should matchExpectingChanges
+    sender.debugStateChangesByAddress(dAppAddress, 1).flatMap(_.stateChanges) should matchExpectingChanges
 
     sender.getDataByKey(dAppAddress, "entry1") shouldBe BooleanDataEntry("entry1", true)
 
