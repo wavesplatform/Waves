@@ -12,10 +12,8 @@ import java.util.{Properties, List => JList, Map => JMap}
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
-import com.google.common.io.ByteStreams
 import com.google.common.primitives.Ints._
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
-import com.spotify.docker.client.messages.HostConfig.Bind
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.ConfigFactory._
@@ -212,9 +210,9 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
         .withFallback(nodeConfig)
         .withFallback(suiteConfig)
         .withFallback(genesisOverride)
+        .withFallback(configTemplate)
 
       val actualConfig = overrides
-        .withFallback(configTemplate)
         .withFallback(defaultApplication())
         .withFallback(defaultReference())
         .resolve()
@@ -243,36 +241,8 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
         config
       }
 
-      def extractTemplateConf(): Path = {
-        val resource = getClass.getClassLoader.getResourceAsStream("template.conf")
-        val tempFile = {
-          val dir = Files.createTempDirectory("waves-it")
-          dir.resolve("waves.conf")
-        }
-        val output = new FileOutputStream(tempFile.toFile)
-        ByteStreams.copy(resource, output)
-        output.close()
-        tempFile
-      }
-
-      val templateConf = extractTemplateConf()
-      val configVolume = Volume
-        .builder()
-        .name(s"waves-it-config")
-        .mountpoint(templateConf.getParent.toString)
-        .build()
-
-      client.createVolume(configVolume)
-
       val hostConfig = HostConfig
         .builder()
-        .appendBinds(
-          Bind
-            .from(configVolume)
-            .to("/etc/waves")
-            .readOnly(true)
-            .build()
-        )
         .publishAllPorts(true)
         .build()
 
@@ -587,7 +557,7 @@ object Docker {
   def apply(owner: Class[_]): Docker = new Docker(tag = owner.getSimpleName)
 
   private def asProperties(config: Config): Properties = {
-    val jsonConfig = config.root().render(ConfigRenderOptions.concise())
+    val jsonConfig = config.resolve().root().render(ConfigRenderOptions.concise())
     propsMapper.writeValueAsProperties(jsonMapper.readTree(jsonConfig))
   }
 
