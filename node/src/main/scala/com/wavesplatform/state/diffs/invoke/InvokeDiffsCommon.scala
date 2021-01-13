@@ -291,7 +291,7 @@ object InvokeDiffsCommon {
     val StepInfo(_, stepFee, scriptsRun) = stepInfo(diffWithState, blockchain, invoke)
     val status                           = if (failed) ScriptExecutionFailed else Succeeded
     diffWithState |+| Diff.empty.copy(
-      portfolios = refundablePortfolios(dAppAddress, invoke, blockchain, stepFee),
+      portfolios = refundablePortfolios(dAppAddress, invoke, blockchain, stepFee, failed),
       scriptsRun = scriptsRun,
       scriptsComplexity = spentComplexity,
       replacingTransactions = Seq(
@@ -337,7 +337,8 @@ object InvokeDiffsCommon {
       dAppAddress: Address,
       invoke: InvokeScriptTransaction,
       blockchain: Blockchain,
-      lastStepFee: Long
+      lastStepFee: Long,
+      failed: Boolean
   ): Map[Address, Portfolio] = {
     val precedingStepCount = blockchain.continuationStates(dAppAddress).asInstanceOf[ContinuationState.InProgress].precedingStepCount
     val consumedFee        = (precedingStepCount + 1) * expectedStepFeeInAttachedAsset(invoke, blockchain) + lastStepFee
@@ -353,7 +354,11 @@ object InvokeDiffsCommon {
         Map(invoker  -> Portfolio.build(asset, unusedFee)) |+|
           Map(issuer -> Portfolio(feeInWaves, assets = Map(asset -> -unusedFee)))
     }
-    val paymentPortfolio = invoke.payments.map(p => Portfolio.build(p.assetId, p.amount)).reduce(_ |+| _)
+    val paymentPortfolio =
+      if (failed)
+        invoke.payments.map(p => Portfolio.build(p.assetId, p.amount)).reduce(_ |+| _)
+      else
+        Portfolio.empty
     unusedFeePortfolio |+| Map(invoker -> paymentPortfolio)
   }
 
