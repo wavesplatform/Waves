@@ -12,8 +12,10 @@ import java.util.{Properties, List => JList, Map => JMap}
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
+import com.google.common.io.ByteStreams
 import com.google.common.primitives.Ints._
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
+import com.spotify.docker.client.messages.HostConfig.Bind
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.ConfigFactory._
@@ -218,10 +220,6 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
         .resolve()
 
       val networkPort = actualConfig.getString("waves.network.port")
-      val hostConfig = HostConfig
-        .builder()
-        .publishAllPorts(true)
-        .build()
 
       val nodeNumber = nodeName.replace("node", "").toInt
       val ip         = ipForNode(nodeNumber)
@@ -245,17 +243,50 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
         config
       }
 
+      def extractTemplateConf(): Path = {
+        val resource = getClass.getClassLoader.getResourceAsStream("template.conf")
+        val tempFile = {
+          val dir = Files.createTempDirectory("waves-it")
+          dir.resolve("waves.conf")
+        }
+        val output = new FileOutputStream(tempFile.toFile)
+        ByteStreams.copy(resource, output)
+        output.close()
+        tempFile
+      }
+
+      val templateConf = extractTemplateConf()
+      val configVolume = Volume
+        .builder()
+        .name(s"waves-it-config")
+        .mountpoint(templateConf.getParent.toString)
+        .build()
+
+      client.createVolume(configVolume)
+
+      val hostConfig = HostConfig
+        .builder()
+        .appendBinds(
+          Bind
+            .from(configVolume)
+            .to("/etc/waves")
+            .readOnly(true)
+            .build()
+        )
+        .publishAllPorts(true)
+        .build()
+
       val containerConfig = ContainerConfig
         .builder()
         .image(imageName)
         .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(wavesNetwork.name() -> endpointConfigFor(nodeName)).asJava))
         .hostConfig(hostConfig)
-        .env(s"WAVES_OPTS=$configOverrides")
+        .env(s"JAVA_OPTS=$configOverrides")
         .build()
 
       val containerId = {
         val jenkinsJobIdFromEnv = sys.env.get("JENKINS_JOB_ID").fold("")(s => s"-$s")
-        val containerName = s"${wavesNetwork.name()}-$nodeName$jenkinsJobIdFromEnv"
+        val containerName       = s"${wavesNetwork.name()}-$nodeName$jenkinsJobIdFromEnv"
         dumpContainers(
           client.listContainers(DockerClient.ListContainersParam.filter("name", containerName)),
           "Containers with same name"
@@ -351,7 +382,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
       log.debug("Set new config directly in the script for starting node")
       val startScript = s"$ContainerRoot/bin/entrypoint.sh"
-      val scriptCmd = Array("sh", "-c", s"JAVA_OPTS='$renderedConfig' $startScript")
+      val scriptCmd   = Array("sh", "-c", s"JAVA_OPTS='$renderedConfig' $startScript")
 
       val execScriptCmd = client.execCreate(node.containerId, scriptCmd).id()
       client.execStart(execScriptCmd)

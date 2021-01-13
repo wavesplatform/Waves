@@ -31,11 +31,10 @@ COPY docker/entrypoint.sh /usr/share/waves/bin/
 
 RUN /bin/bash /tmp/setup-node.sh
 
+USER waves
 WORKDIR /var/lib/waves
 EXPOSE 6869 6868 6863 6862 6870
-
-USER waves
 VOLUME /var/lib/waves
 VOLUME /usr/share/waves/lib/plugins
-#ENTRYPOINT ["/usr/share/waves/bin/entrypoint.sh"]
-CMD ["/bin/bash"]
+
+ENTRYPOINT ["/usr/share/waves/bin/entrypoint.sh"]
