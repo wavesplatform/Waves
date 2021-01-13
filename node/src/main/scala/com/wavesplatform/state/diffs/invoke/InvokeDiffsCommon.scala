@@ -356,7 +356,7 @@ object InvokeDiffsCommon {
     }
     val paymentPortfolio =
       if (failed)
-        invoke.payments.map(p => Portfolio.build(p.assetId, p.amount)).reduce(_ |+| _)
+        invoke.payments.map(p => Portfolio.build(p.assetId, p.amount)).fold(Portfolio.empty)(_ |+| _)
       else
         Portfolio.empty
     unusedFeePortfolio |+| Map(invoker -> paymentPortfolio)
