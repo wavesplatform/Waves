@@ -1,10 +1,9 @@
 package com.wavesplatform.it.sync.smartcontract
 
+import com.wavesplatform.it.BaseFunSuite
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.transactions.BaseTransactionSuite
-import org.scalatest.CancelAfterFailure
 
-class ScriptUtilsTestSuite extends BaseTransactionSuite with CancelAfterFailure {
+class ScriptUtilsTestSuite extends BaseFunSuite {
   test("decompile script containing deep block structure should not blow stack") {
     val node = nodes.head
 

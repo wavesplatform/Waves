@@ -9,12 +9,12 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.CancelAfterFailure
 
 import scala.util.Random
 
-class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure {
-  private def dApp   = firstKeyPair
+class InvokeListForCallable extends BaseTransactionSuite {
+  private def dApp = firstKeyPair
+
   private def caller = secondKeyPair
 
   private lazy val dAppAddress: String = dApp.toAddress.toString
@@ -22,8 +22,8 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
   test("prerequisite: set contract and issue asset") {
     val source =
       """
-      |{-# STDLIB_VERSION 4 #-}
-      |{-# CONTENT_TYPE DAPP #-}
+        |{-# STDLIB_VERSION 4 #-}
+        |{-# CONTENT_TYPE DAPP #-}
       |{-# SCRIPT_TYPE ACCOUNT #-}
       |
       |
@@ -55,7 +55,7 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
       |}
       """.stripMargin
     val script = ScriptCompiler.compile(source, ScriptEstimatorV2).explicitGet()._1.bytes().base64
-    sender.setScript(dApp, Some(script), setScriptFee, waitForTx = true)
+    miner.setScript(dApp, Some(script), setScriptFee, waitForTx = true)
   }
 
   test("check list for all data types except union. Write first element of list of each type to acc data") {
@@ -65,7 +65,7 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
     val byteList  = ARR(IndexedSeq(CONST_BYTESTR(ByteStr(rndString.getBytes())).explicitGet()), limited = false).explicitGet()
     val boolList  = ARR(IndexedSeq(CONST_BOOLEAN(true)), limited = false).explicitGet()
 
-    sender
+    miner
       .invokeScript(
         caller,
         dAppAddress,
@@ -74,10 +74,10 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
         waitForTx = true
       )
 
-    sender.getDataByKey(dAppAddress, "a") shouldBe IntegerDataEntry("a", Long.MaxValue)
-    sender.getDataByKey(dAppAddress, "b") shouldBe StringDataEntry("b", rndString)
-    sender.getDataByKey(dAppAddress, "c") shouldBe BinaryDataEntry("c", ByteStr(rndString.getBytes))
-    sender.getDataByKey(dAppAddress, "y") shouldBe BooleanDataEntry("y", true)
+    miner.getDataByKey(dAppAddress, "a") shouldBe IntegerDataEntry("a", Long.MaxValue)
+    miner.getDataByKey(dAppAddress, "b") shouldBe StringDataEntry("b", rndString)
+    miner.getDataByKey(dAppAddress, "c") shouldBe BinaryDataEntry("c", ByteStr(rndString.getBytes))
+    miner.getDataByKey(dAppAddress, "y") shouldBe BooleanDataEntry("y", true)
   }
 
   test("List can contain union data type") {
@@ -87,7 +87,7 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
     val byteEl  = CONST_BYTESTR(ByteStr(rndString.getBytes())).explicitGet()
     val boolEl  = CONST_BOOLEAN(true)
 
-    sender
+    miner
       .invokeScript(
         caller,
         dAppAddress,
@@ -96,11 +96,11 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
         waitForTx = true
       )
 
-    sender.getDataByKey(dAppAddress, "a") shouldBe IntegerDataEntry("a", Long.MaxValue)
-    sender.getDataByKey(dAppAddress, "b") shouldBe StringDataEntry("b", rndString)
-    sender.getDataByKey(dAppAddress, "c") shouldBe BinaryDataEntry("c", ByteStr(rndString.getBytes))
-    sender.getDataByKey(dAppAddress, "y") shouldBe BooleanDataEntry("y", true)
-    sender.getDataByKey(dAppAddress, "listsize") shouldBe IntegerDataEntry("listsize", 4)
+    miner.getDataByKey(dAppAddress, "a") shouldBe IntegerDataEntry("a", Long.MaxValue)
+    miner.getDataByKey(dAppAddress, "b") shouldBe StringDataEntry("b", rndString)
+    miner.getDataByKey(dAppAddress, "c") shouldBe BinaryDataEntry("c", ByteStr(rndString.getBytes))
+    miner.getDataByKey(dAppAddress, "y") shouldBe BooleanDataEntry("y", true)
+    miner.getDataByKey(dAppAddress, "listsize") shouldBe IntegerDataEntry("listsize", 4)
   }
 
 
@@ -111,7 +111,7 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
     val byteList  = ARR(IndexedSeq(CONST_BYTESTR(ByteStr(rndString.getBytes())).explicitGet()), limited = false).explicitGet()
     val boolList  = ARR(IndexedSeq(CONST_BOOLEAN(true)), limited = false).explicitGet()
 
-    sender
+    miner
       .invokeScript(
         caller,
         dAppAddress,
@@ -120,16 +120,16 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
         waitForTx = true
       )
 
-    sender.getDataByKey(dAppAddress, "a") shouldBe IntegerDataEntry("a", Long.MaxValue)
-    sender.getDataByKey(dAppAddress, "b") shouldBe StringDataEntry("b", rndString)
-    sender.getDataByKey(dAppAddress, "c") shouldBe BinaryDataEntry("c", ByteStr(rndString.getBytes))
-    sender.getDataByKey(dAppAddress, "y") shouldBe BooleanDataEntry("y", true)
+    miner.getDataByKey(dAppAddress, "a") shouldBe IntegerDataEntry("a", Long.MaxValue)
+    miner.getDataByKey(dAppAddress, "b") shouldBe StringDataEntry("b", rndString)
+    miner.getDataByKey(dAppAddress, "c") shouldBe BinaryDataEntry("c", ByteStr(rndString.getBytes))
+    miner.getDataByKey(dAppAddress, "y") shouldBe BooleanDataEntry("y", true)
   }
 
   ignore("error if list size more than 1000") {
     val strList = ARR(genArrOfBoolean(1001), limited = false).explicitGet()
     assertApiError(
-      sender
+      miner
         .invokeScript(
           caller,
           dAppAddress,
@@ -145,7 +145,7 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
   ignore("try to get non-existing element by index") {
     val strList = ARR(genArrOfBoolean(1000), limited = false).explicitGet()
     assertApiError(
-      sender
+      miner
         .invokeScript(
           caller,
           dAppAddress,
@@ -162,7 +162,7 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
   ignore("try to get element by negative index") {
     val strList = ARR(genArrOfBoolean(5), limited = false).explicitGet()
     assertApiError(
-      sender
+      miner
         .invokeScript(
           caller,
           dAppAddress,

@@ -9,14 +9,16 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.it.{ReportingTestName, WaitForHeight2}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
+import org.scalatest.{FreeSpec, Matchers}
 
-class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with CancelAfterFailure with ReportingTestName with NodesFromDocker {
+class UTXAllowance extends FreeSpec with Matchers with WaitForHeight2 with ReportingTestName with NodesFromDocker {
+
   import UTXAllowance._
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
   private def nodeA = nodes.head
+
   private def nodeB = nodes.last
 
   "create two nodes with scripted accounts and check UTX" in {

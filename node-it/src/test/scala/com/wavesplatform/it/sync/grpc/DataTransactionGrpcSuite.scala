@@ -23,7 +23,7 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
-    sender.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(fourthAddress), 10.waves, minFee, waitForTx = true)
+    miner.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(fourthAddress), 10.waves, minFee, waitForTx = true)
   }
 
   test("should not put 65-sized proof") {
@@ -66,29 +66,29 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
   test("sender's waves balance is decreased by fee.") {
     for (v <- dataTxSupportedVersions) {
-      val firstBalance    = sender.wavesBalance(firstAddress).available
-      val firstEffBalance = sender.wavesBalance(firstAddress).effective
+      val firstBalance    = miner.wavesBalance(firstAddress).available
+      val firstEffBalance = miner.wavesBalance(firstAddress).effective
       val entry           = DataEntry("int", DataEntry.Value.IntValue(0xcafebabe))
       val data            = List(entry)
       val fee             = calcDataFee(data, v)
-      sender.putData(firstAcc, data, fee, version = v, waitForTx = true)
-      sender.wavesBalance(firstAddress).available shouldBe firstBalance - fee
-      sender.wavesBalance(firstAddress).effective shouldBe firstEffBalance - fee
+      miner.putData(firstAcc, data, fee, version = v, waitForTx = true)
+      miner.wavesBalance(firstAddress).available shouldBe firstBalance - fee
+      miner.wavesBalance(firstAddress).effective shouldBe firstEffBalance - fee
     }
   }
 
   test("cannot put data without having enough waves") {
     for (v <- dataTxSupportedVersions) {
-      val firstBalance    = sender.wavesBalance(firstAddress).available
-      val firstEffBalance = sender.wavesBalance(firstAddress).effective
+      val firstBalance    = miner.wavesBalance(firstAddress).available
+      val firstEffBalance = miner.wavesBalance(firstAddress).effective
       val entry           = DataEntry("bool", DataEntry.Value.BoolValue(false))
       val data            = List(entry)
 
-      assertGrpcError(sender.putData(firstAcc, data, firstBalance + 1, version = v), "Accounts balance errors", Code.INVALID_ARGUMENT)
+      assertGrpcError(miner.putData(firstAcc, data, firstBalance + 1, version = v), "Accounts balance errors", Code.INVALID_ARGUMENT)
 
       nodes.foreach(n => n.waitForHeight(n.height + 1))
-      sender.wavesBalance(firstAddress).available shouldBe firstBalance
-      sender.wavesBalance(firstAddress).effective shouldBe firstEffBalance
+      miner.wavesBalance(firstAddress).available shouldBe firstBalance
+      miner.wavesBalance(firstAddress).effective shouldBe firstEffBalance
     }
   }
 
@@ -96,28 +96,27 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     val entry = DataEntry("bool", DataEntry.Value.BoolValue(false))
     val data  = List(entry)
     for (v <- dataTxSupportedVersions) {
-      val firstBalance    = sender.wavesBalance(firstAddress).available
-      val firstEffBalance = sender.wavesBalance(firstAddress).effective
+      val firstBalance    = miner.wavesBalance(firstAddress).available
+      val firstEffBalance = miner.wavesBalance(firstAddress).effective
       assertGrpcError(
-        sender.putData(firstAcc, data, minFee, timestamp = System.currentTimeMillis() + 1.day.toMillis, version = v),
+        miner.putData(firstAcc, data, minFee, timestamp = System.currentTimeMillis() + 1.day.toMillis, version = v),
         "Transaction timestamp .* is more than .*ms in the future",
-        Code.INVALID_ARGUMENT
-      )
-      sender.waitForHeight(sender.height + 1)
-      sender.wavesBalance(firstAddress).available shouldBe firstBalance
-      sender.wavesBalance(firstAddress).effective shouldBe firstEffBalance
+        Code.INVALID_ARGUMENT)
+      miner.waitForHeight(miner.height + 1)
+      miner.wavesBalance(firstAddress).available shouldBe firstBalance
+      miner.wavesBalance(firstAddress).effective shouldBe firstEffBalance
     }
   }
   test("cannot broadcast data transaction with insufficient fee") {
     val entry = DataEntry("bool", DataEntry.Value.BoolValue(false))
     val data  = List(entry)
     for (v <- dataTxSupportedVersions) {
-      val firstBalance    = sender.wavesBalance(firstAddress).available
-      val firstEffBalance = sender.wavesBalance(firstAddress).effective
-      assertGrpcError(sender.putData(firstAcc, data, minFee - 1), "Fee .* does not exceed minimal value", Code.INVALID_ARGUMENT)
-      sender.waitForHeight(sender.height + 1)
-      sender.wavesBalance(firstAddress).available shouldBe firstBalance
-      sender.wavesBalance(firstAddress).effective shouldBe firstEffBalance
+      val firstBalance    = miner.wavesBalance(firstAddress).available
+      val firstEffBalance = miner.wavesBalance(firstAddress).effective
+      assertGrpcError(miner.putData(firstAcc, data, minFee - 1), "Fee .* does not exceed minimal value", Code.INVALID_ARGUMENT)
+      miner.waitForHeight(miner.height + 1)
+      miner.wavesBalance(firstAddress).available shouldBe firstBalance
+      miner.wavesBalance(firstAddress).effective shouldBe firstEffBalance
     }
   }
 
@@ -127,7 +126,7 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     val key          = "\u6fae" * (maxKeySizeV1 - 1)
     val data         = List.tabulate(26)(n => DataEntry(key + n.toChar, DataEntry.Value.BinaryValue(ByteString.copyFrom(Array.fill(5599)(n.toByte)))))
     val fee          = calcDataFee(data, TxVersion.V1)
-    sender.putData(firstAcc, data, fee, version = TxVersion.V1, waitForTx = true)
+    miner.putData(firstAcc, data, fee, version = TxVersion.V1, waitForTx = true)
 
     //Max size of transaction V2
     val maxKeySizeV2 = 400
@@ -135,7 +134,7 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     val data2 =
       List.tabulate(5)(n => DataEntry(key2 + n.toChar, DataEntry.Value.BinaryValue(ByteString.copyFrom(Array.fill(Short.MaxValue)(n.toByte)))))
     val fee2 = calcDataFee(data2, TxVersion.V2)
-    sender.putData(firstAcc, data2, fee2, version = TxVersion.V2, waitForTx = true)
+    miner.putData(firstAcc, data2, fee2, version = TxVersion.V2, waitForTx = true)
   }
 
   test("data definition and retrieval") {
@@ -144,37 +143,37 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val txSenderAddress = if (v < 2) secondAddress else thirdAddress
       val intEntry        = DataEntry("int", DataEntry.Value.IntValue(8))
       val intList         = List(intEntry)
-      sender.putData(txSender, intList, calcDataFee(intList, v), version = v, waitForTx = true)
+      miner.putData(txSender, intList, calcDataFee(intList, v), version = v, waitForTx = true)
 
-      sender.getDataByKey(txSenderAddress, "int") shouldBe intList
-      sender.getData(txSenderAddress) shouldBe intList
+      miner.getDataByKey(txSenderAddress, "int") shouldBe intList
+      miner.getData(txSenderAddress) shouldBe intList
 
       val boolEntry = DataEntry("bool", DataEntry.Value.BoolValue(true))
       val boolList  = List(boolEntry)
-      sender.putData(txSender, boolList, calcDataFee(boolList, v), version = v, waitForTx = true)
+      miner.putData(txSender, boolList, calcDataFee(boolList, v), version = v, waitForTx = true)
 
       val stringEntry = DataEntry("str", DataEntry.Value.StringValue("AAA"))
       val stringList  = List(stringEntry)
-      sender.putData(txSender, stringList, calcDataFee(stringList, v), version = v, waitForTx = true)
+      miner.putData(txSender, stringList, calcDataFee(stringList, v), version = v, waitForTx = true)
 
-      sender.getDataByKey(txSenderAddress, "int") shouldBe List(intEntry)
-      sender.getDataByKey(txSenderAddress, "bool") shouldBe List(boolEntry)
-      sender.getDataByKey(txSenderAddress, "str") shouldBe List(stringEntry)
-      sender.getData(txSenderAddress) should contain theSameElementsAs boolList ++ intList ++ stringList
+      miner.getDataByKey(txSenderAddress, "int") shouldBe List(intEntry)
+      miner.getDataByKey(txSenderAddress, "bool") shouldBe List(boolEntry)
+      miner.getDataByKey(txSenderAddress, "str") shouldBe List(stringEntry)
+      miner.getData(txSenderAddress) should contain theSameElementsAs boolList ++ intList ++ stringList
 
       // redefine int entry
       val reIntEntry = DataEntry("int", DataEntry.Value.IntValue(8))
       val reIntList  = List(intEntry)
-      sender.putData(txSender, reIntList, calcDataFee(reIntList, v), version = v, waitForTx = true)
+      miner.putData(txSender, reIntList, calcDataFee(reIntList, v), version = v, waitForTx = true)
 
-      sender.getDataByKey(txSenderAddress, "int") shouldBe List(reIntEntry)
-      sender.getDataByKey(txSenderAddress, "bool") shouldBe List(boolEntry)
-      sender.getDataByKey(txSenderAddress, "str") shouldBe List(stringEntry)
-      sender.getData(txSenderAddress) should contain theSameElementsAs boolList ++ reIntList ++ stringList
+      miner.getDataByKey(txSenderAddress, "int") shouldBe List(reIntEntry)
+      miner.getDataByKey(txSenderAddress, "bool") shouldBe List(boolEntry)
+      miner.getDataByKey(txSenderAddress, "str") shouldBe List(stringEntry)
+      miner.getData(txSenderAddress) should contain theSameElementsAs boolList ++ reIntList ++ stringList
 
       // define tx with all types
-      val firstBalance       = sender.wavesBalance(txSenderAddress).available
-      val firstEffBalance    = sender.wavesBalance(txSenderAddress).effective
+      val firstBalance       = miner.wavesBalance(txSenderAddress).available
+      val firstEffBalance    = miner.wavesBalance(txSenderAddress).effective
       val intEntry2          = DataEntry("int", DataEntry.Value.IntValue(-127))
       val boolEntry2         = DataEntry("bool", DataEntry.Value.BoolValue(false))
       val blobEntry2         = DataEntry("blob", DataEntry.Value.BinaryValue(ByteString.copyFrom(Array[Byte](127.toByte, 0, 1, 1))))
@@ -182,22 +181,22 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val unicodeStringEntry = DataEntry("?&$#^123\\/.a:;'\"\r\n\t\u0000|%è&", DataEntry.Value.StringValue("specïal"))
       val dataAllTypes       = List(intEntry2, boolEntry2, blobEntry2, stringEntry2, unicodeStringEntry)
       val fee                = calcDataFee(dataAllTypes, v)
-      sender.putData(txSender, dataAllTypes, fee, version = v, waitForTx = true)
+      miner.putData(txSender, dataAllTypes, fee, version = v, waitForTx = true)
 
-      sender.getDataByKey(txSenderAddress, "int") shouldBe List(intEntry2)
-      sender.getDataByKey(txSenderAddress, "bool") shouldBe List(boolEntry2)
-      sender.getDataByKey(txSenderAddress, "blob") shouldBe List(blobEntry2)
-      sender.getDataByKey(txSenderAddress, "str") shouldBe List(stringEntry2)
-      sender.getData(txSenderAddress) should contain theSameElementsAs dataAllTypes
+      miner.getDataByKey(txSenderAddress, "int") shouldBe List(intEntry2)
+      miner.getDataByKey(txSenderAddress, "bool") shouldBe List(boolEntry2)
+      miner.getDataByKey(txSenderAddress, "blob") shouldBe List(blobEntry2)
+      miner.getDataByKey(txSenderAddress, "str") shouldBe List(stringEntry2)
+      miner.getData(txSenderAddress) should contain theSameElementsAs dataAllTypes
 
-      sender.wavesBalance(txSenderAddress).available shouldBe firstBalance - fee
-      sender.wavesBalance(txSenderAddress).effective shouldBe firstEffBalance - fee
+      miner.wavesBalance(txSenderAddress).available shouldBe firstBalance - fee
+      miner.wavesBalance(txSenderAddress).effective shouldBe firstEffBalance - fee
     }
   }
 
   test("queries for nonexistent data") {
-    sender.getDataByKey(firstAddress, "foo") shouldBe List.empty
-    sender.getData(fourthAddress) shouldBe List.empty
+    miner.getDataByKey(firstAddress, "foo") shouldBe List.empty
+    miner.getData(fourthAddress) shouldBe List.empty
   }
 
   test("update type for dataEntry") {
@@ -205,13 +204,13 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val nonLatinKey = "\u05EA\u05E8\u05D1\u05D5\u05EA, \u05E1\u05E4\u05D5\u05E8\u05D8 \u05D5\u05EA\u05D9\u05D9\u05E8\u05D5\u05EA"
       val boolData    = List(DataEntry(nonLatinKey, DataEntry.Value.BoolValue(true)))
       val boolDataFee = calcDataFee(boolData, v)
-      sender.putData(firstAcc, boolData, boolDataFee, version = v, waitForTx = true)
-      sender.getDataByKey(firstAddress, nonLatinKey) shouldBe boolData
+      miner.putData(firstAcc, boolData, boolDataFee, version = v, waitForTx = true)
+      miner.getDataByKey(firstAddress, nonLatinKey) shouldBe boolData
 
       val longData    = List(DataEntry(nonLatinKey, DataEntry.Value.IntValue(100500)))
       val longDataFee = calcDataFee(longData, v)
-      sender.putData(firstAcc, longData, longDataFee, version = v, waitForTx = true)
-      sender.getDataByKey(firstAddress, nonLatinKey) shouldBe longData
+      miner.putData(firstAcc, longData, longDataFee, version = v, waitForTx = true)
+      miner.getDataByKey(firstAddress, nonLatinKey) shouldBe longData
     }
   }
 
@@ -223,51 +222,40 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val tooBigKey          = "a" * (maxKeySize + 1)
       val tooBigKeyDataEntry = List(DataEntry(tooBigKey, DataEntry.Value.BoolValue(false)))
 
+      assertGrpcError(miner.putData(firstAcc, tooBigKeyDataEntry, calcDataFee(tooBigKeyDataEntry, v), version = v),
+        "Too big sequence requested", Code.INVALID_ARGUMENT)
+      assertGrpcError(miner.putData(firstAcc, List(DataEntry("", DataEntry.Value.BoolValue(false))), 1.waves, version = v),
+        "Empty key found", Code.INVALID_ARGUMENT)
       assertGrpcError(
-        sender.putData(firstAcc, tooBigKeyDataEntry, calcDataFee(tooBigKeyDataEntry, v), version = v),
-        "Too big sequence requested",
-        Code.INVALID_ARGUMENT
-      )
-      assertGrpcError(
-        sender.putData(firstAcc, List(DataEntry("", DataEntry.Value.BoolValue(false))), 1.waves, version = v),
-        "Empty key found",
-        Code.INVALID_ARGUMENT
-      )
-      assertGrpcError(
-        sender.putData(
-          firstAcc,
-          List(DataEntry("abc", DataEntry.Value.BoolValue(false)), DataEntry("abc", DataEntry.Value.BoolValue(false))),
-          1.waves,
-          version = v
-        ),
+        miner.putData(firstAcc, List(DataEntry("abc", DataEntry.Value.BoolValue(false)), DataEntry("abc", DataEntry.Value.BoolValue(false))), 1.waves, version = v),
         "Duplicated keys found",
         Code.INVALID_ARGUMENT
       )
 
       val extraValueData = List(DataEntry("key", DataEntry.Value.BinaryValue(ByteString.copyFrom(Array.fill(maxValueSize + 1)(1.toByte)))))
       assertGrpcError(
-        sender.putData(firstAcc, extraValueData, calcDataFee(extraValueData, v), version = v),
+        miner.putData(firstAcc, extraValueData, calcDataFee(extraValueData, v), version = v),
         "Too big sequence requested",
         Code.INVALID_ARGUMENT
       )
       val largeBinData =
         List.tabulate(5)(n => DataEntry(tooBigKey, DataEntry.Value.BinaryValue(ByteString.copyFrom(Array.fill(maxValueSize)(n.toByte)))))
       assertGrpcError(
-        sender.putData(firstAcc, largeBinData, calcDataFee(largeBinData, v), version = v),
+        miner.putData(firstAcc, largeBinData, calcDataFee(largeBinData, v), version = v),
         "Too big sequence requested",
         Code.INVALID_ARGUMENT
       )
 
       val largeStrData = List.tabulate(5)(n => DataEntry(tooBigKey, DataEntry.Value.StringValue("A" * maxValueSize)))
       assertGrpcError(
-        sender.putData(firstAcc, largeStrData, calcDataFee(largeStrData, v), version = v),
+        miner.putData(firstAcc, largeStrData, calcDataFee(largeStrData, v), version = v),
         "Too big sequence requested",
         Code.INVALID_ARGUMENT
       )
 
       val tooManyEntriesData = List.tabulate(maxEntryCount + 1)(n => DataEntry(s"key$n", DataEntry.Value.IntValue(10)))
       assertGrpcError(
-        sender.putData(firstAcc, tooManyEntriesData, calcDataFee(tooManyEntriesData, v), version = v),
+        miner.putData(firstAcc, tooManyEntriesData, calcDataFee(tooManyEntriesData, v), version = v),
         "Too big sequence requested",
         Code.INVALID_ARGUMENT
       )
@@ -276,8 +264,8 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
   test("try to put empty data") {
     for (v <- dataTxSupportedVersions) {
-      sender.putData(fourthAcc, List.empty, calcDataFee(List.empty, v))
-      sender.getData(fourthAddress) shouldBe List.empty
+      miner.putData(fourthAcc, List.empty, calcDataFee(List.empty, v))
+      miner.getData(fourthAddress) shouldBe List.empty
     }
   }
 
@@ -297,18 +285,18 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val txIds = dataSet
         .grouped(100)
         .map(_.toList)
-        .map(data => PBTransactions.vanilla(sender.putData(fourthAcc, data, calcDataFee(data, v), version = v)).explicitGet().id().toString)
-      txIds.foreach(tx => sender.waitForTransaction(tx))
+        .map(data => PBTransactions.vanilla(miner.putData(fourthAcc, data, calcDataFee(data, v), version = v)).explicitGet().id().toString)
+      txIds.foreach(tx => miner.waitForTransaction(tx))
       val r = scala.util.Random.nextInt(199)
-      sender.getDataByKey(fourthAddress, s"int$r") shouldBe List(DataEntry(s"int$r", DataEntry.Value.IntValue(1000 + r)))
-      sender.getDataByKey(fourthAddress, s"bool$r") shouldBe List(DataEntry(s"bool$r", DataEntry.Value.BoolValue(false)))
-      sender.getDataByKey(fourthAddress, s"blob$r") shouldBe List(
+      miner.getDataByKey(fourthAddress, s"int$r") shouldBe List(DataEntry(s"int$r", DataEntry.Value.IntValue(1000 + r)))
+      miner.getDataByKey(fourthAddress, s"bool$r") shouldBe List(DataEntry(s"bool$r", DataEntry.Value.BoolValue(false)))
+      miner.getDataByKey(fourthAddress, s"blob$r") shouldBe List(
         DataEntry(s"blob$r", DataEntry.Value.BinaryValue(ByteString.copyFrom(Array[Byte](127.toByte, 0, 1, 1))))
       )
-      sender.getDataByKey(fourthAddress, s"str$r") shouldBe List(DataEntry(s"str$r", DataEntry.Value.StringValue(s"hi there! + $r")))
-      sender.getDataByKey(fourthAddress, s"integer$r") shouldBe List(DataEntry(s"integer$r", DataEntry.Value.IntValue(1000 - r)))
+      miner.getDataByKey(fourthAddress, s"str$r") shouldBe List(DataEntry(s"str$r", DataEntry.Value.StringValue(s"hi there! + $r")))
+      miner.getDataByKey(fourthAddress, s"integer$r") shouldBe List(DataEntry(s"integer$r", DataEntry.Value.IntValue(1000 - r)))
 
-      sender.getData(fourthAddress).size shouldBe 1000
+      miner.getData(fourthAddress).size shouldBe 1000
     }
   }
 

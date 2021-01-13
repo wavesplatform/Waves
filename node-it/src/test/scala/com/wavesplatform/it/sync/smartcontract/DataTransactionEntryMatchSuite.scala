@@ -15,7 +15,7 @@ import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class DataTransactionEntryMatchSuite extends BaseTransactionSuite {
-  private val activationHeight = 5
+  private val activationHeight = 10
 
   private def compile(scriptText: String) =
     ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
@@ -23,7 +23,7 @@ class DataTransactionEntryMatchSuite extends BaseTransactionSuite {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.SynchronousCalls.id, activationHeight)))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.SynchronousCalls, activationHeight)))
       .withDefault(1)
       .buildNonConflicting()
 
@@ -63,18 +63,18 @@ class DataTransactionEntryMatchSuite extends BaseTransactionSuite {
   override protected def beforeAll(): Unit = {
     super.beforeAll()
 
-    val setDApp = sender.setScript(dAppVerifier, Some(script(dApp = true)), setScriptFee, waitForTx = true).id
-    sender.transactionInfo[TransactionInfo](setDApp).script.get.startsWith("base64:") shouldBe true
+    val setDApp = miner.setScript(dAppVerifier, Some(script(dApp = true)), setScriptFee, waitForTx = true).id
+    miner.transactionInfo[TransactionInfo](setDApp).script.get.startsWith("base64:") shouldBe true
 
-    val dAppInfo = sender.addressScriptInfo(dAppVerifier.toAddress.toString)
+    val dAppInfo = miner.addressScriptInfo(dAppVerifier.toAddress.toString)
     dAppInfo.script.isEmpty shouldBe false
     dAppInfo.scriptText.isEmpty shouldBe false
     dAppInfo.script.get.startsWith("base64:") shouldBe true
 
-    val setAccountExpression = sender.setScript(accountExpression, Some(script(dApp = false)), setScriptFee, waitForTx = true).id
-    sender.transactionInfo[TransactionInfo](setAccountExpression).script.get.startsWith("base64:") shouldBe true
+    val setAccountExpression = miner.setScript(accountExpression, Some(script(dApp = false)), setScriptFee, waitForTx = true).id
+    miner.transactionInfo[TransactionInfo](setAccountExpression).script.get.startsWith("base64:") shouldBe true
 
-    val accountExpressionInfo = sender.addressScriptInfo(accountExpression.toAddress.toString)
+    val accountExpressionInfo = miner.addressScriptInfo(accountExpression.toAddress.toString)
     accountExpressionInfo.script.isEmpty shouldBe false
     accountExpressionInfo.scriptText.isEmpty shouldBe false
     accountExpressionInfo.script.get.startsWith("base64:") shouldBe true
@@ -92,13 +92,13 @@ class DataTransactionEntryMatchSuite extends BaseTransactionSuite {
   }
 
   test("successful validation of data transaction for DApp verifier after activation of fix") {
-    sender.waitForHeight(activationHeight)
+    miner.waitForHeight(activationHeight)
     sendDataTransaction(dAppVerifier)
   }
 
   private def sendDataTransaction(address: KeyPair) = {
     val data = List(StringDataEntry("key", "value"))
     val fee  = calcDataFee(data, TxVersion.V1) + smartFee
-    sender.putData(address, data, version = TxVersion.V1, fee = fee, waitForTx = true)
+    miner.putData(address, data, version = TxVersion.V1, fee = fee, waitForTx = true)
   }
 }

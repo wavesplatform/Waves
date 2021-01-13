@@ -20,7 +20,7 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
         tx.timestamp shouldEqual time
         tx.amount shouldEqual amount
         tx.fee shouldEqual fee
-        tx.sender shouldEqual sender.publicKey
+        tx.sender shouldEqual miner.publicKey
         tx.recipient shouldEqual recipient.toAddress
     }
   }

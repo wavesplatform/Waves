@@ -20,7 +20,7 @@ trait DockerBased extends BeforeAndAfterAll {
     r
   }
 
-  protected def createDocker: Docker = Docker(getClass)
+  protected def createDocker: Docker = Docker(getClass, nodeConfigs)
   override protected def afterAll(): Unit = {
     super.afterAll()
     docker.close()

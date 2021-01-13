@@ -69,12 +69,12 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         """.stripMargin
     val script  = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1
     val script2 = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3).explicitGet()._1
-    sender.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(thirdContractAddr), 10.waves, minFee, waitForTx = true)
-    sender.setScript(firstContract, Right(Some(script)), setScriptFee, waitForTx = true)
-    sender.setScript(secondContract, Right(Some(script)), setScriptFee, waitForTx = true)
-    sender.setScript(thirdContract, Right(Some(script2)), setScriptFee, waitForTx = true)
+    miner.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(thirdContractAddr), 10.waves, minFee, waitForTx = true)
+    miner.setScript(firstContract, Right(Some(script)), setScriptFee, waitForTx = true)
+    miner.setScript(secondContract, Right(Some(script)), setScriptFee, waitForTx = true)
+    miner.setScript(thirdContract, Right(Some(script2)), setScriptFee, waitForTx = true)
 
-    val scriptInfo = sender.scriptInfo(firstAddress)
+    val scriptInfo = miner.scriptInfo(firstAddress)
     PBTransactions.toVanillaScript(scriptInfo.scriptBytes) shouldBe Some(script)
   }
 
@@ -82,7 +82,7 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     val arg = ByteStr(Array(42: Byte))
     for (v <- invokeScrTxSupportedVersions) {
       val contract = if (v < 2) firstContractAddr else secondContractAddr
-      sender.broadcastInvokeScript(
+      miner.broadcastInvokeScript(
         caller,
         Recipient().withPublicKeyHash(contract),
         Some(FUNCTION_CALL(FunctionHeader.User("foo"), List(CONST_BYTESTR(arg).explicitGet()))),
@@ -90,8 +90,8 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         waitForTx = true
       )
 
-      sender.getDataByKey(contract, "a") shouldBe List(DataEntry("a", DataEntry.Value.BinaryValue(ByteString.copyFrom(arg.arr))))
-      sender.getDataByKey(contract, "sender") shouldBe List(
+      miner.getDataByKey(contract, "a") shouldBe List(DataEntry("a", DataEntry.Value.BinaryValue(ByteString.copyFrom(arg.arr))))
+      miner.getDataByKey(contract, "sender") shouldBe List(
         DataEntry("sender", DataEntry.Value.BinaryValue(ByteString.copyFrom(caller.toAddress.bytes)))
       )
     }
@@ -100,35 +100,35 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   test("dApp caller invokes a default function on a dApp") {
     for (v <- invokeScrTxSupportedVersions) {
       val contract = if (v < 2) firstContractAddr else secondContractAddr
-      sender.broadcastInvokeScript(
+      miner.broadcastInvokeScript(
         caller,
         Recipient().withPublicKeyHash(contract),
         functionCall = None,
         fee = 1.waves,
         waitForTx = true
       )
-      sender.getDataByKey(contract, "a") shouldBe List(DataEntry("a", DataEntry.Value.StringValue("b")))
-      sender.getDataByKey(contract, "sender") shouldBe List(DataEntry("sender", DataEntry.Value.StringValue("senderId")))
+      miner.getDataByKey(contract, "a") shouldBe List(DataEntry("a", DataEntry.Value.StringValue("b")))
+      miner.getDataByKey(contract, "sender") shouldBe List(DataEntry("sender", DataEntry.Value.StringValue("senderId")))
     }
   }
 
   test("verifier works") {
     for (v <- invokeScrTxSupportedVersions) {
       val contract    = if (v < 2) firstContractAddr else secondContractAddr
-      val dAppBalance = sender.wavesBalance(contract)
+      val dAppBalance = miner.wavesBalance(contract)
       assertGrpcError(
-        sender.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(contract), transferAmount, 1.waves),
+        miner.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(contract), transferAmount, 1.waves),
         "Transaction is not allowed by account-script",
         Code.INVALID_ARGUMENT
       )
-      sender.wavesBalance(contract) shouldBe dAppBalance
+      miner.wavesBalance(contract) shouldBe dAppBalance
     }
   }
 
   test("not able to set an empty key by InvokeScriptTransaction with version >= 2") {
 
     assertGrpcError(
-      sender.broadcastInvokeScript(
+      miner.broadcastInvokeScript(
         caller,
         Recipient().withPublicKeyHash(secondContractAddr),
         Some(FUNCTION_CALL(FunctionHeader.User("emptyKey"), List.empty)),
@@ -139,7 +139,7 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     )
 
     assertGrpcError(
-      sender.broadcastInvokeScript(
+      miner.broadcastInvokeScript(
         caller,
         Recipient().withPublicKeyHash(thirdContractAddr),
         Some(FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)),

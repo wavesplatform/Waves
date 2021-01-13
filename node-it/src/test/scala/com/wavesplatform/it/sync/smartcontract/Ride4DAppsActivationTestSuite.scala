@@ -11,18 +11,18 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.CancelAfterFailure
 
 import scala.concurrent.duration._
 
-class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfterFailure {
+class Ride4DAppsActivationTestSuite extends BaseTransactionSuite {
   private val estimator = ScriptEstimatorV2
 
   import Ride4DAppsActivationTestSuite._
 
   override protected def nodeConfigs: Seq[Config] = configWithRide4DAppsFeature
 
-  private def smartAcc  = firstKeyPair
+  private def smartAcc = firstKeyPair
+
   private def callerAcc = secondKeyPair
 
   private val scriptV3 = ScriptCompiler
@@ -53,9 +53,9 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
     .base64
 
   test("send waves to accounts") {
-    sender
+    miner
       .transfer(
-        sender.keyPair,
+        miner.keyPair,
         recipient = smartAcc.toAddress.toString,
         assetId = None,
         amount = 5.waves,
@@ -64,9 +64,9 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
       )
       .id
 
-    sender
+    miner
       .transfer(
-        sender.keyPair,
+        miner.keyPair,
         recipient = callerAcc.toAddress.toString,
         assetId = None,
         amount = 5.waves,
@@ -78,18 +78,18 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
 
   test("can't set contract to account before Ride4DApps activation") {
     assertBadRequestAndMessage(
-      sender.setScript(smartAcc, Some(scriptV3), setScriptFee + smartFee),
+      miner.setScript(smartAcc, Some(scriptV3), setScriptFee + smartFee),
       "RIDE 4 DAPPS feature has not been activated yet"
     )
   }
 
   test("can't set script with user function to account before Ride4DApps activation") {
-    assertBadRequestAndMessage(sender.setScript(smartAcc, Some(scriptV2), setScriptFee), "RIDE 4 DAPPS feature has not been activated yet")
+    assertBadRequestAndMessage(miner.setScript(smartAcc, Some(scriptV2), setScriptFee), "RIDE 4 DAPPS feature has not been activated yet")
   }
 
   test("can't invoke script before Ride4DApps activation") {
     assertBadRequestAndMessage(
-      sender.invokeScript(callerAcc, smartAcc.toAddress.toString, Some("foo"), List.empty, Seq.empty, smartMinFee, None),
+      miner.invokeScript(callerAcc, smartAcc.toAddress.toString, Some("foo"), List.empty, Seq.empty, smartMinFee, None),
       "RIDE 4 DAPPS feature has not been activated yet"
     )
   }
@@ -97,7 +97,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
   test("can't issue asset with user function in script before Ride4DApps activation") {
 
     assertBadRequestAndMessage(
-      sender.issue(
+      miner.issue(
         smartAcc,
         "Test",
         "Test asset",
@@ -112,7 +112,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
 
   test("can't set script with user function to asset before Ride4DApps activation") {
     assertBadRequestAndMessage(
-      sender.setAssetScript(
+      miner.setAssetScript(
         Asset.IssuedAsset(ByteStr("Test".getBytes("UTF-8"))).id.toString,
         smartAcc,
         issueFee,
@@ -123,11 +123,11 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
   }
 
   test(s"wait height $activationHeight for the feature activation") {
-    sender.waitForHeight(activationHeight, 5.minutes)
+    miner.waitForHeight(activationHeight, 5.minutes)
   }
 
   test("can issue asset and set script with user function after Ride4DApps activation") {
-    val issueTxId = sender
+    val issueTxId = miner
       .issue(
         smartAcc,
         "Test",
@@ -141,7 +141,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
 
     nodes.waitForTransaction(issueTxId)
 
-    sender
+    miner
       .setAssetScript(
         issueTxId,
         smartAcc,
@@ -154,9 +154,9 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
   }
 
   test("can set contract and invoke script after Ride4DApps activation") {
-    sender.setScript(smartAcc, Some(scriptV3), setScriptFee + smartFee, waitForTx = true).id
+    miner.setScript(smartAcc, Some(scriptV3), setScriptFee + smartFee, waitForTx = true).id
 
-    sender
+    miner
       .invokeScript(
         callerAcc,
         smartAcc.toAddress.toString,
@@ -170,11 +170,11 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
       ._1
       .id
 
-    sender.setScript(smartAcc, Some(scriptV2), setScriptFee + smartFee, waitForTx = true).id
+    miner.setScript(smartAcc, Some(scriptV2), setScriptFee + smartFee, waitForTx = true).id
   }
 
   test("can add user function to account script after Ride4DApps activation") {
-    sender.setScript(smartAcc, Some(scriptV2), setScriptFee + smartFee, waitForTx = true).id
+    miner.setScript(smartAcc, Some(scriptV2), setScriptFee + smartFee, waitForTx = true).id
   }
 }
 

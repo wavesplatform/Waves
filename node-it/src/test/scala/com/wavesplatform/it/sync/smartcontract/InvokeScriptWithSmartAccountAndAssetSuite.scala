@@ -11,13 +11,14 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.CancelAfterFailure
 
-class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite with CancelAfterFailure {
+class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite {
   private val estimator = ScriptEstimatorV2
 
-  private def dApp        = firstKeyPair
-  private def caller      = secondKeyPair
+  private def dApp = firstKeyPair
+
+  private def caller = secondKeyPair
+
   private def smartCaller = thirdKeyPair
 
   var asset1: String = ""
@@ -30,7 +31,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
 
   test("invoke by smart account requires just 1 extra fee") {
     assertBadRequestAndMessage(
-      sender.invokeScript(
+      miner.invokeScript(
         smartCaller,
         dAppAddress,
         Some("justWriteData"),
@@ -44,7 +45,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
     val paymentAmount = 20
 
     assertApiError(
-      sender
+      miner
         .invokeScript(
           smartCaller,
           dAppAddress,
@@ -58,7 +59,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
       )
     )
 
-    val invokeScriptTxId = sender
+    val invokeScriptTxId = miner
       .invokeScript(
         smartCaller,
         dAppAddress,
@@ -70,14 +71,14 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
       .id
     nodes.waitForHeightAriseAndTxPresent(invokeScriptTxId)
 
-    sender.debugStateChanges(invokeScriptTxId).stateChanges.get.error shouldBe empty
+    miner.debugStateChanges(invokeScriptTxId).stateChanges.get.error shouldBe empty
   }
 
   test("can't invoke with insufficient payment for @Verifier") {
     val amountLessThanVerifierLimit = 12
 
     assertBadRequestAndMessage(
-      sender
+      miner
         .invokeScript(
           smartCaller,
           dAppAddress,
@@ -95,7 +96,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
     val amountGreaterThanAccountScriptLimit = 20
 
     assertBadRequestAndMessage(
-      sender
+      miner
         .invokeScript(
           caller,
           dAppAddress,
@@ -113,7 +114,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
     val amountGreaterThanAccountScriptLimit = 20
 
     assertApiError(
-      sender
+      miner
         .invokeScript(
           caller,
           dAppAddress,
@@ -131,7 +132,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
   test("can invoke a function with enough payment and fee") {
     val amountGreaterThanAccountScriptLimit = 20
 
-    val invokeScriptId = sender
+    val invokeScriptId = miner
       .invokeScript(
         caller,
         dAppAddress,
@@ -149,7 +150,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
     val amountGreaterThanDAppScriptLimit = 16
 
     assertApiError(
-      sender
+      miner
         .invokeScript(
           caller,
           dAppAddress,
@@ -165,7 +166,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
     val amountLessThanDAppScriptLimit = 15
 
     assertApiError(
-      sender
+      miner
         .invokeScript(
           caller,
           dAppAddress,
@@ -181,7 +182,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
     val amountGreaterThanDAppScriptLimit = 16
 
     assertApiError(
-      sender.invokeScript(
+      miner.invokeScript(
         caller,
         dAppAddress,
         Some("payAsset2GetAsset3"),
@@ -194,7 +195,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
 
   test("can't invoke a function that transfers less than asset script's limit") {
     assertApiError(
-      sender.invokeScript(caller, dAppAddress, Some("get10ofAsset1"), fee = smartMinFee + smartFee),
+      miner.invokeScript(caller, dAppAddress, Some("get10ofAsset1"), fee = smartMinFee + smartFee),
       AssertiveApiError(TransactionNotAllowedByAssetScript.Id, "Transaction is not allowed by token-script")
     )
   }
@@ -203,9 +204,9 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
     super.beforeAll()
 
     withClue("send waves to dApp and caller accounts") {
-      val dAppTransferId        = sender.transfer(sender.keyPair, dAppAddress, 5.waves, minFee).id
-      val callerTransferId      = sender.transfer(sender.keyPair, callerAddress, 5.waves, minFee).id
-      val smartCallerTransferId = sender.transfer(sender.keyPair, smartCallerAddress, 5.waves, minFee).id
+      val dAppTransferId        = miner.transfer(miner.keyPair, dAppAddress, 5.waves, minFee).id
+      val callerTransferId      = miner.transfer(miner.keyPair, callerAddress, 5.waves, minFee).id
+      val smartCallerTransferId = miner.transfer(miner.keyPair, smartCallerAddress, 5.waves, minFee).id
 
       nodes.waitForHeightAriseAndTxPresent(smartCallerTransferId)
       nodes.waitForTransaction(callerTransferId)
@@ -213,7 +214,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
     }
 
     withClue("issue and transfer smart assets between dApp and caller") {
-      asset1 = sender
+      asset1 = miner
         .issue(
           dApp,
           "Asset1",
@@ -240,7 +241,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
         )
         .id
 
-      asset2 = sender
+      asset2 = miner
         .issue(
           dApp,
           "Asset2",
@@ -269,7 +270,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
         )
         .id
 
-      asset3 = sender
+      asset3 = miner
         .issue(
           dApp,
           "Asset3",
@@ -299,20 +300,20 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
 
       nodes.waitForHeightAriseAndTxPresent(asset3)
       nodes.waitForHeightAriseAndTxPresent(asset2)
-      sender.waitForTransaction(asset1)
+      miner.waitForTransaction(asset1)
 
-      val asset1ToCallerId = sender.transfer(dApp, callerAddress, 500, smartMinFee, Some(asset1)).id
-      val asset2ToCallerId = sender.transfer(dApp, callerAddress, 500, smartMinFee, Some(asset2)).id
-      val asset3ToCallerId = sender.transfer(dApp, callerAddress, 500, smartMinFee, Some(asset3)).id
-      val asset1ToSmartId  = sender.transfer(dApp, smartCallerAddress, 500, smartMinFee, Some(asset1)).id
-      val asset2ToSmartId  = sender.transfer(dApp, smartCallerAddress, 500, smartMinFee, Some(asset2)).id
-      val asset3ToSmartId  = sender.transfer(dApp, smartCallerAddress, 500, smartMinFee, Some(asset3)).id
+      val asset1ToCallerId = miner.transfer(dApp, callerAddress, 500, smartMinFee, Some(asset1)).id
+      val asset2ToCallerId = miner.transfer(dApp, callerAddress, 500, smartMinFee, Some(asset2)).id
+      val asset3ToCallerId = miner.transfer(dApp, callerAddress, 500, smartMinFee, Some(asset3)).id
+      val asset1ToSmartId  = miner.transfer(dApp, smartCallerAddress, 500, smartMinFee, Some(asset1)).id
+      val asset2ToSmartId  = miner.transfer(dApp, smartCallerAddress, 500, smartMinFee, Some(asset2)).id
+      val asset3ToSmartId  = miner.transfer(dApp, smartCallerAddress, 500, smartMinFee, Some(asset3)).id
       nodes.waitForHeightAriseAndTxPresent(asset2ToSmartId)
       nodes.waitForHeightAriseAndTxPresent(asset3ToSmartId)
-      sender.waitForTransaction(asset1ToCallerId)
-      sender.waitForTransaction(asset2ToCallerId)
-      sender.waitForTransaction(asset3ToCallerId)
-      sender.waitForTransaction(asset1ToSmartId)
+      miner.waitForTransaction(asset1ToCallerId)
+      miner.waitForTransaction(asset2ToCallerId)
+      miner.waitForTransaction(asset3ToCallerId)
+      miner.waitForTransaction(asset1ToSmartId)
     }
 
     withClue("set scripts to dApp and smartCaller account") {
@@ -387,7 +388,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
         )
         .explicitGet()
         ._1
-      val dAppSetScriptTxId = sender.setScript(dApp, Some(dAppScript.bytes().base64)).id
+      val dAppSetScriptTxId = miner.setScript(dApp, Some(dAppScript.bytes().base64)).id
 
       val smartCallerScript = ScriptCompiler
         .compile(
@@ -410,16 +411,16 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
         )
         .explicitGet()
         ._1
-      val smartCallerSetScriptTxId = sender.setScript(smartCaller, Some(smartCallerScript.bytes().base64)).id
+      val smartCallerSetScriptTxId = miner.setScript(smartCaller, Some(smartCallerScript.bytes().base64)).id
 
       nodes.waitForHeightAriseAndTxPresent(smartCallerSetScriptTxId)
-      sender.waitForTransaction(dAppSetScriptTxId)
+      miner.waitForTransaction(dAppSetScriptTxId)
 
-      val dAppScriptInfo = sender.addressScriptInfo(dAppAddress)
+      val dAppScriptInfo = miner.addressScriptInfo(dAppAddress)
       dAppScriptInfo.script.isEmpty shouldBe false
       dAppScriptInfo.scriptText.isEmpty shouldBe false
       dAppScriptInfo.script.get.startsWith("base64:") shouldBe true
-      val smartCallerScriptInfo = sender.addressScriptInfo(smartCallerAddress)
+      val smartCallerScriptInfo = miner.addressScriptInfo(smartCallerAddress)
       smartCallerScriptInfo.script.isEmpty shouldBe false
       smartCallerScriptInfo.scriptText.isEmpty shouldBe false
       smartCallerScriptInfo.script.get.startsWith("base64:") shouldBe true

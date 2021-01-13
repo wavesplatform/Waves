@@ -4,15 +4,17 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.transactions.NodesFromDocker
-import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
+import org.scalatest.{FunSuite, Matchers}
 
-class ForgeReturnedToUTXSuite extends FunSuite with CancelAfterFailure with NodesFromDocker with Matchers {
+class ForgeReturnedToUTXSuite extends FunSuite with NodesFromDocker with Matchers {
 
   import ForgeReturnedToUTXSuite._
+
   override protected def nodeConfigs: Seq[Config] = Configs
 
   private def miner = nodes.head
-  private def last  = nodes.last
+
+  private def last = nodes.last
 
   test("dependent trasactions can be added to UTX if first mined and returned to UTX") {
 

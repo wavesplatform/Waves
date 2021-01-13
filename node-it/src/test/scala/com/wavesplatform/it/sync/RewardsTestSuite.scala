@@ -8,14 +8,13 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{Node, ReportingTestName}
-import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers, OptionValues}
+import org.scalatest.{FreeSpec, Matchers, OptionValues}
 
 import scala.concurrent.duration._
 
 class RewardsTestSuite
     extends FreeSpec
     with Matchers
-    with CancelAfterFailure
     with NodesFromDocker
     with ActivationStatusRequest
     with ReportingTestName
@@ -113,7 +112,7 @@ class RewardsTestSuite
     }
     "when miner votes for decrease" in {
       docker.restartNode(dockerNodes().head, configWithDecreasedDesired)
-      if (miner.height != 1) nodes.rollback(2, false)
+      if (miner.height != 1) nodes.blacklistPeersAndRollback(2, false)
 
       miner.waitForHeight(activationHeight, 2.minutes)
       val minerBalanceAtActivationHeight = miner.balanceAtHeight(miner.address, activationHeight)

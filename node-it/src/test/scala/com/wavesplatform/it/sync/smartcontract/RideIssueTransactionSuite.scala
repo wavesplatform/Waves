@@ -14,9 +14,8 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.{Assertion, CancelAfterFailure}
 
-class RideIssueTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
+class RideIssueTransactionSuite extends BaseTransactionSuite {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
       .Builder(Default, 1, Seq.empty)
@@ -73,21 +72,21 @@ class RideIssueTransactionSuite extends BaseTransactionSuite with CancelAfterFai
   def compile(script: String): String =
     ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1.bytes().base64
 
-  def assertSuccessIssue(txSender: KeyPair, script: String): Assertion = {
-    val setScriptId = sender.setScript(txSender, Some(script), setScriptFee, waitForTx = true).id
+  def assertSuccessIssue(txSender: KeyPair, script: String): Unit = {
+    val setScriptId = miner.setScript(txSender, Some(script), setScriptFee, waitForTx = true).id
 
-    val scriptInfo = sender.addressScriptInfo(txSender.toAddress.toString)
+    val scriptInfo = miner.addressScriptInfo(txSender.toAddress.toString)
     scriptInfo.script.isEmpty shouldBe false
     scriptInfo.scriptText.isEmpty shouldBe false
     scriptInfo.script.get.startsWith("base64:") shouldBe true
 
-    sender.transactionInfo[TransactionInfo](setScriptId).script.get.startsWith("base64:") shouldBe true
+    miner.transactionInfo[TransactionInfo](setScriptId).script.get.startsWith("base64:") shouldBe true
 
-    val assetId = sender.issue(txSender, assetName, assetDescription, assetQuantity, fee = issueFee + smartFee, waitForTx = true).id
+    val assetId = miner.issue(txSender, assetName, assetDescription, assetQuantity, fee = issueFee + smartFee, waitForTx = true).id
 
-    sender.assertAssetBalance(txSender.toAddress.toString, assetId, assetQuantity)
+    miner.assertAssetBalance(txSender.toAddress.toString, assetId, assetQuantity)
 
-    val asset = sender.assetsDetails(assetId)
+    val asset = miner.assetsDetails(assetId)
     asset.name shouldBe assetName
     asset.description shouldBe assetDescription
   }

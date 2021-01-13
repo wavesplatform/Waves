@@ -20,7 +20,7 @@ class RequestsSpec extends FreeSpec with Matchers with OptionValues with ScalaCh
       Json.obj(
         "type"            -> 4,
         "version"         -> version,
-        "senderPublicKey" -> sender.publicKey.toString,
+        "senderPublicKey" -> miner.publicKey.toString,
         "assetId"         -> JsNull,
         "attachment"      -> "",
         "feeAssetId"      -> JsNull,
@@ -38,7 +38,7 @@ class RequestsSpec extends FreeSpec with Matchers with OptionValues with ScalaCh
         forAll(transferRequestGen(version)) {
           case (sender, json) =>
             val request = json.as[TransferRequest]
-            val tx      = request.toTxFrom(sender.publicKey).explicitGet()
+            val tx      = request.toTxFrom(miner.publicKey).explicitGet()
 
             request.proofs.value should be(tx.proofs)
         }

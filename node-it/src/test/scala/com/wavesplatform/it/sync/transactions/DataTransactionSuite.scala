@@ -6,9 +6,10 @@ import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, TooBigArrayAllocation}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.{TransactionInfo, UnexpectedStatusCodeException}
+import com.wavesplatform.it.api.{BalanceDetails, TransactionInfo, UnexpectedStatusCodeException}
 import com.wavesplatform.it.sync.{calcDataFee, minFee, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -28,26 +29,26 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       .overrideBase(_.quorum(0))
       .overrideBase(_.raw("waves.blockchain.custom.functionality.blocks-for-feature-activation = 1"))
       .overrideBase(_.raw("waves.blockchain.custom.functionality.feature-check-blocks-period = 1"))
-      .overrideBase(_.preactivatedFeatures(15 -> 0))
+      .overrideBase(_.preactivatedFeatures(BlockchainFeatures.BlockV5 -> 0))
       .withDefault(1)
       .withSpecial(1, _.nonMiner)
       .buildNonConflicting()
 
-  private lazy val fourthKeyPair         = sender.createKeyPair()
+  private lazy val fourthKeyPair         = miner.createKeyPair()
   private lazy val fourthAddress: String = fourthKeyPair.toAddress.toString
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
     // explicitly create two new addresses in node's wallet
-    sender.postForm("/addresses")
-    sender.postForm("/addresses")
-    sender.transfer(firstKeyPair, fourthAddress, 10.waves, minFee, waitForTx = true)
+    miner.postForm("/addresses")
+    miner.postForm("/addresses")
+    miner.transfer(firstKeyPair, fourthAddress, 10.waves, minFee, waitForTx = true)
   }
 
   test("should not put 65-sized proof") {
-    val keyPair = sender.createKeyPair()
-    sender.transfer(sender.keyPair, keyPair.toAddress.stringRepr, 1.waves, waitForTx = true)
-    sender.setScript(
+    val keyPair = miner.createKeyPair()
+    miner.transfer(miner.keyPair, keyPair.toAddress.stringRepr, 1.waves, waitForTx = true)
+    miner.setScript(
       keyPair,
       Some(
         ScriptCompiler
@@ -70,7 +71,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       DataTransaction.selfSigned(TxVersion.V1, keyPair, Seq(StringDataEntry("1", "test")), 700000L, System.currentTimeMillis()).explicitGet()
 
     val brokenProofs = dataTx.copy(proofs = Proofs(dataTx.proofs.proofs :+ ByteStr(new Array[Byte](65))))
-    assertBadRequestAndResponse(sender.signedBroadcast(brokenProofs.json(), waitForTx = true), "Too large proof")
+    assertBadRequestAndResponse(miner.signedBroadcast(brokenProofs.json(), waitForTx = true), "Too large proof")
   }
 
   test("put and remove keys") {
@@ -92,7 +93,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
 
     // can put data
     val putDataEntries = (1 to 25).flatMap(i => dataEntries(i)).toList
-    val putTxId        = sender.putData(sender.keyPair, putDataEntries, calcDataFee(putDataEntries, TxVersion.V1)).id
+    val putTxId        = miner.putData(miner.keyPair, putDataEntries, calcDataFee(putDataEntries, TxVersion.V1)).id
     nodes.waitForHeightAriseAndTxPresent(putTxId)
 
     // can put new, update and remove existed in the same transaction
@@ -105,72 +106,72 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
         (1 to 25).map(k => EmptyDataEntry(s"unknown-$k"))                 // 20 unknown keys to remove
 
     val updateAndRemoveTxId =
-      sender.broadcastData(sender.keyPair, updateAndRemoveDataEntries, calcDataFee(updateAndRemoveDataEntries, TxVersion.V2)).id
+      miner.broadcastData(miner.keyPair, updateAndRemoveDataEntries, calcDataFee(updateAndRemoveDataEntries, TxVersion.V2)).id
 
     nodes.waitForHeightAriseAndTxPresent(updateAndRemoveTxId)
 
-    sender.getData(sender.address) should contain theSameElementsAs updatedDatEntries ++ putDataEntries.slice(25, 75) ++ newDataEntries
+    miner.getData(miner.address) should contain theSameElementsAs updatedDatEntries ++ putDataEntries.slice(25, 75) ++ newDataEntries
 
     // can reuse removed keys
     val reusedData = putDataEntries.takeRight(25).map(updateDataEntry)
     val reuseTxId =
-      sender.broadcastData(sender.keyPair, reusedData, calcDataFee(reusedData, TxVersion.V1), version = TxVersion.V1).id
+      miner.broadcastData(miner.keyPair, reusedData, calcDataFee(reusedData, TxVersion.V1), version = TxVersion.V1).id
 
     nodes.waitForHeightAriseAndTxPresent(reuseTxId)
 
-    sender.getData(sender.address) should contain theSameElementsAs updatedDatEntries ++ putDataEntries.slice(25, 75) ++ reusedData ++ newDataEntries
+    miner.getData(miner.address) should contain theSameElementsAs updatedDatEntries ++ putDataEntries.slice(25, 75) ++ reusedData ++ newDataEntries
 
     // can't update and remove keys in the same transaction
     val sameKeyEntries = updateAndRemoveDataEntries.tail :+ EmptyDataEntry(updateAndRemoveDataEntries(1).key)
     assertApiError(
-      sender.broadcastData(sender.keyPair, sameKeyEntries, calcDataFee(sameKeyEntries, TxVersion.V2), version = TxVersion.V2),
+      miner.broadcastData(miner.keyPair, sameKeyEntries, calcDataFee(sameKeyEntries, TxVersion.V2), version = TxVersion.V2),
       CustomValidationError("Duplicated keys found")
     )
 
     //able to "remove" nonexistent key (account state won't be changed, but transaction should be succesfully broadcasted)
-    sender.broadcastData(
-      sender.keyPair,
+    miner.broadcastData(
+      miner.keyPair,
       List(EmptyDataEntry("nonexistentkey")),
       calcDataFee(List(EmptyDataEntry("nonexistentkey")), TxVersion.V2),
       waitForTx = true
     )
-    sender.getData(sender.address).filter(_.key == "nonexistentkey") shouldBe List.empty
+    miner.getData(miner.address).filter(_.key == "nonexistentkey") shouldBe List.empty
 
     // max number of data entries is 100
     val tooLargeSizeDataEntries = updateAndRemoveDataEntries ++ (1 to 11).map(k => EmptyDataEntry(s"another-unknown-$k"))
     assertApiError(
-      sender.broadcastData(sender.keyPair, tooLargeSizeDataEntries, calcDataFee(tooLargeSizeDataEntries, TxVersion.V2), version = TxVersion.V2),
+      miner.broadcastData(miner.keyPair, tooLargeSizeDataEntries, calcDataFee(tooLargeSizeDataEntries, TxVersion.V2), version = TxVersion.V2),
       TooBigArrayAllocation
     )
 
     // max key size is 400 byte
     val tooLargeKeyDataEntries = List(BinaryDataEntry("a" * 401, ByteStr("value".getBytes("utf-8"))))
     assertApiError(
-      sender.broadcastData(sender.keyPair, tooLargeKeyDataEntries, calcDataFee(tooLargeKeyDataEntries, TxVersion.V2), version = TxVersion.V2),
+      miner.broadcastData(miner.keyPair, tooLargeKeyDataEntries, calcDataFee(tooLargeKeyDataEntries, TxVersion.V2), version = TxVersion.V2),
       TooBigArrayAllocation
     )
 
     // can put and remove same data within one block
     nodes.waitForHeightArise()
     val putDataEntries2 = List(IntegerDataEntry("del", 42))
-    val putDataTxId     = sender.putData(sender.keyPair, putDataEntries2, calcDataFee(putDataEntries2, TxVersion.V1) * 10).id
-    val removeDataTxId  = sender.broadcastData(sender.keyPair, List(EmptyDataEntry("del")), calcDataFee(List(EmptyDataEntry("del")), TxVersion.V2)).id
+    val putDataTxId     = miner.putData(miner.keyPair, putDataEntries2, calcDataFee(putDataEntries2, TxVersion.V1) * 10).id
+    val removeDataTxId  = miner.broadcastData(miner.keyPair, List(EmptyDataEntry("del")), calcDataFee(List(EmptyDataEntry("del")), TxVersion.V2)).id
     nodes.waitForTransaction(putDataTxId)
     nodes.waitForTransaction(removeDataTxId)
-    sender.getData(sender.address).filter(_.key == "del") shouldBe List.empty
+    miner.getData(miner.address).filter(_.key == "del") shouldBe List.empty
   }
 
   test("sender's waves balance is decreased by fee") {
     for (v <- dataTxSupportedVersions) {
-      val (balance1, eff1) = miner.accountBalances(firstAddress)
+      val BalanceDetails(_, balance1, _, _, eff1) = miner.balanceDetails(firstAddress)
       val entry            = IntegerDataEntry("int", 0xcafebabe)
       val data             = List(entry)
       val dataFee          = calcDataFee(data, v)
-      val dataTx           = sender.putData(firstKeyPair, data, version = v, fee = dataFee)
+      val dataTx           = miner.putData(firstKeyPair, data, version = v, fee = dataFee)
       nodes.waitForHeightAriseAndTxPresent(dataTx.id)
       if (v > 2) {
         dataTx.chainId shouldBe Some(AddressScheme.current.chainId)
-        sender.transactionInfo[TransactionInfo](dataTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
+        miner.transactionInfo[TransactionInfo](dataTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
       }
       miner.assertBalances(firstAddress, balance1 - dataFee, eff1 - dataFee)
     }
@@ -178,18 +179,18 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
 
   test("cannot broadcast data without having enough waves") {
     for (v <- dataTxSupportedVersions) {
-      val (balance1, eff1) = miner.accountBalances(firstAddress)
+      val BalanceDetails(_, balance1, _, _, eff1) = miner.balanceDetails(firstAddress)
 
       val data = List(BooleanDataEntry("bool", false))
-      assertBadRequestAndResponse(sender.putData(firstKeyPair, data, balance1 + 1, version = v), "Accounts balance errors")
+      assertBadRequestAndResponse(miner.putData(firstKeyPair, data, balance1 + 1, version = v), "Accounts balance errors")
       nodes.waitForHeightArise()
       miner.assertBalances(firstAddress, balance1, eff1)
 
       val leaseAmount = 1.waves
-      val leaseId     = sender.lease(firstKeyPair, secondAddress, leaseAmount, minFee).id
+      val leaseId     = miner.lease(firstKeyPair, secondAddress, leaseAmount, minFee).id
       nodes.waitForHeightAriseAndTxPresent(leaseId)
 
-      assertBadRequestAndResponse(sender.putData(firstKeyPair, data, balance1 - leaseAmount, version = v), "Accounts balance errors")
+      assertBadRequestAndResponse(miner.putData(firstKeyPair, data, balance1 - leaseAmount, version = v), "Accounts balance errors")
       nodes.waitForHeightArise()
       miner.assertBalances(firstAddress, balance1 - minFee, eff1 - leaseAmount - minFee)
     }
@@ -198,10 +199,10 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
   test("cannot broadcast data transaction with invalid timestamp (more than allowed in future)") {
     val dataEntry = List(IntegerDataEntry("int", 177))
     for (v <- dataTxSupportedVersions) {
-      val (balance1, eff1)        = miner.accountBalances(firstAddress)
+      val BalanceDetails(_, balance1, _, _, eff1) = miner.balanceDetails(firstAddress)
       val invalidDataTxFromFuture = data(entries = dataEntry, timestamp = System.currentTimeMillis + 1.day.toMillis, version = v)
       assertBadRequestAndResponse(
-        sender.broadcastRequest(invalidDataTxFromFuture.json()),
+        miner.broadcastRequest(invalidDataTxFromFuture.json()),
         "Transaction timestamp .* is more than .*ms in the future"
       )
       nodes.foreach(_.ensureTxDoesntExist(invalidDataTxFromFuture.id().toString))
@@ -213,10 +214,10 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
   test("cannot broadcast data transaction with insufficient fee") {
     val dataEntry = List(IntegerDataEntry("int", 177))
     for (v <- dataTxSupportedVersions) {
-      val (balance1, eff1) = miner.accountBalances(firstAddress)
+      val BalanceDetails(_, balance1, _, _, eff1) = miner.balanceDetails(firstAddress)
       val invalidDataTx    = data(entries = dataEntry, fee = calcDataFee(dataEntry, v) - 1, version = v)
       assertBadRequestAndResponse(
-        sender.broadcastRequest(invalidDataTx.json()),
+        miner.broadcastRequest(invalidDataTx.json()),
         "Fee .* does not exceed minimal value"
       )
       nodes.foreach(_.ensureTxDoesntExist(invalidDataTx.id().toString))
@@ -231,7 +232,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     val key          = "\u6fae" * (maxKeySizeV1 - 1)
     val data         = List.tabulate(26)(n => BinaryDataEntry(key + n.toChar, ByteStr(Array.fill(5599)(n.toByte))))
     val fee          = calcDataFee(data, TxVersion.V1)
-    val txId         = sender.putData(firstKeyPair, data, fee, version = TxVersion.V1).id
+    val txId         = miner.putData(firstKeyPair, data, fee, version = TxVersion.V1).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
     //Max size of transaction V2
@@ -239,7 +240,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     val key2         = "u" * (maxKeySizeV2 - 1)
     val data2        = List.tabulate(5)(n => BinaryDataEntry(key2 + n.toChar, ByteStr(Array.fill(Short.MaxValue)(n.toByte))))
     val fee2         = calcDataFee(data2, TxVersion.V2)
-    val txId2        = sender.putData(firstKeyPair, data2, fee2, version = TxVersion.V2).id
+    val txId2        = miner.putData(firstKeyPair, data2, fee2, version = TxVersion.V2).id
     nodes.waitForHeightAriseAndTxPresent(txId2)
 
   }
@@ -250,42 +251,42 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       // define first int entry
       val intEntry = IntegerDataEntry("int", 8)
       val intList  = List(intEntry)
-      val tx1      = sender.putData(txSender, intList, calcDataFee(intList, v), version = v).id
+      val tx1      = miner.putData(txSender, intList, calcDataFee(intList, v), version = v).id
       nodes.waitForHeightAriseAndTxPresent(tx1)
 
       val txSenderAddress = txSender.toAddress.toString
-      sender.getDataByKey(txSenderAddress, "int") shouldBe intEntry
-      sender.getData(txSenderAddress) shouldBe intList
+      miner.getDataByKey(txSenderAddress, "int") shouldBe intEntry
+      miner.getData(txSenderAddress) shouldBe intList
 
       // define boolean entry
       val boolEntry = BooleanDataEntry("bool", true)
       val boolList  = List(boolEntry)
-      val tx2       = sender.putData(txSender, boolList, calcDataFee(boolList, v), version = v).id
+      val tx2       = miner.putData(txSender, boolList, calcDataFee(boolList, v), version = v).id
       nodes.waitForHeightAriseAndTxPresent(tx2)
 
       // define string entry
       val stringEntry = StringDataEntry("str", "AAA")
       val stringList  = List(stringEntry)
-      val txS         = sender.putData(txSender, stringList, calcDataFee(stringList, v), version = v).id
+      val txS         = miner.putData(txSender, stringList, calcDataFee(stringList, v), version = v).id
       nodes.waitForHeightAriseAndTxPresent(txS)
 
-      sender.getDataByKey(txSenderAddress, "int") shouldBe intEntry
-      sender.getDataByKey(txSenderAddress, "bool") shouldBe boolEntry
-      sender.getDataByKey(txSenderAddress, "str") shouldBe stringEntry
-      sender.getData(txSenderAddress) shouldBe boolList ++ intList ++ stringList
+      miner.getDataByKey(txSenderAddress, "int") shouldBe intEntry
+      miner.getDataByKey(txSenderAddress, "bool") shouldBe boolEntry
+      miner.getDataByKey(txSenderAddress, "str") shouldBe stringEntry
+      miner.getData(txSenderAddress) shouldBe boolList ++ intList ++ stringList
 
       // redefine int entry
       val reIntEntry = IntegerDataEntry("int", 10)
       val reIntList  = List(reIntEntry)
-      val tx3        = sender.putData(txSender, reIntList, calcDataFee(reIntList, v), version = v).id
+      val tx3        = miner.putData(txSender, reIntList, calcDataFee(reIntList, v), version = v).id
       nodes.waitForHeightAriseAndTxPresent(tx3)
 
-      sender.getDataByKey(txSenderAddress, "int") shouldBe reIntEntry
-      sender.getDataByKey(txSenderAddress, "bool") shouldBe boolEntry
-      sender.getData(txSenderAddress) shouldBe boolList ++ reIntList ++ stringList
+      miner.getDataByKey(txSenderAddress, "int") shouldBe reIntEntry
+      miner.getDataByKey(txSenderAddress, "bool") shouldBe boolEntry
+      miner.getData(txSenderAddress) shouldBe boolList ++ reIntList ++ stringList
 
       // define tx with all types
-      val (balance2, eff2)   = miner.accountBalances(txSenderAddress)
+      val BalanceDetails(_, balance2, _, _, eff2) = miner.balanceDetails(txSenderAddress)
       val intEntry2          = IntegerDataEntry("int", -127)
       val boolEntry2         = BooleanDataEntry("bool", false)
       val blobEntry2         = BinaryDataEntry("blob", ByteStr(Array[Byte](127.toByte, 0, 1, 1)))
@@ -293,18 +294,18 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       val unicodeStringEntry = StringDataEntry("?&$#^123\\/.a:;'\"\r\n\t\u0000|%è&", "specïal")
       val dataAllTypes       = List(intEntry2, boolEntry2, blobEntry2, stringEntry2, unicodeStringEntry)
       val fee                = calcDataFee(dataAllTypes, v)
-      val txId               = sender.putData(txSender, dataAllTypes, fee, version = v).id
+      val txId               = miner.putData(txSender, dataAllTypes, fee, version = v).id
       nodes.waitForHeightAriseAndTxPresent(txId)
 
-      sender.getDataByKey(txSenderAddress, "int") shouldBe intEntry2
-      sender.getDataByKey(txSenderAddress, "bool") shouldBe boolEntry2
-      sender.getDataByKey(txSenderAddress, "blob") shouldBe blobEntry2
-      sender.getDataByKey(txSenderAddress, "str") shouldBe stringEntry2
-      sender.getData(txSenderAddress) shouldBe dataAllTypes.sortBy(_.key)
+      miner.getDataByKey(txSenderAddress, "int") shouldBe intEntry2
+      miner.getDataByKey(txSenderAddress, "bool") shouldBe boolEntry2
+      miner.getDataByKey(txSenderAddress, "blob") shouldBe blobEntry2
+      miner.getDataByKey(txSenderAddress, "str") shouldBe stringEntry2
+      miner.getData(txSenderAddress) shouldBe dataAllTypes.sortBy(_.key)
 
       miner.assertBalances(txSenderAddress, balance2 - fee, eff2 - fee)
 
-      val json = Json.parse(sender.get(s"/transactions/info/$txId").getResponseBody)
+      val json = Json.parse(miner.get(s"/transactions/info/$txId").getResponseBody)
       ((json \ "data")(2) \ "value").as[String].startsWith("base64:") shouldBe true
     }
   }
@@ -314,9 +315,9 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     val keys      = Seq("int", "bool", "int", "blob", "?&$#^123\\/.a:;'\"\r\n\t\u0000|%è&", "str", "inexisted_key", tooBigKey)
     val values    = Seq[Any](-127, false, -127, ByteStr(Array[Byte](127.toByte, 0, 1, 1)), "specïal", "BBBB")
 
-    val list     = sender.getDataList(secondAddress, keys: _*).map(_.value)
-    val jsonList = sender.getDataListJson(secondAddress, keys: _*).map(_.value)
-    val postList = sender.getDataListPost(secondAddress, keys: _*).map(_.value)
+    val list     = miner.getDataList(secondAddress, keys: _*).map(_.value)
+    val jsonList = miner.getDataListJson(secondAddress, keys: _*).map(_.value)
+    val postList = miner.getDataListPost(secondAddress, keys: _*).map(_.value)
 
     list shouldBe values
     jsonList shouldBe list
@@ -324,7 +325,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
   }
 
   test("queries for nonexistent data") {
-    def assertNotFound(url: String): Assertion = Try(sender.get(url)) match {
+    def assertNotFound(url: String): Assertion = Try(miner.get(url)) match {
       case Failure(ApiCallException(UnexpectedStatusCodeException(_, _, statusCode, responseBody))) =>
         statusCode shouldBe 404
         responseBody should include("no data for this key")
@@ -333,7 +334,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
 
     assertNotFound(s"/addresses/data/$secondAddress/foo")
     assertNotFound(s"/addresses/data/$thirdAddress/foo")
-    sender.getData(fourthAddress) shouldBe List.empty
+    miner.getData(fourthAddress) shouldBe List.empty
   }
 
   test("update type for dataEntry") {
@@ -341,15 +342,15 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       val nonLatinKey = "\u05EA\u05E8\u05D1\u05D5\u05EA, \u05E1\u05E4\u05D5\u05E8\u05D8 \u05D5\u05EA\u05D9\u05D9\u05E8\u05D5\u05EA"
       val boolData    = List(BooleanDataEntry(nonLatinKey, true))
       val boolDataFee = calcDataFee(boolData, v)
-      val firstTx     = sender.putData(firstKeyPair, boolData, boolDataFee, version = v).id
+      val firstTx     = miner.putData(firstKeyPair, boolData, boolDataFee, version = v).id
       nodes.waitForHeightAriseAndTxPresent(firstTx)
-      sender.getDataByKey(firstAddress, nonLatinKey) shouldBe boolData.head
+      miner.getDataByKey(firstAddress, nonLatinKey) shouldBe boolData.head
 
       val longData    = List(IntegerDataEntry(nonLatinKey, 100500))
       val longDataFee = calcDataFee(longData, v)
-      val secondTx    = sender.putData(firstKeyPair, longData, longDataFee, version = v).id
+      val secondTx    = miner.putData(firstKeyPair, longData, longDataFee, version = v).id
       nodes.waitForHeightAriseAndTxPresent(secondTx)
-      sender.getDataByKey(firstAddress, nonLatinKey) shouldBe longData.head
+      miner.getDataByKey(firstAddress, nonLatinKey) shouldBe longData.head
     }
   }
 
@@ -359,38 +360,38 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
 
       val validItem = Json.obj("key" -> "key", "type" -> "integer", "value" -> 8)
 
-      assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem - "key")), "key is missing")
+      assertBadRequestAndResponse(miner.postJson("/addresses/data", request(validItem - "key")), "key is missing")
 
-      assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem - "type")), "type is missing")
+      assertBadRequestAndResponse(miner.postJson("/addresses/data", request(validItem - "type")), "type is missing")
 
-      assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem + ("type" -> JsString("falafel")))), "unknown type falafel")
+      assertBadRequestAndResponse(miner.postJson("/addresses/data", request(validItem + ("type" -> JsString("falafel")))), "unknown type falafel")
 
-      assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem - "value")), "value is missing")
+      assertBadRequestAndResponse(miner.postJson("/addresses/data", request(validItem - "value")), "value is missing")
 
       assertBadRequestAndResponse(
-        sender.postJson("/addresses/data", request(validItem + ("value" -> JsString("8")))),
+        miner.postJson("/addresses/data", request(validItem + ("value" -> JsString("8")))),
         "value is missing or not an integer"
       )
 
       val notValidIntValue = Json.obj("key" -> "key", "type" -> "integer", "value" -> JsNull)
 
-      assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidIntValue)), "value is missing or not an integer")
+      assertBadRequestAndResponse(miner.postJson("/addresses/data", request(notValidIntValue)), "value is missing or not an integer")
 
       val notValidBoolValue = Json.obj("key" -> "bool", "type" -> "boolean", "value" -> JsNull)
 
-      assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBoolValue)), "value is missing or not a boolean")
+      assertBadRequestAndResponse(miner.postJson("/addresses/data", request(notValidBoolValue)), "value is missing or not a boolean")
 
       assertBadRequestAndResponse(
-        sender.postJson("/addresses/data", request(notValidBoolValue + ("value" -> JsString("true")))),
+        miner.postJson("/addresses/data", request(notValidBoolValue + ("value" -> JsString("true")))),
         "value is missing or not a boolean"
       )
 
       val notValidBlobValue = Json.obj("key" -> "blob", "type" -> "binary", "value" -> JsNull)
 
-      assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBlobValue)), "value is missing or not a string")
+      assertBadRequestAndResponse(miner.postJson("/addresses/data", request(notValidBlobValue)), "value is missing or not a string")
 
       assertBadRequestAndResponse(
-        sender.postJson("/addresses/data", request(notValidBlobValue + ("value" -> JsString("base64:not a base64")))),
+        miner.postJson("/addresses/data", request(notValidBlobValue + ("value" -> JsString("base64:not a base64")))),
         "Illegal base64 character"
       )
     }
@@ -413,22 +414,22 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       def id(obj: JsObject): String = obj.value("id").as[String]
 
       val noProof = request - "proofs"
-      assertBadRequestAndResponse(sender.postJson("/transactions/broadcast", noProof), "failed to parse json message.*proofs.*missing")
+      assertBadRequestAndResponse(miner.postJson("/transactions/broadcast", noProof), "failed to parse json message.*proofs.*missing")
       nodes.foreach(_.ensureTxDoesntExist(id(noProof)))
 
       val badProof = request ++ Json.obj("proofs" -> Seq(Base58.encode(Array.fill(64)(Random.nextInt().toByte))))
-      assertBadRequestAndResponse(sender.postJson("/transactions/broadcast", badProof), "Proof doesn't validate as signature")
+      assertBadRequestAndResponse(miner.postJson("/transactions/broadcast", badProof), "Proof doesn't validate as signature")
       nodes.foreach(_.ensureTxDoesntExist(id(badProof)))
 
       val withProof = request
       assert((withProof \ "proofs").as[Seq[String]].lengthCompare(1) == 0)
-      sender.postJson("/transactions/broadcast", withProof)
+      miner.postJson("/transactions/broadcast", withProof)
       nodes.waitForHeightAriseAndTxPresent(id(withProof))
     }
   }
 
   private def postDataTxJson(source: KeyPair, data: Seq[DataEntry[_]], fee: Long, version: Byte) =
-    sender.signedBroadcast(
+    miner.signedBroadcast(
       Json.obj(
         "type"            -> DataTransaction.typeId,
         "sender"          -> source.toAddress,
@@ -450,10 +451,10 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       val extraKey      = "a" * (maxKeySize + 1)
       val data          = List(BooleanDataEntry(extraKey, false))
 
-      assertBadRequestAndResponse(sender.putData(firstKeyPair, data, calcDataFee(data, TxVersion.V1), version = v), TooBig)
-      assertBadRequestAndResponse(sender.putData(firstKeyPair, List(IntegerDataEntry("", 4)), 100000, version = v), "Empty key found")
+      assertBadRequestAndResponse(miner.putData(firstKeyPair, data, calcDataFee(data, TxVersion.V1), version = v), TooBig)
+      assertBadRequestAndResponse(miner.putData(firstKeyPair, List(IntegerDataEntry("", 4)), 100000, version = v), "Empty key found")
       assertBadRequestAndResponse(
-        sender.putData(firstKeyPair, List(IntegerDataEntry("abc", 4), IntegerDataEntry("abc", 5)), 100000, version = v),
+        miner.putData(firstKeyPair, List(IntegerDataEntry("abc", 4), IntegerDataEntry("abc", 5)), 100000, version = v),
         "Duplicated keys found"
       )
 
@@ -477,9 +478,9 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
 
   test("try to put empty data") {
     for (v <- dataTxSupportedVersions) {
-      val noDataTx = sender.putData(fourthKeyPair, List.empty, calcDataFee(List.empty, v), version = v).id
+      val noDataTx = miner.putData(fourthKeyPair, List.empty, calcDataFee(List.empty, v), version = v).id
       nodes.waitForHeightAriseAndTxPresent(noDataTx)
-      sender.getData(fourthAddress) shouldBe List.empty
+      miner.getData(fourthAddress) shouldBe List.empty
     }
   }
 
@@ -496,28 +497,28 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
             )
         )
 
-      val txIds = dataSet.grouped(100).map(_.toList).map(data => sender.putData(fourthKeyPair, data, calcDataFee(data, v), version = v).id)
+      val txIds = dataSet.grouped(100).map(_.toList).map(data => miner.putData(fourthKeyPair, data, calcDataFee(data, v), version = v).id)
       txIds foreach nodes.waitForTransaction
 
       val r = scala.util.Random.nextInt(199)
-      sender.getDataByKey(fourthAddress, s"int$r") shouldBe IntegerDataEntry(s"int$r", 1000 + r)
-      sender.getDataByKey(fourthAddress, s"bool$r") shouldBe BooleanDataEntry(s"bool$r", false)
-      sender.getDataByKey(fourthAddress, s"blob$r") shouldBe BinaryDataEntry(s"blob$r", ByteStr(Array[Byte](127.toByte, 0, 1, 1)))
-      sender.getDataByKey(fourthAddress, s"str$r") shouldBe StringDataEntry(s"str$r", s"hi there! + $r")
-      sender.getDataByKey(fourthAddress, s"integer$r") shouldBe IntegerDataEntry(s"integer$r", 1000 - r)
+      miner.getDataByKey(fourthAddress, s"int$r") shouldBe IntegerDataEntry(s"int$r", 1000 + r)
+      miner.getDataByKey(fourthAddress, s"bool$r") shouldBe BooleanDataEntry(s"bool$r", false)
+      miner.getDataByKey(fourthAddress, s"blob$r") shouldBe BinaryDataEntry(s"blob$r", ByteStr(Array[Byte](127.toByte, 0, 1, 1)))
+      miner.getDataByKey(fourthAddress, s"str$r") shouldBe StringDataEntry(s"str$r", s"hi there! + $r")
+      miner.getDataByKey(fourthAddress, s"integer$r") shouldBe IntegerDataEntry(s"integer$r", 1000 - r)
 
-      sender.getData(fourthAddress).size shouldBe 1000
+      miner.getData(fourthAddress).size shouldBe 1000
     }
   }
 
   test("put data in liquid block") {
-    val newAddress = sender.createKeyPair()
+    val newAddress = miner.createKeyPair()
     val entries    = List(StringDataEntry("test", "test"))
-    sender.transfer(firstKeyPair, newAddress.toAddress.toString, 2 waves, 1 waves, waitForTx = true)
-    sender.broadcastData(newAddress, entries, 0.1 waves, waitForTx = true)
-    sender.getData(newAddress.toAddress.toString) shouldBe entries
+    miner.transfer(firstKeyPair, newAddress.toAddress.toString, 2 waves, 1 waves, waitForTx = true)
+    miner.broadcastData(newAddress, entries, 0.1 waves, waitForTx = true)
+    miner.getData(newAddress.toAddress.toString) shouldBe entries
     nodes.waitForHeightArise()
-    sender.getData(newAddress.toAddress.toString) shouldBe entries
+    miner.getData(newAddress.toAddress.toString) shouldBe entries
   }
 
   def data(
@@ -526,5 +527,5 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       timestamp: Long = System.currentTimeMillis,
       version: TxVersion
   ): DataTransaction =
-    DataTransaction.selfSigned(1.toByte, sender.keyPair, entries, fee, timestamp).explicitGet()
+    DataTransaction.selfSigned(1.toByte, miner.keyPair, entries, fee, timestamp).explicitGet()
 }

@@ -15,21 +15,20 @@ import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import org.scalatest.CancelAfterFailure
 
-class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
-  private lazy val fourthAddress: KeyPair = sender.createKeyPair()
-  private lazy val fifthAddress: KeyPair  = sender.createKeyPair()
+class SetScriptTransactionSuite extends BaseTransactionSuite {
+  private lazy val fourthAddress: KeyPair = miner.createKeyPair()
+  private lazy val fifthAddress: KeyPair = miner.createKeyPair()
 
-  private def acc0      = firstKeyPair
-  private def acc1      = secondKeyPair
-  private def acc2      = thirdKeyPair
+  private lazy val acc0 = firstKeyPair
+  private lazy val acc1 = secondKeyPair
+  private lazy val acc2 = thirdKeyPair
   private lazy val acc3 = fourthAddress
   private lazy val acc4 = fifthAddress
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
-    sender.transfer(acc0, acc4.toAddress.toString, 10.waves, waitForTx = true)
+    miner.transfer(acc0, acc4.toAddress.toString, 10.waves, waitForTx = true)
   }
 
   test("set acc0 as 2of2 multisig") {
@@ -49,31 +48,31 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
         }
       """.stripMargin
 
-      val (contractBalance, contractEffBalance) = sender.accountBalances(contract.toAddress.toString)
-      val script                                = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1.bytes().base64
-      val setScriptId                           = sender.setScript(contract, Some(script), setScriptFee, version = v).id
+      val contractBD  = miner.balanceDetails(contract.toAddress.toString)
+      val script      = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1.bytes().base64
+      val setScriptId = miner.setScript(contract, Some(script), setScriptFee, version = v).id
 
       nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
-      val acc0ScriptInfo = sender.addressScriptInfo(contract.toAddress.toString)
+      val acc0ScriptInfo = miner.addressScriptInfo(contract.toAddress.toString)
 
       acc0ScriptInfo.script.isEmpty shouldBe false
       acc0ScriptInfo.scriptText.isEmpty shouldBe false
 
       acc0ScriptInfo.script.get.startsWith("base64:") shouldBe true
 
-      sender.transactionInfo[TransactionInfo](setScriptId).script.get.startsWith("base64:") shouldBe true
-      sender.assertBalances(contract.toAddress.toString, contractBalance - setScriptFee, contractEffBalance - setScriptFee)
+      miner.transactionInfo[TransactionInfo](setScriptId).script.get.startsWith("base64:") shouldBe true
+      miner.assertBalances(contract.toAddress.toString, contractBD.regular - setScriptFee, contractBD.effective - setScriptFee)
     }
   }
 
   test("can't send from contract using old pk") {
     for (v <- setScrTxSupportedVersions) {
-      val contract                              = if (v < 2) acc0 else acc4
-      val (contractBalance, contractEffBalance) = sender.accountBalances(contract.toAddress.toString)
-      val (acc3Balance, acc3EffBalance)         = sender.accountBalances(acc3.toAddress.toString)
+      val contract   = if (v < 2) acc0 else acc4
+      val contractBD = miner.balanceDetails(contract.toAddress.toString)
+      val acc3bd     = miner.balanceDetails(acc3.toAddress.toString)
       assertApiErrorRaised(
-        sender.transfer(
+        miner.transfer(
           contract,
           recipient = acc3.toAddress.toString,
           assetId = None,
@@ -81,16 +80,16 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
           fee = minFee + 0.00001.waves + 0.00002.waves
         )
       )
-      sender.assertBalances(contract.toAddress.toString, contractBalance, contractEffBalance)
-      sender.assertBalances(acc3.toAddress.toString, acc3Balance, acc3EffBalance)
+      miner.assertBalances(contract.toAddress.toString, contractBD.regular, contractBD.effective)
+      miner.assertBalances(acc3.toAddress.toString, acc3bd.regular, acc3bd.effective)
     }
   }
 
   test("can send from acc0 using multisig of acc1 and acc2") {
     for (v <- setScrTxSupportedVersions) {
-      val contract                              = if (v < 2) acc0 else acc4
-      val (contractBalance, contractEffBalance) = sender.accountBalances(contract.toAddress.toString)
-      val (acc3Balance, acc3EffBalance)         = sender.accountBalances(acc3.toAddress.toString)
+      val contract   = if (v < 2) acc0 else acc4
+      val contractBD = miner.balanceDetails(contract.toAddress.toString)
+      val acc3BD     = miner.balanceDetails(acc3.toAddress.toString)
       val unsigned =
         TransferTransaction(
           version = 2.toByte,
@@ -108,23 +107,23 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
       val sig1         = crypto.sign(acc1.privateKey, unsigned.bodyBytes())
       val sig2         = crypto.sign(acc2.privateKey, unsigned.bodyBytes())
       val signed       = unsigned.copy(proofs = Proofs(sig1, sig2))
-      val transferTxId = sender.signedBroadcast(signed.json()).id
+      val transferTxId = miner.signedBroadcast(signed.json()).id
 
       nodes.waitForHeightAriseAndTxPresent(transferTxId)
 
-      sender.assertBalances(
+      miner.assertBalances(
         contract.toAddress.toString,
-        contractBalance - 1000 - minFee - 0.004.waves,
-        contractEffBalance - 1000 - minFee - 0.004.waves
+        contractBD.regular - 1000 - minFee - 0.004.waves,
+        contractBD.effective - 1000 - minFee - 0.004.waves
       )
-      sender.assertBalances(acc3.toAddress.toString, acc3Balance + 1000, acc3EffBalance + 1000)
+      miner.assertBalances(acc3.toAddress.toString, acc3BD.regular + 1000, acc3BD.effective + 1000)
     }
   }
 
   test("can clear script at contract") {
     for (v <- setScrTxSupportedVersions) {
-      val contract                              = if (v < 2) acc0 else acc4
-      val (contractBalance, contractEffBalance) = sender.accountBalances(contract.toAddress.toString)
+      val contract   = if (v < 2) acc0 else acc4
+      val contractBD = miner.balanceDetails(contract.toAddress.toString)
       val unsigned = SetScriptTransaction
         .create(
           version = v,
@@ -140,29 +139,29 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
       val signed = unsigned.copy(version = v, proofs = Proofs(Seq(sig1, sig2)))
 
-      val removeScriptId = sender
+      val removeScriptId = miner
         .signedBroadcast(signed.json())
         .id
 
       nodes.waitForHeightAriseAndTxPresent(removeScriptId)
 
-      sender.transactionInfo[TransactionInfo](removeScriptId).script shouldBe None
-      sender.addressScriptInfo(contract.toAddress.toString).script shouldBe None
-      sender.addressScriptInfo(contract.toAddress.toString).scriptText shouldBe None
-      sender.assertBalances(
+      miner.transactionInfo[TransactionInfo](removeScriptId).script shouldBe None
+      miner.addressScriptInfo(contract.toAddress.toString).script shouldBe None
+      miner.addressScriptInfo(contract.toAddress.toString).scriptText shouldBe None
+      miner.assertBalances(
         contract.toAddress.toString,
-        contractBalance - setScriptFee - 0.004.waves,
-        contractEffBalance - setScriptFee - 0.004.waves
+        contractBD.regular - setScriptFee - 0.004.waves,
+        contractBD.effective - setScriptFee - 0.004.waves
       )
     }
   }
 
   test("can send using old pk of contract") {
     for (v <- setScrTxSupportedVersions) {
-      val contract                              = if (v < 2) acc0 else acc4
-      val (contractBalance, contractEffBalance) = sender.accountBalances(contract.toAddress.toString)
-      val (acc3Balance, acc3EffBalance)         = sender.accountBalances(acc3.toAddress.toString)
-      val transferTxId = sender
+      val contract   = if (v < 2) acc0 else acc4
+      val contractBD = miner.balanceDetails(contract.toAddress.toString)
+      val acc3BD     = miner.balanceDetails(acc3.toAddress.toString)
+      val transferTxId = miner
         .transfer(
           contract,
           recipient = acc3.toAddress.toString,
@@ -174,8 +173,8 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
         .id
 
       nodes.waitForHeightAriseAndTxPresent(transferTxId)
-      sender.assertBalances(contract.toAddress.toString, contractBalance - 1000 - minFee, contractEffBalance - 1000 - minFee)
-      sender.assertBalances(acc3.toAddress.toString, acc3Balance + 1000, acc3EffBalance + 1000)
+      miner.assertBalances(contract.toAddress.toString, contractBD.regular - 1000 - minFee, contractBD.effective - 1000 - minFee)
+      miner.assertBalances(acc3.toAddress.toString, acc3BD.regular + 1000, acc3BD.effective + 1000)
     }
   }
 }

@@ -43,7 +43,7 @@ class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyCh
           genesisTimestamp,
           Constants.TotalWaves,
           None,
-          Seq(GenesisTransactionSettings(sender.toAddress.stringRepr, Constants.TotalWaves)),
+          Seq(GenesisTransactionSettings(miner.toAddress.stringRepr, Constants.TotalWaves)),
           1000,
           1.minute
         )
@@ -69,7 +69,7 @@ class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyCh
             d.blockchainUpdater.processBlock(b, b.header.generationSignature, verify = false)
           }
 
-          Seq[Address](sender.toAddress, r1.toAddress, r2.toAddress).foreach(f(_, blocks, d))
+          Seq[Address](miner.toAddress, r1.toAddress, r2.toAddress).foreach(f(_, blocks, d))
 
           d.blockchainUpdater.processBlock(
             TestBlock.create(System.currentTimeMillis(), blocks.last.signature, Seq.empty),
@@ -77,7 +77,7 @@ class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyCh
             verify = false
           )
 
-          Seq[Address](sender.toAddress, r1.toAddress, r2.toAddress).foreach(f(_, blocks, d))
+          Seq[Address](miner.toAddress, r1.toAddress, r2.toAddress).foreach(f(_, blocks, d))
         }
     }
   }
@@ -86,7 +86,7 @@ class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyCh
     fromBlocks.zipWithIndex
       .flatMap { case (b, h) => b.transactionData.map(t => (h + 1, t)) }
       .collect {
-        case (h, t: TransferTransaction) if t.sender.toAddress == forAddress || t.recipient == forAddress => (h, t.id())
+        case (h, t: TransferTransaction) if t.miner.toAddress == forAddress || t.recipient == forAddress => (h, t.id())
         case (h, g: GenesisTransaction) if g.recipient == forAddress                                      => (h, g.id())
       }
       .reverse

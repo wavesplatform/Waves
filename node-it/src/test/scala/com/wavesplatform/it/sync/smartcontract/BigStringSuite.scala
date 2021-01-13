@@ -12,21 +12,14 @@ import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.CancelAfterFailure
 
-class BigStringSuite extends BaseTransactionSuite with CancelAfterFailure {
+class BigStringSuite extends BaseTransactionSuite {
   private def acc0 = firstKeyPair
   private def acc1 = secondKeyPair
   private def acc2 = thirdKeyPair
 
   test("set contract, make leasing and cancel leasing") {
-    val (balance1, eff1) = miner.accountBalances(acc0.toAddress.toString)
-    val (balance2, eff2) = miner.accountBalances(thirdAddress)
-
-    val txId = sender.transfer(sender.keyPair, acc0.toAddress.toString, 10 * transferAmount, minFee).id
-    nodes.waitForHeightAriseAndTxPresent(txId)
-
-    miner.assertBalances(firstAddress, balance1 + 10 * transferAmount, eff1 + 10 * transferAmount)
+    val bd2 = miner.balanceDetails(acc2.toAddress.toString)
 
     val scriptText = s"""
         let pkA = base58'${acc0.publicKey}'
@@ -44,12 +37,13 @@ class BigStringSuite extends BaseTransactionSuite with CancelAfterFailure {
         """.stripMargin
 
     val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
-    val setScriptTransaction = SetScriptTransaction
-      .selfSigned(1.toByte, acc0, Some(script), setScriptFee, System.currentTimeMillis())
-      .explicitGet()
-
-    val setScriptId = sender
-      .signedBroadcast(setScriptTransaction.json())
+    val setScriptId = miner
+      .signedBroadcast(
+        SetScriptTransaction
+          .selfSigned(1.toByte, acc0, Some(script), setScriptFee, System.currentTimeMillis())
+          .explicitGet()
+          .json()
+      )
       .id
 
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
@@ -73,15 +67,14 @@ class BigStringSuite extends BaseTransactionSuite with CancelAfterFailure {
     val signedLeasing =
       unsignedLeasing.copy(proofs = Proofs(Seq(sigLeasingA, ByteStr.empty, sigLeasingC)))
 
-    assertBadRequestAndMessage(sender.signedBroadcast(signedLeasing.json()).id, "String size=32768 exceeds 32767 bytes")
+    assertBadRequestAndMessage(miner.signedBroadcast(signedLeasing.json()).id, "String size=32768 exceeds 32767 bytes")
 
     val leasingId = Base58.encode(unsignedLeasing.id().arr)
 
     nodes.waitForHeightArise()
     nodes(0).findTransactionInfo(leasingId) shouldBe None
 
-    miner.assertBalances(firstAddress, balance1 + 10 * transferAmount - setScriptFee, eff1 + 10 * transferAmount - setScriptFee)
-    miner.assertBalances(thirdAddress, balance2, eff2)
+    miner.assertBalances(acc2.toAddress.toString, bd2.regular, bd2.effective)
 
   }
 }

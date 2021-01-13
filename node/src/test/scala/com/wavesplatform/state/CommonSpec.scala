@@ -27,8 +27,8 @@ class CommonSpec extends FreeSpec with Matchers with WithDomain with Transaction
     "Zero balance of absent asset" in forAll(accountGen, positiveLongGen, byteArrayGen(AssetIdLength)) {
       case (sender, initialBalance, assetId) =>
         withDomain() { d =>
-          d.appendBlock(genesisBlock(nextTs, sender.toAddress, initialBalance))
-          d.balance(sender.toAddress, IssuedAsset(ByteStr(assetId))) shouldEqual 0L
+          d.appendBlock(genesisBlock(nextTs, miner.toAddress, initialBalance))
+          d.balance(miner.toAddress, IssuedAsset(ByteStr(assetId))) shouldEqual 0L
         }
     }
   }

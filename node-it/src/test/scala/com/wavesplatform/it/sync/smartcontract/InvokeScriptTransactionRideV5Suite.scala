@@ -14,9 +14,9 @@ import org.scalatest.CancelAfterFailure
 
 class InvokeScriptTransactionRideV5Suite extends BaseTransactionSuite with CancelAfterFailure {
 
-  private lazy val dAppV3PK = sender.createKeyPair()
-  private lazy val dAppV4PK = sender.createKeyPair()
-  private lazy val dAppV5PK = sender.createKeyPair()
+  private lazy val dAppV3PK = miner.createKeyPair()
+  private lazy val dAppV4PK = miner.createKeyPair()
+  private lazy val dAppV5PK = miner.createKeyPair()
   private lazy val callerPK = firstKeyPair
   private lazy val dAppV3   = dAppV3PK.toAddress.toString
   private lazy val dAppV4   = dAppV4PK.toAddress.toString
@@ -33,9 +33,9 @@ class InvokeScriptTransactionRideV5Suite extends BaseTransactionSuite with Cance
       .overrideBase(_.quorum(0))
       .overrideBase(
         _.preactivatedFeatures(
-          (BlockchainFeatures.Ride4DApps.id, 0),
-          (BlockchainFeatures.BlockV5.id, 0),
-          (BlockchainFeatures.SynchronousCalls.id, 0)
+          (BlockchainFeatures.Ride4DApps, 0),
+          (BlockchainFeatures.BlockV5, 0),
+          (BlockchainFeatures.SynchronousCalls, 0)
         )
       )
       .withDefault(1)
@@ -74,7 +74,7 @@ class InvokeScriptTransactionRideV5Suite extends BaseTransactionSuite with Cance
         |func default() = nil
         |""".stripMargin
 
-    sender.massTransfer(
+    miner.massTransfer(
       callerPK,
       List(
         Transfer(dAppV3, 10.waves),
@@ -85,26 +85,26 @@ class InvokeScriptTransactionRideV5Suite extends BaseTransactionSuite with Cance
       waitForTx = true
     )
 
-    sender.createAlias(dAppV3PK, dAppAliasV3, fee = 1.waves)
-    sender.createAlias(dAppV4PK, dAppAliasV4, fee = 1.waves)
-    sender.createAlias(dAppV5PK, dAppAliasV5, fee = 1.waves)
+    miner.createAlias(dAppV3PK, dAppAliasV3, fee = 1.waves)
+    miner.createAlias(dAppV4PK, dAppAliasV4, fee = 1.waves)
+    miner.createAlias(dAppV5PK, dAppAliasV5, fee = 1.waves)
 
-    sender.setScript(dAppV3PK, Some(scriptV3.compiled), setScriptFee + 100)
-    sender.setScript(dAppV4PK, Some(scriptV4.compiled), setScriptFee + 10)
-    sender.setScript(dAppV5PK, Some(scriptV5.compiled), setScriptFee, waitForTx = true)
+    miner.setScript(dAppV3PK, Some(scriptV3.compiled), setScriptFee + 100)
+    miner.setScript(dAppV4PK, Some(scriptV4.compiled), setScriptFee + 10)
+    miner.setScript(dAppV5PK, Some(scriptV5.compiled), setScriptFee, waitForTx = true)
   }
 
   //TODO enable in SC-695
   ignore("Can't invoke Ride V5 DApp via InvokeScriptTx V1") {
     assertApiError(
-      sender.invokeScript(callerPK, dAppV5, version = TxVersion.V1)
+      miner.invokeScript(callerPK, dAppV5, version = TxVersion.V1)
     ) { error =>
       error.statusCode shouldBe 400
       error.message shouldBe "State check failed" //TODO detailed message
     }
 
     assertApiError(
-      sender.invokeScript(callerPK, alias(dAppAliasV5), version = TxVersion.V1)
+      miner.invokeScript(callerPK, alias(dAppAliasV5), version = TxVersion.V1)
     ) { error =>
       error.statusCode shouldBe 400
       error.message shouldBe "State check failed" //TODO detailed message
@@ -114,14 +114,14 @@ class InvokeScriptTransactionRideV5Suite extends BaseTransactionSuite with Cance
   //TODO enable in SC-695
   ignore("Can't invoke Ride V5 DApp via InvokeScriptTx V2") {
     assertApiError(
-      sender.invokeScript(callerPK, dAppV5, version = TxVersion.V2)
+      miner.invokeScript(callerPK, dAppV5, version = TxVersion.V2)
     ) { error =>
       error.statusCode shouldBe 400
       error.message shouldBe "State check failed" //TODO detailed message
     }
 
     assertApiError(
-      sender.invokeScript(callerPK, alias(dAppAliasV5), version = TxVersion.V2)
+      miner.invokeScript(callerPK, alias(dAppAliasV5), version = TxVersion.V2)
     ) { error =>
       error.statusCode shouldBe 400
       error.message shouldBe "State check failed" //TODO detailed message
@@ -130,22 +130,22 @@ class InvokeScriptTransactionRideV5Suite extends BaseTransactionSuite with Cance
 
   //TODO enable in SC-695
   ignore("Can invoke Ride V5 DApp via InvokeScriptTx V3") {
-    sender.invokeScript(callerPK, dAppV5, version = TxVersion.V3, waitForTx = true)
-    sender.invokeScript(callerPK, alias(dAppAliasV5), version = TxVersion.V3, waitForTx = true)
+    miner.invokeScript(callerPK, dAppV5, version = TxVersion.V3, waitForTx = true)
+    miner.invokeScript(callerPK, alias(dAppAliasV5), version = TxVersion.V3, waitForTx = true)
   }
 
   //TODO enable in SC-695
   ignore("Can't invoke Ride V3 DApp via InvokeScriptTx V3 if extraFeePerStep is specified") {
     //TODO add extraFeePerStep
     assertApiError(
-      sender.invokeScript(callerPK, dAppV3, version = TxVersion.V3)
+      miner.invokeScript(callerPK, dAppV3, version = TxVersion.V3)
     ) { error =>
       error.statusCode shouldBe 400
       error.message shouldBe "State check failed" //TODO detailed message
     }
 
     assertApiError(
-      sender.invokeScript(callerPK, alias(dAppAliasV3), version = TxVersion.V3)
+      miner.invokeScript(callerPK, alias(dAppAliasV3), version = TxVersion.V3)
     ) { error =>
       error.statusCode shouldBe 400
       error.message shouldBe "State check failed" //TODO detailed message
@@ -156,14 +156,14 @@ class InvokeScriptTransactionRideV5Suite extends BaseTransactionSuite with Cance
   ignore("Can't invoke Ride V4 DApp via InvokeScriptTx V3 if extraFeePerStep is specified") {
     //TODO add extraFeePerStep
     assertApiError(
-      sender.invokeScript(callerPK, dAppV4, version = TxVersion.V3)
+      miner.invokeScript(callerPK, dAppV4, version = TxVersion.V3)
     ) { error =>
       error.statusCode shouldBe 400
       error.message shouldBe "State check failed" //TODO detailed message
     }
 
     assertApiError(
-      sender.invokeScript(callerPK, alias(dAppAliasV4), version = TxVersion.V3)
+      miner.invokeScript(callerPK, alias(dAppAliasV4), version = TxVersion.V3)
     ) { error =>
       error.statusCode shouldBe 400
       error.message shouldBe "State check failed" //TODO detailed message

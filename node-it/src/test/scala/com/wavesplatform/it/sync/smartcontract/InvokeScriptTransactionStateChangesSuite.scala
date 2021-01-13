@@ -11,19 +11,20 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import org.scalactic.source.Position
-import org.scalatest.CancelAfterFailure
 
-class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with CancelAfterFailure {
+class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite {
 
-  private def contract  = firstKeyPair
-  private def caller    = secondKeyPair
+  private def contract = firstKeyPair
+
+  private def caller = secondKeyPair
+
   private def recipient = thirdKeyPair
 
-  var simpleAsset: String               = ""
-  var assetSponsoredByDApp: String      = ""
+  var simpleAsset: String = ""
+  var assetSponsoredByDApp: String = ""
   var assetSponsoredByRecipient: String = ""
-  var initCallerTxs: Long               = 0
-  var initDAppTxs: Long                 = 0
+  var initCallerTxs: Long = 0
+  var initDAppTxs: Long = 0
   var initRecipientTxs: Long            = 0
   var initCallerStateChanges: Long      = 0
   var initDAppStateChanges: Long        = 0
@@ -36,7 +37,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
   test("write") {
     val data = 10
 
-    val invokeTx = sender.validateInvokeScript( // Since BlockV5 broadcasting InvokeTx does not return trace
+    val invokeTx = miner.validateInvokeScript( // Since BlockV5 broadcasting InvokeTx does not return trace
       caller,
       contractAddress,
       func = Some("write"),
@@ -50,19 +51,19 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
     (js \ "trace" \ 0 \ "vars" \ 0 \ "type").as[String] shouldBe "Int"
     (js \ "trace" \ 0 \ "vars" \ 0 \ "value").as[Int] shouldBe data
 
-    val id = sender.signedBroadcast(invokeTx._1, waitForTx = true).id
+    val id = miner.signedBroadcast(invokeTx._1, waitForTx = true).id
 
     nodes.waitForHeightAriseAndTxPresent(id)
 
-    val txInfo = sender.transactionInfo[TransactionInfo](id)
+    val txInfo = miner.transactionInfo[TransactionInfo](id)
 
-    sender.waitForHeight(txInfo.height + 1)
+    miner.waitForHeight(txInfo.height + 1)
 
-    val callerTxs          = sender.transactionsByAddress(callerAddress, 100)
-    val dAppTxs            = sender.transactionsByAddress(contractAddress, 100)
-    val txStateChanges     = sender.debugStateChanges(id)
-    val callerStateChanges = sender.debugStateChangesByAddress(callerAddress, 100)
-    val dAppStateChanges   = sender.debugStateChangesByAddress(contractAddress, 100)
+    val callerTxs          = miner.transactionsByAddress(callerAddress, 100)
+    val dAppTxs            = miner.transactionsByAddress(contractAddress, 100)
+    val txStateChanges     = miner.debugStateChanges(id)
+    val callerStateChanges = miner.debugStateChangesByAddress(callerAddress, 100)
+    val dAppStateChanges   = miner.debugStateChangesByAddress(contractAddress, 100)
 
     callerTxs.length shouldBe initCallerTxs + 1
     callerTxs.length shouldBe callerStateChanges.length
@@ -78,7 +79,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
   }
 
   test("sponsored by dApp") {
-    val invokeTx = sender.invokeScript(
+    val invokeTx = miner.invokeScript(
       caller,
       contractAddress,
       func = Some("sendAsset"),
@@ -92,14 +93,14 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       waitForTx = true
     )
 
-    val txInfo                = sender.transactionInfo[TransactionInfo](invokeTx._1.id)
-    val callerTxs             = sender.transactionsByAddress(callerAddress, 100)
-    val dAppTxs               = sender.transactionsByAddress(contractAddress, 100)
-    val recipientTxs          = sender.transactionsByAddress(recipientAddress, 100)
-    val txStateChanges        = sender.debugStateChanges(invokeTx._1.id)
-    val callerStateChanges    = sender.debugStateChangesByAddress(callerAddress, 100)
-    val dAppStateChanges      = sender.debugStateChangesByAddress(contractAddress, 100)
-    val recipientStateChanges = sender.debugStateChangesByAddress(recipientAddress, 100)
+    val txInfo                = miner.transactionInfo[TransactionInfo](invokeTx._1.id)
+    val callerTxs             = miner.transactionsByAddress(callerAddress, 100)
+    val dAppTxs               = miner.transactionsByAddress(contractAddress, 100)
+    val recipientTxs          = miner.transactionsByAddress(recipientAddress, 100)
+    val txStateChanges        = miner.debugStateChanges(invokeTx._1.id)
+    val callerStateChanges    = miner.debugStateChangesByAddress(callerAddress, 100)
+    val dAppStateChanges      = miner.debugStateChangesByAddress(contractAddress, 100)
+    val recipientStateChanges = miner.debugStateChangesByAddress(recipientAddress, 100)
 
     callerTxs.length shouldBe initCallerTxs + 2
     callerTxs.length shouldBe callerStateChanges.length
@@ -124,7 +125,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
   }
 
   test("sponsored by recipient") {
-    val invokeTx = sender.invokeScript(
+    val invokeTx = miner.invokeScript(
       caller,
       contractAddress,
       func = Some("writeAndSendWaves"),
@@ -134,14 +135,14 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       waitForTx = true
     )
 
-    val txInfo                = sender.transactionInfo[TransactionInfo](invokeTx._1.id)
-    val callerTxs             = sender.transactionsByAddress(callerAddress, 100)
-    val dAppTxs               = sender.transactionsByAddress(contractAddress, 100)
-    val recipientTxs          = sender.transactionsByAddress(recipientAddress, 100)
-    val txStateChanges        = sender.debugStateChanges(invokeTx._1.id)
-    val callerStateChanges    = sender.debugStateChangesByAddress(callerAddress, 100)
-    val dAppStateChanges      = sender.debugStateChangesByAddress(contractAddress, 100)
-    val recipientStateChanges = sender.debugStateChangesByAddress(recipientAddress, 100)
+    val txInfo                = miner.transactionInfo[TransactionInfo](invokeTx._1.id)
+    val callerTxs             = miner.transactionsByAddress(callerAddress, 100)
+    val dAppTxs               = miner.transactionsByAddress(contractAddress, 100)
+    val recipientTxs          = miner.transactionsByAddress(recipientAddress, 100)
+    val txStateChanges        = miner.debugStateChanges(invokeTx._1.id)
+    val callerStateChanges    = miner.debugStateChangesByAddress(callerAddress, 100)
+    val dAppStateChanges      = miner.debugStateChangesByAddress(contractAddress, 100)
+    val recipientStateChanges = miner.debugStateChangesByAddress(recipientAddress, 100)
 
     callerTxs.length shouldBe initCallerTxs + 3
     callerTxs.length shouldBe callerStateChanges.length
@@ -233,9 +234,9 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       ._1
       .bytes()
       .base64
-    sender.setScript(contract, Some(script), setScriptFee + 0.4.waves, waitForTx = true)
+    miner.setScript(contract, Some(script), setScriptFee + 0.4.waves, waitForTx = true)
 
-    val invokeTx1 = sender.invokeScript(
+    val invokeTx1 = miner.invokeScript(
       caller,
       contractAddress,
       func = Some("order1"),
@@ -256,15 +257,15 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
     )
     val expectedTransferResponses = Seq(TransfersInfoResponse(callerAddress, None, 1), TransfersInfoResponse(callerAddress, None, 2))
 
-    val idStateChanges1      = sender.debugStateChanges(invokeTx1._1.id).stateChanges
-    val addressStateChanges1 = sender.debugStateChangesByAddress(callerAddress, 1).head.stateChanges
+    val idStateChanges1      = miner.debugStateChanges(invokeTx1._1.id).stateChanges
+    val addressStateChanges1 = miner.debugStateChangesByAddress(callerAddress, 1).head.stateChanges
 
     Seq(idStateChanges1, addressStateChanges1).foreach { actualStateChanges =>
       actualStateChanges.get.data shouldBe expectedDataResponses
       actualStateChanges.get.transfers shouldBe expectedTransferResponses
     }
 
-    val invokeTx2 = sender.invokeScript(
+    val invokeTx2 = miner.invokeScript(
       caller,
       contractAddress,
       func = Some("order2"),
@@ -287,8 +288,8 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
     )
     val expectedBurnResponses = Seq(BurnInfoResponse(simpleAsset, 3), BurnInfoResponse(assetSponsoredByDApp, 4))
 
-    val idStateChanges2      = sender.debugStateChanges(invokeTx2._1.id).stateChanges
-    val addressStateChanges2 = sender.debugStateChangesByAddress(callerAddress, 1).head.stateChanges
+    val idStateChanges2      = miner.debugStateChanges(invokeTx2._1.id).stateChanges
+    val addressStateChanges2 = miner.debugStateChangesByAddress(callerAddress, 1).head.stateChanges
 
     Seq(idStateChanges2, addressStateChanges2).foreach { actualStateChanges =>
       actualStateChanges.get.sponsorFees shouldBe expectedSponsorFeeResponses
@@ -307,24 +308,24 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
   protected override def beforeAll(): Unit = {
     super.beforeAll()
 
-    simpleAsset = sender.issue(contract, "simple", "", 9000, 0).id
-    assetSponsoredByDApp = sender.issue(contract, "DApp asset", "", 9000, 0).id
-    assetSponsoredByRecipient = sender.issue(recipient, "Recipient asset", "", 9000, 0, waitForTx = true).id
-    sender.massTransfer(contract, List(Transfer(callerAddress, 3000), Transfer(recipientAddress, 3000)), 0.01.waves, assetId = Some(simpleAsset))
-    sender.massTransfer(
+    simpleAsset = miner.issue(contract, "simple", "", 9000, 0).id
+    assetSponsoredByDApp = miner.issue(contract, "DApp asset", "", 9000, 0).id
+    assetSponsoredByRecipient = miner.issue(recipient, "Recipient asset", "", 9000, 0, waitForTx = true).id
+    miner.massTransfer(contract, List(Transfer(callerAddress, 3000), Transfer(recipientAddress, 3000)), 0.01.waves, assetId = Some(simpleAsset))
+    miner.massTransfer(
       contract,
       List(Transfer(callerAddress, 3000), Transfer(recipientAddress, 3000)),
       0.01.waves,
       assetId = Some(assetSponsoredByDApp)
     )
-    sender.massTransfer(
+    miner.massTransfer(
       recipient,
       List(Transfer(callerAddress, 3000), Transfer(contractAddress, 3000)),
       0.01.waves,
       assetId = Some(assetSponsoredByRecipient)
     )
-    sender.sponsorAsset(contract, assetSponsoredByDApp, 1, fee = sponsorReducedFee + smartFee)
-    sender.sponsorAsset(recipient, assetSponsoredByRecipient, 5, fee = sponsorReducedFee + smartFee)
+    miner.sponsorAsset(contract, assetSponsoredByDApp, 1, fee = sponsorReducedFee + smartFee)
+    miner.sponsorAsset(recipient, assetSponsoredByRecipient, 5, fee = sponsorReducedFee + smartFee)
 
     val script = ScriptCompiler
       .compile(
@@ -357,16 +358,16 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       ._1
       .bytes()
       .base64
-    sender.setScript(contract, Some(script), setScriptFee, waitForTx = true)
+    miner.setScript(contract, Some(script), setScriptFee, waitForTx = true)
     nodes.waitForEmptyUtx()
     nodes.waitForHeightArise()
 
-    initCallerTxs = sender.transactionsByAddress(callerAddress, 100).length
-    initDAppTxs = sender.transactionsByAddress(contractAddress, 100).length
-    initRecipientTxs = sender.transactionsByAddress(recipientAddress, 100).length
-    initCallerStateChanges = sender.debugStateChangesByAddress(callerAddress, 100).length
-    initDAppStateChanges = sender.debugStateChangesByAddress(contractAddress, 100).length
-    initRecipientStateChanges = sender.debugStateChangesByAddress(recipientAddress, 100).length
+    initCallerTxs = miner.transactionsByAddress(callerAddress, 100).length
+    initDAppTxs = miner.transactionsByAddress(contractAddress, 100).length
+    initRecipientTxs = miner.transactionsByAddress(recipientAddress, 100).length
+    initCallerStateChanges = miner.debugStateChangesByAddress(callerAddress, 100).length
+    initDAppStateChanges = miner.debugStateChangesByAddress(contractAddress, 100).length
+    initRecipientStateChanges = miner.debugStateChangesByAddress(recipientAddress, 100).length
     initCallerTxs shouldBe initCallerStateChanges
     initDAppTxs shouldBe initDAppStateChanges
     initRecipientTxs shouldBe initRecipientStateChanges

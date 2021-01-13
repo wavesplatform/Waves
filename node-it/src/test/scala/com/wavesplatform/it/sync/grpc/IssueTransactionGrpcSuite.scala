@@ -21,10 +21,10 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
     for (v <- issueTxSupportedVersions) {
       val assetName        = Random.alphanumeric.filter(_.isLetter).take(IssueTransaction.MinAssetNameLength).mkString
       val assetDescription = "my asset description"
-      val issuerBalance    = sender.wavesBalance(issuerAddress).available
-      val issuerEffBalance = sender.wavesBalance(issuerAddress).effective
+      val issuerBalance    = miner.wavesBalance(issuerAddress).available
+      val issuerEffBalance = miner.wavesBalance(issuerAddress).effective
 
-      val issuedAssetTx = sender.broadcastIssue(
+      val issuedAssetTx = miner.broadcastIssue(
         issuer,
         assetName,
         someAssetAmount,
@@ -38,11 +38,11 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
       )
       val issuedAssetId = PBTransactions.vanilla(issuedAssetTx).explicitGet().id().toString
 
-      sender.wavesBalance(issuerAddress).available shouldBe issuerBalance - issueFee
-      sender.wavesBalance(issuerAddress).effective shouldBe issuerEffBalance - issueFee
-      sender.assetsBalance(issuerAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe someAssetAmount
+      miner.wavesBalance(issuerAddress).available shouldBe issuerBalance - issueFee
+      miner.wavesBalance(issuerAddress).effective shouldBe issuerEffBalance - issueFee
+      miner.assetsBalance(issuerAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe someAssetAmount
 
-      val assetInfo = sender.getTransaction(issuedAssetId).getTransaction.getIssue
+      val assetInfo = miner.getTransaction(issuedAssetId).getTransaction.getIssue
 
       assetInfo.decimals shouldBe 8
       assetInfo.amount shouldBe someAssetAmount
@@ -56,24 +56,24 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
     for (v <- issueTxSupportedVersions) {
       val assetName                                 = Random.alphanumeric.filter(_.isLetter).take(IssueTransaction.MinAssetNameLength + 1).mkString
       val assetDescription                          = "nft asset"
-      val issuerBalance                             = sender.wavesBalance(issuerAddress).available
-      val issuerEffBalance                          = sender.wavesBalance(issuerAddress).effective
+      val issuerBalance                             = miner.wavesBalance(issuerAddress).available
+      val issuerEffBalance                          = miner.wavesBalance(issuerAddress).effective
       val (nftQuantity, nftDecimals, nftReissuable) = (1, 0, false)
 
       assertGrpcError(
-        sender.broadcastIssue(issuer, assetName, someAssetAmount, 7, reissuable = true, issueFee - 1, assetDescription, version = v),
+        miner.broadcastIssue(issuer, assetName, someAssetAmount, 7, reissuable = true, issueFee - 1, assetDescription, version = v),
         s"does not exceed minimal value of $issueFee",
         Code.INVALID_ARGUMENT
       )
 
       assertGrpcError(
-        sender.broadcastIssue(issuer, assetName, nftQuantity, nftDecimals, nftReissuable, minFee - 1, assetDescription, version = v),
+        miner.broadcastIssue(issuer, assetName, nftQuantity, nftDecimals, nftReissuable, minFee - 1, assetDescription, version = v),
         s"does not exceed minimal value of $minFee",
         Code.INVALID_ARGUMENT
       )
 
-      sender.wavesBalance(issuerAddress).available shouldBe issuerBalance
-      sender.wavesBalance(issuerAddress).effective shouldBe issuerEffBalance
+      miner.wavesBalance(issuerAddress).available shouldBe issuerBalance
+      miner.wavesBalance(issuerAddress).effective shouldBe issuerEffBalance
     }
   }
 
@@ -82,7 +82,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
       val assetName        = Random.alphanumeric.filter(_.isLetter).take(IssueTransaction.MaxAssetNameLength).mkString
       val assetDescription = "my asset description 2"
 
-      val issuedAssetTx = sender.broadcastIssue(
+      val issuedAssetTx = miner.broadcastIssue(
         issuer,
         assetName,
         someAssetAmount,
@@ -96,7 +96,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
       )
       val issuedAssetId = PBTransactions.vanilla(issuedAssetTx).explicitGet().id().toString
 
-      val issuedAssetTx2 = sender.broadcastIssue(
+      val issuedAssetTx2 = miner.broadcastIssue(
         issuer,
         assetName,
         someAssetAmount,
@@ -110,21 +110,21 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
       )
       val issuedAssetId2 = PBTransactions.vanilla(issuedAssetTx2).explicitGet().id().toString
 
-      sender.assetsBalance(issuerAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe someAssetAmount
-      sender.assetsBalance(issuerAddress, Seq(issuedAssetId2)).getOrElse(issuedAssetId2, 0L) shouldBe someAssetAmount
+      miner.assetsBalance(issuerAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe someAssetAmount
+      miner.assetsBalance(issuerAddress, Seq(issuedAssetId2)).getOrElse(issuedAssetId2, 0L) shouldBe someAssetAmount
 
-      sender.getTransaction(issuedAssetId).getTransaction.getIssue.name shouldBe assetName
-      sender.getTransaction(issuedAssetId2).getTransaction.getIssue.name shouldBe assetName
+      miner.getTransaction(issuedAssetId).getTransaction.getIssue.name shouldBe assetName
+      miner.getTransaction(issuedAssetId2).getTransaction.getIssue.name shouldBe assetName
     }
   }
 
   test("Not able to create asset when insufficient funds") {
     val assetName        = "myasset"
-    val issuerEffBalance = sender.wavesBalance(issuerAddress).effective
+    val issuerEffBalance = miner.wavesBalance(issuerAddress).effective
     val bigAssetFee      = issuerEffBalance + 1.waves
 
     assertGrpcError(
-      sender.broadcastIssue(issuer, assetName, someAssetAmount, 8, reissuable = false, bigAssetFee),
+      miner.broadcastIssue(issuer, assetName, someAssetAmount, 8, reissuable = false, bigAssetFee),
       "Accounts balance errors",
       Code.INVALID_ARGUMENT
     )
@@ -146,7 +146,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
       val assetName = "myasset"
 
       assertGrpcError(
-        sender.broadcastIssue(issuer, assetName, someAssetAmount, 2, reissuable = true, issueFee, script = Left(Base64.decode(script))),
+        miner.broadcastIssue(issuer, assetName, someAssetAmount, 2, reissuable = true, issueFee, script = Left(Base64.decode(script))),
         error,
         Code.INVALID_ARGUMENT
       )
@@ -167,7 +167,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
       val assetName          = "myasset2"
       val decimalBytes: Byte = decimals.toByte
       assertGrpcError(
-        sender.broadcastIssue(issuer, assetName, assetVal, decimalBytes, reissuable = false, issueFee),
+        miner.broadcastIssue(issuer, assetName, assetVal, decimalBytes, reissuable = false, issueFee),
         s"$error",
         Code.INVALID_ARGUMENT
       )
@@ -185,7 +185,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
   forAll(invalid_assets_names) { invalidAssetName: String =>
     test(s"Not able to create asset named $invalidAssetName") {
       assertGrpcError(
-        sender.broadcastIssue(issuer, invalidAssetName, someAssetAmount, 2, reissuable = false, issueFee),
+        miner.broadcastIssue(issuer, invalidAssetName, someAssetAmount, 2, reissuable = false, issueFee),
         "invalid name",
         Code.INVALID_ARGUMENT
       )
@@ -195,7 +195,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
   test("Not able to create asset with too big description") {
     val tooBigDescription = Random.nextString(1000 + 1)
     assertGrpcError(
-      sender.broadcastIssue(issuer, "assetName", someAssetAmount, 2, description = tooBigDescription, reissuable = false, fee = issueFee),
+      miner.broadcastIssue(issuer, "assetName", someAssetAmount, 2, description = tooBigDescription, reissuable = false, fee = issueFee),
       "Too big sequence requested",
       Code.INVALID_ARGUMENT
     )

@@ -156,8 +156,8 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
       for {
         sender                                                                       <- accountGen
         (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
-        issue = IssueTransaction(TxVersion.V1, sender.publicKey, assetName, description, quantity, decimals, reissuable = reissuable, script = None, iFee, timestamp)
-          .signWith(sender.privateKey)
+        issue = IssueTransaction(TxVersion.V1, miner.publicKey, assetName, description, quantity, decimals, reissuable = reissuable, script = None, iFee, timestamp)
+          .signWith(miner.privateKey)
         minFee <- smallFeeGen
         assetId = issue.assetId
       } yield SponsorFeeTransaction.selfSigned(1.toByte, sender, IssuedAsset(assetId), Some(minFee), fee, timestamp) should produce(
@@ -171,8 +171,8 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
       for {
         sender                                                                       <- accountGen
         (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
-        issue = IssueTransaction(TxVersion.V1, sender.publicKey, assetName, description, quantity, decimals, reissuable = reissuable, script = None, iFee, timestamp)
-          .signWith(sender.privateKey)
+        issue = IssueTransaction(TxVersion.V1, miner.publicKey, assetName, description, quantity, decimals, reissuable = reissuable, script = None, iFee, timestamp)
+          .signWith(miner.privateKey)
         minFee  = None
         assetId = issue.assetId
       } yield SponsorFeeTransaction.selfSigned(1.toByte, sender, IssuedAsset(assetId), minFee, fee, timestamp) should produce("insufficient fee")

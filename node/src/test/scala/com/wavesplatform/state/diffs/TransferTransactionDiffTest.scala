@@ -43,7 +43,7 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with With
             assertBalanceInvariant(totalDiff)
 
             val recipient: Address = transfer.recipient.asInstanceOf[Address]
-            if (transfer.sender.toAddress != recipient) {
+            if (transfer.miner.toAddress != recipient) {
               transfer.assetId match {
                 case aid @ IssuedAsset(_) =>
                   newState.balance(recipient) shouldBe 0

@@ -49,7 +49,7 @@ object Schedulers {
   def singleThread(
       name: String,
       reporter: UncaughtExceptionReporter = UncaughtExceptionReporter.default,
-      executionModel: ExecutionModel = ExecutionModel.Default,
+      executionModel: ExecutionModel = ExecutionModel.AlwaysAsyncExecution,
       rejectedExecutionHandler: RejectedExecutionHandler = new DiscardOldestPolicy
   ): SchedulerService = {
     val factory = threadFactory(name, daemonic = true, reporter)
@@ -64,7 +64,7 @@ object Schedulers {
       poolSize: Int,
       name: String,
       reporter: UncaughtExceptionReporter = UncaughtExceptionReporter.default,
-      executionModel: ExecutionModel = ExecutionModel.Default,
+      executionModel: ExecutionModel = ExecutionModel.AlwaysAsyncExecution,
       rejectedExecutionHandler: RejectedExecutionHandler = new DiscardOldestPolicy
   ): SchedulerService = {
     val factory = threadFactory(name, daemonic = true, reporter)

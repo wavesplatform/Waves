@@ -13,23 +13,23 @@ class BurnTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   test("burning assets changes issuer's asset balance; issuer's waves balance is decreased by fee") {
     for (v <- burnTxSupportedVersions) {
       val issuedAssetId = PBTransactions.vanilla(
-        sender.broadcastIssue(firstAcc, s"name+$v", issueAmount, decimals, reissuable = false, fee = issueFee, waitForTx = true)
+        miner.broadcastIssue(firstAcc, s"name+$v", issueAmount, decimals, reissuable = false, fee = issueFee, waitForTx = true)
       ).explicitGet().id().toString
 
-      sender.assetsBalance(firstAddress, Seq(issuedAssetId))(issuedAssetId) shouldBe issueAmount
+      miner.assetsBalance(firstAddress, Seq(issuedAssetId))(issuedAssetId) shouldBe issueAmount
 
       // burn half of the coins and check balance
-      val balance = sender.wavesBalance(firstAddress)
-      sender.broadcastBurn(firstAcc, issuedAssetId, issueAmount / 2, minFee, version = v, waitForTx = true)
+      val balance = miner.wavesBalance(firstAddress)
+      miner.broadcastBurn(firstAcc, issuedAssetId, issueAmount / 2, minFee, version = v, waitForTx = true)
 
-      sender.wavesBalance(firstAddress).available shouldBe balance.available - minFee
-      sender.wavesBalance(firstAddress).effective shouldBe balance.effective - minFee
+      miner.wavesBalance(firstAddress).available shouldBe balance.available - minFee
+      miner.wavesBalance(firstAddress).effective shouldBe balance.effective - minFee
 
-      sender.assetsBalance(firstAddress, Seq(issuedAssetId))(issuedAssetId) shouldBe issueAmount / 2
+      miner.assetsBalance(firstAddress, Seq(issuedAssetId))(issuedAssetId) shouldBe issueAmount / 2
 
       // burn the rest and check again
-      sender.broadcastBurn(firstAcc, issuedAssetId, issueAmount / 2, minFee, version = v, waitForTx = true)
-      sender.assetsBalance(firstAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe 0L
+      miner.broadcastBurn(firstAcc, issuedAssetId, issueAmount / 2, minFee, version = v, waitForTx = true)
+      miner.assetsBalance(firstAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe 0L
     }
   }
 
@@ -39,17 +39,17 @@ class BurnTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val transferredQuantity = issuedQuantity / 2
 
       val issuedAssetId = PBTransactions.vanilla(
-        sender.broadcastIssue(firstAcc, s"name+$v", issuedQuantity, decimals, reissuable = false, issueFee, waitForTx = true)
+        miner.broadcastIssue(firstAcc, s"name+$v", issuedQuantity, decimals, reissuable = false, issueFee, waitForTx = true)
       ).explicitGet().id().toString
-      sender.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(secondAddress), transferredQuantity, minFee, assetId = issuedAssetId, waitForTx = true)
+      miner.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(secondAddress), transferredQuantity, minFee, assetId = issuedAssetId, waitForTx = true)
 
-      sender.broadcastBurn(secondAcc, issuedAssetId, transferredQuantity, minFee, version = v, waitForTx = true)
-      sender.assetsBalance(secondAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe 0L
+      miner.broadcastBurn(secondAcc, issuedAssetId, transferredQuantity, minFee, version = v, waitForTx = true)
+      miner.assetsBalance(secondAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe 0L
 
-      sender.waitForHeightArise()
+      miner.waitForHeightArise()
 
       assertGrpcError(
-        sender.broadcastTransfer(secondAcc, Recipient().withPublicKeyHash(firstAddress), transferredQuantity, minFee, assetId = issuedAssetId),
+        miner.broadcastTransfer(secondAcc, Recipient().withPublicKeyHash(firstAddress), transferredQuantity, minFee, assetId = issuedAssetId),
         "Attempt to transfer unavailable funds",
         Code.INVALID_ARGUMENT
       )
@@ -62,13 +62,13 @@ class BurnTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val burnedQuantity = issuedQuantity + 1
 
       val issuedAssetId = PBTransactions.vanilla(
-        sender.broadcastIssue(firstAcc, s"name+$v", issuedQuantity, decimals, reissuable = false, issueFee, waitForTx = true)
+        miner.broadcastIssue(firstAcc, s"name+$v", issuedQuantity, decimals, reissuable = false, issueFee, waitForTx = true)
       ).explicitGet().id().toString
 
-      sender.waitForHeightArise()
+      miner.waitForHeightArise()
 
       assertGrpcError(
-        sender.broadcastBurn(firstAcc, issuedAssetId, burnedQuantity, minFee, version = v),
+        miner.broadcastBurn(firstAcc, issuedAssetId, burnedQuantity, minFee, version = v),
         "Accounts balance errors",
         Code.INVALID_ARGUMENT
       )
@@ -82,12 +82,12 @@ class BurnTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val burnedQuantity      = transferredQuantity + 1
 
       val issuedAssetId = PBTransactions.vanilla(
-        sender.broadcastIssue(firstAcc, s"name+$v", issuedQuantity, decimals, reissuable = false, issueFee, waitForTx = true)
+        miner.broadcastIssue(firstAcc, s"name+$v", issuedQuantity, decimals, reissuable = false, issueFee, waitForTx = true)
       ).explicitGet().id().toString
-      sender.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(secondAddress), transferredQuantity, minFee, assetId = issuedAssetId, waitForTx = true)
+      miner.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(secondAddress), transferredQuantity, minFee, assetId = issuedAssetId, waitForTx = true)
 
       assertGrpcError(
-        sender.broadcastBurn(secondAcc, issuedAssetId, burnedQuantity, minFee, version = v),
+        miner.broadcastBurn(secondAcc, issuedAssetId, burnedQuantity, minFee, version = v),
         "Accounts balance errors",
         Code.INVALID_ARGUMENT
       )
@@ -100,22 +100,22 @@ class BurnTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val transferredQuantity = issuedQuantity / 2
 
       val issuedAssetId = PBTransactions.vanilla(
-        sender.broadcastIssue(firstAcc, s"name+$v", issuedQuantity, decimals, reissuable = true, issueFee, waitForTx = true)
+        miner.broadcastIssue(firstAcc, s"name+$v", issuedQuantity, decimals, reissuable = true, issueFee, waitForTx = true)
       ).explicitGet().id().toString
 
-      sender.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(secondAddress), transferredQuantity, minFee, assetId = issuedAssetId, waitForTx = true)
-      sender.broadcastBurn(firstAcc, issuedAssetId, transferredQuantity, minFee, v, waitForTx = true)
+      miner.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(secondAddress), transferredQuantity, minFee, assetId = issuedAssetId, waitForTx = true)
+      miner.broadcastBurn(firstAcc, issuedAssetId, transferredQuantity, minFee, v, waitForTx = true)
 
-      sender.assetsBalance(firstAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe 0L
-      sender.assetsBalance(secondAddress, Seq(issuedAssetId))(issuedAssetId) shouldBe transferredQuantity
+      miner.assetsBalance(firstAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe 0L
+      miner.assetsBalance(secondAddress, Seq(issuedAssetId))(issuedAssetId) shouldBe transferredQuantity
 
-      sender.broadcastReissue(firstAcc, issueFee, issuedAssetId, issuedQuantity, waitForTx = true)
+      miner.broadcastReissue(firstAcc, issueFee, issuedAssetId, issuedQuantity, waitForTx = true)
 
-      sender.broadcastBurn(firstAcc, issuedAssetId, issuedQuantity, minFee, v, waitForTx = true)
-      sender.broadcastBurn(secondAcc, issuedAssetId, transferredQuantity, minFee, v, waitForTx = true)
+      miner.broadcastBurn(firstAcc, issuedAssetId, issuedQuantity, minFee, v, waitForTx = true)
+      miner.broadcastBurn(secondAcc, issuedAssetId, transferredQuantity, minFee, v, waitForTx = true)
 
-      sender.assetsBalance(firstAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe 0L
-      sender.assetsBalance(secondAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe 0L
+      miner.assetsBalance(firstAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe 0L
+      miner.assetsBalance(secondAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe 0L
     }
   }
 

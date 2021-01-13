@@ -19,19 +19,19 @@ class AssetsApiGrpcSuite
     import com.wavesplatform.it.api.SyncGrpcApi._
 
     val txs = Map(
-      "non_nft_asset" -> sender.broadcastIssue(firstAcc, "non_nft_asset", 100, 8, reissuable = true, issueFee + smartFee),
-      "nft_asset_1"   -> sender.broadcastIssue(firstAcc, "nft_asset_1", 1, 0, reissuable = false, issueFee + smartFee),
-      "nft_asset_2"   -> sender.broadcastIssue(firstAcc, "nft_asset_2", 1, 0, reissuable = false, issueFee + smartFee)
+      "non_nft_asset" -> miner.broadcastIssue(firstAcc, "non_nft_asset", 100, 8, reissuable = true, issueFee + smartFee),
+      "nft_asset_1"   -> miner.broadcastIssue(firstAcc, "nft_asset_1", 1, 0, reissuable = false, issueFee + smartFee),
+      "nft_asset_2"   -> miner.broadcastIssue(firstAcc, "nft_asset_2", 1, 0, reissuable = false, issueFee + smartFee)
     )
 
-    txs.values.foreach(tx => sender.waitForTransaction(tx.id))
+    txs.values.foreach(tx => miner.waitForTransaction(tx.id))
 
     val allNft = Map(
       "nft_asset_1" -> txs("nft_asset_1").id,
       "nft_asset_2" -> txs("nft_asset_2").id
     )
 
-    val nftList = sender.nftList(firstAddress, 10)
+    val nftList = miner.nftList(firstAddress, 10)
     nftList should have size 2
     nftList.map(_.assetInfo.get.name) should contain theSameElementsAs allNft.keySet
   }

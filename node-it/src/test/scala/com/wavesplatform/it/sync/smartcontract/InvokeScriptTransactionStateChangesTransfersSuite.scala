@@ -10,10 +10,10 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.CancelAfterFailure
 
-class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionSuite with CancelAfterFailure {
-  private def dApp               = firstKeyPair
+class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionSuite {
+  private def dApp = firstKeyPair
+
   private def callerAndRecipient = secondKeyPair
 
   protected override def beforeAll(): Unit = {
@@ -22,7 +22,7 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
     val script = ScriptCompiler
       .compile(
         """
-      |{-# STDLIB_VERSION 4 #-}
+          |{-# STDLIB_VERSION 4 #-}
       |{-# CONTENT_TYPE DAPP #-}
       |
       |@Callable(inv)
@@ -35,14 +35,14 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
       ._1
       .bytes()
       .base64
-    sender.setScript(dApp, Some(script), setScriptFee, waitForTx = true)
+    miner.setScript(dApp, Some(script), setScriptFee, waitForTx = true)
   }
 
   test("payment value higher than transfer") {
     val pamentAmount   = 2
     val transferAmount = 1
 
-    val invokeScriptTx = sender.invokeScript(
+    val invokeScriptTx = miner.invokeScript(
       callerAndRecipient,
       dApp.toAddress.toString,
       func = Some("sendToCaller"),
@@ -52,7 +52,7 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
       waitForTx = true
     )
     nodes.waitForHeightAriseAndTxPresent(invokeScriptTx._1.id)
-    val txStateChanges = sender.debugStateChanges(invokeScriptTx._1.id)
+    val txStateChanges = miner.debugStateChanges(invokeScriptTx._1.id)
 
     val transferCountOpt            = txStateChanges.stateChanges.map(_.transfers.size)
     val firstTransferAddrOpt        = txStateChanges.stateChanges.map(_.transfers.head.address)
@@ -67,7 +67,7 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
     val pamentAmount   = 3
     val transferAmount = 3
 
-    val invokeScriptTx = sender.invokeScript(
+    val invokeScriptTx = miner.invokeScript(
       callerAndRecipient,
       dApp.toAddress.toString,
       func = Some("sendToCaller"),
@@ -77,7 +77,7 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
       waitForTx = true
     )
     nodes.waitForHeightAriseAndTxPresent(invokeScriptTx._1.id)
-    val txStateChanges = sender.debugStateChanges(invokeScriptTx._1.id)
+    val txStateChanges = miner.debugStateChanges(invokeScriptTx._1.id)
 
     val transferCountOpt            = txStateChanges.stateChanges.map(_.transfers.size)
     val firstTransferAddrOpt        = txStateChanges.stateChanges.map(_.transfers.head.address)
@@ -92,7 +92,7 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
     val paymentAmount  = 1
     val transferAmount = 4
 
-    val invokeScriptTx = sender.invokeScript(
+    val invokeScriptTx = miner.invokeScript(
       callerAndRecipient,
       dApp.toAddress.toString,
       func = Some("sendToCaller"),
@@ -102,7 +102,7 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
       waitForTx = true
     )
     nodes.waitForHeightAriseAndTxPresent(invokeScriptTx._1.id)
-    val txStateChanges = sender.debugStateChanges(invokeScriptTx._1.id)
+    val txStateChanges = miner.debugStateChanges(invokeScriptTx._1.id)
 
     val transferCountOpt            = txStateChanges.stateChanges.map(_.transfers.size)
     val firstTransferAddrOpt        = txStateChanges.stateChanges.map(_.transfers.head.address)
@@ -117,7 +117,7 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
     val paymentAmount  = 1
     val transferAmount = 0
 
-    val invokeScriptTx = sender.invokeScript(
+    val invokeScriptTx = miner.invokeScript(
       callerAndRecipient,
       dApp.toAddress.toString,
       func = Some("sendToCaller"),
@@ -127,7 +127,7 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
       waitForTx = true
     )
     nodes.waitForHeightAriseAndTxPresent(invokeScriptTx._1.id)
-    val txStateChanges = sender.debugStateChanges(invokeScriptTx._1.id)
+    val txStateChanges = miner.debugStateChanges(invokeScriptTx._1.id)
 
     val transferCountOpt            = txStateChanges.stateChanges.map(_.transfers.size)
     val firstTransferAddrOpt        = txStateChanges.stateChanges.map(_.transfers.head.address)

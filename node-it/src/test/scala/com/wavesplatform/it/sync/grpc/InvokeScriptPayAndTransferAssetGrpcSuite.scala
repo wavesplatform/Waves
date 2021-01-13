@@ -26,7 +26,7 @@ class InvokeScriptPayAndTransferAssetGrpcSuite extends GrpcBaseTransactionSuite 
   test("issue and transfer asset") {
     assetId = PBTransactions
       .vanilla(
-        sender.broadcastIssue(caller, "Asset", assetQuantity, 2, reissuable = true, fee = issueFee, waitForTx = true)
+        miner.broadcastIssue(caller, "Asset", assetQuantity, 2, reissuable = true, fee = issueFee, waitForTx = true)
       )
       .explicitGet()
       .id()
@@ -35,7 +35,7 @@ class InvokeScriptPayAndTransferAssetGrpcSuite extends GrpcBaseTransactionSuite 
     val script = Right(Some(ScriptCompiler.compile("true", estimator).explicitGet()._1))
     smartAssetId = PBTransactions
       .vanilla(
-        sender.broadcastIssue(caller, "Smart", assetQuantity, 2, reissuable = true, fee = issueFee, script = script, waitForTx = true)
+        miner.broadcastIssue(caller, "Smart", assetQuantity, 2, reissuable = true, fee = issueFee, script = script, waitForTx = true)
       )
       .explicitGet()
       .id()
@@ -45,7 +45,7 @@ class InvokeScriptPayAndTransferAssetGrpcSuite extends GrpcBaseTransactionSuite 
     val smartScript = Right(Some(ScriptCompiler.compile(scriptText, estimator).explicitGet()._1))
     rejAssetId = PBTransactions
       .vanilla(
-        sender.broadcastIssue(caller, "Reject", assetQuantity, 2, reissuable = true, fee = issueFee, script = smartScript, waitForTx = true)
+        miner.broadcastIssue(caller, "Reject", assetQuantity, 2, reissuable = true, fee = issueFee, script = smartScript, waitForTx = true)
       )
       .explicitGet()
       .id()
@@ -53,8 +53,8 @@ class InvokeScriptPayAndTransferAssetGrpcSuite extends GrpcBaseTransactionSuite 
   }
 
   test("set script to dApp account and transfer out all waves") {
-    val dAppBalance = sender.wavesBalance(dAppAddress)
-    sender.broadcastTransfer(
+    val dAppBalance = miner.wavesBalance(dAppAddress)
+    miner.broadcastTransfer(
       dApp,
       Recipient().withPublicKeyHash(callerAddress),
       dAppBalance.available - smartMinFee - setScriptFee,
@@ -82,83 +82,83 @@ class InvokeScriptPayAndTransferAssetGrpcSuite extends GrpcBaseTransactionSuite 
       )
       .explicitGet()
       ._1
-    sender.setScript(dApp, Right(Some(dAppScript)), fee = setScriptFee, waitForTx = true)
+    miner.setScript(dApp, Right(Some(dAppScript)), fee = setScriptFee, waitForTx = true)
   }
 
   test("dApp can transfer payed asset if its own balance is 0") {
-    val dAppInitBalance     = sender.wavesBalance(dAppAddress)
-    val callerInitBalance   = sender.wavesBalance(callerAddress)
-    val receiverInitBalance = sender.wavesBalance(receiverAddress)
+    val dAppInitBalance     = miner.wavesBalance(dAppAddress)
+    val callerInitBalance   = miner.wavesBalance(callerAddress)
+    val receiverInitBalance = miner.wavesBalance(receiverAddress)
 
     val paymentAmount = 10
 
     invoke("resendPayment", paymentAmount, assetId)
 
-    sender.wavesBalance(dAppAddress).regular shouldBe dAppInitBalance.regular
-    sender.wavesBalance(callerAddress).regular shouldBe callerInitBalance.regular - smartMinFee
-    sender.wavesBalance(receiverAddress).regular shouldBe receiverInitBalance.regular
+    miner.wavesBalance(dAppAddress).regular shouldBe dAppInitBalance.regular
+    miner.wavesBalance(callerAddress).regular shouldBe callerInitBalance.regular - smartMinFee
+    miner.wavesBalance(receiverAddress).regular shouldBe receiverInitBalance.regular
 
-    sender.assetsBalance(dAppAddress, Seq(assetId)).getOrElse(assetId, 0L) shouldBe paymentAmount - 1
-    sender.assetsBalance(callerAddress, Seq(assetId)).getOrElse(assetId, 0L) shouldBe assetQuantity - paymentAmount
-    sender.assetsBalance(receiverAddress, Seq(assetId)).getOrElse(assetId, 0L) shouldBe 1
+    miner.assetsBalance(dAppAddress, Seq(assetId)).getOrElse(assetId, 0L) shouldBe paymentAmount - 1
+    miner.assetsBalance(callerAddress, Seq(assetId)).getOrElse(assetId, 0L) shouldBe assetQuantity - paymentAmount
+    miner.assetsBalance(receiverAddress, Seq(assetId)).getOrElse(assetId, 0L) shouldBe 1
   }
 
   test("dApp can transfer payed smart asset if its own balance is 0") {
-    val dAppInitBalance     = sender.wavesBalance(dAppAddress)
-    val callerInitBalance   = sender.wavesBalance(callerAddress)
-    val receiverInitBalance = sender.wavesBalance(receiverAddress)
+    val dAppInitBalance     = miner.wavesBalance(dAppAddress)
+    val callerInitBalance   = miner.wavesBalance(callerAddress)
+    val receiverInitBalance = miner.wavesBalance(receiverAddress)
 
     val paymentAmount = 10
     val fee           = smartMinFee + smartFee * 2
 
     invoke("resendPayment", paymentAmount, smartAssetId, fee)
 
-    sender.wavesBalance(dAppAddress).regular shouldBe dAppInitBalance.regular
-    sender.wavesBalance(callerAddress).regular shouldBe callerInitBalance.regular - fee
-    sender.wavesBalance(receiverAddress).regular shouldBe receiverInitBalance.regular
+    miner.wavesBalance(dAppAddress).regular shouldBe dAppInitBalance.regular
+    miner.wavesBalance(callerAddress).regular shouldBe callerInitBalance.regular - fee
+    miner.wavesBalance(receiverAddress).regular shouldBe receiverInitBalance.regular
 
-    sender.assetsBalance(dAppAddress, Seq(smartAssetId)).getOrElse(smartAssetId, 0L) shouldBe paymentAmount - 1
-    sender.assetsBalance(callerAddress, Seq(smartAssetId)).getOrElse(smartAssetId, 0L) shouldBe assetQuantity - paymentAmount
-    sender.assetsBalance(receiverAddress, Seq(smartAssetId)).getOrElse(smartAssetId, 0L) shouldBe 1
+    miner.assetsBalance(dAppAddress, Seq(smartAssetId)).getOrElse(smartAssetId, 0L) shouldBe paymentAmount - 1
+    miner.assetsBalance(callerAddress, Seq(smartAssetId)).getOrElse(smartAssetId, 0L) shouldBe assetQuantity - paymentAmount
+    miner.assetsBalance(receiverAddress, Seq(smartAssetId)).getOrElse(smartAssetId, 0L) shouldBe 1
   }
 
   test("dApp can't transfer payed smart asset if it rejects transfers and its own balance is 0") {
-    val dAppInitBalance     = sender.wavesBalance(dAppAddress)
-    val callerInitBalance   = sender.wavesBalance(callerAddress)
-    val receiverInitBalance = sender.wavesBalance(receiverAddress)
+    val dAppInitBalance     = miner.wavesBalance(dAppAddress)
+    val callerInitBalance   = miner.wavesBalance(callerAddress)
+    val receiverInitBalance = miner.wavesBalance(receiverAddress)
 
     val paymentAmount = 10
     val fee           = smartMinFee + smartFee * 2
 
     assertGrpcError(invoke("resendPayment", paymentAmount, rejAssetId, fee), "Transaction is not allowed by token-script")
 
-    sender.wavesBalance(dAppAddress).regular shouldBe dAppInitBalance.regular
-    sender.wavesBalance(callerAddress).regular shouldBe callerInitBalance.regular
-    sender.wavesBalance(receiverAddress).regular shouldBe receiverInitBalance.regular
+    miner.wavesBalance(dAppAddress).regular shouldBe dAppInitBalance.regular
+    miner.wavesBalance(callerAddress).regular shouldBe callerInitBalance.regular
+    miner.wavesBalance(receiverAddress).regular shouldBe receiverInitBalance.regular
 
-    sender.assetsBalance(dAppAddress, Seq(rejAssetId)).getOrElse(rejAssetId, 0L) shouldBe 0L
-    sender.assetsBalance(callerAddress, Seq(rejAssetId)).getOrElse(rejAssetId, 0L) shouldBe assetQuantity
-    sender.assetsBalance(receiverAddress, Seq(rejAssetId)).getOrElse(rejAssetId, 0L) shouldBe 0L
+    miner.assetsBalance(dAppAddress, Seq(rejAssetId)).getOrElse(rejAssetId, 0L) shouldBe 0L
+    miner.assetsBalance(callerAddress, Seq(rejAssetId)).getOrElse(rejAssetId, 0L) shouldBe assetQuantity
+    miner.assetsBalance(receiverAddress, Seq(rejAssetId)).getOrElse(rejAssetId, 0L) shouldBe 0L
   }
 
   test("dApp can transfer payed Waves if its own balance is 0") {
-    val dAppInitBalance     = sender.wavesBalance(dAppAddress)
-    val callerInitBalance   = sender.wavesBalance(callerAddress)
-    val receiverInitBalance = sender.wavesBalance(receiverAddress)
+    val dAppInitBalance     = miner.wavesBalance(dAppAddress)
+    val callerInitBalance   = miner.wavesBalance(callerAddress)
+    val receiverInitBalance = miner.wavesBalance(receiverAddress)
 
     dAppInitBalance.regular shouldBe 0
 
     val paymentAmount = 10
     invoke("resendPayment", paymentAmount)
 
-    sender.wavesBalance(dAppAddress).regular shouldBe dAppInitBalance.regular + paymentAmount - 1
-    sender.wavesBalance(callerAddress).regular shouldBe callerInitBalance.regular - paymentAmount - smartMinFee
-    sender.wavesBalance(receiverAddress).regular shouldBe receiverInitBalance.regular + 1
+    miner.wavesBalance(dAppAddress).regular shouldBe dAppInitBalance.regular + paymentAmount - 1
+    miner.wavesBalance(callerAddress).regular shouldBe callerInitBalance.regular - paymentAmount - smartMinFee
+    miner.wavesBalance(receiverAddress).regular shouldBe receiverInitBalance.regular + 1
   }
 
   def invoke(func: String, amount: Long, assetId: String = "WAVES", fee: Long = 500000): PBSignedTransaction = {
     val assetIdByteSting = if (assetId == "WAVES") ByteString.EMPTY else ByteString.copyFrom(Base58.decode(assetId))
-    sender.broadcastInvokeScript(
+    miner.broadcastInvokeScript(
       caller,
       Recipient().withPublicKeyHash(dAppAddress),
       Some(FUNCTION_CALL(FunctionHeader.User(func), List.empty)),

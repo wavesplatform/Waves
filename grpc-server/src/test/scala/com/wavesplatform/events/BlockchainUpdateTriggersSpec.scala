@@ -154,15 +154,15 @@
 //        sender        <- accountGen
 //        recipient     <- accountGen
 //        amount        <- Gen.choose(1L, initialAmount - Constants.UnitsInWave)
-//        master2sender <- transferGeneratorPV2(1, master, sender.toAddress, amount)
-//        fee           <- Gen.choose(1, master2sender.amount - 1)
-//        sender2recipient = TransferTransaction.selfSigned(2.toByte, sender, recipient.toAddress, Waves, master2sender.amount - fee, Waves, fee, ByteStr.empty, 2)
+//        master2sender <- transferGeneratorPV2(1, master, miner.toAddress, amount)
+//        fee           <- Gen.choose(1, master2miner.amount - 1)
+//        sender2recipient = TransferTransaction.selfSigned(2.toByte, sender, recipient.toAddress, Waves, master2miner.amount - fee, Waves, fee, ByteStr.empty, 2)
 //          .explicitGet()
 //      } yield (sender, recipient, master2sender, sender2recipient)
 //    } {
 //      case (sender, recipient, master2sender, sender2recipient) =>
 //        testTxsStateUpdates(Seq(master2sender, sender2recipient)) { transactionStateUpdates =>
-//          transactionStateUpdates.last.balances.find(_._1 == sender.publicKey.toAddress).get._3 shouldBe 0
+//          transactionStateUpdates.last.balances.find(_._1 == miner.publicKey.toAddress).get._3 shouldBe 0
 //
 //          transactionStateUpdates.last.balances.find(_._1 == recipient.publicKey.toAddress).get._3 shouldBe
 //            sender2recipient.amount

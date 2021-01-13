@@ -20,7 +20,7 @@ class LeaseActionSuite extends BaseTransactionSuite {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
       .Builder(Default, 2, Seq.empty)
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.SynchronousCalls.id, 1)))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.SynchronousCalls, 1)))
       .buildNonConflicting()
 
   private def compile(script: String): String =
@@ -55,27 +55,27 @@ class LeaseActionSuite extends BaseTransactionSuite {
        |  }
      """.stripMargin
     )
-    sender.setScript(dAppAcc, Some(dApp), waitForTx = true)
+    miner.setScript(dAppAcc, Some(dApp), waitForTx = true)
   }
 
   test("active leases") {
-    val leaseTxId     = sender.lease(dAppAcc, invokerAddress, txLeaseAmount, smartMinFee, TxVersion.V2, waitForTx = true).id
-    val leaseTxHeight = sender.transactionStatus(leaseTxId).height.get
+    val leaseTxId     = miner.lease(dAppAcc, invokerAddress, txLeaseAmount, smartMinFee, TxVersion.V2, waitForTx = true).id
+    val leaseTxHeight = miner.transactionStatus(leaseTxId).height.get
 
-    val invokeId     = sender.invokeScript(invoker, dAppAddress, Some("lease"), Nil, fee = invokeFee, waitForTx = true)._1.id
-    val invokeHeight = sender.transactionStatus(invokeId).height.get
+    val invokeId     = miner.invokeScript(invoker, dAppAddress, Some("lease"), Nil, fee = invokeFee, waitForTx = true)._1.id
+    val invokeHeight = miner.transactionStatus(invokeId).height.get
 
     val recipient     = Recipient.Address(ByteStr.decodeBase58(invokerAddress).get)
     val leaseActionId = Lease.calculateId(Lease(recipient, dAppLeaseAmount, 0), ByteStr.decodeBase58(invokeId).get).toString
 
-    sender.activeLeases(dAppAddress) should contain theSameElementsAs Seq(
+    miner.activeLeases(dAppAddress) should contain theSameElementsAs Seq(
       LeaseInfo(leaseTxId, leaseTxId, dAppAddress, invokerAddress, txLeaseAmount, leaseTxHeight),
       LeaseInfo(leaseActionId, invokeId, dAppAddress, invokerAddress, dAppLeaseAmount, invokeHeight)
     )
 
     val leaseTxIdParam = List(CONST_BYTESTR(ByteStr.decodeBase58(leaseTxId).get).explicitGet())
-    sender.invokeScript(dAppAcc, dAppAddress, Some("leaseCancel"), leaseTxIdParam, fee = invokeFee, waitForTx = true)
-    sender.activeLeases(dAppAddress) shouldBe Seq(
+    miner.invokeScript(dAppAcc, dAppAddress, Some("leaseCancel"), leaseTxIdParam, fee = invokeFee, waitForTx = true)
+    miner.activeLeases(dAppAddress) shouldBe Seq(
       LeaseInfo(leaseActionId, invokeId, dAppAddress, invokerAddress, dAppLeaseAmount, invokeHeight)
     )
   }

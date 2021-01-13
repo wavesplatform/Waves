@@ -79,14 +79,14 @@ class SetScriptBodyBytesByteVectorSuite extends BaseTransactionSuite {
   }
 
   private def checkByteVectorLimit(address: KeyPair, verifier: String) = {
-    val setScriptId = sender.setScript(address, Some(verifier), setScriptFee, waitForTx = true).id
-    sender.transactionInfo[TransactionInfo](setScriptId).script.get.startsWith("base64:") shouldBe true
+    val setScriptId = miner.setScript(address, Some(verifier), setScriptFee, waitForTx = true).id
+    miner.transactionInfo[TransactionInfo](setScriptId).script.get.startsWith("base64:") shouldBe true
 
-    val scriptInfo = sender.addressScriptInfo(address.toAddress.toString)
+    val scriptInfo = miner.addressScriptInfo(address.toAddress.toString)
     scriptInfo.script.isEmpty shouldBe false
     scriptInfo.scriptText.isEmpty shouldBe false
     scriptInfo.script.get.startsWith("base64:") shouldBe true
 
-    sender.setScript(address, Some(dApp(1781)), setScriptFee + smartFee, waitForTx = true)
+    miner.setScript(address, Some(dApp(1781)), setScriptFee + smartFee, waitForTx = true)
   }
 }

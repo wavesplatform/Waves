@@ -80,9 +80,9 @@ object NFTAssetInfo {
   implicit val nftAssetInfo: Format[NFTAssetInfo] = Json.format
 }
 
-case class FullAssetsInfo(address: String, balances: List[FullAssetInfo])
-object FullAssetsInfo {
-  implicit val fullAssetsInfoFormat: Format[FullAssetsInfo] = Json.format
+case class AssetBalances(address: String, balances: List[FullAssetInfo])
+object AssetBalances {
+  implicit val fullAssetsInfoFormat: Format[AssetBalances] = Json.format
 }
 
 case class ScriptAssetInfo(scriptComplexity: Long, script: String, scriptText: String)

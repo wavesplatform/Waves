@@ -29,14 +29,14 @@ import scala.util.Random
 
 class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with BeforeAndAfterAll {
   test("height should always be reported for transactions") {
-    val txId = sender.transfer(firstKeyPair, secondAddress, 1.waves, fee = minFee).id
+    val txId = miner.transfer(firstKeyPair, secondAddress, 1.waves, fee = minFee).id
 
-    sender.waitForTransaction(txId)
-    val jsv1               = Json.parse(sender.get(s"/transactions/info/$txId").getResponseBody)
+    miner.waitForTransaction(txId)
+    val jsv1               = Json.parse(miner.get(s"/transactions/info/$txId").getResponseBody)
     val hasPositiveHeight1 = (jsv1 \ "height").asOpt[Int].map(_ > 0)
     assert(hasPositiveHeight1.getOrElse(false))
 
-    val response           = sender.get(s"/transactions/address/$firstAddress/limit/1")
+    val response           = miner.get(s"/transactions/address/$firstAddress/limit/1")
     val jsv2               = Json.parse(response.getResponseBody).as[JsArray]
     val hasPositiveHeight2 = (jsv2(0)(0) \ "height").asOpt[Int].map(_ > 0)
 
@@ -45,7 +45,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
 
   test("/transactions/sign should handle erroneous input") {
     def assertSignBadJson(json: JsObject, expectedMessage: String, code: Int = 400): scalatest.Assertion =
-      assertBadRequestAndMessage(sender.postJsonWithApiKey("/transactions/sign", json), expectedMessage, code)
+      assertBadRequestAndMessage(miner.postJsonWithApiKey("/transactions/sign", json), expectedMessage, code)
 
     for (v <- supportedVersions) {
       val json = Json.obj("type" -> CreateAliasTransaction.typeId, "sender" -> firstAddress, "alias" -> "alias", "fee" -> 100000)
@@ -77,13 +77,13 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
       val json =
         Json.obj(
           "type"            -> TransferTransaction.typeId,
-          "senderPublicKey" -> sender.publicKey.toString,
+          "senderPublicKey" -> miner.publicKey.toString,
           "recipient"       -> secondAddress,
           "fee"             -> 100000,
           "amount"          -> 1,
           "assetId"         -> "W" * 524291
         )
-      assertBadRequestAndMessage(sender.calculateFee(json).feeAmount, "failed to parse json message")
+      assertBadRequestAndMessage(miner.calculateFee(json).feeAmount, "failed to parse json message")
     }
   }
 
@@ -93,7 +93,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
       val json =
         Json.obj("type" -> CreateAliasTransaction.typeId, "sender" -> firstAddress, "alias" -> "alias", "fee" -> 100000, "timestamp" -> timestamp)
       val js = if (Option(v).isDefined) json ++ Json.obj("version" -> v) else json
-      val r  = sender.postJsonWithApiKey("/transactions/sign", js)
+      val r  = miner.postJsonWithApiKey("/transactions/sign", js)
       assert(r.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
       assert((Json.parse(r.getResponseBody) \ "timestamp").as[Long] == timestamp)
     }
@@ -101,12 +101,12 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
 
   test("/transactions/broadcast should handle erroneous input") {
     def assertBroadcastBadJson(json: JsObject, expectedMessage: String): scalatest.Assertion =
-      assertBadRequestAndMessage(sender.postJson("/transactions/broadcast", json), expectedMessage)
+      assertBadRequestAndMessage(miner.postJson("/transactions/broadcast", json), expectedMessage)
 
     val timestamp = System.currentTimeMillis
     val jsonV1 = Json.obj(
       "type"            -> CreateAliasTransaction.typeId,
-      "senderPublicKey" -> sender.publicKey.toString,
+      "senderPublicKey" -> miner.publicKey.toString,
       "alias"           -> "alias",
       "fee"             -> 100000,
       "timestamp"       -> timestamp,
@@ -118,7 +118,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
     val jsonV2 = Json.obj(
       "type"            -> CreateAliasTransaction.typeId,
       "version"         -> 2,
-      "senderPublicKey" -> sender.publicKey.toString,
+      "senderPublicKey" -> miner.publicKey.toString,
       "alias"           -> "alias",
       "fee"             -> 100000,
       "timestamp"       -> timestamp,
@@ -321,7 +321,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
   }
 
   test("/transactions/sign/{signerAddress} should sign a transaction by key of signerAddress") {
-    val firstAddress = sender.createKeyPairServerSide().toAddress.stringRepr
+    val firstAddress = miner.createKeyPairServerSide().toAddress.stringRepr
 
     val json = Json.obj(
       "type"      -> TransferTransaction.typeId,
@@ -331,7 +331,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
       "amount"    -> transferAmount
     )
 
-    val signedRequestResponse = sender.postJsonWithApiKey(s"/transactions/sign/$thirdAddress", json)
+    val signedRequestResponse = miner.postJsonWithApiKey(s"/transactions/sign/$thirdAddress", json)
     assert(signedRequestResponse.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
     val signedRequestJson = Json.parse(signedRequestResponse.getResponseBody)
     val signedRequest     = signedRequestJson.as[TransferRequest]
@@ -429,25 +429,25 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
             .json()
         }
 
-      val transactionHeight = sender.waitForTransaction(sender.signedBroadcast(tx).id).height
-      sender.waitForHeight(transactionHeight + 1)
-      assertBadRequestAndMessage(sender.signedBroadcast(tx), "is already in the state on a height")
+      val transactionHeight = miner.waitForTransaction(miner.signedBroadcast(tx).id).height
+      miner.waitForHeight(transactionHeight + 1)
+      assertBadRequestAndMessage(miner.signedBroadcast(tx), "is already in the state on a height")
     }
   }
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
     // explicitly create three more addresses in node's wallet
-    sender.postForm("/addresses")
-    sender.postForm("/addresses")
-    sender.postForm("/addresses")
+    miner.postForm("/addresses")
+    miner.postForm("/addresses")
+    miner.postForm("/addresses")
   }
 
   private def signBroadcastAndCalcFee(json: JsObject, usesProofs: Boolean, version: TxVersion): String = {
-    val jsWithPK  = json ++ Json.obj("senderPublicKey" -> sender.publicKey.toString)
-    val jsWithFee = jsWithPK ++ Json.obj("fee" -> sender.calculateFee(jsWithPK).feeAmount)
+    val jsWithPK  = json ++ Json.obj("senderPublicKey" -> miner.publicKey.toString)
+    val jsWithFee = jsWithPK ++ Json.obj("fee" -> miner.calculateFee(jsWithPK).feeAmount)
     val js        = if (Option(version).isDefined) jsWithFee ++ Json.obj("version" -> version) else jsWithFee
-    val rs        = sender.postJsonWithApiKey("/transactions/sign", js)
+    val rs        = miner.postJsonWithApiKey("/transactions/sign", js)
     assert(rs.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
     val body = Json.parse(rs.getResponseBody)
     val signed: Boolean = if (usesProofs) {
@@ -456,16 +456,16 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
     } else (body \ "signature").as[String].nonEmpty
     assert(signed)
 
-    val validation = sender.postJson("/debug/validate", body)
+    val validation = miner.postJson("/debug/validate", body)
     assert(validation.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
     val validationTime = (Json.parse(validation.getResponseBody) \ "validationTime").as[Double]
     log.debug(s"Validation time of tx is $validationTime ")
 
-    val rb = sender.postJson("/transactions/broadcast", body)
+    val rb = miner.postJson("/transactions/broadcast", body)
     assert(rb.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
     val id = (Json.parse(rb.getResponseBody) \ "id").as[String]
     assert(id.nonEmpty)
-    sender.waitForTransaction(id)
+    miner.waitForTransaction(id)
     id
   }
 }

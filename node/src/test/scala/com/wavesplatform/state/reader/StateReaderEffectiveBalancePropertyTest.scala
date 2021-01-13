@@ -52,7 +52,7 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with PropertyChec
     forAll(setup) {
       case (leaser, genesis, xfer1, lease1, xfer2, lease2) =>
         assertDiffAndState(Seq(block(Seq(genesis)), block(Seq(xfer1, lease1))), block(Seq(xfer2, lease2)), fs) { (_, state) =>
-          val portfolio       = state.wavesPortfolio(lease1.sender.toAddress)
+          val portfolio       = state.wavesPortfolio(lease1.miner.toAddress)
           val expectedBalance = xfer1.amount + xfer2.amount - 2 * Fee
           portfolio.balance shouldBe expectedBalance
           state.generatingBalance(leaser.toAddress, state.lastBlockId) shouldBe 0

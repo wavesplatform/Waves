@@ -1,21 +1,16 @@
 package com.wavesplatform.state
 
-import scala.util.{Left, Right}
-
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
-import com.wavesplatform.network._
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
+import com.wavesplatform.transaction._
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPoolImpl
-import io.netty.channel.Channel
 import kamon.Kamon
-import monix.eval.Task
 
 package object appender extends ScorexLogging {
 
@@ -26,25 +21,6 @@ package object appender extends ScorexLogging {
     812608 -> ByteStr.decodeBase58("2GNCYVy7k3kEPXzz12saMtRDeXFKr8cymVsG8Yxx3sZZ75eHj9csfXnGHuuJe7XawbcwjKdifUrV1uMq4ZNCWPf1").get,
     813207 -> ByteStr.decodeBase58("5uZoDnRKeWZV9Thu2nvJVZ5dBvPB7k2gvpzFD618FMXCbBVBMN2rRyvKBZBhAGnGdgeh2LXEeSr9bJqruJxngsE7").get
   )
-
-  private[appender] def processAndBlacklistOnFailure[A, B](
-      ch: Channel,
-      peerDatabase: PeerDatabase,
-      start: => String,
-      success: => String,
-      errorPrefix: String
-  )(f: => Task[Either[B, Option[BigInt]]]): Task[Either[B, Option[BigInt]]] = {
-    log.debug(start)
-    f map {
-      case Right(maybeNewScore) =>
-        log.debug(success)
-        Right(maybeNewScore)
-      case Left(ve) =>
-        log.warn(s"$errorPrefix: $ve")
-        peerDatabase.blacklistAndClose(ch, s"$errorPrefix: $ve")
-        Left(ve)
-    }
-  }
 
   private[appender] def appendBlock(
       blockchainUpdater: BlockchainUpdater with Blockchain,

@@ -43,7 +43,7 @@ class ScriptComplexityMiningConstraintSuite
           TransactionDiffer(Some(System.currentTimeMillis() - 1000), System.currentTimeMillis())(blockchain, _: Transaction).resultE.explicitGet()
         (blockchain.balance _).when(*, *).returning(10000000)
         (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
-        (blockchain.accountScript _).when(tx1.sender.toAddress).returning(Some(AccountScriptInfo(acc1.publicKey, script, 1000, Map.empty)))
+        (blockchain.accountScript _).when(tx1.miner.toAddress).returning(Some(AccountScriptInfo(acc1.publicKey, script, 1000, Map.empty)))
         (blockchain.accountScript _).when(*).returning(None)
 
         val c1          = constraint.put(blockchain, tx1, txDiffer(tx1))

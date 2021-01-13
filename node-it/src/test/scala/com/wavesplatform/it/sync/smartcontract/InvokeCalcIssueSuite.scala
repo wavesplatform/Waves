@@ -12,31 +12,32 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.BinaryDataEntry
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.{CancelAfterFailure, Matchers, OptionValues}
+import org.scalatest.{Matchers, OptionValues}
 
-class InvokeCalcIssueSuite extends BaseTransactionSuite with Matchers with CancelAfterFailure with OptionValues {
+class InvokeCalcIssueSuite extends BaseTransactionSuite with Matchers with OptionValues {
+
   import InvokeCalcIssueSuite._
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
       .Builder(Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.BlockV5.id, 0), (BlockchainFeatures.BlockV5.id, 0)))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.BlockV5, 0)))
       .buildNonConflicting()
 
-  private def smartAcc  = firstKeyPair
+  private def smartAcc = firstKeyPair
   private def callerAcc = secondKeyPair
 
   test("calculateAssetId should return right unique id for each invoke") {
 
-    sender.setScript(
+    miner.setScript(
       smartAcc,
       Some(ScriptCompiler.compile(dAppV4, ScriptEstimatorV3).explicitGet()._1.bytes().base64),
       fee = setScriptFee + smartFee,
       waitForTx = true
     )
     val smartAccAddress = smartAcc.toAddress.toString
-    sender
+    miner
       .invokeScript(
         callerAcc,
         smartAccAddress,
@@ -45,9 +46,9 @@ class InvokeCalcIssueSuite extends BaseTransactionSuite with Matchers with Cance
         fee = invokeFee + issueFee, // dAppV4 contains 1 Issue action
         waitForTx = true
       )
-    val assetId = sender.getDataByKey(smartAccAddress, "id").as[BinaryDataEntry].value.toString
+    val assetId = miner.getDataByKey(smartAccAddress, "id").as[BinaryDataEntry].value.toString
 
-    sender
+    miner
       .invokeScript(
         callerAcc,
         smartAccAddress,
@@ -56,12 +57,12 @@ class InvokeCalcIssueSuite extends BaseTransactionSuite with Matchers with Cance
         fee = invokeFee + issueFee, // dAppV4 contains 1 Issue action
         waitForTx = true
       )
-    val secondAssetId = sender.getDataByKey(smartAccAddress, "id").as[BinaryDataEntry].value.toString
+    val secondAssetId = miner.getDataByKey(smartAccAddress, "id").as[BinaryDataEntry].value.toString
 
-    sender.assetBalance(smartAccAddress, assetId).balance shouldBe 100
-    sender.assetBalance(smartAccAddress, secondAssetId).balance shouldBe 100
+    miner.assetBalance(smartAccAddress, assetId).balance shouldBe 100
+    miner.assetBalance(smartAccAddress, secondAssetId).balance shouldBe 100
 
-    val assetDetails = sender.assetsDetails(assetId)
+    val assetDetails = miner.assetsDetails(assetId)
     assetDetails.decimals shouldBe decimals
     assetDetails.name shouldBe assetName
     assetDetails.reissuable shouldBe reissuable

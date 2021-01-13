@@ -25,7 +25,7 @@ class LeaseActionGrpcSuite extends GrpcBaseTransactionSuite {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
       .Builder(Default, 2, Seq.empty)
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.SynchronousCalls.id, 1)))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.SynchronousCalls, 1)))
       .buildNonConflicting()
 
   private def compile(script: String): Script =

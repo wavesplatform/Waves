@@ -123,7 +123,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
 
   property("Json Reads Base58") {
     val sender = (json \ "sender").as[Option[Array[Byte]]]
-    sender.get shouldBe Base58.tryDecodeWithLimit(base58Str).get
+    miner.get shouldBe Base58.tryDecodeWithLimit(base58Str).get
 
     (json \ "wrong_sender").validate[Array[Byte]] shouldBe a[JsError]
   }

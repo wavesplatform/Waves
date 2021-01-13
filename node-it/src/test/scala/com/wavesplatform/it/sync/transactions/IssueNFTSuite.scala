@@ -134,7 +134,7 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
     val issetsId = issueManyAssets(20)
     secondNode.waitForTransaction(issetsId.last)
     nodes.waitForHeightArise()
-    val assetsBalance = secondNode.assetsBalance(secondNode.address).balances.map(a => a.assetId)
+    val assetsBalance = secondNode.portfolio(secondNode.address).balances.map(a => a.assetId)
 
     val nftAssetsBalance = secondNode.nftList(secondNode.address, 10).map(id => id.assetId)
 

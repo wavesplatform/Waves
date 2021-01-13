@@ -3,16 +3,15 @@ package com.wavesplatform.it.sync.activation
 import com.typesafe.config.Config
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.{FeatureActivationStatus, NodeFeatureStatus}
-import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.BlockHeader
+import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{NodeConfigs, ReportingTestName}
-import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
+import org.scalatest.{FreeSpec, Matchers}
 
 class NotActivateFeatureTestSuite
     extends FreeSpec
     with Matchers
-    with CancelAfterFailure
     with ActivationStatusRequest
     with ReportingTestName
     with NodesFromDocker {

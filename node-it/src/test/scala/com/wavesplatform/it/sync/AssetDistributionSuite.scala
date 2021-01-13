@@ -1,16 +1,14 @@
 package com.wavesplatform.it.sync
 
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.it.{BaseFunSuite, Node}
 import com.wavesplatform.state.AssetDistributionPage
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
-import org.scalatest.CancelAfterFailure
 
 import scala.concurrent.duration._
 
-class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailure {
+class AssetDistributionSuite extends BaseFunSuite {
 
   lazy val node: Node = nodes.head
 
@@ -47,7 +45,7 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
       .assetDistributionAtHeight(issueTx, distributionHeight, 100)
       .items
 
-    assetDis should be equals node.assetDistribution(issueTx)
+    assetDis shouldEqual node.assetDistribution(issueTx)
 
     val issuerAssetDis = assetDis.view.filterKeys(_ == issuer.toAddress).values
 

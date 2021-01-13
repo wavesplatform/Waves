@@ -18,9 +18,9 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
       .overrideBase(_.quorum(0))
       .overrideBase(
         _.preactivatedFeatures(
-          (BlockchainFeatures.Ride4DApps.id, 0),
-          (BlockchainFeatures.BlockV5.id, 0),
-          (BlockchainFeatures.SynchronousCalls.id, 0)
+          (BlockchainFeatures.Ride4DApps, 0),
+          (BlockchainFeatures.BlockV5, 0),
+          (BlockchainFeatures.SynchronousCalls, 0)
         )
       )
       .withDefault(1)
@@ -76,43 +76,43 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
-    sender.setScript(dApp1, Some(dAppScript1), waitForTx = true)
-    sender.setScript(dApp2, Some(dAppScript2), waitForTx = true)
+    miner.setScript(dApp1, Some(dAppScript1), waitForTx = true)
+    miner.setScript(dApp2, Some(dAppScript2), waitForTx = true)
   }
 
   test("self payment fails when dapp invokes itself") {
-    val callerBalanceBefore = sender.balance(callerAddress).balance
-    val dApp1BalanceBefore = sender.balance(dAppAddress1).balance
+    val callerBalanceBefore = miner.balanceDetails(callerAddress).regular
+    val dApp1BalanceBefore = miner.balanceDetails(dAppAddress1).regular
     assertApiError(
-      sender.invokeScript(caller, dAppAddress1, Some("foo"), fee = 2 * invokeFee, waitForTx = true),
+      miner.invokeScript(caller, dAppAddress1, Some("foo"), fee = 2 * invokeFee, waitForTx = true),
       AssertiveApiError(
         ScriptExecutionError.Id,
         "Error while executing account-script: FailedTransactionError(code = 1, error = DApp self-payment is forbidden since V4, log =)"
       )
     )
     assertApiError(
-      sender.invokeScript(dApp1, dAppAddress2, Some("foo"), fee = 2 * invokeFee, waitForTx = true),
+      miner.invokeScript(dApp1, dAppAddress2, Some("foo"), fee = 2 * invokeFee, waitForTx = true),
       AssertiveApiError(
         ScriptExecutionError.Id,
         s"Error while executing account-script: " +
           s"GenericError(Complex dApp recursion is prohibited, but dApp at address $dAppAddress1 was called twice)"
       )
     )
-    sender.balance(callerAddress).balance shouldBe callerBalanceBefore
-    sender.balance(dAppAddress1).balance shouldBe dApp1BalanceBefore
+    miner.balanceDetails(callerAddress).regular shouldBe callerBalanceBefore
+    miner.balanceDetails(dAppAddress1).regular shouldBe dApp1BalanceBefore
   }
 
   test("self payment fails including if invoked dApp calls caller dApp with payment") {
-    val callerBalanceBefore = sender.balance(dAppAddress1).balance
+    val callerBalanceBefore = miner.balanceDetails(dAppAddress1).regular
     val invFee = 2 * invokeFee + smartFee
     assertApiError(
-      sender.invokeScript(dApp1, dAppAddress2, Some("bar"), fee = invFee, waitForTx = true),
+      miner.invokeScript(dApp1, dAppAddress2, Some("bar"), fee = invFee, waitForTx = true),
       AssertiveApiError(
         ScriptExecutionError.Id,
         s"Error while executing account-script: " +
           s"GenericError(Complex dApp recursion is prohibited, but dApp at address $dAppAddress1 was called twice)"
       )
     )
-    sender.balance(dAppAddress1).balance shouldBe callerBalanceBefore
+    miner.balanceDetails(dAppAddress1).regular shouldBe callerBalanceBefore
   }
 }

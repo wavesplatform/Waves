@@ -19,7 +19,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
   private def checkSerialization(tx: DataTransaction): Assertion = {
     val parsed = DataTransaction.parseBytes(tx.bytes()).get
 
-    parsed.sender.toAddress.toString shouldEqual tx.sender.toAddress.toString
+    parsed.miner.toAddress.toString shouldEqual tx.miner.toAddress.toString
     parsed.timestamp shouldEqual tx.timestamp
     parsed.fee shouldEqual tx.fee
 
@@ -106,7 +106,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
       json.toString shouldEqual tx.toString
 
       val req = json.as[SignedDataRequest]
-      req.senderPublicKey shouldEqual Base58.encode(tx.sender.arr)
+      req.senderPublicKey shouldEqual Base58.encode(tx.miner.arr)
       req.fee shouldEqual tx.fee
       req.timestamp shouldEqual tx.timestamp
 
@@ -234,9 +234,9 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
     val emptyDataEntry = EmptyDataEntry("123")
 
     forAll(accountGen) { sender =>
-      val tx1 = DataTransaction.create(TxVersion.V1, sender.publicKey, Seq(emptyDataEntry), 15000000, System.currentTimeMillis(), Proofs.empty)
+      val tx1 = DataTransaction.create(TxVersion.V1, miner.publicKey, Seq(emptyDataEntry), 15000000, System.currentTimeMillis(), Proofs.empty)
       tx1 shouldBe Left(GenericError("Empty data is not allowed in V1"))
-      val tx2 = DataTransaction.create(TxVersion.V2, sender.publicKey, Seq(emptyDataEntry), 15000000, System.currentTimeMillis(), Proofs.empty)
+      val tx2 = DataTransaction.create(TxVersion.V2, miner.publicKey, Seq(emptyDataEntry), 15000000, System.currentTimeMillis(), Proofs.empty)
       tx2.explicitGet()
     }
   }

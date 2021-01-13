@@ -5,18 +5,16 @@ import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
-import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.TransactionInfo
+import com.wavesplatform.it.api.{BalanceDetails, TransactionInfo}
 import com.wavesplatform.it.sync._
-import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.it.{BaseFunSuite, NodeConfigs}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer._
-import org.scalatest.CancelAfterFailure
 
 /*
 Scenario:
@@ -27,7 +25,7 @@ Scenario:
 5.1 Bob takes funds because he knows secret hash and 5.2 after rollback wait height and Alice takes funds back
  */
 
-class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfterFailure {
+class AtomicSwapSmartContractSuite extends BaseFunSuite {
 
   /*
   One node because:
@@ -42,23 +40,23 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
       .withDefault(1)
       .buildNonConflicting()
 
-  private lazy val BobBC1: KeyPair   = sender.createKeyPair()
-  private lazy val AliceBC1: KeyPair = sender.createKeyPair()
-  private lazy val swapBC1: KeyPair  = sender.createKeyPair()
+  private lazy val BobBC1: KeyPair   = miner.createKeyPair()
+  private lazy val AliceBC1: KeyPair = miner.createKeyPair()
+  private lazy val swapBC1: KeyPair  = miner.createKeyPair()
 
   private val secretText = "some secret message from Alice"
   private val shaSecret  = "BN6RTYGWcwektQfSFzH8raYo9awaLgQ7pLyWLQY4S4F5"
 
   test("step1 - Balances initialization") {
-    val toAliceBC1TxId = sender.transfer(sender.keyPair, AliceBC1.toAddress.toString, 10 * transferAmount, minFee).id
+    val toAliceBC1TxId = miner.transfer(miner.keyPair, AliceBC1.toAddress.toString, 10 * transferAmount, minFee).id
     nodes.waitForHeightAriseAndTxPresent(toAliceBC1TxId)
 
-    val toSwapBC1TxId = sender.transfer(sender.keyPair, swapBC1.toAddress.toString, setScriptFee, minFee).id
+    val toSwapBC1TxId = miner.transfer(miner.keyPair, swapBC1.toAddress.toString, setScriptFee, minFee).id
     nodes.waitForHeightAriseAndTxPresent(toSwapBC1TxId)
   }
 
   test("step2 - Create and setup smart contract for swapBC1") {
-    val beforeHeight = sender.height
+    val beforeHeight = miner.height
     val scriptText   = s"""
     let Bob = Address(base58'${BobBC1.toAddress}')
     let Alice = Address(base58'${AliceBC1.toAddress}')
@@ -78,13 +76,13 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
       .selfSigned(1.toByte, sender = pkSwapBC1, script = Some(script), fee = setScriptFee, timestamp = System.currentTimeMillis())
       .explicitGet()
 
-    val setScriptId = sender
+    val setScriptId = miner
       .signedBroadcast(sc1SetTx.json())
       .id
 
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
-    val swapBC1ScriptInfo = sender.addressScriptInfo(swapBC1.toAddress.toString)
+    val swapBC1ScriptInfo = miner.addressScriptInfo(swapBC1.toAddress.toString)
 
     swapBC1ScriptInfo.script.isEmpty shouldBe false
     swapBC1ScriptInfo.scriptText.isEmpty shouldBe false
@@ -106,7 +104,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         )
         .explicitGet()
 
-    val transferId = sender
+    val transferId = miner
       .signedBroadcast(txToSwapBC1.json())
       .id
     nodes.waitForHeightAriseAndTxPresent(transferId)
@@ -128,15 +126,15 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         )
         .explicitGet()
 
-    assertApiErrorRaised(sender.signedBroadcast(txToSwapBC1.json()))
+    assertApiErrorRaised(miner.signedBroadcast(txToSwapBC1.json()))
   }
 
   test("step5 - Bob makes transfer; after revert Alice takes funds back") {
     val height = nodes.height.max
 
-    val (bobBalance, bobEffBalance)     = miner.accountBalances(BobBC1.toAddress.toString)
-    val (aliceBalance, aliceEffBalance) = miner.accountBalances(AliceBC1.toAddress.toString)
-    val (swapBalance, swapEffBalance)   = miner.accountBalances(swapBC1.toAddress.toString)
+    val BalanceDetails(_, bobBalance, _, _, bobEffBalance)     = miner.balanceDetails(BobBC1.toAddress.toString)
+    val BalanceDetails(_, aliceBalance, _, _, aliceEffBalance) = miner.balanceDetails(AliceBC1.toAddress.toString)
+    val BalanceDetails(_, swapBalance, _, _, swapEffBalance)   = miner.balanceDetails(swapBC1.toAddress.toString)
 
     val unsigned =
       TransferTransaction(
@@ -158,7 +156,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val signed   = unsigned.copy(proofs = Proofs(Seq(proof, sigAlice)))
 
     nodes.waitForHeightArise()
-    val versionedTransferId = sender.signedBroadcast(signed.json()).id
+    val versionedTransferId = miner.signedBroadcast(signed.json()).id
     nodes.waitForHeightAriseAndTxPresent(versionedTransferId)
 
     miner.assertBalances(
@@ -169,11 +167,10 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     miner.assertBalances(BobBC1.toAddress.toString, bobBalance + transferAmount, bobEffBalance + transferAmount)
     miner.assertBalances(AliceBC1.toAddress.toString, aliceBalance, aliceEffBalance)
 
-    nodes.rollback(height, false)
+    nodes.blacklistPeersAndRollback(height, false)
 
     nodes.waitForHeight(height + 20)
 
-    miner.accountBalances(swapBC1.toAddress.toString)
     assertBadRequestAndMessage(miner.transactionInfo[TransactionInfo](versionedTransferId), "transactions does not exist", 404)
 
     val selfSignedToAlice = TransferTransaction
@@ -191,7 +188,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
       .explicitGet()
 
     val transferToAlice =
-      sender.signedBroadcast(selfSignedToAlice.json()).id
+      miner.signedBroadcast(selfSignedToAlice.json()).id
     nodes.waitForHeightAriseAndTxPresent(transferToAlice)
 
     miner.assertBalances(

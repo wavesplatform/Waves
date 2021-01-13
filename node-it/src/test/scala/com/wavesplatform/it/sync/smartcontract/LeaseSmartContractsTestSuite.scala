@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync.smartcontract
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.it.api.BalanceDetails
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, setScriptFee, transferAmount}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -11,18 +12,19 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.CancelAfterFailure
 
-class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfterFailure {
+class LeaseSmartContractsTestSuite extends BaseTransactionSuite {
   private def acc0 = firstKeyPair
+
   private def acc1 = secondKeyPair
+
   private def acc2 = thirdKeyPair
 
   test("set contract, make leasing and cancel leasing") {
-    val (balance1, eff1) = miner.accountBalances(acc0.toAddress.toString)
-    val (balance2, eff2) = miner.accountBalances(thirdKeyPair.toAddress.toString)
+    val BalanceDetails(_, balance1, _, _, eff1) = miner.balanceDetails(acc0.toAddress.toString)
+    val BalanceDetails(_, balance2, _, _, eff2) = miner.balanceDetails(thirdKeyPair.toAddress.toString)
 
-    sender.transfer(sender.keyPair, acc0.toAddress.toString, 10 * transferAmount, minFee, waitForTx = true).id
+    miner.transfer(miner.keyPair, acc0.toAddress.toString, 10 * transferAmount, minFee, waitForTx = true).id
 
     miner.assertBalances(firstAddress, balance1 + 10 * transferAmount, eff1 + 10 * transferAmount)
 
@@ -39,7 +41,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
         """.stripMargin
 
     val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1.bytes().base64
-    sender.setScript(acc0, Some(script), setScriptFee, waitForTx = true).id
+    miner.setScript(acc0, Some(script), setScriptFee, waitForTx = true).id
 
     val unsignedLeasing =
       LeaseTransaction
@@ -61,7 +63,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
       unsignedLeasing.copy(proofs = Proofs(Seq(sigLeasingA, ByteStr.empty, sigLeasingC)))
 
     val leasingId =
-      sender.signedBroadcast(signedLeasing.json(), waitForTx = true).id
+      miner.signedBroadcast(signedLeasing.json(), waitForTx = true).id
 
     miner.assertBalances(
       firstAddress,
@@ -88,7 +90,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
     val signedLeasingCancel =
       unsignedCancelLeasing.copy(proofs = Proofs(Seq(ByteStr.empty, sigLeasingCancelA, sigLeasingCancelB)))
 
-    sender.signedBroadcast(signedLeasingCancel.json(), waitForTx = true).id
+    miner.signedBroadcast(signedLeasingCancel.json(), waitForTx = true).id
 
     miner.assertBalances(
       firstAddress,

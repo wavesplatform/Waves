@@ -86,10 +86,11 @@ object MicroBlockSynchronizer extends ScorexLogging {
 
     lastBlockIdEvents
       .mapEval { f =>
-        log.trace(s"Last block id is now $f")
-        Task(tryDownloadNext(f))
+        Task {
+          log.trace(s"Last block id is now $f")
+          tryDownloadNext(f)
+        }.executeOn(scheduler)
       }
-      .executeOn(scheduler)
       .logErr
       .subscribe()
 

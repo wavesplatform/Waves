@@ -16,7 +16,7 @@ import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class DataTransactionBodyBytesByteVectorSuite extends BaseTransactionSuite {
-  private def compile(scriptText: String) =
+  private def compile(scriptText: String): String =
     ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
 
   override protected def nodeConfigs: Seq[Config] =
@@ -83,19 +83,19 @@ class DataTransactionBodyBytesByteVectorSuite extends BaseTransactionSuite {
   }
 
   private def checkByteVectorLimit(address: KeyPair, data: List[BinaryDataEntry], script: String, version: TxVersion) = {
-    val setScriptId = sender.setScript(address, Some(script), setScriptFee, waitForTx = true).id
-    sender.transactionInfo[TransactionInfo](setScriptId).script.get.startsWith("base64:") shouldBe true
+    val setScriptId = miner.setScript(address, Some(script), setScriptFee, waitForTx = true).id
+    miner.transactionInfo[TransactionInfo](setScriptId).script.get.startsWith("base64:") shouldBe true
 
-    val scriptInfo = sender.addressScriptInfo(address.toAddress.toString)
+    val scriptInfo = miner.addressScriptInfo(address.toAddress.toString)
     scriptInfo.script.isEmpty shouldBe false
     scriptInfo.scriptText.isEmpty shouldBe false
     scriptInfo.script.get.startsWith("base64:") shouldBe true
 
-    sender.putData(address, data, version = version, fee = calcDataFee(data, version) + smartFee, waitForTx = true).id
+    miner.putData(address, data, version = version, fee = calcDataFee(data, version) + smartFee, waitForTx = true).id
 
     val increasedData = data.head.copy(value = data.head.value ++ ByteStr.fromBytes(1)) :: data.tail
     assertBadRequestAndMessage(
-      sender.putData(address, increasedData, version = version, fee = calcDataFee(data, version) + smartFee),
+      miner.putData(address, increasedData, version = version, fee = calcDataFee(data, version) + smartFee),
       "Too big sequence requested"
     )
   }

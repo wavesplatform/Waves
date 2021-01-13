@@ -1,6 +1,6 @@
 package com.wavesplatform.it.api
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 
 import akka.http.scaladsl.model.StatusCodes.BadRequest
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
@@ -201,17 +201,14 @@ object SyncHttpApi extends Assertions {
     def getWithApiKey(path: String): Response =
       sync(async(n).getWithApiKey(path))
 
-    def accountBalances(acc: String): (Long, Long) =
-      sync(async(n).accountBalances(acc))
-
     def balanceAtHeight(address: String, height: Int): Long =
       sync(async(n).balanceAtHeight(address, height))
 
     def accountsBalances(height: Option[Int], accounts: Seq[String], asset: Option[String] = None): Seq[(String, Long)] =
       sync(async(n).accountsBalances(height, accounts, asset))
 
-    def balance(address: String, confirmations: Option[Int] = None, amountsAsStrings: Boolean = false): Balance =
-      sync(async(n).balance(address, confirmations, amountsAsStrings))
+    def wavesBalance(address: String, amountsAsStrings: Boolean = false): Long =
+      sync(async(n).wavesBalance(address, amountsAsStrings))
 
     def effectiveBalance(address: String, confirmations: Option[Int] = None, amountsAsStrings: Boolean = false): Balance =
       sync(async(n).effectiveBalance(address, confirmations, amountsAsStrings))
@@ -236,8 +233,8 @@ object SyncHttpApi extends Assertions {
     def addressScriptInfo(address: String): AddressScriptInfo =
       sync(async(n).scriptInfo(address))
 
-    def assetsBalance(address: String, amountsAsStrings: Boolean = false): FullAssetsInfo =
-      sync(async(n).assetsBalance(address, amountsAsStrings))
+    def portfolio(address: String, amountsAsStrings: Boolean = false): AssetBalances =
+      sync(async(n).portfolio(address, amountsAsStrings))
 
     def nftList(address: String, limit: Int, maybeAfter: Option[String] = None, amountsAsStrings: Boolean = false): Seq[NFTAssetInfo] =
       sync(async(n).nftList(address, limit, maybeAfter, amountsAsStrings))
@@ -309,6 +306,9 @@ object SyncHttpApi extends Assertions {
 
     def transactionInfo[A: Reads](txId: String, amountsAsStrings: Boolean = false): A =
       sync(async(n).transactionInfo[A](txId, amountsAsStrings))
+
+    def transactionInfo[A: Reads](txIds: Seq[String]): A =
+      sync(async(n).transactionInfo[A](txIds))
 
     def transactionStatus(txIds: Seq[String]): Seq[TransactionStatus] =
       sync(async(n).transactionsStatus(txIds))
@@ -409,6 +409,7 @@ object SyncHttpApi extends Assertions {
         fee: Long,
         version: Byte = 2,
         matcherFeeAssetId: Option[String] = None,
+        timestamp: Long = System.currentTimeMillis(),
         waitForTx: Boolean = false,
         amountsAsStrings: Boolean = false,
         validate: Boolean = true
@@ -426,6 +427,7 @@ object SyncHttpApi extends Assertions {
             fee,
             version,
             matcherFeeAssetId,
+            timestamp,
             amountsAsStrings,
             validate
           )
@@ -602,7 +604,7 @@ object SyncHttpApi extends Assertions {
     def waitForHeight(expectedHeight: Int, requestAwaitTime: FiniteDuration = RequestAwaitTime): Int =
       sync(async(n).waitForHeight(expectedHeight), requestAwaitTime)
 
-    def blacklist(address: InetSocketAddress): Unit =
+    def blacklist(address: InetAddress): Unit =
       sync(async(n).blacklist(address))
 
     def clearBlacklist(): Unit =
@@ -652,7 +654,7 @@ object SyncHttpApi extends Assertions {
       sync(async(n).waitFor[A](desc)(x => Future.successful(f(x.n)), cond, retryInterval), 5.minutes)
 
     def waitForEmptyUtx(): Unit =
-      sync(async(n).waitFor("empty utx")(_.utxSize, (_: Int) == 0, 1 second), 5 minutes)
+      sync(async(n).waitForEmptyUtx())
 
     def waitForBlackList(blackList: Int): Seq[BlacklistedPeer] =
       sync(async(n).waitForBlackList(blackList))
@@ -779,7 +781,7 @@ object SyncHttpApi extends Assertions {
     def waitForEmptyUtx(): Unit =
       waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
 
-    def rollbackWithoutBlacklisting(height: Int, returnToUTX: Boolean = true): Unit = {
+    def rollbackToHeight(height: Int, returnToUTX: Boolean = true): Unit = {
       sync(
         Future.traverse(nodes) { node =>
           com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi(node).rollback(height, returnToUTX)
@@ -788,20 +790,18 @@ object SyncHttpApi extends Assertions {
       )
     }
 
-    def rollback(height: Int, returnToUTX: Boolean = true): Unit = {
-      val combinations = nodes.combinations(2).toSeq
-      nodes.combinations(2).foreach {
-        case Seq(n1, n2) =>
-          n1.blacklist(n2.networkAddress)
-          n2.blacklist(n1.networkAddress)
+    def blacklistPeersAndRollback(height: Int, returnToUTX: Boolean = true): Unit = {
+      val HostnameRegexp = ".*/([^:]+):.+".r
+      for (n <- nodes; p <- n.connectedPeers) {
+        val HostnameRegexp(hostname) = p.address
+        n.blacklist(InetAddress.getByName(hostname))
       }
 
-      nodes.rollbackWithoutBlacklisting(height, returnToUTX)
-      nodes.foreach(_.clearBlacklist())
-
-      combinations.foreach {
-        case Seq(n1, n2) =>
-          n1.connect(n2.networkAddress)
+      nodes.rollbackToHeight(height, returnToUTX)
+      nodes.foreach { n =>
+        n.clearBlacklist()
+        n.settings.networkSettings.knownPeers
+          .foreach(a => n.connect(com.wavesplatform.network.inetSocketAddress(a, n.settings.networkSettings.bindAddress.getPort)))
       }
     }
 

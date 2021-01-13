@@ -110,7 +110,7 @@ class AssetsBroadcastRouteSpec
       forAll(broadcastReissueReq) { rr =>
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("reissue"), v) ~> route
 
-        // todo: invalid sender
+        // todo: invalid miner
         forAll(nonPositiveLong) { q =>
           posting(rr.copy(quantity = q)) should produce(NonPositiveAmount(s"$q of assets"))
         }
@@ -241,7 +241,7 @@ class AssetsBroadcastRouteSpec
   protected def createSignedTransferRequest(tx: TransferTransaction): SignedTransferV1Request = {
     import tx._
     SignedTransferV1Request(
-      Base58.encode(tx.sender.arr),
+      Base58.encode(tx.miner.arr),
       assetId.maybeBase58Repr,
       recipient.stringRepr,
       amount,
@@ -256,7 +256,7 @@ class AssetsBroadcastRouteSpec
   protected def createSignedVersionedTransferRequest(tx: TransferTransaction): SignedTransferV2Request = {
     import tx._
     SignedTransferV2Request(
-      Base58.encode(tx.sender.arr),
+      Base58.encode(tx.miner.arr),
       assetId.maybeBase58Repr,
       recipient.stringRepr,
       amount,

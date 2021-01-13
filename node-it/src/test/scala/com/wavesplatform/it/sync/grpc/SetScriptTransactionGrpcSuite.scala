@@ -36,16 +36,16 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
       val script           = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
       val scriptComplexity = Script.estimate(Script.fromBase64String(script.bytes().base64).explicitGet(), ScriptEstimatorV3, useContractVerifierLimit = true).explicitGet()
-      val setScriptTx      = sender.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
+      val setScriptTx      = miner.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
       val setScriptTxId    = PBTransactions.vanilla(setScriptTx).explicitGet().id().toString
 
-      val scriptInfo = sender.scriptInfo(contractAddr)
+      val scriptInfo = miner.scriptInfo(contractAddr)
 
       PBTransactions.toVanillaScript(scriptInfo.scriptBytes) should contain(script)
       scriptInfo.scriptText shouldBe script.expr.toString
       scriptInfo.complexity shouldBe scriptComplexity
 
-      sender.getTransaction(setScriptTxId).getTransaction.getSetScript.script shouldBe PBTransactions.toPBScript(Some(script))
+      miner.getTransaction(setScriptTxId).getTransaction.getSetScript.script shouldBe PBTransactions.toPBScript(Some(script))
     }
   }
 
@@ -53,7 +53,7 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     for (v <- setScrTxSupportedVersions) {
       val contract = if (v < 2) firstAcc else secondAcc
       assertGrpcError(
-        sender.broadcastTransfer(contract, recipient = Recipient().withPublicKeyHash(thirdAddress), amount = transferAmount, fee = minFee + smartFee),
+        miner.broadcastTransfer(contract, recipient = Recipient().withPublicKeyHash(thirdAddress), amount = transferAmount, fee = minFee + smartFee),
         "Transaction is not allowed by account-script",
         Code.INVALID_ARGUMENT
       )
@@ -63,8 +63,8 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   test("able to broadcast tx if that is allowed by account-script") {
     for (v <- setScrTxSupportedVersions) {
       val (contract, contractAddr) = if (v < 2) (firstAcc, firstAddress) else (secondAcc, secondAddress)
-      val firstBalance             = sender.wavesBalance(contractAddr).available
-      val thirdBalance             = sender.wavesBalance(thirdAddress).available
+      val firstBalance             = miner.wavesBalance(contractAddr).available
+      val thirdBalance             = miner.wavesBalance(thirdAddress).available
       val transferFee              = minFee + smartFee
 
       val unsignedTransfer = PBTransaction(
@@ -86,9 +86,9 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val sig2 =
         ByteString.copyFrom(crypto.sign(thirdAcc.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsignedTransfer))).explicitGet().bodyBytes()).arr)
 
-      sender.broadcast(unsignedTransfer, Seq(sig1, sig2), waitForTx = true)
-      sender.wavesBalance(contractAddr).available shouldBe firstBalance - transferAmount - transferFee
-      sender.wavesBalance(thirdAddress).available shouldBe thirdBalance + transferAmount
+      miner.broadcast(unsignedTransfer, Seq(sig1, sig2), waitForTx = true)
+      miner.wavesBalance(contractAddr).available shouldBe firstBalance - transferAmount - transferFee
+      miner.wavesBalance(thirdAddress).available shouldBe thirdBalance + transferAmount
     }
   }
 
@@ -108,20 +108,20 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val sig2 =
         ByteString.copyFrom(crypto.sign(thirdAcc.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsignedSetScript))).explicitGet().bodyBytes()).arr)
 
-      sender.broadcast(unsignedSetScript, Seq(sig1, sig2), waitForTx = true)
+      miner.broadcast(unsignedSetScript, Seq(sig1, sig2), waitForTx = true)
 
-      val scriptInfo = sender.scriptInfo(contractAddr)
+      val scriptInfo = miner.scriptInfo(contractAddr)
       scriptInfo.scriptBytes shouldBe empty
       scriptInfo.scriptText shouldBe ""
       scriptInfo.complexity shouldBe 0L
 
-      val contractBalance = sender.wavesBalance(contractAddr).available
-      val thirdBalance    = sender.wavesBalance(thirdAddress).available
+      val contractBalance = miner.wavesBalance(contractAddr).available
+      val thirdBalance    = miner.wavesBalance(thirdAddress).available
 
-      sender.broadcastTransfer(contract, Recipient().withPublicKeyHash(thirdAddress), transferAmount, minFee, waitForTx = true)
+      miner.broadcastTransfer(contract, Recipient().withPublicKeyHash(thirdAddress), transferAmount, minFee, waitForTx = true)
 
-      sender.wavesBalance(contractAddr).available shouldBe contractBalance - transferAmount - minFee
-      sender.wavesBalance(thirdAddress).available shouldBe thirdBalance + transferAmount
+      miner.wavesBalance(contractAddr).available shouldBe contractBalance - transferAmount - minFee
+      miner.wavesBalance(thirdAddress).available shouldBe thirdBalance + transferAmount
     }
   }
 
@@ -129,24 +129,24 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     for (v <- setScrTxSupportedVersions) {
       val (contract, contractAddr) = if (v < 2) (firstAcc, firstAddress) else (secondAcc, secondAddress)
       val script                   = ScriptCompiler(s"true", isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
-      sender.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
+      miner.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
 
-      val contractBalance    = sender.wavesBalance(contractAddr).available
-      val contractEffBalance = sender.wavesBalance(contractAddr).effective
-      val thirdBalance       = sender.wavesBalance(thirdAddress).available
-      val thirdEffBalance    = sender.wavesBalance(thirdAddress).effective
+      val contractBalance    = miner.wavesBalance(contractAddr).available
+      val contractEffBalance = miner.wavesBalance(contractAddr).effective
+      val thirdBalance       = miner.wavesBalance(thirdAddress).available
+      val thirdEffBalance    = miner.wavesBalance(thirdAddress).effective
 
       assertGrpcError(
-        sender
+        miner
           .broadcastTransfer(contract, recipient = Recipient().withPublicKeyHash(thirdAddress), amount = transferAmount, fee = minFee + smartFee - 1),
         "Transaction sent from smart account",
         Code.INVALID_ARGUMENT
       )
 
-      sender.wavesBalance(contractAddr).available shouldBe contractBalance
-      sender.wavesBalance(contractAddr).effective shouldBe contractEffBalance
-      sender.wavesBalance(thirdAddress).available shouldBe thirdBalance
-      sender.wavesBalance(thirdAddress).effective shouldBe thirdEffBalance
+      miner.wavesBalance(contractAddr).available shouldBe contractBalance
+      miner.wavesBalance(contractAddr).effective shouldBe contractEffBalance
+      miner.wavesBalance(thirdAddress).available shouldBe thirdBalance
+      miner.wavesBalance(thirdAddress).effective shouldBe thirdEffBalance
     }
   }
 }

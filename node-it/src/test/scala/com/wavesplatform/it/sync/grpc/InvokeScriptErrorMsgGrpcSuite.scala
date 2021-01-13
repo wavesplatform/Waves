@@ -38,15 +38,15 @@ class InvokeScriptErrorMsgGrpcSuite extends GrpcBaseTransactionSuite {
         |}
         |""".stripMargin
     val contractScript = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1
-    sender.setScript(contract, Right(Some(contractScript)), setScriptFee, waitForTx = true)
+    miner.setScript(contract, Right(Some(contractScript)), setScriptFee, waitForTx = true)
 
-    sender.setScript(caller, Right(Some(script)), setScriptFee, waitForTx = true)
+    miner.setScript(caller, Right(Some(script)), setScriptFee, waitForTx = true)
   }
 
   test("cannot invoke script without having enough fee; error message is informative") {
     val asset1 = PBTransactions
       .vanilla(
-        sender.broadcastIssue(
+        miner.broadcastIssue(
           caller,
           "ScriptedAsset",
           someAssetAmount,
@@ -63,7 +63,7 @@ class InvokeScriptErrorMsgGrpcSuite extends GrpcBaseTransactionSuite {
 
     val payments = Seq(Amount.of(ByteString.copyFrom(Base58.decode(asset1)), 10))
     assertGrpcError(
-      sender.broadcastInvokeScript(
+      miner.broadcastInvokeScript(
         caller,
         Recipient().withPublicKeyHash(contractAddress),
         None,
@@ -75,7 +75,7 @@ class InvokeScriptErrorMsgGrpcSuite extends GrpcBaseTransactionSuite {
     )
 
     assertGrpcError(
-      sender.broadcastInvokeScript(
+      miner.broadcastInvokeScript(
         caller,
         Recipient().withPublicKeyHash(contractAddress),
         None,

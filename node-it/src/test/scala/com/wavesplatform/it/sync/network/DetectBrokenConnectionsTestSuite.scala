@@ -21,13 +21,13 @@ class DetectBrokenConnectionsTestSuite extends FreeSpec with Matchers with Repor
     Thread.sleep(30.seconds.toMillis)
 
     dockerNodes().foreach { node =>
-      docker.connectToNetwork(Seq(node))
+      docker.connectToNetwork(node)
       node.connectedPeers shouldBe empty
       docker.disconnectFromNetwork(node)
     }
 
     // To prevent errors in the log
-    docker.connectToNetwork(dockerNodes())
+    docker.connectToNetwork(dockerNodes(): _*)
   }
 
 }

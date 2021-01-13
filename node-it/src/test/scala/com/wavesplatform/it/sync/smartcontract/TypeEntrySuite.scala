@@ -36,7 +36,7 @@ class TypeEntrySuite extends BaseTransactionSuite {
       ScriptEstimatorV3
     ).explicitGet()._1.bytes().base64
 
-    firstAssetId = sender.issue(firstDApp, fee = issueFee, script = Some(smartAssetScript), waitForTx = true).id
+    firstAssetId = miner.issue(firstDApp, fee = issueFee, script = Some(smartAssetScript), waitForTx = true).id
 
     val dAppScript = ScriptCompiler(
       s"""
@@ -116,19 +116,19 @@ class TypeEntrySuite extends BaseTransactionSuite {
     ).explicitGet()._1.bytes().base64
 
 
-    sender.setScript(firstDApp, Some(dAppScript), waitForTx = true)
-    sender.setScript(secondDApp, Some(accountScript), waitForTx = true)
+    miner.setScript(firstDApp, Some(dAppScript), waitForTx = true)
+    miner.setScript(secondDApp, Some(accountScript), waitForTx = true)
   }
 
   test("check dApp getEntry after delete") {
-    sender.invokeScript(
+    miner.invokeScript(
       caller,
       firstDApp.toAddress.toString,
       func = Some("writeEntries"),
       fee = issueFee,
       waitForTx = true
     )
-    assertApiError(sender.invokeScript(
+    assertApiError(miner.invokeScript(
       caller,
       firstDApp.toAddress.toString,
       func = Some("deleteEntries"),
@@ -138,7 +138,7 @@ class TypeEntrySuite extends BaseTransactionSuite {
         err.message should include regex "called on unit"
         err.id shouldBe ScriptExecutionError.Id
     }
-    assertApiError(sender.invokeScript(
+    assertApiError(miner.invokeScript(
       caller,
       firstDApp.toAddress.toString,
       func = Some("writeDeleteEntries"),
@@ -151,28 +151,28 @@ class TypeEntrySuite extends BaseTransactionSuite {
   }
 
   test("check dApp getEntry") {
-    sender.invokeScript(
+    miner.invokeScript(
       caller,
       firstDApp.toAddress.toString,
       func = Some("writeEntries"),
       fee = smartMinFee,
       waitForTx = true
     )
-    sender.invokeScript(
+    miner.invokeScript(
       caller,
       firstDApp.toAddress.toString,
       func = Some("checkEntries"),
       fee = smartMinFee,
       waitForTx = true
     )
-    sender.getDataByKey(firstDApp.toAddress.toString, "str").value shouldBe "string"
-    s"${sender.getDataByKey(firstDApp.toAddress.toString, "bin").value}" shouldBe base58String
-    sender.getDataByKey(firstDApp.toAddress.toString, "bool").value shouldBe true
-    sender.getDataByKey(firstDApp.toAddress.toString, "int").value shouldBe 1
-    sender.getDataByKey(firstDApp.toAddress.toString, "check").value shouldBe true
+    miner.getDataByKey(firstDApp.toAddress.toString, "str").value shouldBe "string"
+    s"${miner.getDataByKey(firstDApp.toAddress.toString, "bin").value}" shouldBe base58String
+    miner.getDataByKey(firstDApp.toAddress.toString, "bool").value shouldBe true
+    miner.getDataByKey(firstDApp.toAddress.toString, "int").value shouldBe 1
+    miner.getDataByKey(firstDApp.toAddress.toString, "check").value shouldBe true
   }
 
   test("check account getEntry") {
-    sender.transfer(secondDApp, secondDApp.toAddress.toString, 1000, smartMinFee, waitForTx = true)
+    miner.transfer(secondDApp, secondDApp.toAddress.toString, 1000, smartMinFee, waitForTx = true)
   }
 }

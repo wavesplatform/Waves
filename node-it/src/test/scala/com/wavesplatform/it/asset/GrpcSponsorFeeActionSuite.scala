@@ -68,9 +68,9 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
       sponsoredAssetId = stateChanges.head.sponsorFees.head.assetId
       miner.assetsDetails(sponsoredAssetId).minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
 
-      val dAppBalance = miner.assetsBalance(globalDAppAddress).balances.head
+      val dAppBalance = miner.portfolio(globalDAppAddress).balances.head
       dAppBalance.minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
-      dAppBalance.sponsorBalance shouldBe Some(miner.balance(globalDAppAddress).balance)
+      dAppBalance.sponsorBalance shouldBe Some(miner.wavesBalance(globalDAppAddress))
     }
 
     "Use sponsored asset as fee" in {
@@ -81,9 +81,8 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
 
       val dAppAddress                  = globalDAppAddress
       val startDAppSponsorAssetBalance = miner.assetBalance(dAppAddress, sponsoredAssetId).balance
-      val startDAppBalance             = miner.balance(dAppAddress).balance
-      val startMinerBalance            = miner.balance(miner.address).balance
-
+      val startDAppBalance             = miner.wavesBalance(dAppAddress)
+      val startMinerBalance            = miner.wavesBalance(miner.address)
       val assetFee            = 100
       val assetTransferAmount = 1000
 
@@ -114,8 +113,8 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
       miner.waitForHeight(miner.height + 1)
 
       miner.assetBalance(dAppAddress, sponsoredAssetId).balance shouldBe startDAppSponsorAssetBalance - assetTransferAmount
-      miner.balance(dAppAddress).balance shouldBe startDAppBalance - dAppWavesOutgo
-      miner.balance(miner.address).balance shouldBe startMinerBalance + dAppWavesOutgo + blockReward
+      miner.wavesBalance(dAppAddress)shouldBe startDAppBalance - dAppWavesOutgo
+      miner.wavesBalance(miner.address)shouldBe startMinerBalance + dAppWavesOutgo + blockReward
     }
 
     "Cancel sponsorship" in {
@@ -178,9 +177,9 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
 
       miner.assetsDetails(sponsoredAssetId).minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
 
-      val dAppBalance = miner.assetsBalance(dAppAddress).balances.map(b => (b.assetId, b)).toMap
+      val dAppBalance = miner.portfolio(dAppAddress).balances.map(b => (b.assetId, b)).toMap
       dAppBalance(sponsoredAssetId).minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
-      dAppBalance(sponsoredAssetId).sponsorBalance shouldBe Some(miner.balance(dAppAddress).balance)
+      dAppBalance(sponsoredAssetId).sponsorBalance shouldBe Some(miner.wavesBalance(dAppAddress))
       dAppBalance(cancelledAssetId).minSponsoredAssetFee shouldBe None
       dAppBalance(cancelledAssetId).sponsorBalance shouldBe None
     }
@@ -236,9 +235,9 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
 
       miner.assetsDetails(assetId).minSponsoredAssetFee shouldBe Some(lastMinSponsoredAssetFee)
 
-      val dAppBalance = miner.assetsBalance(dAppAddress).balances.head
+      val dAppBalance = miner.portfolio(dAppAddress).balances.head
       dAppBalance.minSponsoredAssetFee shouldBe Some(lastMinSponsoredAssetFee)
-      dAppBalance.sponsorBalance shouldBe Some(miner.balance(dAppAddress).balance)
+      dAppBalance.sponsorBalance shouldBe Some(miner.wavesBalance(dAppAddress))
     }
 
     "Sponsor and cancel sponsorship is available for same asset" in {
@@ -284,7 +283,7 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
 
       miner.assetsDetails(assetId).minSponsoredAssetFee shouldBe None
 
-      val dAppBalance = miner.assetsBalance(dApp.toAddress.toString).balances.head
+      val dAppBalance = miner.portfolio(dApp.toAddress.toString).balances.head
       dAppBalance.minSponsoredAssetFee shouldBe None
       dAppBalance.sponsorBalance shouldBe None
     }
@@ -386,9 +385,9 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
             sponsorFee.minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
 
             miner.assetsDetails(issueAssetId).minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
-            val dAppBalance = miner.assetsBalance(dappAddress).balances.find(_.assetId == issueAssetId).get
+            val dAppBalance = miner.portfolio(dappAddress).balances.find(_.assetId == issueAssetId).get
             dAppBalance.minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
-            dAppBalance.sponsorBalance shouldBe Some(miner.balance(dappAddress).balance)
+            dAppBalance.sponsorBalance shouldBe Some(miner.wavesBalance(dappAddress))
         }
 
       assertBadRequestAndMessage(
@@ -399,7 +398,7 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
 
     "SponsorFee is available for assets issued via transaction" in {
       val dApp = miner.createKeyPair()
-      miner.transfer(sender.keyPair, dApp.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
+      miner.transfer(miner.keyPair, dApp.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
       val assetId = miner.issue(dApp, waitForTx = true).id
 
       createDApp(
@@ -417,12 +416,12 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
       )
 
       val tx = miner.invokeScript(miner.keyPair, dApp.toAddress.toString, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee)
-      sender.debugStateChanges(tx._1.id).stateChanges.get.sponsorFees.head shouldBe SponsorFeeResponse(assetId, Some(1000))
+      miner.debugStateChanges(tx._1.id).stateChanges.get.sponsorFees.head shouldBe SponsorFeeResponse(assetId, Some(1000))
     }
 
     "Negative fee is not available" in {
       val dApp = miner.createKeyPair()
-      miner.transfer(sender.keyPair, dApp.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
+      miner.transfer(miner.keyPair, dApp.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
       val assetId = miner.issue(dApp, waitForTx = true).id
 
       createDApp(
@@ -447,7 +446,7 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
 
     "SponsorFee is available only for assets issuing from current address" in {
       val issuer = miner.createKeyPair()
-      miner.transfer(sender.keyPair, issuer.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
+      miner.transfer(miner.keyPair, issuer.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
       val assetId = miner.issue(issuer, waitForTx = true).id
 
       val dApp = createDApp(
@@ -471,7 +470,7 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
 
     "SponsorFee is not available for scripted assets" in {
       val dApp = miner.createKeyPair()
-      miner.transfer(sender.keyPair, dApp.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
+      miner.transfer(miner.keyPair, dApp.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
 
       val script  = ScriptCompiler.compile("true", ScriptEstimatorV2).explicitGet()._1.bytes().base64
       val assetId = miner.issue(dApp, script = Some(script), waitForTx = true).id
@@ -506,7 +505,7 @@ class GrpcSponsorFeeActionSuite extends FreeSpec with GrpcBaseTransactionSuiteLi
       .explicitGet()
       ._1
 
-    miner.transfer(sender.keyPair, address.publicKey.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
+    miner.transfer(miner.keyPair, address.publicKey.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
 
     nodes.waitForHeightAriseAndTxPresent(
       miner

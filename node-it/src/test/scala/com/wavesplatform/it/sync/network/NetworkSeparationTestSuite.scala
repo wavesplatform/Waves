@@ -4,25 +4,23 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{issueAmount, issueFee, minFee}
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{Node, ReportingTestName, WaitForHeight2}
-import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
+import com.wavesplatform.it.{Docker, ReportingTestName, WaitForHeight2}
+import org.scalatest.{FreeSpec, Matchers}
 
-import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class NetworkSeparationTestSuite
     extends FreeSpec
     with Matchers
     with WaitForHeight2
-    with CancelAfterFailure
     with ReportingTestName
     with NodesFromDocker {
   import NetworkSeparationTestSuite._
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
-  private def nodeA: Node = nodes.head
-  private def nodeB: Node = nodes.last
+  private def nodeA: Docker.DockerNode = dockerNodes().head
+  private def nodeB: Docker.DockerNode = dockerNodes().last
 
   "node should grow up to 10 blocks together and sync" in {
     nodes.waitForSameBlockHeadersAt(10)
@@ -33,7 +31,7 @@ class NetworkSeparationTestSuite
     val lastMaxHeight = nodes.map(_.height).max
     dockerNodes().foreach(docker.disconnectFromNetwork)
     Thread.sleep(80.seconds.toMillis) // >= 10 blocks, because a new block appears every 6 seconds
-    docker.connectToNetwork(dockerNodes())
+    docker.connectToNetwork(dockerNodes(): _*)
     nodes.map(_.height).max shouldBe >=(lastMaxHeight + 5)
   }
 
@@ -52,23 +50,20 @@ class NetworkSeparationTestSuite
     val txId = nodeA.transfer(nodeA.keyPair, nodeB.address, issueAmount / 2, minFee, Some(issuedAssetId)).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
-    docker.disconnectFromNetwork(dockerNodes().head)
+    docker.disconnectFromNetwork(nodeA)
 
     val burnNoOwnerTxTd = nodeB.burn(nodeB.keyPair, issuedAssetId, issueAmount / 2, minFee).id
-    Await.ready(waitForTxsToReachAllNodes(Seq(nodeB), Seq(burnNoOwnerTxTd)), 2.minute)
-    val heightAfter = nodeB.height
+    val heightAfter = nodeB.waitForTransaction(burnNoOwnerTxTd).height
 
     Thread.sleep(60.seconds.toMillis)
-    docker.disconnectFromNetwork(dockerNodes().last)
-    docker.connectToNetwork(Seq(dockerNodes().head))
+    docker.disconnectFromNetwork(nodeB)
+    docker.connectToNetwork(nodeA)
 
-    nodeA.waitForHeight(heightAfter)
-    val block = nodeA.blockAt(heightAfter)
+    nodeA.waitForHeight(heightAfter + 1)
 
-    docker.connectToNetwork(Seq(dockerNodes().last))
+    docker.connectToNetwork(nodeB)
     Thread.sleep(80.seconds.toMillis)
 
-    assert(nodeA.blockAt(heightAfter) == block)
     val height = nodeA.height
     assert(nodeA.blockAt(height) != nodeB.blockAt(height))
   }

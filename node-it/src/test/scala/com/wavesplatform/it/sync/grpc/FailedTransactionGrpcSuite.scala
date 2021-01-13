@@ -45,11 +45,11 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
   protected override def beforeAll(): Unit = {
     super.beforeAll()
 
-    sender.broadcastTransfer(sender.keyPair, Recipient().withPublicKeyHash(contractAddr), 100.waves, minFee, waitForTx = true)
+    miner.broadcastTransfer(miner.keyPair, Recipient().withPublicKeyHash(contractAddr), 100.waves, minFee, waitForTx = true)
 
     smartAsset = PBTransactions
       .vanillaUnsafe(
-        sender
+        miner
           .broadcastIssue(
             contract,
             "Asset",
@@ -67,7 +67,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
 
     sponsoredAsset = PBTransactions
       .vanillaUnsafe(
-        sender
+        miner
           .broadcastIssue(
             contract,
             "Sponsored Asset",
@@ -129,7 +129,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
          |
         """.stripMargin
     val script = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3).explicitGet()._1
-    sender.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
+    miner.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
   }
 
   test("InvokeScriptTransaction: dApp error propagates failed transaction") {
@@ -140,14 +140,14 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
 
     sendTxsAndThenPriorityTx(
       _ =>
-        sender
+        miner
           .broadcastInvokeScript(
             caller,
             Recipient().withPublicKeyHash(contractAddr),
             Some(FUNCTION_CALL(FunctionHeader.User("canThrow"), List.empty)),
             fee = invokeFee
           ),
-      () => sender.putData(contract, priorityData, priorityFee, waitForTx = true)
+      () => miner.putData(contract, priorityData, priorityFee, waitForTx = true)
     )((txs, _) => assertFailedTxs(txs))
   }
 
@@ -164,7 +164,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
       overflowBlock()
       sendTxsAndThenPriorityTx(
         _ =>
-          sender
+          miner
             .broadcastInvokeScript(
               caller,
               Recipient().withPublicKeyHash(contractAddr),
@@ -188,7 +188,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
 
       sendTxsAndThenPriorityTx(
         _ =>
-          sender
+          miner
             .broadcastInvokeScript(
               caller,
               Recipient().withPublicKeyHash(contractAddr),
@@ -207,7 +207,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
 
     val paymentAsset = PBTransactions
       .vanillaUnsafe(
-        sender
+        miner
           .broadcastIssue(
             caller,
             "paymentAsset",
@@ -227,7 +227,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
     overflowBlock()
     sendTxsAndThenPriorityTx(
       _ =>
-        sender
+        miner
           .broadcastInvokeScript(
             caller,
             Recipient().withPublicKeyHash(contractAddr),
@@ -248,13 +248,13 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
     updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
     updateTikTok("reissue", setAssetScriptMinFee)
 
-    sender.broadcastSponsorFee(
+    miner.broadcastSponsorFee(
       contract,
       Some(Amount.of(ByteString.copyFrom(Base58.decode(sponsoredAsset)), 1)),
       sponsorFee + smartFee,
       waitForTx = true
     )
-    sender.broadcastTransfer(
+    miner.broadcastTransfer(
       contract,
       Recipient().withPublicKeyHash(callerAddr),
       assetAmount,
@@ -262,11 +262,11 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
       assetId = sponsoredAsset,
       waitForTx = true
     )
-    val prevBalance = sender.wavesBalance(contractAddr).regular
+    val prevBalance = miner.wavesBalance(contractAddr).regular
 
     sendTxsAndThenPriorityTx(
       _ =>
-        sender.broadcastInvokeScript(
+        miner.broadcastInvokeScript(
           caller,
           Recipient().withPublicKeyHash(contractAddr),
           Some(FUNCTION_CALL(FunctionHeader.User("tikTok"), List.empty)),
@@ -275,7 +275,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
         ),
       () => updateAssetScript(result = false, smartAsset, contract, priorityFee)
     ) { (txs, _) =>
-      sender.wavesBalance(contractAddr).regular shouldBe prevBalance - invokeFee * txs.size - priorityFee
+      miner.wavesBalance(contractAddr).regular shouldBe prevBalance - invokeFee * txs.size - priorityFee
       assertFailedTxs(txs)
     }
   }
@@ -291,13 +291,13 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
       BinaryDataEntry("bn", ByteStr(Longs.toByteArray(-1))),
       StringDataEntry("s", "-1")
     ).map(PBTransactions.toPBDataEntry)
-    sender.putData(contract, initialEntries, minFee + smartFee)
+    miner.putData(contract, initialEntries, minFee + smartFee)
     updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
 
     overflowBlock()
     sendTxsAndThenPriorityTx(
       i =>
-        sender.broadcastInvokeScript(
+        miner.broadcastInvokeScript(
           caller,
           Recipient().withPublicKeyHash(contractAddr),
           Some(FUNCTION_CALL(FunctionHeader.User("transferAndWrite"), List(Terms.CONST_LONG(i)))),
@@ -323,10 +323,10 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
           .mapValues(PBTransactions.toPBDataEntry)
       initialEntries.map(entry => entry.key -> entry).toMap.foreach {
         case (key, initial) =>
-          sender.getDataByKey(contractAddr, key) shouldBe List(lastSuccessWrites.getOrElse(key, initial))
+          miner.getDataByKey(contractAddr, key) shouldBe List(lastSuccessWrites.getOrElse(key, initial))
       }
 
-      sender.stateChanges(TransactionsRequest(transactionIds = failed.map(_.id))).foreach {
+      miner.stateChanges(TransactionsRequest(transactionIds = failed.map(_.id))).foreach {
         case (_, sc) =>
           sc.issues.size shouldBe 0
           sc.reissues.size shouldBe 0
@@ -349,17 +349,17 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
     updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
 
     overflowBlock()
-    val prevBalance = sender.wavesBalance(callerAddr).regular
+    val prevBalance = miner.wavesBalance(callerAddr).regular
     sendTxsAndThenPriorityTx(
       _ =>
-        sender.broadcastInvokeScript(
+        miner.broadcastInvokeScript(
           caller,
           Recipient().withPublicKeyHash(contractAddr),
           Some(FUNCTION_CALL(FunctionHeader.User("tikTok"), List.empty)),
           fee = invokeFee
         ),
       () =>
-        sender.setScript(
+        miner.setScript(
           caller,
           Right(
             ScriptCompiler
@@ -383,26 +383,26 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
         )
     ) { (txs, _) =>
       val invalid = assertInvalidTxs(txs)
-      sender.wavesBalance(callerAddr).regular shouldBe prevBalance - (txs.size - invalid.size) * invokeFee - priorityFee
+      miner.wavesBalance(callerAddr).regular shouldBe prevBalance - (txs.size - invalid.size) * invokeFee - priorityFee
       invalid
     }
   }
 
   test("ExchangeTransaction: failed exchange tx when asset script fails") {
     val init = Seq(
-      sender.setScript(firstAcc, Right(None), setScriptFee + smartFee),
-      sender.setScript(secondAcc, Right(None), setScriptFee + smartFee),
-      sender.setScript(thirdAcc, Right(None), setScriptFee + smartFee)
+      miner.setScript(firstAcc, Right(None), setScriptFee + smartFee),
+      miner.setScript(secondAcc, Right(None), setScriptFee + smartFee),
+      miner.setScript(thirdAcc, Right(None), setScriptFee + smartFee)
     )
 
     waitForTxs(init)
 
     val quantity                                        = 1000000000L
     val initScript: Either[Array[Byte], Option[Script]] = Right(ScriptCompiler.compile("true", ScriptEstimatorV3).toOption.map(_._1))
-    val amountAsset                                     = sender.broadcastIssue(seller, "Amount asset", quantity, 8, reissuable = true, issueFee, script = initScript)
-    val priceAsset                                      = sender.broadcastIssue(buyer, "Price asset", quantity, 8, reissuable = true, issueFee, script = initScript)
-    val sellMatcherFeeAsset                             = sender.broadcastIssue(matcher, "Seller fee asset", quantity, 8, reissuable = true, issueFee, script = initScript)
-    val buyMatcherFeeAsset                              = sender.broadcastIssue(matcher, "Buyer fee asset", quantity, 8, reissuable = true, issueFee, script = initScript)
+    val amountAsset                                     = miner.broadcastIssue(seller, "Amount asset", quantity, 8, reissuable = true, issueFee, script = initScript)
+    val priceAsset                                      = miner.broadcastIssue(buyer, "Price asset", quantity, 8, reissuable = true, issueFee, script = initScript)
+    val sellMatcherFeeAsset                             = miner.broadcastIssue(matcher, "Seller fee asset", quantity, 8, reissuable = true, issueFee, script = initScript)
+    val buyMatcherFeeAsset                              = miner.broadcastIssue(matcher, "Buyer fee asset", quantity, 8, reissuable = true, issueFee, script = initScript)
 
     val preconditions = Seq(
       amountAsset,
@@ -416,14 +416,14 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
     val sellMatcherFeeAssetId = PBTransactions.vanillaUnsafe(sellMatcherFeeAsset).id().toString
     val buyMatcherFeeAssetId  = PBTransactions.vanillaUnsafe(buyMatcherFeeAsset).id().toString
 
-    val transferToSeller = sender.broadcastTransfer(
+    val transferToSeller = miner.broadcastTransfer(
       matcher,
       Recipient().withPublicKeyHash(sellerAddress),
       quantity,
       fee = minFee + smartFee,
       assetId = sellMatcherFeeAssetId
     )
-    val transferToBuyer = sender.broadcastTransfer(
+    val transferToBuyer = miner.broadcastTransfer(
       matcher,
       Recipient().withPublicKeyHash(buyerAddress),
       quantity,
@@ -449,7 +449,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
         val tx = PBTransactions.protobuf(
           mkExchange(buyer, seller, matcher, assetPair, fee, buyMatcherFeeAssetId, sellMatcherFeeAssetId, buyMatcherFee, sellMatcherFee)
         )
-        sender.broadcast(tx.transaction.get, tx.proofs)
+        miner.broadcast(tx.transaction.get, tx.proofs)
       }
       overflowBlock()
       sendTxsAndThenPriorityTx(
@@ -465,10 +465,10 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
     waitForEmptyUtx()
 
     val quantity            = 1000000000L
-    val amountAsset         = sender.broadcastIssue(seller, "Amount asset", quantity, 8, reissuable = true, issueFee)
-    val priceAsset          = sender.broadcastIssue(buyer, "Price asset", quantity, 8, reissuable = true, issueFee)
-    val sellMatcherFeeAsset = sender.broadcastIssue(matcher, "Seller fee asset", quantity, 8, reissuable = true, issueFee)
-    val buyMatcherFeeAsset  = sender.broadcastIssue(matcher, "Buyer fee asset", quantity, 8, reissuable = true, issueFee)
+    val amountAsset         = miner.broadcastIssue(seller, "Amount asset", quantity, 8, reissuable = true, issueFee)
+    val priceAsset          = miner.broadcastIssue(buyer, "Price asset", quantity, 8, reissuable = true, issueFee)
+    val sellMatcherFeeAsset = miner.broadcastIssue(matcher, "Seller fee asset", quantity, 8, reissuable = true, issueFee)
+    val buyMatcherFeeAsset  = miner.broadcastIssue(matcher, "Buyer fee asset", quantity, 8, reissuable = true, issueFee)
 
     val preconditions = Seq(
       amountAsset,
@@ -482,14 +482,14 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
     val sellMatcherFeeAssetId = PBTransactions.vanillaUnsafe(sellMatcherFeeAsset).id().toString
     val buyMatcherFeeAssetId  = PBTransactions.vanillaUnsafe(buyMatcherFeeAsset).id().toString
 
-    val transferToSeller = sender.broadcastTransfer(
+    val transferToSeller = miner.broadcastTransfer(
       matcher,
       Recipient().withPublicKeyHash(sellerAddress),
       quantity,
       fee = minFee + smartFee,
       assetId = sellMatcherFeeAssetId
     )
-    val transferToBuyer = sender.broadcastTransfer(
+    val transferToBuyer = miner.broadcastTransfer(
       matcher,
       Recipient().withPublicKeyHash(buyerAddress),
       quantity,
@@ -515,7 +515,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
         val tx = PBTransactions.protobuf(
           mkExchange(buyer, seller, matcher, assetPair, fee, buyMatcherFeeAssetId, sellMatcherFeeAssetId, buyMatcherFee, sellMatcherFee)
         )
-        sender.broadcast(tx.transaction.get, tx.proofs)
+        miner.broadcast(tx.transaction.get, tx.proofs)
       }
 
       overflowBlock()
@@ -532,7 +532,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
     val fee     = calcDataFee(entries)
     waitForEmptyUtx()
     waitForHeightArise()
-    for (_ <- 1 to 8) sender.putData(sender.keyPair, entries, fee)
+    for (_ <- 1 to 8) miner.putData(miner.keyPair, entries, fee)
     waitForEmptyUtx()
   }
 
@@ -544,13 +544,13 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
   }
 
   private def updateTikTok(result: String, fee: Long, waitForTx: Boolean = true): PBSignedTransaction =
-    sender.putData(contract, List(StringDataEntry("tikTok", result)).map(PBTransactions.toPBDataEntry), fee = fee, waitForTx = waitForTx)
+    miner.putData(contract, List(StringDataEntry("tikTok", result)).map(PBTransactions.toPBDataEntry), fee = fee, waitForTx = waitForTx)
 
   private def waitForTxs(txs: Seq[PBSignedTransaction]): Unit = {
-    txs.foreach(tx => sender.waitForTransaction(PBTransactions.vanillaUnsafe(tx).id().toString))
+    txs.foreach(tx => miner.waitForTransaction(PBTransactions.vanillaUnsafe(tx).id().toString))
   }
 
-  override protected def waitForHeightArise(): Unit = sender.waitForHeightArise()
+  override protected def waitForHeightArise(): Unit = miner.waitForHeightArise()
 
   override protected def nodeConfigs: Seq[Config] = Configs
 }

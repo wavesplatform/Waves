@@ -14,19 +14,19 @@ import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
+import org.scalatest.{FunSuite, Matchers}
 
 import scala.util.{Random, Try}
 
-class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker with Matchers {
-  private val miner: Node    = nodes.head
+class UtxSuite extends FunSuite with NodesFromDocker with Matchers {
+  private val miner: Node = nodes.head
   private val notMiner: Node = nodes(1)
 
-  private var whitelistedAccount: KeyPair     = _
+  private var whitelistedAccount: KeyPair = _
   private var whitelistedDAppAccount: KeyPair = _
 
   private val ENOUGH_FEE = 5000000
-  private val AMOUNT     = ENOUGH_FEE * 10
+  private val AMOUNT = ENOUGH_FEE * 10
 
   test("Invalid transaction should be removed from from utx") {
     val account = UtxSuite.createAccount

@@ -1,6 +1,7 @@
 package com.wavesplatform.it
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.features.BlockchainFeature
 
 import scala.jdk.CollectionConverters._
 import scala.util.Random
@@ -63,10 +64,10 @@ object NodeConfigs {
   object Templates {
     def raw(x: String): String = x
     def quorum(n: Int): String = s"waves.miner.quorum = $n"
-    def preactivatedFeatures(f: (Int, Int)*): String = {
+    def preactivatedFeatures(f: (BlockchainFeature, Int)*): String = {
       s"""
          |waves.blockchain.custom.functionality.pre-activated-features {
-         ${f.map {case (id, height) => s"|  $id = $height"}.mkString("\n")}
+         ${f.map {case (feature, height) => s"|  ${feature.id} = $height"}.mkString("\n")}
          |}""".stripMargin
     }
     def minAssetInfoUpdateInterval(blocks: Int): String =

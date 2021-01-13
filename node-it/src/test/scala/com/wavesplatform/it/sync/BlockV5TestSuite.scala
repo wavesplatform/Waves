@@ -5,19 +5,18 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
-import com.wavesplatform.it.{NodeConfigs, ReportingTestName}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
 import com.wavesplatform.it.transactions.NodesFromDocker
-import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers, OptionValues}
+import com.wavesplatform.it.{NodeConfigs, ReportingTestName}
+import org.scalatest.{FreeSpec, Matchers, OptionValues}
 import scorex.crypto.hash.Blake2b256
 
 import scala.concurrent.duration._
 
 class BlockV5TestSuite
-    extends FreeSpec
+  extends FreeSpec
     with Matchers
-    with CancelAfterFailure
     with NodesFromDocker
     with ActivationStatusRequest
     with ReportingTestName

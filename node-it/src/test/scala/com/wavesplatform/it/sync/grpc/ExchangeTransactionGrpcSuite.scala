@@ -31,7 +31,7 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
   val versions: immutable.Seq[(TxVersion, TxVersion, TxVersion)] = transactionV1versions +: transactionV2versions
 
   test("exchange tx with orders v1,v2") {
-    val exchAsset          = sender.broadcastIssue(buyer, Base64.encode("exchAsset".utf8Bytes), someAssetAmount, 8, reissuable = true, 1.waves, waitForTx = true)
+    val exchAsset          = miner.broadcastIssue(buyer, Base64.encode("exchAsset".utf8Bytes), someAssetAmount, 8, reissuable = true, 1.waves, waitForTx = true)
     val exchAssetId        = PBTransactions.vanilla(exchAsset).explicitGet().id().toString
     val price              = 500000L
     val amount             = 40000000L
@@ -42,28 +42,28 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
       val expirationTimestamp      = ts + Order.MaxLiveTime
       val buy                      = Order.buy(o1ver, buyer, matcher.publicKey, pair, amount, price, ts, expirationTimestamp, matcherFee)
       val sell                     = Order.sell(o2ver, seller, matcher.publicKey, pair, amount, price, ts, expirationTimestamp, matcherFee)
-      val buyerWavesBalanceBefore  = sender.wavesBalance(buyerAddress).available
-      val sellerWavesBalanceBefore = sender.wavesBalance(sellerAddress).available
-      val buyerAssetBalanceBefore  = sender.assetsBalance(buyerAddress, Seq(exchAssetId)).getOrElse(exchAssetId, 0L)
-      val sellerAssetBalanceBefore = sender.assetsBalance(sellerAddress, Seq(exchAssetId)).getOrElse(exchAssetId, 0L)
+      val buyerWavesBalanceBefore  = miner.wavesBalance(buyerAddress).available
+      val sellerWavesBalanceBefore = miner.wavesBalance(sellerAddress).available
+      val buyerAssetBalanceBefore  = miner.assetsBalance(buyerAddress, Seq(exchAssetId)).getOrElse(exchAssetId, 0L)
+      val sellerAssetBalanceBefore = miner.assetsBalance(sellerAddress, Seq(exchAssetId)).getOrElse(exchAssetId, 0L)
 
-      sender.exchange(matcher, buy, sell, amount, price, matcherFee, matcherFee, matcherFee, ts, tver, waitForTx = true)
+      miner.exchange(matcher, buy, sell, amount, price, matcherFee, matcherFee, matcherFee, ts, tver, waitForTx = true)
 
-      sender.wavesBalance(buyerAddress).available shouldBe buyerWavesBalanceBefore + amount - matcherFee
-      sender.wavesBalance(sellerAddress).available shouldBe sellerWavesBalanceBefore - amount - matcherFee
-      sender.assetsBalance(buyerAddress, Seq(exchAssetId))(exchAssetId) shouldBe buyerAssetBalanceBefore - priceAssetSpending
-      sender.assetsBalance(sellerAddress, Seq(exchAssetId))(exchAssetId) shouldBe sellerAssetBalanceBefore + priceAssetSpending
+      miner.wavesBalance(buyerAddress).available shouldBe buyerWavesBalanceBefore + amount - matcherFee
+      miner.wavesBalance(sellerAddress).available shouldBe sellerWavesBalanceBefore - amount - matcherFee
+      miner.assetsBalance(buyerAddress, Seq(exchAssetId))(exchAssetId) shouldBe buyerAssetBalanceBefore - priceAssetSpending
+      miner.assetsBalance(sellerAddress, Seq(exchAssetId))(exchAssetId) shouldBe sellerAssetBalanceBefore + priceAssetSpending
     }
   }
 
   test("exchange tx with orders v3") {
-    val feeAsset           = sender.broadcastIssue(buyer, "feeAsset", someAssetAmount, 8, reissuable = true, 1.waves, waitForTx = true)
+    val feeAsset           = miner.broadcastIssue(buyer, "feeAsset", someAssetAmount, 8, reissuable = true, 1.waves, waitForTx = true)
     val feeAssetId         = PBTransactions.vanilla(feeAsset).explicitGet().id()
     val price              = 500000L
     val amount             = 40000000L
     val priceAssetSpending = price * amount / 100000000L
 
-    sender.broadcastTransfer(
+    miner.broadcastTransfer(
       buyer,
       Recipient().withPublicKeyHash(sellerAddress),
       someAssetAmount / 2,
@@ -81,7 +81,7 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
            (3: Byte, 2: Byte, IssuedAsset(feeAssetId), Waves, amount, -amount - matcherFee, -priceAssetSpending - matcherFee, priceAssetSpending)
          )) {
       if (matcherFeeOrder1 == Waves && matcherFeeOrder2 != Waves) {
-        sender.broadcastTransfer(
+        miner.broadcastTransfer(
           buyer,
           Recipient().withPublicKeyHash(sellerAddress),
           100000,
@@ -91,10 +91,10 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
         )
       }
 
-      val buyerWavesBalanceBefore  = sender.wavesBalance(buyerAddress).available
-      val sellerWavesBalanceBefore = sender.wavesBalance(sellerAddress).available
-      val buyerAssetBalanceBefore  = sender.assetsBalance(buyerAddress, Seq(feeAssetId.toString)).getOrElse(feeAssetId.toString, 0L)
-      val sellerAssetBalanceBefore = sender.assetsBalance(sellerAddress, Seq(feeAssetId.toString)).getOrElse(feeAssetId.toString, 0L)
+      val buyerWavesBalanceBefore  = miner.wavesBalance(buyerAddress).available
+      val sellerWavesBalanceBefore = miner.wavesBalance(sellerAddress).available
+      val buyerAssetBalanceBefore  = miner.assetsBalance(buyerAddress, Seq(feeAssetId.toString)).getOrElse(feeAssetId.toString, 0L)
+      val sellerAssetBalanceBefore = miner.assetsBalance(sellerAddress, Seq(feeAssetId.toString)).getOrElse(feeAssetId.toString, 0L)
 
       val ts                  = ntpTime.correctedTime()
       val expirationTimestamp = ts + Order.MaxLiveTime
@@ -102,19 +102,19 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
       val buy                 = Order.buy(o1ver, buyer, matcher.publicKey, assetPair, amount, price, ts, expirationTimestamp, matcherFee, matcherFeeOrder1)
       val sell                = Order.sell(o2ver, seller, matcher.publicKey, assetPair, amount, price, ts, expirationTimestamp, matcherFee, matcherFeeOrder2)
 
-      sender.exchange(matcher, sell, buy, amount, price, matcherFee, matcherFee, matcherFee, ts, 3, waitForTx = true)
+      miner.exchange(matcher, sell, buy, amount, price, matcherFee, matcherFee, matcherFee, ts, 3, waitForTx = true)
 
-      sender.wavesBalance(buyerAddress).available shouldBe (buyerWavesBalanceBefore + buyerWavesDelta)
-      sender.wavesBalance(sellerAddress).available shouldBe (sellerWavesBalanceBefore + sellerWavesDelta)
-      sender.assetsBalance(buyerAddress, Seq(feeAssetId.toString))(feeAssetId.toString) shouldBe (buyerAssetBalanceBefore + buyerAssetDelta)
-      sender.assetsBalance(sellerAddress, Seq(feeAssetId.toString))(feeAssetId.toString) shouldBe (sellerAssetBalanceBefore + sellerAssetDelta)
+      miner.wavesBalance(buyerAddress).available shouldBe (buyerWavesBalanceBefore + buyerWavesDelta)
+      miner.wavesBalance(sellerAddress).available shouldBe (sellerWavesBalanceBefore + sellerWavesDelta)
+      miner.assetsBalance(buyerAddress, Seq(feeAssetId.toString))(feeAssetId.toString) shouldBe (buyerAssetBalanceBefore + buyerAssetDelta)
+      miner.assetsBalance(sellerAddress, Seq(feeAssetId.toString))(feeAssetId.toString) shouldBe (sellerAssetBalanceBefore + sellerAssetDelta)
     }
   }
 
   test("cannot exchange non-issued assets") {
     val exchAsset: IssueTransaction = IssueTransaction(
       TxVersion.V1,
-      sender.publicKey,
+      miner.publicKey,
       "myasset".utf8Bytes,
       "my asset description".utf8Bytes,
       quantity = someAssetAmount,
@@ -123,7 +123,7 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
       script = None,
       fee = 1.waves,
       timestamp = System.currentTimeMillis()
-    ).signWith(sender.keyPair.privateKey)
+    ).signWith(miner.keyPair.privateKey)
     for ((o1ver, o2ver, tver) <- versions) {
 
       val assetId             = exchAsset.id().toString
@@ -136,7 +136,7 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
       val sell                = Order.sell(o2ver, seller, matcher.publicKey, pair, amount, price, ts, expirationTimestamp, matcherFee)
 
       assertGrpcError(
-        sender.exchange(matcher, buy, sell, amount, price, matcherFee, matcherFee, matcherFee, ts, tver),
+        miner.exchange(matcher, buy, sell, amount, price, matcherFee, matcherFee, matcherFee, ts, tver),
         "Assets should be issued before they can be traded",
         Code.INVALID_ARGUMENT
       )

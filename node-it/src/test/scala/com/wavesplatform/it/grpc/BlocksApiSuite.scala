@@ -29,7 +29,7 @@ class BlocksApiSuite extends GrpcBaseTransactionSuite with Matchers {
       .withDefault(1)
       .buildNonConflicting()
 
-  private lazy val blocksApi = BlocksApiGrpc.blockingStub(sender.grpcChannel)
+  private lazy val blocksApi = BlocksApiGrpc.blockingStub(miner.grpcChannel)
 
   private def validateHeaders(range: Range)(assertion: PBBlockHeader => Unit): Unit = {
     val headersByHeight = range.map(height => blocksApi.getBlock(BlockRequest(request = BlockRequest.Request.Height(height))))
@@ -49,8 +49,8 @@ class BlocksApiSuite extends GrpcBaseTransactionSuite with Matchers {
   protected override def beforeAll(): Unit = {
     super.beforeAll()
     1 to 100 foreach { i =>
-      sender.broadcastTransfer(
-        sender.keyPair,
+      miner.broadcastTransfer(
+        miner.keyPair,
         PBRecipients.create(PublicKey(Ints.toByteArray(i) ++ new Array[Byte](28)).toAddress),
         100000000L,
         100000L
@@ -59,7 +59,7 @@ class BlocksApiSuite extends GrpcBaseTransactionSuite with Matchers {
   }
 
   test("Validate Block v3 header fields") {
-    sender.waitForHeight(BlockV4Height)
+    miner.waitForHeight(BlockV4Height)
     validateHeaders(2 to BlockV4Height) { header =>
       header.chainId shouldEqual AddressScheme.current.chainId
       header.version shouldEqual 3
@@ -67,7 +67,7 @@ class BlocksApiSuite extends GrpcBaseTransactionSuite with Matchers {
   }
 
   test("Validate Block v4 header fields") {
-    sender.waitForHeight(BlockV5Height)
+    miner.waitForHeight(BlockV5Height)
     validateHeaders(BlockV4Height + 1 until BlockV5Height) { header =>
       header.chainId shouldEqual AddressScheme.current.chainId
       header.version shouldEqual 4
@@ -76,7 +76,7 @@ class BlocksApiSuite extends GrpcBaseTransactionSuite with Matchers {
   }
 
   test("Validate Block v5 header fields") {
-    sender.waitForHeight(BlockV5Height + 2)
+    miner.waitForHeight(BlockV5Height + 2)
     validateHeaders(BlockV5Height until BlockV5Height + 2) { header =>
       header.chainId shouldEqual AddressScheme.current.chainId
       header.version shouldEqual 5

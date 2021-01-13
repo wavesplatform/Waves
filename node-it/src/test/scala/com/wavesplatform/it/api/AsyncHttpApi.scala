@@ -1,7 +1,7 @@
 package com.wavesplatform.it.api
 
 import java.io.IOException
-import java.net.{InetSocketAddress, URLEncoder}
+import java.net.{InetAddress, InetSocketAddress, URLEncoder}
 import java.util.concurrent.TimeoutException
 import java.util.{NoSuchElementException, UUID}
 
@@ -144,8 +144,8 @@ object AsyncHttpApi extends Assertions {
           rb.setHeader("Content-type", "application/x-www-form-urlencoded").setBody(params.map(p => p._1 + "=" + p._2).mkString("&"))
       )
 
-    def blacklist(address: InetSocketAddress): Future[Unit] =
-      post("/debug/blacklist", s"${address.getHostString}:${address.getPort}").map(_ => ())
+    def blacklist(address: InetAddress): Future[Unit] =
+      post("/debug/blacklist", s"${address.getHostName}").map(_ => ())
 
     def clearBlacklist(): Future[Unit] =
       post(s"${n.nodeApiEndpoint}/peers/clearblacklist").map(_ => ())
@@ -251,9 +251,12 @@ object AsyncHttpApi extends Assertions {
       get(s"/blockchain/rewards$maybeHeight", amountsAsString).as[RewardStatus](amountsAsString)
     }
 
-    def balance(address: String, confirmations: Option[Int] = None, amountsAsStrings: Boolean = false): Future[Balance] = {
-      val maybeConfirmations = confirmations.fold("")(a => s"/$a")
-      get(s"/addresses/balance/$address$maybeConfirmations", amountsAsStrings).as[Balance](amountsAsStrings)
+    def balance(address: String, amountsAsStrings: Boolean = false): Future[Balance] = {
+      get(s"/addresses/balance/$address", amountsAsStrings).as[Balance](amountsAsStrings)
+    }
+
+    def wavesBalance(address: String, amountsAsStrings: Boolean = false): Future[Long] = {
+      get(s"/addresses/balance/$address", amountsAsStrings).as[Balance](amountsAsStrings).map(_.balance)
     }
 
     def balances(height: Option[Int], addresses: Seq[String], asset: Option[String]): Future[Seq[Balance]] = {
@@ -298,12 +301,18 @@ object AsyncHttpApi extends Assertions {
       100.millis
     )
 
+    def waitForEmptyUtx(): Future[Unit] = waitFor[Int]("empty utx")(_.utxSize, _ == 0, 1.second).map(_ => ())
+
     def waitForHeight(expectedHeight: Int): Future[Int] = waitFor[Int](s"height >= $expectedHeight")(_.height, h => h >= expectedHeight, 2.seconds)
 
     def rawTransactionInfo(txId: String): Future[JsValue] = get(s"/transactions/info/$txId").map(r => Json.parse(r.getResponseBody))
 
     def transactionInfo[A: Reads](txId: String, amountsAsStrings: Boolean = false): Future[A] = {
       get(s"/transactions/info/$txId", amountsAsStrings).as[A](amountsAsStrings)
+    }
+
+    def transactionInfo[A: Reads](txIds: Seq[String]): Future[A] = {
+      postForm("/transactions/info", txIds.map("id" -> _): _*).as[A]
     }
 
     def transactionsStatus(txIds: Seq[String]): Future[Seq[TransactionStatus]] =
@@ -582,8 +591,8 @@ object AsyncHttpApi extends Assertions {
     def assetBalance(address: String, asset: String, amountsAsStrings: Boolean = false): Future[AssetBalance] =
       get(s"/assets/balance/$address/$asset", amountsAsStrings).as[AssetBalance](amountsAsStrings)
 
-    def assetsBalance(address: String, amountsAsStrings: Boolean = false): Future[FullAssetsInfo] =
-      get(s"/assets/balance/$address", amountsAsStrings).as[FullAssetsInfo](amountsAsStrings)
+    def portfolio(address: String, amountsAsStrings: Boolean = false): Future[AssetBalances] =
+      get(s"/assets/balance/$address", amountsAsStrings).as[AssetBalances](amountsAsStrings)
 
     def nftList(address: String, limit: Int, maybeAfter: Option[String] = None, amountsAsStrings: Boolean = false): Future[Seq[NFTAssetInfo]] = {
       val after = maybeAfter.fold("")(a => s"?after=$a")
@@ -752,6 +761,7 @@ object AsyncHttpApi extends Assertions {
         fee: Long,
         version: Byte,
         matcherFeeAssetId: Option[String],
+        timestamp: Long = System.currentTimeMillis(),
         amountsAsStrings: Boolean = false,
         validate: Boolean = true
     ): Future[Transaction] = {
@@ -765,7 +775,7 @@ object AsyncHttpApi extends Assertions {
         sellMatcherFee = sellMatcherFee,
         fee = fee,
         proofs = Proofs.empty,
-        timestamp = System.currentTimeMillis(),
+        timestamp = timestamp,
         chainId = AddressScheme.current.chainId
       ).signWith(matcher.privateKey)
 
@@ -948,36 +958,28 @@ object AsyncHttpApi extends Assertions {
 
     def accountEffectiveBalance(acc: String): Future[Long] = n.effectiveBalance(acc).map(_.balance)
 
-    def accountBalance(acc: String): Future[Long] = n.balance(acc).map(_.balance)
-
     def balanceAtHeight(address: String, height: Int): Future[Long] =
       accountsBalances(Some(height), Seq(address), None).map(_.collectFirst { case (`address`, balance) => balance }.getOrElse(0L))
 
     def accountsBalances(height: Option[Int], accounts: Seq[String], asset: Option[String]): Future[Seq[(String, Long)]] =
       n.balances(height, accounts, asset).map(_.map(b => (b.address, b.balance)))
 
-    def accountBalances(acc: String): Future[(Long, Long)] = {
-      n.balance(acc).map(_.balance).zip(n.effectiveBalance(acc).map(_.balance))
-    }
-
-    def assertBalances(acc: String, balance: Long, effectiveBalance: Long)(implicit pos: Position): Future[Unit] = {
+    def assertBalances(acc: String, balance: Long, effectiveBalance: Long)(implicit pos: Position): Future[Unit] =
       for {
-        newBalance          <- accountBalance(acc)
-        newEffectiveBalance <- accountEffectiveBalance(acc)
+        bd <- balanceDetails(acc)
       } yield {
         withClue(s"effective balance of $acc") {
-          newEffectiveBalance shouldBe effectiveBalance
+          bd.effective shouldBe effectiveBalance
         }
         withClue(s"balance of $acc") {
-          newBalance shouldBe balance
+          bd.regular shouldBe balance
         }
       }
-    }
 
     def assertAssetBalance(acc: String, assetIdString: String, balance: Long)(implicit pos: Position): Future[Unit] = {
       for {
         plainBalance <- n.assetBalance(acc, assetIdString)
-        pf           <- n.assetsBalance(acc)
+        pf           <- n.portfolio(acc)
         asset        <- n.assetsDetails(assetIdString)
         nftList      <- n.nftList(acc, 100)
       } yield {

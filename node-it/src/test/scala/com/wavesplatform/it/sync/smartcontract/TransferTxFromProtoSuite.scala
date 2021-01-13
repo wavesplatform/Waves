@@ -51,7 +51,7 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
   private val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()._1.bytes().base64
 
   test("TransferTransaction with Waves from proto bytes") {
-    sender.setScript(dApp, Some(script), waitForTx = true)
+    miner.setScript(dApp, Some(script), waitForTx = true)
     val transferTx = TransferTransaction
       .selfSigned(
         version = TxVersion.V3,
@@ -66,11 +66,11 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
       )
       .explicitGet()
 
-    sender.signedBroadcast(transferTx.json(), waitForTx = true)
+    miner.signedBroadcast(transferTx.json(), waitForTx = true)
 
     val protoTransferTxBytes = PBTransactions.protobuf(transferTx).toByteArray
 
-    sender.invokeScript(
+    miner.invokeScript(
       source,
       dAppAddress,
       func = Some("foo"),
@@ -78,21 +78,21 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
       waitForTx = true
     )
 
-    sender.getDataByKey(dAppAddress, "amount").value shouldBe transferTx.amount
-    sender.getDataByKey(dAppAddress, "fee").value shouldBe transferTx.fee
-    sender.getDataByKey(dAppAddress, "id").value shouldBe transferTx.id().toString
-    sender.getDataByKey(dAppAddress, "assetId").value shouldBe "WAVES"
-    sender.getDataByKey(dAppAddress, "feeAssetId").value shouldBe "WAVES"
-    sender.getDataByKey(dAppAddress, "attachment").value shouldBe Base58.encode("WAVES transfer".getBytes)
-    sender.getDataByKey(dAppAddress, "senderPublicKey").value shouldBe transferTx.sender.toString
-    sender.getDataByKey(dAppAddress, "sender").value shouldBe transferTx.sender.toAddress.toString
-    sender.getDataByKey(dAppAddress, "recipient").value shouldBe transferTx.recipient.toString
-    sender.getDataByKey(dAppAddress, "version").value shouldBe transferTx.version
+    miner.getDataByKey(dAppAddress, "amount").value shouldBe transferTx.amount
+    miner.getDataByKey(dAppAddress, "fee").value shouldBe transferTx.fee
+    miner.getDataByKey(dAppAddress, "id").value shouldBe transferTx.id().toString
+    miner.getDataByKey(dAppAddress, "assetId").value shouldBe "WAVES"
+    miner.getDataByKey(dAppAddress, "feeAssetId").value shouldBe "WAVES"
+    miner.getDataByKey(dAppAddress, "attachment").value shouldBe Base58.encode("WAVES transfer".getBytes)
+    miner.getDataByKey(dAppAddress, "senderPublicKey").value shouldBe transferTx.sender.toString
+    miner.getDataByKey(dAppAddress, "sender").value shouldBe transferTx.sender.toAddress.toString
+    miner.getDataByKey(dAppAddress, "recipient").value shouldBe transferTx.recipient.toString
+    miner.getDataByKey(dAppAddress, "version").value shouldBe transferTx.version
   }
 
   test("TransferTransaction with issued asset from proto bytes") {
-    val assetId = sender.issue(source, waitForTx = true).id
-    sender.sponsorAsset(source, assetId, minFee, waitForTx = true)
+    val assetId = miner.issue(source, waitForTx = true).id
+    miner.sponsorAsset(source, assetId, minFee, waitForTx = true)
 
     val transferAssetTx = TransferTransaction
       .selfSigned(
@@ -108,11 +108,11 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
       )
       .explicitGet()
 
-    sender.signedBroadcast(transferAssetTx.json(), waitForTx = true)
+    miner.signedBroadcast(transferAssetTx.json(), waitForTx = true)
 
     val protoTransferTxBytes = PBTransactions.protobuf(transferAssetTx).toByteArray
 
-    sender.invokeScript(
+    miner.invokeScript(
       source,
       dAppAddress,
       func = Some("foo"),
@@ -120,8 +120,8 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
       waitForTx = true
     )
 
-    sender.getDataByKey(dAppAddress, "assetId").value shouldBe assetId
-    sender.getDataByKey(dAppAddress, "feeAssetId").value shouldBe assetId
+    miner.getDataByKey(dAppAddress, "assetId").value shouldBe assetId
+    miner.getDataByKey(dAppAddress, "feeAssetId").value shouldBe assetId
   }
 
   test("check bodyBytes of transaction returned by transferTransactionFromProto") {
@@ -139,11 +139,11 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
       )
       .explicitGet()
 
-    sender.signedBroadcast(transferTx.json(), waitForTx = true)
+    miner.signedBroadcast(transferTx.json(), waitForTx = true)
 
     val protoTransferTxBytes = PBTransactions.protobuf(transferTx).toByteArray
 
-    sender.invokeScript(
+    miner.invokeScript(
       source,
       dAppAddress,
       func = Some("foo"),
@@ -151,6 +151,6 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
       waitForTx = true
     )
 
-    sender.getDataByKey(dAppAddress, "bodyBytes").value.asInstanceOf[ByteStr] shouldBe ByteStr(transferTx.bodyBytes())
+    miner.getDataByKey(dAppAddress, "bodyBytes").value.asInstanceOf[ByteStr] shouldBe ByteStr(transferTx.bodyBytes())
   }
 }

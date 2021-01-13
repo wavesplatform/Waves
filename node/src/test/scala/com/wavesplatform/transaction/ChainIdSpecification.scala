@@ -55,7 +55,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
       case (addressOrAlias, version, sender, amount, fee, ts) =>
         TransferTransaction(
           version,
-          sender.publicKey,
+          miner.publicKey,
           addressOrAlias,
           Waves,
           amount,
@@ -70,7 +70,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
         validateFromOtherNetwork(
           TransferTransaction(
             TxVersion.V3,
-            sender.publicKey,
+            miner.publicKey,
             Alias.createWithChainId("sasha", otherChainId).explicitGet(),
             Waves,
             amount,
@@ -80,7 +80,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.explicitGet()
+          ).signWith(miner.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -89,7 +89,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
     forAll(addressOrAliasWithVersion(PaymentTransaction.supportedVersions)) {
       case (_, _, sender, amount, fee, ts) =>
         PaymentTransaction(
-          sender.publicKey,
+          miner.publicKey,
           addressFromOther,
           amount,
           fee,
@@ -100,14 +100,14 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
 
         validateFromOtherNetwork(
           PaymentTransaction(
-            sender.publicKey,
+            miner.publicKey,
             addressFromOther,
             amount,
             fee,
             ts,
             ByteStr.empty,
             otherChainId
-          ).validatedEither.map(u => u.copy(signature = crypto.sign(sender.privateKey, u.bodyBytes()))).explicitGet()
+          ).validatedEither.map(u => u.copy(signature = crypto.sign(miner.privateKey, u.bodyBytes()))).explicitGet()
         )
     }
   }
@@ -117,7 +117,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
       case (addressOrAlias, version, sender, amount, fee, ts) =>
         LeaseTransaction(
           version,
-          sender.publicKey,
+          miner.publicKey,
           addressOrAlias,
           amount,
           fee,
@@ -129,14 +129,14 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
         validateFromOtherNetwork(
           LeaseTransaction(
             TxVersion.V3,
-            sender.publicKey,
+            miner.publicKey,
             addressOrAlias,
             amount,
             fee,
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.explicitGet()
+          ).signWith(miner.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -146,7 +146,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
       case (addressOrAlias, version, sender, _, fee, ts) =>
         InvokeScriptTransaction(
           version,
-          sender.publicKey,
+          miner.publicKey,
           addressOrAlias,
           None,
           Seq.empty,
@@ -160,7 +160,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
         validateFromOtherNetwork(
           InvokeScriptTransaction(
             TxVersion.V2,
-            sender.publicKey,
+            miner.publicKey,
             addressOrAlias,
             None,
             Seq.empty,
@@ -169,7 +169,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.explicitGet()
+          ).signWith(miner.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -193,14 +193,14 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
         validateFromOtherNetwork(
           BurnTransaction(
             TxVersion.V3,
-            sender.publicKey,
+            miner.publicKey,
             IssuedAsset(ByteStr(bytes32gen.sample.get)),
             amount,
             fee,
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.explicitGet()
+          ).signWith(miner.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -211,13 +211,13 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
         validateFromOtherNetwork(
           CreateAliasTransaction(
             TxVersion.V3,
-            sender.publicKey,
+            miner.publicKey,
             "alias",
             fee,
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.explicitGet()
+          ).signWith(miner.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -228,13 +228,13 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
         validateFromOtherNetwork(
           DataTransaction(
             TxVersion.V2,
-            sender.publicKey,
+            miner.publicKey,
             Seq(StringDataEntry("key", "value")),
             fee,
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.explicitGet()
+          ).signWith(miner.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -246,8 +246,8 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
         validateFromOtherNetwork(
           ExchangeTransaction(
             TxVersion.V3,
-            Order.sell(Order.V3, sender, sender.publicKey, pair, amount, amount, ts, ts + ts, fee),
-            Order.buy(Order.V3, sender, sender.publicKey, pair, amount, amount, ts, ts + ts, fee),
+            Order.sell(Order.V3, sender, miner.publicKey, pair, amount, amount, ts, ts + ts, fee),
+            Order.buy(Order.V3, sender, miner.publicKey, pair, amount, amount, ts, ts + ts, fee),
             amount,
             amount,
             fee,
@@ -256,7 +256,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.explicitGet()
+          ).signWith(miner.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -267,7 +267,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
         validateFromOtherNetwork(
           IssueTransaction(
             TxVersion.V3,
-            sender.publicKey,
+            miner.publicKey,
             ByteString.copyFromUtf8("name"),
             ByteString.copyFromUtf8("description"),
             quantity,
@@ -278,7 +278,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.explicitGet()
+          ).signWith(miner.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -289,13 +289,13 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
         validateFromOtherNetwork(
           LeaseCancelTransaction(
             TxVersion.V3,
-            sender.publicKey,
+            miner.publicKey,
             ByteStr(bytes32gen.sample.get),
             fee,
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.explicitGet()
+          ).signWith(miner.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -306,7 +306,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
         validateFromOtherNetwork(
           MassTransferTransaction(
             TxVersion.V2,
-            sender.publicKey,
+            miner.publicKey,
             Waves,
             Seq(ParsedTransfer(addressOrAlias, amount)),
             fee,
@@ -314,7 +314,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             ByteStr.empty,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.explicitGet()
+          ).signWith(miner.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -325,7 +325,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
         validateFromOtherNetwork(
           ReissueTransaction(
             TxVersion.V3,
-            sender.publicKey,
+            miner.publicKey,
             IssuedAsset(ByteStr(bytes32gen.sample.get)),
             quantity,
             true,
@@ -333,7 +333,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.explicitGet()
+          ).signWith(miner.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -344,14 +344,14 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
         validateFromOtherNetwork(
           SetAssetScriptTransaction(
             TxVersion.V2,
-            sender.publicKey,
+            miner.publicKey,
             IssuedAsset(ByteStr(bytes32gen.sample.get)),
             Some(scriptGen.sample.get),
             fee,
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.explicitGet()
+          ).signWith(miner.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -362,13 +362,13 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
         validateFromOtherNetwork(
           SetScriptTransaction(
             TxVersion.V2,
-            sender.publicKey,
+            miner.publicKey,
             Some(scriptGen.sample.get),
             fee,
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.explicitGet()
+          ).signWith(miner.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -379,14 +379,14 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
         validateFromOtherNetwork(
           SponsorFeeTransaction(
             TxVersion.V2,
-            sender.publicKey,
+            miner.publicKey,
             IssuedAsset(ByteStr(bytes32gen.sample.get)),
             None,
             fee,
             ts,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.explicitGet()
+          ).signWith(miner.privateKey).validatedEither.explicitGet()
         )
     }
   }
@@ -397,7 +397,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
         validateFromOtherNetwork(
           UpdateAssetInfoTransaction(
             version,
-            sender.publicKey,
+            miner.publicKey,
             IssuedAsset(ByteStr(bytes32gen.sample.get)),
             "name",
             "description",
@@ -406,7 +406,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
             Waves,
             Proofs.empty,
             otherChainId
-          ).signWith(sender.privateKey).validatedEither.explicitGet()
+          ).signWith(miner.privateKey).validatedEither.explicitGet()
         )
     }
   }

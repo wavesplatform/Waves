@@ -66,9 +66,9 @@ class SponsorFeeActionSuite extends BaseSuite {
       sponsoredAssetId = stateChanges.head.sponsorFees.head.assetId
       miner.assetsDetails(sponsoredAssetId).minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
 
-      val dAppBalance = miner.assetsBalance(globalDAppAddress).balances.head
+      val dAppBalance = miner.portfolio(globalDAppAddress).balances.head
       dAppBalance.minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
-      dAppBalance.sponsorBalance shouldBe Some(miner.balance(globalDAppAddress).balance)
+      dAppBalance.sponsorBalance shouldBe Some(miner.wavesBalance(globalDAppAddress))
     }
 
     "Use sponsored asset as fee" in {
@@ -79,7 +79,7 @@ class SponsorFeeActionSuite extends BaseSuite {
       val bob   = miner.createKeyPair()
 
       val startDAppSponsorAssetBalance = miner.assetBalance(globalDAppAddress, sponsoredAssetId).balance
-      val startDAppBalance             = miner.balance(globalDAppAddress).balance
+      val startDAppBalance             = miner.wavesBalance(globalDAppAddress)
       val startMinerBalance            = miner.balanceAtHeight(miner.address, firstCheckHeight)
 
       val assetFee            = 100
@@ -174,9 +174,9 @@ class SponsorFeeActionSuite extends BaseSuite {
 
       miner.assetsDetails(sponsoredAssetId).minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
 
-      val dAppBalance = miner.assetsBalance(dAppAddress).balances.map(b => (b.assetId, b)).toMap
+      val dAppBalance = miner.portfolio(dAppAddress).balances.map(b => (b.assetId, b)).toMap
       dAppBalance(sponsoredAssetId).minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
-      dAppBalance(sponsoredAssetId).sponsorBalance shouldBe Some(miner.balance(dAppAddress).balance)
+      dAppBalance(sponsoredAssetId).sponsorBalance shouldBe Some(miner.wavesBalance(dAppAddress))
       dAppBalance(cancelledAssetId).minSponsoredAssetFee shouldBe None
       dAppBalance(cancelledAssetId).sponsorBalance shouldBe None
     }
@@ -232,9 +232,9 @@ class SponsorFeeActionSuite extends BaseSuite {
 
       miner.assetsDetails(assetId).minSponsoredAssetFee shouldBe Some(lastMinSponsoredAssetFee)
 
-      val dAppBalance = miner.assetsBalance(dAppAddress).balances.head
+      val dAppBalance = miner.portfolio(dAppAddress).balances.head
       dAppBalance.minSponsoredAssetFee shouldBe Some(lastMinSponsoredAssetFee)
-      dAppBalance.sponsorBalance shouldBe Some(miner.balance(dAppAddress).balance)
+      dAppBalance.sponsorBalance shouldBe Some(miner.wavesBalance(dAppAddress))
     }
 
     "Sponsor and cancel sponsorship is available for same asset" in {
@@ -280,7 +280,7 @@ class SponsorFeeActionSuite extends BaseSuite {
 
       miner.assetsDetails(assetId).minSponsoredAssetFee shouldBe None
 
-      val dAppBalance = miner.assetsBalance(dAppAddress).balances.head
+      val dAppBalance = miner.portfolio(dAppAddress).balances.head
       dAppBalance.minSponsoredAssetFee shouldBe None
       dAppBalance.sponsorBalance shouldBe None
     }
@@ -379,9 +379,9 @@ class SponsorFeeActionSuite extends BaseSuite {
             sponsorFee.minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
 
             miner.assetsDetails(issueAssetId).minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
-            val dAppBalance = miner.assetsBalance(dAppAddress).balances.find(_.assetId == issueAssetId).get
+            val dAppBalance = miner.portfolio(dAppAddress).balances.find(_.assetId == issueAssetId).get
             dAppBalance.minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
-            dAppBalance.sponsorBalance shouldBe Some(miner.balance(dAppAddress).balance)
+            dAppBalance.sponsorBalance shouldBe Some(miner.wavesBalance(dAppAddress))
         }
 
       assertBadRequestAndMessage(
@@ -392,7 +392,7 @@ class SponsorFeeActionSuite extends BaseSuite {
 
     "SponsorFee is available for assets issued via transaction" in {
       val dApp = miner.createKeyPair()
-      miner.transfer(sender.keyPair, dApp.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
+      miner.transfer(miner.keyPair, dApp.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
       val assetId = miner.issue(dApp, waitForTx = true).id
 
       createDApp(
@@ -410,13 +410,13 @@ class SponsorFeeActionSuite extends BaseSuite {
       )
 
       val tx = miner.invokeScript(miner.keyPair, dApp.toAddress.toString, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee)
-      sender.debugStateChanges(tx._1.id).stateChanges.get.sponsorFees.head shouldBe SponsorFeeResponse(assetId, Some(1000))
+      miner.debugStateChanges(tx._1.id).stateChanges.get.sponsorFees.head shouldBe SponsorFeeResponse(assetId, Some(1000))
     }
 
     "Negative fee is not available" in {
       val dApp        = miner.createKeyPair()
       val dAppAddress = dApp.toAddress.toString
-      miner.transfer(sender.keyPair, dAppAddress, initialWavesBalance, minFee, waitForTx = true)
+      miner.transfer(miner.keyPair, dAppAddress, initialWavesBalance, minFee, waitForTx = true)
       val assetId = miner.issue(dApp, waitForTx = true).id
 
       createDApp(
@@ -438,7 +438,7 @@ class SponsorFeeActionSuite extends BaseSuite {
 
     "SponsorFee is available only for assets issuing from current address" in {
       val issuer = miner.createKeyPair()
-      miner.transfer(sender.keyPair, issuer.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
+      miner.transfer(miner.keyPair, issuer.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
       val assetId = miner.issue(issuer, waitForTx = true).id
 
       val dApp = createDApp(
@@ -463,7 +463,7 @@ class SponsorFeeActionSuite extends BaseSuite {
     "SponsorFee is not available for scripted assets" in {
       val dApp        = miner.createKeyPair()
       val dAppAddress = dApp.toAddress.toString
-      miner.transfer(sender.keyPair, dAppAddress, initialWavesBalance, minFee, waitForTx = true)
+      miner.transfer(miner.keyPair, dAppAddress, initialWavesBalance, minFee, waitForTx = true)
 
       val script  = ScriptCompiler.compile("true", ScriptEstimatorV2).explicitGet()._1.bytes().base64
       val assetId = miner.issue(dApp, script = Some(script), waitForTx = true).id
@@ -523,11 +523,11 @@ class SponsorFeeActionSuite extends BaseSuite {
       val invokeTx2 = miner.invokeScript(miner.keyPair, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee + issueFee)
       miner.debugStateChanges(invokeTx2._1.id).stateChanges.get.sponsorFees.head.assetId shouldBe assetId
 
-      nodes.rollback(firstTxHeight, returnToUTX = false)
+      nodes.blacklistPeersAndRollback(firstTxHeight, returnToUTX = false)
       nodes.waitForHeight(miner.height + 1)
 
       miner.assetsDetails(assetId).minSponsoredAssetFee shouldBe None
-      val dAppBalance = miner.assetsBalance(dApp).balances.head
+      val dAppBalance = miner.portfolio(dApp).balances.head
       dAppBalance.assetId shouldBe assetId
       dAppBalance.minSponsoredAssetFee shouldBe None
       dAppBalance.sponsorBalance shouldBe None
@@ -543,14 +543,14 @@ class SponsorFeeActionSuite extends BaseSuite {
       val invokeTx2 = miner.invokeScript(miner.keyPair, dAppAddress, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee + issueFee)
       miner.debugStateChanges(invokeTx2._1.id).stateChanges.get.sponsorFees.head.assetId shouldBe assetId
 
-      nodes.rollback(firstTxHeight, returnToUTX = true)
+      nodes.blacklistPeersAndRollback(firstTxHeight, returnToUTX = true)
       nodes.waitForTransaction(invokeTx2._1.id)
 
       miner.assetsDetails(assetId).minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
-      val dAppBalance = miner.assetsBalance(dAppAddress).balances.head
+      val dAppBalance = miner.portfolio(dAppAddress).balances.head
       dAppBalance.assetId shouldBe assetId
       dAppBalance.minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
-      dAppBalance.sponsorBalance shouldBe Some(miner.balance(dAppAddress).balance)
+      dAppBalance.sponsorBalance shouldBe Some(miner.wavesBalance(dAppAddress))
     }
   }
 
@@ -563,7 +563,7 @@ class SponsorFeeActionSuite extends BaseSuite {
       .explicitGet()
       ._1
 
-    miner.transfer(sender.keyPair, address.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
+    miner.transfer(miner.keyPair, address.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
 
     nodes.waitForTransaction(
       miner

@@ -1,12 +1,14 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import org.scalatest.{CancelAfterFailure, FunSuite}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
+import org.scalatest.FunSuite
+
 import scala.concurrent.duration._
 
-class FairPoSTestSuite extends FunSuite with CancelAfterFailure with NodesFromDocker {
+class FairPoSTestSuite extends FunSuite with NodesFromDocker {
+
   import FairPoSTestSuite._
 
   override protected def nodeConfigs: Seq[Config] = Configs

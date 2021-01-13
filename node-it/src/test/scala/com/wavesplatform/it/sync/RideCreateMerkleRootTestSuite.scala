@@ -1,116 +1,107 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
-import com.wavesplatform.account._
 import com.wavesplatform.common.merkle.Merkle
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.it._
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.Transaction
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{Node, NodeConfigs, ReportingTestName, TransferSending}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Proofs, TxVersion}
-import org.scalatest.prop.TableDrivenPropertyChecks
-import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
+import org.scalatest.{FunSuite, Matchers}
 
-class RideCreateMerkleRootTestSuite
-    extends FunSuite
-    with CancelAfterFailure
-    with TransferSending
-    with NodesFromDocker
-    with ReportingTestName
-    with Matchers
-    with TableDrivenPropertyChecks {
+class RideCreateMerkleRootTestSuite extends FunSuite with NodesFromDocker with ReportingTestName with Matchers with NTPTime {
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
       .overrideBase(
         _.preactivatedFeatures(
-          (14, 1000000),
-          BlockchainFeatures.NG.id.toInt         -> 0,
-          BlockchainFeatures.FairPoS.id.toInt    -> 0,
-          BlockchainFeatures.Ride4DApps.id.toInt -> 0,
-          BlockchainFeatures.BlockV5.id.toInt    -> 0
+          BlockchainFeatures.BlockReward -> 0,
+          BlockchainFeatures.NG -> 0,
+          BlockchainFeatures.FairPoS -> 0,
+          BlockchainFeatures.Ride4DApps -> 0,
+          BlockchainFeatures.BlockV5 -> 0
         )
       )
       .withDefault(1)
       .buildNonConflicting()
 
-  private def sender: Node = nodes.last
+  private def miner: Node = nodes.last
+
+  private lazy val scriptedKeyPair = miner.createKeyPair()
 
   test("Ride createMerkleRoot") {
-    val script  = """
+    val cscript = ScriptCompiler
+      .compile(
+        """
         |{-# STDLIB_VERSION 4 #-}
         |{-# CONTENT_TYPE DAPP #-}
         |
         | @Callable(inv)
-        |func foo(proof: List[ByteVector], id: ByteVector, index: Int) = [
-        | BinaryEntry("root", createMerkleRoot(proof, id, index))
+        |func foo(proof: List[ByteVector], id: ByteVector, index: Int, txId: String) = [
+        | BinaryEntry(txId, createMerkleRoot(proof, id, index))
         |]
-        """.stripMargin
-    val cscript = ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1.bytes().base64
-    val node    = nodes.head
-    nodes.waitForHeightArise()
-    val tx1   = node.broadcastTransfer(node.keyPair, sender.address, setScriptFee, minFee, None, None, version = TxVersion.V3, waitForTx = false)
-    val txId1 = tx1.id
-    val tx2   = node.broadcastTransfer(node.keyPair, node.address, 1, minFee, None, None, version = TxVersion.V3, waitForTx = false)
-    val txId2 = tx2.id
-    val tx3   = node.broadcastTransfer(node.keyPair, node.address, 1, minFee, None, None, version = TxVersion.V3, waitForTx = false)
-    val txId3 = tx3.id
-    val tx4   = node.broadcastTransfer(node.keyPair, node.address, 1, minFee, None, None, version = TxVersion.V3, waitForTx = false)
-    val txId4 = tx4.id
-    val tx5   = node.broadcastTransfer(node.keyPair, node.address, 1, minFee, None, None, version = TxVersion.V3, waitForTx = false)
-    val txId5 = tx5.id
+        """.stripMargin,
+        ScriptEstimatorV3
+      )
+      .explicitGet()
+      ._1
+      .bytes()
+      .base64
 
-    val height = node.height
-
-    nodes.waitForHeightArise()
-
-    def tt(tx: Transaction) =
+    val transactions = Seq(setScriptFee, 1, 1, 1, 1).map { amount =>
       TransferTransaction
-        .create(
-          tx.version.get,
-          PublicKey(Base58.decode(tx.senderPublicKey.get)),
-          Address.fromString(tx.recipient.get).explicitGet(),
-          Waves /* not support tx.asset.fold(Waves)(v => IssuedAsset(Base58.decode(v))) */,
-          tx.amount.get,
-          Waves /* not support tx.feeAsset.fold(Waves)(v => Issued(Base58.decode(v))) */,
-          tx.fee,
-          ByteStr.empty, // attachment
-          tx.timestamp,
-          Proofs(tx.proofs.get.map(v => ByteStr(Base58.decode(v))))
+        .selfSigned(
+          3.toByte,
+          miner.keyPair,
+          scriptedKeyPair.toAddress,
+          Waves,
+          amount,
+          Waves,
+          minFee,
+          ByteStr.empty,
+          ntpTime.getTimestamp()
         )
         .explicitGet()
-    val natives = Seq(tx1, tx2, tx3, tx4, tx5).map(tt).map(t => Base58.encode(t.id().arr) -> t).toMap
+    }
 
-    val root = Base58.decode(node.blockAt(height).transactionsRoot.get)
+    transactions.foreach(tx => miner.signedBroadcast(tx.json()))
 
-    val proofs = nodes.head.getMerkleProof(txId1, txId2, txId3, txId4, txId5)
+    val transactionInfo = transactions.map(tx => tx -> miner.waitForTransaction(tx.id().toString))
 
-    sender.setScript(sender.keyPair, Some(cscript), setScriptFee, waitForTx = true).id
+    miner.waitForHeight(transactionInfo.map(_._2.height).max + 1)
+    miner.setScript(scriptedKeyPair, Some(cscript), setScriptFee, waitForTx = true)
 
-    for (p <- proofs) {
-      node.invokeScript(
-        node.keyPair,
-        sender.address,
-        func = Some("foo"),
-        args = List(
-          ARR(p.merkleProof.map(v => CONST_BYTESTR(ByteStr(Base58.decode(v))).explicitGet()).toIndexedSeq, false).explicitGet(),
-          CONST_BYTESTR(ByteStr(Merkle.hash(natives(p.id).bytes()))).explicitGet(),
-          CONST_LONG(p.transactionIndex.toLong)
-        ),
-        payment = Seq(),
-        fee = 2 * smartFee + minFee,
-        waitForTx = true
+    for (((tx, txInfo), proofs) <- transactionInfo.zip(miner.getMerkleProof(transactionInfo.map(_._2.id): _*))) {
+      miner.waitForTransaction(
+        miner
+          .invokeScript(
+            miner.keyPair,
+            scriptedKeyPair.toAddress.toString,
+            func = Some("foo"),
+            args = List(
+              ARR(proofs.merkleProof.map(v => CONST_BYTESTR(ByteStr(Base58.decode(v))).explicitGet()).toIndexedSeq, false).explicitGet(),
+              CONST_BYTESTR(ByteStr(Merkle.hash(tx.bytes()))).explicitGet(),
+              CONST_LONG(proofs.transactionIndex),
+              CONST_STRING(txInfo.id).explicitGet()
+            ),
+            payment = Seq(),
+            fee = 2 * smartFee + minFee,
+            waitForTx = true
+          )
+          ._1
+          .id
       )
-      node.getDataByKey(sender.address, "root") shouldBe BinaryDataEntry("root", ByteStr(root))
+
+      val root = ByteStr.decodeBase58(miner.blockHeadersAt(txInfo.height).transactionsRoot.getOrElse("")).get
+
+      miner.getDataByKey(scriptedKeyPair.toAddress.toString, txInfo.id) shouldBe BinaryDataEntry(txInfo.id, root)
     }
   }
 }

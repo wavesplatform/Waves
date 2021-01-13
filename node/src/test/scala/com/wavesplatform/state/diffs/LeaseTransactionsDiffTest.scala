@@ -153,9 +153,9 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with WithSt
       case (genesis, genesis2, lease, unleaseOther, blockTime) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, genesis2, lease))), TestBlock.create(blockTime, Seq(unleaseOther)), settings) {
           case (totalDiff, _) =>
-            totalDiff.portfolios.get(lease.sender.toAddress) shouldBe None
+            totalDiff.portfolios.get(lease.miner.toAddress) shouldBe None
             total(totalDiff.portfolios(lease.recipient.asInstanceOf[Address]).lease) shouldBe -lease.amount
-            total(totalDiff.portfolios(unleaseOther.sender.toAddress).lease) shouldBe lease.amount
+            total(totalDiff.portfolios(unleaseOther.miner.toAddress).lease) shouldBe lease.amount
         }
     }
   }
@@ -169,8 +169,8 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with WithSt
           settings
         ) {
           case (totalDiff, _) =>
-            totalDiff.portfolios.get(lease.sender.toAddress) shouldBe None
-            total(totalDiff.portfolios(unleaseRecipient.sender.toAddress).lease) shouldBe 0
+            totalDiff.portfolios.get(lease.miner.toAddress) shouldBe None
+            total(totalDiff.portfolios(unleaseRecipient.miner.toAddress).lease) shouldBe 0
         }
     }
   }

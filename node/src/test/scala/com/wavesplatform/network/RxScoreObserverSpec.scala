@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.network.RxScoreObserver.{BestChannel, SyncWith}
+import com.wavesplatform.network.RxScoreObserver.SyncWith
 import com.wavesplatform.{RxScheduler, TransactionGen}
 import io.netty.channel.Channel
 import io.netty.channel.local.LocalChannel
@@ -11,7 +11,7 @@ import org.scalatest.{FreeSpec, Matchers}
 import scala.concurrent.duration._
 
 class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen with RxScheduler {
-  override def testSchedulerName = "test-rx-score-observer"
+  override def testSchedulerName: String = "test-rx-score-observer"
 
   private def withObserver(f: (Coeval[Seq[SyncWith]], PublishSubject[BigInt], PublishSubject[(Channel, BigInt)], PublishSubject[Channel]) => Any) = {
     val localScores   = PublishSubject[BigInt]()

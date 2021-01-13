@@ -164,7 +164,7 @@ class UtxPoolSpecification
   private val stateGen = for {
     (sender, senderBalance) <- accountsGen
   } yield {
-    val bcu = mkBlockchain(Map(sender.toAddress -> senderBalance))
+    val bcu = mkBlockchain(Map(miner.toAddress -> senderBalance))
     (sender, senderBalance, bcu)
   }
 
@@ -281,7 +281,7 @@ class UtxPoolSpecification
         10,
         PoolDefaultMaxBytes,
         1000,
-        Set(sender.toAddress.toString),
+        Set(miner.toAddress.toString),
         Set.empty,
         Set.empty,
         allowTransactionsFromSmartAccounts = true,
@@ -302,7 +302,7 @@ class UtxPoolSpecification
         txs.length,
         PoolDefaultMaxBytes,
         1000,
-        Set(sender.toAddress.toString),
+        Set(miner.toAddress.toString),
         Set(recipient.toAddress.toString),
         Set.empty,
         allowTransactionsFromSmartAccounts = true,
@@ -323,9 +323,9 @@ class UtxPoolSpecification
         txs.length,
         PoolDefaultMaxBytes,
         1000,
-        Set(sender.toAddress.stringRepr),
+        Set(miner.toAddress.stringRepr),
         Set.empty,
-        Set(sender.toAddress.stringRepr),
+        Set(miner.toAddress.stringRepr),
         allowTransactionsFromSmartAccounts = true,
         allowSkipChecks = false
       )
@@ -348,7 +348,7 @@ class UtxPoolSpecification
           txs.length,
           PoolDefaultMaxBytes,
           1000,
-          Set(sender.toAddress.toString),
+          Set(miner.toAddress.toString),
           whitelist,
           Set.empty,
           allowTransactionsFromSmartAccounts = true,
@@ -706,31 +706,31 @@ class UtxPoolSpecification
       "is not empty if there are transactions" in forAll(withValidPayments) {
         case (sender, _, utxPool, _, _) =>
           utxPool.size should be > 0
-          utxPool.pessimisticPortfolio(sender.toAddress) should not be empty
+          utxPool.pessimisticPortfolio(miner.toAddress) should not be empty
       }
 
       "is empty if there is no transactions" in forAll(emptyUtxPool) {
         case (sender, _, utxPool) =>
           utxPool.size shouldBe 0
-          utxPool.pessimisticPortfolio(sender.toAddress) shouldBe empty
+          utxPool.pessimisticPortfolio(miner.toAddress) shouldBe empty
       }
 
       "is empty if utx pool was cleaned" in forAll(withValidPayments) {
         case (sender, _, utxPool, _, _) =>
           utxPool.removeAll(utxPool.all)
-          utxPool.pessimisticPortfolio(sender.toAddress) shouldBe empty
+          utxPool.pessimisticPortfolio(miner.toAddress) shouldBe empty
       }
 
       "is changed after transactions with these assets are removed" in forAll(withValidPayments) {
         case (sender, _, utxPool, time, _) =>
-          val portfolioBefore = utxPool.pessimisticPortfolio(sender.toAddress)
+          val portfolioBefore = utxPool.pessimisticPortfolio(miner.toAddress)
           val poolSizeBefore  = utxPool.size
 
           time.advance(maxAge * 2)
           utxPool.packUnconfirmed(limitByNumber(100), PackStrategy.Unlimited)
 
           poolSizeBefore should be > utxPool.size
-          val portfolioAfter = utxPool.pessimisticPortfolio(sender.toAddress)
+          val portfolioAfter = utxPool.pessimisticPortfolio(miner.toAddress)
 
           portfolioAfter should not be portfolioBefore
       }
@@ -740,7 +740,7 @@ class UtxPoolSpecification
       "equal to state's portfolio if utx is empty" in forAll(emptyUtxPool) {
         case (sender, _, utxPool) =>
           val pessimisticAssetIds = {
-            val p = utxPool.pessimisticPortfolio(sender.toAddress)
+            val p = utxPool.pessimisticPortfolio(miner.toAddress)
             p.assetIds.filter(x => p.balanceOf(x) != 0)
           }
 
@@ -749,9 +749,9 @@ class UtxPoolSpecification
 
       "takes into account added txs" in forAll(withValidPaymentsNotAdded) {
         case (sender, _, utxPool, txs, _, _) =>
-          val emptyPf = utxPool.pessimisticPortfolio(sender.toAddress)
+          val emptyPf = utxPool.pessimisticPortfolio(miner.toAddress)
           txs.foreach(utxPool.putIfNew(_).resultE should beRight)
-          utxPool.pessimisticPortfolio(sender.toAddress) should not be emptyPf
+          utxPool.pessimisticPortfolio(miner.toAddress) should not be emptyPf
       }
 
       "takes into account unconfirmed transactions" in pending

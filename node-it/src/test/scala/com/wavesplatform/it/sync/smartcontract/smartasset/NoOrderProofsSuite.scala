@@ -19,7 +19,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
   val estimator = ScriptEstimatorV2
   test("try to use Order in asset scripts") {
     try {
-      sender.issue(
+      miner.issue(
         firstKeyPair,
         "assetWProofs",
         "Test coin for assetWProofs test",
@@ -50,7 +50,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
 
   test("try to use proofs in assets script") {
     val errProofMsg = "Reason: Proof doesn't validate as signature"
-    val assetWProofs = sender
+    val assetWProofs = miner
       .issue(
         firstKeyPair,
         "assetWProofs",
@@ -90,7 +90,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
     )
 
     assertBadRequestAndMessage(
-      sender.signedBroadcast(incorrectTrTx.json()),
+      miner.signedBroadcast(incorrectTrTx.json()),
       errProofMsg
     )
 
@@ -108,7 +108,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
       .explicitGet()
 
     assertBadRequestAndMessage(
-      sender.signedBroadcast(incorrectBrTx.json()),
+      miner.signedBroadcast(incorrectBrTx.json()),
       errProofMsg
     )
   }

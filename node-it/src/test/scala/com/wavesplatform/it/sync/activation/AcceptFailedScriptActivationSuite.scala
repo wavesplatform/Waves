@@ -34,7 +34,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    asset = sender.issue(dAppKP, "Asset", "Description", someAssetAmount, 8, script = assetScript(true), waitForTx = true).id
+    asset = miner.issue(dAppKP, "Asset", "Description", someAssetAmount, 8, script = assetScript(true), waitForTx = true).id
 
     val dAppScript = mkScript(
       s"""
@@ -63,61 +63,61 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
          |""".stripMargin
     )
 
-    sender.setScript(dAppKP, dAppScript, setScriptFee, waitForTx = true).id
+    miner.setScript(dAppKP, dAppScript, setScriptFee, waitForTx = true).id
     nodes.waitForEmptyUtx()
     nodes.waitForHeightArise()
   }
 
   test("reject failed transaction before activation height") {
     overflowBlock()
-    sender.waitForHeight(
-      sender
-        .waitForTransaction(sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(false)).id)
+    miner.waitForHeight(
+      miner
+        .waitForTransaction(miner.setAssetScript(asset, dAppKP, priorityFee, assetScript(false)).id)
         .height + 1
     )
 
-    assertApiErrorRaised(sender.invokeScript(callerKP, dApp, Some("transfer"), fee = minInvokeFee))
+    assertApiErrorRaised(miner.invokeScript(callerKP, dApp, Some("transfer"), fee = minInvokeFee))
   }
 
   test("accept valid transaction before activation height") {
-    val tx = sender.invokeScript(callerKP, dApp, Some("write"), fee = invokeFee, waitForTx = true)._1.id
-    all(sender.lastBlock().transactions.map(_.applicationStatus)) shouldBe None
+    val tx = miner.invokeScript(callerKP, dApp, Some("write"), fee = invokeFee, waitForTx = true)._1.id
+    all(miner.lastBlock().transactions.map(_.applicationStatus)) shouldBe None
 
     def check(): Unit = {
-      val txInfo   = sender.transactionInfo[JsObject](tx)
+      val txInfo   = miner.transactionInfo[JsObject](tx)
       val txHeight = (txInfo \ "height").as[Int]
       (txInfo \ "id").as[String] shouldBe tx
       txInfo.value.contains("applicationStatus") shouldBe false
-      val block = sender.blockAt(txHeight)
+      val block = miner.blockAt(txHeight)
       all(block.transactions.map(_.applicationStatus)) shouldBe None
-      all(sender.blockById(block.id).transactions.map(_.applicationStatus)) shouldBe None
-      all(sender.blockSeq(txHeight - 1, txHeight).flatMap(_.transactions.map(_.applicationStatus))) shouldBe None
-      sender.debugStateChanges(tx).applicationStatus shouldBe None
-      all(sender.debugStateChangesByAddress(caller, 1).map(_.applicationStatus)) shouldBe None
+      all(miner.blockById(block.id).transactions.map(_.applicationStatus)) shouldBe None
+      all(miner.blockSeq(txHeight - 1, txHeight).flatMap(_.transactions.map(_.applicationStatus))) shouldBe None
+      miner.debugStateChanges(tx).applicationStatus shouldBe None
+      all(miner.debugStateChangesByAddress(caller, 1).map(_.applicationStatus)) shouldBe None
     }
 
     nodes.waitForHeightArise()
     check() // hardened
-    all(sender.blockSeqByAddress(sender.address, 1, ActivationHeight - 1).flatMap(_.transactions.map(_.applicationStatus))) shouldBe None
+    all(miner.blockSeqByAddress(miner.address, 1, ActivationHeight - 1).flatMap(_.transactions.map(_.applicationStatus))) shouldBe None
   }
 
   test("accept failed transaction after activation height") {
-    sender.waitForHeight(ActivationHeight)
+    miner.waitForHeight(ActivationHeight)
 
-    sender.setAssetScript(asset, dAppKP, setAssetScriptFee + smartFee, assetScript(true), waitForTx = true)
+    miner.setAssetScript(asset, dAppKP, setAssetScriptFee + smartFee, assetScript(true), waitForTx = true)
     overflowBlock()
-    sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(false))
+    miner.setAssetScript(asset, dAppKP, priorityFee, assetScript(false))
     val txs =
       (1 to MaxTxsInMicroBlock * 2).map { _ =>
-        sender.invokeScript(callerKP, dApp, Some("transfer"), fee = minInvokeFee)._1.id
+        miner.invokeScript(callerKP, dApp, Some("transfer"), fee = minInvokeFee)._1.id
       }
 
-    sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
+    miner.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
 
-    all(sender.lastBlock().transactions.map(_.applicationStatus.isDefined)) shouldBe true
+    all(miner.lastBlock().transactions.map(_.applicationStatus.isDefined)) shouldBe true
 
     def check(): Unit = {
-      val statuses = sender.transactionStatus(txs)
+      val statuses = miner.transactionStatus(txs)
       all(statuses.map(_.status)) shouldBe "confirmed"
       all(statuses.map(_.applicationStatus.isDefined)) shouldBe true
 
@@ -127,31 +127,31 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       all(failed.flatMap(_.applicationStatus)) shouldBe "script_execution_failed"
 
       statuses.foreach { s =>
-        (sender.transactionInfo[JsObject](s.id) \ "applicationStatus").asOpt[String] shouldBe s.applicationStatus
+        (miner.transactionInfo[JsObject](s.id) \ "applicationStatus").asOpt[String] shouldBe s.applicationStatus
       }
 
       val heightToId            = statuses.map(s => s.height.get -> s.id).toMap
       val idToApplicationStatus = statuses.map(s => s.id         -> s.applicationStatus).toMap
       heightToId.keys.foreach { h =>
-        val block = sender.blockAt(h)
+        val block = miner.blockAt(h)
         block.transactions.foreach { tx =>
           tx.applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
           if (tx._type == InvokeScriptTransaction.typeId) {
-            sender.debugStateChanges(tx.id).applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
+            miner.debugStateChanges(tx.id).applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
           }
         }
-        sender.blockById(block.id).transactions.foreach { tx =>
+        miner.blockById(block.id).transactions.foreach { tx =>
           tx.applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
         }
 
-        sender.blockSeq(h - 1, h).flatMap(_.transactions).foreach { tx =>
+        miner.blockSeq(h - 1, h).flatMap(_.transactions).foreach { tx =>
           tx.applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
         }
       }
-      sender.debugStateChangesByAddress(caller, txs.size).foreach { s =>
+      miner.debugStateChangesByAddress(caller, txs.size).foreach { s =>
         s.applicationStatus shouldBe idToApplicationStatus.getOrElse(s.id, Some("succeeded"))
       }
-      sender.blockSeqByAddress(sender.address, ActivationHeight, sender.height).flatMap(_.transactions).foreach { tx =>
+      miner.blockSeqByAddress(miner.address, ActivationHeight, miner.height).flatMap(_.transactions).foreach { tx =>
         tx.applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
       }
     }
@@ -161,14 +161,14 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
   }
 
   test("accept valid transaction after activation height") {
-    val tx = sender.invokeScript(callerKP, dApp, Some("write"), fee = invokeFee, waitForTx = true)._1.id
+    val tx = miner.invokeScript(callerKP, dApp, Some("write"), fee = invokeFee, waitForTx = true)._1.id
 
     def check(): Unit = {
-      val txInfo = sender.transactionInfo[JsObject](tx)
+      val txInfo = miner.transactionInfo[JsObject](tx)
       (txInfo \ "id").as[String] shouldBe tx
       (txInfo \ "applicationStatus").as[String] shouldBe "succeeded"
 
-      sender.transactionStatus(Seq(tx)).map(_.applicationStatus) shouldBe Seq(Some("succeeded"))
+      miner.transactionStatus(Seq(tx)).map(_.applicationStatus) shouldBe Seq(Some("succeeded"))
     }
 
     nodes.waitForHeightArise()
@@ -176,43 +176,43 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
   }
 
   test("accept invalid by asset script InvokeScriptTransaction to utx and save it as failed after activation height") {
-    sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(true), waitForTx = true)
+    miner.setAssetScript(asset, dAppKP, priorityFee, assetScript(true), waitForTx = true)
 
     overflowBlock()
 
     val txs =
       (1 to MaxTxsInMicroBlock * 2).map { i =>
-        sender.invokeScript(callerKP, dApp, Some("transfer"), fee = minInvokeFee + i)._1.id
+        miner.invokeScript(callerKP, dApp, Some("transfer"), fee = minInvokeFee + i)._1.id
       }
 
-    sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(false))
+    miner.setAssetScript(asset, dAppKP, priorityFee, assetScript(false))
 
     def check(): Unit = {
-      val failed = sender.transactionStatus(txs).filterNot(_.applicationStatus.contains("succeeded"))
+      val failed = miner.transactionStatus(txs).filterNot(_.applicationStatus.contains("succeeded"))
       failed should not be empty
 
       all(failed.map(_.status)) shouldBe "confirmed"
       all(failed.map(_.applicationStatus)) shouldBe Some("script_execution_failed")
     }
 
-    sender.waitFor("empty utx")(n => n.utxSize, (_: Int) == 0, 100.millis)
+    miner.waitFor("empty utx")(n => n.utxSize, (_: Int) == 0, 100.millis)
     nodes.waitForHeightArise()
     check() // hardened
   }
 
   test("accept invalid by asset script in payment InvokeScriptTransaction to utx and save it as failed after activation height") {
-    sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(true), waitForTx = true)
+    miner.setAssetScript(asset, dAppKP, priorityFee, assetScript(true), waitForTx = true)
 
-    val invokesCount = MaxTxsInMicroBlock * 2
-    val callerBalance = sender.balance(caller).balance
+    val invokesCount  = MaxTxsInMicroBlock * 2
+    val callerBalance = miner.wavesBalance(caller)
     val callerAssetBalance = {
-      val balance = sender.assetBalance(caller, asset).balance
+      val balance = miner.assetBalance(caller, asset).balance
       if (balance < invokesCount) {
-        sender.transfer(dAppKP, caller, invokesCount - balance, minFee + 2 * smartFee, Some(asset), waitForTx = true)
+        miner.transfer(dAppKP, caller, invokesCount - balance, minFee + 2 * smartFee, Some(asset), waitForTx = true)
       }
-      sender.assetBalance(caller, asset).balance
+      miner.assetBalance(caller, asset).balance
     }
-    val dAppAssetBalance = sender.assetBalance(dApp, asset).balance
+    val dAppAssetBalance = miner.assetBalance(dApp, asset).balance
 
     nodes.waitFor("empty utx")(_.utxSize)(_.forall(_ == 0))
     nodes.waitForHeightArise()
@@ -220,7 +220,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
     val txs =
       (1 to invokesCount).map { _ =>
-        sender
+        miner
           .invokeScript(
             callerKP,
             dApp,
@@ -232,22 +232,22 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
           .id
       }
 
-    sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(false))
-    sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
+    miner.setAssetScript(asset, dAppKP, priorityFee, assetScript(false))
+    miner.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
 
     def check(): Unit = {
-      val failed = sender.transactionStatus(txs).filterNot(_.applicationStatus.contains("succeeded"))
+      val failed = miner.transactionStatus(txs).filterNot(_.applicationStatus.contains("succeeded"))
       failed should not be empty
 
       all(failed.map(_.status)) shouldBe "confirmed"
       all(failed.map(_.applicationStatus)) shouldBe Some("script_execution_failed")
 
-      sender.balance(caller).balance shouldBe callerBalance - invokesCount * minInvokeFee
-      sender.assetBalance(caller, asset).balance should be > 0L
-      sender.assetBalance(dApp, asset).balance shouldBe dAppAssetBalance +- invokesCount
+      miner.wavesBalance(caller) shouldBe callerBalance - invokesCount * minInvokeFee
+      miner.assetBalance(caller, asset).balance should be > 0L
+      miner.assetBalance(dApp, asset).balance shouldBe dAppAssetBalance +- invokesCount
 
       assertApiError(
-        sender
+        miner
           .invokeScript(
             callerKP,
             dApp,
@@ -269,23 +269,23 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
   }
 
   test("reject withdrawal of InvokeScriptTransaction fee from the funds received as a result of the script call execution") {
-    sender.setAssetScript(asset, dAppKP, setAssetScriptFee + smartFee, assetScript(true), waitForTx = true)
+    miner.setAssetScript(asset, dAppKP, setAssetScriptFee + smartFee, assetScript(true), waitForTx = true)
 
-    sender.transfer(otherCallerKP, caller, sender.balance(otherCaller).balance - minFee, fee = minFee, waitForTx = true)
+    miner.transfer(otherCallerKP, caller, miner.wavesBalance(otherCaller) - minFee, fee = minFee, waitForTx = true)
 
-    sender.balance(otherCaller).balance shouldBe 0L
+    miner.wavesBalance(otherCaller) shouldBe 0L
 
-    assertApiError(sender.invokeScript(otherCallerKP, dApp, Some("transfer"), fee = minInvokeFee)) { e =>
+    assertApiError(miner.invokeScript(otherCallerKP, dApp, Some("transfer"), fee = minInvokeFee)) { e =>
       e.id shouldBe StateCheckFailed.Id
       e.message should include("Accounts balance errors")
     }
   }
 
   test("reject withdrawal of matcher fee from orders in ExchangeTransaction") {
-    sender.transfer(callerKP, otherCaller, issueFee, waitForTx = true)
-    val tradeAsset = sender.issue(otherCallerKP, "Trade", decimals = 8: Byte, waitForTx = true).id
+    miner.transfer(callerKP, otherCaller, issueFee, waitForTx = true)
+    val tradeAsset = miner.issue(otherCallerKP, "Trade", decimals = 8: Byte, waitForTx = true).id
 
-    sender.balance(otherCaller).balance shouldBe 0L
+    miner.wavesBalance(otherCaller) shouldBe 0L
 
     val assetPair = AssetPair.createAssetPair("WAVES", tradeAsset)
 
@@ -315,7 +315,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     )
 
     assertApiError(
-      sender.broadcastExchange(
+      miner.broadcastExchange(
         dAppKP,
         sellOrder,
         buyOrder,
@@ -324,7 +324,8 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
         buyMatcherFee = smartMatcherFee,
         sellMatcherFee = smartMatcherFee,
         fee = priorityFee,
-        version = TxVersion.V3
+        version = TxVersion.V3,
+        timestamp = ts
       )
     ) { e =>
       e.id shouldBe StateCheckFailed.Id
@@ -333,27 +334,27 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
   }
 
   test("accept invalid by order asset scripts ExchangeTransaction to utx and save it as failed after activation height") {
-    sender.waitForHeight(ActivationHeight, 5 minutes)
+    miner.waitForHeight(ActivationHeight, 5 minutes)
 
-    sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(true), waitForTx = true)
-    sender.transfer(sender.keyPair, dApp, 100.waves, waitForTx = true)
+    miner.setAssetScript(asset, dAppKP, priorityFee, assetScript(true), waitForTx = true)
+    miner.transfer(miner.keyPair, dApp, 100.waves, waitForTx = true)
     val tradeAsset =
-      sender
+      miner
         .issue(dAppKP, "TradeAsset", quantity = someAssetAmount, decimals = 8: Byte, script = assetScript(true), fee = priorityFee, waitForTx = true)
         .id
     val feeAsset =
-      sender
+      miner
         .issue(dAppKP, "FeeAsset", quantity = someAssetAmount, decimals = 8: Byte, script = assetScript(true), fee = priorityFee, waitForTx = true)
         .id
 
     val preconditions = Seq(
-      sender.transfer(dAppKP, caller, someAssetAmount / 3, assetId = Some(tradeAsset), fee = minFee + 2 * smartFee).id,
-      sender.transfer(dAppKP, caller, someAssetAmount / 3, assetId = Some(feeAsset), fee = minFee + 2 * smartFee).id,
-      sender.transfer(dAppKP, otherCaller, someAssetAmount / 3, assetId = Some(tradeAsset), fee = minFee + 2 * smartFee).id,
-      sender.transfer(dAppKP, otherCaller, someAssetAmount / 3, assetId = Some(feeAsset), fee = minFee + 2 * smartFee).id
+      miner.transfer(dAppKP, caller, someAssetAmount / 3, assetId = Some(tradeAsset), fee = minFee + 2 * smartFee).id,
+      miner.transfer(dAppKP, caller, someAssetAmount / 3, assetId = Some(feeAsset), fee = minFee + 2 * smartFee).id,
+      miner.transfer(dAppKP, otherCaller, someAssetAmount / 3, assetId = Some(tradeAsset), fee = minFee + 2 * smartFee).id,
+      miner.transfer(dAppKP, otherCaller, someAssetAmount / 3, assetId = Some(feeAsset), fee = minFee + 2 * smartFee).id
     )
 
-    sender.waitFor("preconditions")(
+    miner.waitFor("preconditions")(
       n => n.transactionStatus(preconditions),
       (statuses: Seq[TransactionStatus]) => statuses.forall(_.status == "confirmed"),
       100.millis
@@ -395,8 +396,8 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       val (buy, sell) = orders
       overflowBlock()
 
-      sender.setAssetScript(tradeAsset, dAppKP, priorityFee, assetScript(false))
-      val tx = sender
+      miner.setAssetScript(tradeAsset, dAppKP, priorityFee, assetScript(false))
+      val tx = miner
         .broadcastExchange(
           dAppKP,
           buy,
@@ -411,7 +412,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
         )
         .id
 
-      val status = sender.waitFor("exchange accepted and saved as failed")(
+      val status = miner.waitFor("exchange accepted and saved as failed")(
         n => n.transactionStatus(Seq(tx)).head,
         (s: TransactionStatus) => s.status == "confirmed",
         100.millis
@@ -422,11 +423,11 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
     {
       val (buy, sell) = orders
-      sender.setAssetScript(tradeAsset, dAppKP, setAssetScriptFee + smartFee, assetScript(true), waitForTx = true)
+      miner.setAssetScript(tradeAsset, dAppKP, setAssetScriptFee + smartFee, assetScript(true), waitForTx = true)
 
       overflowBlock()
-      sender.setAssetScript(feeAsset, dAppKP, setAssetScriptFee + smartFee, assetScript(false))
-      val tx = sender
+      miner.setAssetScript(feeAsset, dAppKP, setAssetScriptFee + smartFee, assetScript(false))
+      val tx = miner
         .broadcastExchange(
           dAppKP,
           buy,
@@ -441,7 +442,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
         )
         .id
 
-      val status = sender.waitFor("exchange accepted and saved as failed")(
+      val status = miner.waitFor("exchange accepted and saved as failed")(
         n => n.transactionStatus(Seq(tx)).head,
         (s: TransactionStatus) => s.status == "confirmed",
         100.millis
@@ -485,7 +486,7 @@ object AcceptFailedScriptActivationSuite {
       .overrideBase(_.quorum(0))
       .overrideBase(
         _.preactivatedFeatures(
-          (BlockchainFeatures.BlockV5.id, ActivationHeight)
+          (BlockchainFeatures.BlockV5, ActivationHeight)
         )
       )
       .overrideBase(_.raw(s"waves.blockchain.custom.functionality.min-asset-info-update-interval = $UpdateInterval"))

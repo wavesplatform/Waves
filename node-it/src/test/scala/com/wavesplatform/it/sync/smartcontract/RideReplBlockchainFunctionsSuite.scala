@@ -54,7 +54,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
     execute(expr).explicitGet() should endWith(result)
 
   test("prepare") {
-    dataTxId = sender
+    dataTxId = miner
       .putData(
         alice,
         List(
@@ -68,14 +68,14 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
       )
       .id
 
-    sender.createAlias(bob, alias, minFee).id
-    assetId = sender.issue(alice, "Asset", "descr", 1000, 2, waitForTx = true).id
+    miner.createAlias(bob, alias, minFee).id
+    assetId = miner.issue(alice, "Asset", "descr", 1000, 2, waitForTx = true).id
 
     transferTxIds =
       Seq(TxVersion.V1, TxVersion.V2, TxVersion.V3)
           .map {
             version =>
-              val tx = sender.transfer(
+              val tx = miner.transfer(
                 alice,
                 s"alias:$chainId:$alias",
                 transferAmount,
@@ -203,7 +203,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
       .foreach {
         version =>
           val transferTxId = transferTxIds(version)
-          val responseTx = sender.transactionInfo[TransferTransactionInfo](transferTxId)
+          val responseTx = miner.transactionInfo[TransferTransactionInfo](transferTxId)
           val bodyBytes = TransferTransaction.selfSigned(
             version = version,
             sender = alice,

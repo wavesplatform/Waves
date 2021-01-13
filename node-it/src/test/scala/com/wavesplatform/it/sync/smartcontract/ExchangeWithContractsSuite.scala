@@ -9,33 +9,36 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.{DataTransaction, TxVersion}
-import org.scalatest.CancelAfterFailure
 
-class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFailure with NTPTime {
+class ExchangeWithContractsSuite extends BaseTransactionSuite with NTPTime {
   private def acc0 = firstKeyPair
+
   private def acc1 = secondKeyPair
+
   private def acc2 = thirdKeyPair
 
-  var exchAsset: String    = ""
+  var exchAsset: String = ""
   var dtx: DataTransaction = _
-  var pair: AssetPair      = _
+  var pair: AssetPair = _
 
   val sc1: Option[String] = Some(s"true")
-  val sc2: Option[String] = Some(s"""
-               |match tx {
-               |  case _: SetScriptTransaction => true
-               |  case _ => false
-               |}""".stripMargin)
-  val sc3: Option[String] = Some(s"""
-               |match tx {
-               |  case _: SetScriptTransaction => true
-               |  case _ => throw("Some generic error")
-               |}""".stripMargin)
+  val sc2: Option[String] = Some(
+    s"""
+       |match tx {
+       |  case _: SetScriptTransaction => true
+       |  case _ => false
+       |}""".stripMargin)
+  val sc3: Option[String] = Some(
+    s"""
+       |match tx {
+       |  case _: SetScriptTransaction => true
+       |  case _ => throw("Some generic error")
+       |}""".stripMargin)
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
 
-    exchAsset = sender
+    exchAsset = miner
       .issue(
         acc0,
         "ExchangeCoin",
@@ -57,7 +60,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
     val entry4 = StringDataEntry("str", "test")
 
     dtx = DataTransaction.selfSigned(1.toByte, acc0, List(entry1, entry2, entry3, entry4), minFee, ntpTime.correctedTime()).explicitGet()
-    sender.signedBroadcast(dtx.json(), waitForTx = true)
+    miner.signedBroadcast(dtx.json(), waitForTx = true)
   }
 
   test("set contracts and put exchange transaction in blockchain") {
@@ -86,7 +89,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
              (2: Byte, 3: Byte)
            )) {
 
-        sender.signedBroadcast(exchangeTx(pair, smartMatcherFee, orderFee, ntpTime, o1ver, o2ver, acc1, acc0, acc2), waitForTx = true)
+        miner.signedBroadcast(exchangeTx(pair, smartMatcherFee, orderFee, ntpTime, o1ver, o2ver, acc1, acc0, acc2), waitForTx = true)
 
         //TODO : add assert balances
       }
@@ -116,7 +119,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
              (3: Byte, 3: Byte)
            )) {
         assertBadRequestAndMessage(
-          sender.signedBroadcast(exchangeTx(pair, smartMatcherFee, orderFee, ntpTime, o1ver, o2ver, acc1, acc0, acc2)),
+          miner.signedBroadcast(exchangeTx(pair, smartMatcherFee, orderFee, ntpTime, o1ver, o2ver, acc1, acc0, acc2)),
           "Transaction is not allowed by account-script"
         )
         //TODO : add assert balances
@@ -143,7 +146,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
              (3: Byte, 3: Byte)
            )) {
         val tx = exchangeTx(pair, smartMatcherFee, orderFee, ntpTime, o1ver, o2ver, acc1, acc0, acc2)
-        assertBadRequestAndMessage(sender.signedBroadcast(tx), "Error while executing account-script: Some generic error")
+        assertBadRequestAndMessage(miner.signedBroadcast(tx), "Error while executing account-script: Some generic error")
         //TODO : add assert balances
       }
     }
@@ -192,7 +195,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
           .explicitGet()
           .json()
 
-        val txId = sender.signedBroadcast(tx).id
+        val txId = miner.signedBroadcast(tx).id
         nodes.waitForTransaction(txId)
 
         //TODO : add assert balances
@@ -234,7 +237,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
         .explicitGet()
         .json()
 
-      assertBadRequestAndMessage(sender.signedBroadcast(tx), "Reason: Can't process order with signature from scripted account")
+      assertBadRequestAndMessage(miner.signedBroadcast(tx), "Reason: Can't process order with signature from scripted account")
     }
   }
 }

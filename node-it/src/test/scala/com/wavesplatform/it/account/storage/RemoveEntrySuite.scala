@@ -140,7 +140,7 @@ class RemoveEntrySuite extends BaseSuite {
       .explicitGet()
       ._1
 
-    miner.transfer(sender.keyPair, address.toAddress.toString, 10.waves, minFee, waitForTx = true)
+    miner.transfer(miner.keyPair, address.toAddress.toString, 10.waves, minFee, waitForTx = true)
 
     nodes.waitForTransaction(
       miner

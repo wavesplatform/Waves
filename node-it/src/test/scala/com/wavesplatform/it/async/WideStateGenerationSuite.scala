@@ -18,6 +18,7 @@ import scala.concurrent.{Await, Future}
 class WideStateGenerationSuite extends FreeSpec with WaitForHeight2 with Matchers with TransferSending with NodesFromDocker {
 
   override protected def createDocker: Docker = new Docker(
+    nodeConfigs = nodeConfigs,
     suiteConfig = ConfigFactory.parseString(
       """akka.http.server {
         |  parsing.max-content-length = 3737439

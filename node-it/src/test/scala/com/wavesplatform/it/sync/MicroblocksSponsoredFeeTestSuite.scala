@@ -1,23 +1,24 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.state.Sponsorship
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.utils.ScorexLogging
-import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
+import org.scalatest.{FreeSpec, Matchers}
 
-class MicroblocksSponsoredFeeTestSuite extends FreeSpec with Matchers with CancelAfterFailure with NodesFromDocker with ScorexLogging {
+class MicroblocksSponsoredFeeTestSuite extends FreeSpec with Matchers with NodesFromDocker with ScorexLogging {
 
   private def notMiner = nodes.head
 
-  private lazy val sponsor      = nodes(1)
-  private val Token             = 100L
+  private lazy val sponsor = nodes(1)
+  private val Token = 100L
   private val sponsorAssetTotal = 100000 * Token
-  private val minSponsorFee     = Token
-  private val SmallFee          = Token + Token / 2
+  private val minSponsorFee = Token
+  private val SmallFee = Token + Token / 2
 
   private def secondAddress = nodes(2).address
 
@@ -71,7 +72,7 @@ class MicroblocksSponsoredFeeTestSuite extends FreeSpec with Matchers with Cance
       .overrideBase(_.quorum(0))
       .overrideBase(_.raw("waves.blockchain.custom.functionality.blocks-for-feature-activation=1"))
       .overrideBase(_.raw("waves.blockchain.custom.functionality.feature-check-blocks-period=1"))
-      .overrideBase(_.preactivatedFeatures((14, 1000000)))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.BlockReward, 1000000)))
       .withDefault(1)
       .withSpecial(2, _.nonMiner)
       .buildNonConflicting()

@@ -28,7 +28,7 @@ class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[Stri
   override def nodeConfigs: Seq[Config] =
     com.wavesplatform.it.NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures(BlockchainFeatures.BlockV5.id.toInt -> 0))
+      .overrideBase(_.preactivatedFeatures(BlockchainFeatures.BlockV5 -> 0))
       .withDefault(1)
       .buildNonConflicting()
 
@@ -123,8 +123,8 @@ class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[Stri
 
     overflowBlock()
     val failedTxs = sendTxsAndThenPriorityTx(
-      _ => sender.invokeScript(issuer, issuer.toAddress.toString, None, fee = invokeFee)._1.id,
-      () => sender.putData(issuer, priorityData, priorityFee).id
+      _ => miner.invokeScript(issuer, issuer.toAddress.toString, None, fee = invokeFee)._1.id,
+      () => miner.putData(issuer, priorityData, priorityFee).id
     ) { (failed, _) =>
       assertFailedTxs(failed)
     }

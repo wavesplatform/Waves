@@ -21,7 +21,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
-    asset = sender
+    asset = miner
       .issue(
         firstKeyPair,
         "MyAsset",
@@ -38,16 +38,16 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
   }
 
   test("transfer verification with asset script") {
-    val firstAssetBalance  = sender.assetBalance(firstAddress, asset).balance
-    val secondAssetBalance = sender.assetBalance(secondAddress, asset).balance
-    val thirdAssetBalance  = sender.assetBalance(thirdAddress, asset).balance
+    val firstAssetBalance  = miner.assetBalance(firstAddress, asset).balance
+    val secondAssetBalance = miner.assetBalance(secondAddress, asset).balance
+    val thirdAssetBalance  = miner.assetBalance(thirdAddress, asset).balance
 
-    sender.transfer(firstKeyPair, secondAddress, 100, smartMinFee, Some(asset), waitForTx = true)
+    miner.transfer(firstKeyPair, secondAddress, 100, smartMinFee, Some(asset), waitForTx = true)
 
     miner.assertAssetBalance(firstAddress, asset, firstAssetBalance - 100)
     miner.assertAssetBalance(secondAddress, asset, secondAssetBalance + 100)
 
-    sender.transfer(secondKeyPair, thirdAddress, 100, smartMinFee, Some(asset), waitForTx = true)
+    miner.transfer(secondKeyPair, thirdAddress, 100, smartMinFee, Some(asset), waitForTx = true)
 
     //deprecate transfers with amount > 99
     val scr = ScriptCompiler(
@@ -61,13 +61,13 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       isAssetScript = true,
       estimator
     ).explicitGet()._1.bytes().base64
-    sender.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
+    miner.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
-    assertApiError(sender.transfer(firstKeyPair, secondAddress, 100, smartMinFee, Some(asset)), errNotAllowedByTokenApiError)
+    assertApiError(miner.transfer(firstKeyPair, secondAddress, 100, smartMinFee, Some(asset)), errNotAllowedByTokenApiError)
 
-    assertApiError(sender.transfer(thirdKeyPair, secondAddress, 100, smartMinFee, Some(asset)), errNotAllowedByTokenApiError)
+    assertApiError(miner.transfer(thirdKeyPair, secondAddress, 100, smartMinFee, Some(asset)), errNotAllowedByTokenApiError)
 
-    sender.transfer(thirdKeyPair, secondAddress, 99, smartMinFee, Some(asset), waitForTx = true)
+    miner.transfer(thirdKeyPair, secondAddress, 99, smartMinFee, Some(asset), waitForTx = true)
 
     miner.assertAssetBalance(secondAddress, asset, secondAssetBalance + 99)
     miner.assertAssetBalance(thirdAddress, asset, thirdAssetBalance + 1)
@@ -85,13 +85,13 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       isAssetScript = true,
       estimator
     ).explicitGet()._1.bytes().base64
-    sender.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
+    miner.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
-    sender.transfer(firstKeyPair, secondAddress, 100, smartMinFee, Some(asset), waitForTx = true)
+    miner.transfer(firstKeyPair, secondAddress, 100, smartMinFee, Some(asset), waitForTx = true)
 
-    assertApiError(sender.transfer(firstKeyPair, thirdAddress, 100, smartMinFee, Some(asset)), errNotAllowedByTokenApiError)
+    assertApiError(miner.transfer(firstKeyPair, thirdAddress, 100, smartMinFee, Some(asset)), errNotAllowedByTokenApiError)
 
-    assertApiError(sender.transfer(firstKeyPair, firstAddress, 1, smartMinFee, Some(asset)), errNotAllowedByTokenApiError)
+    assertApiError(miner.transfer(firstKeyPair, firstAddress, 1, smartMinFee, Some(asset)), errNotAllowedByTokenApiError)
 
     val scr1 = ScriptCompiler(
       s"""
@@ -104,21 +104,21 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       isAssetScript = true,
       estimator
     ).explicitGet()._1.bytes().base64
-    sender.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr1), waitForTx = true)
+    miner.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr1), waitForTx = true)
 
-    sender.transfer(firstKeyPair, thirdAddress, 100, smartMinFee, Some(asset), waitForTx = true)
+    miner.transfer(firstKeyPair, thirdAddress, 100, smartMinFee, Some(asset), waitForTx = true)
 
-    assertApiError(sender.transfer(firstKeyPair, secondAddress, 100, smartMinFee, Some(asset)), errNotAllowedByTokenApiError)
+    assertApiError(miner.transfer(firstKeyPair, secondAddress, 100, smartMinFee, Some(asset)), errNotAllowedByTokenApiError)
 
-    assertApiError(sender.transfer(firstKeyPair, firstAddress, 1, smartMinFee, Some(asset)), errNotAllowedByTokenApiError)
+    assertApiError(miner.transfer(firstKeyPair, firstAddress, 1, smartMinFee, Some(asset)), errNotAllowedByTokenApiError)
   }
 
   test("smart asset requires fee in other asset") {
-    val feeAsset = sender
+    val feeAsset = miner
       .issue(firstKeyPair, "FeeAsset", "Asset for fee of Smart Asset", someAssetAmount, 2, reissuable = false, issueFee, waitForTx = true)
       .id
 
-    sender.sponsorAsset(firstKeyPair, feeAsset, baseFee = 2, fee = sponsorReducedFee + smartFee, waitForTx = true)
+    miner.sponsorAsset(firstKeyPair, feeAsset, baseFee = 2, fee = sponsorReducedFee + smartFee, waitForTx = true)
 
     val scr = ScriptCompiler(
       s"""
@@ -131,20 +131,20 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       isAssetScript = true,
       estimator
     ).explicitGet()._1.bytes().base64
-    sender.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
+    miner.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
-    assertApiError(sender.transfer(firstKeyPair, thirdAddress, 100, 2, Some(asset), feeAssetId = Some(feeAsset))) { error =>
+    assertApiError(miner.transfer(firstKeyPair, thirdAddress, 100, 2, Some(asset), feeAssetId = Some(feeAsset))) { error =>
       error.message should include("does not exceed minimal value")
     }
 
-    sender.transfer(firstKeyPair, thirdAddress, 100, 10, Some(asset), feeAssetId = Some(feeAsset), waitForTx = true)
+    miner.transfer(firstKeyPair, thirdAddress, 100, 10, Some(asset), feeAssetId = Some(feeAsset), waitForTx = true)
 
-    assertApiError(sender.transfer(firstKeyPair, firstAddress, 1, smartMinFee, Some(asset)), errNotAllowedByTokenApiError)
+    assertApiError(miner.transfer(firstKeyPair, firstAddress, 1, smartMinFee, Some(asset)), errNotAllowedByTokenApiError)
 
   }
 
   test("token that can be only transferred with the issuer's permission - black label") {
-    val blackAsset = sender
+    val blackAsset = miner
       .issue(
         firstKeyPair,
         "BlackAsset",
@@ -159,7 +159,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       )
       .id
 
-    sender.transfer(firstKeyPair, secondAddress, 100, smartMinFee, Some(blackAsset), waitForTx = true)
+    miner.transfer(firstKeyPair, secondAddress, 100, smartMinFee, Some(blackAsset), waitForTx = true)
 
     val scr = ScriptCompiler(
       s"""
@@ -173,7 +173,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       isAssetScript = true,
       estimator
     ).explicitGet()._1.bytes().base64
-    sender.setAssetScript(blackAsset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
+    miner.setAssetScript(blackAsset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
     val blackTx = TransferTransaction.selfSigned(
         2.toByte,
@@ -200,20 +200,20 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       )
       .explicitGet()
 
-    val dataTx = sender.putData(firstKeyPair, List(IntegerDataEntry(s"${blackTx.id()}", 42)), minFee).id
+    val dataTx = miner.putData(firstKeyPair, List(IntegerDataEntry(s"${blackTx.id()}", 42)), minFee).id
     nodes.waitForHeightAriseAndTxPresent(dataTx)
 
-    sender.signedBroadcast(blackTx.json(), waitForTx = true)
+    miner.signedBroadcast(blackTx.json(), waitForTx = true)
 
-    assertApiError(sender.signedBroadcast(incorrectTx.json()), errNotAllowedByTokenApiError)
+    assertApiError(miner.signedBroadcast(incorrectTx.json()), errNotAllowedByTokenApiError)
   }
 
   test("burner is from the list (white or black)") {
-    sender.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scriptBase64), waitForTx = true)
+    miner.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scriptBase64), waitForTx = true)
 
-    sender.transfer(firstKeyPair, secondAddress, 100, smartMinFee, Some(asset), waitForTx = true)
+    miner.transfer(firstKeyPair, secondAddress, 100, smartMinFee, Some(asset), waitForTx = true)
 
-    sender.transfer(firstKeyPair, thirdAddress, 100, smartMinFee, Some(asset), waitForTx = true)
+    miner.transfer(firstKeyPair, thirdAddress, 100, smartMinFee, Some(asset), waitForTx = true)
 
     val scr = ScriptCompiler(
       s"""
@@ -226,11 +226,11 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       isAssetScript = true,
       estimator
     ).explicitGet()._1.bytes().base64
-    sender.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
+    miner.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
-    sender.burn(secondKeyPair, asset, 10, smartMinFee, waitForTx = true)
+    miner.burn(secondKeyPair, asset, 10, smartMinFee, waitForTx = true)
 
-    assertApiError(sender.burn(firstKeyPair, asset, 10, smartMinFee), errNotAllowedByTokenApiError)
+    assertApiError(miner.burn(firstKeyPair, asset, 10, smartMinFee), errNotAllowedByTokenApiError)
 
     val scr1 = ScriptCompiler(
       s"""
@@ -243,13 +243,13 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       isAssetScript = true,
       estimator
     ).explicitGet()._1.bytes().base64
-    sender.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr1), waitForTx = true)
+    miner.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr1), waitForTx = true)
 
-    sender.burn(thirdKeyPair, asset, 10, smartMinFee, waitForTx = true)
+    miner.burn(thirdKeyPair, asset, 10, smartMinFee, waitForTx = true)
 
-    sender.burn(firstKeyPair, asset, 10, smartMinFee, waitForTx = true)
+    miner.burn(firstKeyPair, asset, 10, smartMinFee, waitForTx = true)
 
-    assertApiError(sender.burn(secondKeyPair, asset, 10, smartMinFee), errNotAllowedByTokenApiError)
+    assertApiError(miner.burn(secondKeyPair, asset, 10, smartMinFee), errNotAllowedByTokenApiError)
   }
 
   ignore("burn by some height") {
@@ -264,21 +264,21 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       isAssetScript = true,
       estimator
     ).explicitGet()._1.bytes().base64
-    sender.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
+    miner.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
     if (nodes.map(_.height).max % 2 != 0) nodes.waitForHeightArise()
 
-    sender.burn(firstKeyPair, asset, 10, smartMinFee, waitForTx = true)
+    miner.burn(firstKeyPair, asset, 10, smartMinFee, waitForTx = true)
 
     if (nodes.map(_.height).max % 2 == 0) {
       nodes.waitForHeightArise()
     }
 
-    assertApiError(sender.burn(firstKeyPair, asset, 10, smartMinFee), errNotAllowedByTokenApiError)
+    assertApiError(miner.burn(firstKeyPair, asset, 10, smartMinFee), errNotAllowedByTokenApiError)
   }
 
   test("unburnable asset") {
-    val unBurnable = sender
+    val unBurnable = miner
       .issue(
         firstKeyPair,
         "Unburnable",
@@ -304,7 +304,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       )
       .id
 
-    assertApiError(sender.burn(firstKeyPair, unBurnable, 10, smartMinFee).id, errNotAllowedByTokenApiError)
+    assertApiError(miner.burn(firstKeyPair, unBurnable, 10, smartMinFee).id, errNotAllowedByTokenApiError)
   }
 
   test("masstransfer - taxation") {
@@ -323,14 +323,14 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       isAssetScript = true,
       estimator
     ).explicitGet()._1.bytes().base64
-    sender.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
+    miner.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
     val transfers       = List(Transfer(firstAddress, 10), Transfer(secondAddress, 100))
     val massTransferFee = calcMassTransferFee(transfers.size)
-    sender.massTransfer(firstKeyPair, transfers, massTransferFee + smartFee, assetId = Some(asset), waitForTx = true)
+    miner.massTransfer(firstKeyPair, transfers, massTransferFee + smartFee, assetId = Some(asset), waitForTx = true)
 
     val transfers2 = List(Transfer(firstAddress, 9), Transfer(secondAddress, 100))
-    assertApiError(sender.massTransfer(firstKeyPair, transfers2, massTransferFee + smartFee, assetId = Some(asset)), errNotAllowedByTokenApiError)
+    assertApiError(miner.massTransfer(firstKeyPair, transfers2, massTransferFee + smartFee, assetId = Some(asset)), errNotAllowedByTokenApiError)
   }
 
   test("masstransfer - transferCount <=2") {
@@ -346,20 +346,20 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       isAssetScript = true,
       estimator
     ).explicitGet()._1.bytes().base64
-    sender.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
+    miner.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
     val transfers                  = List(Transfer(firstAddress, 10), Transfer(secondAddress, 100), Transfer(firstAddress, 10))
     val massTransferTransactionFee = calcMassTransferFee(transfers.size)
     assertApiError(
-      sender.massTransfer(firstKeyPair, transfers, massTransferTransactionFee + smartFee, assetId = Some(asset)),
+      miner.massTransfer(firstKeyPair, transfers, massTransferTransactionFee + smartFee, assetId = Some(asset)),
       errNotAllowedByTokenApiError
     )
   }
 
   test("reissue by non-issuer") {
-    sender.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scriptBase64), waitForTx = true)
+    miner.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scriptBase64), waitForTx = true)
 
-    assertApiError(sender.reissue(secondKeyPair, asset, someAssetAmount, reissuable = true, fee = issueFee + smartFee)) { error =>
+    assertApiError(miner.reissue(secondKeyPair, asset, someAssetAmount, reissuable = true, fee = issueFee + smartFee)) { error =>
       error.message should include("Reason: Asset was issued by other address")
     }
 
@@ -374,15 +374,15 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       isAssetScript = true,
       estimator
     ).explicitGet()._1.bytes().base64
-    sender.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
+    miner.setAssetScript(asset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
-    assertApiError(sender.reissue(secondKeyPair, asset, someAssetAmount, reissuable = true, fee = issueFee + smartFee)) { error =>
+    assertApiError(miner.reissue(secondKeyPair, asset, someAssetAmount, reissuable = true, fee = issueFee + smartFee)) { error =>
       error.message should include("Reason: Asset was issued by other address")
     }
   }
 
   test("reissue by issuer and non-issuer non-re issuable smart asset ") {
-    val assetNonReissue = sender
+    val assetNonReissue = miner
       .issue(
         firstKeyPair,
         "MyAsset",
@@ -407,21 +407,21 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       isAssetScript = true,
       estimator
     ).explicitGet()._1.bytes().base64
-    sender.setAssetScript(assetNonReissue, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
+    miner.setAssetScript(assetNonReissue, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
     assertApiError(
-      sender.reissue(secondKeyPair, assetNonReissue, someAssetAmount, reissuable = true, fee = issueFee + smartFee),
+      miner.reissue(secondKeyPair, assetNonReissue, someAssetAmount, reissuable = true, fee = issueFee + smartFee),
       CustomValidationError("Asset is not reissuable")
     )
 
     assertApiError(
-      sender.reissue(firstKeyPair, assetNonReissue, someAssetAmount, reissuable = true, fee = issueFee + smartFee),
+      miner.reissue(firstKeyPair, assetNonReissue, someAssetAmount, reissuable = true, fee = issueFee + smartFee),
       CustomValidationError("Asset is not reissuable")
     )
   }
 
   test("try to send transactions forbidden by the asset's script") {
-    val assetWOSupport = sender
+    val assetWOSupport = miner
       .issue(
         firstKeyPair,
         "assetWOSuppor",
@@ -436,17 +436,17 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       )
       .id
 
-    assertApiError(sender.setAssetScript(assetWOSupport, firstKeyPair, setAssetScriptFee, Some(scriptBase64)), errNotAllowedByTokenApiError)
-    assertApiError(sender.transfer(firstKeyPair, secondAddress, 100, smartMinFee, Some(assetWOSupport)), errNotAllowedByTokenApiError)
-    assertApiError(sender.burn(firstKeyPair, assetWOSupport, 10, smartMinFee), errNotAllowedByTokenApiError)
+    assertApiError(miner.setAssetScript(assetWOSupport, firstKeyPair, setAssetScriptFee, Some(scriptBase64)), errNotAllowedByTokenApiError)
+    assertApiError(miner.transfer(firstKeyPair, secondAddress, 100, smartMinFee, Some(assetWOSupport)), errNotAllowedByTokenApiError)
+    assertApiError(miner.burn(firstKeyPair, assetWOSupport, 10, smartMinFee), errNotAllowedByTokenApiError)
     assertApiError(
-      sender.reissue(firstKeyPair, assetWOSupport, someAssetAmount, true, issueFee + smartFee),
+      miner.reissue(firstKeyPair, assetWOSupport, someAssetAmount, true, issueFee + smartFee),
       CustomValidationError("Asset is not reissuable")
     )
 
     val transfers = List(Transfer(firstAddress, 10))
     assertApiError(
-      sender.massTransfer(firstKeyPair, transfers, calcMassTransferFee(transfers.size) + smartFee, assetId = Some(assetWOSupport)),
+      miner.massTransfer(firstKeyPair, transfers, calcMassTransferFee(transfers.size) + smartFee, assetId = Some(assetWOSupport)),
       errNotAllowedByTokenApiError
     )
 

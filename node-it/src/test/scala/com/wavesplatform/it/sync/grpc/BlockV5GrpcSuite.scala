@@ -10,14 +10,13 @@ import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{GrpcIntegrationSuiteWithThreeAddress, NodeConfigs, ReportingTestName}
-import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers, OptionValues}
+import org.scalatest.{FreeSpec, Matchers, OptionValues}
 
 import scala.concurrent.duration._
 
 class BlockV5GrpcSuite
     extends FreeSpec
     with Matchers
-    with CancelAfterFailure
     with NodesFromDocker
     with ActivationStatusRequest
     with ReportingTestName
@@ -33,11 +32,11 @@ class BlockV5GrpcSuite
 
   "block v5 appears and blockchain grows" - {
     "when feature activation happened" in {
-      sender.waitForHeight(sender.height + 1, 2.minutes)
-      val currentHeight = sender.height
+      miner.waitForHeight(miner.height + 1, 2.minutes)
+      val currentHeight = miner.height
 
-      val blockV5     = sender.blockAt(currentHeight)
-      val blockV5ById = sender.blockById(ByteString.copyFrom(blockV5.id().arr))
+      val blockV5     = miner.blockAt(currentHeight)
+      val blockV5ById = miner.blockById(ByteString.copyFrom(blockV5.id().arr))
 
       blockV5.header.version shouldBe Block.ProtoBlockVersion
       blockV5.id().arr.length shouldBe crypto.DigestLength
@@ -48,19 +47,19 @@ class BlockV5GrpcSuite
       blockV5ById.header.generationSignature.arr.length shouldBe Block.GenerationVRFSignatureLength
       assert(blockV5ById.transactionsRootValid(), "transactionsRoot is not valid")
 
-      sender.waitForHeight(currentHeight + 1, 2.minutes)
+      miner.waitForHeight(currentHeight + 1, 2.minutes)
 
-      val blockAfterVRFUsing     = sender.blockAt(currentHeight + 1)
-      val blockAfterVRFUsingById = sender.blockById(ByteString.copyFrom(blockAfterVRFUsing.id().arr))
+      val blockAfterVRFUsing     = miner.blockAt(currentHeight + 1)
+      val blockAfterVRFUsingById = miner.blockById(ByteString.copyFrom(blockAfterVRFUsing.id().arr))
 
       blockAfterVRFUsing.header.version shouldBe Block.ProtoBlockVersion
       blockAfterVRFUsing.header.generationSignature.arr.length shouldBe Block.GenerationVRFSignatureLength
-      ByteStr(sender.blockHeaderAt(currentHeight + 1).reference.toByteArray) shouldBe blockV5.id()
+      ByteStr(miner.blockHeaderAt(currentHeight + 1).reference.toByteArray) shouldBe blockV5.id()
       blockAfterVRFUsingById.header.version shouldBe Block.ProtoBlockVersion
       blockAfterVRFUsingById.header.generationSignature.arr.length shouldBe Block.GenerationVRFSignatureLength
       assert(blockAfterVRFUsingById.transactionsRootValid(), "transactionsRoot is not valid")
 
-      val blockSeqOfBlocksV5 = sender.blockSeq(currentHeight, currentHeight + 2)
+      val blockSeqOfBlocksV5 = miner.blockSeq(currentHeight, currentHeight + 2)
 
       for (blockV5 <- blockSeqOfBlocksV5) {
         blockV5.header.version shouldBe Block.ProtoBlockVersion
@@ -68,7 +67,7 @@ class BlockV5GrpcSuite
         assert(blockV5.transactionsRootValid(), "transactionsRoot is not valid")
       }
 
-      val blockSeqOfBlocksV5ByAddress = sender.blockSeqByAddress(miner.address, currentHeight, currentHeight + 2)
+      val blockSeqOfBlocksV5ByAddress = miner.blockSeqByAddress(miner.address, currentHeight, currentHeight + 2)
 
       for (blockV5 <- blockSeqOfBlocksV5ByAddress) {
         blockV5.header.generator shouldBe miner.keyPair.publicKey

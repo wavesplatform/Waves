@@ -13,9 +13,8 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.CancelAfterFailure
 
-class RideUpdateAssetInfoTxSuite extends BaseTransactionSuite with CancelAfterFailure {
+class RideUpdateAssetInfoTxSuite extends BaseTransactionSuite {
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.Builder(Default, 1, Seq.empty)
@@ -24,6 +23,7 @@ class RideUpdateAssetInfoTxSuite extends BaseTransactionSuite with CancelAfterFa
       .buildNonConflicting()
 
   private def dApp = firstKeyPair
+
   private def smartAcc = secondKeyPair
 
   private var asset1: IssuedAsset = _
@@ -100,7 +100,7 @@ class RideUpdateAssetInfoTxSuite extends BaseTransactionSuite with CancelAfterFa
   test("can't compile V3 with UpdateAssetInfoTransaction") {
     Seq(sourceDApp(3), sourceAcc(3), sourceAsset(3))
       .foreach { scriptV3 =>
-        assertApiError(sender.scriptCompile(scriptV3)) { error =>
+        assertApiError(miner.scriptCompile(scriptV3)) { error =>
           error.statusCode shouldBe 400
           error.id shouldBe ScriptCompilerError.Id
           error.message should include("Undefined type: `UpdateAssetInfoTransaction`")
@@ -113,21 +113,21 @@ class RideUpdateAssetInfoTxSuite extends BaseTransactionSuite with CancelAfterFa
     val scriptAcc = ScriptCompiler.compile(sourceAcc(4), ScriptEstimatorV2).explicitGet()._1.bytes().base64
     val scriptAsset = ScriptCompiler.compile(sourceAsset(4), ScriptEstimatorV2).explicitGet()._1.bytes().base64
 
-    val issue1 = sender.issue(dApp, script = Some(scriptAsset), waitForTx = true)
-    val issue2 = sender.issue(smartAcc, script = Some(scriptAsset), waitForTx = true)
+    val issue1 = miner.issue(dApp, script = Some(scriptAsset), waitForTx = true)
+    val issue2 = miner.issue(smartAcc, script = Some(scriptAsset), waitForTx = true)
     asset1 = IssuedAsset(ByteStr.decodeBase58(issue1.id).get)
     asset2 = IssuedAsset(ByteStr.decodeBase58(issue2.id).get)
 
-    sender.setScript(dApp, Some(scriptDApp), waitForTx = true)
-    sender.setScript(smartAcc, Some(scriptAcc), waitForTx = true)
+    miner.setScript(dApp, Some(scriptDApp), waitForTx = true)
+    miner.setScript(smartAcc, Some(scriptAcc), waitForTx = true)
   }
 
   test("can check UpdateAssetInfo tx from contracts") {
-    val asset2Height = sender.transactionInfo[TransactionInfo](asset2.id.toString).height
+    val asset2Height = miner.transactionInfo[TransactionInfo](asset2.id.toString).height
     nodes.waitForHeight(asset2Height + 2)
 
-    sender.updateAssetInfo(dApp, asset1.id.toString, name, description, fee, timestamp = Some(timestamp), waitForTx = true)
-    sender.updateAssetInfo(smartAcc, asset2.id.toString, name, description, fee, timestamp = Some(timestamp), waitForTx = true)
+    miner.updateAssetInfo(dApp, asset1.id.toString, name, description, fee, timestamp = Some(timestamp), waitForTx = true)
+    miner.updateAssetInfo(smartAcc, asset2.id.toString, name, description, fee, timestamp = Some(timestamp), waitForTx = true)
   }
 
 }

@@ -22,7 +22,7 @@ import scala.concurrent.duration._
 
 trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
   protected def waitForHeightArise(): Unit
-  protected def sender: Node
+  protected def miner: Node
 
   /**
     * Sends `max-transactions-in-micro-block` * 2 transactions and then sends priority transaction.
@@ -33,7 +33,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
   def sendTxsAndThenPriorityTx[S](t: Int => T, pt: () => T)(
       checker: (Seq[T], T) => Seq[S]
   ): Seq[S] = {
-    val maxTxsInMicroBlock = sender.config.getInt("waves.miner.max-transactions-in-micro-block")
+    val maxTxsInMicroBlock = miner.config.getInt("waves.miner.max-transactions-in-micro-block")
     val txs                = (1 to maxTxsInMicroBlock * 2).map(i => t(i))
     val priorityTx         = pt()
     waitForEmptyUtx()
@@ -49,12 +49,13 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
       * Checks that transactions contain failed and returns them.
       */
     def assertFailedTxs(txs: Seq[String]): Seq[TransactionStatus] = {
-      val statuses = sender.transactionStatus(txs).sortWith { case (f, s) => txs.indexOf(f.id) < txs.indexOf(s.id) }
+      val statuses = miner.transactionStatus(txs).sortWith { case (f, s) => txs.indexOf(f.id) < txs.indexOf(s.id) }
       all(statuses.map(_.status)) shouldBe "confirmed"
       all(statuses.map(_.applicationStatus.isDefined)) shouldBe true
 
-      statuses.foreach { s =>
-        (sender.transactionInfo[JsObject](s.id) \ "applicationStatus").asOpt[String] shouldBe s.applicationStatus
+      miner.transactionInfo[Seq[JsObject]](txs).zip(statuses).foreach { case (txo, s) =>
+        (txo \ "id").as[String] shouldBe s.id
+        (txo \ "applicationStatus").asOpt[String] shouldBe s.applicationStatus
       }
 
       val failed = statuses.dropWhile(s => s.applicationStatus.contains("succeeded"))
@@ -66,12 +67,12 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
 
       failedIdsByHeight.foreach {
         case (h, ids) =>
-          sender.blockAt(h).transactions.map(_.id) should contain allElementsOf ids
-          sender.blockSeq(h, h).head.transactions.map(_.id) should contain allElementsOf ids
-          sender.blockById(sender.blockAt(h).id).transactions.map(_.id) should contain allElementsOf ids
-          sender.blockSeqByAddress(sender.address, h, h).head.transactions.map(_.id) should contain allElementsOf ids
+          miner.blockAt(h).transactions.map(_.id) should contain allElementsOf ids
+          miner.blockSeq(h, h).head.transactions.map(_.id) should contain allElementsOf ids
+          miner.blockById(miner.blockAt(h).id).transactions.map(_.id) should contain allElementsOf ids
+          miner.blockSeqByAddress(miner.address, h, h).head.transactions.map(_.id) should contain allElementsOf ids
 
-          val liquidBlock         = sender.lastBlock()
+          val liquidBlock         = miner.lastBlock()
           val maxHeightWithFailed = failedIdsByHeight.keys.max
           if (liquidBlock.height == maxHeightWithFailed) {
             liquidBlock.transactions.map(_.id) should contain allElementsOf failedIdsByHeight(maxHeightWithFailed)
@@ -84,13 +85,13 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
       * Checks that transactions contain invalid and returns them.
       */
     def assertInvalidTxs(txs: Seq[String]): Seq[TransactionStatus] = {
-      val statuses = sender.transactionStatus(txs).sortWith { case (f, s) => txs.indexOf(f.id) < txs.indexOf(s.id) }
+      val statuses = miner.transactionStatus(txs).sortWith { case (f, s) => txs.indexOf(f.id) < txs.indexOf(s.id) }
 
       val invalid = statuses.dropWhile(s => s.applicationStatus.contains("succeeded"))
       invalid.size should be > 0
 
       invalid.foreach { s =>
-        assertApiError(sender.transactionInfo[JsObject](s.id), TransactionDoesNotExist)
+        assertApiError(miner.transactionInfo[JsObject](s.id), TransactionDoesNotExist)
       }
 
       all(invalid.map(_.status)) shouldBe "not_found"
@@ -100,7 +101,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
     }
 
     def updateAssetScript(result: Boolean, asset: String, owner: KeyPair, fee: Long, waitForTx: Boolean = true): String = {
-      sender
+      miner
         .setAssetScript(
           asset,
           owner,
@@ -129,7 +130,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
     }
 
     def updateAccountScript(result: Option[Boolean], account: KeyPair, fee: Long, waitForTx: Boolean = true): String = {
-      sender
+      miner
         .setScript(
           account,
           result.map { r =>
@@ -172,7 +173,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
       val txsIds = txs.map(PBTransactions.vanillaUnsafe).map(tx => ByteString.copyFrom(tx.id().arr))
       val req    = TransactionsByIdRequest(txs.map(PBTransactions.vanillaUnsafe).map(tx => ByteString.copyFrom(tx.id().arr)))
 
-      val statuses = sender.getStatuses(req).sortWith { case (f, s) => txsIds.indexOf(f.id) < txsIds.indexOf(s.id) }
+      val statuses = miner.getStatuses(req).sortWith { case (f, s) => txsIds.indexOf(f.id) < txsIds.indexOf(s.id) }
       all(statuses.map(_.status)) shouldBe PBTransactionStatus.Status.CONFIRMED
       all(statuses.map(_.applicationStatus)) should not be ApplicationStatus.UNKNOWN
 
@@ -185,8 +186,8 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
 
       failedIdsByHeight.foreach {
         case (h, ids) =>
-          sender.blockAt(h).transactionData.map(_.id()) should contain allElementsOf ids.map(bs => ByteStr(bs.toByteArray))
-          sender.blockSeq(h, h).head.transactionData.map(_.id()) should contain allElementsOf ids.map(bs => ByteStr(bs.toByteArray))
+          miner.blockAt(h).transactionData.map(_.id()) should contain allElementsOf ids.map(bs => ByteStr(bs.toByteArray))
+          miner.blockSeq(h, h).head.transactionData.map(_.id()) should contain allElementsOf ids.map(bs => ByteStr(bs.toByteArray))
       }
 
       failed
@@ -198,7 +199,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
     def assertInvalidTxs(txs: Seq[PBSignedTransaction]): Seq[PBTransactionStatus] = {
       val txsIds   = txs.map(PBTransactions.vanillaUnsafe).map(tx => ByteString.copyFrom(tx.id().arr))
       val req      = TransactionsByIdRequest(txs.map(PBTransactions.vanillaUnsafe).map(tx => ByteString.copyFrom(tx.id().arr)))
-      val statuses = sender.getStatuses(req).sortWith { case (f, s) => txsIds.indexOf(f.id) < txsIds.indexOf(s.id) }
+      val statuses = miner.getStatuses(req).sortWith { case (f, s) => txsIds.indexOf(f.id) < txsIds.indexOf(s.id) }
 
       val invalid = statuses.dropWhile(s => s.status == PBTransactionStatus.Status.CONFIRMED)
       all(invalid.map(_.status)) shouldBe PBTransactionStatus.Status.NOT_EXISTS
@@ -208,7 +209,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
     }
 
     def updateAssetScript(result: Boolean, asset: String, owner: KeyPair, fee: Long, waitForTx: Boolean = true): PBSignedTransaction = {
-      sender
+      miner
         .setAssetScript(
           owner,
           asset,
@@ -236,7 +237,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
     }
 
     def updateAccountScript(result: Option[Boolean], account: KeyPair, fee: Long, waitForTx: Boolean = true): PBSignedTransaction = {
-      sender
+      miner
         .setScript(
           account,
           Right(
@@ -267,7 +268,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
   def waitForEmptyUtx(): Unit = {
     import com.wavesplatform.it.api.SyncHttpApi._
 
-    sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
+    miner.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 500.millis)
   }
 }
 
@@ -312,7 +313,7 @@ object FailedTransactionSuiteLike {
   val Configs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
-      .overrideBase(_.raw(s"waves.miner.max-transactions-in-micro-block = 50"))
+      .overrideBase(_.raw(s"waves.miner.max-transactions-in-micro-block = 20"))
       .withDefault(1)
       .withSpecial(_.nonMiner)
       .buildNonConflicting()

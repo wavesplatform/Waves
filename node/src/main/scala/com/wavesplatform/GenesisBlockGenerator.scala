@@ -9,8 +9,7 @@ import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.PoSCalculator.{generationSignature, hit}
-import com.wavesplatform.consensus.{FairPoSCalculator, NxtPoSCalculator, PoSCalculator}
+import com.wavesplatform.consensus.calculateInitialBaseTarget
 import com.wavesplatform.crypto._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
@@ -20,7 +19,6 @@ import com.wavesplatform.wallet.Wallet
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
-import scala.annotation.tailrec
 import scala.concurrent.duration._
 
 object GenesisBlockGenerator extends App {
@@ -178,7 +176,19 @@ object GenesisBlockGenerator extends App {
   def genesisSettings(predefined: Option[Long]): GenesisSettings =
     predefined
       .map(baseTarget => mkGenesisSettings(baseTarget))
-      .getOrElse(mkGenesisSettings(calcInitialBaseTarget()))
+      .getOrElse(
+        mkGenesisSettings(
+          shares.collect {
+            case (info, share) if info.miner =>
+              calculateInitialBaseTarget(
+                info.account,
+                share,
+                settings.functionalitySettings,
+                settings.averageBlockDelay.toMillis
+              )
+          }.max
+        )
+      )
 
   def mkGenesisSettings(baseTarget: Long): GenesisSettings = {
     val reference     = ByteStr(Array.fill(SignatureLength)(-1: Byte))
@@ -209,43 +219,5 @@ object GenesisBlockGenerator extends App {
       genesis.header.baseTarget,
       settings.averageBlockDelay
     )
-  }
-
-  def calcInitialBaseTarget(): Long = {
-    val posCalculator: PoSCalculator =
-      if (settings.preActivated(BlockchainFeatures.FairPoS))
-        if (settings.preActivated(BlockchainFeatures.BlockV5)) FairPoSCalculator.fromSettings(settings.functionalitySettings)
-        else FairPoSCalculator.V1
-      else NxtPoSCalculator
-
-    val hitSource = ByteStr(new Array[Byte](crypto.DigestLength))
-
-    def getHit(account: KeyPair): BigInt = {
-      val gs = if (settings.preActivated(BlockchainFeatures.BlockV5)) {
-        val vrfProof = crypto.signVRF(account.privateKey, hitSource.arr)
-        crypto.verifyVRF(vrfProof, hitSource.arr, account.publicKey).map(_.arr).explicitGet()
-      } else generationSignature(hitSource, account.publicKey)
-
-      hit(gs)
-    }
-
-    shares.collect {
-      case (accountInfo, amount) if accountInfo.miner =>
-        val hit = getHit(accountInfo.account)
-
-        @tailrec def calculateBaseTarget(keyPair: KeyPair, minBT: Long, maxBT: Long, balance: Long): Long =
-          if (maxBT - minBT <= 1) maxBT
-          else {
-            val newBT = (maxBT + minBT) / 2
-            val delay = posCalculator.calculateDelay(hit, newBT, balance)
-            if (math.abs(delay - settings.averageBlockDelay.toMillis) < 100) newBT
-            else {
-              val (min, max) = if (delay > settings.averageBlockDelay.toMillis) (newBT, maxBT) else (minBT, newBT)
-              calculateBaseTarget(keyPair, min, max, balance)
-            }
-          }
-
-        calculateBaseTarget(accountInfo.account, PoSCalculator.MinBaseTarget, 1000000, amount)
-    }.max
   }
 }

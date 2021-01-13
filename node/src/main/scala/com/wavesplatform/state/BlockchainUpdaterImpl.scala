@@ -442,7 +442,7 @@ class BlockchainUpdaterImpl(
         log.info(s"Blockchain rollback to $blockId succeeded")
         notifyChangedSpendable(prevNgState, ngState)
         publishLastBlockInfo()
-        miner.scheduleMining()
+        miner.scheduleMining(Some(this))
 
       case Left(error) =>
         log.error(s"Blockchain rollback to $blockId failed: ${error.err}")

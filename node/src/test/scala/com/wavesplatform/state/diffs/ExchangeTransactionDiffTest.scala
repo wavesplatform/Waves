@@ -131,7 +131,7 @@ class ExchangeTransactionDiffTest
             totalPortfolioDiff.effectiveBalance shouldBe 0
             totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
-            blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee
+            blockDiff.portfolios(exchange.miner.toAddress).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee
         }
     }
   }
@@ -178,7 +178,7 @@ class ExchangeTransactionDiffTest
             totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
             val matcherPortfolio =
-              Monoid.combineAll(blockDiff.portfolios.view.filterKeys(_.stringRepr == exchange.sender.toAddress.stringRepr).values)
+              Monoid.combineAll(blockDiff.portfolios.view.filterKeys(_.stringRepr == exchange.miner.toAddress.stringRepr).values)
 
             val restoredMatcherPortfolio =
               Monoid.combineAll(
@@ -273,7 +273,7 @@ class ExchangeTransactionDiffTest
             totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
             val matcherPortfolio =
-              Monoid.combineAll(blockDiff.portfolios.view.filterKeys(_.stringRepr == exchange.sender.toAddress.stringRepr).values)
+              Monoid.combineAll(blockDiff.portfolios.view.filterKeys(_.stringRepr == exchange.miner.toAddress.stringRepr).values)
 
             val restoredMatcherPortfolio =
               Monoid.combineAll(
@@ -475,7 +475,7 @@ class ExchangeTransactionDiffTest
               totalPortfolioDiff.effectiveBalance shouldBe 0
               totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
-              blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee
+              blockDiff.portfolios(exchange.miner.toAddress).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee
           }
 
           assertDiffEi(
@@ -549,8 +549,8 @@ class ExchangeTransactionDiffTest
         val tx = createExTx(buy, sell, price, matcher, Ts).explicitGet()
         assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(tx)), fs) {
           case (blockDiff, state) =>
-            blockDiff.portfolios(tx.sender.toAddress).balance shouldBe tx.buyMatcherFee + tx.sellMatcherFee - tx.fee
-            state.balance(tx.sender.toAddress) shouldBe 0L
+            blockDiff.portfolios(tx.miner.toAddress).balance shouldBe tx.buyMatcherFee + tx.sellMatcherFee - tx.fee
+            state.balance(tx.miner.toAddress) shouldBe 0L
         }
     }
   }
@@ -1117,26 +1117,26 @@ class ExchangeTransactionDiffTest
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(exchange), Block.ProtoBlockVersion), fsWithBlockV5) {
           case (diff, state) =>
             diff.scriptsRun shouldBe 0
-            diff.portfolios(exchange.sender.toAddress).balance shouldBe -exchange.fee
-            diff.portfolios.get(exchange.buyOrder.sender.toAddress) shouldBe None
-            diff.portfolios.get(exchange.sellOrder.sender.toAddress) shouldBe None
+            diff.portfolios(exchange.miner.toAddress).balance shouldBe -exchange.fee
+            diff.portfolios.get(exchange.buyOrder.miner.toAddress) shouldBe None
+            diff.portfolios.get(exchange.sellOrder.miner.toAddress) shouldBe None
 
             diff.scriptsComplexity shouldBe DiffsCommon.countVerifierComplexity(Some(throwingScript), state, isAsset = true).explicitGet().get._2
 
             buyerBalance.foreach {
               case (asset, balance) =>
-                state.balance(exchange.buyOrder.sender.toAddress, asset) shouldBe balance
+                state.balance(exchange.buyOrder.miner.toAddress, asset) shouldBe balance
             }
             sellerBalance.foreach {
               case (asset, balance) =>
-                state.balance(exchange.sellOrder.sender.toAddress, asset) shouldBe balance
+                state.balance(exchange.sellOrder.miner.toAddress, asset) shouldBe balance
             }
 
-            state.balance(exchange.sender.toAddress, Waves) shouldBe matcherBalance(Waves) - exchange.fee
+            state.balance(exchange.miner.toAddress, Waves) shouldBe matcherBalance(Waves) - exchange.fee
             matcherBalance.collect { case b @ (IssuedAsset(_), _) => b }.foreach {
               case (asset, balance) =>
-                diff.portfolios(exchange.sender.toAddress).balanceOf(asset) shouldBe 0L
-                state.balance(exchange.sender.toAddress, asset) shouldBe balance
+                diff.portfolios(exchange.miner.toAddress).balanceOf(asset) shouldBe 0L
+                state.balance(exchange.miner.toAddress, asset) shouldBe balance
             }
 
             state.transactionInfo(exchange.id()).map(r => r._2 -> r._3) shouldBe Some((exchange, false))

@@ -48,7 +48,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
         val tx  = issue(acc, method, data, fee)
 
         validateIssuedAssets(acc, tx, data, method = method)
-        sender.balanceDetails(acc.toAddress.toString).regular shouldBe (initialWavesBalance - setScriptPrice - fee)
+        miner.balanceDetails(acc.toAddress.toString).regular shouldBe (initialWavesBalance - setScriptPrice - fee)
       }
 
     for (data <- Seq(simpleNonreissuableAsset, simpleReissuableAsset)) s"${data.assetType} asset could be partially burned" in {
@@ -61,8 +61,8 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
 
       burn(acc, TransactionMethod, assetId, burnQuantity / 2)
       burn(acc, CallableMethod, assetId, burnQuantity / 2)
-      sender.assetsDetails(assetId).quantity shouldBe remainQuantity
-      sender.assertAssetBalance(acc.toAddress.toString, assetId, remainQuantity)
+      miner.assetsDetails(assetId).quantity shouldBe remainQuantity
+      miner.assertAssetBalance(acc.toAddress.toString, assetId, remainQuantity)
     }
 
     for (data <- Seq(simpleNonreissuableAsset, simpleReissuableAsset, nftAsset, longMaxAsset)) s"${data.assetType} could be fully burned" in {
@@ -71,11 +71,11 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val txIssue = issue(acc, method, data, fee)
       val assetId = validateIssuedAssets(acc, txIssue, data, method = method)
 
-      sender.assertAssetBalance(acc.toAddress.toString, assetId, data.quantity)
+      miner.assertAssetBalance(acc.toAddress.toString, assetId, data.quantity)
       val tx = burn(acc, method, assetId, data.quantity)
 
-      sender.assetsDetails(assetId).quantity shouldBe 0
-      sender.assertAssetBalance(acc.toAddress.toString, assetId, 0)
+      miner.assetsDetails(assetId).quantity shouldBe 0
+      miner.assertAssetBalance(acc.toAddress.toString, assetId, 0)
 
       if (isCallable) assertStateChanges(tx) { sd =>
         sd.burns should matchPattern {
@@ -85,8 +85,8 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
 
       if (data.reissuable) {
         reissue(acc, method, assetId, data.quantity, reissuable = true)
-        sender.assetsDetails(assetId).quantity shouldBe data.quantity
-        sender.assertAssetBalance(acc.toAddress.toString, assetId, data.quantity)
+        miner.assetsDetails(assetId).quantity shouldBe data.quantity
+        miner.assertAssetBalance(acc.toAddress.toString, assetId, data.quantity)
       }
     }
 
@@ -101,9 +101,9 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       reissue(acc, TransactionMethod, assetId, addedQuantity / 2, reissuable = true)
       reissue(acc, CallableMethod, assetId, addedQuantity / 2, reissuable = false)
 
-      sender.assetsDetails(assetId).reissuable shouldBe !initialReissuable
-      sender.assetsDetails(assetId).quantity shouldBe initialQuantity + addedQuantity
-      sender.assertAssetBalance(acc.toAddress.toString, assetId, initialQuantity + addedQuantity)
+      miner.assetsDetails(assetId).reissuable shouldBe !initialReissuable
+      miner.assetsDetails(assetId).quantity shouldBe initialQuantity + addedQuantity
+      miner.assertAssetBalance(acc.toAddress.toString, assetId, initialQuantity + addedQuantity)
     }
 
     "Non-reissuable asset could not be reissued" in {
@@ -124,11 +124,11 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
         val assetId      = validateIssuedAssets(assetAcc, txAssetIssue, simpleReissuableAsset, method = method)
         val nftId        = validateIssuedAssets(nftAcc, txNftIssue, nftAsset, method = method)
 
-        sender.sponsorAsset(assetAcc, assetId, simpleReissuableAsset.quantity / 2, sponsorFee, waitForTx = true)
-        sender.sponsorAsset(nftAcc, nftId, 1, sponsorFee, waitForTx = true)
+        miner.sponsorAsset(assetAcc, assetId, simpleReissuableAsset.quantity / 2, sponsorFee, waitForTx = true)
+        miner.sponsorAsset(nftAcc, nftId, 1, sponsorFee, waitForTx = true)
 
-        sender.assetsDetails(assetId).minSponsoredAssetFee shouldBe Some(simpleReissuableAsset.quantity / 2)
-        sender.assetsDetails(nftId).minSponsoredAssetFee shouldBe Some(1L)
+        miner.assetsDetails(assetId).minSponsoredAssetFee shouldBe Some(simpleReissuableAsset.quantity / 2)
+        miner.assetsDetails(nftId).minSponsoredAssetFee shouldBe Some(1L)
       }
     }
   }
@@ -192,7 +192,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
         e.message should include("Asset is not reissuable")
       }
 
-      sender.assetsDetails(assetId).quantity should be(simpleReissuableAsset.quantity)
+      miner.assetsDetails(assetId).quantity should be(simpleReissuableAsset.quantity)
     }
 
     "Issue 10 assets should not produce an error" in {
@@ -201,7 +201,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       for (nth <- 0 to 9) {
         val assetId = validateIssuedAssets(acc, tx, simpleNonreissuableAsset, nth, CallableMethod)
         assertQuantity(assetId)(simpleNonreissuableAsset.quantity, reissuable = false)
-        sender.assertAssetBalance(acc.toAddress.toString, assetId, simpleNonreissuableAsset.quantity)
+        miner.assertAssetBalance(acc.toAddress.toString, assetId, simpleNonreissuableAsset.quantity)
       }
     }
 
@@ -262,23 +262,23 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       reissue(acc, CallableMethod, asset1Id, 10, reissuable = true)
       burn(acc, CallableMethod, asset1Id, 5)
       assertQuantity(asset1Id)(15)
-      sender.assertAssetBalance(acc.toAddress.toString, asset1Id, 15)
+      miner.assertAssetBalance(acc.toAddress.toString, asset1Id, 15)
 
       val issue2   = issue(acc, CallableMethod, asset)
       val asset2Id = validateIssuedAssets(acc, issue2, asset)
       burn(acc, CallableMethod, asset2Id, 5)
       reissue(acc, CallableMethod, asset2Id, 10, reissuable = false)
       assertQuantity(asset2Id)(15, reissuable = false)
-      sender.assertAssetBalance(acc.toAddress.toString, asset2Id, 15)
+      miner.assertAssetBalance(acc.toAddress.toString, asset2Id, 15)
     }
 
     "NFT burning removes it from list" in {
       val acc     = createDapp(script(nftAsset))
       val txIssue = issue(acc, CallableMethod, nftAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, nftAsset, method = CallableMethod)
-      sender.nftList(acc.toAddress.toString, 2).map(_.assetId) shouldBe Seq(assetId)
+      miner.nftList(acc.toAddress.toString, 2).map(_.assetId) shouldBe Seq(assetId)
       burn(acc, CallableMethod, assetId, 1)
-      sender.nftList(acc.toAddress.toString, 1) shouldBe empty
+      miner.nftList(acc.toAddress.toString, 1) shouldBe empty
     }
 
     "distribution works" in {
@@ -286,14 +286,14 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val asset = issueValidated(acc, simpleReissuableAsset)
       invokeScript(acc, "transferAndBurn", assetId = asset, count = 100)
       nodes.waitForHeightArise()
-      sender.assetDistribution(asset).map { case (a, v) => a.stringRepr -> v } shouldBe Map(
+      miner.assetDistribution(asset).map { case (a, v) => a.stringRepr -> v } shouldBe Map(
         miner.address            -> 100L,
         acc.toAddress.stringRepr -> (simpleReissuableAsset.quantity - 200)
       )
       reissue(acc, CallableMethod, asset, 400, reissuable = false)
       invokeScript(acc, "transferAndBurn", assetId = asset, count = 100)
       nodes.waitForHeightArise()
-      sender.assetDistribution(asset).map { case (a, v) => a.stringRepr -> v } shouldBe Map(
+      miner.assetDistribution(asset).map { case (a, v) => a.stringRepr -> v } shouldBe Map(
         miner.address            -> 200L,
         acc.toAddress.stringRepr -> simpleReissuableAsset.quantity
       )
@@ -304,7 +304,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val addressStr = acc.toAddress.toString
       val assetA     = issueValidated(acc, simpleReissuableAsset)
 
-      sender.debugStateChangesByAddress(addressStr, 100).flatMap(_.stateChanges) should matchPattern {
+      miner.debugStateChangesByAddress(addressStr, 100).flatMap(_.stateChanges) should matchPattern {
         case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, Nil, None, Nil)) if issue.name == simpleReissuableAsset.name =>
       }
 
@@ -312,7 +312,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       nodes.waitForHeightArise()
       val txId = invokeScript(acc, "reissueIssueAndNft", assetId = assetA, fee = invocationCost(1)).id
 
-      val (assetNft, assetB) = sender
+      val (assetNft, assetB) = miner
         .debugStateChanges(txId)
         .stateChanges
         .map { scd =>
@@ -324,24 +324,24 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
 
       nodes.waitForHeightArise()
 
-      nodes.rollback(height, returnToUTX = false)
+      nodes.blacklistPeersAndRollback(height, returnToUTX = false)
 
-      sender.debugStateChangesByAddress(addressStr, 100).flatMap(_.stateChanges) should matchPattern {
+      miner.debugStateChangesByAddress(addressStr, 100).flatMap(_.stateChanges) should matchPattern {
         case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, Nil, None, Nil)) if issue.name == simpleReissuableAsset.name =>
       }
-      assertApiError(sender.debugStateChanges(txId), TransactionDoesNotExist)
+      assertApiError(miner.debugStateChanges(txId), TransactionDoesNotExist)
 
       assertAssetDetails(assetA) { ai =>
         ai.quantity shouldBe simpleReissuableAsset.quantity
         ai.reissuable shouldBe true
       }
-      assertApiError(sender.assetsDetails(assetB), AssetDoesNotExist(IssuedAsset(ByteStr.decodeBase58(assetB).get)))
-      assertApiError(sender.assetsDetails(assetNft), AssetDoesNotExist(IssuedAsset(ByteStr.decodeBase58(assetNft).get)))
+      assertApiError(miner.assetsDetails(assetB), AssetDoesNotExist(IssuedAsset(ByteStr.decodeBase58(assetB).get)))
+      assertApiError(miner.assetsDetails(assetNft), AssetDoesNotExist(IssuedAsset(ByteStr.decodeBase58(assetNft).get)))
 
-      sender.assertAssetBalance(addressStr, assetA, simpleReissuableAsset.quantity)
-      sender.assetBalance(addressStr, assetB).balance shouldBe 0L
-      sender.assetsBalance(addressStr).balances.map(_.assetId).toSet shouldBe Set(assetA)
-      sender.nftList(addressStr, 10) shouldBe empty
+      miner.assertAssetBalance(addressStr, assetA, simpleReissuableAsset.quantity)
+      miner.assetBalance(addressStr, assetB).balance shouldBe 0L
+      miner.portfolio(addressStr).balances.map(_.assetId).toSet shouldBe Set(assetA)
+      miner.nftList(addressStr, 10) shouldBe empty
     }
   }
 
@@ -356,7 +356,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       .explicitGet()
       ._1
 
-    miner.transfer(sender.keyPair, address.toAddress.toString, initialWavesBalance, setScriptFee * 2, waitForTx = true)
+    miner.transfer(miner.keyPair, address.toAddress.toString, initialWavesBalance, setScriptFee * 2, waitForTx = true)
 
     nodes.waitForHeightAriseAndTxPresent(
       miner
@@ -416,17 +416,17 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
     f(stateChanges(tx))
     f(stateChangesStrings(tx))
 
-    val result      = sender.debugStateChangesByAddress(tx.sender.get, 100)
+    val result      = miner.debugStateChangesByAddress(tx.sender.get, 100)
     val stateChange = result.find(_.id == tx.id)
     stateChange shouldBe defined
     f(stateChange.get.stateChanges.get)
   }
 
   def stateChanges(tx: Transaction): StateChangesDetails =
-    sender.debugStateChanges(tx.id).stateChanges.get
+    miner.debugStateChanges(tx.id).stateChanges.get
 
   def stateChangesStrings(tx: Transaction): StateChangesDetails =
-    sender.debugStateChanges(tx.id, amountsAsStrings = true).stateChanges.get
+    miner.debugStateChanges(tx.id, amountsAsStrings = true).stateChanges.get
 
   def validateIssue(issue: IssueInfoResponse, data: Asset): Unit = {
     issue.name shouldBe data.name
@@ -444,7 +444,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
   }
 
   def assertAssetDetails(assetId: String)(f: AssetInfo => Unit): Unit = {
-    val assetInfo = sender.assetsDetails(assetId)
+    val assetInfo = miner.assetsDetails(assetId)
     f(assetInfo)
   }
 
@@ -454,7 +454,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       case _              => tx.id
     }
 
-    val assetInfo = sender.assetsDetails(assetId)
+    val assetInfo = miner.assetsDetails(assetId)
 
     assetInfo.originTransactionId shouldBe tx.id
     assetInfo.issueTimestamp shouldBe tx.timestamp
@@ -466,7 +466,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
     assetInfo.quantity shouldBe data.quantity
     assetInfo.scriptDetails shouldBe None
 
-    sender.assertAssetBalance(account.toAddress.toString, assetId, data.quantity)
+    miner.assertAssetBalance(account.toAddress.toString, assetId, data.quantity)
 
     if (method == CallableMethod) assertStateChanges(tx) { sd =>
       val issue = if (nth == -1) sd.issues.head else sd.issues(nth)
@@ -498,7 +498,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
         tx
 
       case _ =>
-        val tx = sender.issue(
+        val tx = miner.issue(
           account,
           data.name,
           data.description,
@@ -532,7 +532,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
           }
         tx
 
-      case _ => sender.reissue(account, assetId, quantity, reissuable, version = TxVersion.V2, waitForTx = true)
+      case _ => miner.reissue(account, assetId, quantity, reissuable, version = TxVersion.V2, waitForTx = true)
     }
   }
 
@@ -546,7 +546,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
           }
         }
         tx
-      case _ => sender.burn(account, assetId, quantity, fee = invokeFee, version = TxVersion.V2, waitForTx = true)
+      case _ => miner.burn(account, assetId, quantity, fee = invokeFee, version = TxVersion.V2, waitForTx = true)
     }
   }
 

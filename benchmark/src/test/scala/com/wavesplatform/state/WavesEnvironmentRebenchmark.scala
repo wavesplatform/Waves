@@ -188,7 +188,7 @@ object WavesEnvironmentRebenchmark {
               .collect { case (dataTx: DataTransaction, true) if dataTx.data.nonEmpty =>
                 (
                   dataTx.data(Random.nextInt(dataTx.data.length)),
-                  Recipient.Address(ByteStr(dataTx.sender.toAddress.bytes))
+                  Recipient.Address(ByteStr(dataTx.miner.toAddress.bytes))
                 )
               }
         }

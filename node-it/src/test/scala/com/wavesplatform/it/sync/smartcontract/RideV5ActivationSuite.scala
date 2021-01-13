@@ -20,8 +20,8 @@ class RideV5ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
     NodeConfigs
       .Builder(Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.Ride4DApps.id, 0)))
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.SynchronousCalls.id, activationHeight - 1)))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.Ride4DApps, 0)))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.SynchronousCalls, activationHeight - 1)))
       .buildNonConflicting()
 
   private def smartAccV5 = firstKeyPair
@@ -77,17 +77,17 @@ class RideV5ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
       e.message should include("Ride V5, dApp-to-dApp invocations feature has not been activated")
     }
 
-    assertFeatureNotActivated(sender.setScript(smartAccV5, Some(dAppV5.compiled)))
-    assertFeatureNotActivated(sender.setScript(smartAccV5, Some(accountV5.compiled)))
+    assertFeatureNotActivated(miner.setScript(smartAccV5, Some(dAppV5.compiled)))
+    assertFeatureNotActivated(miner.setScript(smartAccV5, Some(accountV5.compiled)))
     assertFeatureNotActivated(
-      sender.issue(smartAccV5, "Asset", "", 1, 0, script = Some(assetV5.compiled))
+      miner.issue(smartAccV5, "Asset", "", 1, 0, script = Some(assetV5.compiled))
     )
 
-    val assetId = sender
+    val assetId = miner
       .issue(smartAccV5, "Asset", "", 1, 0, script = Some(assetV4.compiled))
       .id
     assertFeatureNotActivated(
-      sender.setAssetScript(
+      miner.setAssetScript(
         assetId,
         smartAccV5,
         script = Some(accountV5.compiled),
@@ -97,13 +97,13 @@ class RideV5ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
   }
 
   test("can compile via API before the feature activation") {
-    sender.scriptCompile(dAppV5).script shouldBe dAppV5.compiled
-    sender.scriptCompile(accountV5).script shouldBe accountV5.compiled
-    sender.scriptCompile(assetV5).script shouldBe assetV5.compiled
+    miner.scriptCompile(dAppV5).script shouldBe dAppV5.compiled
+    miner.scriptCompile(accountV5).script shouldBe accountV5.compiled
+    miner.scriptCompile(assetV5).script shouldBe assetV5.compiled
   }
 
   test("can decompile via API before the feature activation") {
-    sender.scriptDecompile(dAppV5.compiled).script shouldBe
+    miner.scriptDecompile(dAppV5.compiled).script shouldBe
       """{-# STDLIB_VERSION 5 #-}
         |{-# SCRIPT_TYPE ACCOUNT #-}
         |{-# CONTENT_TYPE DAPP #-}
@@ -119,31 +119,31 @@ class RideV5ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
         |
         |""".stripMargin
 
-    sender.scriptDecompile(accountV5.compiled).script shouldBe
+    miner.scriptDecompile(accountV5.compiled).script shouldBe
       """{-# STDLIB_VERSION 5 #-}
         |{-# CONTENT_TYPE EXPRESSION #-}
         |(tx.sender == this)""".stripMargin
 
-    sender.scriptDecompile(assetV5.compiled).script shouldBe
+    miner.scriptDecompile(assetV5.compiled).script shouldBe
       """{-# STDLIB_VERSION 5 #-}
         |{-# CONTENT_TYPE EXPRESSION #-}
         |(this.quantity > 0)""".stripMargin
   }
 
   test("script compiles as Ride V4 before the feature activation if STDLIB_VERSION isn't specified") {
-    sender.scriptDecompile(sender.scriptCompile(scriptWithoutVersion).script).script should startWith("{-# STDLIB_VERSION 4 #-}")
+    miner.scriptDecompile(miner.scriptCompile(scriptWithoutVersion).script).script should startWith("{-# STDLIB_VERSION 4 #-}")
   }
 
   test("wait for the feature activation") {
-    sender.waitForHeight(activationHeight, 5.minutes)
+    miner.waitForHeight(activationHeight, 5.minutes)
   }
 
   test("script compiles as Ride V5 before the feature activation if STDLIB_VERSION isn't specified") {
-    sender.scriptDecompile(sender.scriptCompile(scriptWithoutVersion).script).script should startWith("{-# STDLIB_VERSION 5 #-}")
+    miner.scriptDecompile(miner.scriptCompile(scriptWithoutVersion).script).script should startWith("{-# STDLIB_VERSION 5 #-}")
   }
 
   test("can set asset script V5 after the feature activation") {
-    val assetId = sender
+    val assetId = miner
       .issue(
         smartAccV5,
         "Test",
@@ -155,13 +155,13 @@ class RideV5ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
       )
       .id
 
-    sender.setAssetScript(assetId, smartAccV5, setAssetScriptFee + smartFee, Some(assetV5.compiled), waitForTx = true)
+    miner.setAssetScript(assetId, smartAccV5, setAssetScriptFee + smartFee, Some(assetV5.compiled), waitForTx = true)
   }
 
   test("can set and invoke account script V5 after the feature activation") {
-    sender.setScript(smartAccV5, Some(accountV5.compiled), waitForTx = true)
-    sender.setScript(smartAccV5, Some(dAppV5.compiled), fee = setScriptFee + smartFee, waitForTx = true)
+    miner.setScript(smartAccV5, Some(accountV5.compiled), waitForTx = true)
+    miner.setScript(smartAccV5, Some(dAppV5.compiled), fee = setScriptFee + smartFee, waitForTx = true)
 
-    sender.invokeScript(callerAcc, smartAccV5.toAddress.toString, waitForTx = true)
+    miner.invokeScript(callerAcc, smartAccV5.toAddress.toString, waitForTx = true)
   }
 }

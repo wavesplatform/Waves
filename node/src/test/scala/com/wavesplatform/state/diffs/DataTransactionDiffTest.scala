@@ -59,26 +59,26 @@ class DataTransactionDiffTest extends PropSpec with PropertyChecks with Transact
         assertDiffAndState(Seq(genesis), blocks(0), fs) {
           case (totalDiff, state) =>
             assertBalanceInvariant(totalDiff)
-            state.balance(sender.toAddress) shouldBe (ENOUGH_AMT - txs(0).fee)
-            state.accountData(sender.toAddress, item1.key) shouldBe Some(item1)
+            state.balance(miner.toAddress) shouldBe (ENOUGH_AMT - txs(0).fee)
+            state.accountData(miner.toAddress, item1.key) shouldBe Some(item1)
         }
 
         val item2 = items(1)
         assertDiffAndState(Seq(genesis, blocks(0)), blocks(1), fs) {
           case (totalDiff, state) =>
             assertBalanceInvariant(totalDiff)
-            state.balance(sender.toAddress) shouldBe (ENOUGH_AMT - txs.take(2).map(_.fee).sum)
-            state.accountData(sender.toAddress, item1.key) shouldBe Some(item1)
-            state.accountData(sender.toAddress, item2.key) shouldBe Some(item2)
+            state.balance(miner.toAddress) shouldBe (ENOUGH_AMT - txs.take(2).map(_.fee).sum)
+            state.accountData(miner.toAddress, item1.key) shouldBe Some(item1)
+            state.accountData(miner.toAddress, item2.key) shouldBe Some(item2)
         }
 
         val item3 = items(2)
         assertDiffAndState(Seq(genesis, blocks(0), blocks(1)), blocks(2), fs) {
           case (totalDiff, state) =>
             assertBalanceInvariant(totalDiff)
-            state.balance(sender.toAddress) shouldBe (ENOUGH_AMT - txs.map(_.fee).sum)
-            state.accountData(sender.toAddress, item1.key) shouldBe Some(item3)
-            state.accountData(sender.toAddress, item2.key) shouldBe Some(item2)
+            state.balance(miner.toAddress) shouldBe (ENOUGH_AMT - txs.map(_.fee).sum)
+            state.accountData(miner.toAddress, item1.key) shouldBe Some(item3)
+            state.accountData(miner.toAddress, item2.key) shouldBe Some(item2)
         }
     }
   }

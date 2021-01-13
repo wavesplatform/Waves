@@ -2,6 +2,7 @@ package com.wavesplatform.settings
 
 import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.BlockchainFeature
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.ValueReader
@@ -135,6 +136,11 @@ object FunctionalitySettings {
   )
 
   val configPath = "waves.blockchain.custom.functionality"
+
+  implicit class FunctionalitySettingsExt(val fs: FunctionalitySettings) extends AnyVal {
+    def isFeatureActivated(feature: BlockchainFeature, height: Int): Boolean =
+      fs.preActivatedFeatures.get(feature.id).exists(_ <= height)
+  }
 }
 
 case class GenesisTransactionSettings(recipient: String, amount: Long)

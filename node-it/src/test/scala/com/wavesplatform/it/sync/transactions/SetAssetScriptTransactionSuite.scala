@@ -6,6 +6,7 @@ import com.wavesplatform.api.http.ApiError.{Mistiming, StateCheckFailed, WrongJs
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
+import com.wavesplatform.it.api.BalanceDetails
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{script, someAssetAmount, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -40,7 +41,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
-    assetWOScript = sender
+    assetWOScript = miner
       .issue(
         firstKeyPair,
         "AssetWOScript",
@@ -53,7 +54,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       )
       .id
 
-    assetWScript = sender
+    assetWScript = miner
       .issue(
         firstKeyPair,
         "SetAssetScript",
@@ -67,7 +68,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       )
       .id
 
-    assetWScript2 = sender
+    assetWScript2 = miner
       .issue(
         firstKeyPair,
         "SetAssetScript",
@@ -84,16 +85,16 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
     nodes.waitForHeightAriseAndTxPresent(assetWOScript)
     nodes.waitForHeightAriseAndTxPresent(assetWScript)
-    sender.postForm("/addresses")
-    sender.postForm("/addresses")
-    sender.postForm("/addresses")
+    miner.postForm("/addresses")
+    miner.postForm("/addresses")
+    miner.postForm("/addresses")
   }
 
   test("issuer cannot change script on asset w/o initial script") {
     for (v <- setAssetScrTxSupportedVersions) {
-      val (balance, eff) = miner.accountBalances(firstAddress)
+      val BalanceDetails(_, balance, _, _, eff) = miner.balanceDetails(firstAddress)
       assertApiError(
-        sender.setAssetScript(assetWOScript, firstKeyPair, setAssetScriptFee, Some(scriptBase64), version = v),
+        miner.setAssetScript(assetWOScript, firstKeyPair, setAssetScriptFee, Some(scriptBase64), version = v),
         AssertiveApiError(StateCheckFailed.Id, StateCheckFailed.message("Cannot set script on an asset issued without a script"))
       )
       assertApiError(
@@ -109,7 +110,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   }
 
   private def broadcastSetAssetScriptJson(assetId: String, issuer: KeyPair, fee: Long, script: Option[String] = None, version: Byte) =
-    sender.signedBroadcast(
+    miner.signedBroadcast(
       Json.obj(
         "type"            -> SetAssetScriptTransaction.typeId,
         "version"         -> version,
@@ -126,7 +127,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     /*
     issuer is first address, but script allows make SetAssetScript only second address
      */
-    val assetWAnotherOwner = sender
+    val assetWAnotherOwner = miner
       .issue(
         firstKeyPair,
         "NonOwnCoin",
@@ -152,7 +153,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAriseAndTxPresent(assetWAnotherOwner)
 
     for (v <- setAssetScrTxSupportedVersions) {
-      assertApiError(sender.setAssetScript(assetWAnotherOwner, secondKeyPair, setAssetScriptFee, Some(scriptBase64), version = v)) { error =>
+      assertApiError(miner.setAssetScript(assetWAnotherOwner, secondKeyPair, setAssetScriptFee, Some(scriptBase64), version = v)) { error =>
         error.id shouldBe StateCheckFailed.Id
         error.message shouldBe StateCheckFailed.message("Asset was issued by other address")
       }
@@ -164,10 +165,10 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   }
 
   test("non-issuer cannot change script on asset w/o script") {
-    val (balance1, eff1) = miner.accountBalances(firstAddress)
-    val (balance2, eff2) = miner.accountBalances(secondAddress)
+    val BalanceDetails(_, balance1, _, _, eff1) = miner.balanceDetails(firstAddress)
+    val BalanceDetails(_, balance2, _, _, eff2) = miner.balanceDetails(secondAddress)
     for (v <- setAssetScrTxSupportedVersions) {
-      assertApiError(sender.setAssetScript(assetWOScript, secondKeyPair, setAssetScriptFee, Some(scriptBase64), version = v)) { error =>
+      assertApiError(miner.setAssetScript(assetWOScript, secondKeyPair, setAssetScriptFee, Some(scriptBase64), version = v)) { error =>
         error.id shouldBe StateCheckFailed.Id
         error.message shouldBe StateCheckFailed.message("Asset was issued by other address")
       }
@@ -194,8 +195,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     assert(details.scriptText == "true")
     assert(details.script == scriptBase64)
     for (v <- setAssetScrTxSupportedVersions) {
-      val (balance, eff) = miner.accountBalances(firstAddress)
-      val txId           = sender.setAssetScript(assetWScript, firstKeyPair, setAssetScriptFee, Some(script2), version = v).id
+      val BalanceDetails(_, balance, _, _, eff) = miner.balanceDetails(firstAddress)
+      val txId           = miner.setAssetScript(assetWScript, firstKeyPair, setAssetScriptFee, Some(script2), version = v).id
       nodes.waitForHeightAriseAndTxPresent(txId)
       miner.assertBalances(firstAddress, balance - setAssetScriptFee, eff - setAssetScriptFee)
       val details2 = miner.assetsDetails(assetWScript, true).scriptDetails.getOrElse(fail("Expecting to get asset details"))
@@ -205,9 +206,9 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   }
 
   test("cannot transact without having enough waves") {
-    val (balance, eff) = miner.accountBalances(firstAddress)
+    val BalanceDetails(_, balance, _, _, eff) = miner.balanceDetails(firstAddress)
     for (v <- setAssetScrTxSupportedVersions) {
-      assertApiError(sender.setAssetScript(assetWScript, firstKeyPair, balance + 1, Some(scriptBase64), version = v)) { error =>
+      assertApiError(miner.setAssetScript(assetWScript, firstKeyPair, balance + 1, Some(scriptBase64), version = v)) { error =>
         error.id shouldBe StateCheckFailed.Id
         error.message shouldBe StateCheckFailed.message("Accounts balance errors")
       }
@@ -216,11 +217,11 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     }
 
     val leaseAmount = 1.waves
-    val leaseId     = sender.lease(firstKeyPair, secondAddress, leaseAmount, minFee).id
+    val leaseId     = miner.lease(firstKeyPair, secondAddress, leaseAmount, minFee).id
     nodes.waitForHeightAriseAndTxPresent(leaseId)
 
     for (v <- setAssetScrTxSupportedVersions) {
-      assertApiError(sender.setAssetScript(assetWScript, firstKeyPair, balance - leaseAmount, Some(scriptBase64), version = v)) { error =>
+      assertApiError(miner.setAssetScript(assetWScript, firstKeyPair, balance - leaseAmount, Some(scriptBase64), version = v)) { error =>
         error.id shouldBe StateCheckFailed.Id
         error.message should include regex StateCheckFailed.message(s"Accounts balance errors")
       }
@@ -237,10 +238,10 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
           assetId: IssuedAsset = IssuedAsset(ByteStr.decodeBase58(assetWScript).get)
       ): SetAssetScriptTransaction =
         SetAssetScriptTransaction
-          .signed(version = v, sender.keyPair.publicKey, assetId, Some(script), fee, timestamp, sender.keyPair.privateKey)
+          .signed(version = v, miner.keyPair.publicKey, assetId, Some(script), fee, timestamp, miner.keyPair.privateKey)
           .explicitGet()
 
-      val (balance, eff) = miner.accountBalances(firstAddress)
+      val BalanceDetails(_, balance, _, _, eff) = miner.balanceDetails(firstAddress)
 
       val invalidTxs = Seq(
         (
@@ -262,7 +263,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       )
 
       for ((tx, diag) <- invalidTxs) {
-        assertApiError(sender.broadcastRequest(tx.json()), diag)
+        assertApiError(miner.broadcastRequest(tx.json()), diag)
         nodes.foreach(_.ensureTxDoesntExist(tx.id().toString))
       }
 
@@ -289,7 +290,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       def id(obj: JsObject) = obj.value("id").as[String]
 
       val noProof = request - "proofs"
-      assertApiError(sender.postJson("/transactions/broadcast", noProof)) { error =>
+      assertApiError(miner.postJson("/transactions/broadcast", noProof)) { error =>
         error.message should include regex "failed to parse json message"
 
         val validationErrors = (error.json \ "validationErrors" \ "obj.proofs").as[JsArray].value.flatMap(json => (json \ "msg").as[List[String]])
@@ -298,14 +299,14 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       nodes.foreach(_.ensureTxDoesntExist(id(noProof)))
 
       val badProof = request ++ Json.obj("proofs" -> Seq(Base58.encode(Array.fill(64)(Random.nextInt().toByte))))
-      assertApiError(sender.postJson("/transactions/broadcast", badProof)) { error =>
+      assertApiError(miner.postJson("/transactions/broadcast", badProof)) { error =>
         error.message should include regex "Proof doesn't validate as signature"
       }
       nodes.foreach(_.ensureTxDoesntExist(id(badProof)))
 
       val withProof = request
       assert((withProof \ "proofs").as[Seq[String]].lengthCompare(1) == 0)
-      sender.postJson("/transactions/broadcast", withProof)
+      miner.postJson("/transactions/broadcast", withProof)
       nodes.waitForHeightAriseAndTxPresent(id(withProof))
     }
   }
@@ -325,7 +326,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     /*
     script doesn't allow do SetAssetScript
      */
-    val assetUnchangeableScript = sender
+    val assetUnchangeableScript = miner
       .issue(
         firstKeyPair,
         "SetAssetWDep",
@@ -342,7 +343,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAriseAndTxPresent(assetUnchangeableScript)
 
     for (v <- setAssetScrTxSupportedVersions) {
-      assertApiError(sender.setAssetScript(assetUnchangeableScript, firstKeyPair, setAssetScriptFee, Some(scriptBase64), version = v)) { error =>
+      assertApiError(miner.setAssetScript(assetUnchangeableScript, firstKeyPair, setAssetScriptFee, Some(scriptBase64), version = v)) { error =>
         error.message shouldBe errNotAllowedByToken
       }
     }
@@ -374,7 +375,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         )
         .explicitGet()
 
-      val setScriptId = sender
+      val setScriptId = miner
         .signedBroadcast(setScriptTransaction.json())
         .id
 
@@ -397,7 +398,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         nonIssuerUnsignedTx.copy(proofs = Proofs(Seq(sigTxB)))
 
       val tx =
-        sender.signedBroadcast(signedTxByB.json()).id
+        miner.signedBroadcast(signedTxByB.json()).id
 
       nodes.waitForHeightAriseAndTxPresent(tx)
 
@@ -418,7 +419,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       val signedTxByB2 =
         nonIssuerUnsignedTx2.copy(proofs = Proofs(Seq(sigTxB2)))
 
-      assertApiError(sender.signedBroadcast(signedTxByB2.json())) { error =>
+      assertApiError(miner.signedBroadcast(signedTxByB2.json())) { error =>
         error.message shouldBe errNotAllowedByToken
       }
       nodes.foreach(_.ensureTxDoesntExist(signedTxByB2.id().toString))
@@ -426,19 +427,19 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   }
 
   test("try to make SetAssetScript for asset v1") {
-    val assetV1 = sender
+    val assetV1 = miner
       .issue(thirdKeyPair, "AssetV1", "Test coin for V1", someAssetAmount, 0, reissuable = false, issueFee)
       .id
     nodes.waitForHeightAriseAndTxPresent(assetV1)
 
-    val (balance1, eff1) = miner.accountBalances(thirdAddress)
-    val (balance2, eff2) = miner.accountBalances(secondAddress)
+    val BalanceDetails(_, balance1, _, _, eff1) = miner.balanceDetails(thirdAddress)
+    val BalanceDetails(_, balance2, _, _, eff2) = miner.balanceDetails(secondAddress)
     for (v <- setAssetScrTxSupportedVersions) {
-      assertApiError(sender.setAssetScript(assetV1, thirdKeyPair, setAssetScriptFee, Some(scriptBase64), version = v)) { error =>
+      assertApiError(miner.setAssetScript(assetV1, thirdKeyPair, setAssetScriptFee, Some(scriptBase64), version = v)) { error =>
         error.message.contains("Reason: Cannot set script on an asset issued without a script") shouldBe true
       }
 
-      assertApiError(sender.setAssetScript(assetV1, secondKeyPair, setAssetScriptFee, Some(scriptBase64), version = v)) { error =>
+      assertApiError(miner.setAssetScript(assetV1, secondKeyPair, setAssetScriptFee, Some(scriptBase64), version = v)) { error =>
         error.message.contains("Reason: Asset was issued by other address") shouldBe true
       }
     }

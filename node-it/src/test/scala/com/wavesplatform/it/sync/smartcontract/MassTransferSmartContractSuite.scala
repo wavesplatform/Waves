@@ -12,7 +12,6 @@ import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer._
-import org.scalatest.CancelAfterFailure
 
 import scala.concurrent.duration._
 
@@ -23,16 +22,18 @@ every month a foundation makes payments from two MassTransactions(type == 11):
 2) 10% as tax and 10% to bank go after 30sec of payment from step 1)
  */
 
-class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAfterFailure {
+class MassTransferSmartContractSuite extends BaseTransactionSuite {
+  private lazy val notMiner = nodes.find(!_.settings.minerSettings.enable).get
   private lazy val fourthAddress: String = notMiner.createKeyPair().toAddress.toString
 
   test("airdrop emulation via MassTransfer") {
-    val scriptText = s"""
-       |{-# STDLIB_VERSION 2 #-}
-       |match tx {
-       |  case ttx: MassTransferTransaction =>
-       |    let commonAmount = (ttx.transfers[0].amount + ttx.transfers[1].amount)
-       |    let totalAmountToUsers = commonAmount == 8000000000
+    val scriptText =
+      s"""
+         |{-# STDLIB_VERSION 2 #-}
+         |match tx {
+         |  case ttx: MassTransferTransaction =>
+         |    let commonAmount = (ttx.transfers[0].amount + ttx.transfers[1].amount)
+         |    let totalAmountToUsers = commonAmount == 8000000000
        |    let totalAmountToGov = commonAmount == 2000000000
        |    let massTxSize = size(ttx.transfers) == 2
        |

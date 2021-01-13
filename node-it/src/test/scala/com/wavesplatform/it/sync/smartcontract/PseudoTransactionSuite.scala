@@ -27,7 +27,7 @@ class PseudoTransactionSuite extends BaseTransactionSuite {
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
-    smartAssetId = sender.issue(firstDApp, fee = issueFee, script = Some(scriptBase64), waitForTx = true).id
+    smartAssetId = miner.issue(firstDApp, fee = issueFee, script = Some(scriptBase64), waitForTx = true).id
 
     val dAppScript = ScriptCompiler(
       s"""
@@ -51,29 +51,29 @@ class PseudoTransactionSuite extends BaseTransactionSuite {
       ScriptEstimatorV3
     ).explicitGet()._1.bytes().base64
 
-    sender.setScript(firstDApp, Some(dAppScript), waitForTx = true)
-    sender.setScript(recipient, Some(dAppScript), waitForTx = true)
+    miner.setScript(firstDApp, Some(dAppScript), waitForTx = true)
+    miner.setScript(recipient, Some(dAppScript), waitForTx = true)
   }
 
   test("check burn pseudotransaction fields") {
-    val smartAssetQuantityBefore = sender.assetsDetails(smartAssetId).quantity
+    val smartAssetQuantityBefore = miner.assetsDetails(smartAssetId).quantity
     val burnedQuantity = 100000
     val signedInvoke = invokeScriptTransaction("burnAsset", List(Terms.CONST_BYTESTR(ByteStr.decodeBase58(smartAssetId).get).explicitGet(), Terms.CONST_LONG(burnedQuantity)))
-    sender.setAssetScript(smartAssetId, firstDApp, script = Some(smartAssetScript(signedInvoke.id().toString)), fee = issueFee + smartFee, waitForTx = true)
-    sender.signedBroadcast(signedInvoke.json(), waitForTx = true)
+    miner.setAssetScript(smartAssetId, firstDApp, script = Some(smartAssetScript(signedInvoke.id().toString)), fee = issueFee + smartFee, waitForTx = true)
+    miner.signedBroadcast(signedInvoke.json(), waitForTx = true)
 
-    sender.assetsDetails(smartAssetId).quantity shouldBe smartAssetQuantityBefore - burnedQuantity
+    miner.assetsDetails(smartAssetId).quantity shouldBe smartAssetQuantityBefore - burnedQuantity
   }
 
   test("check reissue pseudotransaction fields") {
-    val smartAssetQuantityBefore = sender.assetsDetails(smartAssetId).quantity
+    val smartAssetQuantityBefore = miner.assetsDetails(smartAssetId).quantity
     val addedQuantity = 100000
     val signedInvoke = invokeScriptTransaction("reissueAsset",
       List(Terms.CONST_BYTESTR(ByteStr.decodeBase58(smartAssetId).get).explicitGet(), Terms.CONST_BOOLEAN(true), Terms.CONST_LONG(addedQuantity)))
-    sender.setAssetScript(smartAssetId, firstDApp, script = Some(smartAssetScript(signedInvoke.id().toString)), fee = issueFee + smartFee, waitForTx = true)
-    sender.signedBroadcast(signedInvoke.json(), waitForTx = true)
+    miner.setAssetScript(smartAssetId, firstDApp, script = Some(smartAssetScript(signedInvoke.id().toString)), fee = issueFee + smartFee, waitForTx = true)
+    miner.signedBroadcast(signedInvoke.json(), waitForTx = true)
 
-    sender.assetsDetails(smartAssetId).quantity shouldBe smartAssetQuantityBefore + addedQuantity
+    miner.assetsDetails(smartAssetId).quantity shouldBe smartAssetQuantityBefore + addedQuantity
   }
 
   test("check transfer pseudotransaction fields") {
@@ -83,18 +83,18 @@ class PseudoTransactionSuite extends BaseTransactionSuite {
         Terms.CONST_BYTESTR(ByteStr.decodeBase58(smartAssetId).get).explicitGet(),
         Terms.CONST_LONG(transferAmount / 2)
       ))
-    sender.setAssetScript(smartAssetId, firstDApp, script = Some(smartAssetScript(signedInvoke.id().toString)), fee = issueFee + smartFee, waitForTx = true)
-    sender.signedBroadcast(signedInvoke.json(), waitForTx = true)
+    miner.setAssetScript(smartAssetId, firstDApp, script = Some(smartAssetScript(signedInvoke.id().toString)), fee = issueFee + smartFee, waitForTx = true)
+    miner.signedBroadcast(signedInvoke.json(), waitForTx = true)
 
-    sender.createAlias(recipient, recipientAlias, fee = smartMinFee, waitForTx = true)
+    miner.createAlias(recipient, recipientAlias, fee = smartMinFee, waitForTx = true)
     val signedInvoke2 = invokeScriptTransaction("transferAssetByAlias",
       List(
         Terms.CONST_STRING(recipientAlias).explicitGet(),
         Terms.CONST_BYTESTR(ByteStr.decodeBase58(smartAssetId).get).explicitGet(),
         Terms.CONST_LONG(transferAmount / 2)
       ))
-    sender.setAssetScript(smartAssetId, firstDApp, script = Some(smartAssetScript(signedInvoke2.id().toString)), fee = issueFee + smartFee, waitForTx = true)
-    sender.signedBroadcast(signedInvoke2.json(), waitForTx = true)
+    miner.setAssetScript(smartAssetId, firstDApp, script = Some(smartAssetScript(signedInvoke2.id().toString)), fee = issueFee + smartFee, waitForTx = true)
+    miner.signedBroadcast(signedInvoke2.json(), waitForTx = true)
   }
 
   private def smartAssetScript(invokeId: String): String = ScriptCompiler(
@@ -113,14 +113,14 @@ class PseudoTransactionSuite extends BaseTransactionSuite {
        |     && t.id == fromBase58String("$invokeId")
        |     && (toBase58String(addressFromRecipient(t.recipient).bytes) == "${recipient.toAddress.toString}" ||
        |     toBase58String(addressFromRecipient(t.recipient).bytes) == "$recipientAlias")
-       |     && toBase58String(t.sender.bytes) == "${firstDApp.toAddress.toString}"
+       |     && toBase58String(t.miner.bytes) == "${firstDApp.toAddress.toString}"
        |     && t.version == 0
        |    case r: ReissueTransaction => r.senderPublicKey.toBase58String() == "${firstDApp.publicKey.toString}"
        |     && r.assetId.value().toBase58String() == "$smartAssetId"
        |     && r.bodyBytes.size() == 0
        |     && r.fee == 0
        |     && r.id.size() != 0
-       |     && toBase58String(r.sender.bytes) == "${firstDApp.toAddress.toString}"
+       |     && toBase58String(r.miner.bytes) == "${firstDApp.toAddress.toString}"
        |     && r.version == 0
        |     && r.quantity == 100000
        |     && r.reissuable == true
@@ -129,7 +129,7 @@ class PseudoTransactionSuite extends BaseTransactionSuite {
        |     && b.bodyBytes.size() == 0
        |     && b.fee == 0
        |     && b.id.size() != 0
-       |     && toBase58String(b.sender.bytes) == "${firstDApp.toAddress.toString}"
+       |     && toBase58String(b.miner.bytes) == "${firstDApp.toAddress.toString}"
        |     && b.version == 0
        |     && b.quantity == 100000
        |    case _ => true

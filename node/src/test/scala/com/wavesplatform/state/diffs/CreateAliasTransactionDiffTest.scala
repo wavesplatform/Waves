@@ -48,7 +48,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with W
             totalPortfolioDiff.balance shouldBe 0
             totalPortfolioDiff.effectiveBalance shouldBe 0
 
-            val senderAcc = anotherAliasTx.sender.toAddress
+            val senderAcc = anotherAliasTx.miner.toAddress
             blockDiff.aliases shouldBe Map(anotherAliasTx.alias -> senderAcc)
 
             addressTransactions(db, Some(Height(newState.height + 1) -> blockDiff), senderAcc, Set(CreateAliasTransaction.typeId), None).collect {
@@ -104,8 +104,8 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with W
       case (gen, gen2, issue1, issue2, aliasTx, transfer, _) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(gen, gen2, issue1, issue2, aliasTx))), TestBlock.create(Seq(transfer))) {
           case (blockDiff, _) =>
-            if (transfer.sender.toAddress != aliasTx.sender.toAddress) {
-              val recipientPortfolioDiff = blockDiff.portfolios(aliasTx.sender.toAddress)
+            if (transfer.miner.toAddress != aliasTx.miner.toAddress) {
+              val recipientPortfolioDiff = blockDiff.portfolios(aliasTx.miner.toAddress)
               transfer.assetId match {
                 case aid @ IssuedAsset(_) => recipientPortfolioDiff shouldBe Portfolio(0, LeaseBalance.empty, Map(aid -> transfer.amount))
                 case Waves                => recipientPortfolioDiff shouldBe Portfolio(transfer.amount, LeaseBalance.empty, Map.empty)
@@ -119,8 +119,8 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with W
     forAll(preconditionsTransferLease) {
       case (gen, gen2, issue1, issue2, aliasTx, _, lease) =>
         assertDiffEi(Seq(TestBlock.create(Seq(gen, gen2, issue1, issue2, aliasTx))), TestBlock.create(Seq(lease))) { blockDiffEi =>
-          if (lease.sender.toAddress != aliasTx.sender.toAddress) {
-            val recipientPortfolioDiff = blockDiffEi.explicitGet().portfolios(aliasTx.sender.toAddress)
+          if (lease.miner.toAddress != aliasTx.miner.toAddress) {
+            val recipientPortfolioDiff = blockDiffEi.explicitGet().portfolios(aliasTx.miner.toAddress)
             recipientPortfolioDiff shouldBe Portfolio(0, LeaseBalance(lease.amount, 0), Map.empty)
           } else {
             blockDiffEi should produce("Cannot lease to self")

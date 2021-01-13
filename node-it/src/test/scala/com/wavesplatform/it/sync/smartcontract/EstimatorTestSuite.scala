@@ -3,20 +3,19 @@ package com.wavesplatform.it.sync.smartcontract
 import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
+import com.wavesplatform.it.{NodeConfigs, RandomKeyPair}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.BinaryDataEntry
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.CancelAfterFailure
 
 import scala.concurrent.duration._
 
-class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
+class EstimatorTestSuite extends BaseTransactionSuite {
   private val estimator = ScriptEstimatorV2
 
   private val featureHeight = 8
@@ -32,8 +31,8 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
                               |}""".stripMargin))
       .buildNonConflicting()
 
-  private def smartAcc  = firstKeyPair
-  private def callerAcc = secondKeyPair
+  private def smartAcc       = firstKeyPair
+  private lazy val callerAcc = RandomKeyPair()
 
   private val accScript = ScriptCompiler
     .compile(
@@ -114,9 +113,9 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     Seq(smartAcc, callerAcc).foreach(
       r =>
-        sender
+        miner
           .transfer(
-            sender.keyPair,
+            miner.keyPair,
             recipient = r.toAddress.toString,
             assetId = None,
             amount = 5.waves,
@@ -148,11 +147,11 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
           .get
       )
     )
-    sender.putData(smartAcc, data, 0.3.waves, waitForTx = true)
+    miner.putData(smartAcc, data, 0.3.waves, waitForTx = true)
   }
 
   test("can issue scripted asset and set script fro asset before precheck activation") {
-    issuedAssetId = sender
+    issuedAssetId = miner
       .issue(
         smartAcc,
         "Test",
@@ -165,7 +164,7 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
       )
       .id
 
-    sender
+    miner
       .setAssetScript(
         issuedAssetId,
         smartAcc,
@@ -178,9 +177,9 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
   }
 
   test("can set contract and invoke script before precheck activation") {
-    sender.setScript(smartAcc, Some(accScript), setScriptFee + smartFee, waitForTx = true).id
+    miner.setScript(smartAcc, Some(accScript), setScriptFee + smartFee, waitForTx = true).id
 
-    sender
+    miner
       .invokeScript(
         callerAcc,
         smartAcc.toAddress.toString,
@@ -194,17 +193,17 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
       ._1
       .id
 
-    sender.setScript(smartAcc, Some(accScript), setScriptFee + smartFee, waitForTx = true).id
+    miner.setScript(smartAcc, Some(accScript), setScriptFee + smartFee, waitForTx = true).id
   }
 
   test(s"wait height from to $featureHeight for precheck activation") {
-    sender.waitForHeight(featureHeight + 1, 5.minutes)
+    miner.waitForHeight(featureHeight + 1, 5.minutes)
   }
 
   test("can't issue asset after estimator v1 precheck activation") {
 
     assertBadRequestAndMessage(
-      sender.issue(
+      miner.issue(
         smartAcc,
         "Test",
         "Test asset",
@@ -219,7 +218,7 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
 
   test("can't set script for issued asset after estimator v1 precheck activation") {
     assertBadRequestAndMessage(
-      sender.setAssetScript(
+      miner.setAssetScript(
         issuedAssetId,
         smartAcc,
         issueFee + smartFee,
@@ -231,13 +230,13 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
 
   test("can't set contract to account after estimator v1 precheck activation") {
     assertBadRequestAndMessage(
-      sender.setScript(smartAcc, Some(accScript), setScriptFee + smartFee),
+      miner.setScript(smartAcc, Some(accScript), setScriptFee + smartFee),
       "Contract function (default) is too complex"
     )
   }
 
   test("can still invoke account and asset scripts after estimator v1 precheck activation") {
-    sender
+    miner
       .invokeScript(
         callerAcc,
         smartAcc.toAddress.toString,
@@ -251,7 +250,7 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
       ._1
       .id
 
-    sender.transfer(smartAcc, callerAcc.toAddress.toString, 1, minFee + 2 * smartFee, Some(issuedAssetId), None, waitForTx = true)
+    miner.transfer(smartAcc, callerAcc.toAddress.toString, 1, minFee + 2 * smartFee, Some(issuedAssetId), None, waitForTx = true)
   }
 
 }

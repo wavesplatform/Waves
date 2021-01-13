@@ -34,8 +34,8 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
       fee                                                                      <- smallFeeGen
       reissuable                                                               <- Gen.oneOf(true, false)
     } yield {
-      val issue = IssueTransaction(TxVersion.V1, sender.publicKey, assetName, description, quantity, decimals, reissuable = true, script = None, iFee, timestamp)
-        .signWith(sender.privateKey)
+      val issue = IssueTransaction(TxVersion.V1, miner.publicKey, assetName, description, quantity, decimals, reissuable = true, script = None, iFee, timestamp)
+        .signWith(miner.privateKey)
       val reissue1 = ReissueTransaction
         .selfSigned(2.toByte, sender, issue.asset, quantity, reissuable = reissuable, fee, timestamp)
         .explicitGet()

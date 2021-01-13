@@ -3,13 +3,12 @@ package com.wavesplatform.it
 import java.io.{FileOutputStream, IOException}
 import java.net.{InetAddress, InetSocketAddress, URL}
 import java.nio.file.{Files, Path, Paths}
-import java.time.LocalDateTime
+import java.time.{Instant, LocalDateTime}
 import java.time.format.DateTimeFormatter
 import java.util.Collections._
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.{Properties, List => JList, Map => JMap}
-
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.primitives.Ints._
@@ -18,8 +17,10 @@ import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.ConfigFactory._
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
-import com.wavesplatform.account.AddressScheme
+import com.typesafe.scalalogging.StrictLogging
+import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
@@ -33,6 +34,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.io.IOUtils
 import org.asynchttpclient.Dsl._
 
+import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, blocking}
@@ -40,8 +42,13 @@ import scala.jdk.CollectionConverters._
 import scala.util.control.NonFatal
 import scala.util.{Random, Try}
 
-class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boolean = false, imageName: String = Docker.NodeImageName)
-    extends AutoCloseable
+class Docker(
+    nodeConfigs: Seq[Config],
+    suiteConfig: Config = empty,
+    tag: String = "",
+    enableProfiling: Boolean = false,
+    imageName: String = Docker.NodeImageName
+) extends AutoCloseable
     with ScorexLogging {
 
   import Docker._
@@ -68,10 +75,19 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     close()
   }
 
-  private val genesisOverride = Docker.genesisOverride
+  private lazy val genesisOverride =
+    Docker.genesisOverride(nodeConfigs.collect {
+      case cfg if cfg.getOrElse("waves.miner.enable", true) =>
+        cfg
+          .withFallback(suiteConfig)
+          .withFallback(configTemplate)
+          .withFallback(defaultApplication())
+          .withFallback(defaultReference())
+          .resolve()
+    })
 
   // a random network in 10.x.x.x range
-  val networkSeed = Random.nextInt(0x100000) << 4 | 0x0A000000
+  private val networkSeed = Random.nextInt(0x100000) << 4 | 0x0A000000
   // 10.x.x.x/28 network will accommodate up to 13 nodes
   private val networkPrefix = s"${InetAddress.getByAddress(toByteArray(networkSeed)).getHostAddress}/28"
 
@@ -197,7 +213,9 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
   private def startNodeInternal(nodeConfig: Config, autoConnect: Boolean = true): DockerNode =
     try {
-      val nodeName = nodeConfig.getString("waves.network.node-name")
+      val nodeName         = nodeConfig.getString("waves.network.node-name")
+      val networkingConfig = ContainerConfig.NetworkingConfig.create(Map(wavesNetwork.name() -> endpointConfigFor(nodeName)).asJava)
+
       val peersOverrides = if (autoConnect) {
         val otherAddrs = peersFor(nodeName)
 
@@ -247,7 +265,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
       val containerConfig = ContainerConfig
         .builder()
         .image(imageName)
-        .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(wavesNetwork.name() -> endpointConfigFor(nodeName)).asJava))
+        .networkingConfig(networkingConfig)
         .hostConfig(hostConfig)
         .env(s"JAVA_OPTS=$configOverrides")
         .build()
@@ -255,10 +273,6 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
       val containerId = {
         val jenkinsJobIdFromEnv = sys.env.get("JENKINS_JOB_ID").fold("")(s => s"-$s")
         val containerName       = s"${wavesNetwork.name()}-$nodeName$jenkinsJobIdFromEnv"
-        dumpContainers(
-          client.listContainers(DockerClient.ListContainersParam.filter("name", containerName)),
-          "Containers with same name"
-        )
 
         log.debug(s"Creating container $containerName at $ip with options: $javaOptions")
         val r = client.createContainer(containerConfig, containerName)
@@ -289,6 +303,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     NodeInfo(restApiPort, networkPort, wavesIpAddress, containerInfo.networkSettings().ports())
   }
 
+  @tailrec
   private def inspectContainer(containerId: String): ContainerInfo = {
     val containerInfo = client.inspectContainer(containerId)
     if (containerInfo.networkSettings().networks().asScala.contains(wavesNetwork.name())) containerInfo
@@ -476,7 +491,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     node
   }
 
-  def connectToNetwork(nodes: Seq[DockerNode]): Unit = {
+  def connectToNetwork(nodes: DockerNode*): Unit = {
     nodes.foreach(connectToNetwork)
     Await.result(Future.traverse(nodes)(connectToAll), 1.minute)
   }
@@ -522,7 +537,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
 }
 
-object Docker {
+object Docker extends StrictLogging {
   val NodeImageName: String = "com.wavesplatform/node-it:latest"
 
   private val ContainerRoot = Paths.get("/usr/share/waves")
@@ -534,27 +549,46 @@ object Docker {
   private val propsMapper = new JavaPropsMapper
 
   val configTemplate: Config = parseResources("template.conf")
-  def genesisOverride: Config = {
-    val genesisTs = System.currentTimeMillis()
-
+  def genesisOverride(minerConfigs: Seq[Config]): Config = {
+    val genesisTs          = System.currentTimeMillis()
     val timestampOverrides = parseString(s"""waves.blockchain.custom.genesis {
                                             |  timestamp = $genesisTs
                                             |  block-timestamp = $genesisTs
-                                            |  signature = null # To calculate it in Block.genesis
                                             |}""".stripMargin)
 
-    val genesisConfig    = timestampOverrides.withFallback(configTemplate)
+    val baseTargetOverrides =
+      if (minerConfigs.isEmpty) empty()
+      else {
+        val maxBaseTarget = (for {
+          minerConfig <- minerConfigs
+          balance <- minerConfig
+            .getConfigList("waves.blockchain.custom.genesis.transactions")
+            .asScala
+            .find(_.getString("recipient") == minerConfig.getString("address"))
+        } yield com.wavesplatform.consensus.calculateInitialBaseTarget(
+          KeyPair(ByteStr.decodeBase58(minerConfig.getString("account-seed")).get),
+          balance.getLong("amount"),
+          minerConfig.getAs[FunctionalitySettings]("waves.blockchain.custom.functionality").get,
+          minerConfig.getDuration("waves.blockchain.custom.genesis.average-block-delay", TimeUnit.MILLISECONDS)
+        )).max
+        logger.debug(s"Initial base target $maxBaseTarget, genesis timestamp ${Instant.ofEpochMilli(genesisTs)}")
+        parseString(s"waves.blockchain.custom.genesis.initial-base-target = $maxBaseTarget")
+      }
+
+    val baseGenesisSettings = timestampOverrides.withFallback(baseTargetOverrides)
+    val genesisConfig    = baseGenesisSettings.withFallback(configTemplate)
     val gs               = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")
     val genesisSignature = Block.genesis(gs).explicitGet().id()
 
-    parseString(s"waves.blockchain.custom.genesis.signature = $genesisSignature").withFallback(timestampOverrides)
+    parseString(s"waves.blockchain.custom.genesis.signature = $genesisSignature")
+      .withFallback(baseGenesisSettings)
   }
 
   AddressScheme.current = new AddressScheme {
     override val chainId: Byte = configTemplate.as[String]("waves.blockchain.custom.address-scheme-character").charAt(0).toByte
   }
 
-  def apply(owner: Class[_]): Docker = new Docker(tag = owner.getSimpleName)
+  def apply(owner: Class[_], nodeConfigs: Seq[Config]): Docker = new Docker(nodeConfigs, tag = owner.getSimpleName)
 
   private def asProperties(config: Config): Properties = {
     val jsonConfig = config.resolve().root().render(ConfigRenderOptions.concise())

@@ -213,7 +213,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .create(
       1.toByte,
       publicKey,
-      Address.fromString(sender.address).explicitGet(),
+      Address.fromString(miner.address).explicitGet(),
       10000000,
       minFee,
       ts,
@@ -225,7 +225,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .create(
       2.toByte,
       publicKey,
-      Address.fromString(sender.address).explicitGet(),
+      Address.fromString(miner.address).explicitGet(),
       10000000,
       minFee,
       ts,
@@ -318,7 +318,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     )
     .explicitGet()
 
-  private lazy val recipient = Address.fromString(sender.address).explicitGet()
+  private lazy val recipient = Address.fromString(miner.address).explicitGet()
   private lazy val transferV1 = TransferTransaction(
     1.toByte,
     publicKey,
@@ -395,7 +395,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
       )
     ) { (tx, name) =>
       info(name)
-      val r = sender.transactionSerializer(tx.json()).bytes.map(_.toByte)
+      val r = miner.transactionSerializer(tx.json()).bytes.map(_.toByte)
       r shouldBe tx.bodyBytes()
     }
   }

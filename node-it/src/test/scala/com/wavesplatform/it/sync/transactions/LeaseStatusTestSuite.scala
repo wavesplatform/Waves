@@ -2,34 +2,35 @@ package com.wavesplatform.it.sync.transactions
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.TransactionsApiRoute.LeaseStatus
+import com.wavesplatform.it.RandomKeyPair
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import org.scalatest.CancelAfterFailure
 import play.api.libs.json.Json
 
-class LeaseStatusTestSuite extends BaseTransactionSuite with CancelAfterFailure {
+class LeaseStatusTestSuite extends BaseTransactionSuite {
   import LeaseStatusTestSuite._
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
   test("verification of leasing status") {
-    val createdLeaseTxId = sender.lease(firstKeyPair, secondAddress, leasingAmount, leasingFee = minFee).id
+    val secondAddress    = RandomKeyPair().toAddress.toString
+    val createdLeaseTxId = miner.lease(firstKeyPair, secondAddress, leasingAmount, leasingFee = minFee).id
     nodes.waitForHeightAriseAndTxPresent(createdLeaseTxId)
     val status = getStatus(createdLeaseTxId)
     status shouldBe LeaseStatus.Active
 
-    val cancelLeaseTxId = sender.cancelLease(firstKeyPair, createdLeaseTxId, fee = minFee).id
+    val cancelLeaseTxId = miner.cancelLease(firstKeyPair, createdLeaseTxId, fee = minFee).id
     miner.waitForTransaction(cancelLeaseTxId)
     nodes.waitForHeightArise()
     val status1 = getStatus(createdLeaseTxId)
     status1 shouldBe LeaseStatus.Canceled
-    val sizeActiveLeases = sender.activeLeasesOld(firstAddress).size
+    val sizeActiveLeases = miner.activeLeasesOld(firstAddress).size
     sizeActiveLeases shouldBe 0
   }
 
   private def getStatus(txId: String): String = {
-    val r = sender.get(s"/transactions/info/$txId")
+    val r = miner.get(s"/transactions/info/$txId")
     (Json.parse(r.getResponseBody) \ "status").as[String]
 
   }

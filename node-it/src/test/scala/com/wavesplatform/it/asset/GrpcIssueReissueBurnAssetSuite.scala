@@ -44,7 +44,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
         val tx  = issue(acc, method, data, fee)
 
         validateIssuedAssets(acc, tx, data, method = method)
-        sender.wavesBalance(acc).regular shouldBe (initialWavesBalance - setScriptPrice - fee)
+        miner.wavesBalance(acc).regular shouldBe (initialWavesBalance - setScriptPrice - fee)
       }
 
     for (data <- Seq(simpleNonreissuableAsset, simpleReissuableAsset)) s"${data.assetType} asset could be partially burned" in {
@@ -57,8 +57,8 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
 
       burn(acc, TransactionMethod, assetId, burnQuantity / 2)
       burn(acc, CallableMethod, assetId, burnQuantity / 2)
-      sender.assetInfo(assetId).totalVolume shouldBe remainQuantity
-      sender.assertAssetBalance(acc, assetId, remainQuantity)
+      miner.assetInfo(assetId).totalVolume shouldBe remainQuantity
+      miner.assertAssetBalance(acc, assetId, remainQuantity)
     }
 
     for (data <- Seq(simpleNonreissuableAsset, simpleReissuableAsset, nftAsset, longMaxAsset)) s"${data.assetType} could be fully burned" in {
@@ -67,11 +67,11 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
       val txIssue = issue(acc, method, data, fee)
       val assetId = validateIssuedAssets(acc, txIssue, data, method = method)
 
-      sender.assertAssetBalance(acc, assetId, data.quantity)
+      miner.assertAssetBalance(acc, assetId, data.quantity)
       val tx = burn(acc, method, assetId, data.quantity)
 
-      sender.assetInfo(assetId).totalVolume shouldBe 0
-      sender.assertAssetBalance(acc, assetId, 0)
+      miner.assetInfo(assetId).totalVolume shouldBe 0
+      miner.assertAssetBalance(acc, assetId, 0)
 
       if (isCallable) assertStateChanges(tx) { sd =>
         sd.burns should matchPattern {
@@ -81,8 +81,8 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
 
       if (data.reissuable) {
         reissue(acc, method, assetId, data.quantity, reissuable = true)
-        sender.assetInfo(assetId).totalVolume shouldBe data.quantity
-        sender.assertAssetBalance(acc, assetId, data.quantity)
+        miner.assetInfo(assetId).totalVolume shouldBe data.quantity
+        miner.assertAssetBalance(acc, assetId, data.quantity)
       }
     }
 
@@ -97,9 +97,9 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
       reissue(acc, TransactionMethod, assetId, addedQuantity / 2, reissuable = true)
       reissue(acc, CallableMethod, assetId, addedQuantity / 2, reissuable = false)
 
-      sender.assetInfo(assetId).reissuable shouldBe !initialReissuable
-      sender.assetInfo(assetId).totalVolume shouldBe initialQuantity + addedQuantity
-      sender.assertAssetBalance(acc, assetId, initialQuantity + addedQuantity)
+      miner.assetInfo(assetId).reissuable shouldBe !initialReissuable
+      miner.assetInfo(assetId).totalVolume shouldBe initialQuantity + addedQuantity
+      miner.assertAssetBalance(acc, assetId, initialQuantity + addedQuantity)
     }
 
     "Non-reissuable asset could not be reissued" in {
@@ -168,7 +168,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
 
       invokeScript(acc, "reissueAndReissue", assetId = assetId, count = 1000)
 
-      sender.assetInfo(assetId).totalVolume should be(simpleReissuableAsset.quantity + 1000)
+      miner.assetInfo(assetId).totalVolume should be(simpleReissuableAsset.quantity + 1000)
     }
 
     "Issue 10 assets should not produce an error" in {
@@ -177,7 +177,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
       for (nth <- 0 to 9) {
         val assetId = validateIssuedAssets(acc, tx, simpleNonreissuableAsset, nth, CallableMethod)
         assertQuantity(assetId)(simpleNonreissuableAsset.quantity, reissuable = false)
-        sender.assertAssetBalance(acc, assetId, simpleNonreissuableAsset.quantity)
+        miner.assertAssetBalance(acc, assetId, simpleNonreissuableAsset.quantity)
       }
     }
 
@@ -232,23 +232,23 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
       reissue(acc, CallableMethod, asset1Id, 10, reissuable = true)
       burn(acc, CallableMethod, asset1Id, 5)
       assertQuantity(asset1Id)(15)
-      sender.assertAssetBalance(acc, asset1Id, 15)
+      miner.assertAssetBalance(acc, asset1Id, 15)
 
       val issue2   = issue(acc, CallableMethod, asset)
       val asset2Id = validateIssuedAssets(acc, issue2, asset)
       burn(acc, CallableMethod, asset2Id, 5)
       reissue(acc, CallableMethod, asset2Id, 10, reissuable = false)
       assertQuantity(asset2Id)(15, reissuable = false)
-      sender.assertAssetBalance(acc, asset2Id, 15)
+      miner.assertAssetBalance(acc, asset2Id, 15)
     }
 
     "NFT burning removes it from list" in {
       val acc     = createDapp(script(nftAsset))
       val txIssue = issue(acc, CallableMethod, nftAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, nftAsset, method = CallableMethod)
-      sender.nftList(acc, 2).map(r => Base58.encode(r.assetId.toByteArray)) shouldBe Seq(assetId)
+      miner.nftList(acc, 2).map(r => Base58.encode(r.assetId.toByteArray)) shouldBe Seq(assetId)
       burn(acc, CallableMethod, assetId, 1)
-      sender.nftList(acc, 1) shouldBe empty
+      miner.nftList(acc, 1) shouldBe empty
     }
 
     "liquid block works" in {
@@ -262,8 +262,8 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
           sd.reissues should have size 1
         }
         assertQuantity(asset)(simpleReissuableAsset.quantity)
-        sender.assertAssetBalance(acc, asset, simpleReissuableAsset.quantity)
-        sender.nftList(acc, 10) should have size 1
+        miner.assertAssetBalance(acc, asset, simpleReissuableAsset.quantity)
+        miner.nftList(acc, 10) should have size 1
       }
       checks()
       miner.waitForHeightArise()
@@ -282,7 +282,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
       .explicitGet()
       ._1
 
-    miner.broadcastTransfer(sender.keyPair, PBRecipients.create(address.toAddress), initialWavesBalance, minFee, waitForTx = true)
+    miner.broadcastTransfer(miner.keyPair, PBRecipients.create(address.toAddress), initialWavesBalance, minFee, waitForTx = true)
 
     miner.waitForTransaction(
       miner
@@ -335,13 +335,13 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
   }
 
   def assertStateChanges(tx: String)(f: StateChangesDetails => Unit): Unit = {
-    val (transaction, details) = sender.stateChanges(tx)
+    val (transaction, details) = miner.stateChanges(tx)
     transaction.chainId shouldBe 'I'.toByte
     f(details)
   }
 
   def grpcBalance(address: KeyPair, assetId: String): Long = {
-    sender.assetsBalance(address, Seq(assetId)).headOption.fold(0L)(_._2)
+    miner.assetsBalance(address, Seq(assetId)).headOption.fold(0L)(_._2)
   }
 
   def validateIssue(issue: IssueInfoResponse, data: Asset): Unit = {
@@ -361,7 +361,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
 
   def assertGrpcAssetDetails(assetId: String)(f: AssetInfoResponse => Unit): Unit = {
     import com.wavesplatform.it.api.SyncGrpcApi._
-    val assetInfo = sender.grpc.assetInfo(assetId)
+    val assetInfo = miner.grpc.assetInfo(assetId)
     f(assetInfo)
   }
 
@@ -379,7 +379,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
       assetInfo.totalVolume shouldBe data.quantity
     }
 
-    sender.assertAssetBalance(account, assetId, data.quantity)
+    miner.assertAssetBalance(account, assetId, data.quantity)
     grpcBalance(account, assetId) shouldBe data.quantity
 
     if (method == CallableMethod) assertStateChanges(tx) { sd =>
@@ -391,8 +391,8 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
   }
 
   def invokeAssetId(tx: String, nth: Int = -1): String = {
-    (if (nth == -1) sender.stateChanges(tx)._2.issues.head
-     else sender.stateChanges(tx)._2.issues(nth)).assetId
+    (if (nth == -1) miner.stateChanges(tx)._2.issues.head
+     else miner.stateChanges(tx)._2.issues(nth)).assetId
   }
 
   def issueValidated(account: KeyPair, data: Asset): String = {
@@ -412,7 +412,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
         tx
 
       case _ =>
-        sender
+        miner
           .broadcastIssue(
             account,
             data.name,
@@ -448,7 +448,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
           }
         tx
 
-      case _ => sender.broadcastReissue(account, fee, assetId, quantity, reissuable, version = TxVersion.V2, waitForTx = true).id
+      case _ => miner.broadcastReissue(account, fee, assetId, quantity, reissuable, version = TxVersion.V2, waitForTx = true).id
     }
   }
 
@@ -462,7 +462,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
           }
         }
         tx
-      case _ => sender.broadcastBurn(account, assetId, quantity, fee = invokeFee, version = TxVersion.V2, waitForTx = true).id
+      case _ => miner.broadcastBurn(account, assetId, quantity, fee = invokeFee, version = TxVersion.V2, waitForTx = true).id
     }
   }
 

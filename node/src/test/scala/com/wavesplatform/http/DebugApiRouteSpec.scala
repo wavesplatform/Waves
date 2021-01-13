@@ -106,6 +106,7 @@ class DebugApiRouteSpec
     def routeWithBlockchain(blockchain: Blockchain with NG) =
       debugApiRoute.copy(blockchain = blockchain, priorityPoolBlockchain = () => blockchain).route
 
+
     def validatePost(tx: TransferTransaction) =
       Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString()))
 

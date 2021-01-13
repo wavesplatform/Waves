@@ -29,7 +29,7 @@ class PaymentValidationSuite extends BaseTransactionSuite {
          |}
       """.stripMargin
     val scriptV4 = ScriptCompiler.compile(sourceV4, ScriptEstimatorV3).explicitGet()._1.bytes().base64
-    sender.setScript(dApp, Some(scriptV4), setScriptFee, waitForTx = true)
+    miner.setScript(dApp, Some(scriptV4), setScriptFee, waitForTx = true)
 
     val scr = ScriptCompiler(
       s"""
@@ -42,10 +42,10 @@ class PaymentValidationSuite extends BaseTransactionSuite {
       isAssetScript = true,
       ScriptEstimatorV3
     ).explicitGet()._1.bytes().base64
-    val smartAssetId = sender.issue(caller, script = Some(scr), fee = issueFee + smartFee, waitForTx = true).id
+    val smartAssetId = miner.issue(caller, script = Some(scr), fee = issueFee + smartFee, waitForTx = true).id
 
     assertApiError(
-      sender.invokeScript(caller, dApp.toAddress.toString, func = Some("write"),
+      miner.invokeScript(caller, dApp.toAddress.toString, func = Some("write"),
         payment = Seq(Payment(1000L, IssuedAsset(ByteStr(Base58.decode(smartAssetId))))), fee = issueFee)) {
       err =>
         err.message should include regex "called on unit"

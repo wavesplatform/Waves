@@ -12,20 +12,20 @@ import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.CancelAfterFailure
 
-class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
+class HodlContractTransactionSuite extends BaseTransactionSuite {
 
   private def contract = firstKeyPair
-  private def caller   = secondKeyPair
+
+  private def caller = secondKeyPair
 
   private lazy val contractAddress: String = contract.toAddress.toString
-  private lazy val callerAddress: String   = caller.toAddress.toString
+  private lazy val callerAddress: String = caller.toAddress.toString
 
   test("setup contract account with waves") {
-    sender
+    miner
       .transfer(
-        sender.keyPair,
+        miner.keyPair,
         recipient = contractAddress,
         assetId = None,
         amount = 5.waves,
@@ -36,9 +36,9 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
   }
 
   test("setup caller account with waves") {
-    sender
+    miner
       .transfer(
-        sender.keyPair,
+        miner.keyPair,
         recipient = callerAddress,
         assetId = None,
         amount = 10.waves,
@@ -90,20 +90,20 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         """.stripMargin
 
     val script      = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
-    val setScriptId = sender.setScript(contract, Some(script), setScriptFee, waitForTx = true).id
+    val setScriptId = miner.setScript(contract, Some(script), setScriptFee, waitForTx = true).id
 
-    val acc0ScriptInfo = sender.addressScriptInfo(contractAddress)
+    val acc0ScriptInfo = miner.addressScriptInfo(contractAddress)
 
     acc0ScriptInfo.script.isEmpty shouldBe false
     acc0ScriptInfo.scriptText.isEmpty shouldBe false
     acc0ScriptInfo.script.get.startsWith("base64:") shouldBe true
 
-    sender.transactionInfo[TransactionInfo](setScriptId).script.get.startsWith("base64:") shouldBe true
+    miner.transactionInfo[TransactionInfo](setScriptId).script.get.startsWith("base64:") shouldBe true
   }
 
   test("caller deposits waves") {
-    val balanceBefore = sender.accountBalances(contractAddress)._1
-    val invokeScriptId = sender
+    val balanceBefore = miner.wavesBalance(contractAddress)
+    val invokeScriptId = miner
       .invokeScript(
         caller,
         dappAddress = contractAddress,
@@ -116,17 +116,16 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
       ._1
       .id
 
-    sender.waitForTransaction(invokeScriptId)
+    miner.waitForTransaction(invokeScriptId)
 
-    sender.getDataByKey(contractAddress, callerAddress) shouldBe IntegerDataEntry(callerAddress, 1.5.waves)
-    val balanceAfter = sender.accountBalances(contractAddress)._1
-
+    miner.getDataByKey(contractAddress, callerAddress) shouldBe IntegerDataEntry(callerAddress, 1.5.waves)
+    val balanceAfter = miner.wavesBalance(contractAddress)
     (balanceAfter - balanceBefore) shouldBe 1.5.waves
   }
 
   test("caller can't withdraw more than owns") {
     assertBadRequestAndMessage(
-      sender
+      miner
         .invokeScript(
           caller,
           contractAddress,
@@ -140,8 +139,8 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
   }
 
   test("caller can withdraw less than he owns") {
-    val balanceBefore = sender.accountBalances(contractAddress)._1
-    val invokeScriptId = sender
+    val balanceBefore = miner.wavesBalance(contractAddress)
+    val invokeScriptId = miner
       .invokeScript(
         caller,
         dappAddress = contractAddress,
@@ -154,12 +153,11 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
       ._1
       .id
 
-    val balanceAfter = sender.accountBalances(contractAddress)._1
-
-    sender.getDataByKey(contractAddress, callerAddress) shouldBe IntegerDataEntry(callerAddress, 0.01.waves)
+    val balanceAfter = miner.wavesBalance(contractAddress)
+    miner.getDataByKey(contractAddress, callerAddress) shouldBe IntegerDataEntry(callerAddress, 0.01.waves)
     (balanceAfter - balanceBefore) shouldBe -1.49.waves
 
-    val stateChangesInfo = sender.debugStateChanges(invokeScriptId).stateChanges
+    val stateChangesInfo = miner.debugStateChanges(invokeScriptId).stateChanges
 
     val stateChangesData = stateChangesInfo.get.data.head.asInstanceOf[PutDataResponse]
     stateChangesInfo.get.data.length shouldBe 1

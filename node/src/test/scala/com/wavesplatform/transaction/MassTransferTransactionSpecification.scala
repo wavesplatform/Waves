@@ -86,20 +86,20 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
 
     forAll(massTransferGen) {
       case MassTransferTransaction(_, sender, assetId, transfers, fee, timestamp, attachment, proofs, _) =>
-        val tooManyTransfers   = List.fill(MaxTransferCount + 1)(ParsedTransfer(sender.toAddress, 1L))
+        val tooManyTransfers   = List.fill(MaxTransferCount + 1)(ParsedTransfer(miner.toAddress, 1L))
         val tooManyTransfersEi = create(1.toByte, sender, assetId, tooManyTransfers, fee, timestamp, attachment, proofs)
         tooManyTransfersEi shouldBe Left(GenericError(s"Number of transfers ${tooManyTransfers.length} is greater than $MaxTransferCount"))
 
-        val negativeTransfer   = List(ParsedTransfer(sender.toAddress, -1L))
+        val negativeTransfer   = List(ParsedTransfer(miner.toAddress, -1L))
         val negativeTransferEi = create(1.toByte, sender, assetId, negativeTransfer, fee, timestamp, attachment, proofs)
         negativeTransferEi shouldBe Left(GenericError("One of the transfers has negative amount"))
 
         val oneHalf    = Long.MaxValue / 2 + 1
-        val overflow   = List.fill(2)(ParsedTransfer(sender.toAddress, oneHalf))
+        val overflow   = List.fill(2)(ParsedTransfer(miner.toAddress, oneHalf))
         val overflowEi = create(1.toByte, sender, assetId, overflow, fee, timestamp, attachment, proofs)
         overflowEi shouldBe Left(TxValidationError.OverflowError)
 
-        val feeOverflow   = List(ParsedTransfer(sender.toAddress, oneHalf))
+        val feeOverflow   = List(ParsedTransfer(miner.toAddress, oneHalf))
         val feeOverflowEi = create(1.toByte, sender, assetId, feeOverflow, oneHalf, timestamp, attachment, proofs)
         feeOverflowEi shouldBe Left(TxValidationError.OverflowError)
 
@@ -113,11 +113,11 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
         val negativeFeeEi = create(1.toByte, sender, assetId, feeOverflow, -100, timestamp, attachment, proofs)
         negativeFeeEi shouldBe Left(TxValidationError.InsufficientFee())
 
-        val differentChainIds = Seq(ParsedTransfer(sender.toAddress, 100), ParsedTransfer(sender.toAddress('?'.toByte), 100))
+        val differentChainIds = Seq(ParsedTransfer(miner.toAddress, 100), ParsedTransfer(miner.toAddress('?'.toByte), 100))
         val invalidChainIdEi  = create(1.toByte, sender, assetId, differentChainIds, 100, timestamp, attachment, proofs)
         invalidChainIdEi should produce("One of chain ids not match")
 
-        val otherChainIds         = Seq(ParsedTransfer(sender.toAddress('?'.toByte), 100), ParsedTransfer(sender.toAddress('?'.toByte), 100))
+        val otherChainIds         = Seq(ParsedTransfer(miner.toAddress('?'.toByte), 100), ParsedTransfer(miner.toAddress('?'.toByte), 100))
         val invalidOtherChainIdEi = create(1.toByte, sender, assetId, otherChainIds, 100, timestamp, attachment, proofs)
         invalidOtherChainIdEi should produce("One of chain ids not match")
     }

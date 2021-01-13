@@ -9,17 +9,17 @@ import com.wavesplatform.it.{Node, NodeConfigs, TransferSending}
 import org.scalactic.source.Position
 import org.scalatest._
 
-import scala.concurrent.duration._
 import scala.concurrent.Await
+import scala.concurrent.duration._
 
-class BlockHeadersTestSuite extends FunSuite with CancelAfterFailure with TransferSending with NodesFromDocker with Matchers {
+class BlockHeadersTestSuite extends FunSuite with TransferSending with NodesFromDocker with Matchers {
 
-  private val activationHeight   = 4
+  private val activationHeight = 4
   private val minerDesiredReward = 750000000
-  private val minIncrement       = 50000000
-  private val initialReward      = 600000000
-  private val rewardTerm         = 3
-  private val votingInterval     = 2
+  private val minIncrement = 50000000
+  private val initialReward = 600000000
+  private val rewardTerm = 3
+  private val votingInterval = 2
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder

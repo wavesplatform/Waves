@@ -9,13 +9,14 @@ import com.wavesplatform.lang.v1.compiler.Terms.CONST_STRING
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.IntegerDataEntry
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.CancelAfterFailure
 
-class InvokeWithTransferSmartassetSuite extends BaseTransactionSuite with CancelAfterFailure {
+class InvokeWithTransferSmartassetSuite extends BaseTransactionSuite {
   private val estimator = ScriptEstimatorV2
 
-  private def dApp      = firstKeyPair
+  private def dApp = firstKeyPair
+
   private def callerAcc = secondKeyPair
+
   private def issuerAcc = thirdKeyPair
 
   private val accScript = ScriptCompiler
@@ -52,21 +53,21 @@ class InvokeWithTransferSmartassetSuite extends BaseTransactionSuite with Cancel
 
   test("prereqisetes: issue asset and set dapp") {
     val issuerData = List(IntegerDataEntry("x", 1))
-    sender.putData(issuerAcc, issuerData, 0.1.waves, waitForTx = true)
+    miner.putData(issuerAcc, issuerData, 0.1.waves, waitForTx = true)
 
     val dAppData = List(IntegerDataEntry("y", 1))
-    sender.putData(dApp, dAppData, 0.1.waves, waitForTx = true)
+    miner.putData(dApp, dAppData, 0.1.waves, waitForTx = true)
 
-    issuedAssetId = sender.issue(thirdKeyPair, "some", "asset", someAssetAmount, script = Some(assetScript), waitForTx = true).id
-    sender.transfer(issuerAcc, dApp.toAddress.toString, someAssetAmount, smartMinFee, Some(issuedAssetId), waitForTx = true)
-    sender.setScript(firstKeyPair, Some(accScript), setScriptFee, waitForTx = true)
+    issuedAssetId = miner.issue(thirdKeyPair, "some", "asset", someAssetAmount, script = Some(assetScript), waitForTx = true).id
+    miner.transfer(issuerAcc, dApp.toAddress.toString, someAssetAmount, smartMinFee, Some(issuedAssetId), waitForTx = true)
+    miner.setScript(firstKeyPair, Some(accScript), setScriptFee, waitForTx = true)
   }
 
   test("can make transfer") {
-    val callerBalance = sender.assetBalance(callerAcc.toAddress.toString, issuedAssetId).balance
-    val dAppBalance = sender.assetBalance(dApp.toAddress.toString, issuedAssetId).balance
+    val callerBalance = miner.assetBalance(callerAcc.toAddress.toString, issuedAssetId).balance
+    val dAppBalance = miner.assetBalance(dApp.toAddress.toString, issuedAssetId).balance
 
-    sender
+    miner
       .invokeScript(
         callerAcc,
         dApp.toAddress.toString,
@@ -80,7 +81,7 @@ class InvokeWithTransferSmartassetSuite extends BaseTransactionSuite with Cancel
       ._1
       .id
 
-    sender.assetBalance(callerAcc.toAddress.toString, issuedAssetId).balance shouldBe callerBalance + 1
-    sender.assetBalance(dApp.toAddress.toString, issuedAssetId).balance shouldBe dAppBalance - 1
+    miner.assetBalance(callerAcc.toAddress.toString, issuedAssetId).balance shouldBe callerBalance + 1
+    miner.assetBalance(dApp.toAddress.toString, issuedAssetId).balance shouldBe dAppBalance - 1
   }
 }

@@ -17,6 +17,8 @@ import scala.util.Random
 
 class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
 
+  private lazy val notMiner = nodes.find(!_.settings.minerSettings.enable).get
+
   import TransactionsStatusSuite._
 
   test("/transactions/status should return correct data") {
