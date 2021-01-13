@@ -546,7 +546,16 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     sender.transactionsByAddress(dAppAddress, limit = 10).find(_.id == invoke.id) shouldBe None
     sender.transactionsByAddress(callerAddress, limit = 10).find(_.id == invoke.id) shouldBe defined
 
-    sender.getDataList(dAppAddress, "entry1") shouldBe Seq()
+    sender.getData(dAppAddress, "entry1") shouldBe Seq()
+  }
+
+  private def assertNoStateChanges(invoke: Transaction): Unit = {
+    sender.debugStateChangesByAddress(dAppAddress, 10).flatMap(_.stateChanges) shouldBe Seq()
+
+    sender.transactionsByAddress(dAppAddress, limit = 10).find(_.id == invoke.id) shouldBe None
+    sender.transactionsByAddress(callerAddress, limit = 10).find(_.id == invoke.id) shouldBe None
+
+    sender.getData(dAppAddress, "entry1") shouldBe Seq()
   }
 
   private def testPartialRollback(startHeight: Int, invoke: Transaction, actionsFee: Long): Unit = {
@@ -556,16 +565,18 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     sender.getData(dAppAddress) shouldBe Nil
 
     waitForContinuation(invoke.id, shouldBeFailed = false)
-    assertContinuationChain(invoke.id, sender.height, actionsFee = actionsFee)
+    val endHeight = sender.height
+
+    assertContinuationChain(invoke.id, endHeight, actionsFee = actionsFee)
+    assertStateChanges(invoke)
+    assertBalances(startHeight, endHeight, enoughFee, actionsFee, expectedPayment = Some(paymentAmount))
   }
 
   private def testFullRollback(startHeight: Int, invoke: Transaction): Unit = {
     nodes.rollback(startHeight - 1, returnToUTX = false)
     nodes.waitForHeight(sender.height + 1)
 
-    sender.getData(dAppAddress) shouldBe Nil
-    sender.transactionsByAddress(dAppAddress, limit = 10).find(_.id == invoke.id) shouldBe None
-    sender.transactionsByAddress(callerAddress, limit = 10).find(_.id == invoke.id) shouldBe None
+    assertNoStateChanges(invoke)
     sender.blockSeq(startHeight, sender.height).flatMap(_.transactions) shouldBe Nil
   }
 
