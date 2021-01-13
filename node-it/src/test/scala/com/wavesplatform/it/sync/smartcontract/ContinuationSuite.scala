@@ -18,7 +18,9 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.ContinuationTransaction
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, TxVersion, smart}
@@ -261,6 +263,9 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   }
 
   test("failed continuation") {
+    val startHeight = sender.height + 2
+    sender.waitForHeight(startHeight)
+
     val invoke = sender
       .invokeScript(
         caller,
@@ -269,36 +274,47 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         args = List(CONST_BOOLEAN(true)),
         fee = enoughFee + redundantFee,
         version = TxVersion.V3,
+        payment = Seq(Payment(123456L, Waves)),
         waitForTx = true
       )
       ._1
     waitForContinuation(invoke.id, shouldBeFailed = true)
+    val endHeight = sender.height
+
     assertContinuationChain(invoke.id, sender.height, shouldBeFailed = true)
-    sender.transactionsByAddress(dAppAddress, limit = 10).find(_.id == invoke.id) shouldBe None
-    sender.transactionsByAddress(callerAddress, limit = 10).find(_.id == invoke.id) shouldBe defined
+    assertFailedStateChanges(invoke)
+    assertBalances(startHeight, endHeight, enoughFee - actionsFee, actionsFee = 0)
   }
 
   test("failed continuation with sponsored asset") {
+    sponsoredAssetId // run txs
+
+    val startHeight = sender.height + 2
+    sender.waitForHeight(startHeight)
+
     val invoke = sender
       .invokeScript(
         caller,
         dAppAddress,
         func = Some("foo"),
         args = List(CONST_BOOLEAN(true)),
-        fee = 1.waves,
+        fee = Sponsorship.fromWaves(enoughFee + redundantFee, minSponsoredAssetFee),
         feeAssetId = Some(sponsoredAssetId),
         version = TxVersion.V3,
+        payment = Seq(Payment(123456L, IssuedAsset(ByteStr.decodeBase58(sponsoredAssetId).get))),
         waitForTx = true
       )
       ._1
     waitForContinuation(invoke.id, shouldBeFailed = true)
+    val endHeight = sender.height
+
     assertContinuationChain(invoke.id, sender.height, shouldBeFailed = true, feeAssetInfo = sponsorFee)
-    sender.transactionsByAddress(dAppAddress, limit = 10).find(_.id == invoke.id) shouldBe None
-    sender.transactionsByAddress(callerAddress, limit = 10).find(_.id == invoke.id) shouldBe defined
+    assertFailedStateChanges(invoke)
+    assertBalances(startHeight, endHeight, enoughFee - actionsFee, actionsFee = 0, Some((sponsoredAssetId, minSponsoredAssetFee, sponsoredAssetIssuer)))
   }
 
   test("continuation prioritization") {
-    val extraFee = invokeFee / 1000
+    val extraFee    = invokeFee / 1000
     val assetScript = compile(s"""getBooleanValue(Address(base58'$dAppAddress2'), "isAllowed")""")
     val assetId     = sender.issue(dApp, quantity = 100, script = Some(assetScript), fee = issueFee + smartFee, waitForTx = true).id
 
@@ -510,6 +526,16 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
 
     sender.transactionsByAddress(dAppAddress, limit = 10).find(_.id == invoke.id) shouldBe defined
     sender.transactionsByAddress(callerAddress, limit = 10).find(_.id == invoke.id) shouldBe defined
+  }
+
+  private def assertFailedStateChanges(invoke: Transaction): Unit = {
+    sender.debugStateChanges(invoke.id).stateChanges shouldBe None
+    sender.debugStateChangesByAddress(dAppAddress, 10).flatMap(_.stateChanges) shouldBe Seq()
+
+    sender.transactionsByAddress(dAppAddress, limit = 10).find(_.id == invoke.id) shouldBe None
+    sender.transactionsByAddress(callerAddress, limit = 10).find(_.id == invoke.id) shouldBe defined
+
+    sender.getDataList(dAppAddress, "entry1") shouldBe Seq()
   }
 
   private def testPartialRollback(startHeight: Int, invoke: Transaction, actionsFee: Long): Unit = {

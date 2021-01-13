@@ -342,15 +342,19 @@ object InvokeDiffsCommon {
     val precedingStepCount = blockchain.continuationStates(dAppAddress).asInstanceOf[ContinuationState.InProgress].precedingStepCount
     val consumedFee        = (precedingStepCount + 1) * expectedStepFeeInAttachedAsset(invoke, blockchain) + lastStepFee
     val unusedFee          = invoke.fee - consumedFee
-    invoke.assetFee._1 match {
+    val invoker            = invoke.sender.toAddress
+    val unusedFeePortfolio = invoke.assetFee._1 match {
       case Waves =>
-        Map(invoke.sender.toAddress -> Portfolio(unusedFee))
+        Map(invoker -> Portfolio(unusedFee))
       case asset @ IssuedAsset(_) =>
         val assetInfo  = blockchain.assetDescription(asset).get
+        val issuer     = assetInfo.issuer.toAddress
         val feeInWaves = Sponsorship.toWaves(unusedFee, assetInfo.sponsorship)
-        Map(invoke.sender.toAddress      -> Portfolio.build(asset, unusedFee)) |+|
-          Map(assetInfo.issuer.toAddress -> Portfolio(feeInWaves, assets = Map(asset -> -unusedFee)))
+        Map(invoker  -> Portfolio.build(asset, unusedFee)) |+|
+          Map(issuer -> Portfolio(feeInWaves, assets = Map(asset -> -unusedFee)))
     }
+    val paymentPortfolio = invoke.payments.map(p => Portfolio.build(p.assetId, p.amount)).reduce(_ |+| _)
+    unusedFeePortfolio |+| Map(invoker -> paymentPortfolio)
   }
 
   def paymentsPart(
@@ -364,10 +368,10 @@ object InvokeDiffsCommon {
           assetId match {
             case asset @ IssuedAsset(_) =>
               Map(tx.sender.toAddress -> Portfolio(assets = Map(asset -> -amt))) |+|
-                Map(dAppAddress       -> Portfolio(assets = Map(asset -> amt)))
+                Map(dAppAddress    -> Portfolio(assets = Map(asset -> amt)))
             case Waves =>
               Map(tx.sender.toAddress -> Portfolio(-amt)) |+|
-                Map(dAppAddress       -> Portfolio(amt))
+                Map(dAppAddress    -> Portfolio(amt))
           }
       }
       .foldLeft(Map[Address, Portfolio]())(_ |+| _)
@@ -508,7 +512,14 @@ object InvokeDiffsCommon {
                       tx.id()
                     )
                     val assetValidationDiff =
-                      validatePseudoTxWithSmartAssetScript(blockchain, tx)(pseudoTx, a.id, assetVerifierDiff, script, complexity, complexityLimit)
+                      validatePseudoTxWithSmartAssetScript(blockchain, tx)(
+                        pseudoTx,
+                        a.id,
+                        assetVerifierDiff,
+                        script,
+                        complexity,
+                        complexityLimit
+                      )
                     val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
                     TracedResult(
                       assetValidationDiff.map(d => nextDiff.copy(scriptsComplexity = d.scriptsComplexity)),
