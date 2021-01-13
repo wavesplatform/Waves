@@ -553,7 +553,6 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
 
   private def assertFailedStateChanges(invoke: Transaction): Unit = {
     sender.debugStateChanges(invoke.id).stateChanges shouldBe None
-    sender.debugStateChangesByAddress(dAppAddress, 10).flatMap(_.stateChanges) shouldBe Seq()
 
     sender.transactionsByAddress(dAppAddress, limit = 10).find(_.id == invoke.id) shouldBe None
     sender.transactionsByAddress(callerAddress, limit = 10).find(_.id == invoke.id) shouldBe defined
