@@ -471,11 +471,8 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       sponsorship: Option[(String, Long, KeyPair)] = None,
       expectedPayment: Option[Long] = None
   ): Unit = {
-    def balanceDiff(address: String, assetId: Option[String] = None): Long = {
-      val startBalance  = sender.accountsBalances(Some(startHeight - 1), Seq(address), assetId).head._2
-      val resultBalance = sender.accountsBalances(Some(endHeight), Seq(address), assetId).head._2
-      resultBalance - startBalance
-    }
+    def balanceDiff(address: String, assetId: Option[String] = None) =
+      balanceDiffByHeight(startHeight, endHeight)(address, assetId)
 
     val minersBalanceIncrease =
       nodes
@@ -514,6 +511,21 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         balanceDiff(callerAddress, Some(assetId)) shouldBe -feeInAsset - expectedPayment.getOrElse(0L)
         balanceDiff(dAppAddress) shouldBe expectedPayment.getOrElse(0L)
     }
+  }
+
+  private def assertUnchangedBalances(startHeight: Int, endHeight: Int): Unit = {
+    def balanceDiff(address: String) = balanceDiffByHeight(startHeight, endHeight)(address)
+    val blockReward = sender.lastBlock().reward.value
+
+    nodes.foreach(node => balanceDiff(node.address) % blockReward shouldBe 0)
+    balanceDiff(callerAddress) shouldBe 0
+    balanceDiff(dAppAddress) shouldBe 0
+  }
+
+  private def balanceDiffByHeight(startHeight: Int, endHeight: Int)(address: String, assetId: Option[String] = None): Long = {
+    val startBalance  = sender.accountsBalances(Some(startHeight - 1), Seq(address), assetId).head._2
+    val resultBalance = sender.accountsBalances(Some(endHeight), Seq(address), assetId).head._2
+    resultBalance - startBalance
   }
 
   private def assertStateChanges(invoke: Transaction): Unit = {
@@ -574,10 +586,12 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
 
   private def testFullRollback(startHeight: Int, invoke: Transaction): Unit = {
     nodes.rollback(startHeight - 1, returnToUTX = false)
-    nodes.waitForHeight(sender.height + 1)
-
+    val endHeight = sender.height + 1
+    nodes.waitForHeight(endHeight)
+    
+    sender.blockSeq(startHeight, endHeight).flatMap(_.transactions) shouldBe Nil
     assertNoStateChanges(invoke)
-    sender.blockSeq(startHeight, sender.height).flatMap(_.transactions) shouldBe Nil
+    assertUnchangedBalances(startHeight, endHeight)
   }
 
   private def assertAbsenceOfTransactions(fromHeight: Int, toHeight: Int): Unit =
