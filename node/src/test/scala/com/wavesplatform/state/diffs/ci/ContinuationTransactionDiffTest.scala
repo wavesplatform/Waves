@@ -26,6 +26,7 @@ import com.wavesplatform.lang.{Common, Global}
 import com.wavesplatform.settings.TestSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.FeeValidation._
+import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.diffs.invoke.{ContinuationTransactionDiff, InvokeScriptTransactionDiff}
 import com.wavesplatform.transaction.ApplicationStatus.{ScriptExecutionInProgress, Succeeded}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -148,10 +149,14 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
     (blockchain.accountScript _)
       .expects(invoke.dAppAddressOrAlias.asInstanceOf[Address])
       .returning(Some(AccountScriptInfo(invoke.sender, dApp, 99L, Map(3 -> Map(func))))) // verifier complexity counts separately in Verifier.scala
+      .anyNumberOfTimes()
     (() => blockchain.activatedFeatures)
       .expects()
-      .returning(Map(BlockchainFeatures.Ride4DApps.id -> 0, BlockchainFeatures.BlockV5.id -> 0))
+      .returning(Map(BlockchainFeatures.Ride4DApps.id -> 0, BlockchainFeatures.BlockV5.id -> 0, BlockchainFeatures.ContinuationTransaction.id -> 0))
       .anyNumberOfTimes()
+    (blockchain.containsTransaction _)
+      .expects(*)
+      .returning(false)
     (() => blockchain.height)
       .expects()
       .returning(1)
@@ -432,6 +437,12 @@ class ContinuationTransactionDiffTest extends PropSpec with PathMockFactory with
           FailedTransactionError(Cause.AssetScriptInAction, `expectingComplexity`, _, Some("failed by asset verifier"), Some(`failingAssetId`))
           ) =>
     }
+    val consumedFee = (precedingStepCount + 2) * FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
+    TransactionDiffer(None, timestamp)(blockchain, tx = continuation).resultE.getOrElse(???).portfolios shouldBe
+      Map(
+        invoke.sender.toAddress -> Portfolio(invoke.fee - consumedFee, assets = Map(scriptedAsset -> paymentAmount)),
+        dAppAddress             -> Portfolio.build(scriptedAsset, -paymentAmount),
+      )
   }
 
   property("failed by payment asset verifier") {
