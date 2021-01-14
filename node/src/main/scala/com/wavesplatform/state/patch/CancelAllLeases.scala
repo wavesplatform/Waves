@@ -26,6 +26,6 @@ case object CancelAllLeases extends DiffPatchFactory {
     }
     val leasesToCancel = patch.cancelledLeases.map(str => ByteStr.decodeBase58(str).get)
 
-    Diff.empty.copy(portfolios = pfs, leaseState = leasesToCancel.map((_, (false, None))).toMap)
+    Diff.empty // TODO
   }
 }

@@ -43,8 +43,10 @@ import scala.util.control.NonFatal
 
 object LevelDBWriter extends ScorexLogging {
 
+/*
   private def loadLeaseStatus(db: ReadOnlyDB, leaseId: ByteStr): Boolean =
     db.get(Keys.leaseStatusHistory(leaseId)).headOption.fold(false)(h => db.get(Keys.leaseStatus(leaseId)(h)))
+*/
 
   /** {{{
     * ([10, 7, 4], 5, 11) => [10, 7, 4]
@@ -362,7 +364,7 @@ abstract class LevelDBWriter private[database] (
       balances: Map[AddressId, Map[Asset, Long]],
       leaseBalances: Map[AddressId, LeaseBalance],
       addressTransactions: Map[AddressId, Seq[TransactionId]],
-      leaseStates: Map[ByteStr, (Boolean, Option[LeaseActionInfo])],
+      leaseStates: Map[ByteStr, LeaseDetails],
       issuedAssets: Map[IssuedAsset, NewAssetInfo],
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
       filledQuantity: Map[ByteStr, VolumeAndFee],
@@ -460,18 +462,8 @@ abstract class LevelDBWriter private[database] (
         expiredKeys ++= updateHistory(rw, Keys.assetDetailsHistory(asset), threshold, Keys.assetDetails(asset))
       }
 
-      for ((leaseId, (isActive, actionInfoOpt)) <- leaseStates) {
-        actionInfoOpt.foreach {
-          case LeaseActionInfo(_, dAppPublicKey, recipient, amount) =>
-            val key = Keys.leaseActionDetails(leaseId)
-            val details = rw.get(key).fold(
-              LeaseDetails(dAppPublicKey, recipient, height, amount, isActive)
-            )(
-              _.copy(isActive = isActive)
-            )
-            rw.put(key, Some(details))
-        }
-        rw.put(Keys.leaseStatus(leaseId)(height), isActive)
+      for ((leaseId, details) <- leaseStates) {
+        rw.put(Keys.leaseStatus(leaseId)(height), Some(details))
         expiredKeys ++= updateHistory(rw, Keys.leaseStatusHistory(leaseId), threshold, Keys.leaseStatus(leaseId))
       }
 
@@ -678,14 +670,7 @@ abstract class LevelDBWriter private[database] (
 
           writableDB
             .withResource(loadLeaseIds(_, currentHeight, currentHeight, includeCancelled = true))
-            .foreach { leaseId =>
-              rollbackLeaseStatus(rw, leaseId, currentHeight)
-              val key = Keys.leaseActionDetails(leaseId)
-              rw.get(key).foreach {
-                case lease if lease.isActive => rw.delete(key)
-                case lease                   => rw.put(key, Some(lease.copy(isActive = true)))
-              }
-            }
+            .foreach { leaseId => rollbackLeaseStatus(rw, leaseId, currentHeight) }
 
           rollbackAssetsInfo(rw, currentHeight)
 
@@ -840,14 +825,9 @@ abstract class LevelDBWriter private[database] (
   }
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>
-    transactionInfo(leaseId, db) match {
-      case Some((h, lt: LeaseTransaction, true)) =>
-        Some(LeaseDetails(lt.sender, lt.recipient, h, lt.amount, loadLeaseStatus(db, leaseId)))
-      case Some((_, _, false)) =>
-        None
-      case _ =>
-        db.get(Keys.leaseActionDetails(leaseId))
-    }
+    db.get(Keys.leaseStatusHistory(leaseId))
+      .headOption
+      .flatMap { leaseHeight => db.get(Keys.leaseStatus(leaseId)(leaseHeight)) }
   }
 
   // These two caches are used exclusively for balance snapshots. They are not used for portfolios, because there aren't

@@ -4,14 +4,13 @@ import cats.data.Ior
 import cats.implicits._
 import cats.kernel.{Monoid, Semigroup}
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 import play.api.libs.json._
 
@@ -153,7 +152,7 @@ case class Diff(
     updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
     aliases: Map[Alias, Address],
     orderFills: Map[ByteStr, VolumeAndFee],
-    leaseState: Map[ByteStr, (Boolean, Option[LeaseActionInfo])],
+    leaseState: Map[ByteStr, LeaseDetails],
     scripts: Map[Address, Option[AccountScriptInfo]],
     assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
     accountData: Map[Address, AccountDataInfo],
@@ -187,7 +186,7 @@ object Diff {
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map.empty,
       aliases: Map[Alias, Address] = Map.empty,
       orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
-      leaseState: Map[ByteStr, (Boolean, Option[LeaseActionInfo])] = Map.empty,
+      leaseState: Map[ByteStr, LeaseDetails] = Map.empty,
       scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,
       assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map.empty,
       accountData: Map[Address, AccountDataInfo] = Map.empty,
@@ -219,7 +218,7 @@ object Diff {
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map.empty,
       aliases: Map[Alias, Address] = Map.empty,
       orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
-      leaseState: Map[ByteStr, (Boolean, Option[LeaseActionInfo])] = Map.empty,
+      leaseState: Map[ByteStr, LeaseDetails] = Map.empty,
       scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,
       assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map.empty,
       accountData: Map[Address, AccountDataInfo] = Map.empty,

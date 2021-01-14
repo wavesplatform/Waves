@@ -54,10 +54,8 @@ object Keys {
   def leaseBalance(addressId: AddressId)(height: Int): Key[LeaseBalance] =
     Key(LeaseBalance, hAddr(height, addressId), readLeaseBalance, writeLeaseBalance)
   def leaseStatusHistory(leaseId: ByteStr): Key[Seq[Int]] = historyKey(LeaseStatusHistory, leaseId.arr)
-  def leaseStatus(leaseId: ByteStr)(height: Int): Key[Boolean] =
-    Key(LeaseStatus, Ints.toByteArray(height) ++ leaseId.arr, _(0) == 1, active => Array[Byte](if (active) 1 else 0))
-  def leaseActionDetails(leaseId: ByteStr): Key[Option[LeaseDetails]] =
-    Key.opt(LeaseActionDetails, leaseId.arr, readLeaseDetails, writeLeaseDetails)
+  def leaseStatus(leaseId: ByteStr)(height: Int): Key[Option[LeaseDetails]] =
+    Key.opt(LeaseStatus, hBytes(leaseId.arr, height), readLeaseDetails, writeLeaseDetails)
 
   def filledVolumeAndFeeHistory(orderId: ByteStr): Key[Seq[Int]] = historyKey(FilledVolumeAndFeeHistory, orderId.arr)
   def filledVolumeAndFee(orderId: ByteStr)(height: Int): Key[VolumeAndFee] =

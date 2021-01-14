@@ -190,18 +190,18 @@ package object database extends ScorexLogging {
     pb.LeaseDetails(
       ByteString.copyFrom(ld.sender.arr),
       Some(PBRecipients.create(ld.recipient)),
-      ld.height,
+      ByteString.copyFrom(ld.txId.arr),
       ld.amount,
       ld.isActive
     ).toByteArray
   }
 
   def readLeaseDetails(data: Array[Byte]): LeaseDetails = {
-    val pb.LeaseDetails(sender, recipient, height, amount, isActive) = pb.LeaseDetails.parseFrom(data)
+    val pb.LeaseDetails(sender, recipient, sourceId, amount, isActive) = pb.LeaseDetails.parseFrom(data)
     LeaseDetails(
       sender.toPublicKey,
       PBRecipients.toAddressOrAlias(recipient.get, AddressScheme.current.chainId).explicitGet(),
-      height,
+      sourceId.toByteStr,
       amount,
       isActive
     )
@@ -623,7 +623,7 @@ package object database extends ScorexLogging {
     (for {
       id          <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
       leaseStatus <- fromHistory(r, Keys.leaseStatusHistory(id), Keys.leaseStatus(id))
-      if leaseStatus
+      if leaseStatus.headOption.map(_.isActive).getOrElse(false)
       pb.TransactionMeta(h, n, _, _) <- r.get(Keys.transactionMetaById(TransactionId(id)))
       tx                                <- r.get(Keys.transactionAt(Height(h), TxNum(n.toShort)))
     } yield tx).collect {

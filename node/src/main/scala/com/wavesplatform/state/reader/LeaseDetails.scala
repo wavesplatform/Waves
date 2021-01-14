@@ -1,5 +1,6 @@
 package com.wavesplatform.state.reader
 
-import com.wavesplatform.account.{PublicKey, AddressOrAlias}
+import com.wavesplatform.account.{AddressOrAlias, PublicKey}
+import com.wavesplatform.common.state.ByteStr
 
-case class LeaseDetails(sender: PublicKey, recipient: AddressOrAlias, height: Int, amount: Long, isActive: Boolean)
+case class LeaseDetails(sender: PublicKey, recipient: AddressOrAlias, txId: ByteStr, amount: Long, isActive: Boolean)
