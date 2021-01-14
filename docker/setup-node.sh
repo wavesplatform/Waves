@@ -1,24 +1,21 @@
 #!/bin/bash
 
 HOME=/usr/share/waves
-
-groupadd -g 143 waves && useradd -d /var/lib/waves -g 143 -u 143 -s /bin/bash -M waves
-
-mkdir -p /var/lib/waves /etc/waves $HOME/lib/plugins
-chown -R 143:143 /var/lib/waves $HOME /etc/waves
-chmod -R 755 /var/lib/waves $HOME /etc/waves
-ln -fs /var/lib/waves/log /var/log/waves
 chmod +x $HOME/bin/entrypoint.sh
+
+# Additional dependencies
+mkdir -p /usr/share/man/man1
+apt-get update && apt-get install -y wget unzip default-jre-headless || exit 1
+
+# Install DEB packages
+dpkg -i /tmp/waves.deb || exit 1
 
 if [[ $ENABLE_GRPC == "true" ]]; then
   echo "Installing gRPC server"
-  cd /tmp/grpc-server || exit 1
-  tar xzf ./grpc-server-*.tgz
-  mv ./grpc-server-*/lib/* $HOME/lib/plugins
+ dpkg -i /tmp/grpc-server.deb || exit 1
 fi
 
-# Additional files for integration tests
-apt-get update && apt-get install -y wget unzip
+rm /etc/waves/waves.conf # Remove example config
 
 wget --quiet "https://search.maven.org/remotecontent?filepath=org/aspectj/aspectjweaver/1.9.1/aspectjweaver-1.9.1.jar" -O $HOME/aspectjweaver.jar
 
@@ -28,4 +25,5 @@ wget --quiet "https://www.yourkit.com/download/docker/$YOURKIT_ARCHIVE" -P /tmp/
   rm -f /tmp/$YOURKIT_ARCHIVE
 
 # Clean
-apt-get remove -y wget unzip && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+apt-get remove -y wget unzip && apt-get autoremove -y && apt-get autoclean && rm -rf /var/lib/apt/lists/*
+rm -rf /tmp/*

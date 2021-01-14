@@ -11,21 +11,18 @@ ENV BRANCH=$BRANCH
 ENV DEB_PACKAGE_NETWORKS=$DEB_PACKAGE_NETWORKS
 RUN /bin/bash /waves_current/docker/build.sh
 
-FROM openjdk:11-jre-slim
-ARG WAVES_VERSION="current"
+FROM debian:stable-slim
 ARG WAVES_LOG_LEVEL="INFO"
 ARG WAVES_HEAP_SIZE="2g"
 ARG WAVES_NETWORK="mainnet"
 ARG ENABLE_GRPC="false"
 
-ENV WAVES_VERSION=$WAVES_VERSION
 ENV WAVES_LOG_LEVEL=$WAVES_LOG_LEVEL
 ENV WAVES_HEAP_SIZE=$WAVES_HEAP_SIZE
 ENV WAVES_NETWORK=$WAVES_NETWORK
 ENV ENABLE_GRPC=$ENABLE_GRPC
 
-COPY --from=builder /waves/node/target/waves-all-*.jar /usr/share/waves/lib/
-COPY --from=builder /waves/grpc-server/target/universal /tmp/grpc-server
+COPY --from=builder /out /tmp/
 COPY docker/setup-node.sh /tmp/
 COPY docker/entrypoint.sh /usr/share/waves/bin/
 

@@ -15,10 +15,8 @@ function downloadRelease() {
       releaseUrl="https://github.com/wavesplatform/Waves/releases/download" &&
       echo "Downloading jar file" &&
       mkdir -p /waves/node/target /waves/grpc-server/target/universal &&
-      curl -fL ${releaseUrl}/v${WAVES_VERSION}/waves-all-${WAVES_VERSION}.jar \
-        -o /waves/node/target/waves-all-${WAVES_VERSION}.jar
-      curl -fL ${releaseUrl}/v${WAVES_VERSION}/grpc-server-${WAVES_VERSION}.tgz \
-        -o /waves/grpc-server/target/universal/grpc-server-${WAVES_VERSION}.tgz
+      curl -fL ${releaseUrl}/v${WAVES_VERSION}/waves_${WAVES_VERSION}_all.deb -o /out/waves.deb &&
+      curl -fL ${releaseUrl}/v${WAVES_VERSION}/grpc-server_${WAVES_VERSION}_all.deb -o /out/grpc-server.deb
   } || {
     echo "Release $WAVES_VERSION not found"
     exit 1
@@ -30,30 +28,19 @@ function downloadBranch() {
     --branch $BRANCH waves && cd waves &&
     git config --global user.name "Sbt Builder" &&
     git config --global user.email "sbt@builder.docker" &&
-    git tag -a "v${WAVES_VERSION}" -m "Docker build"
+    git fetch --tags
 }
 
-function moveReleaseFiles() {
-  mkdir -p /out/${network} &&
-    mv node/target/waves*.deb /out/${network}/ &&
-    cp node/target/waves-all*.jar /out/${network}/ &&
-    mv grpc-server/target/universal/grpc-server*.tgz /out/${network}/ &&
-    mv grpc-server/target/grpc-server*.deb /out/${network}/
-}
-
-# TODO: What is $DEB_PACKAGE_NETWORKS and where its used?
 function createSbtBuild() {
   echo "Downloading sbt '${SBT_VERSION}'" &&
-    curl -fL -o sbt-$SBT_VERSION.deb \
-      https://dl.bintray.com/sbt/debian/sbt-$SBT_VERSION.deb &&
+    curl -fL -o sbt-$SBT_VERSION.deb "https://dl.bintray.com/sbt/debian/sbt-$SBT_VERSION.deb" &&
     dpkg -i sbt-$SBT_VERSION.deb && rm sbt-$SBT_VERSION.deb &&
-    SBT_OPTS="-Xmx2g -XX:ReservedCodeCacheSize=128m" sbt node/assembly grpc-server/packageZipTarball &&
-    for network in $DEB_PACKAGE_NETWORKS; do
-      echo "Building '${network}' package" &&
-        SBT_OPTS="-XX:ReservedCodeCacheSize=128m -Xmx2g -Dnetwork=${network}" sbt 'packageAll'
-      moveReleaseFiles
-    done
+    SBT_OPTS="-Xmx2g -XX:ReservedCodeCacheSize=128m" sbt node/debian:packageBin grpc-server/debian:packageBin &&
+    mv node/target/waves_*_all.deb /out/waves.deb &&
+    mv grpc-server/target/grpc-server_*_all.deb /out/grpc-server.deb
 }
+
+mkdir -p /out
 
 if [[ $WAVES_VERSION == "branch" ]]; then
   echo "Using branch $BRANCH"

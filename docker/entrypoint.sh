@@ -25,11 +25,6 @@ else
   echo "Found custom '$WAVES_CONFIG'. Using it."
 fi
 
-if [[ "${WAVES_VERSION}" == "latest" || "${WAVES_VERSION}" == "current" || "${WAVES_VERSION}" == "branch" ]]; then
-  filename=$(find /usr/share/waves/lib -name 'waves-all*' -printf '%f\n')
-  export WAVES_VERSION=$(echo ${filename##*-} | cut -d\. -f1-3)
-fi
-
 [ -n "${WAVES_WALLET_PASSWORD}" ] && JAVA_OPTS="${JAVA_OPTS} -Dwaves.wallet.password=${WAVES_WALLET_PASSWORD}"
 [ -n "${WAVES_WALLET_SEED}" ] && JAVA_OPTS="${JAVA_OPTS} -Dwaves.wallet.seed=${WAVES_WALLET_SEED}"
 JAVA_OPTS="${JAVA_OPTS} -Dwaves.data-directory=/var/lib/waves/data -Dwaves.directory=/var/lib/waves"
@@ -37,7 +32,6 @@ JAVA_OPTS="${JAVA_OPTS} -Dwaves.data-directory=/var/lib/waves/data -Dwaves.direc
 echo "Node is starting..." | tee -a /var/log/waves/waves.log
 echo "WAVES_HEAP_SIZE='${WAVES_HEAP_SIZE}'" | tee -a /var/log/waves/waves.log
 echo "WAVES_LOG_LEVEL='${WAVES_LOG_LEVEL}'" | tee -a /var/log/waves/waves.log
-echo "WAVES_VERSION='${WAVES_VERSION}'" | tee -a /var/log/waves/waves.log
 echo "WAVES_NETWORK='${WAVES_NETWORK}'" | tee -a /var/log/waves/waves.log
 echo "WAVES_WALLET_SEED='${WAVES_WALLET_SEED}'" | tee -a /var/log/waves/waves.log
 echo "WAVES_WALLET_PASSWORD='${WAVES_WALLET_PASSWORD}'" | tee -a /var/log/waves/waves.log
