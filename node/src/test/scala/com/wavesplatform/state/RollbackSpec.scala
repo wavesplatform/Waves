@@ -10,6 +10,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.features._
 import com.wavesplatform.history.Domain
+import com.wavesplatform.it.util.AddressOrAliasExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.DirectiveSet
