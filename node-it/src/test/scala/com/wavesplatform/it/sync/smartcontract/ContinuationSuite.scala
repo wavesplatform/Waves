@@ -265,6 +265,9 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
   }
 
   test("failed continuation") {
+    val entry = List(EmptyDataEntry("isAllowed"))
+    sender.putData(dApp, entry, calcDataFee(entry, TxVersion.V1) + smartFee, waitForTx = true)
+
     val startHeight = sender.height + 2
     sender.waitForHeight(startHeight)
 
@@ -290,6 +293,9 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
 
   test("failed continuation with sponsored asset") {
     sponsoredAssetId // run txs
+
+    val entry = List(EmptyDataEntry("isAllowed"))
+    sender.putData(dApp, entry, calcDataFee(entry, TxVersion.V1) + smartFee, waitForTx = true)
 
     val startHeight = sender.height + 2
     sender.waitForHeight(startHeight)
