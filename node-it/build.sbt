@@ -1,24 +1,17 @@
-import WavesDockerKeys._
-
-enablePlugins(WavesDockerPlugin, IntegrationTestsPlugin)
+enablePlugins(IntegrationTestsPlugin)
 
 description := "NODE integration tests"
 libraryDependencies ++= Dependencies.it
 
-def stageFiles(ref: ProjectReference): TaskKey[File] =
-  ref / Universal / stage
+lazy val docker = taskKey[Unit]("build docker image")
+docker := {
+  val command = "docker build -t testnode --build-arg WAVES_VERSION=current --build-arg ENABLE_GRPC=true -f docker/Dockerfile ."
+  val result = new ProcessBuilder()
+    .command(command.split(" "): _*)
+    .directory(baseDirectory.value.getParentFile)
+    .inheritIO()
+    .start()
+    .waitFor()
 
-(Test / test) := (Test / test).dependsOn(Docker / docker).value
-
-inTask(docker)(
-  Seq(
-    imageNames := Seq(ImageName("com.wavesplatform/node-it")),
-    exposedPorts := Set(6863, 6869, 6870), // NetworkApi, RestApi, gRPC
-    additionalFiles ++= Seq(
-      stageFiles(LocalProject("node")).value,
-      stageFiles(LocalProject("grpc-server")).value,
-      (Test / resourceDirectory).value / "template.conf",
-      (Test / sourceDirectory).value / "container" / "start-waves.sh"
-    )
-  )
-)
+  require(result == 0, "Docker build error")
+}
