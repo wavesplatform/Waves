@@ -211,6 +211,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     val startHeight = sender.height + 2
     sender.waitForHeight(startHeight)
 
+    val payment = Seq(Payment(paymentAmount, Waves))
     val invoke = sender
       .invokeScript(
         caller,
@@ -219,7 +220,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         args = List(CONST_BOOLEAN(false)),
         fee = enoughFee + redundantFee,
         version = TxVersion.V3,
-        payment = Seq(Payment(paymentAmount, Waves)),
+        payment = payment,
         waitForTx = true
       )
       ._1
@@ -231,9 +232,9 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
 
     assertContinuationChain(invoke.id, endHeight, actionsFee = actionsFee)
     assertStateChanges(invoke)
-    assertBalances(startHeight, endHeight, enoughFee, actionsFee, expectedPayment = Some(paymentAmount))
+    assertBalances(startHeight, endHeight, enoughFee, actionsFee, expectedPayments = payment)
 
-    testPartialRollback(startHeight, invoke, actionsFee)
+    testPartialRollback(startHeight, invoke, actionsFee, payment)
     testFullRollback(startHeight, invoke)
   }
 
@@ -243,6 +244,10 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     val startHeight = sender.height + 2
     sender.waitForHeight(startHeight)
 
+    val payments = Seq(
+      Payment(paymentAmount, Waves),
+      Payment(paymentAmount / 2, IssuedAsset(ByteStr.decodeBase58(sponsoredAssetId).get))
+    )
     val invoke = sender
       .invokeScript(
         caller,
@@ -252,6 +257,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         fee = Sponsorship.fromWaves(enoughFee + redundantFee, minSponsoredAssetFee),
         feeAssetId = Some(sponsoredAssetId),
         version = TxVersion.V3,
+        payment = payments,
         waitForTx = true
       )
       ._1
@@ -261,7 +267,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
 
     assertContinuationChain(invoke.id, endHeight, feeAssetInfo = sponsorFee, actionsFee = actionsFee)
     assertStateChanges(invoke)
-    assertBalances(startHeight, endHeight, enoughFee, actionsFee, Some((sponsoredAssetId, minSponsoredAssetFee, sponsoredAssetIssuer)))
+    assertBalances(startHeight, endHeight, enoughFee, actionsFee, Some((sponsoredAssetId, minSponsoredAssetFee, sponsoredAssetIssuer)), payments)
   }
 
   test("failed continuation") {
@@ -300,6 +306,10 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     val startHeight = sender.height + 2
     sender.waitForHeight(startHeight)
 
+    val payments = Seq(
+      Payment(paymentAmount, Waves),
+      Payment(paymentAmount / 2, IssuedAsset(ByteStr.decodeBase58(sponsoredAssetId).get))
+    )
     val invoke = sender
       .invokeScript(
         caller,
@@ -309,7 +319,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
         fee = Sponsorship.fromWaves(enoughFee + redundantFee, minSponsoredAssetFee),
         feeAssetId = Some(sponsoredAssetId),
         version = TxVersion.V3,
-        payment = Seq(Payment(paymentAmount, IssuedAsset(ByteStr.decodeBase58(sponsoredAssetId).get))),
+        payment = payments,
         waitForTx = true
       )
       ._1
@@ -475,7 +485,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
       totalFee: Long,
       actionsFee: Long,
       sponsorship: Option[(String, Long, KeyPair)] = None,
-      expectedPayment: Option[Long] = None
+      expectedPayments: Seq[Payment] = Seq()
   ): Unit = {
     def balanceDiff(address: String, assetId: Option[String] = None) =
       balanceDiffByHeight(startHeight, endHeight)(address, assetId)
@@ -506,16 +516,20 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     minersBalanceIncrease.values.sum shouldBe totalFee + (endHeight - startHeight + 1) * blockReward
     minersBalanceIncrease should contain theSameElementsAs blockRewardDistribution
 
+    val paymentInWaves = expectedPayments.collect { case Payment(amount, Waves) => amount }.sum
     sponsorship.fold {
-      balanceDiff(callerAddress) shouldBe -totalFee - expectedPayment.getOrElse(0L)
-      balanceDiff(dAppAddress) shouldBe expectedPayment.getOrElse(0L)
+      balanceDiff(callerAddress) shouldBe -totalFee - paymentInWaves
+      balanceDiff(dAppAddress) shouldBe paymentInWaves
     } {
       case (assetId, minSponsoredFee, assetIssuer) =>
+        val paymentsInAsset = expectedPayments.collect { case Payment(amount, IssuedAsset(id)) if id.toString == assetId => amount }.sum
         val feeInAsset = Sponsorship.fromWaves(totalFee, minSponsoredFee)
         balanceDiff(assetIssuer.toAddress.toString) shouldBe -totalFee
         balanceDiff(assetIssuer.toAddress.toString, Some(assetId)) shouldBe feeInAsset
-        balanceDiff(callerAddress, Some(assetId)) shouldBe -feeInAsset - expectedPayment.getOrElse(0L)
-        balanceDiff(dAppAddress) shouldBe expectedPayment.getOrElse(0L)
+        balanceDiff(callerAddress) shouldBe -paymentInWaves
+        balanceDiff(callerAddress, Some(assetId)) shouldBe -feeInAsset - paymentsInAsset
+        balanceDiff(dAppAddress) shouldBe paymentInWaves
+        balanceDiff(dAppAddress, Some(assetId)) shouldBe paymentsInAsset
     }
   }
 
@@ -575,7 +589,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
     sender.getData(dAppAddress, "entry1") shouldBe Seq()
   }
 
-  private def testPartialRollback(startHeight: Int, invoke: Transaction, actionsFee: Long): Unit = {
+  private def testPartialRollback(startHeight: Int, invoke: Transaction, actionsFee: Long, payments: Seq[Payment]): Unit = {
     nodes.rollback(startHeight + 1, returnToUTX = false)
 
     sender.transactionStatus(invoke.id).applicationStatus.value shouldBe "script_execution_in_progress"
@@ -586,7 +600,7 @@ class ContinuationSuite extends BaseTransactionSuite with OptionValues {
 
     assertContinuationChain(invoke.id, endHeight, actionsFee = actionsFee)
     assertStateChanges(invoke)
-    assertBalances(startHeight, endHeight, enoughFee, actionsFee, expectedPayment = Some(paymentAmount))
+    assertBalances(startHeight, endHeight, enoughFee, actionsFee, expectedPayments = payments)
   }
 
   private def testFullRollback(startHeight: Int, invoke: Transaction): Unit = {
