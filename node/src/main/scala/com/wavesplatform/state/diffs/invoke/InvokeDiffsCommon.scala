@@ -359,7 +359,7 @@ object InvokeDiffsCommon {
         invoke.payments.map(p => Portfolio.build(p.assetId, p.amount)).fold(Portfolio.empty)(_ |+| _)
       else
         Portfolio.empty
-    unusedFeePortfolio |+| Map(invoker -> paymentPortfolio)
+    unusedFeePortfolio |+| Map(invoker -> paymentPortfolio, dAppAddress -> paymentPortfolio.negate)
   }
 
   def paymentsPart(
