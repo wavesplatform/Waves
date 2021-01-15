@@ -350,9 +350,11 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     if (configUpdates != empty) {
       val renderedConfig = renderProperties(asProperties(configUpdates))
 
-      log.debug("Set new config directly in the script for starting node")
-      val startScript = s"$ContainerRoot/bin/entrypoint.sh"
-      val scriptCmd   = Array("sh", "-c", s"JAVA_OPTS='$renderedConfig' $startScript")
+      // Docker do not allow updating ENV https://github.com/moby/moby/issues/8838 :(
+      log.debug("Set new config directly in the entrypoint.sh script")
+      val shPath = "/usr/share/waves/bin/entrypoint.sh"
+      val scriptCmd: Array[String] =
+        Array("sh", "-c", s"sed -i 's|$${JAVA_OPTS} \\\\|$${JAVA_OPTS} $renderedConfig \\\\|' $shPath && cat $shPath")
 
       val execScriptCmd = client.execCreate(node.containerId, scriptCmd).id()
       client.execStart(execScriptCmd)
