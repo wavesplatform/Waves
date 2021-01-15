@@ -621,9 +621,9 @@ package object database extends ScorexLogging {
 
   def loadActiveLeases(db: DB, fromHeight: Int, toHeight: Int): Seq[LeaseTransaction] = db.withResource { r =>
     (for {
-      id          <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
-      leaseStatus <- fromHistory(r, Keys.leaseStatusHistory(id), Keys.leaseStatus(id))
-      if leaseStatus.headOption.map(_.isActive).getOrElse(false)
+      id      <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
+      details <- fromHistory(r, Keys.leaseStatusHistory(id), Keys.leaseStatus(id))
+      if details.map(_.isActive).getOrElse(false)
       pb.TransactionMeta(h, n, _, _) <- r.get(Keys.transactionMetaById(TransactionId(id)))
       tx                                <- r.get(Keys.transactionAt(Height(h), TxNum(n.toShort)))
     } yield tx).collect {

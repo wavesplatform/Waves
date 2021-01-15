@@ -665,7 +665,7 @@ abstract class LevelDBWriter private[database] (
 
           writableDB
             .withResource(loadLeaseIds(_, currentHeight, currentHeight, includeCancelled = true))
-            .foreach { leaseId => rollbackLeaseStatus(rw, leaseId, currentHeight) }
+            .foreach(rollbackLeaseStatus(rw, _, currentHeight))
 
           rollbackAssetsInfo(rw, currentHeight)
 
@@ -822,7 +822,7 @@ abstract class LevelDBWriter private[database] (
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>
     db.get(Keys.leaseStatusHistory(leaseId))
       .headOption
-      .flatMap { leaseHeight => db.get(Keys.leaseStatus(leaseId)(leaseHeight)) }
+      .flatMap(leaseHeight => db.get(Keys.leaseStatus(leaseId)(leaseHeight)))
   }
 
   // These two caches are used exclusively for balance snapshots. They are not used for portfolios, because there aren't
