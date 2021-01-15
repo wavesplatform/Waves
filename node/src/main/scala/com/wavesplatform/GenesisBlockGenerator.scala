@@ -152,7 +152,7 @@ object GenesisBlockGenerator extends App {
          |    address-scheme-character = $chainId
          |    functionality {
          |      pre-activated-features = null # undefines all previously defined pre-activated features
-         |      pre-activated-features = ${preActivatedFeatures.map { case (f, h) => s"$f = $h" }.mkString("{", ", ", "}")}
+         |      pre-activated-features = ${preActivatedFeatures.toSeq.sorted.map { case (f, h) => s"$f = $h" }.mkString("{", ", ", "}")}
          |    }
          |    genesis {
          |      average-block-delay = ${settings.averageBlockDelay.toSeconds}s
