@@ -210,7 +210,7 @@ object DiffsCommon {
       )
       senderPortfolio    = Map(sender.toAddress -> Portfolio(-fee, LeaseBalance(0, -lease.amount)))
       recipientPortfolio = Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0)))
-      actionInfo         = LeaseDetails(sender, lease.recipient, txId, lease.amount, isActive = false)
+      actionInfo         = LeaseDetails(sender, lease.recipient, lease.sourceId, lease.amount, isActive = false)
     } yield Diff.stateOps(
       portfolios = senderPortfolio |+| recipientPortfolio,
       leaseState = Map((leaseId, actionInfo))
