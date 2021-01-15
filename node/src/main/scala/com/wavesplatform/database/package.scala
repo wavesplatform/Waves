@@ -190,7 +190,7 @@ package object database extends ScorexLogging {
     pb.LeaseDetails(
       ByteString.copyFrom(ld.sender.arr),
       Some(PBRecipients.create(ld.recipient)),
-      ByteString.copyFrom(ld.txId.arr),
+      ByteString.copyFrom(ld.sourceId.arr),
       ld.amount,
       ld.isActive
     ).toByteArray
