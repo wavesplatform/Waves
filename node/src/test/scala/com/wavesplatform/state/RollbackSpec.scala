@@ -689,44 +689,44 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
         val beforeInvoke1 = d.lastBlockId
 
         val call = leaseCancelFunctionCall(leaseId)
-        def leaseDetails(invokeId: ByteStr, isActive: Boolean) =
-          Some(LeaseDetails(dApp.publicKey, invoker.toAddress, invokeId, leaseAmount, isActive))
+        def leaseDetails(isActive: Boolean) =
+          Some(LeaseDetails(dApp.publicKey, invoker.toAddress, leaseId, leaseAmount, isActive))
 
         // liquid block rollback
-        val invokeId1 = append(d.lastBlockId, call)
+        append(d.lastBlockId, call)
 
         d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance.empty
         d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance.empty
-        d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(invokeId1, false)
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(invokeId1, true)
+        d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(false)
+        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(true)
         d.appendBlock()
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(invokeId1, false)
+        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(false)
 
         d.blockchain.removeAfter(beforeInvoke1).explicitGet()
 
         d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance(in = leaseAmount, 0)
         d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance(0, out = leaseAmount)
-        d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(invokeId1, true)
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(invokeId1, true)
+        d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(true)
+        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails( true)
 
         // hardened block rollback
         val beforeInvoke2 = d.lastBlockId
-        val invokeId2 = append(d.lastBlockId, call)
+        append(d.lastBlockId, call)
 
         d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance.empty
         d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance.empty
-        d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(invokeId2, false)
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(invokeId2, true)
+        d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(false)
+        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(true)
         d.appendBlock()
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(invokeId2, false)
+        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(false)
 
         d.appendBlock()
         d.blockchain.removeAfter(beforeInvoke2).explicitGet()
 
         d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance(in = leaseAmount, 0)
         d.blockchain.leaseBalance(dApp.toAddress) shouldBe LeaseBalance(0, out = leaseAmount)
-        d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(invokeId2, true)
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(invokeId2, true)
+        d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(true)
+        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(true)
       }
 
       "leaseCancel with lease tx" in forAll(scenario) {
