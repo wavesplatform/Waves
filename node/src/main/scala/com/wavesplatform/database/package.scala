@@ -645,7 +645,7 @@ package object database extends ScorexLogging {
     while (iterator.hasNext && keyInRange()) {
       val e       = iterator.next()
       val leaseId = ByteStr(e.getKey.drop(6))
-      if (includeCancelled || Option(e.getValue).exists(_(0) == 1))
+      if (includeCancelled || readLeaseDetails(e.getValue).isActive)
         leaseIds += leaseId
       else
         leaseIds -= leaseId
