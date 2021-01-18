@@ -466,7 +466,6 @@ object Types {
       "MassTransferTransaction",
       addProofsIfNeeded(
         List(
-          "feeAssetId"    -> optionByteVector,
           "assetId"       -> optionByteVector,
           "totalAmount"   -> LONG,
           "transfers"     -> listTransfers,
