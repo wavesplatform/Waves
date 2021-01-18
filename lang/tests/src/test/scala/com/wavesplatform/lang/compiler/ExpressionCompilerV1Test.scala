@@ -438,9 +438,13 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
 
     DirectiveDictionary[StdLibVersion].all
       .foreach { version =>
-        ExpressionCompiler(getTestContext(version).compilerContext, expr(version)) should produce(
-          "Compilation failed: [Undefined field `feeAssetId` of variable of type `MassTransferTransaction` in 116-128]"
-        )
+        val result = ExpressionCompiler(getTestContext(version).compilerContext, expr(version))
+        if (version < V5)
+          result shouldBe Symbol("right")
+        else
+          result should produce(
+            "Compilation failed: [Undefined field `feeAssetId` of variable of type `MassTransferTransaction` in 116-128]"
+          )
       }
   }
 

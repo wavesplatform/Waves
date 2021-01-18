@@ -471,7 +471,8 @@ object Types {
           "transfers"     -> listTransfers,
           "transferCount" -> LONG,
           "attachment"    -> BYTESTR
-        ) ++ header ++ proven,
+        ) ++ (if (version < V5) List("feeAssetId" -> optionByteVector) else Nil)
+          ++ header ++ proven,
         proofsEnabled
       )
     )
