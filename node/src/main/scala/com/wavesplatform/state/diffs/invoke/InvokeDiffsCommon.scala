@@ -6,6 +6,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.BlockV5
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider._
@@ -17,14 +18,14 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
-import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, _}
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.DiffsCommon
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.{Asset, AssetIdLength}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -187,6 +188,7 @@ object InvokeDiffsCommon {
         Either.cond(transferList.map(_.amount).forall(_ >= 0), (), FailedTransactionError.dAppExecution("Negative amount", invocationComplexity))
       )
       _ <- TracedResult(checkOverflow(transferList.map(_.amount))).leftMap(FailedTransactionError.dAppExecution(_, invocationComplexity))
+      _ <- TracedResult(checkTransferAssets(blockchain, transferList)).leftMap(FailedTransactionError.dAppExecution(_, invocationComplexity))
 
       actionAssets = tx.checkedAssets ++
         transferList.flatMap(_.assetId).map(IssuedAsset) ++
@@ -319,6 +321,29 @@ object InvokeDiffsCommon {
         _ => ().asRight[String]
       )
   }
+
+  private def checkTransferAssets(blockchain: Blockchain, transfers: List[AssetTransfer]): Either[String, Unit] =
+    if (blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction)) {
+      val errors =
+        transfers
+          .flatMap { case AssetTransfer(_, _, assetId) => assetId }
+          .distinct
+          .map(checkTransferAsset(blockchain, _))
+          .collect { case Left(error) => error }
+      if (errors.isEmpty)
+        Right(())
+      else
+        Left(errors.mkString("; "))
+    } else
+      Right(())
+
+  private def checkTransferAsset(blockchain: Blockchain, assetId: ByteStr): Either[String, Unit] =
+    if (assetId.size != AssetIdLength)
+      Left(s"Invalid transferring asset '$assetId' length = ${assetId.size} bytes != $AssetIdLength")
+    else if (!blockchain.hasAssetScript(IssuedAsset(assetId)))
+      Left(s"Transferring asset '$assetId' is not found in the blockchain")
+    else
+      Right(())
 
   private[this] def checkDataEntries(
       tx: InvokeScriptLike,

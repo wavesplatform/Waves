@@ -29,10 +29,12 @@ import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.{TestFunctionalitySettings, TestSettings}
+import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.state.diffs.invoke.{InvokeDiffsCommon, InvokeScriptTransactionDiff}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, produce}
+import com.wavesplatform.transaction.ApplicationStatus.{ScriptExecutionFailed, Succeeded}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets._
@@ -1179,7 +1181,9 @@ class InvokeScriptTransactionDiffTest
       funcBinding <- validAliasStringGen
       fee         <- ciFee(1)
       fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet()))
-      ci = InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, Some(fc), Seq(Payment(-1, Waves)), fee, Waves, ts)
+      ci = InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, Some(fc), Seq(Payment(-1, Waves)), fee, Waves,
+        ts
+      )
     } yield ci) { _ should produce("NonPositiveAmount") }
   }
 
@@ -1690,6 +1694,17 @@ class InvokeScriptTransactionDiffTest
             )
           )
           .anyNumberOfTimes()
+        (blockchain.blockHeader _)
+          .expects(*)
+          .returning(
+            Some(
+              SignedBlockHeader(
+                BlockHeader(1, 1, ByteStr.empty, 1, ByteStr.empty, PublicKey(new Array[Byte](32)), Seq(), 1, ByteStr.empty),
+                ByteStr.empty
+              )
+            )
+          )
+          .anyNumberOfTimes()
         (blockchain.assetDescription _)
           .expects(*)
           .returning(
@@ -1853,6 +1868,119 @@ class InvokeScriptTransactionDiffTest
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
             ei should produce("negative asset balance")
           }
+        }
+    }
+  }
+
+  property("transfer base58'WAVES' with zero amount") {
+    val illegalAsset1 = IssuedAsset(ByteStr.decodeBase58("WAVES").get)
+    val illegalAsset2 = IssuedAsset(ByteStr.decodeBase58("WAVESwavesWAVESwavesWAVESwavesWAVESwaves123").get)
+
+    val transferBase58WavesDApp: DApp = {
+      val expr = {
+        val script =
+          s"""
+             |{-# STDLIB_VERSION 4       #-}
+             |{-# CONTENT_TYPE   DAPP    #-}
+             |{-# SCRIPT_TYPE    ACCOUNT #-}
+             |
+             |@Callable(i)
+             |func default() = {
+             |  [
+             |    ScriptTransfer(i.caller, 0, unit),
+             |    ScriptTransfer(i.caller, 0, base58'$illegalAsset1'),
+             |    ScriptTransfer(i.caller, 0, base58'$illegalAsset2')
+             |  ]
+             |}
+          """.stripMargin
+        Parser.parseContract(script).get.value
+      }
+      compileContractFromExpr(expr, V4)
+    }
+
+    val transferBase58WavesDAppScenario =
+      for {
+        activated <- Gen.oneOf(true, false)
+        master    <- accountGen
+        invoker   <- accountGen
+        ts        <- timestampGen
+        fee       <- ciFee(nonNftIssue = 1)
+        genesis1Tx  = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
+        genesis2Tx  = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+        script      = ContractScript(V4, transferBase58WavesDApp)
+        setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
+        invokeTx = InvokeScriptTransaction
+          .selfSigned(TxVersion.V2, invoker, master.toAddress, None, Seq(), fee, Waves, InvokeScriptTransaction.DefaultExtraFeePerStep, ts + 3)
+          .explicitGet()
+      } yield (activated, invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
+
+    forAll(transferBase58WavesDAppScenario) {
+      case (activated, invoke, genesisTxs) =>
+        tempDb { _ =>
+          val dAppAddress = invoke.dAppAddressOrAlias.asInstanceOf[Address]
+          val miner       = TestBlock.defaultSigner.toAddress
+          def invokeInfo(status: ApplicationStatus) =
+            Map(invoke.id.value() -> NewTransactionInfo(invoke, Set(invoke.senderAddress, dAppAddress), status))
+          val expectedResult =
+            if (activated)
+              Diff.empty.copy(
+                transactions = invokeInfo(ScriptExecutionFailed),
+                portfolios = Map(
+                  invoke.senderAddress -> Portfolio.waves(-invoke.fee),
+                  miner                -> Portfolio.waves(invoke.fee)
+                ),
+                scriptsComplexity = 26,
+                scriptResults = Map(
+                  invoke.id.value() -> InvokeScriptResult(
+                    error = Some(
+                      ErrorMessage(
+                        1,
+                        s"Invalid transferring asset '$illegalAsset1' length = 4 bytes != 32; " +
+                          s"Transferring asset '$illegalAsset2' is not found in the blockchain"
+                      )
+                    )
+                  )
+                )
+              )
+            else {
+              val assets = Map(illegalAsset1 -> 0L, illegalAsset2 -> 0L)
+              Diff.empty.copy(
+                transactions = invokeInfo(Succeeded),
+                portfolios = Map(
+                  invoke.senderAddress -> Portfolio(-invoke.fee, assets = assets),
+                  miner                -> Portfolio(invoke.fee),
+                  dAppAddress          -> Portfolio(-0, assets = assets)
+                ),
+                scriptsRun = 1,
+                scriptsComplexity = 26,
+                scriptResults = Map(
+                  invoke.id.value() -> InvokeScriptResult(
+                    transfers = Seq(
+                      InvokeScriptResult.Payment(invoke.senderAddress, Waves, 0),
+                      InvokeScriptResult.Payment(invoke.senderAddress, illegalAsset1, 0),
+                      InvokeScriptResult.Payment(invoke.senderAddress, illegalAsset2, 0)
+                    )
+                  )
+                )
+              )
+            }
+
+          val features =
+            if (activated)
+              fs.copy(
+                preActivatedFeatures = fs.preActivatedFeatures ++ Map(
+                  BlockchainFeatures.BlockV5.id                 -> 0,
+                  BlockchainFeatures.ContinuationTransaction.id -> 0
+                )
+              )
+            else
+              fs.copy(
+                preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
+              )
+
+          assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features)(
+            _ shouldBe Right(expectedResult)
+          )
         }
     }
   }
@@ -2078,7 +2206,9 @@ class InvokeScriptTransactionDiffTest
           .map { arg =>
             val fc = Terms.FUNCTION_CALL(FunctionHeader.User("sameComplexity"), List(CONST_STRING(arg).explicitGet()))
             InvokeScriptTransaction
-              .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 4)
+              .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves,
+                ts + 4
+              )
               .explicitGet()
           }
       } yield (Seq(gTx1, gTx2, ssTx, iTx), master.toAddress, txs)
@@ -3130,7 +3260,6 @@ class InvokeScriptTransactionDiffTest
     }
   }
 
-
   property("Payment in transaction process after Invoke") {
 
     def contract(asset: ByteStr): DApp = {
@@ -3375,7 +3504,9 @@ class InvokeScriptTransactionDiffTest
         fc                = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments          = List(Payment(paymentFromInvokerAmount, Waves))
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, clientDAppAcc.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .selfSigned(TxVersion.V3, invoker, clientDAppAcc.toAddress, Some(fc), payments, fee, Waves,
+            ts + 6
+          )
           .explicitGet()
       } yield (
         Seq(gTx1, gTx2, gTx3, setServiceDApp, setClientDApp, paymentIssue, transferIssue),
