@@ -188,7 +188,6 @@ object InvokeDiffsCommon {
         Either.cond(transferList.map(_.amount).forall(_ >= 0), (), FailedTransactionError.dAppExecution("Negative amount", invocationComplexity))
       )
       _ <- TracedResult(checkOverflow(transferList.map(_.amount))).leftMap(FailedTransactionError.dAppExecution(_, invocationComplexity))
-      _ <- TracedResult(checkTransferAssets(blockchain, transferList)).leftMap(FailedTransactionError.dAppExecution(_, invocationComplexity))
 
       actionAssets = tx.checkedAssets ++
         transferList.flatMap(_.assetId).map(IssuedAsset) ++
@@ -322,26 +321,14 @@ object InvokeDiffsCommon {
       )
   }
 
-  private def checkTransferAssets(blockchain: Blockchain, transfers: List[AssetTransfer]): Either[String, Unit] =
-    if (blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction)) {
-      val errors =
-        transfers
-          .flatMap { case AssetTransfer(_, _, assetId) => assetId }
-          .distinct
-          .map(checkTransferAsset(blockchain, _))
-          .collect { case Left(error) => error }
-      if (errors.isEmpty)
-        Right(())
-      else
-        Left(errors.mkString("; "))
-    } else
-      Right(())
-
   private def checkTransferAsset(blockchain: Blockchain, assetId: ByteStr): Either[String, Unit] =
-    if (assetId.size != AssetIdLength)
-      Left(s"Invalid transferring asset '$assetId' length = ${assetId.size} bytes != $AssetIdLength")
-    else if (!blockchain.hasAssetScript(IssuedAsset(assetId)))
-      Left(s"Transferring asset '$assetId' is not found in the blockchain")
+    if (blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction))
+      if (assetId.size != AssetIdLength)
+        Left(s"Invalid transferring asset '$assetId' length = ${assetId.size} bytes != $AssetIdLength")
+      else if (blockchain.assetDescription(IssuedAsset(assetId)).isEmpty)
+        Left(s"Transferring asset '$assetId' is not found in the blockchain")
+      else
+        Right(())
     else
       Right(())
 
@@ -432,7 +419,12 @@ object InvokeDiffsCommon {
                     Map(address       -> Portfolio(assets = Map(a -> amount))) |+|
                       Map(dAppAddress -> Portfolio(assets = Map(a -> -amount)))
                 )
-                blockchain.assetScript(a).fold(TracedResult(nextDiff.asRight[FailedTransactionError])) {
+                blockchain.assetScript(a).fold {
+                  val r = checkTransferAsset(blockchain, id)
+                    .map(_ => nextDiff)
+                    .leftMap(FailedTransactionError.dAppExecution(_, 0))
+                  TracedResult(r)
+                } {
                   case AssetScriptInfo(script, complexity) =>
                     val assetVerifierDiff =
                       if (blockchain.disallowSelfPayment) nextDiff
