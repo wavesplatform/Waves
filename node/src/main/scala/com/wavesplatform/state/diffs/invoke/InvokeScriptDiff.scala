@@ -144,7 +144,8 @@ object InvokeScriptDiff {
                   pk,
                   tx.senderDApp,
                   runsLimit-1-checkedPayments.size,
-                  invokeDeep-1
+                  invokeDeep-1,
+                  (if(version < V5) { Diff.empty } else { InvokeDiffsCommon.paymentsPart(tx, tx.dAppAddress, Map()) })
                 )
 
                 //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
