@@ -40,6 +40,29 @@ import shapeless.Coproduct
 import scala.util.{Failure, Right, Success, Try}
 
 object InvokeDiffsCommon {
+  def txFeeDiff(blockchain: Blockchain, tx: InvokeScriptTransaction) = {
+    val attachedFee = tx.fee
+    tx.assetFee._1 match {
+      case Waves => Right((attachedFee, Map(tx.sender.toAddress -> Portfolio(-attachedFee))))
+      case asset @ IssuedAsset(_) =>
+        for {
+          assetInfo <- blockchain
+            .assetDescription(asset)
+            .toRight(GenericError(s"Asset $asset does not exist, cannot be used to pay fees"))
+          feeInWaves <- Either.cond(
+            assetInfo.sponsorship > 0,
+            Sponsorship.toWaves(attachedFee, assetInfo.sponsorship),
+            GenericError(s"Asset $asset is not sponsored, cannot be used to pay fees")
+          )
+        } yield {
+          val portfolioDiff =
+            Map(tx.sender.toAddress          -> Portfolio(assets = Map(asset              -> -attachedFee))) |+|
+              Map(assetInfo.issuer.toAddress -> Portfolio(-feeInWaves, assets = Map(asset -> attachedFee)))
+          (feeInWaves, portfolioDiff)
+        }
+    }
+  }
+
   def calcAndCheckFee[E <: ValidationError](
       makeError: (String, Long) => E,
       tx: InvokeScriptTransaction,
@@ -56,28 +79,8 @@ object InvokeDiffsCommon {
         else
           invocationComplexity / stepLimit + 1
 
-      val attachedFee = tx.fee
-
       for {
-        (attachedFeeInWaves, portfolioDiff) <- tx.assetFee._1 match {
-          case Waves => Right((attachedFee, Map(tx.sender.toAddress -> Portfolio(-attachedFee))))
-          case asset @ IssuedAsset(_) =>
-            for {
-              assetInfo <- blockchain
-                .assetDescription(asset)
-                .toRight(GenericError(s"Asset $asset does not exist, cannot be used to pay fees"))
-              feeInWaves <- Either.cond(
-                assetInfo.sponsorship > 0,
-                Sponsorship.toWaves(attachedFee, assetInfo.sponsorship),
-                GenericError(s"Asset $asset is not sponsored, cannot be used to pay fees")
-              )
-            } yield {
-              val portfolioDiff =
-                Map(tx.sender.toAddress          -> Portfolio(assets = Map(asset              -> -attachedFee))) |+|
-                  Map(assetInfo.issuer.toAddress -> Portfolio(-feeInWaves, assets = Map(asset -> attachedFee)))
-              (feeInWaves, portfolioDiff)
-            }
-        }
+        (attachedFeeInWaves, portfolioDiff) <- txFeeDiff(blockchain, tx)
         _ <- {
           val dAppFee    = expectedStepFeeInWaves(tx, blockchain) * stepsNumber
           val issuesFee  = issueList.count(!blockchain.isNFT(_)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
@@ -224,7 +227,14 @@ object InvokeDiffsCommon {
         )
       )
 
-      paymentsAndFeeDiff = paymentsPart(tx, dAppAddress, feeDiff)
+      paymentsAndFeeDiff = if (isSyncCall) {
+        Diff(tx = tx.root)
+      } else if(version < V5) {
+        paymentsPart(tx, dAppAddress, feeDiff)
+      } else {
+        Diff(tx.root, portfolios = txFeeDiff(blockchain, tx.root).explicitGet()._2)
+      }
+
       compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey)(actions, paymentsAndFeeDiff, complexityLimit)
         .leftMap(_.addComplexity(invocationComplexity))
 

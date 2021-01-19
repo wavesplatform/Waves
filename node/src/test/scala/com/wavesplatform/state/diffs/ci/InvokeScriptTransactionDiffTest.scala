@@ -3270,11 +3270,12 @@ class InvokeScriptTransactionDiffTest
                       | let startWavesBalance = this.issuer.getIntegerValue("startWavesBalance")
                       | let startInvokerBalance = this.issuer.getIntegerValue("startInvokerBalance")
                       | let resultInvokerBalance = wavesBalance(Address(base58'${invoker.toAddress.stringRepr}')).regular
+                      | let issuerBalance = wavesBalance(this.issuer)
                       |
                       | assetBalance(this.issuer, this.id) == $ENOUGH_AMT                                     &&
                       | assetBalance(this.issuer, paymentAsset) == $ENOUGH_AMT - $paymentFromClientDAppAmount &&
-                      | wavesBalance(this.issuer).regular == startWavesBalance + $paymentFromInvokerAmount    &&
-                      | resultInvokerBalance == startInvokerBalance - $fee - $paymentFromInvokerAmount
+                      | issuerBalance.regular == startWavesBalance                                            &&
+                      | resultInvokerBalance == startInvokerBalance - $fee
                     """.stripMargin
       ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
     }
@@ -3290,11 +3291,12 @@ class InvokeScriptTransactionDiffTest
              | @Callable(i)
              | func bar(startInvokerBalance: Int, startWavesBalance: Int, startPaymentAssetBalance: Int, paymentAsset: ByteVector) = {
              |   let resultInvokerBalance = wavesBalance(Address(base58'${invoker.toAddress.stringRepr}')).regular
+             |   let paymentAssetBalance = assetBalance(i.caller, paymentAsset)
              |
              |   if (
              |     startInvokerBalance == resultInvokerBalance         &&
              |     startWavesBalance == wavesBalance(i.caller).regular &&
-             |     startPaymentAssetBalance == assetBalance(i.caller, paymentAsset)
+             |     startPaymentAssetBalance == paymentAssetBalance + i.payments[0].amount
              |   )
              |     then
              |       ([IntegerEntry("bar", 1)], $returnValue)
