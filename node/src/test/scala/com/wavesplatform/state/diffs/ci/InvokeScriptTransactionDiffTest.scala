@@ -831,7 +831,8 @@ class InvokeScriptTransactionDiffTest
     forAll(for {
       a  <- accountGen
       am <- smallFeeGen
-      contractGen = paymentContractGen(a.toAddress, am) _
+      version <- Gen.oneOf(V3, V4, V5)
+      contractGen = paymentContractGen(a.toAddress, am, version = version) _
       invoker <- accountGen
       ts      <- timestampGen
       asset = IssueTransaction(
@@ -850,11 +851,12 @@ class InvokeScriptTransactionDiffTest
         contractGen,
         invokerGen = Gen.oneOf(Seq(invoker)),
         payment = Some(Payment(1, IssuedAsset(asset.id()))),
-        feeGen = ciFee(1)
+        feeGen = ciFee(1),
+        version = version
       )
-    } yield (a, am, r._1, r._2, r._3, r._4, asset, invoker)) {
-      case (acc, amount, genesis, setScript, ci, dAppAddress, asset, invoker) =>
-        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), fs) {
+    } yield (a, am, r._1, r._2, r._3, r._4, asset, invoker, version)) {
+      case (acc, amount, genesis, setScript, ci, dAppAddress, asset, invoker, version) =>
+        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), (if(version < V4) { fs } else { fsWithV5 })) {
           case (blockDiff, newState) =>
             blockDiff.scriptsRun shouldBe 2
             newState.balance(acc.toAddress, Waves) shouldBe amount
