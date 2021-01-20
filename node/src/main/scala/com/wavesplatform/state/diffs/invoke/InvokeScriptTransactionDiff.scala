@@ -118,7 +118,7 @@ object InvokeScriptTransactionDiff {
                   dAppAddress,
                   runsLimit,
                   (if(invocationComplexity <= stepLimit) { 13 } else { 0 }),
-                  (if(version < V5) { Diff.empty } else { InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()) })
+                  (if(false && version < V5) { Diff.empty } else { InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()) })
                 )
 
                 //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
@@ -158,6 +158,7 @@ object InvokeScriptTransactionDiff {
                     case _ =>
                       Right((failFreeResult, Nil))
                   }
+//                  _ = println(s"envDiff = ${environment.currentDiff}")
                 } yield (environment.currentDiff, (result, fullLimit), failFreeLog ::: log)
               })
               TracedResult(
@@ -204,8 +205,9 @@ object InvokeScriptTransactionDiff {
                   .addContinuationState(dAppAddress, state)
                 val StepInfo(_, _, scriptsRun) = InvokeDiffsCommon.stepInfo(diffWithState, blockchain, tx)
                 val portfolios = Diff.stateOps(portfolios = totalFeePortfolio, scriptsRun = scriptsRun)
-                TracedResult.wrapValue((if(version >= V5) { Diff.empty } else { InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map())}) |+| diffWithState |+| portfolios)
+                TracedResult.wrapValue((if(true || version >= V5) { Diff.empty } else { InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map())}) |+| diffWithState |+| portfolios)
             }
+//            _ = println(invocationDiff)
           } yield invocationDiff |+| resultDiff
         } yield result
 

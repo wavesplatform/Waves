@@ -268,7 +268,7 @@ object InvokeDiffsCommon {
 
       paymentsAndFeeDiff = if (isContinuation || isSyncCall) {
         Diff(tx = tx.root)
-      } else if(version < V5) {
+      } else if(false && version < V5) {
         paymentsPart(tx, dAppAddress, feeDiff)
       } else {
         Diff(tx.root, portfolios = txFeeDiff(blockchain, tx.root).explicitGet()._2)
