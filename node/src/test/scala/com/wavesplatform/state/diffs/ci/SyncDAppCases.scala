@@ -13,12 +13,14 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_LONG, CONST_STRING}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.state.IntegerDataEntry
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside, Matchers, PropSpec}
@@ -271,6 +273,128 @@ class SyncDAppCases
             diff.errorMessage(invokeTx.id.value()) shouldBe None
             val expectingAmount = tradeAmount * (100 * 100 / (100 - exchangeRateDiffPercent) - loanFeePercent - 100) / 100
             diff.portfolios(invokeTx.senderAddress).assets shouldBe Map(IssuedAsset(tradedAsset) -> expectingAmount)
+        }
+    }
+  }
+
+  property("swap") {
+    val exchangeRate = 5
+    val tradeAmount  = 1000
+
+    def stakingScript(usdN: ByteStr) = {
+      val script = s"""
+                      | {-# STDLIB_VERSION 5     #-}
+                      | {-# SCRIPT_TYPE ACCOUNT  #-}
+                      | {-# CONTENT_TYPE DAPP    #-}
+                      |
+                      | let usdN = base58'$usdN'
+                      |
+                      | @Callable(i)
+                      | func cancelStake(amount: Int) = {
+                      |   if (this.getIntegerValue(i.caller.toString()) >= amount)
+                      |     then
+                      |       [ ScriptTransfer(i.caller, amount, usdN) ]
+                      |     else
+                      |       throw("too big amount")
+                      |
+                      | }
+                    """.stripMargin
+      Some(ContractScript(V5, compileContractFromExpr(Parser.parseContract(script).get.value, V5)).explicitGet())
+    }
+
+    def exchangerScript(usdN: ByteStr, stakingAddress: Address) = {
+      val script = s"""
+                      | {-# STDLIB_VERSION 5     #-}
+                      | {-# SCRIPT_TYPE ACCOUNT  #-}
+                      | {-# CONTENT_TYPE DAPP    #-}
+                      |
+                      | let usdN = base58'$usdN'
+                      | let exchangeRate = $exchangeRate
+                      | let staker = Address(base58'$stakingAddress')
+                      |
+                      | @Callable(i)
+                      | func exchangeWavesUsdN() = {
+                      |   if (i.payments[0].assetId != unit)
+                      |     then
+                      |       throw("unexpected asset")
+                      |     else {
+                      |       strict r = Invoke(staker, "cancelStake", [i.payments[0].amount * exchangeRate], [])
+                      |       [ ScriptTransfer(i.caller, i.payments[0].amount * exchangeRate, usdN) ]
+                      |     }
+                      | }
+                    """.stripMargin
+      Some(ContractScript(V5, compileContractFromExpr(Parser.parseContract(script).get.value, V5)).explicitGet())
+    }
+
+    val scenario =
+      for {
+        invoker   <- accountGen
+        staker    <- accountGen
+        exchanger <- accountGen
+        ts        <- timestampGen
+        fee       <- ciFee(1)
+
+        usdNIssue = IssueTransaction
+          .selfSigned(
+            2.toByte,
+            staker,
+            "USDN",
+            "",
+            ENOUGH_AMT,
+            8,
+            reissuable = true,
+            None,
+            fee,
+            ts + 1
+          )
+          .explicitGet()
+
+        gTx1 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+        gTx2 = GenesisTransaction.create(staker.toAddress, ENOUGH_AMT, ts).explicitGet()
+        gTx3 = GenesisTransaction.create(exchanger.toAddress, ENOUGH_AMT, ts).explicitGet()
+
+        usdN = usdNIssue.id.value()
+
+        stakingScriptR = stakingScript(usdN)
+        exchangerR     = exchangerScript(usdN, staker.toAddress)
+
+        s1 = SetScriptTransaction.selfSigned(1.toByte, staker, stakingScriptR, fee, ts + 5).explicitGet()
+        s2 = SetScriptTransaction.selfSigned(1.toByte, exchanger, exchangerR, fee, ts + 5).explicitGet()
+
+        d = DataTransaction
+          .selfSigned(TxVersion.V2, staker, Seq(IntegerDataEntry(exchanger.toAddress.toString, tradeAmount * exchangeRate)), fee, ts + 5)
+          .explicitGet()
+
+        fc = Terms.FUNCTION_CALL(
+          FunctionHeader.User("exchangeWavesUsdN"),
+          Nil
+        )
+        invokeTx = InvokeScriptTransaction
+          .selfSigned(
+            TxVersion.V3,
+            invoker,
+            exchanger.toAddress,
+            Some(fc),
+            List(Payment(tradeAmount, Waves)),
+            fee * 100,
+            Waves,
+            InvokeScriptTransaction.DefaultExtraFeePerStep,
+            ts + 10
+          )
+          .explicitGet()
+
+      } yield (
+        Seq(gTx1, gTx2, gTx3, usdNIssue, s1, s2, d),
+        invokeTx,
+        usdN
+      )
+
+    forAll(scenario) {
+      case (genesisTxs, invokeTx, usdN) =>
+        assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
+          case (diff, _) =>
+            diff.errorMessage(invokeTx.id.value()) shouldBe None
+            diff.portfolios(invokeTx.sender.toAddress).assets shouldBe Map(IssuedAsset(usdN) -> tradeAmount * exchangeRate)
         }
     }
   }
