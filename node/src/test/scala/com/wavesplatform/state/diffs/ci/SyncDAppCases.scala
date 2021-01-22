@@ -749,4 +749,130 @@ class SyncDAppCases
         }
     }
   }
+
+  property("early-bird") {
+    def swopMiningScript(swopToken: ByteStr) = {
+      val script = s"""
+                      | {-# STDLIB_VERSION 5     #-}
+                      | {-# SCRIPT_TYPE ACCOUNT  #-}
+                      | {-# CONTENT_TYPE DAPP    #-}
+                      |
+                      | let swopToken = base58'$swopToken'
+                      |
+                      | @Callable(i)
+                      | func increase(address: ByteVector) = {
+                      |   if (i.payments[0].assetId != swopToken)
+                      |     then
+                      |       throw("unexpected asset")
+                      |     else {
+                      |       let key = Address(address).toString()
+                      |       let currentValue = this.getInteger(key).valueOrElse(0)
+                      |       let newValue = currentValue + i.payments[0].amount
+                      |       [ IntegerEntry(key, newValue) ]
+                      |     }
+                      | }
+                    """.stripMargin
+      Some(ContractScript(V5, compileContractFromExpr(Parser.parseContract(script).get.value, V5)).explicitGet())
+    }
+
+    def earlyBirdScript(swopToken: ByteStr, swopMiner: Address) = {
+      val script = s"""
+                      | {-# STDLIB_VERSION 5     #-}
+                      | {-# SCRIPT_TYPE ACCOUNT  #-}
+                      | {-# CONTENT_TYPE DAPP    #-}
+                      |
+                      | let swopToken = base58'$swopToken'
+                      | let swopMiner = Address(base58'$swopMiner')
+                      |
+                      | @Callable(i)
+                      | func process() = {
+                      |    let key = i.caller.toString()
+                      |    let reward = this.getIntegerValue(key)
+                      |    strict r = Invoke(swopMiner, "increase", [i.caller.bytes], [AttachedPayment(swopToken, reward)])
+                      |    []
+                      | }
+                    """.stripMargin
+      Some(ContractScript(V5, compileContractFromExpr(Parser.parseContract(script).get.value, V5)).explicitGet())
+    }
+
+    val scenario =
+      for {
+        invoker   <- accountGen
+        swopMiner <- accountGen
+        earlyBird <- accountGen
+        ts        <- timestampGen
+        fee       <- ciFee(1)
+
+        swopTokenIssue = IssueTransaction
+          .selfSigned(
+            2.toByte,
+            earlyBird,
+            "Share",
+            "",
+            ENOUGH_AMT,
+            8,
+            reissuable = true,
+            None,
+            fee,
+            ts + 1
+          )
+          .explicitGet()
+
+        gTx1 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+        gTx2 = GenesisTransaction.create(swopMiner.toAddress, ENOUGH_AMT, ts).explicitGet()
+        gTx3 = GenesisTransaction.create(earlyBird.toAddress, ENOUGH_AMT, ts).explicitGet()
+
+        swopToken = swopTokenIssue.id.value()
+
+        swopMiningScriptR = swopMiningScript(swopToken)
+        exchangerR        = earlyBirdScript(swopToken, swopMiner.toAddress)
+
+        s1 = SetScriptTransaction.selfSigned(1.toByte, swopMiner, swopMiningScriptR, fee, ts + 5).explicitGet()
+        s2 = SetScriptTransaction.selfSigned(1.toByte, earlyBird, exchangerR, fee, ts + 5).explicitGet()
+
+        data2 = DataTransaction
+          .selfSigned(
+            2.toByte,
+            earlyBird,
+            Seq(
+              IntegerDataEntry(invoker.toAddress.toString, 1000)
+            ),
+            fee,
+            ts + 5
+          )
+          .explicitGet()
+
+        fc = Terms.FUNCTION_CALL(
+          FunctionHeader.User("process"),
+          Nil
+        )
+        invokeTx = InvokeScriptTransaction
+          .selfSigned(
+            TxVersion.V3,
+            invoker,
+            earlyBird.toAddress,
+            Some(fc),
+            Nil,
+            fee * 100,
+            Waves,
+            InvokeScriptTransaction.DefaultExtraFeePerStep,
+            ts + 10
+          )
+          .explicitGet()
+
+      } yield (
+        Seq(gTx1, gTx2, gTx3, swopTokenIssue, s1, s2, data2),
+        invokeTx,
+        swopToken
+      )
+
+    forAll(scenario) {
+      case (genesisTxs, invokeTx, swopToken) =>
+        assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
+          case (diff, _) =>
+            diff.errorMessage(invokeTx.id.value()) shouldBe None
+            diff.portfolios(invokeTx.dAppAddressOrAlias.asInstanceOf[Address]).assets shouldBe Map(IssuedAsset(swopToken) -> -1000)
+        }
+    }
+  }
 }
