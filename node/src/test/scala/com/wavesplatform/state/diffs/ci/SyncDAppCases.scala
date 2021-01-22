@@ -751,6 +751,8 @@ class SyncDAppCases
   }
 
   property("early-bird") {
+    val rewardAmount = 1000
+
     def swopMiningScript(swopToken: ByteStr) = {
       val script = s"""
                       | {-# STDLIB_VERSION 5     #-}
@@ -835,7 +837,7 @@ class SyncDAppCases
             2.toByte,
             earlyBird,
             Seq(
-              IntegerDataEntry(invoker.toAddress.toString, 1000)
+              IntegerDataEntry(invoker.toAddress.toString, rewardAmount)
             ),
             fee,
             ts + 5
@@ -871,7 +873,145 @@ class SyncDAppCases
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
           case (diff, _) =>
             diff.errorMessage(invokeTx.id.value()) shouldBe None
-            diff.portfolios(invokeTx.dAppAddressOrAlias.asInstanceOf[Address]).assets shouldBe Map(IssuedAsset(swopToken) -> -1000)
+            diff.portfolios(invokeTx.dAppAddressOrAlias.asInstanceOf[Address]).assets shouldBe Map(IssuedAsset(swopToken) -> -rewardAmount)
+        }
+    }
+  }
+
+  property("receive all rewards") {
+    val shareAmount = 777
+    val swapAmount = 1000
+
+    def swopMiningScript(swopToken: ByteStr) = {
+      val script = s"""
+                      | {-# STDLIB_VERSION 5     #-}
+                      | {-# SCRIPT_TYPE ACCOUNT  #-}
+                      | {-# CONTENT_TYPE DAPP    #-}
+                      |
+                      | let swopToken = base58'$swopToken'
+                      |
+                      | @Callable(i)
+                      | func receive(address: ByteVector) = {
+                      |    let key = Address(address).toString()
+                      |    let amount = this.getInteger(key).valueOrElse(0)
+                      |    [ ScriptTransfer(Address(address), amount, swopToken) ]
+                      | }
+                    """.stripMargin
+      Some(ContractScript(V5, compileContractFromExpr(Parser.parseContract(script).get.value, V5)).explicitGet())
+    }
+
+    def earlyBirdScript(swopToken: ByteStr, swopMiner: Address, shareToken: ByteStr) = {
+      val script = s"""
+                      | {-# STDLIB_VERSION 5     #-}
+                      | {-# SCRIPT_TYPE ACCOUNT  #-}
+                      | {-# CONTENT_TYPE DAPP    #-}
+                      |
+                      | let swopToken = base58'$swopToken'
+                      | let shareToken = base58'$shareToken'
+                      | let swopMiner = Address(base58'$swopMiner')
+                      |
+                      | @Callable(i)
+                      | func process() = {
+                      |    strict r = Invoke(swopMiner, "receive", [i.caller.bytes], [])
+                      |    [ ScriptTransfer(i.caller, $shareAmount, shareToken) ]
+                      | }
+                    """.stripMargin
+      Some(ContractScript(V5, compileContractFromExpr(Parser.parseContract(script).get.value, V5)).explicitGet())
+    }
+
+    val scenario =
+      for {
+        invoker   <- accountGen
+        swopMiner <- accountGen
+        earlyBird <- accountGen
+        ts        <- timestampGen
+        fee       <- ciFee(1)
+
+        swopTokenIssue = IssueTransaction
+          .selfSigned(
+            2.toByte,
+            swopMiner,
+            "Swop",
+            "",
+            ENOUGH_AMT,
+            8,
+            reissuable = true,
+            None,
+            fee,
+            ts + 1
+          )
+          .explicitGet()
+
+        shareTokenIssue = IssueTransaction
+          .selfSigned(
+            2.toByte,
+            earlyBird,
+            "Share",
+            "",
+            ENOUGH_AMT,
+            8,
+            reissuable = true,
+            None,
+            fee,
+            ts + 1
+          )
+          .explicitGet()
+
+        gTx1 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+        gTx2 = GenesisTransaction.create(swopMiner.toAddress, ENOUGH_AMT, ts).explicitGet()
+        gTx3 = GenesisTransaction.create(earlyBird.toAddress, ENOUGH_AMT, ts).explicitGet()
+
+        swopToken  = swopTokenIssue.id.value()
+        shareToken = shareTokenIssue.id.value()
+
+        swopMiningScriptR = swopMiningScript(swopToken)
+        exchangerR        = earlyBirdScript(swopToken, swopMiner.toAddress, shareToken)
+
+        s1 = SetScriptTransaction.selfSigned(1.toByte, swopMiner, swopMiningScriptR, fee, ts + 5).explicitGet()
+        s2 = SetScriptTransaction.selfSigned(1.toByte, earlyBird, exchangerR, fee, ts + 5).explicitGet()
+
+        data2 = DataTransaction
+          .selfSigned(
+            2.toByte,
+            swopMiner,
+            Seq(
+              IntegerDataEntry(invoker.toAddress.toString, swapAmount)
+            ),
+            fee,
+            ts + 5
+          )
+          .explicitGet()
+
+        fc = Terms.FUNCTION_CALL(
+          FunctionHeader.User("process"),
+          Nil
+        )
+        invokeTx = InvokeScriptTransaction
+          .selfSigned(
+            TxVersion.V3,
+            invoker,
+            earlyBird.toAddress,
+            Some(fc),
+            Nil,
+            fee * 100,
+            Waves,
+            InvokeScriptTransaction.DefaultExtraFeePerStep,
+            ts + 10
+          )
+          .explicitGet()
+
+      } yield (
+        Seq(gTx1, gTx2, gTx3, swopTokenIssue, shareTokenIssue, s1, s2, data2),
+        invokeTx,
+        shareToken
+      )
+
+    forAll(scenario) {
+      case (genesisTxs, invokeTx, shareToken) =>
+        assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
+          case (diff, _) =>
+            diff.errorMessage(invokeTx.id.value()) shouldBe None
+            diff.portfolios(invokeTx.dAppAddressOrAlias.asInstanceOf[Address]).assets shouldBe Map(IssuedAsset(shareToken) -> -777)
         }
     }
   }
