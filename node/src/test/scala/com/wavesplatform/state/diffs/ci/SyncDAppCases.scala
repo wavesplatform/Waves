@@ -13,10 +13,11 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_LONG, CONST_STRING}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.IntegerDataEntry
 import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.{BinaryDataEntry, IntegerDataEntry}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -560,6 +561,190 @@ class SyncDAppCases
             diff.portfolios(invokeTx.sender.toAddress).assets shouldBe Map(
               IssuedAsset(usdN)       -> -stakeAmount,
               IssuedAsset(shareToken) -> 1
+            )
+        }
+    }
+  }
+
+  property("decrease liquidity") {
+    val stakeAmount = 1000
+    val leaseAmount = 777
+
+    def stakingScript(usdN: ByteStr) = {
+      val script = s"""
+                      | {-# STDLIB_VERSION 5     #-}
+                      | {-# SCRIPT_TYPE ACCOUNT  #-}
+                      | {-# CONTENT_TYPE DAPP    #-}
+                      |
+                      | let usdN = base58'$usdN'
+                      |
+                      | @Callable(i)
+                      | func cancelStake(amount: Int) = {
+                      |   if (this.getIntegerValue(i.caller.toString()) >= amount)
+                      |     then
+                      |       [ ScriptTransfer(i.caller, amount, usdN) ]
+                      |     else
+                      |       throw("too big amount")
+                      |
+                      | }
+                    """.stripMargin
+      Some(ContractScript(V5, compileContractFromExpr(Parser.parseContract(script).get.value, V5)).explicitGet())
+    }
+
+    def exchangerScript(usdN: ByteStr, stakingAddress: Address, shareToken: ByteStr) = {
+      val script = s"""
+                      | {-# STDLIB_VERSION 5     #-}
+                      | {-# SCRIPT_TYPE ACCOUNT  #-}
+                      | {-# CONTENT_TYPE DAPP    #-}
+                      |
+                      | let usdN = base58'$usdN'
+                      | let staker = Address(base58'$stakingAddress')
+                      | let shareToken = base58'$shareToken'
+                      |
+                      | @Callable(i)
+                      | func exchangeWavesUsdN() = {
+                      |   if (i.payments[0].assetId != shareToken)
+                      |     then
+                      |       throw("unexpected asset")
+                      |     else {
+                      |       let stakeAmountKey = "STAKE_AMOUNT_" + i.caller.toString()
+                      |       let leaseAmountKey = "LEASE_AMOUNT_" + i.caller.toString()
+                      |       let leaseIdKey     = "LEASE_ID_" + i.caller.toString()
+                      |
+                      |       let stakedAmount = this.getInteger(stakeAmountKey).valueOrElse(0)
+                      |       strict r = Invoke(staker, "cancelStake", [stakedAmount], [])
+                      |
+                      |       let leaseId = this.getBinaryValue(leaseIdKey)
+                      |       let leaseAmount = this.getIntegerValue(leaseAmountKey)
+                      |       [
+                      |         LeaseCancel(leaseId),
+                      |         ScriptTransfer(i.caller, stakedAmount, usdN),
+                      |         ScriptTransfer(i.caller, leaseAmount, unit),
+                      |         DeleteEntry(leaseAmountKey),
+                      |         DeleteEntry(stakeAmountKey),
+                      |         DeleteEntry(leaseIdKey)
+                      |       ]
+                      |     }
+                      | }
+                    """.stripMargin
+      Some(ContractScript(V5, compileContractFromExpr(Parser.parseContract(script).get.value, V5)).explicitGet())
+    }
+
+    val scenario =
+      for {
+        invoker   <- accountGen
+        staker    <- accountGen
+        exchanger <- accountGen
+        ts        <- timestampGen
+        fee       <- ciFee(1)
+
+        usdNIssue = IssueTransaction
+          .selfSigned(
+            2.toByte,
+            staker,
+            "USDN",
+            "",
+            ENOUGH_AMT,
+            8,
+            reissuable = true,
+            None,
+            fee,
+            ts + 1
+          )
+          .explicitGet()
+
+        shareTokenIssue = IssueTransaction
+          .selfSigned(
+            2.toByte,
+            invoker,
+            "Share",
+            "",
+            ENOUGH_AMT,
+            8,
+            reissuable = true,
+            None,
+            fee,
+            ts + 1
+          )
+          .explicitGet()
+
+        gTx1 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
+        gTx2 = GenesisTransaction.create(staker.toAddress, ENOUGH_AMT, ts).explicitGet()
+        gTx3 = GenesisTransaction.create(exchanger.toAddress, ENOUGH_AMT, ts).explicitGet()
+
+        usdN       = usdNIssue.id.value()
+        shareToken = shareTokenIssue.id.value()
+
+        stakingScriptR = stakingScript(usdN)
+        exchangerR     = exchangerScript(usdN, staker.toAddress, shareToken)
+
+        s1 = SetScriptTransaction.selfSigned(1.toByte, staker, stakingScriptR, fee, ts + 5).explicitGet()
+        s2 = SetScriptTransaction.selfSigned(1.toByte, exchanger, exchangerR, fee, ts + 5).explicitGet()
+
+        transfer1 = TransferTransaction
+          .selfSigned(2.toByte, staker, invoker.toAddress, IssuedAsset(usdN), Int.MaxValue, Waves, fee, ByteStr.empty, ts + 5)
+          .explicitGet()
+
+        lease = LeaseTransaction.selfSigned(2.toByte, exchanger, staker.toAddress, leaseAmount, fee, ts + 5).explicitGet()
+
+        data = DataTransaction
+          .selfSigned(
+            2.toByte,
+            exchanger,
+            Seq(
+              IntegerDataEntry(s"STAKE_AMOUNT_${invoker.toAddress}", stakeAmount),
+              IntegerDataEntry(s"LEASE_AMOUNT_${invoker.toAddress}", leaseAmount),
+              BinaryDataEntry(s"LEASE_ID_${invoker.toAddress}", lease.id.value())
+            ),
+            fee,
+            ts + 5
+          )
+          .explicitGet()
+        data2 = DataTransaction
+          .selfSigned(
+            2.toByte,
+            staker,
+            Seq(
+              IntegerDataEntry(exchanger.toAddress.toString, stakeAmount)
+            ),
+            fee,
+            ts + 5
+          )
+          .explicitGet()
+
+        fc = Terms.FUNCTION_CALL(
+          FunctionHeader.User("exchangeWavesUsdN"),
+          Nil
+        )
+        invokeTx = InvokeScriptTransaction
+          .selfSigned(
+            TxVersion.V3,
+            invoker,
+            exchanger.toAddress,
+            Some(fc),
+            List(Payment(1, IssuedAsset(shareToken))),
+            fee * 100,
+            Waves,
+            InvokeScriptTransaction.DefaultExtraFeePerStep,
+            ts + 10
+          )
+          .explicitGet()
+
+      } yield (
+        Seq(gTx1, gTx2, gTx3, usdNIssue, shareTokenIssue, s1, s2, transfer1, lease, data, data2),
+        invokeTx,
+        usdN,
+        shareToken
+      )
+
+    forAll(scenario) {
+      case (genesisTxs, invokeTx, usdN, shareToken) =>
+        assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
+          case (diff, _) =>
+            diff.errorMessage(invokeTx.id.value()) shouldBe None
+            diff.portfolios(invokeTx.sender.toAddress).assets shouldBe Map(
+              IssuedAsset(usdN)       -> stakeAmount,
+              IssuedAsset(shareToken) -> -1
             )
         }
     }
