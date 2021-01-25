@@ -62,8 +62,7 @@ class SyncDAppCases
         assetB: ByteStr,
         exchangerABAddress: Address,
         exchangerBAAddress: Address,
-        loanerAddress: Address,
-        beneficiary: Address
+        loanerAddress: Address
     ) = {
       val script = s"""
                       | {-# STDLIB_VERSION 5     #-}
@@ -76,10 +75,9 @@ class SyncDAppCases
                       | let exchangerABAddress = Address(base58'$exchangerABAddress')
                       | let exchangerBAAddress = Address(base58'$exchangerBAAddress')
                       | let loanerAddress      = Address(base58'$loanerAddress')
-                      | let beneficiaryAddress = Address(base58'$beneficiary')        # TODO should be available as first caller
                       |
                       | @Callable(i)
-                      | func trade(amount: Int) = {
+                      | func trade(amount: Int, beneficiary: ByteVector) = {
                       |   strict startBalanceB = this.assetBalance(assetB)
                       |   strict r1 = Invoke(exchangerABAddress, "exchangeAB", [], [AttachedPayment(assetA, amount)])
                       |   strict diffB = this.assetBalance(assetB) - startBalanceB
@@ -89,7 +87,7 @@ class SyncDAppCases
                       |   let debt = amount.fraction(100 + loanFeePercent, 100)
                       |   let profit = this.assetBalance(assetA) - debt
                       |   [
-                      |     ScriptTransfer(beneficiaryAddress, profit, assetA),
+                      |     ScriptTransfer(Address(beneficiary), profit, assetA),
                       |     ScriptTransfer(loanerAddress, debt, assetA)
                       |   ]
                       | }
@@ -109,7 +107,7 @@ class SyncDAppCases
                       | @Callable(i)
                       | func loan(amount: Int, callback: String, borrower: ByteVector) = {
                       |   strict startBalance = this.assetBalance(assetA)
-                      |   strict r = Invoke(Address(borrower), callback, [amount], [AttachedPayment(assetA, amount)])
+                      |   strict r = Invoke(Address(borrower), callback, [amount, i.caller.bytes], [AttachedPayment(assetA, amount)])
                       |
                       |   let balanceDiff = this.assetBalance(assetA) - startBalance
                       |   let profit      = amount.fraction(loanFeePercent, 100)
@@ -219,7 +217,7 @@ class SyncDAppCases
         assetA = assetAIssue.id.value()
         assetB = assetBIssue.id.value()
 
-        borrowerScriptR    = borrowerScript(assetA, assetB, exchangerAB.toAddress, exchangerBA.toAddress, loaner.toAddress, beneficiary.toAddress)
+        borrowerScriptR    = borrowerScript(assetA, assetB, exchangerAB.toAddress, exchangerBA.toAddress, loaner.toAddress)
         loanerScriptR      = loanerAScript(assetA)
         exchangerABScriptR = exchangerABScript(assetA, assetB)
         exchangerBAScriptR = exchangerBAScript(assetA, assetB)
