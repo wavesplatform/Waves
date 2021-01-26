@@ -8,15 +8,15 @@ mkdir -p /var/lib/waves/log
 if [[ ! -f "$WAVES_CONFIG" ]]; then
   echo "Custom '$WAVES_CONFIG' not found. Using a default one for '${WAVES_NETWORK,,}' network." | tee -a /var/log/waves/waves.log
   if [[ $NETWORKS == *"${WAVES_NETWORK,,}"* ]]; then
-    touch "WAVES_CONFIG"
-    echo "waves.blockchain.type=${WAVES_NETWORK}" >> $WAVES_CONFIG
+    touch "$WAVES_CONFIG"
+    echo "waves.blockchain.type=${WAVES_NETWORK}" >>$WAVES_CONFIG
 
     sed -i 's/include "local.conf"//' "$WAVES_CONFIG"
     for f in /etc/waves/ext/*.conf; do
       echo "Adding $f extension config to waves.conf"
-      echo "include required(\"$f\")" >> $WAVES_CONFIG
+      echo "include required(\"$f\")" >>$WAVES_CONFIG
     done
-    echo 'include "local.conf"' >> $WAVES_CONFIG
+    echo 'include "local.conf"' >>$WAVES_CONFIG
   else
     echo "Network '${WAVES_NETWORK,,}' not found. Exiting."
     exit 1
@@ -38,12 +38,10 @@ echo "WAVES_WALLET_PASSWORD='${WAVES_WALLET_PASSWORD}'" | tee -a /var/log/waves/
 echo "WAVES_CONFIG='${WAVES_CONFIG}'" | tee -a /var/log/waves/waves.log
 echo "JAVA_OPTS='${JAVA_OPTS}'" | tee -a /var/log/waves/waves.log
 
-exec java -Dlogback.stdout.level=${WAVES_LOG_LEVEL} \
-  -XX:+ExitOnOutOfMemoryError \
-  -Xmx${WAVES_HEAP_SIZE} \
-  -Dlogback.file.directory=/var/log/waves \
-  -Dconfig.override_with_env_vars=true \
-  ${JAVA_OPTS} \
-  -cp '/usr/share/waves/lib/plugins/*:/usr/share/waves/lib/*' \
-  com.wavesplatform.Application \
-  "$WAVES_CONFIG"
+JAVA_OPTS="-Dlogback.stdout.level=${WAVES_LOG_LEVEL}
+  -XX:+ExitOnOutOfMemoryError
+  -Xmx${WAVES_HEAP_SIZE}
+  -Dlogback.file.directory=/var/log/waves
+  -Dconfig.override_with_env_vars=true
+  ${JAVA_OPTS}
+  -cp '/usr/share/waves/lib/plugins/*:/usr/share/waves/lib/*'" sudo -u waves waves "$WAVES_CONFIG"

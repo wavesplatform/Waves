@@ -9,11 +9,15 @@ ENV WAVES_HEAP_SIZE=$WAVES_HEAP_SIZE
 ENV WAVES_NETWORK=$WAVES_NETWORK
 ENV ENABLE_GRPC=$ENABLE_GRPC
 
-COPY target /tmp/
-COPY setup-node.sh /tmp/
-COPY entrypoint.sh /usr/share/waves/bin/
+COPY build_scripts /tmp/
 
+# Additional dependencies
+RUN /bin/bash /tmp/setup-deps.sh
+
+# Node DEB files
+COPY target /tmp/
 RUN /bin/bash /tmp/setup-node.sh
+RUN rm -rf /tmp/*
 
 USER waves
 WORKDIR /var/lib/waves
