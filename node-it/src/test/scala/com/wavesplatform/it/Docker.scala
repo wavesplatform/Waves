@@ -236,8 +236,6 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
             s"sampling,monitors,sessionname=WavesNode,dir=$ContainerRoot/profiler,logdir=$ContainerRoot,onexit=snapshot "
         }
 
-        val withAspectJ = Option(System.getenv("WITH_ASPECTJ")).fold(false)(_.toBoolean)
-        if (withAspectJ) config += s"-javaagent:$ContainerRoot/aspectjweaver.jar "
         config
       }
 

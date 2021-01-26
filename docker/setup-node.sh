@@ -17,8 +17,6 @@ fi
 
 rm /etc/waves/waves.conf # Remove example config
 
-wget --quiet "https://search.maven.org/remotecontent?filepath=org/aspectj/aspectjweaver/1.9.1/aspectjweaver-1.9.1.jar" -O $HOME/aspectjweaver.jar
-
 YOURKIT_ARCHIVE="YourKit-JavaProfiler-2019.8-docker.zip"
 wget --quiet "https://www.yourkit.com/download/docker/$YOURKIT_ARCHIVE" -P /tmp/ &&
   unzip /tmp/$YOURKIT_ARCHIVE -d /usr/local &&
