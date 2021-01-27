@@ -5,9 +5,16 @@ libraryDependencies ++= Dependencies.it
 
 lazy val docker = taskKey[Unit]("build docker image")
 docker := {
+  val dockerDir = new File(baseDirectory.value.getParentFile, "docker")
+
+  val nodeDebFile = (packageBin in Debian in LocalProject("node")).value
+  val grpcDebFile = (packageBin in Debian in LocalProject("grpc-server")).value
+  IO.copyFile(nodeDebFile, new File(dockerDir, "target/waves.deb"))
+  IO.copyFile(grpcDebFile, new File(dockerDir, "target/grpc-server.deb"))
+
   val result = new ProcessBuilder()
-    .command("/bin/bash", "-c", "./docker_build.sh && docker build -t testnode --build-arg WAVES_VERSION=current --build-arg ENABLE_GRPC=true docker")
-    .directory(baseDirectory.value.getParentFile)
+    .command("docker build -t testnode --build-arg WAVES_VERSION=current --build-arg ENABLE_GRPC=true .".split(' '): _*)
+    .directory(dockerDir)
     .inheritIO()
     .start()
     .waitFor()
