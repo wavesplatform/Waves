@@ -13,7 +13,7 @@ docker := {
   IO.copyFile(grpcDebFile, new File(dockerDir, "target/grpc-server.deb"))
 
   val result = new ProcessBuilder()
-    .command("docker build -t testnode --build-arg WAVES_VERSION=current --build-arg ENABLE_GRPC=true .".split(' '): _*)
+    .command("docker build -t testnode --build-arg ENABLE_GRPC=true .".split(' '): _*)
     .directory(dockerDir)
     .inheritIO()
     .start()
