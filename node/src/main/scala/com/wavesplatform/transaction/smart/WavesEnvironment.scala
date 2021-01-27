@@ -8,10 +8,10 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.MultiPaymentPolicyProvider._
-import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.FunctionHeader.User
+import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
 import com.wavesplatform.lang.v1.traits.domain._
@@ -21,9 +21,9 @@ import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import monix.eval.Coeval
 import shapeless._
 
@@ -190,7 +190,12 @@ class WavesEnvironment(
         address => Address(ByteStr(address.bytes))
       )
 
-  override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)]): Either[ValidationError, EVALUATED] = ???
+  override def callScript(
+      dApp: Address,
+      func: String,
+      args: List[EVALUATED],
+      payments: Seq[(Option[Array[Byte]], Long)]
+  ): Either[ValidationError, EVALUATED] = ???
 }
 
 class DAppEnvironment(
@@ -204,26 +209,52 @@ class DAppEnvironment(
     currentDApp: com.wavesplatform.account.Address,
     currentDAppPk: com.wavesplatform.account.PublicKey,
     senderDApp: com.wavesplatform.account.Address,
-    var runsLimit: Int,
-    invokeDeep: Int
+    var remainingComplexity: Long
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id()) {
 
   var currentDiff: Diff = Diff.empty
 
   override def currentBlockchain() = CompositeBlockchain(blockchain, Some(currentDiff))
 
-  override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)]): Either[ValidationError, EVALUATED] = {
+  override def callScript(
+      dApp: Address,
+      func: String,
+      args: List[EVALUATED],
+      payments: Seq[(Option[Array[Byte]], Long)]
+  ): Either[ValidationError, EVALUATED] = {
     com.wavesplatform.account.Address.fromBytes(dApp.bytes.arr).flatMap { dApp =>
-      val inv: InvokeScript = InvokeScript(currentDApp, currentDAppPk, dApp, FUNCTION_CALL(User(func, func), args), payments.map(p => Payment(p._2, p._1.fold(Waves:Asset)(a => IssuedAsset(ByteStr(a))))), tx.root)
-      InvokeScriptDiff(currentBlockchain(), blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp+1, false, runsLimit, invokeDeep)(inv).resultE.map {
+      val inv: InvokeScript = InvokeScript(
+        currentDApp,
+        currentDAppPk,
+        dApp,
+        FUNCTION_CALL(User(func, func), args),
+        payments.map(p => Payment(p._2, p._1.fold(Waves: Asset)(a => IssuedAsset(ByteStr(a))))),
+        tx.root
+      )
+      InvokeScriptDiff(
+        currentBlockchain(),
+        blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
+        false,
+        remainingComplexity
+      )(inv).resultE.map {
         case (diff, res) =>
-          val fixedDiff = diff.copy(scriptResults = Map(tx.root.id() ->
-            InvokeScriptResult(invokes = Seq(InvokeScriptResult.Invocation(dApp,
-                                                                           InvokeScriptResult.Call(func, args),
-                                                                           payments.map(p => InvokeScriptResult.AttachedPayment(p._1.fold(Asset.Waves:Asset)(a => IssuedAsset(ByteStr(a))), p._2)),
-                                                                           diff.scriptResults(tx.root.id()))))))
+          val fixedDiff = diff.copy(
+            scriptResults = Map(
+              tx.root.id() ->
+                InvokeScriptResult(
+                  invokes = Seq(
+                    InvokeScriptResult.Invocation(
+                      dApp,
+                      InvokeScriptResult.Call(func, args),
+                      payments.map(p => InvokeScriptResult.AttachedPayment(p._1.fold(Asset.Waves: Asset)(a => IssuedAsset(ByteStr(a))), p._2)),
+                      diff.scriptResults(tx.root.id())
+                    )
+                  )
+                )
+            )
+          )
           currentDiff = currentDiff combine fixedDiff
-          runsLimit = runsLimit - diff.scriptsRun
+          remainingComplexity = remainingComplexity - diff.scriptsComplexity
           res
       }
     }

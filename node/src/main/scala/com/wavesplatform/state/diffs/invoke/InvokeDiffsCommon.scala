@@ -148,7 +148,7 @@ object InvokeDiffsCommon {
       tx: InvokeScriptLike,
       blockchain: Blockchain,
       blockTime: Long,
-      runsLimit: Int,
+      remainingComplexity: Long,
       isSyncCall: Boolean,
       limitedExecution: Boolean,
       otherIssues: Seq[Issue] = Seq()
@@ -194,8 +194,8 @@ object InvokeDiffsCommon {
         burnList.map(b => IssuedAsset(b.assetId)) ++
         sponsorFeeList.map(sf => IssuedAsset(sf.assetId))
 
-      additionalScriptsInvoked = actionAssets.count(blockchain.hasAssetScript) +
-        (if (blockchain.hasAccountScript(tx.sender.toAddress)) 1 else 0)
+      additionalScripts = actionAssets.flatMap(blockchain.assetScript(_).map(_.complexity)) ++
+        (blockchain.accountScript(tx.sender.toAddress).map(_.verifierComplexity))
 
       stepLimit = ContractLimits.MaxComplexityByVersion(version)
       feeDiff <- if (isSyncCall)
@@ -208,17 +208,18 @@ object InvokeDiffsCommon {
           stepLimit,
           invocationComplexity,
           issueList ++ otherIssues,
-          additionalScriptsInvoked
+          additionalScripts.size
         ).map(_._2)
 
       // TODO there will be no failed tests if code block below would be commented
       // is it useful?
+      additionalComplexity = additionalScripts.sum
       _ <- TracedResult(
         Either.cond(
-          additionalScriptsInvoked <= runsLimit,
+          additionalComplexity <= remainingComplexity,
           (),
           FailedTransactionError.feeForActions(
-            s"Too many script runs: max: $runsLimit, actual: $additionalScriptsInvoked",
+            s"Too many additional scripts complexity: remaining limit: $remainingComplexity, actual: $additionalComplexity",
             invocationComplexity
           )
         )
@@ -257,7 +258,7 @@ object InvokeDiffsCommon {
 
       resultDiff = compositeDiff.copy(
         transactions = updatedTxDiff,
-        scriptsRun = if (isSyncCall) 0 else additionalScriptsInvoked + 1,
+        scriptsRun = if (isSyncCall) 0 else additionalScripts.size + 1,
         scriptResults = Map(tx.root.id() -> isr),
         scriptsComplexity = invocationComplexity + compositeDiff.scriptsComplexity
       )

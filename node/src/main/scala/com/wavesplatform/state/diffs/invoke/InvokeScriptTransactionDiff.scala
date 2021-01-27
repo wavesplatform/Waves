@@ -81,7 +81,10 @@ object InvokeScriptTransactionDiff {
             issueList = Nil,
             additionalScriptsInvoked = 0
           )
-          runsLimit = BigDecimal((feeInWaves - FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit) / ScriptExtraFee).toIntExact
+
+          maxComplexity       = ContractLimits.MaxTotalDAppComplexity(version)
+          paidComplexity      = (feeInWaves - FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit) / ScriptExtraFee * stepLimit
+          remainingComplexity = Math.min(maxComplexity, paidComplexity)
 
           directives <- TracedResult.wrapE(DirectiveSet(version, Account, DAppType).leftMap(GenericError.apply))
           payments   <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DAppTarget).leftMap(GenericError.apply))
@@ -114,8 +117,7 @@ object InvokeScriptTransactionDiff {
                   dAppAddress,
                   pk,
                   dAppAddress,
-                  runsLimit,
-                  (if(invocationComplexity <= stepLimit) { 13 } else { 0 })
+                  remainingComplexity
                 )
 
                 //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
@@ -157,13 +159,15 @@ object InvokeScriptTransactionDiff {
               })
               TracedResult(
                 scriptResultE,
-                List(InvokeScriptTrace(
-                  tx.id.value(),
-                  tx.dAppAddressOrAlias,
-                  functionCall,
-                  scriptResultE.map(_._2._1),
-                  scriptResultE.fold(_.log, _._3)
-                ))
+                List(
+                  InvokeScriptTrace(
+                    tx.id.value(),
+                    tx.dAppAddressOrAlias,
+                    functionCall,
+                    scriptResultE.map(_._2._1),
+                    scriptResultE.fold(_.log, _._3)
+                  )
+                )
               )
             }
 
@@ -178,7 +182,7 @@ object InvokeScriptTransactionDiff {
               tx,
               CompositeBlockchain(blockchain, Some(invocationDiff)),
               blockTime,
-              runsLimit - invocationDiff.scriptsRun,
+              remainingComplexity - invocationDiff.scriptsComplexity,
               isSyncCall = false,
               limitedExecution,
               otherIssues
@@ -186,7 +190,7 @@ object InvokeScriptTransactionDiff {
 
             resultDiff <- scriptResult match {
               case ScriptResultV3(dataItems, transfers, _) => doProcessActions(dataItems ::: transfers)
-              case ScriptResultV4(actions, _, _)              => doProcessActions(actions)
+              case ScriptResultV4(actions, _, _)           => doProcessActions(actions)
               case _: IncompleteResult if limitedExecution => doProcessActions(Nil)
             }
           } yield invocationDiff |+| resultDiff

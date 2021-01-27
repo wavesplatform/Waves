@@ -9,6 +9,9 @@ object ContractLimits {
     case V3 | V4 | V5 => 4000
   }
 
+  val MaxTotalDAppComplexity: StdLibVersion => Int =
+    v => MaxComplexityByVersion(v) * (MaxAttachedPaymentAmount + MaxCallableActionsAmount + 1)
+
   // used after activation of BlockV5
   val MaxAccountVerifierComplexityByVersion: StdLibVersion => Int =
     _ => 2000
