@@ -44,4 +44,4 @@ JAVA_OPTS="-Dlogback.stdout.level=${WAVES_LOG_LEVEL}
   -Dlogback.file.directory=/var/log/waves
   -Dconfig.override_with_env_vars=true
   ${JAVA_OPTS}
-  -cp '/usr/share/waves/lib/plugins/*:/usr/share/waves/lib/*'" sudo -u waves waves "$WAVES_CONFIG"
+  -cp '/usr/share/waves/lib/plugins/*:/usr/share/waves/lib/*'" waves "$WAVES_CONFIG"

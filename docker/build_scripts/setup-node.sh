@@ -10,3 +10,4 @@ fi
 
 rm /etc/waves/waves.conf # Remove example config
 cp /tmp/entrypoint.sh /usr/share/waves/bin/entrypoint.sh
+chmod +x /usr/share/waves/bin/entrypoint.sh
