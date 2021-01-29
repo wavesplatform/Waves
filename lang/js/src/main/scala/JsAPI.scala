@@ -132,7 +132,7 @@ object JsAPI {
       compiled    <- parseAndCompileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVersion - 1))
     } yield compiled
     r.fold(
-      e => js.Dynamic.literal(s"libraries: ${libraries.toString} \n size: ${libraries.size} \n error" -> e),
+      e => js.Dynamic.literal("error" -> e),
       identity
     )
   }
@@ -195,7 +195,10 @@ object JsAPI {
       compiled    <- compileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVersion - 1))
     } yield compiled
     r.fold(
-      e => js.Dynamic.literal(s"libraries: ${libraries.toString} \n size: ${libraries.size} \n error" -> e),
+      e => js.Dynamic.literal(
+        "error" -> e,
+        "additionalErrInfo" -> s"libraries: ${libraries.toString} \n size: ${libraries.size}"
+      ),
       identity
     )
   }
