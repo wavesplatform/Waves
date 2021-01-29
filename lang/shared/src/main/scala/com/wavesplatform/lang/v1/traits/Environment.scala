@@ -5,6 +5,7 @@ import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.ValidationError
+import monix.eval.Coeval
 import shapeless._
 
 object Environment {
@@ -46,5 +47,5 @@ trait Environment[F[_]] {
   def transferTransactionFromProto(b: Array[Byte]): F[Option[Tx.Transfer]]
   def addressFromString(address: String): Either[String, Address]
   def dAppAlias: Boolean = false
-  def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)]): F[Either[ValidationError, EVALUATED]]
+  def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)]): Coeval[F[Either[ValidationError, EVALUATED]]]
 }

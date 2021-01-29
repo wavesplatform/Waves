@@ -5,9 +5,11 @@ import cats.{Eval, Monad}
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.compiler.Types.TYPE
+import monix.eval.Coeval
 
 abstract class ContextfulNativeFunction[C[_[_]]](name: String, resultType: TYPE, args: Seq[(String, TYPE)]) {
   def ev[F[_]: Monad](input: (C[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]]
+
   final def apply[F[_]: Monad](input: (C[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] = {
     try {
      ev(input)
@@ -22,6 +24,9 @@ abstract class ContextfulNativeFunction[C[_[_]]](name: String, resultType: TYPE,
          }}""").pure[F]
     }
   }
+
+  def coeval[F[_]: Monad](input: (C[F], List[EVALUATED])): Coeval[F[Either[ExecutionError, EVALUATED]]] =
+    Coeval.now(apply(input))
 }
 
 trait ContextfulUserFunction[C[_[_]]] {

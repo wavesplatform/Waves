@@ -14,6 +14,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.{AttachedPayments, Recipient}
+import monix.eval.Coeval
 
 object ContractEvaluator {
 
@@ -118,9 +119,22 @@ object ContractEvaluator {
       version: StdLibVersion,
       limit: Int
   ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] =
-    buildExprFromInvocation(dApp, i, version)
-      .leftMap((_, Nil))
-      .flatMap(applyV2(ctx, freezingLets, _, version, i.transactionId, limit))
+    applyV2Coeval(ctx, freezingLets, dApp, i, version, limit).value()
+
+  def applyV2Coeval(
+      ctx: EvaluationContext[Environment, Id],
+      freezingLets: Map[String, LazyVal[Id]],
+      dApp: DApp,
+      i: Invocation,
+      version: StdLibVersion,
+      limit: Int
+  ): Coeval[Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])]] =
+    Coeval
+      .now(buildExprFromInvocation(dApp, i, version).leftMap((_, Nil)))
+      .flatMap {
+        case l: Left[_, _] => Coeval.now(l.asInstanceOf[Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])]])
+        case Right(value)  => applyV2Coeval(ctx, freezingLets, value, version, i.transactionId, limit)
+      }
 
   def applyV2(
       ctx: EvaluationContext[Environment, Id],
@@ -129,15 +143,25 @@ object ContractEvaluator {
       version: StdLibVersion,
       transactionId: ByteStr,
       limit: Int
-  ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] = {
+  ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] =
+    applyV2Coeval(ctx, freezingLets, expr, version, transactionId, limit).value()
+
+  def applyV2Coeval(
+      ctx: EvaluationContext[Environment, Id],
+      freezingLets: Map[String, LazyVal[Id]],
+      expr: EXPR,
+      version: StdLibVersion,
+      transactionId: ByteStr,
+      limit: Int
+  ): Coeval[Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])]] = {
     val exprWithLets =
       freezingLets.foldLeft(expr) {
         case (buildingExpr, (letName, letValue)) =>
           BLOCK(LET(letName, letValue.value.value.explicitGet()), buildingExpr)
       }
     EvaluatorV2
-      .applyLimited(exprWithLets, limit, ctx, version)
-      .flatMap {
+      .applyLimitedCoeval(exprWithLets, limit, ctx, version)
+      .map(_.flatMap {
         case (expr, unusedComplexity, log) =>
           val result =
             expr match {
@@ -145,6 +169,6 @@ object ContractEvaluator {
               case expr: EXPR       => Right(IncompleteResult(expr, unusedComplexity))
             }
           result.bimap((_, log), (_, log))
-      }
+      })
   }
 }

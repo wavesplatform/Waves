@@ -120,7 +120,11 @@ object TxValidationError {
   case class ScriptExecutionError(error: String, log: Log[Id], assetId: Option[ByteStr]) extends ValidationError with WithLog {
     def isAssetScript: Boolean    = assetId.isDefined
     private val target: String    = assetId.fold("Account")(_ => "Asset")
-    override def toString: String = s"ScriptExecutionError(error = $error, type = $target, log =${logToString(log)})"
+    override def toString: String =
+      if (error.startsWith("ScriptExecutionError"))
+        error
+      else
+        s"ScriptExecutionError(error = $error, type = $target, log =${logToString(log)})"
   }
 
   object ScriptExecutionError {

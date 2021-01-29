@@ -15,9 +15,10 @@ import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
 import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.invoke.InvokeScriptDiff._
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff}
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset._
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
@@ -195,7 +196,7 @@ class WavesEnvironment(
       func: String,
       args: List[EVALUATED],
       payments: Seq[(Option[Array[Byte]], Long)]
-  ): Either[ValidationError, EVALUATED] = ???
+  ): Coeval[Either[ValidationError, EVALUATED]] = ???
 }
 
 class DAppEnvironment(
@@ -214,49 +215,107 @@ class DAppEnvironment(
 
   var currentDiff: Diff = Diff.empty
 
-  override def currentBlockchain() = CompositeBlockchain(blockchain, Some(currentDiff))
+  var mutableBlockchain = blockchain
+
+  override def currentBlockchain() = mutableBlockchain
 
   override def callScript(
       dApp: Address,
       func: String,
       args: List[EVALUATED],
       payments: Seq[(Option[Array[Byte]], Long)]
-  ): Either[ValidationError, EVALUATED] = {
-    com.wavesplatform.account.Address.fromBytes(dApp.bytes.arr).flatMap { dApp =>
-      val inv: InvokeScript = InvokeScript(
-        currentDApp,
-        currentDAppPk,
-        dApp,
-        FUNCTION_CALL(User(func, func), args),
-        payments.map(p => Payment(p._2, p._1.fold(Waves: Asset)(a => IssuedAsset(ByteStr(a))))),
-        tx.root
+  ): Coeval[Either[ValidationError, EVALUATED]] = {
+    val r = for {
+      invoke <- traced(
+        account.Address
+          .fromBytes(dApp.bytes.arr)
+          .map(
+            InvokeScript(
+              currentDApp,
+              currentDAppPk,
+              _,
+              FUNCTION_CALL(User(func, func), args),
+              payments.map(p => Payment(p._2, p._1.fold(Waves: Asset)(a => IssuedAsset(ByteStr(a))))),
+              tx.root
+            )
+          )
       )
-      InvokeScriptDiff(
-        currentBlockchain(),
+      (diff, evaluated) <- InvokeScriptDiff(
+        mutableBlockchain,
         blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
         false,
         remainingComplexity
-      )(inv).resultE.map {
-        case (diff, res) =>
-          val fixedDiff = diff.copy(
-            scriptResults = Map(
-              tx.root.id() ->
-                InvokeScriptResult(
-                  invokes = Seq(
-                    InvokeScriptResult.Invocation(
-                      dApp,
-                      InvokeScriptResult.Call(func, args),
-                      payments.map(p => InvokeScriptResult.AttachedPayment(p._1.fold(Asset.Waves: Asset)(a => IssuedAsset(ByteStr(a))), p._2)),
-                      diff.scriptResults(tx.root.id())
+      )(invoke)
+    } yield {
+      val fixedDiff = diff.copy(
+        scriptResults = Map(
+          tx.root.id() ->
+            InvokeScriptResult(
+              invokes = Seq(
+                InvokeScriptResult.Invocation(
+                  invoke.dAppAddress,
+                  InvokeScriptResult.Call(func, args),
+                  payments.map(p => InvokeScriptResult.AttachedPayment(p._1.fold(Asset.Waves: Asset)(a => IssuedAsset(ByteStr(a))), p._2)),
+                  diff.scriptResults(tx.root.id())
+                )
+              )
+            )
+        )
+      )
+      currentDiff = currentDiff combine fixedDiff
+      mutableBlockchain = CompositeBlockchain(blockchain, Some(currentDiff))
+      remainingComplexity = remainingComplexity - diff.scriptsComplexity
+      evaluated
+    }
+    r.v.map(_.resultE)
+  }
+  /*  {
+    Coeval
+      .now()
+      .map(_.map(
+        InvokeScript(
+          currentDApp,
+          currentDAppPk,
+          _,
+          FUNCTION_CALL(User(func, func), args),
+          payments.map(p => Payment(p._2, p._1.fold(Waves: Asset)(a => IssuedAsset(ByteStr(a))))),
+          tx.root
+        )
+      )
+      )
+      .flatMap { inv =>
+        inv.map(i =>
+            InvokeScriptDiff(
+              currentBlockchain(),
+              blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
+              false,
+              remainingComplexity
+            )(i).map(
+              _.resultE.map {
+                case (diff, res) =>
+                  val fixedDiff = diff.copy(
+                    scriptResults = Map(
+                      tx.root.id() ->
+                        InvokeScriptResult(
+                          invokes = Seq(
+                            InvokeScriptResult.Invocation(
+                              i.dAppAddress,
+                              InvokeScriptResult.Call(func, args),
+                              payments.map(p => InvokeScriptResult.AttachedPayment(p._1.fold(Asset.Waves: Asset)(a => IssuedAsset(ByteStr(a))), p._2)),
+                              diff.scriptResults(tx.root.id())
+                            )
+                          )
+                        )
                     )
                   )
-                )
+                  currentDiff = currentDiff combine fixedDiff
+                  mutableBlockchain = CompositeBlockchain(blockchain, Some(currentDiff))
+                  remainingComplexity = remainingComplexity - diff.scriptsComplexity
+                  res
+              }
             )
           )
-          currentDiff = currentDiff combine fixedDiff
-          remainingComplexity = remainingComplexity - diff.scriptsComplexity
-          res
+
       }
-    }
-  }
+  }*/
 }

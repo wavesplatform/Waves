@@ -2731,7 +2731,7 @@ class InvokeScriptTransactionDiffTest
     }
   }
 
-  ignore("Infinite recurcive crosscontract call") {
+  property("Infinite recurcive crosscontract call") {
     def contract(): DApp = {
       val expr = {
         val script =

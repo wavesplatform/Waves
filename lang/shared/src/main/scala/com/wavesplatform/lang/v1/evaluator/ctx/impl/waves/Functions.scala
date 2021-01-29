@@ -19,6 +19,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, NativeFunction, Us
 import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction}
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
+import monix.eval.Coeval
 
 object Functions {
   private def getDataFromStateF(name: String, internalName: Short, dataType: DataType): BaseFunction[Environment] = {
@@ -482,44 +483,56 @@ object Functions {
       ("args", LIST(ANY)),
       ("payments", listPayment)
     ) {
-      new ContextfulNativeFunction[Environment]("Invoke", ANY, Seq(("dapp", BYTESTR), ("name", STRING), ("args", LIST(ANY)), ("payments", listPayment))) {
-        override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] = {
-          for {
-            dappBytes <- input match {
-              case (env, (dapp: CaseObj) :: _) if dapp.caseType == addressType =>
-                dapp.fields("bytes") match {
-                  case CONST_BYTESTR(d) => d.pure[F]
-                  case _ => ???
-                }
-              case (env, (dapp: CaseObj) :: _) if dapp.caseType == aliasType =>
-                dapp.fields("alias") match {
-                  case CONST_STRING(a) => env.resolveAlias(a).map(_.explicitGet().bytes)
-                }
-              case _ => ???
-            }
-            name = input match {
-              case (_, _ :: CONST_STRING(name) :: _) => name
-              case (_, _ :: CaseObj(UNIT, _) :: _) => "default"
-              case _ => ???
-            }
-            result <- input match {
-              case (env,  _ :: _ :: ARR(args) :: ARR(payments) :: Nil) =>
-                env
-                  .callScript(Recipient.Address(dappBytes), name, args.toList, (payments.map {
-                    case (p: CaseObj) if p.caseType == paymentType => List("assetId", "amount").map(p.fields) match {
-                      case List(CONST_BYTESTR(a), CONST_LONG(v)) => (Some(a.arr), v)
-                      case List(CaseObj(UNIT, _), CONST_LONG(v)) => (None, v)
-                    }
+      new ContextfulNativeFunction[Environment](
+        "Invoke",
+        ANY,
+        Seq(("dapp", BYTESTR), ("name", STRING), ("args", LIST(ANY)), ("payments", listPayment))
+      ) {
+        override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
+          coeval(input).value()
+
+        override def coeval[F[_]: Monad](input: (Environment[F], List[EVALUATED])): Coeval[F[Either[ExecutionError, EVALUATED]]] = {
+          val dappBytes = input match {
+            case (env, (dapp: CaseObj) :: _) if dapp.caseType == addressType =>
+              dapp.fields("bytes") match {
+                case CONST_BYTESTR(d) => d.pure[F]
+                case _                => ???
+              }
+            case (env, (dapp: CaseObj) :: _) if dapp.caseType == aliasType =>
+              dapp.fields("alias") match {
+                case CONST_STRING(a) => env.resolveAlias(a).map(_.explicitGet().bytes)
+              }
+            case _ => ???
+          }
+          val name = input match {
+            case (_, _ :: CONST_STRING(name) :: _) => name
+            case (_, _ :: CaseObj(UNIT, _) :: _)   => "default"
+            case _                                 => ???
+          }
+          input match {
+            case (env, _ :: _ :: ARR(args) :: ARR(payments) :: Nil) =>
+              env
+                .callScript(
+                  Recipient.Address(dappBytes.asInstanceOf[ByteStr]),
+                  name,
+                  args.toList,
+                  payments.map {
+                    case (p: CaseObj) if p.caseType == paymentType =>
+                      List("assetId", "amount").map(p.fields) match {
+                        case List(CONST_BYTESTR(a), CONST_LONG(v)) => (Some(a.arr), v)
+                        case List(CaseObj(UNIT, _), CONST_LONG(v)) => (None, v)
+                      }
                     case _ => ???
-                  }))
-                  .map(_.leftMap(_.toString))
-              case (_, xs) => notImplemented[F, EVALUATED](s"Invoke(dapp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
-            }
-          } yield result
+                  }
+                )
+                .map(_.map(_.leftMap(_.toString)))
+            case (_, xs) =>
+              val err = notImplemented[F, EVALUATED](s"Invoke(dapp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
+              Coeval(err)
+          }
         }
       }
     }
-
 
   private def withExtract[C[_[_]]](f: BaseFunction[C], version: StdLibVersion): BaseFunction[C] = {
     val args = f.signature.args.zip(f.args).map {
