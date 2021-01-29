@@ -26,7 +26,7 @@ object ScriptPreprocessor {
       .map(f => (f, (f, libraries.get(f))))
       .toMap
       .unorderedTraverse { case (name, expr) => expr.toValidNec(name) }
-      .leftMap(f => s"Unresolved imports: ${f.map(s => s"`$s`").toList.mkString(", ")}")
+      .leftMap(f => s"Unresolved imports: ${f.map(s => s"`$s`").toList.mkString(", ")} \n filenames: ${imports.fileNames.mkString(",")} \n libraries: ${libraries.toString()}")
       .toEither
   }
 
