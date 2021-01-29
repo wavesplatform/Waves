@@ -22,7 +22,7 @@ import scala.scalajs.js
 import scala.scalajs.js.Dynamic.{literal => jObj}
 import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.annotation.JSExportTopLevel
-import scala.scalajs.js.{Any, Dictionary, Promise, UndefOr}
+import scala.scalajs.js.{Any, Dictionary, Promise, UndefOr, Array}
 
 object JsAPI {
 
@@ -186,18 +186,23 @@ object JsAPI {
   def compile(
       input: String,
       estimatorVersion: Int,
-      libraries: Dictionary[String]
+      libraries: Array[String]
   ): js.Dynamic = {
+    val libs = libraries.toList.map{
+      el =>
+        val keyVal =  el.split("~")
+        (keyVal(0) -> keyVal(1))
+    }.toMap
     val r = for {
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives)
-      linkedInput <- ScriptPreprocessor(input, libraries.toMap, ds.imports)
+      linkedInput <- ScriptPreprocessor(input, libs, ds.imports)
       compiled    <- compileScript(ds, linkedInput, ScriptEstimator.all.toIndexedSeq(estimatorVersion - 1))
     } yield compiled
     r.fold(
       e => js.Dynamic.literal(
         "error" -> e,
-        "additionalErrInfo" -> s"libraries: ${libraries.values.toList.mkString(",")} \n size: ${libraries.size}"
+        "additionalErrInfo" -> s"libraries: ${libs.values.toList.mkString(",")} \n size: ${libraries.size} \n estVersion: $estimatorVersion"
       ),
       identity
     )
