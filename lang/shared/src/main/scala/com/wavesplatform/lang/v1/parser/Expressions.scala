@@ -139,13 +139,13 @@ object Expressions {
   }
   case class FUNCTION_CALL(position: Pos, name: PART[String], args: List[EXPR], resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR
 
-  trait Pattern {
+  sealed trait Pattern {
     def isRest: Boolean = false
     def subpatterns: Seq[(SimplePattern, Seq[PART[String]])]
     def position: Pos
   }
 
-  trait SimplePattern extends Pattern {
+  sealed trait SimplePattern extends Pattern {
     def subpatterns: Seq[(SimplePattern, Seq[PART[String]])] = Seq((this, Seq()))
   }
 
