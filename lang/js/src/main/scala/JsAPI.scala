@@ -186,7 +186,7 @@ object JsAPI {
   def compile(
       input: String,
       estimatorVersion: Int,
-      libraries: Dictionary[String] = Dictionary.empty
+      libraries: Dictionary[String]
   ): js.Dynamic = {
     val r = for {
       directives  <- DirectiveParser(input)
@@ -197,7 +197,7 @@ object JsAPI {
     r.fold(
       e => js.Dynamic.literal(
         "error" -> e,
-        "additionalErrInfo" -> s"libraries: ${libraries.toString} \n size: ${libraries.size}"
+        "additionalErrInfo" -> s"libraries: ${libraries.values.toList.mkString(",")} \n size: ${libraries.size}"
       ),
       identity
     )
