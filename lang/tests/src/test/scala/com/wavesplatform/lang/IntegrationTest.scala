@@ -2228,4 +2228,33 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """.stripMargin
     eval[EVALUATED](sampleScript, version=V4) shouldBe evaluated("qqq")
   }
+/*
+  property("caseType destruct") {
+    val sampleScript =
+      """|
+         |match p {
+         |  case _: PointA => 0
+         |  case PointC(YB=n:Int) => n
+         |  case _  => 1
+         |}
+         |
+      """.stripMargin
+    eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
+    eval[EVALUATED](sampleScript, Some(pointCInstance)) shouldBe evaluated(42)
+  }
+*/
+  property("caseType constant field") {
+    val sampleScript =
+      """|
+         |match p {
+         |  case _: PointA => 0
+         |  case PointC(YB=24) => 2
+         |  case PointC(YB=42) => 6
+         |  case _  => 1
+         |}
+         |
+      """.stripMargin
+    eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
+    eval[EVALUATED](sampleScript, Some(pointCInstance)) shouldBe evaluated(6)
+  }
 }

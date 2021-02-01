@@ -265,7 +265,7 @@ object Parser {
       }
 
     def restMatchCaseInvalidP(implicit c: fastparse.P[Any]): P[String] = P((!P("=>") ~~ AnyChar.!).repX.map(_.mkString))
-    def varDefP(implicit c: fastparse.P[Any]): P[Option[PART[String]]] = (anyVarName ~~ !"'").map(Some(_)) | P("_").!.map(_ => None)
+    def varDefP(implicit c: fastparse.P[Any]): P[Option[PART[String]]] = (anyVarName ~~ !("'"|"(")).map(Some(_)) | P("_").!.map(_ => None)
 
     def typesDefP(implicit c: fastparse.P[Any]) = (
       ":" ~ comment ~
@@ -277,12 +277,14 @@ object Parser {
     def pattern(implicit c: fastparse.P[Any]): P[Pattern] =
                  (varDefP ~ comment ~ typesDefP).map { case (v, t) => TypedVar(v, t) } |
                  (Index ~ "(" ~ pattern.rep(min=2, sep=",") ~ ")" ~ Index).map(p => TuplePat(p._2, Pos(p._1, p._3))) |
+                 (Index ~ anyVarName ~ "(" ~ (anyVarName ~ "=" ~ pattern).rep(sep=",") ~ ")" ~ Index).map(p => ObjPat(p._3.map(kp => (PART.toOption(kp._1).get, kp._2)).toMap, Single(p._2, None), Pos(p._1, p._4))) |
                  (Index ~ baseExpr.rep(min=1, sep="|") ~ Index).map(p => ConstsPat(p._2, Pos(p._1, p._3)))
 
     def checkPattern(p: Pattern): Either[INVALID, Option[Pos]] = p match {
       case TypedVar(_, t) => checkForGenericAndGetLastPos(t)
       case ConstsPat(_, pos) => Right(Some(pos))
       case TuplePat(ps, pos) => ps.toList traverse checkPattern map { _ => Some(pos) }
+      case ObjPat(ps, _, pos) => ps.values.toList traverse checkPattern map { _ => Some(pos) }
     }
 
     P(

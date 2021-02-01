@@ -149,18 +149,33 @@ object Expressions {
     def subpatterns: Seq[(SimplePattern, Seq[PART[String]])] = Seq((this, Seq()))
   }
 
+  sealed trait CompositePattern extends Pattern {
+    def caseType: Option[Single]
+  }
+
   case class TypedVar(newVarName: Option[PART[String]], caseType: Type) extends SimplePattern {
     override def isRest: Boolean = caseType.isEmpty || caseType.isInstanceOf[AnyType]
     def position: Pos = newVarName.fold(Pos.AnyPos: Pos)(_.position)
   }
 
   case class ConstsPat(constatns: Seq[EXPR], position: Pos) extends SimplePattern
-  case class TuplePat(patterns: Seq[Pattern], position: Pos) extends Pattern {
+
+  case class TuplePat(patterns: Seq[Pattern], position: Pos) extends CompositePattern {
     val subpatterns: Seq[(SimplePattern, Seq[PART[String]])] = patterns.zipWithIndex.flatMap {
       case (p, i) => p.subpatterns.map {
         case (sp, path) => (sp, Expressions.PART.VALID(p.position, s"_${i+1}") +: path)
       }
     }
+    val caseType: Option[Single] = None
+  }
+
+  case class ObjPat(patterns: Map[String, Pattern], objType: Single, position: Pos) extends CompositePattern {
+    val subpatterns: Seq[(SimplePattern, Seq[PART[String]])] = patterns.toSeq.flatMap {
+      case (i, p) => p.subpatterns.map {
+        case (sp, path) => (sp, Expressions.PART.VALID(p.position, i) +: path)
+      }
+    }
+    val caseType: Option[Single] = Some(objType)
   }
 
   case class MATCH_CASE(

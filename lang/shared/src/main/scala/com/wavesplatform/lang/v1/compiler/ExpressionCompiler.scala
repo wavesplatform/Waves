@@ -13,7 +13,7 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE, PART, Pos, TypedVar, ConstsPat, TuplePat}
+import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE, PART, Pos, TypedVar, ConstsPat, CompositePattern, ObjPat}
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
@@ -255,6 +255,7 @@ object ExpressionCompiler {
       }
       matchTypes <- cases.traverse {
         case MATCH_CASE(_, TypedVar(_, t), _, _, _) => handleCompositeType(p, t, Some(exprTypes), allowShadowVarName)
+        case MATCH_CASE(_, ObjPat(_, t, _), _, _, _) => handleCompositeType(p, t, Some(exprTypes), allowShadowVarName)
         case _ => (NOTHING: FINAL).pure[CompileM]
       }
       defaultType = exprTypes match {
@@ -688,7 +689,7 @@ object ExpressionCompiler {
             case _ => caseType
           }
           Expressions.BLOCK(mc.position, Expressions.LET(mc.position, nv, refTmp, Some(t), allowShadowing), mc.expr)
-        case (p@TuplePat(ps, _)) =>
+        case (p: CompositePattern) =>
           p.subpatterns.foldRight(mc.expr) { (pa, exp) =>
             pa match {
               case (TypedVar(Some(nv), t), path) =>
@@ -712,9 +713,9 @@ object ExpressionCompiler {
           )
 
       (mc.pattern, caseType.unfold) match {
-        case (TypedVar(_, _), ANY) => Right(blockWithNewVar)
-        case (TypedVar(_, _), UNION(Nil, _)) => Right(blockWithNewVar)
-        case (TypedVar(_, _), UNION(types, _)) =>
+        case (_:TypedVar, ANY) => Right(blockWithNewVar)
+        case (_:TypedVar, UNION(Nil, _)) => Right(blockWithNewVar)
+        case (x:TypedVar, UNION(types, _)) =>
           for {
             cases <- types.map(_.name) match {
               case hType :: tTypes =>
@@ -724,18 +725,20 @@ object ExpressionCompiler {
               case Nil => ???
             }
           } yield cases
-        case (TypedVar(_, _), t) =>
+        case (_:TypedVar, t) =>
           Right(Expressions.IF(mc.position, isInst(t.name), blockWithNewVar, further))
 
         case (ConstsPat(consts, _), _) =>
           val cond = consts.map(c => BINARY_OP(mc.position, c, BinaryOperation.EQ_OP, refTmp)).reduceRight((c, r) => BINARY_OP(mc.position, c, BinaryOperation.OR_OP, r))
           Right(Expressions.IF(mc.position, cond, blockWithNewVar, further))
 
-        case (p:TuplePat, _) =>
-          val cond = p.subpatterns collect {
+        case (p:CompositePattern, _) =>
+          val pos = p.position
+          val newRef = p.caseType.fold(refTmp)(t => refTmp.copy(resultType = Some(caseType)))
+          val conds = p.subpatterns collect {
             case (pat @ TypedVar(_, Expressions.Union(types)), path) if types.nonEmpty =>
               val pos = pat.position
-              val v = mkGet(path, refTmp, pos) 
+              val v = mkGet(path, newRef, pos) 
               types map {
                 case Expressions.Single(t, None) =>
                    Expressions.FUNCTION_CALL(pos, PART.VALID(pos, "_isInstanceOf"), List(v, Expressions.CONST_STRING(pos, t))): Expressions.EXPR
@@ -747,24 +750,32 @@ object ExpressionCompiler {
               }
             case (pat @ TypedVar(_, Expressions.Single(PART.VALID(pos, "List"), Some(PART.VALID(_, Expressions.AnyType(_))))), path) =>
               val pos = pat.position
-              val v = mkGet(path, refTmp, pos)
+              val v = mkGet(path, newRef, pos)
               Expressions.FUNCTION_CALL(pos, PART.VALID(pos, "_isInstanceOf"), List(v, Expressions.CONST_STRING(pos, PART.VALID(pos, "List[Any]")))): Expressions.EXPR
             case (pat @ TypedVar(_, Expressions.Single(t, None)), path) =>
               val pos = pat.position
-              val v = mkGet(path, refTmp, pos)
+              val v = mkGet(path, newRef, pos)
               Expressions.FUNCTION_CALL(pos, PART.VALID(pos, "_isInstanceOf"), List(v, Expressions.CONST_STRING(pos, t))): Expressions.EXPR
             case (pat @ TypedVar(_, Expressions.Single(_, _)), _) => ???
             case (pat @ ConstsPat(consts, pos), path) =>
-              val v = mkGet(path, refTmp, pos) 
+              val pos = pat.position
+              val v = mkGet(path, newRef, pos) 
               consts map { c =>
                 BINARY_OP(pos, c, BinaryOperation.EQ_OP, v)
               } reduceRight { (c,r) =>
                 BINARY_OP(pos, c, BinaryOperation.OR_OP, r)
               }
-          } reduceRight { (c, r) =>
-            BINARY_OP(mc.position, c, BinaryOperation.AND_OP, r): Expressions.EXPR
           }
-          Right(Expressions.IF(mc.position, cond, blockWithNewVar, further))
+          val cond = if(conds.isEmpty) {
+              Expressions.TRUE(pos): Expressions.EXPR
+            } else {
+              conds.reduceRight { (c, r) => BINARY_OP(pos, c, BinaryOperation.AND_OP, r): Expressions.EXPR }
+            }
+          Right(Expressions.IF(mc.position, p.caseType.fold(cond)(t =>
+              BINARY_OP(pos,
+                Expressions.FUNCTION_CALL(pos, PART.VALID(pos, "_isInstanceOf"), List(refTmp, Expressions.CONST_STRING(pos, t.name))),
+                BinaryOperation.AND_OP,
+                Expressions.BLOCK(pos, Expressions.LET(pos, newRef.key, newRef, Some(caseType), true), cond))), blockWithNewVar, further))
       }
     }
 
