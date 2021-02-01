@@ -31,7 +31,7 @@ class ReissueTransactionDiffTest
     for {
       (issuer, b1) <- genesis
       issue        <- issueTx(issuer)
-      reissue      <- reissueTx(issuer, IssuedAsset(issue.assetId), BeforeActivationFee)
+      reissue      <- reissueTx(issuer, issue.asset, BeforeActivationFee)
       b2 = TestBlock.create(
         ntpNow,
         b1.id(),

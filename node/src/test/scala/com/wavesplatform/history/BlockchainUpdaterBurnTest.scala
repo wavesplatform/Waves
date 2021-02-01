@@ -32,9 +32,9 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
       .explicitGet()
     issue: IssueTransaction = IssueTransaction(TxVersion.V1, alice.publicKey, assetName, description, quantity, decimals, false, script = None, Waves, ts + 100)
       .signWith(alice.privateKey)
-    burn: BurnTransaction = BurnTransaction.selfSigned(1.toByte, alice, IssuedAsset(issue.assetId), quantity / 2, Waves, ts + 200).explicitGet()
+    burn: BurnTransaction = BurnTransaction.selfSigned(1.toByte, alice, issue.asset, quantity / 2, Waves, ts + 200).explicitGet()
     reissue: ReissueTransaction = ReissueTransaction
-      .selfSigned(1.toByte, alice, IssuedAsset(issue.assetId), burn.quantity, true, Waves, ts + 300)
+      .selfSigned(1.toByte, alice, issue.asset, burn.quantity, true, Waves, ts + 300)
       .explicitGet()
   } yield (ts, genesis, masterToAlice, issue, burn, reissue)
 
@@ -61,12 +61,12 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
         domain.appendBlock(block1)
 
         domain.appendBlock(block2)
-        val assetDescription1 = domain.blockchainUpdater.assetDescription(IssuedAsset(issue.assetId)).get
+        val assetDescription1 = domain.blockchainUpdater.assetDescription(issue.asset).get
         assetDescription1.reissuable should be(false)
         assetDescription1.totalVolume should be(issue.quantity)
 
         domain.appendBlock(block3)
-        val assetDescription2 = domain.blockchainUpdater.assetDescription(IssuedAsset(issue.assetId)).get
+        val assetDescription2 = domain.blockchainUpdater.assetDescription(issue.asset).get
         assetDescription2.reissuable should be(false)
         assetDescription2.totalVolume should be(issue.quantity - burn.quantity)
 
@@ -86,7 +86,7 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
         domain.appendBlock(block1)
 
         domain.appendBlock(block2)
-        val assetDescription1 = domain.blockchainUpdater.assetDescription(IssuedAsset(issue.assetId)).get
+        val assetDescription1 = domain.blockchainUpdater.assetDescription(issue.asset).get
         assetDescription1.reissuable should be(false)
         assetDescription1.totalVolume should be(issue.quantity)
 

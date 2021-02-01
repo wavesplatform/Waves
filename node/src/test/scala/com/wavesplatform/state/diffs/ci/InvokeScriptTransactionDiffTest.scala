@@ -1929,7 +1929,7 @@ class InvokeScriptTransactionDiffTest
           acc             <- accountGen
           amt             <- Gen.choose(1L, issueTx.quantity)
           arg             <- genBoundedStringBytes(1, 32)
-          paymentContract <- paymentContractGen(acc.toAddress, amt, List(IssuedAsset(issueTx.assetId)), V4)(funcBinding)
+          paymentContract <- paymentContractGen(acc.toAddress, amt, List(issueTx.asset), V4)(funcBinding)
         } yield (fee, Waves, paymentContract, List(CONST_BYTESTR(ByteStr(arg)).explicitGet()))
       )
     }

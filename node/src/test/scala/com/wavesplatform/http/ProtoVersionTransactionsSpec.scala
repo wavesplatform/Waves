@@ -110,7 +110,7 @@ class ProtoVersionTransactionsSpec
       }
 
       val reissueTxUnsigned = ReissueTransaction
-        .create(TxVersion.V3, account.publicKey, IssuedAsset(issueTx.assetId), quantity, reissuable, MinIssueFee, Now, Proofs.empty)
+        .create(TxVersion.V3, account.publicKey, issueTx.asset, quantity, reissuable, MinIssueFee, Now, Proofs.empty)
         .explicitGet()
 
       val (reissueProofs, reissueTxJson) = Post(routePath("/sign"), reissueTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
@@ -125,7 +125,7 @@ class ProtoVersionTransactionsSpec
       }
 
       val burnTxUnsigned =
-        BurnTransaction.create(TxVersion.V3, account.publicKey, IssuedAsset(issueTx.assetId), quantity, MinIssueFee, Now, Proofs.empty).explicitGet()
+        BurnTransaction.create(TxVersion.V3, account.publicKey, issueTx.asset, quantity, MinIssueFee, Now, Proofs.empty).explicitGet()
 
       val (burnProofs, burnTxJson) = Post(routePath("/sign"), burnTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
         checkProofs(response, burnTxUnsigned)

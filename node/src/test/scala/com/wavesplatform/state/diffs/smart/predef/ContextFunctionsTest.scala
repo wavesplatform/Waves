@@ -322,7 +322,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
               .signed(
                 TxVersion.V1,
                 masterAcc.publicKey,
-                IssuedAsset(issueTx.assetId),
+                issueTx.asset,
                 Some(sponsoredFee),
                 MinIssueFee,
                 dataTransaction.timestamp + 6,
