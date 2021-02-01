@@ -14,8 +14,7 @@ import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext, unit}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LazyVal}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
@@ -167,7 +166,7 @@ object InvokeScriptDiff {
 
                 for {
                   (failFreeResult, evaluationCtx, failFreeLog) <- CoevalR(
-                    evaluateV2(version, contract, directives, invocation, environment, failFreeLimit).map(TracedResult(_))
+                    evaluateV2(version, contract, invocation, environment, failFreeLimit).map(TracedResult(_))
                   )
                   (result, log) <- failFreeResult match {
                     case IncompleteResult(expr, unusedComplexity) if !limitedExecution =>
@@ -223,22 +222,13 @@ object InvokeScriptDiff {
   private def evaluateV2(
       version: StdLibVersion,
       contract: DApp,
-      directives: DirectiveSet,
       invocation: ContractEvaluator.Invocation,
       environment: Environment[Id],
       limit: Int
   ): Coeval[Either[ScriptExecutionError, (ScriptResult, EvaluationContext[Environment, Id], Log[Id])]] = {
-    val wavesContext = WavesContext.build(directives)
-    val ctx =
-      PureContext.build(version).withEnvironment[Environment] |+|
-        CryptoContext.build(Global, version).withEnvironment[Environment] |+|
-        wavesContext.copy(vars = Map())
-
-    val freezingLets  = wavesContext.evaluationContext(environment).letDefs
-    val evaluationCtx = ctx.evaluationContext(environment)
-
+    val evaluationCtx = CachedDAppCTX.forVersion(version).completeContext(environment)
     ContractEvaluator
-      .applyV2Coeval(evaluationCtx, freezingLets, contract, invocation, version, limit)
+      .applyV2Coeval(evaluationCtx, Map(), contract, invocation, version, limit)
       .map(
         _.bimap(
           { case (error, log) => ScriptExecutionError.dAppExecution(error, log) }, { case (result, log) => (result, evaluationCtx, log) }
