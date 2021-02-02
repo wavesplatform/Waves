@@ -2,7 +2,6 @@ package com.wavesplatform.state.diffs.invoke
 
 import cats.Id
 import cats.implicits._
-import com.google.common.base.Throwables
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
@@ -107,7 +106,7 @@ object InvokeScriptDiff {
                   tx.root.timestamp,
                   tx.root.id()
                 )
-                val r: CoevalET[Unit] = ScriptRunner(
+                val r = ScriptRunner(
                   Coproduct[TxOrd](pseudoTx),
                   blockchain,
                   script.script,
@@ -117,26 +116,17 @@ object InvokeScriptDiff {
                 ) match {
                   case (log, Left(error)) =>
                     val err = FailedTransactionError.assetExecutionInAction(error, 0, log, assetId)
-                    traced(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
+                    TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
                   case (log, Right(FALSE)) =>
                     val err = FailedTransactionError.notAllowedByAssetInAction(0, log, assetId)
-                    traced(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
+                    TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
                   case (_, Right(TRUE)) =>
-                    traced(Right(()))
+                    TracedResult(Right(()))
                   case (log, Right(x)) =>
                     val err = FailedTransactionError.assetExecutionInAction(s"Script returned not a boolean result, but $x", 0, log, assetId)
-                    traced(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
+                    TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
                 }
-                CoevalET(
-                  r.v.redeem(
-                    e =>
-                      Left(
-                        FailedTransactionError
-                          .assetExecutionInAction(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", 0L, List.empty, assetId)
-                      ),
-                    r => Right(())
-                  )
-                )
+                CoevalET(Coeval.now(r))
             }
           }
           tthis = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(dAppAddress.bytes)))
