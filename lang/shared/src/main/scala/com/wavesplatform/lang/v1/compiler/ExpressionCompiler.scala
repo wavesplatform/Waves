@@ -690,10 +690,11 @@ object ExpressionCompiler {
           }
           Expressions.BLOCK(mc.position, Expressions.LET(mc.position, nv, refTmp, Some(t), allowShadowing), mc.expr)
         case (p: CompositePattern) =>
-          p.subpatterns.foldRight(mc.expr) { (pa, exp) =>
+          val newRef = p.caseType.fold(refTmp)(t => refTmp.copy(resultType = Some(caseType)))
+          val expr = p.subpatterns.foldRight(mc.expr) { (pa, exp) =>
             pa match {
               case (TypedVar(Some(nv), t), path) =>
-                val accs = mkGet(path, refTmp, nv.position)
+                val accs = mkGet(path, newRef, nv.position)
                 val allowShadowing = nv match {
                   case PART.VALID(_, x) => allowShadowVarName.contains(x)
                   case _                => false
@@ -702,6 +703,7 @@ object ExpressionCompiler {
               case _ => exp
             }
           }
+          p.caseType.fold(expr)(_ => Expressions.BLOCK(p.position, Expressions.LET(p.position, newRef.key, newRef, Some(caseType), true), expr))
       }
 
       def isInst(matchType: String): Expressions.EXPR =

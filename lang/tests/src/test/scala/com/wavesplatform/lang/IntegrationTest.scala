@@ -2228,7 +2228,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """.stripMargin
     eval[EVALUATED](sampleScript, version=V4) shouldBe evaluated("qqq")
   }
-/*
+
   property("caseType destruct") {
     val sampleScript =
       """|
@@ -2242,7 +2242,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
     eval[EVALUATED](sampleScript, Some(pointCInstance)) shouldBe evaluated(42)
   }
-*/
+
   property("caseType constant field") {
     val sampleScript =
       """|
