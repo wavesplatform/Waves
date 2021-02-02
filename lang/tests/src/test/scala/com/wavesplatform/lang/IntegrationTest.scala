@@ -2234,6 +2234,20 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """|
          |match p {
          |  case _: PointA => 0
+         |  case PointC(YB=n) => n
+         |  case _  => 1
+         |}
+         |
+      """.stripMargin
+    eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
+    eval[EVALUATED](sampleScript, Some(pointCInstance)) shouldBe evaluated(42)
+  }
+
+  property("caseType destruct with type checking") {
+    val sampleScript =
+      """|
+         |match p {
+         |  case _: PointA => 0
          |  case PointC(YB=n:Int) => n
          |  case _  => 1
          |}
@@ -2242,6 +2256,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe evaluated(0)
     eval[EVALUATED](sampleScript, Some(pointCInstance)) shouldBe evaluated(42)
   }
+
 
   property("caseType constant field") {
     val sampleScript =
