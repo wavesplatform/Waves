@@ -97,11 +97,6 @@ package object serde {
   }
 
   implicit class BlockchainUpdatedVanilla(val self: BlockchainUpdated) extends AnyVal {
-    private def throwError() = {
-      val base58Id = self.id.toByteStr.toString
-      throw new IllegalArgumentException(s"Invalid protobuf BlockchainUpdated at height ${self.height}, id $base58Id")
-    }
-
     def vanilla: Try[ve.BlockchainUpdated] =
       Try {
         self.update match {
@@ -111,7 +106,7 @@ package object serde {
                 ve.BlockAppended(
                   id = self.id.toByteStr,
                   height = self.height,
-                  block = PBBlocks.vanilla(body.block.get, unsafe = true).get,
+                  block = body.block.map(PBBlocks.vanilla(_, unsafe = true).get).orNull,
                   updatedWavesAmount = body.updatedWavesAmount,
                   blockStateUpdate = append.stateUpdate.fold(Monoid[ve.StateUpdate].empty)(_.vanilla.get),
                   transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get)
@@ -125,7 +120,7 @@ package object serde {
                   transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get),
                   totalTransactionsRoot = body.updatedTransactionsRoot.toByteStr
                 )
-              case Body.Empty => throwError()
+              case Body.Empty => throw new IllegalArgumentException("Empty append body")
             }
           case Update.Rollback(rollback) =>
             rollback.`type` match {
@@ -145,11 +140,11 @@ package object serde {
                   height = self.height,
                   RollbackResult.micro(rollback.removedTransactionIds.map(_.toByteStr), rollback.getRollbackStateUpdate.vanilla.get)
                 )
-              case RollbackType.Unrecognized(_) => throwError()
+              case RollbackType.Unrecognized(v) => throw new IllegalArgumentException(s"Unrecognized rollback type $v")
             }
-          case Update.Empty => throwError()
+          case Update.Empty => throw new IllegalArgumentException("Update body is empty")
         }
-      } recoverWith { case _: Throwable => Try(throwError()) }
+      } recoverWith { case err: Throwable => Failure(new IllegalArgumentException(s"Invalid protobuf BlockchainUpdated at height ${self.height}, id ${self.id.toByteStr}", err)) }
   }
 
   implicit class StateUpdateVanilla(val self: StateUpdate) extends AnyVal {

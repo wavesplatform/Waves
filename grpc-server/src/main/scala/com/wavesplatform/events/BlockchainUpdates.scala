@@ -26,7 +26,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   private[this] implicit val scheduler = Schedulers.fixedPool(sys.runtime.availableProcessors(), "blockchain-updates")
 
   private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("waves.blockchain-updates")
-  private[this] val repo     = new UpdatesRepoImpl(s"${context.settings.directory}/blockchain-updates")
+  private[this] val repo     = new UpdatesRepoImpl(s"${context.settings.directory}/blockchain-updates", context.blocksApi)
 
   private[this] var grpcServer: Server = null
 
@@ -43,7 +43,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     } else if (nodeHeight > 0) {
       (repo.updateForHeight(nodeHeight), context.blockchain.blockHeader(nodeHeight)) match {
         case (Success(extensionBlockAtNodeHeight), Some(lastNodeBlockHeader)) =>
-          val lastNodeBlockId = lastNodeBlockHeader.id.value()
+          val lastNodeBlockId = lastNodeBlockHeader.id()
 
           // check if extension is on fork. Block ids must be equal at node height
           if (extensionBlockAtNodeHeight.id != lastNodeBlockId) {

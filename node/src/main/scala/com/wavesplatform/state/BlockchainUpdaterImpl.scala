@@ -422,11 +422,13 @@ class BlockchainUpdaterImpl(
         ngState = None
         Right(Seq((ng.bestLiquidBlock, ng.hitSource)))
       case maybeNg =>
+        val blockHeight = leveldb.heightOf(blockId).getOrElse(throw new IllegalStateException(s"No such block $blockId"))
+        blockchainUpdateTriggers.onRollback(blockId, blockHeight)
+
         leveldb
           .rollbackTo(blockId)
           .map { bs =>
             ngState = None
-            blockchainUpdateTriggers.onRollback(blockId, leveldb.height)
             bs ++ maybeNg.map(ng => (ng.bestLiquidBlock, ng.hitSource)).toSeq
           }
           .leftMap(err => GenericError(err))

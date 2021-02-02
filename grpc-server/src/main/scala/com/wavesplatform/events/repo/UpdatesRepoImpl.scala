@@ -5,10 +5,10 @@ import java.nio.{ByteBuffer, ByteOrder}
 import cats.kernel.Monoid
 import com.wavesplatform.Shutdownable
 import com.wavesplatform.api.common.CommonBlocksApi
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events._
-import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.serde._
 import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
@@ -70,6 +70,11 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
     }
   }
 
+  private[this] def readBlock(height: Int) = {
+    val (meta, txs) = blocks.blockAtHeight(height).get
+    Block(meta.header, meta.signature, txs.map(_._1))
+  }
+
   override def updateForHeight(height: Int): Try[BlockAppended] =
     Try(liquidState match {
       case Some(ls) if ls.keyBlock.height == height =>
@@ -86,7 +91,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
         } else {
           val pbParseResult = PBBlockchainUpdated.parseFrom(bytes)
           val vanillaUpdate = pbParseResult.vanilla.get.asInstanceOf[BlockAppended]
-          vanillaUpdate
+          vanillaUpdate.copy(block = readBlock(vanillaUpdate.height))
         }
     })
 
@@ -107,7 +112,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
         val solidBlock = ls.solidify()
         db.put(
           key(solidBlock.height),
-          solidBlock.protobuf.update(_.append.body := Body.Empty).toByteArray
+          solidBlock.protobuf.update(_.append.block.optionalBlock := None).toByteArray
         )
       }
       liquidState = Some(LiquidState(blockAppended, Seq.empty))
@@ -162,8 +167,9 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
           val key = iter.next.getKey
           val update = protobuf.BlockchainUpdated.parseFrom(db.get(key)).vanilla.collect {
             case ba: BlockAppended =>
-              val transactions = blocks.blockAtHeight(ba.height).get._2.collect { case (tx, _) => tx.id() }
-              RollbackResult(Seq(ba.id), transactions, ba.reverseStateUpdate)
+              val block        = readBlock(ba.height)
+              val transactions = block.transactionData.map(_.id())
+              RollbackResult(Seq(block), transactions.reverse, ba.reverseStateUpdate)
           }
           changes = update.get +: changes
           batch.delete(key)
@@ -231,7 +237,13 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
             iterator.seek(key(from))
             iterator.asScala
               .take(LevelDBReadBatchSize)
-              .map(e => PBBlockchainUpdated.parseFrom(e.getValue).vanilla.get)
+              .map(
+                e =>
+                  PBBlockchainUpdated.parseFrom(e.getValue).vanilla.get match {
+                    case b: BlockAppended => b.copy(block = readBlock(b.height))
+                    case u                => u
+                  }
+              )
               .toVector
           } finally iterator.close()
         }

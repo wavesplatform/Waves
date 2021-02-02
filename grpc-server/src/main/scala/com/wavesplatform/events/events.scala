@@ -299,9 +299,13 @@ object StateUpdate {
       }
       // merge asset state updates, preserving order
       val assetsMap = mutable.LinkedHashMap.empty[ByteStr, AssetStateUpdate]
-      (x.assets ++ y.assets).foreach { a =>
-        assetsMap(a.assetId) = a
+      (x.assets ++ y.assets).foreach { assetUpdate =>
+        assetsMap(assetUpdate.assetId) = assetsMap.get(assetUpdate.assetId) match {
+          case Some(prevUpdate) => assetUpdate.copy(before = prevUpdate.before)
+          case None             => assetUpdate
+        }
       }
+
       val leasesMap = mutable.LinkedHashMap.empty[ByteStr, LeaseUpdate]
       (x.leases ++ y.leases).foreach { lease =>
         leasesMap(lease.originTransactionId) = lease
@@ -386,7 +390,8 @@ object StateUpdate {
       case Some(_) => parentStateUpdate
       case None =>
         val minerBalance = blockchainBeforeWithMinerReward.balance(minerAddress, Waves)
-        parentStateUpdate.copy(balances = parentStateUpdate.balances :+ ((minerAddress, Waves, minerBalance)))
+        val reward       = blockchainBeforeWithMinerReward.blockReward(blockchainBeforeWithMinerReward.height).getOrElse(0L)
+        parentStateUpdate.copy(balances = parentStateUpdate.balances :+ BalanceUpdate(minerAddress, Waves, minerBalance - reward, minerBalance))
     }
 
     val (txsStateUpdates, _) = txsDiffs.reverse
