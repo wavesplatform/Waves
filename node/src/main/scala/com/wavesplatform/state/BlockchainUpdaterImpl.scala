@@ -418,7 +418,7 @@ class BlockchainUpdaterImpl(
         Right(Seq.empty)
       case Some(ng) if ng.base.id() == blockId =>
         log.trace("Discarding liquid block, no rollback necessary")
-        blockchainUpdateTriggers.onRollback(blockId, leveldb.height)
+        blockchainUpdateTriggers.onMicroBlockRollback(blockId, leveldb.height)
         ngState = None
         Right(Seq((ng.bestLiquidBlock, ng.hitSource)))
       case maybeNg =>

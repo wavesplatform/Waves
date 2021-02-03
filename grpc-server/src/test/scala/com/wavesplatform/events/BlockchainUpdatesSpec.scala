@@ -60,6 +60,20 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
       val reissue  = TxHelpers.reissue(issue.asset)
       val data     = TxHelpers.data()
 
+      val description = AssetDescription(
+        issue.assetId,
+        null,
+        issue.name,
+        issue.description,
+        issue.decimals,
+        issue.reissuable,
+        issue.quantity + reissue.quantity,
+        Height @@ 1,
+        None,
+        0L,
+        nft = false
+      )
+
       withGenerateSubscription() { d =>
         d.appendKeyBlock()
         d.appendMicroBlock(transfer, lease, issue, reissue, data)
@@ -70,7 +84,6 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
         val rollback: RollbackResult = events.last.vanilla.get.asInstanceOf[RollbackCompleted].rollbackResult
         rollback.removedTransactionIds shouldBe Seq(data, reissue, issue, lease, transfer).map(_.id())
         rollback.removedBlocks should have length 1
-        println(rollback.stateUpdate)
 
         rollback.stateUpdate.balances shouldBe Seq(
           BalanceUpdate(TxHelpers.defaultAddress, Waves, 10000001036400000L, after = 10000000600000000L),
@@ -91,18 +104,39 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
           DataEntryUpdate(TxHelpers.defaultAddress, StringDataEntry("test", "test"), EmptyDataEntry("test"))
         )
 
-        val description = AssetDescription(
-          issue.assetId,
-          null,
-          issue.name,
-          issue.description,
-          issue.decimals,
-          issue.reissuable,
-          issue.quantity + reissue.quantity,
-          Height @@ 1,
-          None,
-          0L,
-          nft = false
+        rollback.stateUpdate.assets shouldBe Seq(
+          AssetStateUpdate(Some(description), None)
+        )
+      }
+
+      withGenerateSubscription() { d =>
+        d.appendKeyBlock()
+        d.appendMicroBlock(TxHelpers.transfer())
+        d.appendMicroBlock(transfer, lease, issue, reissue, data)
+        d.rollbackMicros()
+      } { events =>
+        import com.wavesplatform.events.protobuf.serde._
+        val rollback: RollbackResult = events.last.vanilla.get.asInstanceOf[MicroBlockRollbackCompleted].rollbackResult
+        rollback.removedTransactionIds shouldBe Seq(data, reissue, issue, lease, transfer).map(_.id())
+        rollback.removedBlocks shouldBe empty
+
+        rollback.stateUpdate.balances shouldBe Seq(
+          BalanceUpdate(TxHelpers.defaultAddress, Waves, 10000000935800000L, after = 10000001099400000L),
+          BalanceUpdate(TxHelpers.defaultAddress, issue.asset, 2000, after = 0),
+          BalanceUpdate(TxHelpers.secondAddress, Waves, 200000000, after = 100000000)
+        )
+
+        rollback.stateUpdate.leasingForAddress shouldBe Seq(
+          LeasingBalanceUpdate(TxHelpers.secondAddress, LeaseBalance(1000000000, 0), LeaseBalance(0, 0)),
+          LeasingBalanceUpdate(TxHelpers.defaultAddress, LeaseBalance(0, 1000000000), LeaseBalance(0, 0))
+        )
+
+        rollback.stateUpdate.leases shouldBe Seq(
+          LeaseUpdate(lease.id(), LeaseStatus.Inactive, lease.amount, lease.sender, lease.recipient.asInstanceOf[Address], lease.id())
+        )
+
+        rollback.stateUpdate.dataEntries shouldBe Seq(
+          DataEntryUpdate(TxHelpers.defaultAddress, StringDataEntry("test", "test"), EmptyDataEntry("test"))
         )
 
         rollback.stateUpdate.assets shouldBe Seq(
@@ -131,6 +165,7 @@ class BlockchainUpdatesSpec extends FreeSpec with Matchers with WithDomain with 
 
         val subscription = repo.createSubscription(request)
         generateBlocks(d)
+        Thread.sleep(1000)
         subscription.cancel()
 
         val result = subscription.futureValue

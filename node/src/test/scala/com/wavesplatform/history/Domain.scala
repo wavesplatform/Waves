@@ -96,6 +96,16 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     blockchainUpdater.removeAfter(blockId).explicitGet()
   }
 
+  def rollbackMicros(offset: Int = 1): Unit = {
+    val blockId =
+      blockchainUpdater.microblockIds
+        .drop(offset)
+        .headOption
+        .getOrElse(throw new IllegalStateException("Insufficient count of microblocks"))
+
+    blockchainUpdater.removeAfter(blockId).explicitGet()
+  }
+
   def createBlock(version: Byte, txs: Seq[Transaction]): Block = {
     val reference = blockchainUpdater.lastBlockId.getOrElse(randomSig)
     val timestamp = System.currentTimeMillis()

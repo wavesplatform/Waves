@@ -41,6 +41,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
   private[this] val realTimeUpdates = ConcurrentSubject.replayLimited[BlockchainUpdated](100)
 
   private[this] def sendRealTimeUpdate(ba: BlockchainUpdated): Try[Unit] = {
+    println(s"Sending $ba")
     realTimeUpdates.onNext(ba) match {
       case Ack.Continue =>
         Success(())
@@ -208,7 +209,7 @@ class UpdatesRepoImpl(directory: String, blocks: CommonBlocksApi)(implicit val s
               Failure(new IllegalArgumentException("BlockchainUpdates attempted to rollback a non-existing microblock"))
             } else {
               liquidState = Some(ls.copy(microBlocks = keep))
-              val removedTxs  = drop.flatMap(_.microBlock.transactionData).map(_.id())
+              val removedTxs  = drop.flatMap(_.microBlock.transactionData).map(_.id()).reverse
               val stateUpdate = MicroBlockAppended.revertMicroBlocks(drop)
               Success(RollbackResult.micro(removedTxs, stateUpdate))
             }
