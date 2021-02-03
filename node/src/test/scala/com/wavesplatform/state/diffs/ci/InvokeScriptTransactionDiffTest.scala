@@ -1179,7 +1179,9 @@ class InvokeScriptTransactionDiffTest
       funcBinding <- validAliasStringGen
       fee         <- ciFee(1)
       fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet()))
-      ci = InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, Some(fc), Seq(Payment(-1, Waves)), fee, Waves, ts)
+      ci = InvokeScriptTransaction.selfSigned(1.toByte, invoker, master.toAddress, Some(fc), Seq(Payment(-1, Waves)), fee, Waves,
+        ts
+      )
     } yield ci) { _ should produce("NonPositiveAmount") }
   }
 
@@ -1690,6 +1692,17 @@ class InvokeScriptTransactionDiffTest
             )
           )
           .anyNumberOfTimes()
+        (blockchain.blockHeader _)
+          .expects(*)
+          .returning(
+            Some(
+              SignedBlockHeader(
+                BlockHeader(1, 1, ByteStr.empty, 1, ByteStr.empty, PublicKey(new Array[Byte](32)), Seq(), 1, ByteStr.empty),
+                ByteStr.empty
+              )
+            )
+          )
+          .anyNumberOfTimes()
         (blockchain.assetDescription _)
           .expects(*)
           .returning(
@@ -2078,7 +2091,9 @@ class InvokeScriptTransactionDiffTest
           .map { arg =>
             val fc = Terms.FUNCTION_CALL(FunctionHeader.User("sameComplexity"), List(CONST_STRING(arg).explicitGet()))
             InvokeScriptTransaction
-              .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves, ts + 4)
+              .selfSigned(TxVersion.V2, invoker, master.toAddress, Some(fc), Seq(), fee, Waves,
+                ts + 4
+              )
               .explicitGet()
           }
       } yield (Seq(gTx1, gTx2, ssTx, iTx), master.toAddress, txs)
@@ -2732,7 +2747,7 @@ class InvokeScriptTransactionDiffTest
   }
 
   property("Infinite recursive crosscontract call") {
-    def contract(): DApp = {
+    val recursiveContract: DApp = {
       val expr = {
         val script =
           s"""
@@ -2756,30 +2771,37 @@ class InvokeScriptTransactionDiffTest
 
       compileContractFromExpr(expr, V5)
     }
-    val scenario =
+
+    def recursiveScenario(dAppsFee: Int) =
       for {
         master  <- accountGen
         invoker <- accountGen
         ts      <- timestampGen
-        fee     <- ciFee(dApps = 9999)
+        fee     <- ciFee(dApps = dAppsFee)
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
-        script   = ContractScript(V5, contract())
+        script   = ContractScript(V5, recursiveContract)
         ssTx     = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 5).explicitGet()
         fc       = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments = List(Payment(10, Waves))
         invokeTx = InvokeScriptTransaction
           .selfSigned(TxVersion.V3, invoker, master.toAddress, Some(fc), payments, fee, Waves, ts + 6)
           .explicitGet()
-      } yield (Seq(gTx1, gTx2, ssTx), invokeTx, master.toAddress)
+      } yield (Seq(gTx1, gTx2, ssTx), invokeTx)
 
-    forAll(scenario) {
-      case (genesisTxs, invokeTx, dApp) =>
-        assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { ei =>
-          ei should produce("DApp calls limit = 100 is exceeded")
-        }
+    def assertLimitByFee(limit: Int, dAppsFee: Int): Unit = {
+      val (genesisTxs, invokeTx) = recursiveScenario(dAppsFee).sample.get
+      assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { ei =>
+        ei should produce(s"DApp calls limit = $limit is exceeded")
+      }
     }
+
+    assertLimitByFee(100, 9999)
+    assertLimitByFee(100, 100)
+    assertLimitByFee(99, 99)
+    assertLimitByFee(1, 1)
+    assertLimitByFee(0, 0)
   }
 
   property("Smart asset transfer by nested contract actions") {
@@ -3130,7 +3152,6 @@ class InvokeScriptTransactionDiffTest
     }
   }
 
-
   property("Payment in transaction process after Invoke") {
 
     def contract(asset: ByteStr): DApp = {
@@ -3375,7 +3396,9 @@ class InvokeScriptTransactionDiffTest
         fc                = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List.empty)
         payments          = List(Payment(paymentFromInvokerAmount, Waves))
         invokeTx = InvokeScriptTransaction
-          .selfSigned(TxVersion.V3, invoker, clientDAppAcc.toAddress, Some(fc), payments, fee, Waves, ts + 6)
+          .selfSigned(TxVersion.V3, invoker, clientDAppAcc.toAddress, Some(fc), payments, fee, Waves,
+            ts + 6
+          )
           .explicitGet()
       } yield (
         Seq(gTx1, gTx2, gTx3, setServiceDApp, setClientDApp, paymentIssue, transferIssue),
