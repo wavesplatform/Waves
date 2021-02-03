@@ -41,19 +41,27 @@ object InvokeScriptDiff {
   private val stats = TxProcessingStats
   import stats.TxTimerExt
 
-  def apply(blockchain: Blockchain, blockTime: Long, limitedExecution: Boolean, remainingComplexity: Long)(
+  def apply(blockchain: Blockchain, blockTime: Long, limitedExecution: Boolean, remainingComplexity: Long, remainingCalls: Int, callsLimit: Int)(
       tx: InvokeScript
   ): CoevalR[(Diff, EVALUATED)] = {
-    if (remainingComplexity <= 0) {
-      return traced(Left(ValidationError.ScriptRunsLimitError(s"Too many scripts run while invoke $tx, maybe not enough fee.")))
-    }
-    val dAppAddress  = tx.dAppAddress
-    val accScript    = blockchain.accountScript(dAppAddress)
-    val functionCall = tx.funcCall
-
-    accScript match {
+    val dAppAddress = tx.dAppAddress
+    blockchain.accountScript(dAppAddress) match {
       case Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, callableComplexities)) =>
         for {
+          _ <- traced(
+            Either.cond(
+              remainingCalls > 0,
+              (),
+              ValidationError.ScriptRunsLimitError(s"DApp calls limit = $callsLimit is exceeded")
+            )
+          )
+          _ <- traced(
+            Either.cond(
+              remainingComplexity > 0,
+              (),
+              ValidationError.ScriptRunsLimitError(s"Invoke complexity limit = ${ContractLimits.MaxTotalInvokeComplexity(version)} is exceeded")
+            )
+          )
           invocationComplexity <- traced {
             InvokeDiffsCommon.getInvocationComplexity(blockchain, tx.funcCall, callableComplexities, dAppAddress)
           }
@@ -118,7 +126,7 @@ object InvokeScriptDiff {
               val scriptResultE = stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
                 val invoker = tx.senderDApp
                 val invocation = ContractEvaluator.Invocation(
-                  functionCall,
+                  tx.funcCall,
                   Recipient.Address(ByteStr(invoker.bytes)),
                   ByteStr(tx.sender.arr),
                   payments,
@@ -139,7 +147,9 @@ object InvokeScriptDiff {
                   tx.dAppAddress,
                   pk,
                   tx.senderDApp,
-                  remainingComplexity - invocationComplexity - checkedPayments.map(_._1.complexity).sum
+                  callsLimit,
+                  remainingCalls - 1,
+                  remainingComplexity - invocationComplexity - checkedPayments.map(_._1.complexity).sum,
                 )
 
                 //to avoid continuations when evaluating underestimated by EstimatorV2 scripts

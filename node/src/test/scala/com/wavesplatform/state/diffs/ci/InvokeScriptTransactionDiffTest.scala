@@ -2228,7 +2228,7 @@ class InvokeScriptTransactionDiffTest
         master  <- accountGen
         invoker <- accountGen
         ts      <- timestampGen
-        fee     <- ciFee(1)
+        fee     <- ciFee(dApps = 1)
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
@@ -2309,7 +2309,7 @@ class InvokeScriptTransactionDiffTest
     forAll(scenario) {
       case (genesisTxs, invokeTx, dApp) =>
         assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { ei =>
-          ei should produce("Too many scripts run while invoke")
+          ei should produce("DApp calls limit = 0 is exceeded")
         }
     }
   }
@@ -2601,7 +2601,7 @@ class InvokeScriptTransactionDiffTest
         invoker <- accountGen
         service <- accountGen
         ts      <- timestampGen
-        fee     <- ciFee(2)
+        fee     <- ciFee(dApps = 2)
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
@@ -2705,7 +2705,7 @@ class InvokeScriptTransactionDiffTest
         invoker <- accountGen
         service <- accountGen
         ts      <- timestampGen
-        fee     <- ciFee(2)
+        fee     <- ciFee(dApps = 2)
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx3 = GenesisTransaction.create(service.toAddress, ENOUGH_AMT, ts).explicitGet()
@@ -2731,7 +2731,7 @@ class InvokeScriptTransactionDiffTest
     }
   }
 
-  property("Infinite recurcive crosscontract call") {
+  property("Infinite recursive crosscontract call") {
     def contract(): DApp = {
       val expr = {
         val script =
@@ -2761,7 +2761,7 @@ class InvokeScriptTransactionDiffTest
         master  <- accountGen
         invoker <- accountGen
         ts      <- timestampGen
-        fee     <- ciFee(240)
+        fee     <- ciFee(dApps = 9999)
         gTx1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
         gTx2 = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
 
@@ -2777,7 +2777,7 @@ class InvokeScriptTransactionDiffTest
     forAll(scenario) {
       case (genesisTxs, invokeTx, dApp) =>
         assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { ei =>
-          ei should produce("Too many scripts run while invoke")
+          ei should produce("DApp calls limit = 100 is exceeded")
         }
     }
   }
@@ -2871,7 +2871,7 @@ class InvokeScriptTransactionDiffTest
         invoker <- accountGen
         service <- accountGen
         ts      <- timestampGen
-        fee     <- ciFee(3)
+        fee     <- ciFee(dApps = 3)
         iTx = IssueTransaction
           .selfSigned(2.toByte, service, "True asset", "", ENOUGH_AMT, 8, reissuable = true, Some(assetScript), fee, ts + 1)
           .explicitGet()
@@ -2988,7 +2988,7 @@ class InvokeScriptTransactionDiffTest
         invoker <- accountGen
         service <- accountGen
         ts      <- timestampGen
-        fee     <- ciFee(3)
+        fee     <- ciFee(dApps = 3)
         iTx = IssueTransaction
           .selfSigned(2.toByte, service, "False asset", "", ENOUGH_AMT, 8, reissuable = true, Some(assetScript), fee, ts + 1)
           .explicitGet()

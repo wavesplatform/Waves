@@ -210,7 +210,9 @@ class DAppEnvironment(
     currentDApp: com.wavesplatform.account.Address,
     currentDAppPk: com.wavesplatform.account.PublicKey,
     senderDApp: com.wavesplatform.account.Address,
-    var remainingComplexity: Long
+    callsLimit: Int,
+    var remainingCalls: Int,
+    var remainingComplexity: Long,
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id()) {
 
   var currentDiff: Diff = Diff.empty
@@ -244,7 +246,9 @@ class DAppEnvironment(
         mutableBlockchain,
         blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
         false,
-        remainingComplexity
+        remainingComplexity,
+        remainingCalls,
+        callsLimit
       )(invoke)
     } yield {
       val fixedDiff = diff.copy(
@@ -265,6 +269,7 @@ class DAppEnvironment(
       currentDiff = currentDiff combine fixedDiff
       mutableBlockchain = CompositeBlockchain(blockchain, Some(currentDiff))
       remainingComplexity = remainingComplexity - diff.scriptsComplexity
+      remainingCalls = remainingCalls - 1
       evaluated
     }
     r.v.map(_.resultE)

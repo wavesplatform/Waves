@@ -82,9 +82,12 @@ object InvokeScriptTransactionDiff {
             additionalScriptsInvoked = 0
           )
 
-          maxComplexity       = ContractLimits.MaxTotalDAppComplexity(version)
-          paidComplexity      = (feeInWaves - FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit) / ScriptExtraFee * stepLimit
-          remainingComplexity = Math.min(maxComplexity, paidComplexity)
+          maxCalls       = ContractLimits.MaxSyncDAppCalls(version)
+          invokeFee      = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
+          paidCalls      = feeInWaves / invokeFee - 1
+          remainingCalls = Math.min(maxCalls, paidCalls).toInt
+
+          remainingComplexity = ContractLimits.MaxTotalInvokeComplexity(version)
 
           directives <- TracedResult.wrapE(DirectiveSet(version, Account, DAppType).leftMap(GenericError.apply))
           payments   <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DAppTarget).leftMap(GenericError.apply))
@@ -117,6 +120,8 @@ object InvokeScriptTransactionDiff {
                   dAppAddress,
                   pk,
                   dAppAddress,
+                  remainingCalls,
+                  remainingCalls,
                   remainingComplexity
                 )
 
