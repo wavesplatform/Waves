@@ -28,7 +28,8 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
-import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TraceStep, TracedResult}
+import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
+import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, CoevalR, TracedResult}
 import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import com.wavesplatform.transaction.{Transaction, TxValidationError}
 import monix.eval.Coeval
@@ -40,31 +41,9 @@ object InvokeScriptDiff {
   private val stats = TxProcessingStats
   import stats.TxTimerExt
 
-  case class CoevalET[+A](v: Coeval[TracedResult[ValidationError, A]]) extends AnyVal {
-    def flatMap[B](f: A => CoevalET[B]): CoevalET[B] = {
-      val r = v.flatMap(
-        t =>
-          t.resultE match {
-            case Right(value)  => f(value).v
-            case l: Left[_, _] => Coeval.now(TracedResult(l.asInstanceOf[Either[ValidationError, B]]))
-          }
-      )
-      CoevalET(r)
-    }
-
-    def map[B](f: A => B): CoevalET[B] =
-      CoevalET(v.map(_.map(f)))
-
-    def withFilter(f: A => Boolean): CoevalET[A] =
-      CoevalET(v.map(_.withFilter(f)))
-  }
-
-  def traced[A](a: Either[ValidationError, A], trace: List[TraceStep] = Nil): CoevalET[A] =
-    CoevalET(Coeval.now(TracedResult(a, trace)))
-
   def apply(blockchain: Blockchain, blockTime: Long, limitedExecution: Boolean, remainingComplexity: Long)(
       tx: InvokeScript
-  ): CoevalET[(Diff, EVALUATED)] = {
+  ): CoevalR[(Diff, EVALUATED)] = {
     if (remainingComplexity <= 0) {
       return traced(Left(ValidationError.ScriptRunsLimitError(s"Too many scripts run while invoke $tx, maybe not enough fee.")))
     }
@@ -126,7 +105,7 @@ object InvokeScriptDiff {
                     val err = FailedTransactionError.assetExecutionInAction(s"Script returned not a boolean result, but $x", 0, log, assetId)
                     TracedResult(Left(err), List(AssetVerifierTrace(assetId, Some(err))))
                 }
-                CoevalET(Coeval.now(r))
+                CoevalR(Coeval.now(r))
             }
           }
           tthis = Coproduct[Environment.Tthis](Recipient.Address(ByteStr(dAppAddress.bytes)))
@@ -177,12 +156,12 @@ object InvokeScriptDiff {
                     fullLimit
 
                 for {
-                  (failFreeResult, evaluationCtx, failFreeLog) <- CoevalET(
+                  (failFreeResult, evaluationCtx, failFreeLog) <- CoevalR(
                     evaluateV2(version, contract, directives, invocation, environment, failFreeLimit).map(TracedResult(_))
                   )
                   (result, log) <- failFreeResult match {
                     case IncompleteResult(expr, unusedComplexity) if !limitedExecution =>
-                      CoevalET(
+                      CoevalR(
                         continueEvaluation(
                           version,
                           expr,
@@ -207,7 +186,7 @@ object InvokeScriptDiff {
             }
 
             doProcessActions = (actions: List[CallableAction]) =>
-              CoevalET(
+              CoevalR(
                 Coeval.now(
                   InvokeDiffsCommon.processActions(
                     actions,
