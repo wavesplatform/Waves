@@ -9,7 +9,7 @@ ENV WAVES_HEAP_SIZE=$WAVES_HEAP_SIZE
 ENV WAVES_NETWORK=$WAVES_NETWORK
 ENV ENABLE_GRPC=$ENABLE_GRPC
 
-COPY build_scripts /tmp/
+COPY build-scripts /tmp/
 
 # Additional dependencies
 RUN /bin/bash /tmp/setup-deps.sh

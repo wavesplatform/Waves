@@ -1,23 +1,18 @@
-enablePlugins(IntegrationTestsPlugin)
+enablePlugins(IntegrationTestsPlugin, sbtdocker.DockerPlugin)
 
 description := "NODE integration tests"
 libraryDependencies ++= Dependencies.it
 
-lazy val docker = taskKey[Unit]("build docker image")
-docker := {
-  val dockerDir = new File(baseDirectory.value.getParentFile, "docker")
+imageNames in docker := Seq(ImageName("com.wavesplatform/node-it"))
 
-  val nodeDebFile = (packageBin in Debian in LocalProject("node")).value
-  val grpcDebFile = (packageBin in Debian in LocalProject("grpc-server")).value
-  IO.copyFile(nodeDebFile, new File(dockerDir, "target/waves.deb"))
-  IO.copyFile(grpcDebFile, new File(dockerDir, "target/grpc-server.deb"))
+dockerfile in docker := NativeDockerfile(baseDirectory.value.getParentFile / "docker" / "Dockerfile")
 
-  val result = new ProcessBuilder()
-    .command("docker build -t testnode --build-arg ENABLE_GRPC=true .".split(' '): _*)
-    .directory(dockerDir)
-    .inheritIO()
-    .start()
-    .waitFor()
+buildOptions in docker := BuildOptions()
 
-  require(result == 0, "Docker build error")
-}
+dockerBuildArguments := Map(
+  "ENABLE_GRPC" -> "true"
+)
+
+val packageAll = taskKey[Unit]("build all packages")
+docker := docker.dependsOn(packageAll in LocalProject("root")).value
+

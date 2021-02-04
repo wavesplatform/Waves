@@ -14,11 +14,7 @@ GitHub repository: https://github.com/wavesplatform/Waves/tree/master/docker
 It is highly recommended to read more about [Waves Node configuration](https://docs.wavesplatform.com/en/waves-Node/Node-configuration.html) before running the container.
 
 ## Building Docker image
-
-Dockerfile supports 3 main scenarios:
-1. Basic scenario `docker build -t wavesplatform/wavesnode docker` (from the repository root) - build an image with the current master branch
-2. Existing Version scenario `--build-arg WAVES_VERSION=1.1.1` - specify the version of Waves Node available in GitHub Releases. If this version does not exist, this is the next scenario. Use `latest` for the latest available release.
-3. Build scenario `--build-arg WAVES_VERSION=branch --build-arg BRANCH=version-0.17.x` - this scenario assumes that you want to build Waves Node from sources. Use `WAVES_VERSION` build argument to specify a Git tag ('v' is added automatically) and `BRANCH` to specify a Git branch to checkout to. Make sure you specify a tag that does not exist in the repo, otherwise it is the previous scenario.
+`docker build -t wavesplatform/wavesnode docker` (from the repository root) - builds an image with the current local repository
 
 **You can specify following arguments when building the image:**
 
@@ -26,9 +22,6 @@ Dockerfile supports 3 main scenarios:
 |Argument              | Default value |Description   |
 |----------------------|-------------------|--------------|
 |`WAVES_NETWORK`       | `mainnet`         | Waves Blockchain network. Available values are `mainnet`, `testnet`, `stagenet`. Can be overridden in a runtime using environment variable with the same name.|
-|`WAVES_VERSION`       | `latest`            | A node version which corresponds to the Git tag we want to use/create. |
-|`BRANCH`              | `version-0.17.x`    | Relevant if Git tag 'v`WAVES_VERSION`' does not exist in the public repository. This option represents a Git branch we will use to compile Waves node and set a Git tag on.|
-|`SBT_VERSION`         | `1.2.8` 	       | Scala build tool version.|
 |`WAVES_LOG_LEVEL`     | `DEBUG`           | Default Waves Node log level. Available values: `OFF`, `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`. More details about logging are available [here](https://docs.wavesplatform.com/en/waves-Node/logging-configuration.html). Can be overridden in a runtime using environment variable with the same name. |
 |`WAVES_HEAP_SIZE`     | `2g`              | Default Waves Node JVM Heap Size limit in -X Command-line Options notation (`-Xms=[your value]`). More details [here](https://docs.oracle.com/cd/E13150_01/jrockit_jvm/jrockit/jrdocs/refman/optionX.html). Can be overridden in a runtime using environment variable with the same name. |
 

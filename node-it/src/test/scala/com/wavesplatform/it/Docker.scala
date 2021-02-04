@@ -523,7 +523,7 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 }
 
 object Docker {
-  val NodeImageName: String = "testnode:latest"
+  val NodeImageName: String = "com.wavesplatform/node-it:latest"
 
   private val ContainerRoot = Paths.get("/usr/share/waves")
   private val ProfilerPort  = 10001
