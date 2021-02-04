@@ -135,9 +135,6 @@ object StateUpdate {
       case object Inactive extends LeaseStatus
     }
 
-    import com.wavesplatform.events.protobuf.StateUpdate.LeaseUpdate.{LeaseStatus => PBLeaseStatus}
-    import com.wavesplatform.events.protobuf.StateUpdate.{LeaseUpdate => PBLeaseUpdate}
-
     def fromPB(v: PBLeaseUpdate): LeaseUpdate = {
       LeaseUpdate(
         v.leaseId.toByteStr,
@@ -179,8 +176,7 @@ object StateUpdate {
   }
 
   object AssetStateUpdate {
-    import com.wavesplatform.events.protobuf.StateUpdate.AssetDetails.{AssetScriptInfo => PBAssetScriptInfo}
-    import com.wavesplatform.events.protobuf.StateUpdate.{AssetDetails => PBAssetDetails, AssetStateUpdate => PBAssetStateUpdate}
+    import com.wavesplatform.events.protobuf.StateUpdate.{AssetStateUpdate => PBAssetStateUpdate}
 
     def fromPB(self: PBAssetStateUpdate): AssetStateUpdate = {
       def detailsFromPB(v: PBAssetDetails): AssetDescription = {
@@ -360,7 +356,11 @@ object StateUpdate {
           // TODO: case is: InvokeScriptTransaction if diff.scriptResults(is.id()).leases.contains(leaseId) => ???
         }
 
-        val Some((_, tx: LeaseTransaction, _)) = blockchainAfter.transactionInfo(leaseId)
+        val tx = blockchainAfter.transactionInfo(leaseId) match {
+          case Some((_, tx: LeaseTransaction, _)) => tx
+          case None => throw new IllegalArgumentException(s"Transaction $leaseId is not a lease transaction")
+        }
+
         LeaseUpdate(
           leaseId,
           if (newState) LeaseStatus.Active else LeaseStatus.Inactive,
