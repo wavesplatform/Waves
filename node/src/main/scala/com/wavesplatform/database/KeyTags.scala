@@ -57,8 +57,8 @@ object KeyTags extends Enumeration {
   IssuedAssets,
   UpdatedAssets,
   SponsoredAssets,
-  LeaseActionDetails,
-  StateHash = Value
+  StateHash,
+  LeaseActionDetails = Value
 
   final implicit class KeyTagExt(val t: KeyTag) extends AnyVal {
     @inline def prefixBytes: Array[Byte] = Shorts.toByteArray(t.id.toShort)
