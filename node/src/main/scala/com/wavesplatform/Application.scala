@@ -145,7 +145,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
 
-    val pos = PoSSelector(blockchainUpdater, settings.synchronizationSettings)
+    val pos = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTargetOpt)
 
     if (settings.minerSettings.enable)
       miner = new MinerImpl(allChannels, blockchainUpdater, settings, time, utxStorage, wallet, pos, minerScheduler, appenderScheduler)
@@ -451,7 +451,13 @@ object Application extends ScorexLogging {
     if (config.hasPath("waves.config.directory")) System.setProperty("waves.config.directory", config.getString("waves.config.directory"))
 
     maybeExternalConfig match {
-      case Success(None) => log.warn("Config file not defined, TESTNET config will be used")
+      case Success(None) =>
+        val currentBlockchainType = Try(ConfigFactory.defaultOverrides().getString("waves.blockchain.type"))
+          .orElse(Try(ConfigFactory.defaultOverrides().getString("waves.defaults.blockchain.type")))
+          .map(_.toUpperCase)
+          .getOrElse("TESTNET")
+
+        log.warn(s"Config file not defined, default $currentBlockchainType config will be used")
       case Failure(exception) =>
         log.error(s"Couldn't read ${external.get.toPath.toAbsolutePath}", exception)
         forceStopApplication(Misconfiguration)
