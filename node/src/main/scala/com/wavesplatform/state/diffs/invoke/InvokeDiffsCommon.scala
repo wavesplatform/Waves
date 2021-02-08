@@ -149,7 +149,6 @@ object InvokeDiffsCommon {
       blockchain: Blockchain,
       blockTime: Long,
       runsLimit: Int,
-      isContinuation: Boolean, // TODO refactor?
       isSyncCall: Boolean,
       limitedExecution: Boolean,
       otherIssues: Seq[Issue] = Seq()
@@ -199,7 +198,7 @@ object InvokeDiffsCommon {
         (if (blockchain.hasAccountScript(tx.sender.toAddress)) 1 else 0)
 
       stepLimit = ContractLimits.MaxComplexityByVersion(version)
-      feeDiff <- if (isContinuation || isSyncCall)
+      feeDiff <- if (isSyncCall)
         TracedResult.wrapValue(Map[Address, Portfolio]())
       else
         calcAndCheckFee(
@@ -216,7 +215,7 @@ object InvokeDiffsCommon {
       // is it useful?
       _ <- TracedResult(
         Either.cond(
-          isContinuation || additionalScriptsInvoked <= runsLimit,
+          additionalScriptsInvoked <= runsLimit,
           (),
           FailedTransactionError.feeForActions(
             s"Too many script runs: max: $runsLimit, actual: $additionalScriptsInvoked",
@@ -225,8 +224,7 @@ object InvokeDiffsCommon {
         )
       )
 
-      paymentsAndFeeDiff = if (isContinuation) Diff(tx = tx.root) else paymentsPart(tx, dAppAddress, feeDiff)
-
+      paymentsAndFeeDiff = paymentsPart(tx, dAppAddress, feeDiff)
       compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey)(actions, paymentsAndFeeDiff, complexityLimit)
         .leftMap(_.addComplexity(invocationComplexity))
 
@@ -259,9 +257,9 @@ object InvokeDiffsCommon {
 
       resultDiff = compositeDiff.copy(
         transactions = updatedTxDiff,
-        scriptsRun = if (isContinuation || isSyncCall) 0 else additionalScriptsInvoked + 1,
+        scriptsRun = if (isSyncCall) 0 else additionalScriptsInvoked + 1,
         scriptResults = Map(tx.root.id() -> isr),
-        scriptsComplexity = (if (isContinuation) 0 else invocationComplexity) + compositeDiff.scriptsComplexity
+        scriptsComplexity = invocationComplexity + compositeDiff.scriptsComplexity
       )
     } yield resultDiff
   }

@@ -226,7 +226,7 @@ class LeaseActionDiffTest extends PropSpec with PropertyChecks with Matchers wit
       } yield (preparingTxs, invoke, leaseAmount, dAppAcc.toAddress, invoker.toAddress, leaseTxs, leaseCancel)
     }.explicitGet()
 
-  property(s"Lease action is restricted before activation ${BlockchainFeatures.ContinuationTransaction}") {
+  property(s"Lease action is restricted before activation ${BlockchainFeatures.SynchronousCalls}") {
     forAll(leasePreconditions()) {
       case (preparingTxs, _, _, _, _, _, _) =>
           assertDiffEi(

@@ -186,7 +186,6 @@ object InvokeScriptDiff {
               CompositeBlockchain(blockchain, Some(scriptResult._1)),
               blockTime,
               runsLimit - scriptResult._1.scriptsRun-checkedPayments.size,
-              isContinuation = false,
               isSyncCall = true,
               limitedExecution,
               Seq()
@@ -221,7 +220,7 @@ object InvokeScriptDiff {
     val freezingLets  = wavesContext.evaluationContext(environment).letDefs
     val evaluationCtx = ctx.evaluationContext(environment)
 
-    Try(ContractEvaluator.applyV2(evaluationCtx, freezingLets, contract, invocation, version, limit, continuationFirstStepMode = false))
+    Try(ContractEvaluator.applyV2(evaluationCtx, freezingLets, contract, invocation, version, limit))
       .fold(
         e => Left((e.getMessage, Nil)),
         _.map { case (result, log) => (result, evaluationCtx, log) }
@@ -239,7 +238,7 @@ object InvokeScriptDiff {
       transactionId: ByteStr,
       failComplexity: Long
   ): Either[FailedTransactionError, (ScriptResult, Log[Id])] =
-    Try(ContractEvaluator.applyV2(evaluationCtx, Map[String, LazyVal[Id]](), expr, version, transactionId, limit, continuationFirstStepMode = false))
+    Try(ContractEvaluator.applyV2(evaluationCtx, Map[String, LazyVal[Id]](), expr, version, transactionId, limit))
       .fold(e => Left((e.getMessage, Nil)), identity)
       .leftMap { case (error, log) => FailedTransactionError.dAppExecution(error, failComplexity, log) }
 

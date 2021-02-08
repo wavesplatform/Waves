@@ -6,7 +6,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.db.WithState
-import com.wavesplatform.features.BlockchainFeatures.{BlockV5, ContinuationTransaction, FeeSponsorship}
+import com.wavesplatform.features.BlockchainFeatures.{BlockV5, SynchronousCalls, FeeSponsorship}
 import com.wavesplatform.lagonaki.mocks.TestBlock._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.values._
@@ -297,7 +297,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
             else
               features
           if (v5Activation)
-            features1.copy(preActivatedFeatures = features1.preActivatedFeatures + (ContinuationTransaction.id -> 0))
+            features1.copy(preActivatedFeatures = features1.preActivatedFeatures + (SynchronousCalls.id -> 0))
           else
             features1
         }
@@ -440,7 +440,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
           if (withVrf) ByteStr(new Array[Byte](Block.GenerationVRFSignatureLength)) else ByteStr(new Array[Byte](Block.GenerationSignatureLength))
 
         val fs =
-          if (version >= V5) smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (ContinuationTransaction.id -> 0))
+          if (version >= V5) smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (SynchronousCalls.id -> 0))
           else smartEnabledFS
 
         val fsWithVrf =

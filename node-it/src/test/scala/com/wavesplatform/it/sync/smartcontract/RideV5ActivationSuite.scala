@@ -20,7 +20,7 @@ class RideV5ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
     NodeConfigs
       .Builder(Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.ContinuationTransaction.id, activationHeight - 1)))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.SynchronousCalls.id, activationHeight - 1)))
       .buildNonConflicting()
 
   private def smartAccV5 = firstKeyPair
@@ -73,7 +73,7 @@ class RideV5ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
     def assertFeatureNotActivated[R](f: => R): Assertion = assertApiError(f) { e =>
       e.statusCode shouldBe 400
       e.id shouldBe StateCheckFailed.Id
-      e.message should include("Continuation Transaction feature has not been activated")
+      e.message should include("Synchronous DAPP Calls feature has not been activated")
     }
 
     assertFeatureNotActivated(sender.setScript(smartAccV5, Some(dAppV5.compiled)))
