@@ -42,13 +42,13 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
 
   private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
-      BlockchainFeatures.SmartAccounts.id           -> 0,
-      BlockchainFeatures.SmartAssets.id             -> 0,
-      BlockchainFeatures.Ride4DApps.id              -> 0,
-      BlockchainFeatures.FeeSponsorship.id          -> 0,
-      BlockchainFeatures.DataTransaction.id         -> 0,
-      BlockchainFeatures.BlockV5.id                 -> 0,
-      BlockchainFeatures.ContinuationTransaction.id -> 0
+      BlockchainFeatures.SmartAccounts.id    -> 0,
+      BlockchainFeatures.SmartAssets.id      -> 0,
+      BlockchainFeatures.Ride4DApps.id       -> 0,
+      BlockchainFeatures.FeeSponsorship.id   -> 0,
+      BlockchainFeatures.DataTransaction.id  -> 0,
+      BlockchainFeatures.BlockV5.id          -> 0,
+      BlockchainFeatures.SynchronousCalls.id -> 0
     )
   )
 
@@ -150,7 +150,6 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
             payments,
             fee,
             Waves,
-            InvokeScriptTransaction.DefaultExtraFeePerStep,
             ts + 10
           )
           .explicitGet()
@@ -248,7 +247,6 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
             payments,
             fee,
             Waves,
-            InvokeScriptTransaction.DefaultExtraFeePerStep,
             ts + 10
           )
           .explicitGet()
@@ -451,7 +449,6 @@ class InvokeScriptTransactionCrosscontractCallDiffTest
             payments,
             fee * 100,
             Waves,
-            InvokeScriptTransaction.DefaultExtraFeePerStep,
             ts + 10
           )
           .explicitGet()

@@ -34,12 +34,12 @@ package object compiler {
 
   private val arr = ARR(IndexedSeq[EVALUATED](Common.pointAInstance, Common.pointAInstance), false).explicitGet()
 
-  def getTestContext(v: StdLibVersion): CTX[Environment] = {
+  def getTestContext(v: StdLibVersion, t: ScriptType = Account): CTX[Environment] = {
     Monoid
       .combineAll(Seq(
         PureContext.build(v).withEnvironment[Environment],
         CryptoContext.build(Global, v).withEnvironment[Environment],
-        WavesContext.build(DirectiveSet(v, Account, Expression).explicitGet()),
+        WavesContext.build(DirectiveSet(v, t, Expression).explicitGet()),
         CTX[NoContext](
           Seq(pointType, Common.pointTypeA, Common.pointTypeB, Common.pointTypeC),
           Map(
